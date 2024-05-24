@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+pragma solidity >=0.8.26;
+
+interface IEnclave {
+    /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).
+    /// @param poolId ID of the pool of nodes from which to select the committee.
+    /// @param threshold The M/N threshold for the committee.
+    /// @param duration The duration of the computation in seconds.
+    /// @param computationModule Address of the computation module.
+    /// @param computationParams ABI encoded computation parameters.
+    /// @param executionModule Address of the execution module.
+    /// @param emParams ABI encoded execution module parameters.
+    /// @return e3Id ID of the E3.
+    function request(
+        uint256 poolId,
+        uint32[2] calldata threshold,
+        uint256 duration,
+        address computationModule,
+        bytes memory computationParams,
+        address executionModule,
+        bytes memory emParams
+    ) external payable returns (uint e3Id);
+
+    /// @notice This function should be called to input data into an Encrypted Execution Environment (E3).
+    /// @param e3Id ID of the E3.
+    /// @param data ABI encoded input data.
+    function input(uint e3Id, bytes calldata data) external;
+}
