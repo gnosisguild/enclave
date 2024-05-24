@@ -13,6 +13,7 @@ interface IEnclave {
     /// @param executionModule Address of the execution module.
     /// @param emParams ABI encoded execution module parameters.
     /// @return e3Id ID of the E3.
+    /// @return e3 The E3 struct.
     function request(
         uint256 poolId,
         uint32[2] calldata threshold,
@@ -23,8 +24,21 @@ interface IEnclave {
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3);
 
-    /// @notice This function should be called to input data into an Encrypted Execution Environment (E3).
+    /// @notice This function should be called to publish input data for Encrypted Execution Environment (E3).
     /// @param e3Id ID of the E3.
-    /// @param data ABI encoded input data.
-    function input(uint e3Id, bytes calldata data) external returns (bool success);
+    /// @param data ABI encoded input data to publish.
+    /// @return success True if the input was successfully published.
+    function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
+
+    /// @notice This function should be called to publish output data for an Encrypted Execution Environment (E3).
+    /// @param e3Id ID of the E3.
+    /// @param data ABI encoded output data to verify.
+    /// @return success True if the output was successfully published.
+    function publishOutput(uint256 e3Id, bytes memory data) external returns (bool success);
+
+    /// @notice This function should be called to decrypt the output of an Encrypted Execution Environment (E3).
+    /// @param e3Id ID of the E3.
+    /// @param data ABI encoded output data to decrypt.
+    /// @return success True if the output was successfully decrypted.
+    function decryptOutput(uint256 e3Id, bytes memory data) external returns (bool success);
 }

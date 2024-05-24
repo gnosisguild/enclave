@@ -4,6 +4,7 @@ pragma solidity >=0.8.26;
 import { IEnclave, E3, IComputationModule, IExecutionModule } from "./Interfaces/IEnclave.sol";
 import { ICypherNodeRegistry } from "./Interfaces/ICypherNodeRegistry.sol";
 import { IInputValidator } from "./Interfaces/IInputValidator.sol";
+import { IOutputVerifier } from "./Interfaces/IOutputVerifier.sol";
 
 contract Enclave is IEnclave {
     ICypherNodeRegistry public cypherNodeRegistry; // TODO: add a setter function.
@@ -15,6 +16,7 @@ contract Enclave is IEnclave {
     mapping(address moduleAddress => bool allowed) public executionModules; // Mapping of allowed execution modules.
     mapping(uint256 id => E3) public e3s; // Mapping of E3s.
 
+    event CiphertextOutputPublished(uint256 e3Id, bytes ciphertextOutput);
     event E3Requested(
         uint256 e3Id,
         E3 e3,
@@ -23,14 +25,20 @@ contract Enclave is IEnclave {
         IExecutionModule indexed executionModule
     );
     event InputPublished(uint256 e3Id, bytes data);
+    event PlaintextOutputPublished(uint256 e3Id, bytes plaintextOutput);
 
-    error InputDeadlinePassed(uint e3Id, uint expiration);
+    error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
+    error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputation();
     error InvalidExecutionModuleSetup();
     error InvalidInput();
     error InvalidDuration();
+    error InvalidOutput();
     error InvalidThreshold();
+    error CiphertextOutputAlreadyPublished(uint256 e3Id);
+    error CiphertextOutputNotPublished(uint256 e3Id);
     error PaymentRequired();
+    error PlaintextOutputAlreadyPublished(uint256 e3Id);
 
     /// @param _maxDuration The maximum duration of a computation in seconds.
     constructor(uint256 _maxDuration) {
@@ -45,7 +53,7 @@ contract Enclave is IEnclave {
         bytes memory computationParams,
         IExecutionModule executionModule,
         bytes memory emParams
-    ) external payable returns (uint e3Id, E3 memory e3) {
+    ) external payable returns (uint256 e3Id, E3 memory e3) {
         require(msg.value > 0, PaymentRequired()); // TODO: allow for other payment methods or only native tokens?
 
         require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold());
@@ -58,7 +66,8 @@ contract Enclave is IEnclave {
         require(address(inputValidator) != address(0), InvalidComputation());
 
         // TODO: validate that the requested computation can be performed by the given execution module.
-        require(executionModule.validate(emParams), InvalidExecutionModuleSetup());
+        IOutputVerifier outputVerifier = executionModule.validate(emParams);
+        require(address(outputVerifier) != address(0), InvalidExecutionModuleSetup());
 
         bytes32 committeeId = cypherNodeRegistry.selectCommittee(poolId, threshold);
         // TODO: validate that the selected pool accepts both the computation and execution modules.
@@ -69,19 +78,46 @@ contract Enclave is IEnclave {
             computationModule: computationModule,
             executionModule: executionModule,
             inputValidator: inputValidator,
-            committeeId: committeeId
+            outputVerifier: outputVerifier,
+            committeeId: committeeId,
+            ciphertextOutput: new bytes(0),
+            plaintextOutput: new bytes(0)
         });
         e3s[e3Id] = e3;
 
         emit E3Requested(e3Id, e3s[e3Id], poolId, computationModule, executionModule);
     }
 
-    function input(uint e3Id, bytes calldata data) external returns (bool success) {
+    function publishInput(uint256 e3Id, bytes memory data) external returns (bool success) {
         E3 storage e3 = e3s[e3Id];
         require(e3.expiration > block.timestamp, InputDeadlinePassed(e3Id, e3.expiration));
-        success = e3.inputValidator.validate(msg.sender, data);
+        bytes memory input;
+        (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
 
-        emit InputPublished(e3Id, data);
+        emit InputPublished(e3Id, input);
+    }
+
+    function publishOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+        E3 storage e3 = e3s[e3Id];
+        require(e3.expiration <= block.timestamp, InputDeadlineNotPassed(e3Id, e3.expiration));
+        require(e3.ciphertextOutput.length == 0, CiphertextOutputAlreadyPublished(e3Id));
+        bytes memory output;
+        (output, success) = e3.outputVerifier.verify(e3Id, data);
+        require(success, InvalidOutput());
+        e3.ciphertextOutput = output;
+
+        emit CiphertextOutputPublished(e3Id, output);
+    }
+
+    function decryptOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+        E3 storage e3 = e3s[e3Id];
+        require(e3.ciphertextOutput.length > 0, CiphertextOutputNotPublished(e3Id));
+        require(e3.plaintextOutput.length == 0, PlaintextOutputAlreadyPublished(e3Id));
+        bytes memory output;
+        (output, success) = e3.computationModule.verify(e3Id, data);
+        e3.plaintextOutput = output;
+
+        emit PlaintextOutputPublished(e3Id, output);
     }
 }
