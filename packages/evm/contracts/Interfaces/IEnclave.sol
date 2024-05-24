@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
+import { E3, IComputationModule, IExecutionModule } from "./IE3.sol";
+
 interface IEnclave {
     /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).
     /// @param poolId ID of the pool of nodes from which to select the committee.
@@ -15,14 +17,14 @@ interface IEnclave {
         uint256 poolId,
         uint32[2] calldata threshold,
         uint256 duration,
-        address computationModule,
+        IComputationModule computationModule,
         bytes memory computationParams,
-        address executionModule,
+        IExecutionModule executionModule,
         bytes memory emParams
-    ) external payable returns (uint e3Id);
+    ) external payable returns (uint256 e3Id, E3 memory e3);
 
     /// @notice This function should be called to input data into an Encrypted Execution Environment (E3).
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded input data.
-    function input(uint e3Id, bytes calldata data) external;
+    function input(uint e3Id, bytes calldata data) external returns (bool success);
 }

@@ -1,18 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { IEnclave } from "./Interfaces/IEnclave.sol";
-import { IComputationModule } from "./Interfaces/IComputationModule.sol";
+import { IEnclave, E3, IComputationModule, IExecutionModule } from "./Interfaces/IEnclave.sol";
 import { ICypherNodeRegistry } from "./Interfaces/ICypherNodeRegistry.sol";
-import { IExecutionModule } from "./Interfaces/IExecutionModule.sol";
-import { IInputVerifier } from "./Interfaces/IInputVerifier.sol";
-
-struct E3 {
-    uint32[2] threshold; // M/N threshold for the committee.
-    uint256 expiration; // timestamp when committee duties expire.
-    address inputVerifier; // address of the input verifier contract.
-    bytes32 committeeId; // ID of the selected committee.
-}
+import { IInputValidator } from "./Interfaces/IInputValidator.sol";
 
 contract Enclave is IEnclave {
     ICypherNodeRegistry public cypherNodeRegistry; // TODO: add a setter function.
@@ -28,8 +19,8 @@ contract Enclave is IEnclave {
         uint256 e3Id,
         E3 e3,
         uint256 indexed poolId,
-        address indexed computationModule,
-        address indexed executionModule
+        IComputationModule indexed computationModule,
+        IExecutionModule indexed executionModule
     );
     event InputPublished(uint256 e3Id, bytes data);
 
@@ -41,6 +32,7 @@ contract Enclave is IEnclave {
     error InvalidThreshold();
     error PaymentRequired();
 
+    /// @param _maxDuration The maximum duration of a computation in seconds.
     constructor(uint256 _maxDuration) {
         maxDuration = _maxDuration;
     }
@@ -49,34 +41,46 @@ contract Enclave is IEnclave {
         uint256 poolId,
         uint32[2] calldata threshold,
         uint256 duration,
-        address computationModule,
+        IComputationModule computationModule,
         bytes memory computationParams,
-        address executionModule,
+        IExecutionModule executionModule,
         bytes memory emParams
-    ) external payable returns (uint e3Id) {
+    ) external payable returns (uint e3Id, E3 memory e3) {
         require(msg.value > 0, PaymentRequired()); // TODO: allow for other payment methods or only native tokens?
 
         require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold());
         require(duration > 0 && duration <= maxDuration, InvalidDuration());
 
-        address inputVerifier = IComputationModule(computationModule).validate(computationParams);
-        require(inputVerifier != address(0), InvalidComputation());
+        e3Id = nexte3Id;
+        nexte3Id++;
+
+        IInputValidator inputValidator = computationModule.validate(computationParams);
+        require(address(inputValidator) != address(0), InvalidComputation());
 
         // TODO: validate that the requested computation can be performed by the given execution module.
-        require(IExecutionModule(executionModule).validate(emParams), InvalidExecutionModuleSetup());
+        require(executionModule.validate(emParams), InvalidExecutionModuleSetup());
 
-        e3Id = nexte3Id;
         bytes32 committeeId = cypherNodeRegistry.selectCommittee(poolId, threshold);
         // TODO: validate that the selected pool accepts both the computation and execution modules.
-        e3s[e3Id] = E3(threshold, block.timestamp + duration, inputVerifier, committeeId);
+
+        e3 = E3({
+            threshold: threshold,
+            expiration: block.timestamp + duration,
+            computationModule: computationModule,
+            executionModule: executionModule,
+            inputValidator: inputValidator,
+            committeeId: committeeId
+        });
+        e3s[e3Id] = e3;
 
         emit E3Requested(e3Id, e3s[e3Id], poolId, computationModule, executionModule);
     }
 
-    function input(uint e3Id, bytes calldata data) external {
+    function input(uint e3Id, bytes calldata data) external returns (bool success) {
         E3 storage e3 = e3s[e3Id];
         require(e3.expiration > block.timestamp, InputDeadlinePassed(e3Id, e3.expiration));
-        require(IInputVerifier(e3.inputVerifier).validate(msg.sender, data), InvalidInput());
+        success = e3.inputValidator.validate(msg.sender, data);
+        require(success, InvalidInput());
 
         emit InputPublished(e3Id, data);
     }
