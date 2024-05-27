@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { IInputValidator } from ".//IInputValidator.sol";
+import { IInputValidator } from "./IInputValidator.sol";
 import { IExecutionModule } from "./IExecutionModule.sol";
 import { IComputationModule } from "./IComputationModule.sol";
 import { IOutputVerifier } from "./IOutputVerifier.sol";
