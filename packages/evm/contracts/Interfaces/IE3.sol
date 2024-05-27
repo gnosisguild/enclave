@@ -6,14 +6,25 @@ import { IExecutionModule } from "./IExecutionModule.sol";
 import { IComputationModule } from "./IComputationModule.sol";
 import { IOutputVerifier } from "./IOutputVerifier.sol";
 
+/// @title E3 struct
+/// @notice This struct represents an E3 computation.
+/// @param threshold M/N threshold for the committee.
+/// @param expiration Timestamp when committee duties expire.
+/// @param computationModule Address of the computation module contract.
+/// @param executionModule Address of the execution module contract.
+/// @param inputValidator Address of the input validator contract.
+/// @param outputVerifier Address of the output verifier contract.
+/// @param committeeId ID of the selected committee.
+/// @param ciphertextOutput Encrypted output data.
+/// @param plaintextOutput Decrypted output data.
 struct E3 {
-    uint32[2] threshold; // M/N threshold for the committee.
-    uint256 expiration; // timestamp when committee duties expire.
-    IComputationModule computationModule; // address of the computation module contract.
-    IExecutionModule executionModule; // address of the execution module contract.
-    IInputValidator inputValidator; // address of the input validator contract.
-    IOutputVerifier outputVerifier; // address of the output verifier contract.
-    bytes32 committeeId; // ID of the selected committee.
-    bytes ciphertextOutput; // encrypted output data.
-    bytes plaintextOutput; // decrypted output data.
+    uint32[2] threshold;
+    uint256 expiration;
+    IComputationModule computationModule;
+    IExecutionModule executionModule;
+    IInputValidator inputValidator;
+    IOutputVerifier outputVerifier;
+    bytes32 committeeId;
+    bytes ciphertextOutput;
+    bytes plaintextOutput;
 }
