@@ -70,4 +70,9 @@ interface IEnclave {
     /// @param data ABI encoded output data to decrypt.
     /// @return success True if the output was successfully decrypted.
     function decryptOutput(uint256 e3Id, bytes memory data) external returns (bool success);
+
+    /// @notice This function should be called to retrieve the details of an Encrypted Execution Environment (E3).
+    /// @param e3Id ID of the E3.
+    /// @return e3 The struct representing the requested E3.
+    function getE3(uint256 e3Id) external view returns (E3 memory e3);
 }

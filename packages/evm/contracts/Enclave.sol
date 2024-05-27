@@ -109,4 +109,8 @@ contract Enclave is IEnclave {
 
         emit PlaintextOutputPublished(e3Id, output);
     }
+
+    function getE3(uint256 e3Id) external view returns (E3 memory e3) {
+        return e3s[e3Id];
+    }
 }
