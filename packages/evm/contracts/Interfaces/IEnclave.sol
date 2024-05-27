@@ -4,6 +4,35 @@ pragma solidity >=0.8.26;
 import { E3, IComputationModule, IExecutionModule } from "./IE3.sol";
 
 interface IEnclave {
+    /// @notice This event MUST be emitted when the ciphertext output of an Encrypted Execution Environment (E3) is successfully published.
+    /// @param e3Id ID of the E3.
+    /// @param ciphertextOutput ABI encoded ciphertext output.
+    event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
+
+    /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully requested.
+    /// @param e3Id ID of the E3.
+    /// @param e3 Details of the E3.
+    /// @param poolId ID of the pool of nodes from which the Cypher Node committee was selected.
+    /// @param computationModule Address of the Computation module selected.
+    /// @param executionModule  Address of the execution module selected.
+    event E3Requested(
+        uint256 e3Id,
+        E3 e3,
+        uint256 indexed poolId,
+        IComputationModule indexed computationModule,
+        IExecutionModule indexed executionModule
+    );
+
+    /// @notice This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is successfully published.
+    /// @param e3Id ID of the E3.
+    /// @param data ABI encoded input data.
+    event InputPublished(uint256 indexed e3Id, bytes data);
+
+    /// @notice This event MUST be emitted when the plaintext output of an Encrypted Execution Environment (E3) is successfully published.
+    /// @param e3Id ID of the E3.
+    /// @param plaintextOutput ABI encoded plaintext output.
+    event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
+
     /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).
     /// @param poolId ID of the pool of nodes from which to select the committee.
     /// @param threshold The M/N threshold for the committee.

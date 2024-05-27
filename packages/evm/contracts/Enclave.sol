@@ -16,17 +16,6 @@ contract Enclave is IEnclave {
     mapping(address moduleAddress => bool allowed) public executionModules; // Mapping of allowed execution modules.
     mapping(uint256 id => E3) public e3s; // Mapping of E3s.
 
-    event CiphertextOutputPublished(uint256 e3Id, bytes ciphertextOutput);
-    event E3Requested(
-        uint256 e3Id,
-        E3 e3,
-        uint256 indexed poolId,
-        IComputationModule indexed computationModule,
-        IExecutionModule indexed executionModule
-    );
-    event InputPublished(uint256 e3Id, bytes data);
-    event PlaintextOutputPublished(uint256 e3Id, bytes plaintextOutput);
-
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputation();
