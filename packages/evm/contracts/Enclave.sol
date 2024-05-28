@@ -22,7 +22,9 @@ contract Enclave is IEnclave {
 
     mapping(uint256 id => E3) public e3s; // Mapping of E3s.
 
+    error CommitteeSelectionFailed();
     error ComputationModuleNotAllowed();
+    error E3AlreadyActivated(uint256 e3Id);
     error ExecutionModuleNotAllowed();
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
@@ -69,23 +71,35 @@ contract Enclave is IEnclave {
         IOutputVerifier outputVerifier = executionModule.validate(emParams);
         require(address(outputVerifier) != address(0), InvalidExecutionModuleSetup());
 
-        bytes32 committeeId = cypherNodeRegistry.selectCommittee(e3Id, poolId, threshold);
+        require(cypherNodeRegistry.selectCommittee(e3Id, poolId, threshold), CommitteeSelectionFailed());
         // TODO: validate that the selected pool accepts both the computation and execution modules.
 
         e3 = E3({
             threshold: threshold,
-            expiration: block.timestamp + duration,
+            expiration: 0,
             computationModule: computationModule,
             executionModule: executionModule,
             inputValidator: inputValidator,
             outputVerifier: outputVerifier,
-            committeeId: committeeId,
+            committeePublicKey: new bytes(0),
             ciphertextOutput: new bytes(0),
             plaintextOutput: new bytes(0)
         });
         e3s[e3Id] = e3;
 
         emit E3Requested(e3Id, e3s[e3Id], poolId, computationModule, executionModule);
+    }
+
+    function activate(uint256 e3Id) external returns (bool success) {
+        E3 storage e3 = e3s[e3Id];
+        require(e3.expiration == 0, E3AlreadyActivated(e3Id));
+        e3.expiration = block.timestamp + maxDuration;
+
+        e3.committeePublicKey = cypherNodeRegistry.getCommitteePublicKey(e3Id);
+        success = e3.committeePublicKey.length > 0;
+        require(success, CommitteeSelectionFailed());
+
+        emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);
     }
 
     function publishInput(uint256 e3Id, bytes memory data) external returns (bool success) {

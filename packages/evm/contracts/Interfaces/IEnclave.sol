@@ -18,6 +18,12 @@ interface IEnclave {
         IExecutionModule indexed executionModule
     );
 
+    /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.
+    /// @param e3Id ID of the E3.
+    /// @param expiration Timestamp when committee duties expire.
+    /// @param committeePublicKey Public key of the committee.
+    event E3Activated(uint256 e3Id, uint256 expiration, bytes committeePublicKey);
+
     /// @notice This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is successfully published.
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded input data.
@@ -54,7 +60,15 @@ interface IEnclave {
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3);
 
+    /// @notice This function should be called to activate an Encrypted Execution Environment (E3) once it has been initialized and is ready for input.
+    /// @dev This function MUST emit the E3Activated event.
+    /// @dev This function MUST revert if the given E3 has not yet been requested.
+    /// @dev This function MUST revert if the selected node committee has not yet published a public key.
+    /// @param e3Id ID of the E3.
+    function activate(uint256 e3Id) external returns (bool success);
+
     /// @notice This function should be called to publish input data for Encrypted Execution Environment (E3).
+    /// @dev This function MUST revert if the E3 is not yet activated.
     /// @dev This function MUST emit the InputPublished event.
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded input data to publish.

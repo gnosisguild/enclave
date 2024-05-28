@@ -24,7 +24,7 @@ struct E3 {
     IExecutionModule executionModule;
     IInputValidator inputValidator;
     IOutputVerifier outputVerifier;
-    bytes32 committeeId;
+    bytes committeePublicKey;
     bytes ciphertextOutput;
     bytes plaintextOutput;
 }
