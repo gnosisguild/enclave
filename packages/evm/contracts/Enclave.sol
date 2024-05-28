@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { IEnclave, E3, IComputationModule, IExecutionModule } from "./Interfaces/IEnclave.sol";
-import { ICypherNodeRegistry } from "./Interfaces/ICypherNodeRegistry.sol";
-import { IInputValidator } from "./Interfaces/IInputValidator.sol";
-import { IOutputVerifier } from "./Interfaces/IOutputVerifier.sol";
+import { IEnclave, E3, IComputationModule, IExecutionModule } from "./interfaces/IEnclave.sol";
+import { ICypherNodeRegistry } from "./interfaces/ICypherNodeRegistry.sol";
+import { IInputValidator } from "./interfaces/IInputValidator.sol";
+import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
 
 contract Enclave is IEnclave {
     ICypherNodeRegistry public cypherNodeRegistry; // TODO: add a setter function.
