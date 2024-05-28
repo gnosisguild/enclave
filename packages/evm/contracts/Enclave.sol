@@ -12,10 +12,18 @@ contract Enclave is IEnclave {
     uint256 public nexte3Id; // ID of the next E3.
     uint256 public requests; // total number of requests made to Enclave.
 
-    mapping(address moduleAddress => bool allowed) public computationModules; // Mapping of allowed computation modules.
-    mapping(address moduleAddress => bool allowed) public executionModules; // Mapping of allowed execution modules.
+    // TODO: should computation and execution modules be explicitly allowed?
+    // My intuition is that an allowlist is required since they impose slashing conditions.
+    // But perhaps this is one place where node pools might be utilized, allowing nodes to
+    // opt in to being selected for specific computations, along with the corresponding slashing conditions.
+    // This would reduce the governance overhead for Enclave.
+    mapping(IComputationModule => bool allowed) public computationModules; // Mapping of allowed computation modules.
+    mapping(IExecutionModule => bool allowed) public executionModules; // Mapping of allowed execution modules.
+
     mapping(uint256 id => E3) public e3s; // Mapping of E3s.
 
+    error ComputationModuleNotAllowed();
+    error ExecutionModuleNotAllowed();
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputation();
@@ -47,6 +55,8 @@ contract Enclave is IEnclave {
 
         require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold());
         require(duration > 0 && duration <= maxDuration, InvalidDuration());
+        require(computationModules[computationModule], ComputationModuleNotAllowed());
+        require(executionModules[executionModule], ExecutionModuleNotAllowed());
 
         e3Id = nexte3Id;
         nexte3Id++;
