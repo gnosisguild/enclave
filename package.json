@@ -10,11 +10,13 @@
     "compile": "yarn evm:compile",
     "lint": "yarn evm:lint",
     "typechain": "yarn evm:typechain",
+    "test": "yarn evm:test",
     "coverage": "yarn evm:coverage",
     "evm:install": "cd packages/evm && yarn install",
     "evm:compile": "cd packages/evm && yarn compile",
     "evm:lint": "cd packages/evm && yarn lint",
     "evm:typechain": "cd packages/evm && yarn typechain",
+    "evm:test": "cd packages/evm && yarn test",
     "evm:coverage": "cd packages/evm && yarn coverage",
     "preinstall": "yarn evm:install"
   }
