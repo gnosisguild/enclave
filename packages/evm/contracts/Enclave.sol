@@ -58,6 +58,7 @@ contract Enclave is IEnclave {
         require(computationModules[computationModule], ComputationModuleNotAllowed());
         require(executionModules[executionModule], ExecutionModuleNotAllowed());
 
+        // TODO: should IDs be incremental or produced deterministic?
         e3Id = nexte3Id;
         nexte3Id++;
 
@@ -68,7 +69,7 @@ contract Enclave is IEnclave {
         IOutputVerifier outputVerifier = executionModule.validate(emParams);
         require(address(outputVerifier) != address(0), InvalidExecutionModuleSetup());
 
-        bytes32 committeeId = cypherNodeRegistry.selectCommittee(poolId, threshold);
+        bytes32 committeeId = cypherNodeRegistry.selectCommittee(e3Id, poolId, threshold);
         // TODO: validate that the selected pool accepts both the computation and execution modules.
 
         e3 = E3({
@@ -109,7 +110,7 @@ contract Enclave is IEnclave {
         emit CiphertextOutputPublished(e3Id, output);
     }
 
-    function decryptOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+    function publishDecryptedOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
         E3 storage e3 = e3s[e3Id];
         require(e3.ciphertextOutput.length > 0, CiphertextOutputNotPublished(e3Id));
         require(e3.plaintextOutput.length == 0, PlaintextOutputAlreadyPublished(e3Id));

@@ -34,6 +34,7 @@ interface IEnclave {
     event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
 
     /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).
+    /// @dev This function MUST emit the E3Requested event.
     /// @param poolId ID of the pool of nodes from which to select the committee.
     /// @param threshold The M/N threshold for the committee.
     /// @param duration The duration of the computation in seconds.
@@ -54,24 +55,29 @@ interface IEnclave {
     ) external payable returns (uint256 e3Id, E3 memory e3);
 
     /// @notice This function should be called to publish input data for Encrypted Execution Environment (E3).
+    /// @dev This function MUST emit the InputPublished event.
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded input data to publish.
     /// @return success True if the input was successfully published.
     function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
 
     /// @notice This function should be called to publish output data for an Encrypted Execution Environment (E3).
+    /// @dev This function MUST emit the CiphertextOutputPublished event.
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded output data to verify.
     /// @return success True if the output was successfully published.
     function publishOutput(uint256 e3Id, bytes memory data) external returns (bool success);
 
     /// @notice This function should be called to decrypt the output of an Encrypted Execution Environment (E3).
+    /// @dev This function MUST revert if the output has not been published.
+    /// @dev This function MUST emit the PlaintextOutputPublished event.
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded output data to decrypt.
     /// @return success True if the output was successfully decrypted.
-    function decryptOutput(uint256 e3Id, bytes memory data) external returns (bool success);
+    function publishDecryptedOutput(uint256 e3Id, bytes memory data) external returns (bool success);
 
     /// @notice This function should be called to retrieve the details of an Encrypted Execution Environment (E3).
+    /// @dev This function MUST revert if the E3 does not exist.
     /// @param e3Id ID of the E3.
     /// @return e3 The struct representing the requested E3.
     function getE3(uint256 e3Id) external view returns (E3 memory e3);
