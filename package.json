@@ -7,6 +7,7 @@
     "url": "https://github.com/gnosisguild"
   },
   "scripts": {
+    "clean": "cd packages/evm && yarn clean",
     "compile": "yarn evm:compile",
     "lint": "yarn evm:lint",
     "typechain": "yarn evm:typechain",
