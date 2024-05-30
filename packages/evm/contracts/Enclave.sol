@@ -47,7 +47,7 @@ contract Enclave is IEnclave {
     function request(
         uint256 poolId,
         uint32[2] calldata threshold,
-        uint256 duration,
+        uint256 duration, // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are published before the request is made? This kind of assumes the cypher nodes have already been selected and generated a shared secret.
         IComputationModule computationModule,
         bytes memory computationParams,
         IExecutionModule executionModule,
