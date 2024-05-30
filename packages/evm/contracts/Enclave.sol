@@ -5,8 +5,15 @@ import { IEnclave, E3, IComputationModule, IExecutionModule } from "./interfaces
 import { ICypherNodeRegistry } from "./interfaces/ICypherNodeRegistry.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
+import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract Enclave is IEnclave {
+contract Enclave is IEnclave, OwnableUpgradeable {
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                 Storage Variables                      //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
     ICypherNodeRegistry public cypherNodeRegistry; // TODO: add a setter function.
     uint256 public maxDuration; // TODO: add a setter function.
     uint256 public nexte3Id; // ID of the next E3.
@@ -24,9 +31,16 @@ contract Enclave is IEnclave {
 
     mapping(uint256 id => E3) public e3s; // Mapping of E3s.
 
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                        Errors                          //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
     error CommitteeSelectionFailed();
     error ComputationModuleNotAllowed();
     error E3AlreadyActivated(uint256 e3Id);
+    error E3DoesNotExist(uint256 e3Id);
     error ExecutionModuleNotAllowed();
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
@@ -41,10 +55,30 @@ contract Enclave is IEnclave {
     error PaymentRequired();
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
 
-    /// @param _maxDuration The maximum duration of a computation in seconds.
-    constructor(uint256 _maxDuration) {
-        maxDuration = _maxDuration;
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Initialization                       //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @param _owner The owner of this contract
+    /// @param _maxDuration The maximum duration of a computation in seconds
+    constructor(address _owner, uint256 _maxDuration) {
+        initialize(_owner, _maxDuration);
     }
+
+    /// @param _owner The owner of this contract
+    /// @param _maxDuration The maximum duration of a computation in seconds
+    function initialize(address _owner, uint256 _maxDuration) public initializer {
+        maxDuration = _maxDuration;
+        __Ownable_init(_owner);
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                  Core Entrypoints                      //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
 
     function request(
         uint256 poolId,
@@ -137,7 +171,26 @@ contract Enclave is IEnclave {
         emit PlaintextOutputPublished(e3Id, output);
     }
 
-    function getE3(uint256 e3Id) external view returns (E3 memory e3) {
-        return e3s[e3Id];
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Set Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function setMaxDuration(uint256 _maxDuration) external onlyOwner returns (bool success) {
+        maxDuration = _maxDuration;
+        success = true;
+        emit MaxDurationSet(_maxDuration);
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Get Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function getE3(uint256 e3Id) public view returns (E3 memory e3) {
+        e3 = e3s[e3Id];
+        require(e3.computationModule != IComputationModule(address(0)), E3DoesNotExist(e3Id));
     }
 }

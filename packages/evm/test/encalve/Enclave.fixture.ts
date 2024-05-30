@@ -1,8 +1,7 @@
-import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { ethers } from "hardhat";
 
-import type { Enclave } from "../../types/Enclave";
-import type { Enclave__factory } from "../../types/factories/Enclave__factory";
+import type { Enclave } from "../../types/contracts/Enclave";
+import type { Enclave__factory } from "../../types/factories/contracts/Enclave__factory";
 
 export async function deployEnclaveFixture() {
   // Contracts are deployed using the first signer/account by default
@@ -10,7 +9,7 @@ export async function deployEnclaveFixture() {
   const maxDuration = 60 * 60 * 24 * 30;
 
   const Enclave = (await ethers.getContractFactory("Enclave")) as Enclave__factory;
-  const enclave = (await Enclave.deploy(maxDuration)) as Enclave;
+  const enclave = (await Enclave.deploy(owner.address, maxDuration)) as Enclave;
   const enclave_address = await enclave.getAddress();
 
   return { enclave, enclave_address, maxDuration, owner, otherAccount };

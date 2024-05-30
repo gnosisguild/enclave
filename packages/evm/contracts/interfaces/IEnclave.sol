@@ -4,6 +4,12 @@ pragma solidity >=0.8.26;
 import { E3, IComputationModule, IExecutionModule } from "./IE3.sol";
 
 interface IEnclave {
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                         Events                         //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
     /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully requested.
     /// @param e3Id ID of the E3.
     /// @param e3 Details of the E3.
@@ -38,6 +44,16 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @param ciphertextOutput ABI encoded ciphertext output.
     event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
+
+    /// @notice This event MUST be emitted any time the `maxDuration` is set.
+    /// @param maxDuration The maximum duration of a computation in seconds.
+    event MaxDurationSet(uint256 maxDuration);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                  Core Entrypoints                      //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
 
     /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).
     /// @dev This function MUST emit the E3Requested event.
@@ -89,6 +105,23 @@ interface IEnclave {
     /// @param data ABI encoded output data to decrypt.
     /// @return success True if the output was successfully decrypted.
     function publishDecryptedOutput(uint256 e3Id, bytes memory data) external returns (bool success);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Set Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice This function should be called to set the maximum duration of requested computations.
+    /// @param _maxDuration The maximum duration of a computation in seconds.
+    /// @return success True if the max duration was successfully set.
+    function setMaxDuration(uint256 _maxDuration) external returns (bool success);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Get Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
 
     /// @notice This function should be called to retrieve the details of an Encrypted Execution Environment (E3).
     /// @dev This function MUST revert if the E3 does not exist.
