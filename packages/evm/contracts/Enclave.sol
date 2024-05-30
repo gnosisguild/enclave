@@ -17,7 +17,9 @@ contract Enclave is IEnclave {
     // But perhaps this is one place where node pools might be utilized, allowing nodes to
     // opt in to being selected for specific computations, along with the corresponding slashing conditions.
     // This would reduce the governance overhead for Enclave.
+    // TODO: add setter function
     mapping(IComputationModule => bool allowed) public computationModules; // Mapping of allowed computation modules.
+    // TODO: add setter function
     mapping(IExecutionModule => bool allowed) public executionModules; // Mapping of allowed execution modules.
 
     mapping(uint256 id => E3) public e3s; // Mapping of E3s.
@@ -71,9 +73,6 @@ contract Enclave is IEnclave {
         IOutputVerifier outputVerifier = executionModule.validate(emParams);
         require(address(outputVerifier) != address(0), InvalidExecutionModuleSetup());
 
-        require(cypherNodeRegistry.selectCommittee(e3Id, poolId, threshold), CommitteeSelectionFailed());
-        // TODO: validate that the selected pool accepts both the computation and execution modules.
-
         e3 = E3({
             threshold: threshold,
             expiration: 0,
@@ -86,6 +85,9 @@ contract Enclave is IEnclave {
             plaintextOutput: new bytes(0)
         });
         e3s[e3Id] = e3;
+
+        require(cypherNodeRegistry.selectCommittee(e3Id, poolId, threshold), CommitteeSelectionFailed());
+        // TODO: validate that the selected pool accepts both the computation and execution modules.
 
         emit E3Requested(e3Id, e3s[e3Id], poolId, computationModule, executionModule);
     }
