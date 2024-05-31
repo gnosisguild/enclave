@@ -70,8 +70,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
     function initialize(address _owner, uint256 _maxDuration) public initializer {
-        maxDuration = _maxDuration;
-        __Ownable_init(_owner);
+        __Ownable_init(msg.sender);
+        setMaxDuration(_maxDuration);
+        if (_owner != owner()) transferOwnership(_owner);
     }
 
     ////////////////////////////////////////////////////////////
@@ -177,7 +178,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    function setMaxDuration(uint256 _maxDuration) external onlyOwner returns (bool success) {
+    function setMaxDuration(uint256 _maxDuration) public onlyOwner returns (bool success) {
         maxDuration = _maxDuration;
         success = true;
         emit MaxDurationSet(_maxDuration);

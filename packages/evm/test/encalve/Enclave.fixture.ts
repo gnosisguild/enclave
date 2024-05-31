@@ -12,5 +12,5 @@ export async function deployEnclaveFixture() {
   const enclave = (await Enclave.deploy(owner.address, maxDuration)) as Enclave;
   const enclave_address = await enclave.getAddress();
 
-  return { enclave, enclave_address, maxDuration, owner, otherAccount };
+  return { Enclave, enclave, enclave_address, maxDuration, owner, otherAccount };
 }

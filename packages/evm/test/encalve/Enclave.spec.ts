@@ -18,11 +18,14 @@ describe("Enclave", function () {
   });
 
   beforeEach(async function () {
-    const { enclave, enclave_address, maxDuration, owner } = await this.loadFixture(deployEnclaveFixture);
+    const { Enclave, enclave, enclave_address, maxDuration, owner, otherAccount } =
+      await this.loadFixture(deployEnclaveFixture);
+    this.Enclave = Enclave;
     this.enclave = enclave;
     this.enclave_address = enclave_address;
     this.maxDuration = maxDuration;
     this.owner = owner;
+    this.otherAccount = otherAccount;
 
     const { mockComputationModule, mockComputationModule_address } = await this.loadFixture(
       deployMockComputationModuleFixture,
@@ -33,15 +36,23 @@ describe("Enclave", function () {
 
   describe("Deployment", function () {
     it("correctly sets max duration", async function () {
-      // We don't use the fixture here because we want a different deployment
       const maxDuration = await this.enclave.maxDuration();
+
       expect(maxDuration).to.equal(this.maxDuration);
     });
 
     it("correctly sets owner", async function () {
-      // We don't use the fixture here because we want a different deployment
-      const owner = await this.enclave.owner();
-      expect(owner).to.equal(this.owner);
+      // uses the fixture deployment with this.owner set as the owner
+      const owner1 = await this.enclave.owner();
+      // create a new deployment with this.otherAccount as the owner
+      // note that this.owner is msg.sender in both cases
+      const enclave = await this.Enclave.deploy(this.otherAccount.address, this.maxDuration);
+      const owner2 = await enclave.owner();
+
+      // expect the owner to be the same as the one set in the fixture
+      expect(owner1).to.equal(this.owner);
+      // expect the owner to be the same as the one set in the new deployment
+      expect(owner2).to.equal(this.otherAccount);
     });
   });
 
