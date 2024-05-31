@@ -5,6 +5,10 @@ import { ethers } from "hardhat";
 
 import func from "../../deploy/deploy";
 import { deployMockComputationModuleFixture } from "../mocks/MockComputationModule.fixture";
+import { deployMockCypherNodeRegistryFixture } from "../mocks/MockCypherNodeRegistry.fixture";
+import { deployMockExecutionModuleFixture } from "../mocks/MockExecutionModule.fixture";
+import { deployMockInputValidatorFixture } from "../mocks/MockInputValidator.fixture";
+import { deployMockOutputVerifierFixture } from "../mocks/MockOutputVerifier.fixture";
 import type { Signers } from "../types";
 import { deployEnclaveFixture } from "./Enclave.fixture";
 
@@ -33,6 +37,26 @@ describe("Enclave", function () {
     );
     this.mockComputationModule = mockComputationModule;
     this.mockComputationModule_address = mockComputationModule_address;
+
+    const { mockOutputVerifier, mockOutputVerifier_address } = await this.loadFixture(deployMockOutputVerifierFixture);
+    this.mockOutputVerifier = mockOutputVerifier;
+    this.mockOutputVerifier_address = mockOutputVerifier_address;
+
+    const { mockCypherNodeRegistry, mockCypherNodeRegistry_address } = await this.loadFixture(
+      deployMockCypherNodeRegistryFixture,
+    );
+    this.mockCypherNodeRegistry = mockCypherNodeRegistry;
+    this.mockCypherNodeRegistry_address = mockCypherNodeRegistry_address;
+
+    const { mockExecutionModule, mockExecutionModule_address } = await this.loadFixture(
+      deployMockExecutionModuleFixture,
+    );
+    this.mockExecutionModule = mockExecutionModule;
+    this.mockExecutionModule_address = mockExecutionModule_address;
+
+    const { mockInputValidator, mockInputValidator_address } = await this.loadFixture(deployMockInputValidatorFixture);
+    this.mockInputValidator = mockInputValidator;
+    this.mockInputValidator_address = mockInputValidator_address;
   });
 
   describe("constructor / initialize()", function () {
