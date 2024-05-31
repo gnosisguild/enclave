@@ -8,6 +8,7 @@ export async function deployMockCypherNodeRegistryFixture() {
     "MockCypherNodeRegistry",
   )) as MockCypherNodeRegistry__factory;
   const mockCypherNodeRegistry = (await MockCypherNodeRegistry.deploy()) as MockCypherNodeRegistry;
-  const mockCypherNodeRegistry_address = mockCypherNodeRegistry.getAddress();
+  const mockCypherNodeRegistry_address = await mockCypherNodeRegistry.getAddress();
+
   return { mockCypherNodeRegistry, mockCypherNodeRegistry_address };
 }

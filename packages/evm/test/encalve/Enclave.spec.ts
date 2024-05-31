@@ -57,6 +57,8 @@ describe("Enclave", function () {
     const { mockInputValidator, mockInputValidator_address } = await this.loadFixture(deployMockInputValidatorFixture);
     this.mockInputValidator = mockInputValidator;
     this.mockInputValidator_address = mockInputValidator_address;
+
+    await this.enclave.setCypherNodeRegistry(this.mockCypherNodeRegistry_address);
   });
 
   describe("constructor / initialize()", function () {
@@ -77,7 +79,7 @@ describe("Enclave", function () {
     it("correctly sets cypherNodeRegistry address", async function () {
       const cypherNodeRegistry = await this.enclave.cypherNodeRegistry();
 
-      expect(cypherNodeRegistry).to.equal(this.otherAccount.address);
+      expect(cypherNodeRegistry).to.equal(this.mockCypherNodeRegistry_address);
     });
 
     it("correctly sets max duration", async function () {
@@ -121,9 +123,9 @@ describe("Enclave", function () {
         .withArgs(ethers.ZeroAddress);
     });
     it("reverts if given address is the same as the current cypherNodeRegistry", async function () {
-      await expect(this.enclave.setCypherNodeRegistry(this.otherAccount.address))
+      await expect(this.enclave.setCypherNodeRegistry(this.mockCypherNodeRegistry_address))
         .to.be.revertedWithCustomError(this.enclave, "InvalidCypherNodeRegistry")
-        .withArgs(this.otherAccount.address);
+        .withArgs(this.mockCypherNodeRegistry_address);
     });
     it("sets cypherNodeRegistry correctly", async function () {
       await this.enclave.setCypherNodeRegistry(this.owner.address);

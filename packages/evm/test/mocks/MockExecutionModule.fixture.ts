@@ -6,6 +6,7 @@ import { MockExecutionModule__factory } from "../../types/factories/contracts/te
 export async function deployMockExecutionModuleFixture() {
   const MockExecutionModule = (await ethers.getContractFactory("MockExecutionModule")) as MockExecutionModule__factory;
   const mockExecutionModule = (await MockExecutionModule.deploy()) as MockExecutionModule;
-  const mockExecutionModule_address = mockExecutionModule.getAddress();
+  const mockExecutionModule_address = await mockExecutionModule.getAddress();
+
   return { mockExecutionModule, mockExecutionModule_address };
 }
