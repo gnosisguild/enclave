@@ -183,96 +183,96 @@ describe("Enclave", function () {
 
   describe("disableComputationModule()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).disableComputationModule(this.otherAccount.address))
+      await expect(this.enclave.connect(this.otherAccount).disableComputationModule(this.mockComputationModule_address))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
         .withArgs(this.otherAccount.address);
     });
     it("reverts if computation module is not enabled", async function () {
-      await expect(this.enclave.disableComputationModule(this.otherAccount.address))
+      await expect(this.enclave.disableComputationModule(this.mockComputationModule_address))
         .to.be.revertedWithCustomError(this.enclave, "ModuleNotEnabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(this.mockComputationModule_address);
     });
     it("disables computation module correctly", async function () {
-      await this.enclave.enableComputationModule(this.otherAccount.address);
-      await this.enclave.disableComputationModule(this.otherAccount.address);
+      await this.enclave.enableComputationModule(this.mockComputationModule_address);
+      await this.enclave.disableComputationModule(this.mockComputationModule_address);
 
-      const enabled = await this.enclave.computationModules(this.otherAccount.address);
+      const enabled = await this.enclave.computationModules(this.mockComputationModule_address);
       expect(enabled).to.be.false;
     });
     it("returns true if computation module is disabled successfully", async function () {
-      await this.enclave.enableComputationModule(this.otherAccount.address);
-      const result = await this.enclave.disableComputationModule.staticCall(this.otherAccount.address);
+      await this.enclave.enableComputationModule(this.mockComputationModule_address);
+      const result = await this.enclave.disableComputationModule.staticCall(this.mockComputationModule_address);
 
       expect(result).to.be.true;
     });
     it("emits ComputationModuleDisabled event", async function () {
-      await this.enclave.enableComputationModule(this.otherAccount.address);
-      await expect(this.enclave.disableComputationModule(this.otherAccount.address))
+      await this.enclave.enableComputationModule(this.mockComputationModule_address);
+      await expect(this.enclave.disableComputationModule(this.mockComputationModule_address))
         .to.emit(this.enclave, "ComputationModuleDisabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(this.mockComputationModule_address);
     });
   });
 
   describe("enableExecutionModule()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).enableExecutionModule(this.otherAccount.address))
+      await expect(this.enclave.connect(this.otherAccount).enableExecutionModule(this.mockExecutionModule_address))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
         .withArgs(this.otherAccount.address);
     });
     it("reverts if execution module is already enabled", async function () {
-      await this.enclave.enableExecutionModule(this.otherAccount.address);
+      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
 
-      await expect(this.enclave.enableExecutionModule(this.otherAccount.address))
+      await expect(this.enclave.enableExecutionModule(this.mockExecutionModule_address))
         .to.be.revertedWithCustomError(this.enclave, "ModuleAlreadyEnabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(this.mockExecutionModule_address);
     });
     it("enables execution module correctly", async function () {
-      await this.enclave.enableExecutionModule(this.otherAccount.address);
+      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
 
-      const enabled = await this.enclave.executionModules(this.otherAccount.address);
+      const enabled = await this.enclave.executionModules(this.mockExecutionModule_address);
       expect(enabled).to.be.true;
     });
     it("returns true if execution module is enabled successfully", async function () {
-      const result = await this.enclave.enableExecutionModule.staticCall(this.otherAccount.address);
+      const result = await this.enclave.enableExecutionModule.staticCall(this.mockExecutionModule_address);
 
       expect(result).to.be.true;
     });
     it("emits ExecutionModuleEnabled event", async function () {
-      await expect(this.enclave.enableExecutionModule(this.otherAccount.address))
+      await expect(this.enclave.enableExecutionModule(this.mockExecutionModule_address))
         .to.emit(this.enclave, "ExecutionModuleEnabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(this.mockExecutionModule_address);
     });
   });
 
   describe("disableExecutionModule()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).disableExecutionModule(this.otherAccount.address))
+      await expect(this.enclave.connect(this.otherAccount).disableExecutionModule(this.mockExecutionModule_address))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
         .withArgs(this.otherAccount.address);
     });
     it("reverts if execution module is not enabled", async function () {
-      await expect(this.enclave.disableExecutionModule(this.otherAccount.address))
+      await expect(this.enclave.disableExecutionModule(this.mockExecutionModule_address))
         .to.be.revertedWithCustomError(this.enclave, "ModuleNotEnabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(this.mockExecutionModule_address);
     });
     it("disables execution module correctly", async function () {
-      await this.enclave.enableExecutionModule(this.otherAccount.address);
-      await this.enclave.disableExecutionModule(this.otherAccount.address);
+      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
+      await this.enclave.disableExecutionModule(this.mockExecutionModule_address);
 
-      const enabled = await this.enclave.executionModules(this.otherAccount.address);
+      const enabled = await this.enclave.executionModules(this.mockExecutionModule_address);
       expect(enabled).to.be.false;
     });
     it("returns true if execution module is disabled successfully", async function () {
-      await this.enclave.enableExecutionModule(this.otherAccount.address);
-      const result = await this.enclave.disableExecutionModule.staticCall(this.otherAccount.address);
+      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
+      const result = await this.enclave.disableExecutionModule.staticCall(this.mockExecutionModule_address);
 
       expect(result).to.be.true;
     });
     it("emits ExecutionModuleDisabled event", async function () {
-      await this.enclave.enableExecutionModule(this.otherAccount.address);
-      await expect(this.enclave.disableExecutionModule(this.otherAccount.address))
+      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
+      await expect(this.enclave.disableExecutionModule(this.mockExecutionModule_address))
         .to.emit(this.enclave, "ExecutionModuleDisabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(this.mockExecutionModule_address);
     });
   });
 });
