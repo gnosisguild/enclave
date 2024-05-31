@@ -49,6 +49,26 @@ interface IEnclave {
     /// @param maxDuration The maximum duration of a computation in seconds.
     event MaxDurationSet(uint256 maxDuration);
 
+    /// @notice This event MUST be emitted any time the CypherNodeRegistry is set.
+    /// @param cypherNodeRegistry The address of the CypherNodeRegistry contract.
+    event CypherNodeRegistrySet(address cypherNodeRegistry);
+
+    /// @notice This event MUST be emitted any time a computation module is enabled.
+    /// @param computationModule The address of the computation module.
+    event ComputationModuleEnabled(IComputationModule computationModule);
+
+    /// @notice This event MUST be emitted any time a computation module is disabled.
+    /// @param computationModule The address of the computation module.
+    event ComputationModuleDisabled(IComputationModule computationModule);
+
+    /// @notice This event MUST be emitted any time an execution module is enabled.
+    /// @param executionModule The address of the execution module.
+    event ExecutionModuleEnabled(IExecutionModule executionModule);
+
+    /// @notice This event MUST be emitted any time an execution module is disabled.
+    /// @param executionModule The address of the execution module.
+    event ExecutionModuleDisabled(IExecutionModule executionModule);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Core Entrypoints                      //

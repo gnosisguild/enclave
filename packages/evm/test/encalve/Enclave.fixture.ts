@@ -9,7 +9,7 @@ export async function deployEnclaveFixture() {
   const maxDuration = 60 * 60 * 24 * 30;
 
   const Enclave = (await ethers.getContractFactory("Enclave")) as Enclave__factory;
-  const enclave = (await Enclave.deploy(owner.address, maxDuration)) as Enclave;
+  const enclave = (await Enclave.deploy(owner.address, otherAccount.address, maxDuration)) as Enclave;
   const enclave_address = await enclave.getAddress();
 
   return { Enclave, enclave, enclave_address, maxDuration, owner, otherAccount };

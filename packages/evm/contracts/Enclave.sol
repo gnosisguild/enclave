@@ -41,11 +41,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error ComputationModuleNotAllowed();
     error E3AlreadyActivated(uint256 e3Id);
     error E3DoesNotExist(uint256 e3Id);
-    error ExecutionModuleNotAllowed();
+    error ModuleAlreadyEnabled(address module);
+    error ModuleNotEnabled(address module);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputation();
     error InvalidExecutionModuleSetup();
+    error InvalidCypherNodeRegistry(ICypherNodeRegistry cypherNodeRegistry);
     error InvalidInput();
     error InvalidDuration();
     error InvalidOutput();
@@ -63,15 +65,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
-    constructor(address _owner, uint256 _maxDuration) {
-        initialize(_owner, _maxDuration);
+    constructor(address _owner, ICypherNodeRegistry _cypherNodeRegistry, uint256 _maxDuration) {
+        initialize(_owner, _cypherNodeRegistry, _maxDuration);
     }
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
-    function initialize(address _owner, uint256 _maxDuration) public initializer {
+    function initialize(
+        address _owner,
+        ICypherNodeRegistry _cypherNodeRegistry,
+        uint256 _maxDuration
+    ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
+        setCypherNodeRegistry(_cypherNodeRegistry);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -95,7 +102,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold());
         require(duration > 0 && duration <= maxDuration, InvalidDuration());
         require(computationModules[computationModule], ComputationModuleNotAllowed());
-        require(executionModules[executionModule], ExecutionModuleNotAllowed());
+        require(executionModules[executionModule], ModuleNotEnabled(address(executionModule)));
 
         // TODO: should IDs be incremental or produced deterministic?
         e3Id = nexte3Id;
@@ -182,6 +189,44 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         maxDuration = _maxDuration;
         success = true;
         emit MaxDurationSet(_maxDuration);
+    }
+
+    function setCypherNodeRegistry(ICypherNodeRegistry _cypherNodeRegistry) public onlyOwner returns (bool success) {
+        require(
+            address(_cypherNodeRegistry) != address(0) && _cypherNodeRegistry != cypherNodeRegistry,
+            InvalidCypherNodeRegistry(_cypherNodeRegistry)
+        );
+        cypherNodeRegistry = _cypherNodeRegistry;
+        success = true;
+        emit CypherNodeRegistrySet(address(_cypherNodeRegistry));
+    }
+
+    function enableComputationModule(IComputationModule computationModule) public onlyOwner returns (bool success) {
+        require(!computationModules[computationModule], ModuleAlreadyEnabled(address(computationModule)));
+        computationModules[computationModule] = true;
+        success = true;
+        emit ComputationModuleEnabled(computationModule);
+    }
+
+    function enableExecutionModule(IExecutionModule executionModule) public onlyOwner returns (bool success) {
+        require(!executionModules[executionModule], ModuleAlreadyEnabled(address(executionModule)));
+        executionModules[executionModule] = true;
+        success = true;
+        emit ExecutionModuleEnabled(executionModule);
+    }
+
+    function disableComputationModule(IComputationModule computationModule) public onlyOwner returns (bool success) {
+        require(computationModules[computationModule], ModuleNotEnabled(address(computationModule)));
+        delete computationModules[computationModule];
+        success = true;
+        emit ComputationModuleDisabled(computationModule);
+    }
+
+    function disableExecutionModule(IExecutionModule executionModule) public onlyOwner returns (bool success) {
+        require(executionModules[executionModule], ModuleNotEnabled(address(executionModule)));
+        delete executionModules[executionModule];
+        success = true;
+        emit ExecutionModuleDisabled(executionModule);
     }
 
     ////////////////////////////////////////////////////////////
