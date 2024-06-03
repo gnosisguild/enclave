@@ -11,6 +11,7 @@ import type { Signers } from "../types";
 import { deployEnclaveFixture } from "./Enclave.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+const AddressTwo = "0x0000000000000000000000000000000000000002";
 
 describe("Enclave", function () {
   before(async function () {
@@ -18,43 +19,33 @@ describe("Enclave", function () {
 
     const signers = await ethers.getSigners();
     this.signers.admin = signers[0];
-
-    this.loadFixture = loadFixture;
   });
 
   beforeEach(async function () {
-    const { Enclave, enclave, enclave_address, maxDuration, owner, otherAccount } =
-      await this.loadFixture(deployEnclaveFixture);
-    this.Enclave = Enclave;
+    const enclave = await loadFixture(deployEnclaveFixture);
     this.enclave = enclave;
-    this.enclave_address = enclave_address;
-    this.maxDuration = maxDuration;
-    this.owner = owner;
-    this.otherAccount = otherAccount;
 
-    const { mockComputationModule, mockComputationModule_address } = await this.loadFixture(
+    const { mockComputationModule, mockComputationModule_address } = await loadFixture(
       deployMockComputationModuleFixture,
     );
     this.mockComputationModule = mockComputationModule;
     this.mockComputationModule_address = mockComputationModule_address;
 
-    const { mockOutputVerifier, mockOutputVerifier_address } = await this.loadFixture(deployMockOutputVerifierFixture);
+    const { mockOutputVerifier, mockOutputVerifier_address } = await loadFixture(deployMockOutputVerifierFixture);
     this.mockOutputVerifier = mockOutputVerifier;
     this.mockOutputVerifier_address = mockOutputVerifier_address;
 
-    const { mockCypherNodeRegistry, mockCypherNodeRegistry_address } = await this.loadFixture(
+    const { mockCypherNodeRegistry, mockCypherNodeRegistry_address } = await loadFixture(
       deployMockCypherNodeRegistryFixture,
     );
     this.mockCypherNodeRegistry = mockCypherNodeRegistry;
     this.mockCypherNodeRegistry_address = mockCypherNodeRegistry_address;
 
-    const { mockExecutionModule, mockExecutionModule_address } = await this.loadFixture(
-      deployMockExecutionModuleFixture,
-    );
+    const { mockExecutionModule, mockExecutionModule_address } = await loadFixture(deployMockExecutionModuleFixture);
     this.mockExecutionModule = mockExecutionModule;
     this.mockExecutionModule_address = mockExecutionModule_address;
 
-    const { mockInputValidator, mockInputValidator_address } = await this.loadFixture(deployMockInputValidatorFixture);
+    const { mockInputValidator, mockInputValidator_address } = await loadFixture(deployMockInputValidatorFixture);
     this.mockInputValidator = mockInputValidator;
     this.mockInputValidator_address = mockInputValidator_address;
 
@@ -75,17 +66,16 @@ describe("Enclave", function () {
 
   describe("constructor / initialize()", function () {
     it("correctly sets owner", async function () {
-      // uses the fixture deployment with this.owner set as the owner
       const owner1 = await this.enclave.owner();
-      // create a new deployment with this.otherAccount as the owner
-      // note that this.owner is msg.sender in both cases
-      const enclave = await this.Enclave.deploy(this.otherAccount.address, this.otherAccount.address, this.maxDuration);
-      const owner2 = await enclave.owner();
+      const [, , , otherOwner, otherRegistry] = await ethers.getSigners();
+
+      const enclave = await deployEnclaveFixture({ owner: otherOwner, registry: otherRegistry });
 
       // expect the owner to be the same as the one set in the fixture
-      expect(owner1).to.equal(this.owner);
+      expect(owner1).to.not.equal(otherOwner);
       // expect the owner to be the same as the one set in the new deployment
-      expect(owner2).to.equal(this.otherAccount);
+      expect(await enclave.owner()).to.equal(otherOwner);
+      expect(await enclave.cypherNodeRegistry()).to.equal(otherRegistry);
     });
 
     it("correctly sets cypherNodeRegistry address", async function () {
@@ -95,17 +85,17 @@ describe("Enclave", function () {
     });
 
     it("correctly sets max duration", async function () {
-      const maxDuration = await this.enclave.maxDuration();
-
-      expect(maxDuration).to.equal(this.maxDuration);
+      const enclave = await deployEnclaveFixture({ maxDuration: 9876 });
+      expect(await enclave.maxDuration()).to.equal(9876);
     });
   });
 
   describe("setMaxDuration()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).setMaxDuration(1))
+      const [, , , notTheOwner] = await ethers.getSigners();
+      await expect(this.enclave.connect(notTheOwner).setMaxDuration(1))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
-        .withArgs(this.otherAccount.address);
+        .withArgs(notTheOwner);
     });
     it("set max duration correctly", async function () {
       await this.enclave.setMaxDuration(1);
@@ -125,9 +115,11 @@ describe("Enclave", function () {
 
   describe("setCypherNodeRegistry()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).setCypherNodeRegistry(this.otherAccount.address))
+      const [, , , notTheOwner] = await ethers.getSigners();
+
+      await expect(this.enclave.connect(notTheOwner).setCypherNodeRegistry(AddressTwo))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
-        .withArgs(this.otherAccount.address);
+        .withArgs(notTheOwner);
     });
     it("reverts if given address(0)", async function () {
       await expect(this.enclave.setCypherNodeRegistry(ethers.ZeroAddress))
@@ -140,20 +132,21 @@ describe("Enclave", function () {
         .withArgs(this.mockCypherNodeRegistry_address);
     });
     it("sets cypherNodeRegistry correctly", async function () {
-      await this.enclave.setCypherNodeRegistry(this.owner.address);
+      expect(await this.enclave.cypherNodeRegistry()).to.not.equal(AddressTwo);
 
-      const cypherNodeRegistry = await this.enclave.cypherNodeRegistry();
-      expect(cypherNodeRegistry).to.equal(this.owner.address);
+      await this.enclave.setCypherNodeRegistry(AddressTwo);
+
+      expect(await this.enclave.cypherNodeRegistry()).to.equal(AddressTwo);
     });
     it("returns true if cypherNodeRegistry is set successfully", async function () {
-      const result = await this.enclave.setCypherNodeRegistry.staticCall(this.owner.address);
+      const result = await this.enclave.setCypherNodeRegistry.staticCall(AddressTwo);
 
       expect(result).to.be.true;
     });
     it("emits CypherNodeRegistrySet event", async function () {
-      await expect(this.enclave.setCypherNodeRegistry(this.owner.address))
+      await expect(this.enclave.setCypherNodeRegistry(AddressTwo))
         .to.emit(this.enclave, "CypherNodeRegistrySet")
-        .withArgs(this.owner.address);
+        .withArgs(AddressTwo);
     });
   });
 
@@ -188,9 +181,10 @@ describe("Enclave", function () {
 
   describe("enableComputationModule()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).enableComputationModule(this.mockComputationModule_address))
+      const [, , , notTheOwner] = await ethers.getSigners();
+      await expect(this.enclave.connect(notTheOwner).enableComputationModule(this.mockComputationModule_address))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
-        .withArgs(this.otherAccount);
+        .withArgs(notTheOwner);
     });
     it("reverts if computation module is already enabled", async function () {
       await expect(this.enclave.enableComputationModule(this.mockComputationModule_address))
@@ -202,27 +196,27 @@ describe("Enclave", function () {
       expect(enabled).to.be.true;
     });
     it("returns true if computation module is enabled successfully", async function () {
-      const result = await this.enclave.enableComputationModule.staticCall(this.otherAccount.address);
-
+      const result = await this.enclave.enableComputationModule.staticCall(AddressTwo);
       expect(result).to.be.true;
     });
     it("emits ComputationModuleEnabled event", async function () {
-      await expect(this.enclave.enableComputationModule(this.otherAccount.address))
+      await expect(this.enclave.enableComputationModule(AddressTwo))
         .to.emit(this.enclave, "ComputationModuleEnabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(AddressTwo);
     });
   });
 
   describe("disableComputationModule()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).disableComputationModule(this.mockComputationModule_address))
+      const [, , , notTheOwner] = await ethers.getSigners();
+      await expect(this.enclave.connect(notTheOwner).disableComputationModule(this.mockComputationModule_address))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
-        .withArgs(this.otherAccount.address);
+        .withArgs(notTheOwner);
     });
     it("reverts if computation module is not enabled", async function () {
-      await expect(this.enclave.disableComputationModule(this.otherAccount.address))
+      await expect(this.enclave.disableComputationModule(AddressTwo))
         .to.be.revertedWithCustomError(this.enclave, "ModuleNotEnabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(AddressTwo);
     });
     it("disables computation module correctly", async function () {
       await this.enclave.disableComputationModule(this.mockComputationModule_address);
@@ -244,9 +238,10 @@ describe("Enclave", function () {
 
   describe("enableExecutionModule()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).enableExecutionModule(this.mockExecutionModule_address))
+      const [, , , notTheOwner] = await ethers.getSigners();
+      await expect(this.enclave.connect(notTheOwner).enableExecutionModule(this.mockExecutionModule_address))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
-        .withArgs(this.otherAccount.address);
+        .withArgs(notTheOwner.address);
     });
     it("reverts if execution module is already enabled", async function () {
       await expect(this.enclave.enableExecutionModule(this.mockExecutionModule_address))
@@ -258,27 +253,29 @@ describe("Enclave", function () {
       expect(enabled).to.be.true;
     });
     it("returns true if execution module is enabled successfully", async function () {
-      const result = await this.enclave.enableExecutionModule.staticCall(this.otherAccount.address);
+      const result = await this.enclave.enableExecutionModule.staticCall(AddressTwo);
 
       expect(result).to.be.true;
     });
     it("emits ExecutionModuleEnabled event", async function () {
-      await expect(this.enclave.enableExecutionModule(this.otherAccount))
+      await expect(this.enclave.enableExecutionModule(AddressTwo))
         .to.emit(this.enclave, "ExecutionModuleEnabled")
-        .withArgs(this.otherAccount);
+        .withArgs(AddressTwo);
     });
   });
 
   describe("disableExecutionModule()", function () {
     it("reverts if not called by owner", async function () {
-      await expect(this.enclave.connect(this.otherAccount).disableExecutionModule(this.mockExecutionModule_address))
+      const [, , , notTheOwner] = await ethers.getSigners();
+
+      await expect(this.enclave.connect(notTheOwner).disableExecutionModule(this.mockExecutionModule_address))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
-        .withArgs(this.otherAccount.address);
+        .withArgs(notTheOwner);
     });
     it("reverts if execution module is not enabled", async function () {
-      await expect(this.enclave.disableExecutionModule(this.otherAccount.address))
+      await expect(this.enclave.disableExecutionModule(AddressTwo))
         .to.be.revertedWithCustomError(this.enclave, "ModuleNotEnabled")
-        .withArgs(this.otherAccount.address);
+        .withArgs(AddressTwo);
     });
     it("disables execution module correctly", async function () {
       await this.enclave.disableExecutionModule(this.mockExecutionModule_address);
