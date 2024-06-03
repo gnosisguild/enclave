@@ -14,13 +14,6 @@ const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 
 describe("Enclave", function () {
-  before(async function () {
-    this.signers = {} as Signers;
-
-    const signers = await ethers.getSigners();
-    this.signers.admin = signers[0];
-  });
-
   beforeEach(async function () {
     const enclave = await loadFixture(deployEnclaveFixture);
     this.enclave = enclave;
