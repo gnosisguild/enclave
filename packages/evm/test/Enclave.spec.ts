@@ -542,7 +542,11 @@ describe("Enclave", function () {
   });
 
   describe("activate()", function () {
-    it("reverts if E3 does not exist");
+    it("reverts if E3 does not exist", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(enclave, "E3DoesNotExist").withArgs(0);
+    });
     it("reverts if E3 has already been activated");
     it("reverts if cypherNodeRegistry does not return a public key");
     it("sets committeePublicKey correctly");
