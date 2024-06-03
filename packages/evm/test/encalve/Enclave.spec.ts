@@ -164,7 +164,29 @@ describe("Enclave", function () {
     it("reverts if E3 does not exist", async function () {
       await expect(this.enclave.getE3(1)).to.be.revertedWithCustomError(this.enclave, "E3DoesNotExist").withArgs(1);
     });
-    it("returns correct E3 details");
+    it("returns correct E3 details", async function () {
+      await this.enclave.request(
+        this.requestParams.poolId,
+        this.requestParams.threshold,
+        this.requestParams.duration,
+        this.requestParams.computationModule,
+        this.requestParams.cMParams,
+        this.requestParams.executionModule,
+        this.requestParams.eMParams,
+        { value: 10 },
+      );
+      const e3 = await this.enclave.getE3(0);
+
+      expect(e3.threshold).to.deep.equal(this.requestParams.threshold);
+      expect(e3.expiration).to.equal(0n);
+      expect(e3.computationModule).to.equal(this.requestParams.computationModule);
+      expect(e3.inputValidator).to.equal(abiCoder.decode(["address"], this.requestParams.cMParams)[0]);
+      expect(e3.executionModule).to.equal(this.requestParams.executionModule);
+      expect(e3.outputVerifier).to.equal(abiCoder.decode(["address"], this.requestParams.eMParams)[0]);
+      expect(e3.committeePublicKey).to.equal("0x");
+      expect(e3.ciphertextOutput).to.equal("0x");
+      expect(e3.plaintextOutput).to.equal("0x");
+    });
   });
 
   describe("enableComputationModule()", function () {
