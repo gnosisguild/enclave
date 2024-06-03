@@ -175,7 +175,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit CiphertextOutputPublished(e3Id, output);
     }
 
-    function publishDecryptedOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+    function publishPlaintextOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         require(e3.ciphertextOutput.length > 0, CiphertextOutputNotPublished(e3Id));
         require(e3.plaintextOutput.length == 0, PlaintextOutputAlreadyPublished(e3Id));
