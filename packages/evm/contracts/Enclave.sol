@@ -159,7 +159,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit InputPublished(e3Id, input);
     }
 
-    function publishComputationOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+    function publishCiphertextOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration <= block.timestamp, InputDeadlineNotPassed(e3Id, e3.expiration));
         require(e3.ciphertextOutput.length == 0, CiphertextOutputAlreadyPublished(e3Id)); // TODO: should the output verifier be able to change its mind? i.e. should we be able to call this multiple times?
@@ -171,7 +171,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit CiphertextOutputPublished(e3Id, output);
     }
 
-    function publishDecryptionOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+    function publishDecryptedOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         require(e3.ciphertextOutput.length > 0, CiphertextOutputNotPublished(e3Id));
         require(e3.plaintextOutput.length == 0, PlaintextOutputAlreadyPublished(e3Id));

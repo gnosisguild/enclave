@@ -510,7 +510,7 @@ describe("Enclave", function () {
     it("emits InputPublished event");
   });
 
-  describe("publishComputationOutput()", function () {
+  describe("publishCiphertextOutput()", function () {
     it("reverts if E3 does not exist");
     it("reverts if E3 has not been activated");
     it("reverts if input deadline has not passed");
@@ -521,7 +521,7 @@ describe("Enclave", function () {
     it("emits CiphertextOutputPublished event");
   });
 
-  describe("publishExecutionOutput()", function () {
+  describe("publishPlaintextOutput()", function () {
     it("reverts if E3 does not exist");
     it("reverts if E3 has not been activated");
     it("reverts if ciphertextOutput has not been published");
