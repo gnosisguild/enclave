@@ -38,7 +38,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     error CommitteeSelectionFailed();
-    error ComputationModuleNotAllowed();
+    error ComputationModuleNotAllowed(IComputationModule computationModule);
     error E3AlreadyActivated(uint256 e3Id);
     error E3DoesNotExist(uint256 e3Id);
     error ModuleAlreadyEnabled(address module);
@@ -49,12 +49,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidExecutionModuleSetup();
     error InvalidCypherNodeRegistry(ICypherNodeRegistry cypherNodeRegistry);
     error InvalidInput();
-    error InvalidDuration();
+    error InvalidDuration(uint256 duration);
     error InvalidOutput();
-    error InvalidThreshold();
+    error InvalidThreshold(uint32[2] threshold);
     error CiphertextOutputAlreadyPublished(uint256 e3Id);
     error CiphertextOutputNotPublished(uint256 e3Id);
-    error PaymentRequired();
+    error PaymentRequired(uint256 value);
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
 
     ////////////////////////////////////////////////////////////
@@ -97,11 +97,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         IExecutionModule executionModule,
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
-        require(msg.value > 0, PaymentRequired()); // TODO: allow for other payment methods or only native tokens?
+        // TODO: allow for other payment methods or only native tokens?
+        // TODO: should payment checks be done somewhere else? Perhaps in the computation module or cypher node registry?
+        require(msg.value > 0, PaymentRequired(msg.value));
 
-        require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold());
-        require(duration > 0 && duration <= maxDuration, InvalidDuration());
-        require(computationModules[computationModule], ComputationModuleNotAllowed());
+        require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold(threshold));
+        require(duration > 0 && duration <= maxDuration, InvalidDuration(duration)); // TODO: should 0 be a magic number for infinite duration?
+        require(computationModules[computationModule], ComputationModuleNotAllowed(computationModule));
         require(executionModules[executionModule], ModuleNotEnabled(address(executionModule)));
 
         // TODO: should IDs be incremental or produced deterministic?
@@ -137,7 +139,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function activate(uint256 e3Id) external returns (bool success) {
         E3 storage e3 = e3s[e3Id];
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
-        e3.expiration = block.timestamp + maxDuration;
+        e3.expiration = block.timestamp + maxDuration; // TODO: this should be based on the duration requested, not the current max duration.
 
         e3.committeePublicKey = cypherNodeRegistry.getCommitteePublicKey(e3Id);
         success = e3.committeePublicKey.length > 0;

@@ -1,6 +1,7 @@
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
+import exp from "constants";
 import { ethers } from "hardhat";
 
 import func from "../../deploy/deploy";
@@ -11,6 +12,8 @@ import { deployMockInputValidatorFixture } from "../mocks/MockInputValidator.fix
 import { deployMockOutputVerifierFixture } from "../mocks/MockOutputVerifier.fixture";
 import type { Signers } from "../types";
 import { deployEnclaveFixture } from "./Enclave.fixture";
+
+const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
 describe("Enclave", function () {
   before(async function () {
@@ -59,6 +62,18 @@ describe("Enclave", function () {
     this.mockInputValidator_address = mockInputValidator_address;
 
     await this.enclave.setCypherNodeRegistry(this.mockCypherNodeRegistry_address);
+    await this.enclave.enableComputationModule(this.mockComputationModule_address);
+    await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
+
+    this.requestParams = {
+      poolId: 1n,
+      threshold: [2n, 2n],
+      duration: time.duration.days(30),
+      computationModule: this.mockComputationModule_address,
+      cMParams: abiCoder.encode(["address"], [this.mockInputValidator_address]),
+      executionModule: this.mockExecutionModule_address,
+      eMParams: abiCoder.encode(["address"], [this.mockOutputVerifier_address]),
+    };
   });
 
   describe("constructor / initialize()", function () {
@@ -159,27 +174,23 @@ describe("Enclave", function () {
         .withArgs(this.otherAccount);
     });
     it("reverts if computation module is already enabled", async function () {
-      await this.enclave.enableComputationModule(this.mockComputationModule_address);
-
       await expect(this.enclave.enableComputationModule(this.mockComputationModule_address))
         .to.be.revertedWithCustomError(this.enclave, "ModuleAlreadyEnabled")
         .withArgs(this.mockComputationModule_address);
     });
     it("enables computation module correctly", async function () {
-      await this.enclave.enableComputationModule(this.mockComputationModule_address);
-
       const enabled = await this.enclave.computationModules(this.mockComputationModule_address);
       expect(enabled).to.be.true;
     });
     it("returns true if computation module is enabled successfully", async function () {
-      const result = await this.enclave.enableComputationModule.staticCall(this.mockComputationModule_address);
+      const result = await this.enclave.enableComputationModule.staticCall(this.otherAccount.address);
 
       expect(result).to.be.true;
     });
     it("emits ComputationModuleEnabled event", async function () {
-      await expect(this.enclave.enableComputationModule(this.mockComputationModule_address))
+      await expect(this.enclave.enableComputationModule(this.otherAccount.address))
         .to.emit(this.enclave, "ComputationModuleEnabled")
-        .withArgs(this.mockComputationModule_address);
+        .withArgs(this.otherAccount.address);
     });
   });
 
@@ -190,25 +201,22 @@ describe("Enclave", function () {
         .withArgs(this.otherAccount.address);
     });
     it("reverts if computation module is not enabled", async function () {
-      await expect(this.enclave.disableComputationModule(this.mockComputationModule_address))
+      await expect(this.enclave.disableComputationModule(this.otherAccount.address))
         .to.be.revertedWithCustomError(this.enclave, "ModuleNotEnabled")
-        .withArgs(this.mockComputationModule_address);
+        .withArgs(this.otherAccount.address);
     });
     it("disables computation module correctly", async function () {
-      await this.enclave.enableComputationModule(this.mockComputationModule_address);
       await this.enclave.disableComputationModule(this.mockComputationModule_address);
 
       const enabled = await this.enclave.computationModules(this.mockComputationModule_address);
       expect(enabled).to.be.false;
     });
     it("returns true if computation module is disabled successfully", async function () {
-      await this.enclave.enableComputationModule(this.mockComputationModule_address);
       const result = await this.enclave.disableComputationModule.staticCall(this.mockComputationModule_address);
 
       expect(result).to.be.true;
     });
     it("emits ComputationModuleDisabled event", async function () {
-      await this.enclave.enableComputationModule(this.mockComputationModule_address);
       await expect(this.enclave.disableComputationModule(this.mockComputationModule_address))
         .to.emit(this.enclave, "ComputationModuleDisabled")
         .withArgs(this.mockComputationModule_address);
@@ -222,27 +230,23 @@ describe("Enclave", function () {
         .withArgs(this.otherAccount.address);
     });
     it("reverts if execution module is already enabled", async function () {
-      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
-
       await expect(this.enclave.enableExecutionModule(this.mockExecutionModule_address))
         .to.be.revertedWithCustomError(this.enclave, "ModuleAlreadyEnabled")
         .withArgs(this.mockExecutionModule_address);
     });
     it("enables execution module correctly", async function () {
-      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
-
       const enabled = await this.enclave.executionModules(this.mockExecutionModule_address);
       expect(enabled).to.be.true;
     });
     it("returns true if execution module is enabled successfully", async function () {
-      const result = await this.enclave.enableExecutionModule.staticCall(this.mockExecutionModule_address);
+      const result = await this.enclave.enableExecutionModule.staticCall(this.otherAccount.address);
 
       expect(result).to.be.true;
     });
     it("emits ExecutionModuleEnabled event", async function () {
-      await expect(this.enclave.enableExecutionModule(this.mockExecutionModule_address))
+      await expect(this.enclave.enableExecutionModule(this.otherAccount))
         .to.emit(this.enclave, "ExecutionModuleEnabled")
-        .withArgs(this.mockExecutionModule_address);
+        .withArgs(this.otherAccount);
     });
   });
 
@@ -253,28 +257,215 @@ describe("Enclave", function () {
         .withArgs(this.otherAccount.address);
     });
     it("reverts if execution module is not enabled", async function () {
-      await expect(this.enclave.disableExecutionModule(this.mockExecutionModule_address))
+      await expect(this.enclave.disableExecutionModule(this.otherAccount.address))
         .to.be.revertedWithCustomError(this.enclave, "ModuleNotEnabled")
-        .withArgs(this.mockExecutionModule_address);
+        .withArgs(this.otherAccount.address);
     });
     it("disables execution module correctly", async function () {
-      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
       await this.enclave.disableExecutionModule(this.mockExecutionModule_address);
 
       const enabled = await this.enclave.executionModules(this.mockExecutionModule_address);
       expect(enabled).to.be.false;
     });
     it("returns true if execution module is disabled successfully", async function () {
-      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
       const result = await this.enclave.disableExecutionModule.staticCall(this.mockExecutionModule_address);
 
       expect(result).to.be.true;
     });
     it("emits ExecutionModuleDisabled event", async function () {
-      await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
       await expect(this.enclave.disableExecutionModule(this.mockExecutionModule_address))
         .to.emit(this.enclave, "ExecutionModuleDisabled")
         .withArgs(this.mockExecutionModule_address);
+    });
+  });
+
+  describe("request()", function () {
+    it("reverts if msg.value is 0", async function () {
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          this.requestParams.threshold,
+          this.requestParams.duration,
+          this.requestParams.computationModule,
+          this.requestParams.cMParams,
+          this.requestParams.executionModule,
+          this.requestParams.eMParams,
+        ),
+      ).to.be.revertedWithCustomError(this.enclave, "PaymentRequired");
+    });
+    it("reverts if threshold is 0", async function () {
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          [0, 2],
+          this.requestParams.duration,
+          this.requestParams.computationModule,
+          this.requestParams.cMParams,
+          this.requestParams.executionModule,
+          this.requestParams.eMParams,
+          { value: 10 },
+        ),
+      ).to.be.revertedWithCustomError(this.enclave, "InvalidThreshold");
+    });
+    it("reverts if threshold is greater than number", async function () {
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          [3, 2],
+          this.requestParams.duration,
+          this.requestParams.computationModule,
+          this.requestParams.cMParams,
+          this.requestParams.executionModule,
+          this.requestParams.eMParams,
+          { value: 10 },
+        ),
+      ).to.be.revertedWithCustomError(this.enclave, "InvalidThreshold");
+    });
+    it("reverts if duration is 0", async function () {
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          this.requestParams.threshold,
+          0,
+          this.requestParams.computationModule,
+          this.requestParams.cMParams,
+          this.requestParams.executionModule,
+          this.requestParams.eMParams,
+          { value: 10 },
+        ),
+      ).to.be.revertedWithCustomError(this.enclave, "InvalidDuration");
+    });
+    it("reverts if duration is greater than maxDuration", async function () {
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          this.requestParams.threshold,
+          time.duration.days(31),
+          this.requestParams.computationModule,
+          this.requestParams.cMParams,
+          this.requestParams.executionModule,
+          this.requestParams.eMParams,
+          { value: 10 },
+        ),
+      ).to.be.revertedWithCustomError(this.enclave, "InvalidDuration");
+    });
+    it("reverts if computation module is not enabled", async function () {
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          this.requestParams.threshold,
+          this.requestParams.duration,
+          ethers.ZeroAddress,
+          this.requestParams.cMParams,
+          this.requestParams.executionModule,
+          this.requestParams.eMParams,
+          { value: 10 },
+        ),
+      )
+        .to.be.revertedWithCustomError(this.enclave, "ComputationModuleNotAllowed")
+        .withArgs(ethers.ZeroAddress);
+    });
+    it("reverts if execution module is not enabled", async function () {
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          this.requestParams.threshold,
+          this.requestParams.duration,
+          this.requestParams.computationModule,
+          this.requestParams.cMParams,
+          ethers.ZeroAddress,
+          this.requestParams.eMParams,
+          { value: 10 },
+        ),
+      )
+        .to.be.revertedWithCustomError(this.enclave, "ModuleNotEnabled")
+        .withArgs(ethers.ZeroAddress);
+    });
+    it("reverts if input computation module does not return input validator address", async function () {
+      const zeroInput = abiCoder.encode(["address"], [ethers.ZeroAddress]);
+
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          this.requestParams.threshold,
+          this.requestParams.duration,
+          this.requestParams.computationModule,
+          zeroInput,
+          this.requestParams.executionModule,
+          this.requestParams.eMParams,
+          { value: 10 },
+        ),
+      ).to.be.revertedWithCustomError(this.enclave, "InvalidComputation");
+    });
+    it("reverts if input execution module does not return output verifier address", async function () {
+      const zeroInput = abiCoder.encode(["address"], [ethers.ZeroAddress]);
+
+      await expect(
+        this.enclave.request(
+          this.requestParams.poolId,
+          this.requestParams.threshold,
+          this.requestParams.duration,
+          this.requestParams.computationModule,
+          this.requestParams.cMParams,
+          this.requestParams.executionModule,
+          zeroInput,
+          { value: 10 },
+        ),
+      ).to.be.revertedWithCustomError(this.enclave, "InvalidExecutionModuleSetup");
+    });
+    it("reverts if committee selection fails", async function () {
+      await expect(
+        this.enclave.request(
+          0,
+          this.requestParams.threshold,
+          this.requestParams.duration,
+          this.requestParams.computationModule,
+          this.requestParams.cMParams,
+          this.requestParams.executionModule,
+          this.requestParams.eMParams,
+          { value: 10 },
+        ),
+      ).to.be.revertedWithCustomError(this.enclave, "CommitteeSelectionFailed");
+    });
+    it("instantiates a new E3", async function () {
+      await this.enclave.request(
+        this.requestParams.poolId,
+        this.requestParams.threshold,
+        this.requestParams.duration,
+        this.requestParams.computationModule,
+        this.requestParams.cMParams,
+        this.requestParams.executionModule,
+        this.requestParams.eMParams,
+        { value: 10 },
+      );
+      const e3 = await this.enclave.getE3(0);
+
+      expect(e3.threshold).to.deep.equal(this.requestParams.threshold);
+      expect(e3.expiration).to.equal(0n);
+      expect(e3.computationModule).to.equal(this.requestParams.computationModule);
+      expect(e3.inputValidator).to.equal(abiCoder.decode(["address"], this.requestParams.cMParams)[0]);
+      expect(e3.executionModule).to.equal(this.requestParams.executionModule);
+      expect(e3.outputVerifier).to.equal(abiCoder.decode(["address"], this.requestParams.eMParams)[0]);
+      expect(e3.committeePublicKey).to.equal("0x");
+      expect(e3.ciphertextOutput).to.equal("0x");
+      expect(e3.plaintextOutput).to.equal("0x");
+    });
+    it("emits E3Requested event", async function () {
+      const tx = await this.enclave.request(
+        this.requestParams.poolId,
+        this.requestParams.threshold,
+        this.requestParams.duration,
+        this.requestParams.computationModule,
+        this.requestParams.cMParams,
+        this.requestParams.executionModule,
+        this.requestParams.eMParams,
+        { value: 10 },
+      );
+      const e3 = await this.enclave.getE3(0);
+
+      await expect(tx)
+        .to.emit(this.enclave, "E3Requested")
+        .withArgs(0, e3, 1, this.requestParams.computationModule, this.requestParams.executionModule);
     });
   });
 });
