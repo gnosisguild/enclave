@@ -3,12 +3,11 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
-import { deployMockComputationModuleFixture } from "./fixtures/MockComputationModule.fixture";
+import { deployComputationModuleFixture } from "./fixtures/MockComputationModule.fixture";
 import { deployMockCypherNodeRegistryFixture } from "./fixtures/MockCypherNodeRegistry.fixture";
 import { deployMockExecutionModuleFixture } from "./fixtures/MockExecutionModule.fixture";
 import { deployMockInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
 import { deployMockOutputVerifierFixture } from "./fixtures/MockOutputVerifier.fixture";
-import { Signers } from "./types";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -18,11 +17,7 @@ describe("Enclave", function () {
     const enclave = await loadFixture(deployEnclaveFixture);
     this.enclave = enclave;
 
-    const { mockComputationModule, mockComputationModule_address } = await loadFixture(
-      deployMockComputationModuleFixture,
-    );
-    this.mockComputationModule = mockComputationModule;
-    this.mockComputationModule_address = mockComputationModule_address;
+    const computationModule = await loadFixture(deployComputationModuleFixture);
 
     const { mockOutputVerifier, mockOutputVerifier_address } = await loadFixture(deployMockOutputVerifierFixture);
     this.mockOutputVerifier = mockOutputVerifier;
@@ -43,14 +38,14 @@ describe("Enclave", function () {
     this.mockInputValidator_address = mockInputValidator_address;
 
     await this.enclave.setCypherNodeRegistry(this.mockCypherNodeRegistry_address);
-    await this.enclave.enableComputationModule(this.mockComputationModule_address);
+    await this.enclave.enableComputationModule(await computationModule.getAddress());
     await this.enclave.enableExecutionModule(this.mockExecutionModule_address);
 
     this.requestParams = {
       poolId: 1n,
       threshold: [2n, 2n],
       duration: time.duration.days(30),
-      computationModule: this.mockComputationModule_address,
+      computationModule: await computationModule.getAddress(),
       cMParams: abiCoder.encode(["address"], [this.mockInputValidator_address]),
       executionModule: this.mockExecutionModule_address,
       eMParams: abiCoder.encode(["address"], [this.mockOutputVerifier_address]),
@@ -175,17 +170,20 @@ describe("Enclave", function () {
   describe("enableComputationModule()", function () {
     it("reverts if not called by owner", async function () {
       const [, , , notTheOwner] = await ethers.getSigners();
-      await expect(this.enclave.connect(notTheOwner).enableComputationModule(this.mockComputationModule_address))
+      const { computationModule } = this.requestParams;
+      await expect(this.enclave.connect(notTheOwner).enableComputationModule(computationModule))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
     it("reverts if computation module is already enabled", async function () {
-      await expect(this.enclave.enableComputationModule(this.mockComputationModule_address))
+      const { computationModule } = this.requestParams;
+      await expect(this.enclave.enableComputationModule(computationModule))
         .to.be.revertedWithCustomError(this.enclave, "ModuleAlreadyEnabled")
-        .withArgs(this.mockComputationModule_address);
+        .withArgs(computationModule);
     });
     it("enables computation module correctly", async function () {
-      const enabled = await this.enclave.computationModules(this.mockComputationModule_address);
+      const { computationModule } = this.requestParams;
+      const enabled = await this.enclave.computationModules(computationModule);
       expect(enabled).to.be.true;
     });
     it("returns true if computation module is enabled successfully", async function () {
@@ -202,7 +200,8 @@ describe("Enclave", function () {
   describe("disableComputationModule()", function () {
     it("reverts if not called by owner", async function () {
       const [, , , notTheOwner] = await ethers.getSigners();
-      await expect(this.enclave.connect(notTheOwner).disableComputationModule(this.mockComputationModule_address))
+      const { computationModule } = this.requestParams;
+      await expect(this.enclave.connect(notTheOwner).disableComputationModule(computationModule))
         .to.be.revertedWithCustomError(this.enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
@@ -212,20 +211,23 @@ describe("Enclave", function () {
         .withArgs(AddressTwo);
     });
     it("disables computation module correctly", async function () {
-      await this.enclave.disableComputationModule(this.mockComputationModule_address);
+      const { computationModule } = this.requestParams;
+      await this.enclave.disableComputationModule(computationModule);
 
-      const enabled = await this.enclave.computationModules(this.mockComputationModule_address);
+      const enabled = await this.enclave.computationModules(computationModule);
       expect(enabled).to.be.false;
     });
     it("returns true if computation module is disabled successfully", async function () {
-      const result = await this.enclave.disableComputationModule.staticCall(this.mockComputationModule_address);
+      const { computationModule } = this.requestParams;
+      const result = await this.enclave.disableComputationModule.staticCall(computationModule);
 
       expect(result).to.be.true;
     });
     it("emits ComputationModuleDisabled event", async function () {
-      await expect(this.enclave.disableComputationModule(this.mockComputationModule_address))
+      const { computationModule } = this.requestParams;
+      await expect(this.enclave.disableComputationModule(computationModule))
         .to.emit(this.enclave, "ComputationModuleDisabled")
-        .withArgs(this.mockComputationModule_address);
+        .withArgs(computationModule);
     });
   });
 
