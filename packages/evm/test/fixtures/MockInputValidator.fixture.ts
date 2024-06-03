@@ -1,12 +1,8 @@
 import { ethers } from "hardhat";
 
-import { MockInputValidator } from "../../types/contracts/test/MockInputValidator";
 import { MockInputValidator__factory } from "../../types/factories/contracts/test/MockInputValidator__factory";
 
-export async function deployMockInputValidatorFixture() {
-  const MockInputValidator = (await ethers.getContractFactory("MockInputValidator")) as MockInputValidator__factory;
-  const mockInputValidator = (await MockInputValidator.deploy()) as MockInputValidator;
-  const mockInputValidator_address = await mockInputValidator.getAddress();
-
-  return { mockInputValidator, mockInputValidator_address };
+export async function deployInputValidatorFixture() {
+  const deployment = await (await ethers.getContractFactory("MockInputValidator")).deploy();
+  return MockInputValidator__factory.connect(await deployment.getAddress());
 }
