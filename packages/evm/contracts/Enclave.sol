@@ -124,9 +124,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             executionModule: executionModule,
             inputValidator: inputValidator,
             outputVerifier: outputVerifier,
-            committeePublicKey: new bytes(0),
-            ciphertextOutput: new bytes(0),
-            plaintextOutput: new bytes(0)
+            committeePublicKey: hex"",
+            ciphertextOutput: hex"",
+            plaintextOutput: hex""
         });
         e3s[e3Id] = e3;
 
