@@ -137,16 +137,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     function activate(uint256 e3Id) external returns (bool success) {
+        // Note: we could load this into a storage pointer, and do the sets there
+        // Requires a mew internal _getter that returns storage
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
-        e3.expiration = block.timestamp + maxDuration; // TODO: this should be based on the duration requested, not the current max duration.
 
         bytes memory committeePublicKey = cypherNodeRegistry.getCommitteePublicKey(e3Id);
-        success = committeePublicKey.length > 0;
-        require(success, CommitteeSelectionFailed());
+        require(committeePublicKey.length > 0, CommitteeSelectionFailed());
+
+        e3s[e3Id].expiration = block.timestamp + maxDuration; // TODO: this should be based on the duration requested, not the current max duration.
         e3s[e3Id].committeePublicKey = committeePublicKey;
 
         emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);
+
+        return true;
     }
 
     function publishInput(uint256 e3Id, bytes memory data) external returns (bool success) {
