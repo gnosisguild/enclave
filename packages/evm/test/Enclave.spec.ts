@@ -2,13 +2,13 @@ import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-import { deployMockComputationModuleFixture } from "../mocks/MockComputationModule.fixture";
-import { deployMockCypherNodeRegistryFixture } from "../mocks/MockCypherNodeRegistry.fixture";
-import { deployMockExecutionModuleFixture } from "../mocks/MockExecutionModule.fixture";
-import { deployMockInputValidatorFixture } from "../mocks/MockInputValidator.fixture";
-import { deployMockOutputVerifierFixture } from "../mocks/MockOutputVerifier.fixture";
-import type { Signers } from "../types";
-import { deployEnclaveFixture } from "./Enclave.fixture";
+import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
+import { deployMockComputationModuleFixture } from "./fixtures/MockComputationModule.fixture";
+import { deployMockCypherNodeRegistryFixture } from "./fixtures/MockCypherNodeRegistry.fixture";
+import { deployMockExecutionModuleFixture } from "./fixtures/MockExecutionModule.fixture";
+import { deployMockInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
+import { deployMockOutputVerifierFixture } from "./fixtures/MockOutputVerifier.fixture";
+import { Signers } from "./types";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
