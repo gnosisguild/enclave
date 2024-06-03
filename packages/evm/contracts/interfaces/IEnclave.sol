@@ -116,7 +116,7 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded output data to verify.
     /// @return success True if the output was successfully published.
-    function publishOutput(uint256 e3Id, bytes memory data) external returns (bool success);
+    function publishComputationOutput(uint256 e3Id, bytes memory data) external returns (bool success);
 
     /// @notice This function should be called to decrypt the output of an Encrypted Execution Environment (E3).
     /// @dev This function MUST revert if the output has not been published.
@@ -124,7 +124,7 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded output data to decrypt.
     /// @return success True if the output was successfully decrypted.
-    function publishDecryptedOutput(uint256 e3Id, bytes memory data) external returns (bool success);
+    function publishDecryptionOutput(uint256 e3Id, bytes memory data) external returns (bool success);
 
     ////////////////////////////////////////////////////////////
     //                                                        //

@@ -490,4 +490,45 @@ describe("Enclave", function () {
         .withArgs(0, e3, 1, this.requestParams.computationModule, this.requestParams.executionModule);
     });
   });
+
+  describe("activate()", function () {
+    it("reverts if E3 does not exist");
+    it("reverts if E3 has already been activated");
+    it("reverts if cypherNodeRegistry does not return a public key");
+    it("sets committeePublicKey correctly");
+    it("returns true if E3 is activated successfully");
+    it("emits E3Activated event");
+  });
+
+  describe("publishInput()", function () {
+    it("reverts if E3 does not exist");
+    it("reverts if E3 has not been activated");
+    it("reverts if outside of input window");
+    it("reverts if input is not valid");
+    it("sets ciphertextInput correctly");
+    it("returns true if input is published successfully");
+    it("emits InputPublished event");
+  });
+
+  describe("publishComputationOutput()", function () {
+    it("reverts if E3 does not exist");
+    it("reverts if E3 has not been activated");
+    it("reverts if input deadline has not passed");
+    it("reverts if output has already been published");
+    it("reverts if output is not valid");
+    it("sets ciphertextOutput correctly");
+    it("returns true if output is published successfully");
+    it("emits CiphertextOutputPublished event");
+  });
+
+  describe("publishExecutionOutput()", function () {
+    it("reverts if E3 does not exist");
+    it("reverts if E3 has not been activated");
+    it("reverts if ciphertextOutput has not been published");
+    it("reverts if plaintextOutput has already been published");
+    it("reverts if output is not valid");
+    it("sets plaintextOutput correctly");
+    it("returns true if output is published successfully");
+    it("emits PlaintextOutputPublished event");
+  });
 });

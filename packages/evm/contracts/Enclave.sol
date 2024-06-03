@@ -137,46 +137,48 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     function activate(uint256 e3Id) external returns (bool success) {
-        E3 storage e3 = e3s[e3Id];
+        E3 memory e3 = getE3(e3Id);
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
         e3.expiration = block.timestamp + maxDuration; // TODO: this should be based on the duration requested, not the current max duration.
 
-        e3.committeePublicKey = cypherNodeRegistry.getCommitteePublicKey(e3Id);
-        success = e3.committeePublicKey.length > 0;
+        bytes memory committeePublicKey = cypherNodeRegistry.getCommitteePublicKey(e3Id);
+        success = committeePublicKey.length > 0;
         require(success, CommitteeSelectionFailed());
+        e3s[e3Id].committeePublicKey = committeePublicKey;
 
         emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);
     }
 
     function publishInput(uint256 e3Id, bytes memory data) external returns (bool success) {
-        E3 storage e3 = e3s[e3Id];
-        require(e3.expiration > block.timestamp, InputDeadlinePassed(e3Id, e3.expiration));
+        E3 memory e3 = getE3(e3Id);
+        require(e3.expiration > block.timestamp, InputDeadlinePassed(e3Id, e3.expiration)); // TODO: should we have an input window, including both a start and end timestamp?
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
-
+        // TODO: do we need to store or accumulate the inputs? Probably yes.
         emit InputPublished(e3Id, input);
     }
 
-    function publishOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
-        E3 storage e3 = e3s[e3Id];
+    function publishComputationOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+        E3 memory e3 = getE3(e3Id);
         require(e3.expiration <= block.timestamp, InputDeadlineNotPassed(e3Id, e3.expiration));
-        require(e3.ciphertextOutput.length == 0, CiphertextOutputAlreadyPublished(e3Id));
+        require(e3.ciphertextOutput.length == 0, CiphertextOutputAlreadyPublished(e3Id)); // TODO: should the output verifier be able to change its mind? i.e. should we be able to call this multiple times?
         bytes memory output;
         (output, success) = e3.outputVerifier.verify(e3Id, data);
         require(success, InvalidOutput());
-        e3.ciphertextOutput = output;
+        e3s[e3Id].ciphertextOutput = output;
 
         emit CiphertextOutputPublished(e3Id, output);
     }
 
-    function publishDecryptedOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
-        E3 storage e3 = e3s[e3Id];
+    function publishDecryptionOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+        E3 memory e3 = getE3(e3Id);
         require(e3.ciphertextOutput.length > 0, CiphertextOutputNotPublished(e3Id));
         require(e3.plaintextOutput.length == 0, PlaintextOutputAlreadyPublished(e3Id));
         bytes memory output;
         (output, success) = e3.computationModule.verify(e3Id, data);
-        e3.plaintextOutput = output;
+        require(success, InvalidOutput());
+        e3s[e3Id].plaintextOutput = output;
 
         emit PlaintextOutputPublished(e3Id, output);
     }
