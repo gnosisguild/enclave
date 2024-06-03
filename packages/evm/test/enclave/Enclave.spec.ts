@@ -1,10 +1,7 @@
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
-import exp from "constants";
 import { ethers } from "hardhat";
 
-import func from "../../deploy/deploy";
 import { deployMockComputationModuleFixture } from "../mocks/MockComputationModule.fixture";
 import { deployMockCypherNodeRegistryFixture } from "../mocks/MockCypherNodeRegistry.fixture";
 import { deployMockExecutionModuleFixture } from "../mocks/MockExecutionModule.fixture";
