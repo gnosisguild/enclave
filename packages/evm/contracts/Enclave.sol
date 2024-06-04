@@ -89,7 +89,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function request(
-        address pool,
+        address pool, // TODO: should we allow for multiple pools?
         uint32[2] calldata threshold,
         uint256 duration, // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are published before the request is made? This kind of assumes the cypher nodes have already been selected and generated a shared secret.
         IComputationModule computationModule,
