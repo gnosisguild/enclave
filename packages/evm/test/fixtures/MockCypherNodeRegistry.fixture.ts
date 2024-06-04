@@ -1,9 +1,9 @@
 import { ethers } from "hardhat";
 
-import { MockCypherNodeRegistry__factory } from "../../types/factories/contracts/test/MockCypherNodeRegistry__factory";
+import { MockCyphernodeRegistry__factory } from "../../types/factories/contracts/test/MockCyphernodeRegistry__factory";
 
-export async function deployCypherNodeRegistryFixture() {
-  const deployment = await (await ethers.getContractFactory("MockCypherNodeRegistry")).deploy();
+export async function deployCyphernodeRegistryFixture() {
+  const deployment = await (await ethers.getContractFactory("MockCyphernodeRegistry")).deploy();
 
-  return MockCypherNodeRegistry__factory.connect(await deployment.getAddress());
+  return MockCyphernodeRegistry__factory.connect(await deployment.getAddress());
 }

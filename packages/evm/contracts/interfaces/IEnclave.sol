@@ -49,9 +49,9 @@ interface IEnclave {
     /// @param maxDuration The maximum duration of a computation in seconds.
     event MaxDurationSet(uint256 maxDuration);
 
-    /// @notice This event MUST be emitted any time the CypherNodeRegistry is set.
-    /// @param cypherNodeRegistry The address of the CypherNodeRegistry contract.
-    event CypherNodeRegistrySet(address cypherNodeRegistry);
+    /// @notice This event MUST be emitted any time the CyphernodeRegistry is set.
+    /// @param cyphernodeRegistry The address of the CyphernodeRegistry contract.
+    event CyphernodeRegistrySet(address cyphernodeRegistry);
 
     /// @notice This event MUST be emitted any time a computation module is enabled.
     /// @param computationModule The address of the computation module.

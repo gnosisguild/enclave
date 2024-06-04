@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-interface ICypherNodeRegistry {
+interface ICyphernodeRegistry {
     /// @notice This event MUST be emitted when a node is added to the registry.
     /// @param nodeId ID of the node.
     /// @param node Address of the node.

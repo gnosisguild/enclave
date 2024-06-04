@@ -5,7 +5,7 @@ import { ethers } from "hardhat";
 
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
 import { deployComputationModuleFixture } from "./fixtures/MockComputationModule.fixture";
-import { deployCypherNodeRegistryFixture } from "./fixtures/MockCypherNodeRegistry.fixture";
+import { deployCyphernodeRegistryFixture } from "./fixtures/MockCyphernodeRegistry.fixture";
 import { deployExecutionModuleFixture } from "./fixtures/MockExecutionModule.fixture";
 import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
 import { deployOutputVerifierFixture } from "./fixtures/MockOutputVerifier.fixture";
@@ -17,7 +17,7 @@ describe("Enclave", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
 
-    const registry = await deployCypherNodeRegistryFixture();
+    const registry = await deployCyphernodeRegistryFixture();
     const computationModule = await deployComputationModuleFixture();
     const outputVerifier = await deployOutputVerifierFixture();
     const executionModule = await deployExecutionModuleFixture();
@@ -49,13 +49,13 @@ describe("Enclave", function () {
     it("correctly sets owner", async function () {
       const [, , , someSigner] = await ethers.getSigners();
       const enclave = await deployEnclaveFixture({ owner: someSigner, registry: AddressTwo });
-      expect(await enclave.cypherNodeRegistry()).to.equal(AddressTwo);
+      expect(await enclave.cyphernodeRegistry()).to.equal(AddressTwo);
     });
 
-    it("correctly sets cypherNodeRegistry address", async function () {
+    it("correctly sets cyphernodeRegistry address", async function () {
       const [aSigner] = await ethers.getSigners();
       const enclave = await deployEnclaveFixture({ owner: aSigner, registry: AddressTwo });
-      expect(await enclave.cypherNodeRegistry()).to.equal(AddressTwo);
+      expect(await enclave.cyphernodeRegistry()).to.equal(AddressTwo);
     });
 
     it("correctly sets max duration", async function () {
@@ -88,47 +88,47 @@ describe("Enclave", function () {
     });
   });
 
-  describe("setCypherNodeRegistry()", function () {
+  describe("setCyphernodeRegistry()", function () {
     it("reverts if not called by owner", async function () {
       const { enclave, notTheOwner } = await loadFixture(setup);
 
-      await expect(enclave.connect(notTheOwner).setCypherNodeRegistry(AddressTwo))
+      await expect(enclave.connect(notTheOwner).setCyphernodeRegistry(AddressTwo))
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
     it("reverts if given address(0)", async function () {
       const { enclave } = await loadFixture(setup);
-      await expect(enclave.setCypherNodeRegistry(ethers.ZeroAddress))
-        .to.be.revertedWithCustomError(enclave, "InvalidCypherNodeRegistry")
+      await expect(enclave.setCyphernodeRegistry(ethers.ZeroAddress))
+        .to.be.revertedWithCustomError(enclave, "InvalidCyphernodeRegistry")
         .withArgs(ethers.ZeroAddress);
     });
-    it("reverts if given address is the same as the current cypherNodeRegistry", async function () {
+    it("reverts if given address is the same as the current cyphernodeRegistry", async function () {
       const {
         enclave,
         mocks: { registry },
       } = await loadFixture(setup);
-      await expect(enclave.setCypherNodeRegistry(registry))
-        .to.be.revertedWithCustomError(enclave, "InvalidCypherNodeRegistry")
+      await expect(enclave.setCyphernodeRegistry(registry))
+        .to.be.revertedWithCustomError(enclave, "InvalidCyphernodeRegistry")
         .withArgs(registry);
     });
-    it("sets cypherNodeRegistry correctly", async function () {
+    it("sets cyphernodeRegistry correctly", async function () {
       const { enclave } = await loadFixture(setup);
 
-      expect(await enclave.cypherNodeRegistry()).to.not.equal(AddressTwo);
-      await enclave.setCypherNodeRegistry(AddressTwo);
-      expect(await enclave.cypherNodeRegistry()).to.equal(AddressTwo);
+      expect(await enclave.cyphernodeRegistry()).to.not.equal(AddressTwo);
+      await enclave.setCyphernodeRegistry(AddressTwo);
+      expect(await enclave.cyphernodeRegistry()).to.equal(AddressTwo);
     });
-    it("returns true if cypherNodeRegistry is set successfully", async function () {
+    it("returns true if cyphernodeRegistry is set successfully", async function () {
       const { enclave } = await loadFixture(setup);
 
-      const result = await enclave.setCypherNodeRegistry.staticCall(AddressTwo);
+      const result = await enclave.setCyphernodeRegistry.staticCall(AddressTwo);
       expect(result).to.be.true;
     });
-    it("emits CypherNodeRegistrySet event", async function () {
+    it("emits CyphernodeRegistrySet event", async function () {
       const { enclave } = await loadFixture(setup);
 
-      await expect(enclave.setCypherNodeRegistry(AddressTwo))
-        .to.emit(enclave, "CypherNodeRegistrySet")
+      await expect(enclave.setCyphernodeRegistry(AddressTwo))
+        .to.emit(enclave, "CyphernodeRegistrySet")
         .withArgs(AddressTwo);
     });
   });
@@ -565,7 +565,7 @@ describe("Enclave", function () {
       await expect(enclave.activate(0)).to.not.be.reverted;
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(enclave, "E3AlreadyActivated").withArgs(0);
     });
-    it("reverts if cypherNodeRegistry does not return a public key");
+    it("reverts if cyphernodeRegistry does not return a public key");
     it("sets committeePublicKey correctly");
     it("returns true if E3 is activated successfully");
     it("emits E3Activated event");

@@ -2,7 +2,7 @@
 pragma solidity >=0.8.26;
 
 import { IEnclave, E3, IComputationModule, IExecutionModule } from "./interfaces/IEnclave.sol";
-import { ICypherNodeRegistry } from "./interfaces/ICypherNodeRegistry.sol";
+import { ICyphernodeRegistry } from "./interfaces/ICyphernodeRegistry.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
 import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -14,7 +14,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    ICypherNodeRegistry public cypherNodeRegistry; // TODO: add a setter function.
+    ICyphernodeRegistry public cyphernodeRegistry; // TODO: add a setter function.
     uint256 public maxDuration; // TODO: add a setter function.
     uint256 public nexte3Id; // ID of the next E3.
     uint256 public requests; // total number of requests made to Enclave.
@@ -47,7 +47,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputation();
     error InvalidExecutionModuleSetup();
-    error InvalidCypherNodeRegistry(ICypherNodeRegistry cypherNodeRegistry);
+    error InvalidCyphernodeRegistry(ICyphernodeRegistry cyphernodeRegistry);
     error InvalidInput();
     error InvalidDuration(uint256 duration);
     error InvalidOutput();
@@ -65,20 +65,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
-    constructor(address _owner, ICypherNodeRegistry _cypherNodeRegistry, uint256 _maxDuration) {
-        initialize(_owner, _cypherNodeRegistry, _maxDuration);
+    constructor(address _owner, ICyphernodeRegistry _cyphernodeRegistry, uint256 _maxDuration) {
+        initialize(_owner, _cyphernodeRegistry, _maxDuration);
     }
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
     function initialize(
         address _owner,
-        ICypherNodeRegistry _cypherNodeRegistry,
+        ICyphernodeRegistry _cyphernodeRegistry,
         uint256 _maxDuration
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
-        setCypherNodeRegistry(_cypherNodeRegistry);
+        setCyphernodeRegistry(_cyphernodeRegistry);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -130,7 +130,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         });
         e3s[e3Id] = e3;
 
-        require(cypherNodeRegistry.selectCommittee(e3Id, pool, threshold), CommitteeSelectionFailed());
+        require(cyphernodeRegistry.selectCommittee(e3Id, pool, threshold), CommitteeSelectionFailed());
         // TODO: validate that the selected pool accepts both the computation and execution modules.
 
         emit E3Requested(e3Id, e3s[e3Id], pool, computationModule, executionModule);
@@ -142,7 +142,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
 
-        bytes memory committeePublicKey = cypherNodeRegistry.getCommitteePublicKey(e3Id);
+        bytes memory committeePublicKey = cyphernodeRegistry.getCommitteePublicKey(e3Id);
         require(committeePublicKey.length > 0, CommitteeSelectionFailed());
 
         e3s[e3Id].expiration = block.timestamp + maxDuration; // TODO: this should be based on the duration requested, not the current max duration.
@@ -199,14 +199,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit MaxDurationSet(_maxDuration);
     }
 
-    function setCypherNodeRegistry(ICypherNodeRegistry _cypherNodeRegistry) public onlyOwner returns (bool success) {
+    function setCyphernodeRegistry(ICyphernodeRegistry _cyphernodeRegistry) public onlyOwner returns (bool success) {
         require(
-            address(_cypherNodeRegistry) != address(0) && _cypherNodeRegistry != cypherNodeRegistry,
-            InvalidCypherNodeRegistry(_cypherNodeRegistry)
+            address(_cyphernodeRegistry) != address(0) && _cyphernodeRegistry != cyphernodeRegistry,
+            InvalidCyphernodeRegistry(_cyphernodeRegistry)
         );
-        cypherNodeRegistry = _cypherNodeRegistry;
+        cyphernodeRegistry = _cyphernodeRegistry;
         success = true;
-        emit CypherNodeRegistrySet(address(_cypherNodeRegistry));
+        emit CyphernodeRegistrySet(address(_cyphernodeRegistry));
     }
 
     function enableComputationModule(IComputationModule computationModule) public onlyOwner returns (bool success) {
