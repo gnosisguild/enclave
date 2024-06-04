@@ -6,10 +6,10 @@ import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
 contract MockCyphernodeRegistry is ICyphernodeRegistry {
     function selectCommittee(
         uint256,
-        address pool,
+        address[] memory pools,
         uint32[2] calldata
     ) external pure returns (bool success) {
-        if (pool == address(2)) {
+        if (pools[0] == address(2)) {
             success = false;
         } else {
             success = true;
@@ -24,17 +24,17 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
 contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
     function selectCommittee(
         uint256,
-        address pool,
+        address[] memory pools,
         uint32[2] calldata
     ) external pure returns (bool success) {
-        if (pool == address(2)) {
+        if (pools[0] == address(2)) {
             success = false;
         } else {
             success = true;
         }
     }
 
-    function getCommitteePublicKey(uint256 e3Id) external pure returns (bytes memory) {
+    function getCommitteePublicKey(uint256) external pure returns (bytes memory) {
         return hex"";
     }
 }

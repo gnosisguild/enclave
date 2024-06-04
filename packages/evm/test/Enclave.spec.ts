@@ -43,7 +43,7 @@ describe("Enclave", function () {
         registry,
       },
       request: {
-        pool: ethers.ZeroAddress,
+        pool: [ethers.ZeroAddress],
         threshold: [2, 2] as [number, number],
         duration: time.duration.days(30),
         computationModule: await computationModule.getAddress(),
@@ -507,7 +507,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          AddressTwo,
+          [AddressTwo],
           request.threshold,
           request.duration,
           request.computationModule,

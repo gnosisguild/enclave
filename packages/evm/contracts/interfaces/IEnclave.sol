@@ -19,7 +19,7 @@ interface IEnclave {
     event E3Requested(
         uint256 e3Id,
         E3 e3,
-        address indexed pool,
+        address[] pool,
         IComputationModule indexed computationModule,
         IExecutionModule indexed executionModule
     );
@@ -77,7 +77,7 @@ interface IEnclave {
 
     /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).
     /// @dev This function MUST emit the E3Requested event.
-    /// @param pool ID of the pool of nodes from which to select the committee.
+    /// @param pools IDs of the pool of nodes from which to select the committee.
     /// @param threshold The M/N threshold for the committee.
     /// @param duration The duration of the computation in seconds.
     /// @param computationModule Address of the computation module.
@@ -87,7 +87,7 @@ interface IEnclave {
     /// @return e3Id ID of the E3.
     /// @return e3 The E3 struct.
     function request(
-        address pool,
+        address[] memory pools,
         uint32[2] calldata threshold,
         uint256 duration,
         IComputationModule computationModule,
