@@ -2,6 +2,24 @@
 pragma solidity >=0.8.26;
 
 interface ICypherNodeRegistry {
+    /// @notice This event MUST be emitted when a node is added to the registry.
+    /// @param nodeId ID of the node.
+    /// @param node Address of the node.
+    event NodeAdded(uint256 indexed nodeId, address indexed node);
+
+    /// @notice This event MUST be emitted when a node is removed from the registry.
+    /// @param nodeId ID of the node.
+    /// @param node Address of the node.
+    event NodeRemoved(uint256 indexed nodeId, address indexed node);
+
+    /// @notice This event MUST be emitted when a pool is added to the registry.
+    /// @param poolId ID of the pool.
+    event PoolAdded(address indexed poolId);
+
+    /// @notice This event MUST be emitted when a pool is removed from the registry.
+    /// @param poolId ID of the pool.
+    event PoolRemoved(address indexed poolId);
+
     /// @notice This function should be called by the Enclave contract to select a node committee.
     /// @param e3Id ID of the E3 for which to select the committee.
     /// @param poolId ID of the pool of nodes from which to select the committee.
@@ -9,7 +27,7 @@ interface ICypherNodeRegistry {
     /// @return success True if committee selection was successfully initiated.
     function selectCommittee(
         uint256 e3Id,
-        uint256 poolId,
+        address poolId,
         uint32[2] calldata threshold
     ) external returns (bool success);
 

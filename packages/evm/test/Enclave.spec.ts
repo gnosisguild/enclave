@@ -34,7 +34,7 @@ describe("Enclave", function () {
       enclave,
       mocks: { computationModule, outputVerifier, executionModule, inputValidator, registry },
       request: {
-        poolId: 1n,
+        pool: ethers.ZeroAddress,
         threshold: [2, 2] as [number, number],
         duration: time.duration.days(30),
         computationModule: await computationModule.getAddress(),
@@ -142,7 +142,7 @@ describe("Enclave", function () {
     it("returns correct E3 details", async function () {
       const { enclave, request } = await loadFixture(setup);
       await enclave.request(
-        request.poolId,
+        request.pool,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -347,7 +347,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -361,7 +361,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           [0, 2],
           request.duration,
           request.computationModule,
@@ -376,7 +376,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           [3, 2],
           request.duration,
           request.computationModule,
@@ -391,7 +391,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           request.threshold,
           0,
           request.computationModule,
@@ -406,7 +406,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           request.threshold,
           time.duration.days(31),
           request.computationModule,
@@ -421,7 +421,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           request.threshold,
           request.duration,
           ethers.ZeroAddress,
@@ -438,7 +438,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -456,7 +456,7 @@ describe("Enclave", function () {
 
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -471,7 +471,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.poolId,
+          request.pool,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -486,7 +486,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          0,
+          AddressTwo,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -500,7 +500,7 @@ describe("Enclave", function () {
     it("instantiates a new E3", async function () {
       const { enclave, request } = await loadFixture(setup);
       await enclave.request(
-        request.poolId,
+        request.pool,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -524,7 +524,7 @@ describe("Enclave", function () {
     it("emits E3Requested event", async function () {
       const { enclave, request } = await loadFixture(setup);
       const tx = await enclave.request(
-        request.poolId,
+        request.pool,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -537,7 +537,7 @@ describe("Enclave", function () {
 
       await expect(tx)
         .to.emit(enclave, "E3Requested")
-        .withArgs(0, e3, 1, request.computationModule, request.executionModule);
+        .withArgs(0, e3, request.pool, request.computationModule, request.executionModule);
     });
   });
 
@@ -551,7 +551,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.poolId,
+        request.pool,
         request.threshold,
         request.duration,
         request.computationModule,

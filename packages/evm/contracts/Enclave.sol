@@ -89,7 +89,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function request(
-        uint256 poolId,
+        address pool,
         uint32[2] calldata threshold,
         uint256 duration, // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are published before the request is made? This kind of assumes the cypher nodes have already been selected and generated a shared secret.
         IComputationModule computationModule,
@@ -130,10 +130,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         });
         e3s[e3Id] = e3;
 
-        require(cypherNodeRegistry.selectCommittee(e3Id, poolId, threshold), CommitteeSelectionFailed());
+        require(cypherNodeRegistry.selectCommittee(e3Id, pool, threshold), CommitteeSelectionFailed());
         // TODO: validate that the selected pool accepts both the computation and execution modules.
 
-        emit E3Requested(e3Id, e3s[e3Id], poolId, computationModule, executionModule);
+        emit E3Requested(e3Id, e3s[e3Id], pool, computationModule, executionModule);
     }
 
     function activate(uint256 e3Id) external returns (bool success) {
