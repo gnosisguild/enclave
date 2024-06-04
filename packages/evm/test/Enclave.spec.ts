@@ -565,7 +565,29 @@ describe("Enclave", function () {
       await expect(enclave.activate(0)).to.not.be.reverted;
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(enclave, "E3AlreadyActivated").withArgs(0);
     });
-    it("reverts if cyphernodeRegistry does not return a public key");
+    it("reverts if cyphernodeRegistry does not return a public key", async function () {
+      const { enclave, request } = await loadFixture(setup);
+
+      await enclave.request(
+        request.pool,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const prevRegistry = await enclave.cyphernodeRegistry();
+      const nextRegistry = await deployCyphernodeRegistryFixture("MockCyphernodeRegistryEmptyKey");
+
+      await enclave.setCyphernodeRegistry(nextRegistry);
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
+
+      await enclave.setCyphernodeRegistry(prevRegistry);
+      await expect(enclave.activate(0)).to.not.be.reverted;
+    });
     it("sets committeePublicKey correctly");
     it("returns true if E3 is activated successfully");
     it("emits E3Activated event");
