@@ -645,8 +645,45 @@ describe("Enclave", function () {
       e3 = await enclave.getE3(e3Id);
       expect(e3.committeePublicKey).to.equal(publicKey);
     });
-    it("returns true if E3 is activated successfully");
-    it("emits E3Activated event");
+    it("returns true if E3 is activated successfully", async () => {
+      const { enclave, request } = await loadFixture(setup);
+
+      await enclave.request(
+        request.pool,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const e3Id = 0;
+
+      expect(await enclave.activate.staticCall(e3Id)).to.be.equal(true);
+    });
+    it("emits E3Activated event", async () => {
+      const { enclave, request } = await loadFixture(setup);
+
+      await enclave.request(
+        request.pool,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const e3Id = 0;
+      const e3 = await enclave.getE3(e3Id);
+
+      expect(await enclave.activate(e3Id))
+        .to.emit(enclave, "E3Activated")
+        .withArgs(e3Id, e3.expiration, e3.committeePublicKey);
+    });
   });
 
   describe("publishInput()", function () {
