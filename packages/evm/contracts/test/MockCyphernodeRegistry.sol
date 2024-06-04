@@ -4,7 +4,11 @@ pragma solidity >=0.8.26;
 import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
 
 contract MockCyphernodeRegistry is ICyphernodeRegistry {
-    function selectCommittee(uint256, address pool, uint32[2] calldata) external pure returns (bool success) {
+    function selectCommittee(
+        uint256,
+        address pool,
+        uint32[2] calldata
+    ) external pure returns (bool success) {
         if (pool == address(2)) {
             success = false;
         } else {
@@ -18,7 +22,11 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
 }
 
 contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
-    function selectCommittee(uint256, address pool, uint32[2] calldata) external pure returns (bool success) {
+    function selectCommittee(
+        uint256,
+        address pool,
+        uint32[2] calldata
+    ) external pure returns (bool success) {
         if (pool == address(2)) {
             success = false;
         } else {

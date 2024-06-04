@@ -14,5 +14,8 @@ interface IComputationModule {
     /// @param outputData ABI encoded output data to be verified.
     /// @return output The output data to be published.
     /// @return success Whether the output data is valid.
-    function verify(uint256 e3Id, bytes memory outputData) external returns (bytes memory output, bool success);
+    function verify(
+        uint256 e3Id,
+        bytes memory outputData
+    ) external returns (bytes memory output, bool success);
 }

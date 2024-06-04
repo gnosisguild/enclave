@@ -23,7 +23,10 @@ describe("Enclave", function () {
     const executionModule = await deployExecutionModuleFixture();
     const inputValidator = await deployInputValidatorFixture();
 
-    const enclave = await deployEnclaveFixture({ owner, registry: await registry.getAddress() });
+    const enclave = await deployEnclaveFixture({
+      owner,
+      registry: await registry.getAddress(),
+    });
 
     await enclave.enableComputationModule(await computationModule.getAddress());
     await enclave.enableExecutionModule(await executionModule.getAddress());
@@ -32,7 +35,13 @@ describe("Enclave", function () {
       owner,
       notTheOwner,
       enclave,
-      mocks: { computationModule, outputVerifier, executionModule, inputValidator, registry },
+      mocks: {
+        computationModule,
+        outputVerifier,
+        executionModule,
+        inputValidator,
+        registry,
+      },
       request: {
         pool: ethers.ZeroAddress,
         threshold: [2, 2] as [number, number],
@@ -48,19 +57,29 @@ describe("Enclave", function () {
   describe("constructor / initialize()", function () {
     it("correctly sets owner", async function () {
       const [, , , someSigner] = await ethers.getSigners();
-      const enclave = await deployEnclaveFixture({ owner: someSigner, registry: AddressTwo });
+      const enclave = await deployEnclaveFixture({
+        owner: someSigner,
+        registry: AddressTwo,
+      });
       expect(await enclave.cyphernodeRegistry()).to.equal(AddressTwo);
     });
 
     it("correctly sets cyphernodeRegistry address", async function () {
       const [aSigner] = await ethers.getSigners();
-      const enclave = await deployEnclaveFixture({ owner: aSigner, registry: AddressTwo });
+      const enclave = await deployEnclaveFixture({
+        owner: aSigner,
+        registry: AddressTwo,
+      });
       expect(await enclave.cyphernodeRegistry()).to.equal(AddressTwo);
     });
 
     it("correctly sets max duration", async function () {
       const [aSigner] = await ethers.getSigners();
-      const enclave = await deployEnclaveFixture({ owner: aSigner, registry: AddressTwo, maxDuration: 9876 });
+      const enclave = await deployEnclaveFixture({
+        owner: aSigner,
+        registry: AddressTwo,
+        maxDuration: 9876,
+      });
       expect(await enclave.maxDuration()).to.equal(9876);
     });
   });
@@ -137,7 +156,9 @@ describe("Enclave", function () {
     it("reverts if E3 does not exist", async function () {
       const { enclave } = await loadFixture(setup);
 
-      await expect(enclave.getE3(1)).to.be.revertedWithCustomError(enclave, "E3DoesNotExist").withArgs(1);
+      await expect(enclave.getE3(1))
+        .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
+        .withArgs(1);
     });
     it("returns correct E3 details", async function () {
       const { enclave, request } = await loadFixture(setup);
@@ -545,7 +566,9 @@ describe("Enclave", function () {
     it("reverts if E3 does not exist", async function () {
       const { enclave } = await loadFixture(setup);
 
-      await expect(enclave.activate(0)).to.be.revertedWithCustomError(enclave, "E3DoesNotExist").withArgs(0);
+      await expect(enclave.activate(0))
+        .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
+        .withArgs(0);
     });
     it("reverts if E3 has already been activated", async function () {
       const { enclave, request } = await loadFixture(setup);
@@ -563,7 +586,9 @@ describe("Enclave", function () {
 
       await expect(enclave.getE3(0)).to.not.be.reverted;
       await expect(enclave.activate(0)).to.not.be.reverted;
-      await expect(enclave.activate(0)).to.be.revertedWithCustomError(enclave, "E3AlreadyActivated").withArgs(0);
+      await expect(enclave.activate(0))
+        .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
+        .withArgs(0);
     });
     it("reverts if cyphernodeRegistry does not return a public key", async function () {
       const { enclave, request } = await loadFixture(setup);
@@ -583,7 +608,10 @@ describe("Enclave", function () {
       const nextRegistry = await deployCyphernodeRegistryFixture("MockCyphernodeRegistryEmptyKey");
 
       await enclave.setCyphernodeRegistry(nextRegistry);
-      await expect(enclave.activate(0)).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
+        enclave,
+        "CommitteeSelectionFailed",
+      );
 
       await enclave.setCyphernodeRegistry(prevRegistry);
       await expect(enclave.activate(0)).to.not.be.reverted;

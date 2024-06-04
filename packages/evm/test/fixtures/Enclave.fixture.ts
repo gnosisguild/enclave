@@ -12,7 +12,9 @@ export async function deployEnclaveFixture({
   registry: string;
   maxDuration?: number;
 }) {
-  const deployment = await (await ethers.getContractFactory("Enclave")).deploy(owner, registry, maxDuration);
+  const deployment = await (
+    await ethers.getContractFactory("Enclave")
+  ).deploy(owner, registry, maxDuration);
 
   return Enclave__factory.connect(await deployment.getAddress(), owner);
 }

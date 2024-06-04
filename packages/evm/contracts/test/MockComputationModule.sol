@@ -13,7 +13,10 @@ contract MockComputationModule is IComputationModule {
         }
     }
 
-    function verify(uint256, bytes memory outputData) external pure returns (bytes memory output, bool success) {
+    function verify(
+        uint256,
+        bytes memory outputData
+    ) external pure returns (bytes memory output, bool success) {
         return (outputData, true);
     }
 }

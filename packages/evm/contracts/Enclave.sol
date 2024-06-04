@@ -5,7 +5,9 @@ import { IEnclave, E3, IComputationModule, IExecutionModule } from "./interfaces
 import { ICyphernodeRegistry } from "./interfaces/ICyphernodeRegistry.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
-import { OwnableUpgradeable } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
@@ -103,7 +105,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold(threshold));
         require(duration > 0 && duration <= maxDuration, InvalidDuration(duration)); // TODO: should 0 be a magic number for infinite duration?
-        require(computationModules[computationModule], ComputationModuleNotAllowed(computationModule));
+        require(
+            computationModules[computationModule],
+            ComputationModuleNotAllowed(computationModule)
+        );
         require(executionModules[executionModule], ModuleNotEnabled(address(executionModule)));
 
         // TODO: should IDs be incremental or produced deterministic?
@@ -130,7 +135,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         });
         e3s[e3Id] = e3;
 
-        require(cyphernodeRegistry.selectCommittee(e3Id, pool, threshold), CommitteeSelectionFailed());
+        require(
+            cyphernodeRegistry.selectCommittee(e3Id, pool, threshold),
+            CommitteeSelectionFailed()
+        );
         // TODO: validate that the selected pool accepts both the computation and execution modules.
 
         emit E3Requested(e3Id, e3s[e3Id], pool, computationModule, executionModule);
@@ -143,6 +151,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
 
         bytes memory committeePublicKey = cyphernodeRegistry.getCommitteePublicKey(e3Id);
+        // Note: This check feels weird
         require(committeePublicKey.length > 0, CommitteeSelectionFailed());
 
         e3s[e3Id].expiration = block.timestamp + maxDuration; // TODO: this should be based on the duration requested, not the current max duration.
@@ -163,7 +172,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit InputPublished(e3Id, input);
     }
 
-    function publishCiphertextOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+    function publishCiphertextOutput(
+        uint256 e3Id,
+        bytes memory data
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration <= block.timestamp, InputDeadlineNotPassed(e3Id, e3.expiration));
         require(e3.ciphertextOutput.length == 0, CiphertextOutputAlreadyPublished(e3Id)); // TODO: should the output verifier be able to change its mind? i.e. should we be able to call this multiple times?
@@ -175,7 +187,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit CiphertextOutputPublished(e3Id, output);
     }
 
-    function publishPlaintextOutput(uint256 e3Id, bytes memory data) external returns (bool success) {
+    function publishPlaintextOutput(
+        uint256 e3Id,
+        bytes memory data
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         require(e3.ciphertextOutput.length > 0, CiphertextOutputNotPublished(e3Id));
         require(e3.plaintextOutput.length == 0, PlaintextOutputAlreadyPublished(e3Id));
@@ -199,7 +214,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit MaxDurationSet(_maxDuration);
     }
 
-    function setCyphernodeRegistry(ICyphernodeRegistry _cyphernodeRegistry) public onlyOwner returns (bool success) {
+    function setCyphernodeRegistry(
+        ICyphernodeRegistry _cyphernodeRegistry
+    ) public onlyOwner returns (bool success) {
         require(
             address(_cyphernodeRegistry) != address(0) && _cyphernodeRegistry != cyphernodeRegistry,
             InvalidCyphernodeRegistry(_cyphernodeRegistry)
@@ -209,28 +226,42 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit CyphernodeRegistrySet(address(_cyphernodeRegistry));
     }
 
-    function enableComputationModule(IComputationModule computationModule) public onlyOwner returns (bool success) {
-        require(!computationModules[computationModule], ModuleAlreadyEnabled(address(computationModule)));
+    function enableComputationModule(
+        IComputationModule computationModule
+    ) public onlyOwner returns (bool success) {
+        require(
+            !computationModules[computationModule],
+            ModuleAlreadyEnabled(address(computationModule))
+        );
         computationModules[computationModule] = true;
         success = true;
         emit ComputationModuleEnabled(computationModule);
     }
 
-    function enableExecutionModule(IExecutionModule executionModule) public onlyOwner returns (bool success) {
+    function enableExecutionModule(
+        IExecutionModule executionModule
+    ) public onlyOwner returns (bool success) {
         require(!executionModules[executionModule], ModuleAlreadyEnabled(address(executionModule)));
         executionModules[executionModule] = true;
         success = true;
         emit ExecutionModuleEnabled(executionModule);
     }
 
-    function disableComputationModule(IComputationModule computationModule) public onlyOwner returns (bool success) {
-        require(computationModules[computationModule], ModuleNotEnabled(address(computationModule)));
+    function disableComputationModule(
+        IComputationModule computationModule
+    ) public onlyOwner returns (bool success) {
+        require(
+            computationModules[computationModule],
+            ModuleNotEnabled(address(computationModule))
+        );
         delete computationModules[computationModule];
         success = true;
         emit ComputationModuleDisabled(computationModule);
     }
 
-    function disableExecutionModule(IExecutionModule executionModule) public onlyOwner returns (bool success) {
+    function disableExecutionModule(
+        IExecutionModule executionModule
+    ) public onlyOwner returns (bool success) {
         require(executionModules[executionModule], ModuleNotEnabled(address(executionModule)));
         delete executionModules[executionModule];
         success = true;

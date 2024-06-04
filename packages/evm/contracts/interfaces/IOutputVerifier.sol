@@ -6,5 +6,8 @@ interface IOutputVerifier {
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded output data to be verified.
     /// @return output Ciphertext output of the given computation.
-    function verify(uint256 e3Id, bytes memory data) external returns (bytes memory output, bool success);
+    function verify(
+        uint256 e3Id,
+        bytes memory data
+    ) external returns (bytes memory output, bool success);
 }

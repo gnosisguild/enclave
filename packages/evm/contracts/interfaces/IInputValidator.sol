@@ -6,5 +6,8 @@ interface IInputValidator {
     /// @param params ABI encoded input parameters.
     /// @return input The input data to be published.
     /// @return success Whether the input parameters are valid.
-    function validate(address sender, bytes memory params) external returns (bytes memory input, bool success);
+    function validate(
+        address sender,
+        bytes memory params
+    ) external returns (bytes memory input, bool success);
 }
