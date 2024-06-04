@@ -588,7 +588,35 @@ describe("Enclave", function () {
       await enclave.setCyphernodeRegistry(prevRegistry);
       await expect(enclave.activate(0)).to.not.be.reverted;
     });
-    it("sets committeePublicKey correctly");
+    it("sets committeePublicKey correctly", async () => {
+      const {
+        enclave,
+        request,
+        mocks: { registry },
+      } = await loadFixture(setup);
+
+      await enclave.request(
+        request.pool,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const e3Id = 0;
+      const publicKey = await registry.getCommitteePublicKey(e3Id);
+
+      let e3 = await enclave.getE3(e3Id);
+      expect(e3.committeePublicKey).to.not.equal(publicKey);
+
+      await enclave.activate(e3Id);
+
+      e3 = await enclave.getE3(e3Id);
+      expect(e3.committeePublicKey).to.equal(publicKey);
+    });
     it("returns true if E3 is activated successfully");
     it("emits E3Activated event");
   });
