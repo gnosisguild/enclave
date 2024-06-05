@@ -17,7 +17,11 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
     }
 
     function getCommitteePublicKey(uint256 e3Id) external pure returns (bytes memory) {
-        return abi.encodePacked(keccak256(abi.encode(e3Id)));
+        if (e3Id == type(uint256).max) {
+            return hex"";
+        } else {
+            return abi.encodePacked(keccak256(abi.encode(e3Id)));
+        }
     }
 }
 

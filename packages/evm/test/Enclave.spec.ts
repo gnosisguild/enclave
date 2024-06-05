@@ -680,7 +680,7 @@ describe("Enclave", function () {
       const e3Id = 0;
       const e3 = await enclave.getE3(e3Id);
 
-      expect(await enclave.activate(e3Id))
+      await expect(enclave.activate(e3Id))
         .to.emit(enclave, "E3Activated")
         .withArgs(e3Id, e3.expiration, e3.committeePublicKey);
     });

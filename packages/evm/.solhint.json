@@ -3,12 +3,14 @@
   "plugins": ["prettier"],
   "rules": {
     "code-complexity": ["error", 8],
-    "compiler-version": ["error", ">=0.8.4"],
+    "compiler-version": ["error", ">=0.8.26"],
     "func-visibility": ["error", { "ignoreConstructors": true }],
     "max-line-length": ["error", 120],
     "named-parameters-mapping": "warn",
     "no-console": "off",
     "not-rely-on-time": "off",
+    "gas-custom-errors": "off",
+    "one-contract-per-file": "off",
     "prettier/prettier": [
       "error",
       {

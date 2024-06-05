@@ -30,17 +30,20 @@ interface IEnclave {
     /// @param committeePublicKey Public key of the committee.
     event E3Activated(uint256 e3Id, uint256 expiration, bytes committeePublicKey);
 
-    /// @notice This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is successfully published.
+    /// @notice This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is
+    /// successfully published.
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded input data.
     event InputPublished(uint256 indexed e3Id, bytes data);
 
-    /// @notice This event MUST be emitted when the plaintext output of an Encrypted Execution Environment (E3) is successfully published.
+    /// @notice This event MUST be emitted when the plaintext output of an Encrypted Execution Environment (E3)
+    /// is successfully published.
     /// @param e3Id ID of the E3.
     /// @param plaintextOutput ABI encoded plaintext output.
     event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
 
-    /// @notice This event MUST be emitted when the ciphertext output of an Encrypted Execution Environment (E3) is successfully published.
+    /// @notice This event MUST be emitted when the ciphertext output of an Encrypted Execution Environment (E3)
+    /// is successfully published.
     /// @param e3Id ID of the E3.
     /// @param ciphertextOutput ABI encoded ciphertext output.
     event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
@@ -96,7 +99,8 @@ interface IEnclave {
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3);
 
-    /// @notice This function should be called to activate an Encrypted Execution Environment (E3) once it has been initialized and is ready for input.
+    /// @notice This function should be called to activate an Encrypted Execution Environment (E3) once it has been
+    /// initialized and is ready for input.
     /// @dev This function MUST emit the E3Activated event.
     /// @dev This function MUST revert if the given E3 has not yet been requested.
     /// @dev This function MUST revert if the selected node committee has not yet published a public key.
@@ -121,7 +125,7 @@ interface IEnclave {
         bytes memory data
     ) external returns (bool success);
 
-    /// @notice This function should be called to publish the plaintext output of an Encrypted Execution Environment (E3).
+    /// @notice This function publishes the plaintext output of an Encrypted Execution Environment (E3).
     /// @dev This function MUST revert if the output has not been published.
     /// @dev This function MUST emit the PlaintextOutputPublished event.
     /// @param e3Id ID of the E3.

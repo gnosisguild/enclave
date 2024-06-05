@@ -26,12 +26,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     // But perhaps this is one place where node pools might be utilized, allowing nodes to
     // opt in to being selected for specific computations, along with the corresponding slashing conditions.
     // This would reduce the governance overhead for Enclave.
-    // TODO: add setter function
-    mapping(IComputationModule => bool allowed) public computationModules; // Mapping of allowed computation modules.
-    // TODO: add setter function
-    mapping(IExecutionModule => bool allowed) public executionModules; // Mapping of allowed execution modules.
 
-    mapping(uint256 id => E3) public e3s; // Mapping of E3s.
+    // Mapping of allowed computation modules.
+    mapping(IComputationModule computationModule => bool allowed) public computationModules;
+
+    // Mapping of allowed execution modules.
+    mapping(IExecutionModule executionModule => bool allowed) public executionModules;
+
+    // Mapping of E3s.
+    mapping(uint256 id => E3 e3) public e3s;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -93,18 +96,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function request(
         address[] memory pools, // TODO: should we allow for multiple pools?
         uint32[2] calldata threshold,
-        uint256 duration, // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are published before the request is made? This kind of assumes the cypher nodes have already been selected and generated a shared secret.
+        // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are
+        //published before the request is made? This kind of assumes the cypher nodes have already been selected
+        // and generated a shared secret.
+        uint256 duration,
         IComputationModule computationModule,
         bytes memory computationParams,
         IExecutionModule executionModule,
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
-        // TODO: should payment checks be done somewhere else? Perhaps in the computation module or cypher node registry?
+        // TODO: should payment checks be somewhere else? Perhaps in the computation module or cyphernode registry?
         require(msg.value > 0, PaymentRequired(msg.value));
 
         require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold(threshold));
-        require(duration > 0 && duration <= maxDuration, InvalidDuration(duration)); // TODO: should 0 be a magic number for infinite duration?
+        // TODO: should 0 be a magic number for infinite duration?
+        require(duration > 0 && duration <= maxDuration, InvalidDuration(duration));
         require(
             computationModules[computationModule],
             ComputationModuleNotAllowed(computationModule)
@@ -154,7 +161,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // Note: This check feels weird
         require(committeePublicKey.length > 0, CommitteeSelectionFailed());
 
-        e3s[e3Id].expiration = block.timestamp + maxDuration; // TODO: this should be based on the duration requested, not the current max duration.
+        // TODO: this should be based on the duration requested, not the current max duration.
+        e3s[e3Id].expiration = block.timestamp + maxDuration;
         e3s[e3Id].committeePublicKey = committeePublicKey;
 
         emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);
@@ -164,7 +172,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function publishInput(uint256 e3Id, bytes memory data) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
-        require(e3.expiration > block.timestamp, InputDeadlinePassed(e3Id, e3.expiration)); // TODO: should we have an input window, including both a start and end timestamp?
+        // TODO: should we have an input window, including both a start and end timestamp?
+        require(e3.expiration > block.timestamp, InputDeadlinePassed(e3Id, e3.expiration));
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
@@ -178,7 +187,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration <= block.timestamp, InputDeadlineNotPassed(e3Id, e3.expiration));
-        require(e3.ciphertextOutput.length == 0, CiphertextOutputAlreadyPublished(e3Id)); // TODO: should the output verifier be able to change its mind? i.e. should we be able to call this multiple times?
+        // TODO: should the output verifier be able to change its mind?
+        //i.e. should we be able to call this multiple times?
+        require(e3.ciphertextOutput.length == 0, CiphertextOutputAlreadyPublished(e3Id));
         bytes memory output;
         (output, success) = e3.outputVerifier.verify(e3Id, data);
         require(success, InvalidOutput());

@@ -8,6 +8,7 @@ contract MockExecutionModule is IExecutionModule {
 
     function validate(bytes memory params) external pure returns (IOutputVerifier outputVerifier) {
         require(params.length == 32, invalidParams());
+        // solhint-disable no-inline-assembly
         assembly {
             outputVerifier := mload(add(params, 32))
         }

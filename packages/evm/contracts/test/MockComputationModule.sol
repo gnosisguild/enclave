@@ -8,6 +8,7 @@ contract MockComputationModule is IComputationModule {
 
     function validate(bytes memory params) external pure returns (IInputValidator inputValidator) {
         require(params.length == 32, "invalid params");
+        // solhint-disable no-inline-assembly
         assembly {
             inputValidator := mload(add(params, 32))
         }

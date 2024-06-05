@@ -2,6 +2,7 @@
   "name": "@gnosisguild/enclave",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
   "version": "0.0.0",
+  "license": "LGPL-3.0-only",
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
@@ -24,7 +25,7 @@
     "@typescript-eslint/parser": "^7.11.0",
     "chai": "^4.3.10",
     "cross-env": "^7.0.3",
-    "eslint": "^9.4.0",
+    "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "ethers": "^6.9.0",
     "fs-extra": "^11.2.0",
