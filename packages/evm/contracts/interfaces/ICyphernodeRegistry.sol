@@ -3,8 +3,16 @@ pragma solidity >=0.8.26;
 
 interface ICyphernodeRegistry {
     /// @notice This event MUST be emitted when a committee is selected for an E3.
+    /// @param e3Id ID of the E3 for which the committee was selected.
+    /// @param pools Addresses of the pools of nodes from which the committee was selected.
+    /// @param threshold The M/N threshold for the committee.
     event CommitteeRequested(uint256 indexed e3Id, address[] pools, uint32[2] threshold);
 
+    /// @notice This event MUST be emitted when a committee is selected for an E3.
+    /// @param e3Id ID of the E3 for which the committee was selected.
+    /// @param nodes Addresses of the nodes in the committee.
+    /// @param merkleRoots Merkle roots of the nodes in the committee.
+    /// @param publicKey Public key of the committee.
     event CommitteeSelected(
         uint256 indexed e3Id,
         address[] nodes,
