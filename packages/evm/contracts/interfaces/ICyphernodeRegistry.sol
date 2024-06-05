@@ -2,6 +2,16 @@
 pragma solidity >=0.8.26;
 
 interface ICyphernodeRegistry {
+    /// @notice This event MUST be emitted when a committee is selected for an E3.
+    event CommitteeRequested(uint256 indexed e3Id, address[] pools, uint32[2] threshold);
+
+    event CommitteeSelected(
+        uint256 indexed e3Id,
+        address[] nodes,
+        bytes32[] merkleRoots,
+        bytes publicKey
+    );
+
     /// @notice This event MUST be emitted when a node is added to the registry.
     /// @param nodeId ID of the node.
     /// @param node Address of the node.
@@ -11,6 +21,10 @@ interface ICyphernodeRegistry {
     /// @param nodeId ID of the node.
     /// @param node Address of the node.
     event NodeRemoved(uint256 indexed nodeId, address indexed node);
+
+    /// @notice This event MUST be emitted when `encalve` is set.
+    /// @param enclave Address of the enclave contract.
+    event EnclaveSet(address indexed enclave);
 
     /// @notice This function should be called by the Enclave contract to select a node committee.
     /// @param e3Id ID of the E3 for which to select the committee.
