@@ -2,6 +2,7 @@
   "name": "@gnosisguild/enclave",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
   "version": "0.0.0",
+  "license": "LGPL-3.0-only",
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
@@ -12,6 +13,7 @@
     "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.2",
+    "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
@@ -19,8 +21,8 @@
     "@types/fs-extra": "^11.0.4",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.10.4",
-    "@typescript-eslint/eslint-plugin": "^6.14.0",
-    "@typescript-eslint/parser": "^6.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.11.0",
+    "@typescript-eslint/parser": "^7.11.0",
     "chai": "^4.3.10",
     "cross-env": "^7.0.3",
     "eslint": "^8.56.0",
@@ -29,13 +31,13 @@
     "fs-extra": "^11.2.0",
     "hardhat": "^2.19.2",
     "hardhat-deploy": "^0.12.1",
-    "hardhat-gas-reporter": "^1.0.9",
+    "hardhat-gas-reporter": "^2.2.0",
     "lodash": "^4.17.21",
     "mocha": "^10.2.0",
     "prettier": "^3.1.1",
     "prettier-plugin-solidity": "^1.2.0",
     "rimraf": "^5.0.5",
-    "solhint": "^4.0.0",
+    "solhint": "^5.0.1",
     "solhint-plugin-prettier": "^0.1.0",
     "solidity-coverage": "^0.8.5",
     "ts-generator": "^0.1.1",
@@ -75,5 +77,6 @@
     "task:withdraw": "hardhat task:withdraw",
     "test": "hardhat test",
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain"
-  }
+  },
+  "dependencies": {}
 }
