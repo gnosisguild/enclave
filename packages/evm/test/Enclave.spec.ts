@@ -687,8 +687,39 @@ describe("Enclave", function () {
   });
 
   describe("publishInput()", function () {
-    it("reverts if E3 does not exist");
-    it("reverts if E3 has not been activated");
+    it("reverts if E3 does not exist", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      await expect(enclave.publishInput(0, "0x"))
+        .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
+        .withArgs(0);
+    });
+
+    it("reverts if E3 has not been activated", async function () {
+      const { enclave, request } = await loadFixture(setup);
+
+      await enclave.request(
+        request.pool,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const inputData = abiCoder.encode(["bytes32"], [ZeroHash]);
+
+      await expect(enclave.getE3(0)).to.not.be.reverted;
+      await expect(enclave.publishInput(0, inputData))
+        .to.be.revertedWithCustomError(enclave, "E3NotActivated")
+        .withArgs(0);
+
+      await enclave.activate(0);
+
+      await expect(enclave.publishInput(0, inputData)).to.not.be.reverted;
+    });
     it("reverts if outside of input window");
     it("reverts if input is not valid");
     it("sets ciphertextInput correctly");

@@ -45,6 +45,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error CommitteeSelectionFailed();
     error ComputationModuleNotAllowed(IComputationModule computationModule);
     error E3AlreadyActivated(uint256 e3Id);
+    error E3NotActivated(uint256 e3Id);
     error E3DoesNotExist(uint256 e3Id);
     error ModuleAlreadyEnabled(address module);
     error ModuleNotEnabled(address module);
@@ -172,6 +173,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function publishInput(uint256 e3Id, bytes memory data) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+
+        // Note: if we make 0 a no expiration, this has to be refactored
+        require(e3.expiration > 0, E3NotActivated(e3Id));
         // TODO: should we have an input window, including both a start and end timestamp?
         require(e3.expiration > block.timestamp, InputDeadlinePassed(e3Id, e3.expiration));
         bytes memory input;
