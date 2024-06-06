@@ -16,7 +16,9 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
         }
     }
 
-    function getCommitteePublicKey(uint256 e3Id) external pure returns (bytes memory) {
+    function getCommitteePublicKey(
+        uint256 e3Id
+    ) external pure returns (bytes memory) {
         if (e3Id == type(uint256).max) {
             return hex"";
         } else {
@@ -38,7 +40,9 @@ contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
         }
     }
 
-    function getCommitteePublicKey(uint256) external pure returns (bytes memory) {
+    function getCommitteePublicKey(
+        uint256
+    ) external pure returns (bytes memory) {
         return hex"";
     }
 }

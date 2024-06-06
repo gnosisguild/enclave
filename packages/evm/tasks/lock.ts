@@ -7,7 +7,9 @@ task("task:deployEnclave", "Deploys Enclave contract")
     const signers = await ethers.getSigners();
     const enclaveFactory = await ethers.getContractFactory("Enclave");
     console.log(`Deploying Enclave...`);
-    const enclave = await enclaveFactory.connect(signers[0]).deploy(taskArguments.maxDuration);
+    const enclave = await enclaveFactory
+      .connect(signers[0])
+      .deploy(taskArguments.maxDuration);
     await enclave.waitForDeployment();
     console.log("Enclave deployed to: ", await enclave.getAddress());
   });

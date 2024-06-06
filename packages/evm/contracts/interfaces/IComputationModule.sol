@@ -7,7 +7,9 @@ interface IComputationModule {
     /// @notice This function should be called by the Enclave contract to validate the computation parameters.
     /// @param params ABI encoded computation parameters.
     /// @return inputValidator The input validator to be used for the computation.
-    function validate(bytes calldata params) external returns (IInputValidator inputValidator);
+    function validate(
+        bytes calldata params
+    ) external returns (IInputValidator inputValidator);
 
     /// @notice This function should be called by the Enclave contract to verify the decrypted output of an E3.
     /// @param e3Id ID of the E3.

@@ -99,7 +99,10 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         bytes memory publicKey
     ) external onlyOwner {
         Committee storage committee = committees[e3Id];
-        require(keccak256(committee.publicKey) == keccak256(hex""), CommitteeAlreadyPublished());
+        require(
+            keccak256(committee.publicKey) == keccak256(hex""),
+            CommitteeAlreadyPublished()
+        );
         committee.nodes = _nodes;
         committee.merkleRoots = merkleRoots;
         committee.publicKey = publicKey;
@@ -124,12 +127,16 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    function getCommitteePublicKey(uint256 e3Id) external view returns (bytes memory publicKey) {
+    function getCommitteePublicKey(
+        uint256 e3Id
+    ) external view returns (bytes memory publicKey) {
         publicKey = committees[e3Id].publicKey;
         require(publicKey.length > 0, NoPublicKeyPublished());
     }
 
-    function getCommittee(uint256 e3Id) external view returns (Committee memory committee) {
+    function getCommittee(
+        uint256 e3Id
+    ) external view returns (Committee memory committee) {
         committee = committees[e3Id];
         require(committees[e3Id].threshold.length > 0, CommitteeDoesNotExist());
     }

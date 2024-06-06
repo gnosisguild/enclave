@@ -1,4 +1,8 @@
-import { loadFixture, mine, time } from "@nomicfoundation/hardhat-network-helpers";
+import {
+  loadFixture,
+  mine,
+  time,
+} from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { ZeroHash } from "ethers";
 import { ethers } from "hardhat";
@@ -47,9 +51,15 @@ describe("Enclave", function () {
         threshold: [2, 2] as [number, number],
         duration: time.duration.days(30),
         computationModule: await computationModule.getAddress(),
-        cMParams: abiCoder.encode(["address"], [await inputValidator.getAddress()]),
+        cMParams: abiCoder.encode(
+          ["address"],
+          [await inputValidator.getAddress()],
+        ),
         executionModule: await executionModule.getAddress(),
-        eMParams: abiCoder.encode(["address"], [await outputVerifier.getAddress()]),
+        eMParams: abiCoder.encode(
+          ["address"],
+          [await outputVerifier.getAddress()],
+        ),
       },
     };
   }
@@ -103,7 +113,9 @@ describe("Enclave", function () {
     });
     it("emits MaxDurationSet event", async function () {
       const { enclave } = await loadFixture(setup);
-      await expect(enclave.setMaxDuration(1)).to.emit(enclave, "MaxDurationSet").withArgs(1);
+      await expect(enclave.setMaxDuration(1))
+        .to.emit(enclave, "MaxDurationSet")
+        .withArgs(1);
     });
   });
 
@@ -111,7 +123,9 @@ describe("Enclave", function () {
     it("reverts if not called by owner", async function () {
       const { enclave, notTheOwner } = await loadFixture(setup);
 
-      await expect(enclave.connect(notTheOwner).setCyphernodeRegistry(AddressTwo))
+      await expect(
+        enclave.connect(notTheOwner).setCyphernodeRegistry(AddressTwo),
+      )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
@@ -177,9 +191,13 @@ describe("Enclave", function () {
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
       expect(e3.computationModule).to.equal(request.computationModule);
-      expect(e3.inputValidator).to.equal(abiCoder.decode(["address"], request.cMParams)[0]);
+      expect(e3.inputValidator).to.equal(
+        abiCoder.decode(["address"], request.cMParams)[0],
+      );
       expect(e3.executionModule).to.equal(request.executionModule);
-      expect(e3.outputVerifier).to.equal(abiCoder.decode(["address"], request.eMParams)[0]);
+      expect(e3.outputVerifier).to.equal(
+        abiCoder.decode(["address"], request.eMParams)[0],
+      );
       expect(e3.committeePublicKey).to.equal("0x");
       expect(e3.ciphertextOutput).to.equal("0x");
       expect(e3.plaintextOutput).to.equal("0x");
@@ -194,7 +212,9 @@ describe("Enclave", function () {
         mocks: { computationModule },
       } = await loadFixture(setup);
 
-      await expect(enclave.connect(notTheOwner).enableComputationModule(computationModule))
+      await expect(
+        enclave.connect(notTheOwner).enableComputationModule(computationModule),
+      )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
@@ -218,7 +238,8 @@ describe("Enclave", function () {
     });
     it("returns true if computation module is enabled successfully", async function () {
       const { enclave } = await loadFixture(setup);
-      const result = await enclave.enableComputationModule.staticCall(AddressTwo);
+      const result =
+        await enclave.enableComputationModule.staticCall(AddressTwo);
       expect(result).to.be.true;
     });
     it("emits ComputationModuleEnabled event", async function () {
@@ -236,7 +257,11 @@ describe("Enclave", function () {
         enclave,
         mocks: { computationModule },
       } = await loadFixture(setup);
-      await expect(enclave.connect(notTheOwner).disableComputationModule(computationModule))
+      await expect(
+        enclave
+          .connect(notTheOwner)
+          .disableComputationModule(computationModule),
+      )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
@@ -261,7 +286,8 @@ describe("Enclave", function () {
         enclave,
         mocks: { computationModule },
       } = await loadFixture(setup);
-      const result = await enclave.disableComputationModule.staticCall(computationModule);
+      const result =
+        await enclave.disableComputationModule.staticCall(computationModule);
 
       expect(result).to.be.true;
     });
@@ -279,7 +305,9 @@ describe("Enclave", function () {
   describe("enableExecutionModule()", function () {
     it("reverts if not called by owner", async function () {
       const { notTheOwner, enclave } = await loadFixture(setup);
-      await expect(enclave.connect(notTheOwner).enableExecutionModule(AddressTwo))
+      await expect(
+        enclave.connect(notTheOwner).enableExecutionModule(AddressTwo),
+      )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner.address);
     });
@@ -322,7 +350,9 @@ describe("Enclave", function () {
         mocks: { executionModule },
       } = await loadFixture(setup);
 
-      await expect(enclave.connect(notTheOwner).disableExecutionModule(executionModule))
+      await expect(
+        enclave.connect(notTheOwner).disableExecutionModule(executionModule),
+      )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
@@ -347,7 +377,8 @@ describe("Enclave", function () {
         enclave,
         mocks: { executionModule },
       } = await loadFixture(setup);
-      const result = await enclave.disableExecutionModule.staticCall(executionModule);
+      const result =
+        await enclave.disableExecutionModule.staticCall(executionModule);
 
       expect(result).to.be.true;
     });
@@ -535,9 +566,13 @@ describe("Enclave", function () {
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
       expect(e3.computationModule).to.equal(request.computationModule);
-      expect(e3.inputValidator).to.equal(abiCoder.decode(["address"], request.cMParams)[0]);
+      expect(e3.inputValidator).to.equal(
+        abiCoder.decode(["address"], request.cMParams)[0],
+      );
       expect(e3.executionModule).to.equal(request.executionModule);
-      expect(e3.outputVerifier).to.equal(abiCoder.decode(["address"], request.eMParams)[0]);
+      expect(e3.outputVerifier).to.equal(
+        abiCoder.decode(["address"], request.eMParams)[0],
+      );
       expect(e3.committeePublicKey).to.equal("0x");
       expect(e3.ciphertextOutput).to.equal("0x");
       expect(e3.plaintextOutput).to.equal("0x");
@@ -558,7 +593,13 @@ describe("Enclave", function () {
 
       await expect(tx)
         .to.emit(enclave, "E3Requested")
-        .withArgs(0, e3, request.pool, request.computationModule, request.executionModule);
+        .withArgs(
+          0,
+          e3,
+          request.pool,
+          request.computationModule,
+          request.executionModule,
+        );
     });
   });
 
@@ -605,7 +646,9 @@ describe("Enclave", function () {
       );
 
       const prevRegistry = await enclave.cyphernodeRegistry();
-      const nextRegistry = await deployCyphernodeRegistryFixture("MockCyphernodeRegistryEmptyKey");
+      const nextRegistry = await deployCyphernodeRegistryFixture(
+        "MockCyphernodeRegistryEmptyKey",
+      );
 
       await enclave.setCyphernodeRegistry(nextRegistry);
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
@@ -738,10 +781,9 @@ describe("Enclave", function () {
       const inputData = abiCoder.encode(["bytes"], ["0xaabbcc"]);
 
       await enclave.activate(0);
-      await expect(enclave.publishInput(0, inputData)).to.be.revertedWithCustomError(
-        enclave,
-        "InvalidInput",
-      );
+      await expect(
+        enclave.publishInput(0, inputData),
+      ).to.be.revertedWithCustomError(enclave, "InvalidInput");
     });
 
     it("reverts if outside of input window", async function () {
@@ -765,10 +807,9 @@ describe("Enclave", function () {
 
       await mine(2, { interval: request.duration });
 
-      await expect(enclave.publishInput(0, inputData)).to.be.revertedWithCustomError(
-        enclave,
-        "InputDeadlinePassed",
-      );
+      await expect(
+        enclave.publishInput(0, inputData),
+      ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
     });
     it("sets ciphertextInput correctly");
     it("returns true if input is published successfully");

@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { IExecutionModule, IOutputVerifier } from "../interfaces/IExecutionModule.sol";
+import {
+    IExecutionModule,
+    IOutputVerifier
+} from "../interfaces/IExecutionModule.sol";
 
 contract MockExecutionModule is IExecutionModule {
     error invalidParams();
 
-    function validate(bytes memory params) external pure returns (IOutputVerifier outputVerifier) {
+    function validate(
+        bytes memory params
+    ) external pure returns (IOutputVerifier outputVerifier) {
         require(params.length == 32, invalidParams());
         // solhint-disable no-inline-assembly
         assembly {

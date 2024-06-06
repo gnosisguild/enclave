@@ -8,5 +8,8 @@ export async function deployCyphernodeRegistryFixture(name?: string) {
     await ethers.getContractFactory(name || "MockCyphernodeRegistry")
   ).deploy();
 
-  return MockCyphernodeRegistry__factory.connect(await deployment.getAddress(), signer.provider);
+  return MockCyphernodeRegistry__factory.connect(
+    await deployment.getAddress(),
+    signer.provider,
+  );
 }

@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { IEnclave, E3, IComputationModule, IExecutionModule } from "./interfaces/IEnclave.sol";
+import {
+    IEnclave,
+    E3,
+    IComputationModule,
+    IExecutionModule
+} from "./interfaces/IEnclave.sol";
 import { ICyphernodeRegistry } from "./interfaces/ICyphernodeRegistry.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
@@ -28,10 +33,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     // This would reduce the governance overhead for Enclave.
 
     // Mapping of allowed computation modules.
-    mapping(IComputationModule computationModule => bool allowed) public computationModules;
+    mapping(IComputationModule computationModule => bool allowed)
+        public computationModules;
 
     // Mapping of allowed execution modules.
-    mapping(IExecutionModule executionModule => bool allowed) public executionModules;
+    mapping(IExecutionModule executionModule => bool allowed)
+        public executionModules;
 
     // Mapping of E3s.
     mapping(uint256 id => E3 e3) public e3s;
@@ -71,7 +78,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
-    constructor(address _owner, ICyphernodeRegistry _cyphernodeRegistry, uint256 _maxDuration) {
+    constructor(
+        address _owner,
+        ICyphernodeRegistry _cyphernodeRegistry,
+        uint256 _maxDuration
+    ) {
         initialize(_owner, _cyphernodeRegistry, _maxDuration);
     }
 
@@ -110,25 +121,39 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: should payment checks be somewhere else? Perhaps in the computation module or cyphernode registry?
         require(msg.value > 0, PaymentRequired(msg.value));
 
-        require(threshold[1] >= threshold[0] && threshold[0] > 0, InvalidThreshold(threshold));
+        require(
+            threshold[1] >= threshold[0] && threshold[0] > 0,
+            InvalidThreshold(threshold)
+        );
         // TODO: should 0 be a magic number for infinite duration?
-        require(duration > 0 && duration <= maxDuration, InvalidDuration(duration));
+        require(
+            duration > 0 && duration <= maxDuration,
+            InvalidDuration(duration)
+        );
         require(
             computationModules[computationModule],
             ComputationModuleNotAllowed(computationModule)
         );
-        require(executionModules[executionModule], ModuleNotEnabled(address(executionModule)));
+        require(
+            executionModules[executionModule],
+            ModuleNotEnabled(address(executionModule))
+        );
 
         // TODO: should IDs be incremental or produced deterministic?
         e3Id = nexte3Id;
         nexte3Id++;
 
-        IInputValidator inputValidator = computationModule.validate(computationParams);
+        IInputValidator inputValidator = computationModule.validate(
+            computationParams
+        );
         require(address(inputValidator) != address(0), InvalidComputation());
 
         // TODO: validate that the requested computation can be performed by the given execution module.
         IOutputVerifier outputVerifier = executionModule.validate(emParams);
-        require(address(outputVerifier) != address(0), InvalidExecutionModuleSetup());
+        require(
+            address(outputVerifier) != address(0),
+            InvalidExecutionModuleSetup()
+        );
 
         e3 = E3({
             threshold: threshold,
@@ -149,7 +174,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         // TODO: validate that the selected pool accepts both the computation and execution modules.
 
-        emit E3Requested(e3Id, e3s[e3Id], pools, computationModule, executionModule);
+        emit E3Requested(
+            e3Id,
+            e3s[e3Id],
+            pools,
+            computationModule,
+            executionModule
+        );
     }
 
     function activate(uint256 e3Id) external returns (bool success) {
@@ -158,7 +189,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
 
-        bytes memory committeePublicKey = cyphernodeRegistry.getCommitteePublicKey(e3Id);
+        bytes memory committeePublicKey = cyphernodeRegistry
+            .getCommitteePublicKey(e3Id);
         // Note: This check feels weird
         require(committeePublicKey.length > 0, CommitteeSelectionFailed());
 
@@ -171,13 +203,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         return true;
     }
 
-    function publishInput(uint256 e3Id, bytes memory data) external returns (bool success) {
+    function publishInput(
+        uint256 e3Id,
+        bytes memory data
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
         // TODO: should we have an input window, including both a start and end timestamp?
-        require(e3.expiration > block.timestamp, InputDeadlinePassed(e3Id, e3.expiration));
+        require(
+            e3.expiration > block.timestamp,
+            InputDeadlinePassed(e3Id, e3.expiration)
+        );
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
@@ -190,10 +228,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory data
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
-        require(e3.expiration <= block.timestamp, InputDeadlineNotPassed(e3Id, e3.expiration));
+        require(
+            e3.expiration <= block.timestamp,
+            InputDeadlineNotPassed(e3Id, e3.expiration)
+        );
         // TODO: should the output verifier be able to change its mind?
         //i.e. should we be able to call this multiple times?
-        require(e3.ciphertextOutput.length == 0, CiphertextOutputAlreadyPublished(e3Id));
+        require(
+            e3.ciphertextOutput.length == 0,
+            CiphertextOutputAlreadyPublished(e3Id)
+        );
         bytes memory output;
         (output, success) = e3.outputVerifier.verify(e3Id, data);
         require(success, InvalidOutput());
@@ -207,8 +251,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory data
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
-        require(e3.ciphertextOutput.length > 0, CiphertextOutputNotPublished(e3Id));
-        require(e3.plaintextOutput.length == 0, PlaintextOutputAlreadyPublished(e3Id));
+        require(
+            e3.ciphertextOutput.length > 0,
+            CiphertextOutputNotPublished(e3Id)
+        );
+        require(
+            e3.plaintextOutput.length == 0,
+            PlaintextOutputAlreadyPublished(e3Id)
+        );
         bytes memory output;
         (output, success) = e3.computationModule.verify(e3Id, data);
         require(success, InvalidOutput());
@@ -223,7 +273,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    function setMaxDuration(uint256 _maxDuration) public onlyOwner returns (bool success) {
+    function setMaxDuration(
+        uint256 _maxDuration
+    ) public onlyOwner returns (bool success) {
         maxDuration = _maxDuration;
         success = true;
         emit MaxDurationSet(_maxDuration);
@@ -233,7 +285,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         ICyphernodeRegistry _cyphernodeRegistry
     ) public onlyOwner returns (bool success) {
         require(
-            address(_cyphernodeRegistry) != address(0) && _cyphernodeRegistry != cyphernodeRegistry,
+            address(_cyphernodeRegistry) != address(0) &&
+                _cyphernodeRegistry != cyphernodeRegistry,
             InvalidCyphernodeRegistry(_cyphernodeRegistry)
         );
         cyphernodeRegistry = _cyphernodeRegistry;
@@ -256,7 +309,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function enableExecutionModule(
         IExecutionModule executionModule
     ) public onlyOwner returns (bool success) {
-        require(!executionModules[executionModule], ModuleAlreadyEnabled(address(executionModule)));
+        require(
+            !executionModules[executionModule],
+            ModuleAlreadyEnabled(address(executionModule))
+        );
         executionModules[executionModule] = true;
         success = true;
         emit ExecutionModuleEnabled(executionModule);
@@ -277,7 +333,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function disableExecutionModule(
         IExecutionModule executionModule
     ) public onlyOwner returns (bool success) {
-        require(executionModules[executionModule], ModuleNotEnabled(address(executionModule)));
+        require(
+            executionModules[executionModule],
+            ModuleNotEnabled(address(executionModule))
+        );
         delete executionModules[executionModule];
         success = true;
         emit ExecutionModuleDisabled(executionModule);
@@ -291,6 +350,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function getE3(uint256 e3Id) public view returns (E3 memory e3) {
         e3 = e3s[e3Id];
-        require(e3.computationModule != IComputationModule(address(0)), E3DoesNotExist(e3Id));
+        require(
+            e3.computationModule != IComputationModule(address(0)),
+            E3DoesNotExist(e3Id)
+        );
     }
 }

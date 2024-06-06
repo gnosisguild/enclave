@@ -28,7 +28,11 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @param expiration Timestamp when committee duties expire.
     /// @param committeePublicKey Public key of the committee.
-    event E3Activated(uint256 e3Id, uint256 expiration, bytes committeePublicKey);
+    event E3Activated(
+        uint256 e3Id,
+        uint256 expiration,
+        bytes committeePublicKey
+    );
 
     /// @notice This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is
     /// successfully published.
@@ -46,7 +50,10 @@ interface IEnclave {
     /// is successfully published.
     /// @param e3Id ID of the E3.
     /// @param ciphertextOutput ABI encoded ciphertext output.
-    event CiphertextOutputPublished(uint256 indexed e3Id, bytes ciphertextOutput);
+    event CiphertextOutputPublished(
+        uint256 indexed e3Id,
+        bytes ciphertextOutput
+    );
 
     /// @notice This event MUST be emitted any time the `maxDuration` is set.
     /// @param maxDuration The maximum duration of a computation in seconds.
@@ -113,7 +120,10 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded input data to publish.
     /// @return success True if the input was successfully published.
-    function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
+    function publishInput(
+        uint256 e3Id,
+        bytes calldata data
+    ) external returns (bool success);
 
     /// @notice This function should be called to publish output data for an Encrypted Execution Environment (E3).
     /// @dev This function MUST emit the CiphertextOutputPublished event.
@@ -145,7 +155,9 @@ interface IEnclave {
     /// @notice This function should be called to set the maximum duration of requested computations.
     /// @param _maxDuration The maximum duration of a computation in seconds.
     /// @return success True if the max duration was successfully set.
-    function setMaxDuration(uint256 _maxDuration) external returns (bool success);
+    function setMaxDuration(
+        uint256 _maxDuration
+    ) external returns (bool success);
 
     ////////////////////////////////////////////////////////////
     //                                                        //

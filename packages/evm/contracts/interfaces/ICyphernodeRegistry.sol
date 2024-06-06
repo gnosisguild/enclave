@@ -6,7 +6,11 @@ interface ICyphernodeRegistry {
     /// @param e3Id ID of the E3 for which the committee was selected.
     /// @param pools Addresses of the pools of nodes from which the committee was selected.
     /// @param threshold The M/N threshold for the committee.
-    event CommitteeRequested(uint256 indexed e3Id, address[] pools, uint32[2] threshold);
+    event CommitteeRequested(
+        uint256 indexed e3Id,
+        address[] pools,
+        uint32[2] threshold
+    );
 
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
@@ -50,5 +54,7 @@ interface ICyphernodeRegistry {
     /// @dev This function MUST revert if the committee has not yet published a public key.
     /// @param e3Id ID of the E3 for which to get the committee public key.
     /// @return publicKey The public key of the committee.
-    function getCommitteePublicKey(uint256 e3Id) external view returns (bytes memory publicKey);
+    function getCommitteePublicKey(
+        uint256 e3Id
+    ) external view returns (bytes memory publicKey);
 }
