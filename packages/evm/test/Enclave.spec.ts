@@ -772,7 +772,29 @@ describe("Enclave", function () {
     });
     it("sets ciphertextInput correctly");
     it("returns true if input is published successfully");
-    it("emits InputPublished event");
+    it("emits InputPublished event", async function () {
+      const { enclave, request } = await loadFixture(setup);
+
+      await enclave.request(
+        request.pool,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const e3Id = 0;
+
+      const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
+      await enclave.activate(e3Id);
+
+      await expect(enclave.publishInput(e3Id, inputData))
+        .to.emit(enclave, "InputPublished")
+        .withArgs(e3Id, "0xaabbccddeeff");
+    });
   });
 
   describe("publishCiphertextOutput()", function () {
