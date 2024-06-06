@@ -1,35 +1,16 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-interface ICyphernodeRegistry {
+interface ICommitteeCoordinator {
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
-    /// @param filter Address of the contract that will coordinate committee selection.
     /// @param threshold The M/N threshold for the committee.
-    event CommitteeRequested(
-        uint256 indexed e3Id,
-        address filter,
-        uint32[2] threshold
-    );
+    event CommitteeRequested(uint256 indexed e3Id, uint32[2] threshold);
 
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
     /// @param publicKey Public key of the committee.
-    event CommitteeSelected(uint256 indexed e3Id, bytes publicKey);
-
-    /// @notice This event MUST be emitted when a filter is added to the registry.
-    event FilterAdded(address indexed filter);
-
-    /// @notice This event MUST be emitted when a filter is removed from the registry.
-    event FilterRemoved(address indexed filter);
-
-    /// @notice This event MUST be emitted when `encalve` is set.
-    /// @param enclave Address of the enclave contract.
-    event EnclaveSet(address indexed enclave);
-
-    function addFilter(address filter) external;
-
-    function removeFilter(address filter) external;
+    event CommitteeAssembled(uint256 indexed e3Id, bytes publicKey);
 
     /// @notice This function should be called by the Enclave contract to select a node committee.
     /// @param e3Id ID of the E3 for which to select the committee.
@@ -37,7 +18,6 @@ interface ICyphernodeRegistry {
     /// @return success True if committee selection was successfully initiated.
     function requestCommittee(
         uint256 e3Id,
-        address filter,
         uint32[2] calldata threshold
     ) external returns (bool success);
 

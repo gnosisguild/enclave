@@ -1,24 +1,37 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
 import { ICommitteeCoordinator } from "../interfaces/ICommitteeCoordinator.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
+contract NaiveCommitteeCoordinator is
+    ICommitteeCoordinator,
+    OwnableUpgradeable
+{
+    struct Committee {
+        address[] nodes;
+        uint32[2] threshold;
+        bytes publicKey;
+    }
+
+    struct Node {
+        bool eligible;
+        // Number of duties the node has not yet completed.
+        // Incremented each time a duty is added, decremented each time a duty is completed.
+        uint256 outstandingDuties;
+    }
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    address public enclave;
+    address public registry;
 
-    mapping(address filter => bool enabled) public filters;
-
-    mapping(uint256 e3 => ICommitteeCoordinator coordinator) public requests;
+    mapping(uint256 e3 => Committee committee) public committees;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -26,12 +39,11 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    error CommitteeAlreadyRequested();
     error CommitteeAlreadyExists();
     error CommitteeAlreadyPublished();
     error CommitteeDoesNotExist();
     error NoPublicKeyPublished();
-    error OnlyEnclave();
+    error OnlyRegistry();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -39,8 +51,8 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    modifier onlyEnclave() {
-        require(msg.sender == enclave, OnlyEnclave());
+    modifier onlyRegistry() {
+        require(msg.sender == registry, OnlyRegistry());
         _;
     }
 
@@ -54,9 +66,9 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         initialize(_owner, _enclave);
     }
 
-    function initialize(address _owner, address _enclave) public initializer {
+    function initialize(address _owner, address _registry) public initializer {
         __Ownable_init(msg.sender);
-        setEnclave(_enclave);
+        setRegistry(_registry);
         transferOwnership(_owner);
     }
 
@@ -68,19 +80,26 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
 
     function requestCommittee(
         uint256 e3Id,
-        address filter,
         uint32[2] calldata threshold
-    ) external onlyEnclave returns (bool success) {
-        require(
-            requests[e3Id] == ICommitteeCoordinator(address(0)),
-            CommitteeAlreadyRequested()
-        );
-        requests[e3Id] = ICommitteeCoordinator(filter);
-
-        ICommitteeCoordinator(filter).requestCommittee(e3Id, threshold);
-
-        emit CommitteeRequested(e3Id, filter, threshold);
+    ) external onlyRegistry returns (bool success) {
+        Committee storage committee = committees[e3Id];
+        require(committee.threshold.length == 0, CommitteeAlreadyExists());
+        committee.threshold = threshold;
         success = true;
+    }
+
+    function publishCommittee(
+        uint256 e3Id,
+        address[] memory _nodes,
+        bytes memory publicKey
+    ) external onlyOwner {
+        Committee storage committee = committees[e3Id];
+        require(
+            keccak256(committee.publicKey) == keccak256(hex""),
+            CommitteeAlreadyPublished()
+        );
+        committee.nodes = _nodes;
+        committee.publicKey = publicKey;
     }
 
     ////////////////////////////////////////////////////////////
@@ -89,19 +108,8 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    function setEnclave(address _enclave) public onlyOwner {
-        enclave = _enclave;
-        emit EnclaveSet(_enclave);
-    }
-
-    function addFilter(address filter) external {
-        filters[filter] = true;
-        emit FilterAdded(filter);
-    }
-
-    function removeFilter(address filter) external onlyOwner {
-        filters[filter] = false;
-        emit FilterRemoved(filter);
+    function setRegistry(address _registry) public onlyOwner {
+        registry = _registry;
     }
 
     ////////////////////////////////////////////////////////////
@@ -113,9 +121,22 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     function committeePublicKey(
         uint256 e3Id
     ) external view returns (bytes memory publicKey) {
-        require(requests[e3Id] != ICommitteeCoordinator(address(0)));
-
-        publicKey = requests[e3Id].committeePublicKey(e3Id);
+        publicKey = committees[e3Id].publicKey;
         require(publicKey.length > 0, NoPublicKeyPublished());
+    }
+
+    /*
+     * This naive registry does make store and make nodes available on chain
+     * other more sophisticated registry may keep these on an off-chain tree
+     * and store the root
+     *
+     * The idea is to not include this speficics on the main interfaces for
+     * enclave for now
+     */
+    function getCommittee(
+        uint256 e3Id
+    ) external view returns (Committee memory committee) {
+        committee = committees[e3Id];
+        require(committees[e3Id].threshold.length > 0, CommitteeDoesNotExist());
     }
 }

@@ -106,7 +106,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function request(
-        address[] memory pools, // TODO: should we allow for multiple pools?
+        address filter,
         uint32[2] calldata threshold,
         // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are
         //published before the request is made? This kind of assumes the cypher nodes have already been selected
@@ -169,7 +169,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3s[e3Id] = e3;
 
         require(
-            cyphernodeRegistry.selectCommittee(e3Id, pools, threshold),
+            cyphernodeRegistry.requestCommittee(e3Id, filter, threshold),
             CommitteeSelectionFailed()
         );
         // TODO: validate that the selected pool accepts both the computation and execution modules.
@@ -177,7 +177,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3Requested(
             e3Id,
             e3s[e3Id],
-            pools,
+            filter,
             computationModule,
             executionModule
         );
@@ -190,7 +190,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
 
         bytes memory committeePublicKey = cyphernodeRegistry
-            .getCommitteePublicKey(e3Id);
+            .committeePublicKey(e3Id);
         // Note: This check feels weird
         require(committeePublicKey.length > 0, CommitteeSelectionFailed());
 
