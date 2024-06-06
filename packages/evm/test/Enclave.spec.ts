@@ -1,4 +1,4 @@
-import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
+import { loadFixture, mine, time } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { ZeroHash } from "ethers";
 import { ethers } from "hardhat";
@@ -720,8 +720,56 @@ describe("Enclave", function () {
 
       await expect(enclave.publishInput(0, inputData)).to.not.be.reverted;
     });
-    it("reverts if outside of input window");
-    it("reverts if input is not valid");
+
+    it("reverts if input is not valid", async function () {
+      const { enclave, request } = await loadFixture(setup);
+
+      await enclave.request(
+        request.pool,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const inputData = abiCoder.encode(["bytes"], ["0xaabbcc"]);
+
+      await enclave.activate(0);
+      await expect(enclave.publishInput(0, inputData)).to.be.revertedWithCustomError(
+        enclave,
+        "InvalidInput",
+      );
+    });
+
+    it("reverts if outside of input window", async function () {
+      const { enclave, request } = await loadFixture(setup);
+
+      await enclave.request(
+        request.pool,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const inputData = abiCoder.encode(["bytes32"], [ZeroHash]);
+
+      await enclave.activate(0);
+      await expect(enclave.publishInput(0, inputData)).to.not.be.reverted;
+
+      await mine(2, { interval: request.duration });
+
+      await expect(enclave.publishInput(0, inputData)).to.be.revertedWithCustomError(
+        enclave,
+        "InputDeadlinePassed",
+      );
+    });
     it("sets ciphertextInput correctly");
     it("returns true if input is published successfully");
     it("emits InputPublished event");
