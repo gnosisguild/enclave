@@ -21,8 +21,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    ICyphernodeRegistry public cyphernodeRegistry; // TODO: add a setter function.
-    uint256 public maxDuration; // TODO: add a setter function.
+    ICyphernodeRegistry public cyphernodeRegistry; // address of the Cyphernode registry.
+    uint256 public maxDuration; // maximum duration of a computation in seconds.
     uint256 public nexte3Id; // ID of the next E3.
     uint256 public requests; // total number of requests made to Enclave.
 
@@ -64,6 +64,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidInput();
     error InvalidDuration(uint256 duration);
     error InvalidOutput();
+    error InvalidStartWindow();
     error InvalidThreshold(uint32[2] threshold);
     error CiphertextOutputAlreadyPublished(uint256 e3Id);
     error CiphertextOutputNotPublished(uint256 e3Id);
@@ -109,8 +110,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         address filter,
         uint32[2] calldata threshold,
         // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are
-        //published before the request is made? This kind of assumes the cypher nodes have already been selected
+        // published before the request is made? This kind of assumes the cypher nodes have already been selected
         // and generated a shared secret.
+        uint256[2] memory startWindow,
         uint256 duration,
         IComputationModule computationModule,
         bytes memory computationParams,
@@ -120,12 +122,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: allow for other payment methods or only native tokens?
         // TODO: should payment checks be somewhere else? Perhaps in the computation module or cyphernode registry?
         require(msg.value > 0, PaymentRequired(msg.value));
-
         require(
             threshold[1] >= threshold[0] && threshold[0] > 0,
             InvalidThreshold(threshold)
         );
-        // TODO: should 0 be a magic number for infinite duration?
+        require(
+            // TODO: do we need a minimum start window to allow time for committee selection?
+            startWindow[1] >= startWindow[0] && startWindow[1] >= block.timestamp,
+            InvalidStartWindow()
+        );
         require(
             duration > 0 && duration <= maxDuration,
             InvalidDuration(duration)
@@ -157,6 +162,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         e3 = E3({
             threshold: threshold,
+            startWindow: startWindow,
             expiration: 0,
             computationModule: computationModule,
             executionModule: executionModule,
@@ -188,6 +194,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // Requires a mew internal _getter that returns storage
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
+        require(e3.startWindow[0] <= block.timestamp, "E3 not ready yet");
+        // TODO: handle what happens to the payment if the start window has passed.
+        require(e3.startWindow[1] >= block.timestamp, "E3 expired")
 
         bytes memory publicKey = cyphernodeRegistry.committeePublicKey(e3Id);
         // Note: This check feels weird
