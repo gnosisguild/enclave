@@ -2,7 +2,7 @@
 pragma solidity >=0.8.26;
 
 import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
-import { ICommitteeCoordinator } from "../interfaces/ICommitteeCoordinator.sol";
+import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -16,9 +16,9 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
 
     address public enclave;
 
-    mapping(address filter => bool enabled) public filters;
+    mapping(address cyphernode => bool isEnabled) public isEnabled;
 
-    mapping(uint256 e3 => ICommitteeCoordinator coordinator) public requests;
+    mapping(uint256 e3Id => IRegistryFilter filter) public requests;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -30,7 +30,8 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     error CommitteeAlreadyExists();
     error CommitteeAlreadyPublished();
     error CommitteeDoesNotExist();
-    error NoPublicKeyPublished();
+    error CommitteeInvalid();
+    error CyphernodeNotEnabled(address node);
     error OnlyEnclave();
 
     ////////////////////////////////////////////////////////////
@@ -72,13 +73,12 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         uint32[2] calldata threshold
     ) external onlyEnclave returns (bool success) {
         require(
-            requests[e3Id] == ICommitteeCoordinator(address(0)),
+            requests[e3Id] == IRegistryFilter(address(0)),
             CommitteeAlreadyRequested()
         );
-        requests[e3Id] = ICommitteeCoordinator(filter);
+        requests[e3Id] = IRegistryFilter(filter);
 
-        ICommitteeCoordinator(filter).requestCommittee(e3Id, threshold);
-
+        IRegistryFilter(filter).requestCommittee(e3Id, threshold);
         emit CommitteeRequested(e3Id, filter, threshold);
         success = true;
     }
@@ -94,14 +94,18 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         emit EnclaveSet(_enclave);
     }
 
-    function addFilter(address filter) external {
-        filters[filter] = true;
-        emit FilterAdded(filter);
+    function addCyphernode(address node) external onlyOwner {
+        isEnabled[node] = true;
+        emit CyphernodeAdded(node);
     }
 
-    function removeFilter(address filter) external onlyOwner {
-        filters[filter] = false;
-        emit FilterRemoved(filter);
+    function removeCyphernode(address node) external onlyOwner {
+        isEnabled[node] = false;
+        emit CyphernodeRemoved(node);
+    }
+
+    function isCyphernodeEnabled(address node) external view returns (bool) {
+        return isEnabled[node];
     }
 
     ////////////////////////////////////////////////////////////
@@ -112,10 +116,29 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
 
     function committeePublicKey(
         uint256 e3Id
-    ) external view returns (bytes memory publicKey) {
-        require(requests[e3Id] != ICommitteeCoordinator(address(0)));
+    ) external view returns (bytes memory) {
+        require(
+            requests[e3Id] != IRegistryFilter(address(0)),
+            CommitteeDoesNotExist()
+        );
 
-        publicKey = requests[e3Id].committeePublicKey(e3Id);
-        require(publicKey.length > 0, NoPublicKeyPublished());
+        (
+            uint32[2] memory threshold,
+            bytes memory publicKey,
+            address[] memory cyphernodes
+        ) = IRegistryFilter(requests[e3Id]).retrieveCommittee(e3Id);
+
+        require(
+            threshold[0] > 0 && threshold[0] < threshold[1],
+            CommitteeInvalid()
+        );
+
+        require(threshold[1] <= cyphernodes.length, CommitteeInvalid());
+
+        for (uint256 i = 0; i < cyphernodes.length; i++) {
+            require(isEnabled[cyphernodes[i]] == true, CommitteeInvalid());
+        }
+
+        return publicKey;
     }
 }

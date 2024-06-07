@@ -26,9 +26,9 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
         }
     }
 
-    function addFilter(address filter) external {}
-
-    function removeFilter(address filter) external {}
+    function isCyphernodeEnabled(address) external pure returns (bool) {
+        return false;
+    }
 }
 
 contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
@@ -48,7 +48,7 @@ contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
         return hex"";
     }
 
-    function addFilter(address filter) external {}
-
-    function removeFilter(address filter) external {}
+    function isCyphernodeEnabled(address) external pure returns (bool) {
+        return false;
+    }
 }

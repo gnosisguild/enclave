@@ -189,14 +189,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
 
-        bytes memory committeePublicKey = cyphernodeRegistry
-            .committeePublicKey(e3Id);
+        bytes memory publicKey = cyphernodeRegistry.committeePublicKey(e3Id);
         // Note: This check feels weird
-        require(committeePublicKey.length > 0, CommitteeSelectionFailed());
+        require(publicKey.length > 0, CommitteeSelectionFailed());
 
         // TODO: this should be based on the duration requested, not the current max duration.
         e3s[e3Id].expiration = block.timestamp + maxDuration;
-        e3s[e3Id].committeePublicKey = committeePublicKey;
+        e3s[e3Id].committeePublicKey = publicKey;
 
         emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);
 

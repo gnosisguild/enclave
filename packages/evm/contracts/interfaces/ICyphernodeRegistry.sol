@@ -12,24 +12,22 @@ interface ICyphernodeRegistry {
         uint32[2] threshold
     );
 
+    /// @notice This event MUST be emitted when `encalve` is set.
+    /// @param enclave Address of the enclave contract.
+    event EnclaveSet(address indexed enclave);
+
+    /// @notice This event MUST be emitted when a cyphernode is added to the registry.
+    event CyphernodeAdded(address indexed node);
+
+    /// @notice This event MUST be emitted when a cyphernode is removed from the registry.
+    event CyphernodeRemoved(address indexed node);
+
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
     /// @param publicKey Public key of the committee.
     event CommitteeSelected(uint256 indexed e3Id, bytes publicKey);
 
-    /// @notice This event MUST be emitted when a filter is added to the registry.
-    event FilterAdded(address indexed filter);
-
-    /// @notice This event MUST be emitted when a filter is removed from the registry.
-    event FilterRemoved(address indexed filter);
-
-    /// @notice This event MUST be emitted when `encalve` is set.
-    /// @param enclave Address of the enclave contract.
-    event EnclaveSet(address indexed enclave);
-
-    function addFilter(address filter) external;
-
-    function removeFilter(address filter) external;
+    function isCyphernodeEnabled(address ciphernode) external returns (bool);
 
     /// @notice This function should be called by the Enclave contract to select a node committee.
     /// @param e3Id ID of the E3 for which to select the committee.
