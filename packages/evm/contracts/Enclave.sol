@@ -172,7 +172,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             cyphernodeRegistry.requestCommittee(e3Id, filter, threshold),
             CommitteeSelectionFailed()
         );
-        // TODO: validate that the selected pool accepts both the computation and execution modules.
 
         emit E3Requested(
             e3Id,

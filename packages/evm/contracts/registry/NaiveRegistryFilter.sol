@@ -6,18 +6,19 @@ import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
+interface IRegistry {
+    function publishCommittee(
+        uint256 e3Id,
+        address[] calldata cyphernodes,
+        bytes calldata publicKey
+    ) external;
+}
+
 contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     struct Committee {
         address[] nodes;
         uint32[2] threshold;
         bytes publicKey;
-    }
-
-    struct Node {
-        bool eligible;
-        // Number of duties the node has not yet completed.
-        // Incremented each time a duty is added, decremented each time a duty is completed.
-        uint256 outstandingDuties;
     }
 
     ////////////////////////////////////////////////////////////
@@ -85,26 +86,6 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         success = true;
     }
 
-    function retrieveCommittee(
-        uint256 e3Id
-    )
-        external
-        view
-        returns (
-            uint32[2] memory threshold,
-            bytes memory publicKey,
-            address[] memory ciphernodes
-        )
-    {
-        Committee storage committee = committees[e3Id];
-        require(committee.threshold.length > 0, CommitteeDoesNotExist());
-        threshold = committee.threshold;
-        require(committee.publicKey.length > 0, CommitteeNotPublished());
-        publicKey = committee.publicKey;
-        require(committee.nodes.length > 0, CommitteeNotPublished());
-        ciphernodes = committee.nodes;
-    }
-
     function publishCommittee(
         uint256 e3Id,
         address[] memory nodes,
@@ -117,6 +98,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         );
         committee.nodes = nodes;
         committee.publicKey = publicKey;
+        IRegistry(registry).publishCommittee(e3Id, nodes, publicKey);
     }
 
     ////////////////////////////////////////////////////////////
@@ -127,18 +109,5 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     function setRegistry(address _registry) public onlyOwner {
         registry = _registry;
-    }
-
-    ////////////////////////////////////////////////////////////
-    //                                                        //
-    //                   Get Functions                        //
-    //                                                        //
-    ////////////////////////////////////////////////////////////
-
-    function committeePublicKey(
-        uint256 e3Id
-    ) external view returns (bytes memory publicKey) {
-        publicKey = committees[e3Id].publicKey;
-        require(publicKey.length > 0, CommitteeNotPublished());
     }
 }
