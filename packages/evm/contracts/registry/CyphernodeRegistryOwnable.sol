@@ -19,6 +19,7 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     mapping(address cyphernode => bool isEnabled) public isEnabled;
 
     mapping(uint256 e3Id => IRegistryFilter filter) public requests;
+    mapping(uint256 e3Id => bytes publicKey) public publicKeys;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -27,10 +28,9 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     error CommitteeAlreadyRequested();
-    error CommitteeAlreadyExists();
     error CommitteeAlreadyPublished();
     error CommitteeDoesNotExist();
-    error CommitteeInvalid();
+    error CommitteeNotPublished();
     error CyphernodeNotEnabled(address node);
     error OnlyEnclave();
 
@@ -83,6 +83,25 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         success = true;
     }
 
+    function publishCommittee(
+        uint256 e3Id,
+        address[] calldata cyphernodes,
+        bytes calldata publicKey
+    ) external {
+        // only to be published by the filter
+        require(address(requests[e3Id]) == msg.sender, CommitteeDoesNotExist());
+
+        for (uint256 i = 0; i < cyphernodes.length; i++) {
+            require(
+                isEnabled[cyphernodes[i]] == true,
+                CyphernodeNotEnabled(cyphernodes[i])
+            );
+        }
+
+        publicKeys[e3Id] = publicKey;
+        emit CommitteePublished(e3Id, cyphernodes, publicKey);
+    }
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Set Functions                        //
@@ -116,29 +135,8 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
 
     function committeePublicKey(
         uint256 e3Id
-    ) external view returns (bytes memory) {
-        require(
-            requests[e3Id] != IRegistryFilter(address(0)),
-            CommitteeDoesNotExist()
-        );
-
-        (
-            uint32[2] memory threshold,
-            bytes memory publicKey,
-            address[] memory cyphernodes
-        ) = IRegistryFilter(requests[e3Id]).retrieveCommittee(e3Id);
-
-        require(
-            threshold[0] > 0 && threshold[0] < threshold[1],
-            CommitteeInvalid()
-        );
-
-        require(threshold[1] <= cyphernodes.length, CommitteeInvalid());
-
-        for (uint256 i = 0; i < cyphernodes.length; i++) {
-            require(isEnabled[cyphernodes[i]] == true, CommitteeInvalid());
-        }
-
-        return publicKey;
+    ) external view returns (bytes memory publicKey) {
+        publicKey = publicKeys[e3Id];
+        require(publicKey.length > 0, CommitteeNotPublished());
     }
 }
