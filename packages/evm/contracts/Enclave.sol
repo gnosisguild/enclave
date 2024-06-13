@@ -128,7 +128,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         require(
             // TODO: do we need a minimum start window to allow time for committee selection?
-            startWindow[1] >= startWindow[0] && startWindow[1] >= block.timestamp,
+            startWindow[1] >= startWindow[0] &&
+                startWindow[1] >= block.timestamp,
             InvalidStartWindow()
         );
         require(
@@ -194,9 +195,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // Requires a mew internal _getter that returns storage
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
-        require(e3.startWindow[0] <= block.timestamp, "E3 not ready yet");
+        require(e3.startWindow[0] <= block.timestamp, E3NotReady());
         // TODO: handle what happens to the payment if the start window has passed.
-        require(e3.startWindow[1] >= block.timestamp, "E3 expired")
+        require(e3.startWindow[1] >= block.timestamp, E3Expired());
 
         bytes memory publicKey = cyphernodeRegistry.committeePublicKey(e3Id);
         // Note: This check feels weird
