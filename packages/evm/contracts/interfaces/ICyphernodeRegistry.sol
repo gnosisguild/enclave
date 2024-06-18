@@ -34,7 +34,7 @@ interface ICyphernodeRegistry {
     /// @param node Address of the node.
     event NodeRemoved(uint256 indexed nodeId, address indexed node);
 
-    /// @notice This event MUST be emitted when `encalve` is set.
+    /// @notice This event MUST be emitted when `enclave` is set.
     /// @param enclave Address of the enclave contract.
     event EnclaveSet(address indexed enclave);
 
