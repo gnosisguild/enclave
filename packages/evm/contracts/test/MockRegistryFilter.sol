@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
+interface IRegistry {
+    function publishCommittee(
+        uint256 e3Id,
+        address[] calldata cyphernodes,
+        bytes calldata publicKey
+    ) external;
+}
 
 contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     struct Committee {
@@ -91,7 +98,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         );
         committee.nodes = nodes;
         committee.publicKey = publicKey;
-        ICyphernodeRegistry(registry).publishCommittee(e3Id, publicKey);
+        IRegistry(registry).publishCommittee(e3Id, nodes, publicKey);
     }
 
     ////////////////////////////////////////////////////////////

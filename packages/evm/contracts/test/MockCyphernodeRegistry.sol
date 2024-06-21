@@ -16,6 +16,8 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
         }
     }
 
+    function publishCommittee(uint256, bytes calldata) external {}
+
     function committeePublicKey(
         uint256 e3Id
     ) external pure returns (bytes memory) {
@@ -43,6 +45,8 @@ contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
             success = true;
         }
     }
+
+    function publishCommittee(uint256, bytes calldata) external {}
 
     function committeePublicKey(uint256) external pure returns (bytes memory) {
         return hex"";

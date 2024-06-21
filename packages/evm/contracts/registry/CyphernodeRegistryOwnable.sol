@@ -83,23 +83,19 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         success = true;
     }
 
-    function publishCommittee(
-        uint256 e3Id,
-        address[] calldata cyphernodes,
-        bytes calldata publicKey
-    ) external {
+    function publishCommittee(uint256 e3Id, bytes calldata publicKey) external {
         // only to be published by the filter
         require(address(requests[e3Id]) == msg.sender, CommitteeDoesNotExist());
 
-        for (uint256 i = 0; i < cyphernodes.length; i++) {
-            require(
-                isEnabled[cyphernodes[i]] == true,
-                CyphernodeNotEnabled(cyphernodes[i])
-            );
-        }
+        // for (uint256 i = 0; i < cyphernodes.length; i++) {
+        //     require(
+        //         isEnabled[cyphernodes[i]] == true,
+        //         CyphernodeNotEnabled(cyphernodes[i])
+        //     );
+        // }
 
         publicKeys[e3Id] = publicKey;
-        emit CommitteePublished(e3Id, cyphernodes, publicKey);
+        emit CommitteePublished(e3Id, publicKey);
     }
 
     ////////////////////////////////////////////////////////////
