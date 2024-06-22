@@ -99,6 +99,7 @@ interface IEnclave {
     function request(
         address[] memory pools,
         uint32[2] calldata threshold,
+        uint256[2] calldata startWindow,
         uint256 duration,
         IComputationModule computationModule,
         bytes memory computationParams,

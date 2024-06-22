@@ -32,6 +32,8 @@ describe("Enclave", function () {
       registry: await registry.getAddress(),
     });
 
+    const latestBlock = await ethers.provider.getBlock("latest");
+
     await enclave.enableComputationModule(await computationModule.getAddress());
     await enclave.enableExecutionModule(await executionModule.getAddress());
 
@@ -49,6 +51,10 @@ describe("Enclave", function () {
       request: {
         pool: [ethers.ZeroAddress],
         threshold: [2, 2] as [number, number],
+        startTime: [
+          latestBlock ? latestBlock.timestamp : 0,
+          latestBlock ? latestBlock.timestamp + 100 : 100,
+        ] as [number, number],
         duration: time.duration.days(30),
         computationModule: await computationModule.getAddress(),
         cMParams: abiCoder.encode(
@@ -179,6 +185,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -401,6 +408,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -415,6 +423,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           [0, 2],
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -430,6 +439,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           [3, 2],
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -445,6 +455,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           request.threshold,
+          request.startTime,
           0,
           request.computationModule,
           request.cMParams,
@@ -460,6 +471,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           request.threshold,
+          request.startTime,
           time.duration.days(31),
           request.computationModule,
           request.cMParams,
@@ -475,6 +487,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           request.threshold,
+          request.startTime,
           request.duration,
           ethers.ZeroAddress,
           request.cMParams,
@@ -492,6 +505,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -510,6 +524,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           ZeroHash,
@@ -525,6 +540,7 @@ describe("Enclave", function () {
         enclave.request(
           request.pool,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -540,6 +556,7 @@ describe("Enclave", function () {
         enclave.request(
           [AddressTwo],
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -554,6 +571,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -582,6 +600,7 @@ describe("Enclave", function () {
       const tx = await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -617,6 +636,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -631,12 +651,15 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
         .withArgs(0);
     });
+    it("reverts if E3 is not yet ready to start");
+    it("reverts if E3 start has expired");
     it("reverts if cyphernodeRegistry does not return a public key", async function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -669,6 +692,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -694,6 +718,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -712,6 +737,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -744,6 +770,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -770,6 +797,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -792,6 +820,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -819,6 +848,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.pool,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
