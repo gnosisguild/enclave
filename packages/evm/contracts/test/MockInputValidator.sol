@@ -8,7 +8,7 @@ contract MockInputValidator is IInputValidator {
         address,
         bytes memory params
     ) external pure returns (bytes memory input, bool success) {
-        input = abi.decode(params, (bytes));
+        input = params;
 
         if (input.length == 3) {
             success = false;

@@ -25,6 +25,7 @@ struct E3 {
     IInputValidator inputValidator;
     IOutputVerifier outputVerifier;
     bytes committeePublicKey;
+    bytes[] inputs;
     bytes ciphertextOutput;
     bytes plaintextOutput;
 }

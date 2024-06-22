@@ -163,6 +163,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             inputValidator: inputValidator,
             outputVerifier: outputVerifier,
             committeePublicKey: hex"",
+            inputs: new bytes[](0),
             ciphertextOutput: hex"",
             plaintextOutput: hex""
         });
@@ -217,7 +218,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
-        // TODO: do we need to store or accumulate the inputs? Probably yes.
+        // TODO: probably better to accumulate inputs, rather than just dumping them in storage.
+        e3s[e3Id].inputs.push(input);
         emit InputPublished(e3Id, input);
     }
 

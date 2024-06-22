@@ -782,11 +782,9 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      const inputData = abiCoder.encode(["bytes"], ["0xaabbcc"]);
-
       await enclave.activate(0);
       await expect(
-        enclave.publishInput(0, inputData),
+        enclave.publishInput(0, "0xaabbcc"),
       ).to.be.revertedWithCustomError(enclave, "InvalidInput");
     });
 
@@ -804,19 +802,60 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      const inputData = abiCoder.encode(["bytes32"], [ZeroHash]);
-
       await enclave.activate(0);
-      await expect(enclave.publishInput(0, inputData)).to.not.be.reverted;
+      await expect(enclave.publishInput(0, ZeroHash)).to.not.be.reverted;
 
       await mine(2, { interval: request.duration });
 
       await expect(
-        enclave.publishInput(0, inputData),
+        enclave.publishInput(0, ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
     });
-    it("sets ciphertextInput correctly");
-    it("returns true if input is published successfully");
+    it("sets ciphertextInput correctly", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const inputData = "0x12345678";
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      await enclave.activate(0);
+
+      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
+      let e3 = await enclave.getE3(0);
+      expect(e3.inputs[0]).to.equal(inputData);
+      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
+      e3 = await enclave.getE3(0);
+      expect(e3.inputs[1]).to.equal(inputData);
+    });
+    it("returns true if input is published successfully", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const inputData = "0x12345678";
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      await enclave.activate(0);
+
+      expect(await enclave.publishInput.staticCall(0, inputData)).to.equal(
+        true,
+      );
+    });
     it("emits InputPublished event", async function () {
       const { enclave, request } = await loadFixture(setup);
 
@@ -838,7 +877,7 @@ describe("Enclave", function () {
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")
-        .withArgs(e3Id, "0xaabbccddeeff");
+        .withArgs(e3Id, inputData);
     });
   });
 
