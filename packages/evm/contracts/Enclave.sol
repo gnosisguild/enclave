@@ -52,7 +52,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error CommitteeSelectionFailed();
     error ComputationModuleNotAllowed(IComputationModule computationModule);
     error E3AlreadyActivated(uint256 e3Id);
+    error E3Expired();
     error E3NotActivated(uint256 e3Id);
+    error E3NotReady();
     error E3DoesNotExist(uint256 e3Id);
     error ModuleAlreadyEnabled(address module);
     error ModuleNotEnabled(address module);
@@ -112,7 +114,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are
         // published before the request is made? This kind of assumes the cypher nodes have already been selected
         // and generated a shared secret.
-        uint256[2] memory startWindow,
+        uint256[2] calldata startWindow,
         uint256 duration,
         IComputationModule computationModule,
         bytes memory computationParams,
