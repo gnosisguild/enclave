@@ -26,9 +26,13 @@ sequenceDiagram
     participant Computation Module
     participant Execution Module
 
+    Note over Token Holders, Execution Module: <br/>Ciphernode setup flow:<br/>
+
     loop Each token holder that wants to register a ciphernode
         Token Holders ->> Ciphernode Registry: Stake tokens to register ciphernodes
     end
+
+    Note over Token Holders, Execution Module: <br/>Computation flow:<br/>
 
     loop Each computation request
         Requester ->> Enclave: Request computation
