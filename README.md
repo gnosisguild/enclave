@@ -17,7 +17,6 @@ Enclave employs a modular architecture involving numerous actors and participant
 
 ```mermaid
 sequenceDiagram
-    actor Token Holders
     actor Requester
     actor Data Providers
     participant Enclave
@@ -25,14 +24,6 @@ sequenceDiagram
     participant Ciphernodes
     participant Computation Module
     participant Execution Module
-
-    Note over Token Holders, Execution Module: <br/>Ciphernode setup flow:<br/>
-
-    loop Each token holder that wants to register a ciphernode
-        Token Holders ->> Ciphernode Registry: Stake tokens to register ciphernodes
-    end
-
-    Note over Token Holders, Execution Module: <br/>Computation flow:<br/>
 
     loop Each computation request
         Requester ->> Enclave: Request computation
@@ -46,7 +37,7 @@ sequenceDiagram
                 Ciphernode Registry -->> Enclave: Publish Committee
             deactivate Ciphernode Registry
 
-            loop Each input provider
+            loop Each input
                 Data Providers ->> Enclave: Publish inputs
                 Enclave ->> Computation Module: Validate inputs
                 activate Computation Module
