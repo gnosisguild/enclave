@@ -2,6 +2,7 @@
 pragma solidity >=0.8.26;
 
 import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
+import { ICyphernodeState } from "../interfaces/ICyphernodeState.sol";
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import {
     OwnableUpgradeable
@@ -15,8 +16,7 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     address public enclave;
-
-    mapping(address cyphernode => bool isEnabled) public isEnabled;
+    address public state;
 
     mapping(uint256 e3Id => IRegistryFilter filter) public requests;
     mapping(uint256 e3Id => bytes publicKey) public publicKeys;
@@ -31,7 +31,6 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     error CommitteeAlreadyPublished();
     error CommitteeDoesNotExist();
     error CommitteeNotPublished();
-    error CyphernodeNotEnabled(address node);
     error OnlyEnclave();
 
     ////////////////////////////////////////////////////////////
@@ -51,13 +50,18 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    constructor(address _owner, address _enclave) {
-        initialize(_owner, _enclave);
+    constructor(address _owner, address _enclave, address _state) {
+        initialize(_owner, _enclave, _state);
     }
 
-    function initialize(address _owner, address _enclave) public initializer {
+    function initialize(
+        address _owner,
+        address _enclave,
+        address _state
+    ) public initializer {
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
+        setEnclave(_state);
         transferOwnership(_owner);
     }
 
@@ -85,18 +89,13 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
 
     function publishCommittee(
         uint256 e3Id,
-        bytes calldata,
+        bytes calldata proof,
         bytes calldata publicKey
     ) external {
         // only to be published by the filter
         require(address(requests[e3Id]) == msg.sender, CommitteeDoesNotExist());
 
-        // for (uint256 i = 0; i < cyphernodes.length; i++) {
-        //     require(
-        //         isEnabled[cyphernodes[i]] == true,
-        //         CyphernodeNotEnabled(cyphernodes[i])
-        //     );
-        // }
+        ICyphernodeState(state).verifyCommittee(e3Id, proof, publicKey);
 
         publicKeys[e3Id] = publicKey;
         emit CommitteePublished(e3Id, publicKey);
@@ -113,18 +112,12 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         emit EnclaveSet(_enclave);
     }
 
-    function addCyphernode(address node) external onlyOwner {
-        isEnabled[node] = true;
-        emit CyphernodeAdded(node);
-    }
-
-    function removeCyphernode(address node) external onlyOwner {
-        isEnabled[node] = false;
-        emit CyphernodeRemoved(node);
+    function setState(address _state) public onlyOwner {
+        state = _state;
     }
 
     function isCyphernodeEligible(address node) external view returns (bool) {
-        return isEnabled[node];
+        return ICyphernodeState(state).isCyphernodeEligible(node);
     }
 
     ////////////////////////////////////////////////////////////
