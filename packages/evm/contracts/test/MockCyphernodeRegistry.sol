@@ -16,7 +16,11 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
         }
     }
 
-    function publishCommittee(uint256, bytes calldata) external {}
+    function publishCommittee(
+        uint256,
+        bytes calldata,
+        bytes calldata
+    ) external {}
 
     function committeePublicKey(
         uint256 e3Id
@@ -28,7 +32,7 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
         }
     }
 
-    function isCyphernodeEnabled(address) external pure returns (bool) {
+    function isCyphernodeEligible(address) external pure returns (bool) {
         return false;
     }
 }
@@ -46,13 +50,17 @@ contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
         }
     }
 
-    function publishCommittee(uint256, bytes calldata) external {}
+    function publishCommittee(
+        uint256,
+        bytes calldata,
+        bytes calldata
+    ) external {}
 
     function committeePublicKey(uint256) external pure returns (bytes memory) {
         return hex"";
     }
 
-    function isCyphernodeEnabled(address) external pure returns (bool) {
+    function isCyphernodeEligible(address) external pure returns (bool) {
         return false;
     }
 }

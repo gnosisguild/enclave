@@ -91,7 +91,11 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         );
         committee.nodes = nodes;
         committee.publicKey = publicKey;
-        ICyphernodeRegistry(registry).publishCommittee(e3Id, publicKey);
+        ICyphernodeRegistry(registry).publishCommittee(
+            e3Id,
+            abi.encode(nodes),
+            publicKey
+        );
     }
 
     ////////////////////////////////////////////////////////////

@@ -83,7 +83,11 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         success = true;
     }
 
-    function publishCommittee(uint256 e3Id, bytes calldata publicKey) external {
+    function publishCommittee(
+        uint256 e3Id,
+        bytes calldata,
+        bytes calldata publicKey
+    ) external {
         // only to be published by the filter
         require(address(requests[e3Id]) == msg.sender, CommitteeDoesNotExist());
 
@@ -119,7 +123,7 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         emit CyphernodeRemoved(node);
     }
 
-    function isCyphernodeEnabled(address node) external view returns (bool) {
+    function isCyphernodeEligible(address node) external view returns (bool) {
         return isEnabled[node];
     }
 
