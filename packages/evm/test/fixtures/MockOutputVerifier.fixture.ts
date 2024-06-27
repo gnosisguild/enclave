@@ -4,7 +4,7 @@ import { MockOutputVerifier__factory } from "../../types/factories/contracts/tes
 
 export async function deployOutputVerifierFixture() {
   const deployment = await (
-    await ethers.getContractFactory("MockComputationModule")
+    await ethers.getContractFactory("MockOutputVerifier")
   ).deploy();
   return MockOutputVerifier__factory.connect(await deployment.getAddress());
 }

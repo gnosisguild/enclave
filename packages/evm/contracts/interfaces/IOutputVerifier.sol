@@ -9,5 +9,5 @@ interface IOutputVerifier {
     function verify(
         uint256 e3Id,
         bytes memory data
-    ) external returns (bytes memory output, bool success);
+    ) external view returns (bytes memory output, bool success);
 }

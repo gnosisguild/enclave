@@ -65,7 +65,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidCyphernodeRegistry(ICyphernodeRegistry cyphernodeRegistry);
     error InvalidInput();
     error InvalidDuration(uint256 duration);
-    error InvalidOutput();
+    error InvalidOutput(bytes output);
     error InvalidStartWindow();
     error InvalidThreshold(uint32[2] threshold);
     error CiphertextOutputAlreadyPublished(uint256 e3Id);
@@ -240,6 +240,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory data
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+        // Note: if we make 0 a no expiration, this has to be refactored
+        require(e3.expiration > 0, E3NotActivated(e3Id));
         require(
             e3.expiration <= block.timestamp,
             InputDeadlineNotPassed(e3Id, e3.expiration)
@@ -252,7 +254,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         bytes memory output;
         (output, success) = e3.outputVerifier.verify(e3Id, data);
-        require(success, InvalidOutput());
+        require(success, InvalidOutput(output));
         e3s[e3Id].ciphertextOutput = output;
 
         emit CiphertextOutputPublished(e3Id, output);
@@ -263,6 +265,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory data
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+        // Note: if we make 0 a no expiration, this has to be refactored
+        require(e3.expiration > 0, E3NotActivated(e3Id));
         require(
             e3.ciphertextOutput.length > 0,
             CiphertextOutputNotPublished(e3Id)
@@ -273,7 +277,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         bytes memory output;
         (output, success) = e3.computationModule.verify(e3Id, data);
-        require(success, InvalidOutput());
+        require(success, InvalidOutput(output));
         e3s[e3Id].plaintextOutput = output;
 
         emit PlaintextOutputPublished(e3Id, output);
