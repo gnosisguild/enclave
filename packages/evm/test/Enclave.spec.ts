@@ -53,6 +53,10 @@ describe("Enclave", function () {
       request: {
         filter: FilterOkay,
         threshold: [2, 2] as [number, number],
+        startTime: [await time.latest(), (await time.latest()) + 100] as [
+          number,
+          number,
+        ],
         duration: time.duration.days(30),
         computationModule: await computationModule.getAddress(),
         cMParams: abiCoder.encode(
@@ -183,6 +187,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -405,6 +410,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -419,6 +425,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           [0, 2],
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -434,6 +441,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           [3, 2],
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -449,6 +457,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           request.threshold,
+          request.startTime,
           0,
           request.computationModule,
           request.cMParams,
@@ -464,6 +473,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           request.threshold,
+          request.startTime,
           time.duration.days(31),
           request.computationModule,
           request.cMParams,
@@ -479,6 +489,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           request.threshold,
+          request.startTime,
           request.duration,
           ethers.ZeroAddress,
           request.cMParams,
@@ -496,6 +507,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -514,6 +526,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           ZeroHash,
@@ -529,6 +542,7 @@ describe("Enclave", function () {
         enclave.request(
           request.filter,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -544,6 +558,7 @@ describe("Enclave", function () {
         enclave.request(
           FilterFail,
           request.threshold,
+          request.startTime,
           request.duration,
           request.computationModule,
           request.cMParams,
@@ -558,6 +573,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -586,6 +602,7 @@ describe("Enclave", function () {
       const tx = await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -621,6 +638,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -635,12 +653,113 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
         .withArgs(0);
     });
+    it("reverts if E3 is not yet ready to start", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const startTime = [
+        (await time.latest()) + 1000,
+        (await time.latest()) + 2000,
+      ] as [number, number];
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
+        enclave,
+        "E3NotReady",
+      );
+    });
+    it("reverts if E3 start has expired", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const startTime = [await time.latest(), (await time.latest()) + 1] as [
+        number,
+        number,
+      ];
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      mine(1, { interval: 1000 });
+
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
+        enclave,
+        "E3Expired",
+      );
+    });
+    it("reverts if cyphernodeRegistry does not return a public key", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const startTime = [
+        (await time.latest()) + 1000,
+        (await time.latest()) + 2000,
+      ] as [number, number];
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
+        enclave,
+        "E3NotReady",
+      );
+    });
+    it("reverts if E3 start has expired", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const startTime = [await time.latest(), (await time.latest()) + 1] as [
+        number,
+        number,
+      ];
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      mine(1, { interval: 1000 });
+
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
+        enclave,
+        "E3Expired",
+      );
+    });
     it("reverts if cyphernodeRegistry does not return a public key", async function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -673,6 +792,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -698,6 +818,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -716,6 +837,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -748,6 +870,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -774,6 +897,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -794,6 +918,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -818,6 +943,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -842,6 +968,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -862,6 +989,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -882,24 +1010,329 @@ describe("Enclave", function () {
   });
 
   describe("publishCiphertextOutput()", function () {
-    it("reverts if E3 does not exist");
-    it("reverts if E3 has not been activated");
-    it("reverts if input deadline has not passed");
-    it("reverts if output has already been published");
-    it("reverts if output is not valid");
-    it("sets ciphertextOutput correctly");
-    it("returns true if output is published successfully");
-    it("emits CiphertextOutputPublished event");
+    it("reverts if E3 does not exist", async function () {
+      const { enclave, request } = await loadFixture(setup);
+
+      await expect(enclave.publishCiphertextOutput(0, "0x"))
+        .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
+        .withArgs(0);
+    });
+    it("reverts if E3 has not been activated", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await expect(enclave.publishCiphertextOutput(e3Id, "0x"))
+        .to.be.revertedWithCustomError(enclave, "E3NotActivated")
+        .withArgs(e3Id);
+    });
+    it("reverts if input deadline has not passed", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const tx = await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      const block = await tx.getBlock();
+      const timestamp = block ? block.timestamp : await time.latest();
+      const expectedExpiration = timestamp + request.duration + 1;
+      const e3Id = 0;
+
+      await enclave.activate(e3Id);
+
+      await expect(enclave.publishCiphertextOutput(e3Id, "0x"))
+        .to.be.revertedWithCustomError(enclave, "InputDeadlineNotPassed")
+        .withArgs(e3Id, expectedExpiration);
+    });
+    it("reverts if output has already been published", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      expect(await enclave.publishCiphertextOutput(e3Id, "0x1337"));
+      await expect(enclave.publishCiphertextOutput(e3Id, "0x1337"))
+        .to.be.revertedWithCustomError(
+          enclave,
+          "CiphertextOutputAlreadyPublished",
+        )
+        .withArgs(e3Id);
+    });
+    it("reverts if output is not valid", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      await expect(
+        enclave.publishCiphertextOutput(e3Id, "0x"),
+      ).to.be.revertedWithCustomError(enclave, "InvalidOutput");
+    });
+    it("sets ciphertextOutput correctly", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      expect(await enclave.publishCiphertextOutput(e3Id, "0x1337"));
+      const e3 = await enclave.getE3(e3Id);
+      expect(e3.ciphertextOutput).to.equal("0x1337");
+    });
+    it("returns true if output is published successfully", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      expect(
+        await enclave.publishCiphertextOutput.staticCall(e3Id, "0x1337"),
+      ).to.equal(true);
+    });
+    it("emits CiphertextOutputPublished event", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      await expect(enclave.publishCiphertextOutput(e3Id, "0x1337"))
+        .to.emit(enclave, "CiphertextOutputPublished")
+        .withArgs(e3Id, "0x1337");
+    });
   });
 
   describe("publishPlaintextOutput()", function () {
-    it("reverts if E3 does not exist");
-    it("reverts if E3 has not been activated");
-    it("reverts if ciphertextOutput has not been published");
-    it("reverts if plaintextOutput has already been published");
-    it("reverts if output is not valid");
-    it("sets plaintextOutput correctly");
-    it("returns true if output is published successfully");
-    it("emits PlaintextOutputPublished event");
+    it("reverts if E3 does not exist", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await expect(enclave.publishPlaintextOutput(e3Id, "0x"))
+        .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
+        .withArgs(e3Id);
+    });
+    it("reverts if E3 has not been activated", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await expect(enclave.publishPlaintextOutput(e3Id, "0x"))
+        .to.be.revertedWithCustomError(enclave, "E3NotActivated")
+        .withArgs(e3Id);
+    });
+    it("reverts if ciphertextOutput has not been published", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await expect(enclave.publishPlaintextOutput(e3Id, "0x"))
+        .to.be.revertedWithCustomError(enclave, "CiphertextOutputNotPublished")
+        .withArgs(e3Id);
+    });
+    it("reverts if plaintextOutput has already been published", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      await enclave.publishCiphertextOutput(e3Id, "0x1337");
+      await enclave.publishPlaintextOutput(e3Id, "0x1337");
+      await expect(enclave.publishPlaintextOutput(e3Id, "0x1337"))
+        .to.be.revertedWithCustomError(
+          enclave,
+          "PlaintextOutputAlreadyPublished",
+        )
+        .withArgs(e3Id);
+    });
+    it("reverts if output is not valid", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      await enclave.publishCiphertextOutput(e3Id, "0x1337");
+      await expect(enclave.publishPlaintextOutput(e3Id, "0x"))
+        .to.be.revertedWithCustomError(enclave, "InvalidOutput")
+        .withArgs("0x");
+    });
+    it("sets plaintextOutput correctly", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      await enclave.publishCiphertextOutput(e3Id, "0x1337");
+      expect(await enclave.publishPlaintextOutput(e3Id, "0x1337"));
+
+      const e3 = await enclave.getE3(e3Id);
+      expect(e3.plaintextOutput).to.equal("0x1337");
+    });
+    it("returns true if output is published successfully", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      await enclave.publishCiphertextOutput(e3Id, "0x1337");
+      expect(
+        await enclave.publishPlaintextOutput.staticCall(e3Id, "0x1337"),
+      ).to.equal(true);
+    });
+    it("emits PlaintextOutputPublished event", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const e3Id = 0;
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        [await time.latest(), (await time.latest()) + 100],
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+      await enclave.activate(e3Id);
+      await mine(2, { interval: request.duration });
+      await enclave.publishCiphertextOutput(e3Id, "0x1337");
+      expect(await enclave.publishPlaintextOutput(e3Id, "0x1337"))
+        .to.emit(enclave, "PlaintextOutputPublished")
+        .withArgs(e3Id, "0x1337");
+    });
   });
 });

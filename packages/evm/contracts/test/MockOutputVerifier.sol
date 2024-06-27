@@ -8,7 +8,8 @@ contract MockOutputVerifier is IOutputVerifier {
         uint256,
         bytes memory data
     ) external pure returns (bytes memory output, bool success) {
-        (output) = abi.decode(data, (bytes));
-        success = true;
+        output = data;
+
+        if (output.length > 0) success = true;
     }
 }
