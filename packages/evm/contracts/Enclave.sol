@@ -166,6 +166,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3 = E3({
             threshold: threshold,
             startWindow: startWindow,
+            duration: duration,
             expiration: 0,
             computationModule: computationModule,
             executionModule: executionModule,
@@ -205,8 +206,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // Note: This check feels weird
         require(publicKey.length > 0, CommitteeSelectionFailed());
 
-        // TODO: this should be based on the duration requested, not the current max duration.
-        e3s[e3Id].expiration = block.timestamp + maxDuration;
+        e3s[e3Id].expiration = block.timestamp + e3.duration;
         e3s[e3Id].committeePublicKey = publicKey;
 
         emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);
