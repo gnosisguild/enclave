@@ -106,7 +106,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function request(
-        address[] memory pools, // TODO: should we allow for multiple pools?
+        address filter,
         uint32[2] calldata threshold,
         // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are
         //published before the request is made? This kind of assumes the cypher nodes have already been selected
@@ -163,21 +163,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             inputValidator: inputValidator,
             outputVerifier: outputVerifier,
             committeePublicKey: hex"",
+            inputs: new bytes[](0),
             ciphertextOutput: hex"",
             plaintextOutput: hex""
         });
         e3s[e3Id] = e3;
 
         require(
-            cyphernodeRegistry.selectCommittee(e3Id, pools, threshold),
+            cyphernodeRegistry.requestCommittee(e3Id, filter, threshold),
             CommitteeSelectionFailed()
         );
-        // TODO: validate that the selected pool accepts both the computation and execution modules.
 
         emit E3Requested(
             e3Id,
             e3s[e3Id],
-            pools,
+            filter,
             computationModule,
             executionModule
         );
@@ -189,14 +189,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         E3 memory e3 = getE3(e3Id);
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
 
-        bytes memory committeePublicKey = cyphernodeRegistry
-            .getCommitteePublicKey(e3Id);
+        bytes memory publicKey = cyphernodeRegistry.committeePublicKey(e3Id);
         // Note: This check feels weird
-        require(committeePublicKey.length > 0, CommitteeSelectionFailed());
+        require(publicKey.length > 0, CommitteeSelectionFailed());
 
         // TODO: this should be based on the duration requested, not the current max duration.
         e3s[e3Id].expiration = block.timestamp + maxDuration;
-        e3s[e3Id].committeePublicKey = committeePublicKey;
+        e3s[e3Id].committeePublicKey = publicKey;
 
         emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);
 
@@ -219,7 +218,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
-        // TODO: do we need to store or accumulate the inputs? Probably yes.
+        // TODO: probably better to accumulate inputs, rather than just dumping them in storage.
+        e3s[e3Id].inputs.push(input);
         emit InputPublished(e3Id, input);
     }
 

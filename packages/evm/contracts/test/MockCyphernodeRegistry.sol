@@ -4,19 +4,25 @@ pragma solidity >=0.8.26;
 import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
 
 contract MockCyphernodeRegistry is ICyphernodeRegistry {
-    function selectCommittee(
+    function requestCommittee(
         uint256,
-        address[] memory pools,
+        address filter,
         uint32[2] calldata
     ) external pure returns (bool success) {
-        if (pools[0] == address(2)) {
+        if (filter == address(2)) {
             success = false;
         } else {
             success = true;
         }
     }
 
-    function getCommitteePublicKey(
+    function publishCommittee(
+        uint256,
+        bytes calldata,
+        bytes calldata
+    ) external {}
+
+    function committeePublicKey(
         uint256 e3Id
     ) external pure returns (bytes memory) {
         if (e3Id == type(uint256).max) {
@@ -25,24 +31,36 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
             return abi.encodePacked(keccak256(abi.encode(e3Id)));
         }
     }
+
+    function isCyphernodeEligible(address) external pure returns (bool) {
+        return false;
+    }
 }
 
 contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
-    function selectCommittee(
+    function requestCommittee(
         uint256,
-        address[] memory pools,
+        address filter,
         uint32[2] calldata
     ) external pure returns (bool success) {
-        if (pools[0] == address(2)) {
+        if (filter == address(2)) {
             success = false;
         } else {
             success = true;
         }
     }
 
-    function getCommitteePublicKey(
-        uint256
-    ) external pure returns (bytes memory) {
+    function publishCommittee(
+        uint256,
+        bytes calldata,
+        bytes calldata
+    ) external {}
+
+    function committeePublicKey(uint256) external pure returns (bytes memory) {
         return hex"";
+    }
+
+    function isCyphernodeEligible(address) external pure returns (bool) {
+        return false;
     }
 }

@@ -16,6 +16,10 @@ import { deployOutputVerifierFixture } from "./fixtures/MockOutputVerifier.fixtu
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
+const AddressSix = "0x0000000000000000000000000000000000000006";
+
+const FilterFail = AddressTwo;
+const FilterOkay = AddressSix;
 
 describe("Enclave", function () {
   async function setup() {
@@ -47,7 +51,7 @@ describe("Enclave", function () {
         registry,
       },
       request: {
-        pool: [ethers.ZeroAddress],
+        filter: FilterOkay,
         threshold: [2, 2] as [number, number],
         duration: time.duration.days(30),
         computationModule: await computationModule.getAddress(),
@@ -177,7 +181,7 @@ describe("Enclave", function () {
     it("returns correct E3 details", async function () {
       const { enclave, request } = await loadFixture(setup);
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -399,7 +403,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -413,7 +417,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           [0, 2],
           request.duration,
           request.computationModule,
@@ -428,7 +432,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           [3, 2],
           request.duration,
           request.computationModule,
@@ -443,7 +447,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           request.threshold,
           0,
           request.computationModule,
@@ -458,7 +462,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           request.threshold,
           time.duration.days(31),
           request.computationModule,
@@ -473,7 +477,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           request.threshold,
           request.duration,
           ethers.ZeroAddress,
@@ -490,7 +494,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -508,7 +512,7 @@ describe("Enclave", function () {
 
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -523,7 +527,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.pool,
+          request.filter,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -538,7 +542,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          [AddressTwo],
+          FilterFail,
           request.threshold,
           request.duration,
           request.computationModule,
@@ -552,7 +556,7 @@ describe("Enclave", function () {
     it("instantiates a new E3", async function () {
       const { enclave, request } = await loadFixture(setup);
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -580,7 +584,7 @@ describe("Enclave", function () {
     it("emits E3Requested event", async function () {
       const { enclave, request } = await loadFixture(setup);
       const tx = await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -596,7 +600,7 @@ describe("Enclave", function () {
         .withArgs(
           0,
           e3,
-          request.pool,
+          request.filter,
           request.computationModule,
           request.executionModule,
         );
@@ -615,7 +619,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -635,7 +639,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -667,7 +671,7 @@ describe("Enclave", function () {
       } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -678,7 +682,7 @@ describe("Enclave", function () {
       );
 
       const e3Id = 0;
-      const publicKey = await registry.getCommitteePublicKey(e3Id);
+      const publicKey = await registry.committeePublicKey(e3Id);
 
       let e3 = await enclave.getE3(e3Id);
       expect(e3.committeePublicKey).to.not.equal(publicKey);
@@ -692,7 +696,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -710,7 +714,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -742,7 +746,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -768,7 +772,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -778,11 +782,9 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      const inputData = abiCoder.encode(["bytes"], ["0xaabbcc"]);
-
       await enclave.activate(0);
       await expect(
-        enclave.publishInput(0, inputData),
+        enclave.publishInput(0, "0xaabbcc"),
       ).to.be.revertedWithCustomError(enclave, "InvalidInput");
     });
 
@@ -790,7 +792,7 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -800,24 +802,65 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      const inputData = abiCoder.encode(["bytes32"], [ZeroHash]);
-
       await enclave.activate(0);
-      await expect(enclave.publishInput(0, inputData)).to.not.be.reverted;
+      await expect(enclave.publishInput(0, ZeroHash)).to.not.be.reverted;
 
       await mine(2, { interval: request.duration });
 
       await expect(
-        enclave.publishInput(0, inputData),
+        enclave.publishInput(0, ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
     });
-    it("sets ciphertextInput correctly");
-    it("returns true if input is published successfully");
+    it("sets ciphertextInput correctly", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const inputData = "0x12345678";
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      await enclave.activate(0);
+
+      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
+      let e3 = await enclave.getE3(0);
+      expect(e3.inputs[0]).to.equal(inputData);
+      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
+      e3 = await enclave.getE3(0);
+      expect(e3.inputs[1]).to.equal(inputData);
+    });
+    it("returns true if input is published successfully", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const inputData = "0x12345678";
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      await enclave.activate(0);
+
+      expect(await enclave.publishInput.staticCall(0, inputData)).to.equal(
+        true,
+      );
+    });
     it("emits InputPublished event", async function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         request.duration,
         request.computationModule,
@@ -834,7 +877,7 @@ describe("Enclave", function () {
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")
-        .withArgs(e3Id, "0xaabbccddeeff");
+        .withArgs(e3Id, inputData);
     });
   });
 
