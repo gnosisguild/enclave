@@ -57,6 +57,10 @@ describe("Enclave", function () {
           number,
           number,
         ],
+        startTime: [await time.latest(), (await time.latest()) + 100] as [
+          number,
+          number,
+        ],
         duration: time.duration.days(30),
         computationModule: await computationModule.getAddress(),
         cMParams: abiCoder.encode(
@@ -661,7 +665,7 @@ describe("Enclave", function () {
       ] as [number, number];
 
       await enclave.request(
-        request.pool,
+        request.filter,
         request.threshold,
         startTime,
         request.duration,
@@ -685,7 +689,57 @@ describe("Enclave", function () {
       ];
 
       await enclave.request(
-        request.pool,
+        request.filter,
+        request.threshold,
+        startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      mine(1, { interval: 1000 });
+
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
+        enclave,
+        "E3Expired",
+      );
+    });
+    it("reverts if cyphernodeRegistry does not return a public key", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const startTime = [
+        (await time.latest()) + 1000,
+        (await time.latest()) + 2000,
+      ] as [number, number];
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      await expect(enclave.activate(0)).to.be.revertedWithCustomError(
+        enclave,
+        "E3NotReady",
+      );
+    });
+    it("reverts if E3 start has expired", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const startTime = [await time.latest(), (await time.latest()) + 1] as [
+        number,
+        number,
+      ];
+
+      await enclave.request(
+        request.filter,
         request.threshold,
         startTime,
         request.duration,
@@ -893,6 +947,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
@@ -917,6 +972,7 @@ describe("Enclave", function () {
       await enclave.request(
         request.filter,
         request.threshold,
+        request.startTime,
         request.duration,
         request.computationModule,
         request.cMParams,
