@@ -1,0 +1,14 @@
+[package]
+name = "enclave-bfv"
+version = "0.1.0"
+edition = "2021"
+description = ": coordinates the encryption and decryption of enclave computations"
+repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-std = "1.12.0"
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
