@@ -1,5 +1,5 @@
 [package]
-name = "core"
+name = "enclave-zkp"
 version = "0.1.0"
 edition = "2021"
 description = ": coordinates the encryption and decryption of enclave computations"
@@ -9,8 +9,6 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
 [dependencies]
 async-std = "1.12.0"
-libp2p = "0.53.2"
 fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-

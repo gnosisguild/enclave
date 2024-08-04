@@ -290,17 +290,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
-name = "core"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "fhe",
- "fhe-traits",
- "fhe-util",
- "libp2p",
-]
-
-[[package]]
 name = "core2"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,14 +435,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
-name = "enclave"
+name = "enclave-core"
 version = "0.1.0"
 dependencies = [
  "async-std",
- "eth",
  "fhe",
  "fhe-traits",
  "fhe-util",
+ "libp2p",
 ]
 
 [[package]]
@@ -470,16 +459,6 @@ checksum = "534c5cf6194dfab3db3242765c03bbe257cf92f22b38f6bc0c58d59108a820ba"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "eth"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "fhe",
- "fhe-traits",
- "fhe-util",
 ]
 
 [[package]]
