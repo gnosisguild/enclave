@@ -1,5 +1,5 @@
 [package]
-name = "enclave-bfv"
+name = "bfv"
 version = "0.1.0"
 edition = "2021"
 description = ": coordinates the encryption and decryption of enclave computations"

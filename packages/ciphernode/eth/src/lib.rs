@@ -8,7 +8,7 @@ pub struct EtherClient {
 }
 
 impl EtherClient {
-    fn new(address: String) -> Self {
+    pub fn new(address: String) -> Self {
         Self { address }
     }
 }
