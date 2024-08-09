@@ -111,9 +111,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function request(
         address filter,
         uint32[2] calldata threshold,
-        // TODO: do we also need a start block/time? Would it be possible to have computations where inputs are
-        // published before the request is made? This kind of assumes the cypher nodes have already been selected
-        // and generated a shared secret.
         uint256[2] calldata startWindow,
         uint256 duration,
         IComputationModule computationModule,
@@ -147,7 +144,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             ModuleNotEnabled(address(executionModule))
         );
 
-        // TODO: should IDs be incremental or produced deterministic?
+        // TODO: should IDs be incremental or produced deterministically?
         e3Id = nexte3Id;
         nexte3Id++;
 

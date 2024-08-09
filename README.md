@@ -32,7 +32,7 @@ sequenceDiagram
             activate Ciphernode Registry
                 Ciphernode Registry -->> Ciphernodes: Key Setup
                 activate Ciphernodes
-                    Ciphernodes -->> Ciphernode Registry: Publish shared key
+                    Ciphernodes -->> Ciphernode Registry: Publish shared keys
                 deactivate Ciphernodes
                 Ciphernode Registry -->> Enclave: Publish Committee
             deactivate Ciphernode Registry
