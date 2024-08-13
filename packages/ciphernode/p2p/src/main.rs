@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::{io, io::AsyncBufReadExt, select};
 use tracing_subscriber::EnvFilter;
+use bfv::EnclaveBFV;
 
 #[derive(NetworkBehaviour)]
 struct MyBehaviour {
@@ -66,6 +67,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
         select! {
             Ok(Some(line)) = stdin.next_line() => {
+            	println!("Generating Public Key Share");
+            	let node_bfv = bfv::EnclaveBFV::new("test".to_string());
                 if let Err(e) = swarm
                     .behaviour_mut().gossipsub
                     .publish(topic.clone(), line.as_bytes()) {
@@ -89,10 +92,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     propagation_source: peer_id,
                     message_id: id,
                     message,
-                })) => println!(
+                })) => {
+                	println!(
                         "Got message: '{}' with id: {id} from peer: {peer_id}",
                         String::from_utf8_lossy(&message.data),
-                    ),
+                    );
+                    let node_bfv = bfv::EnclaveBFV::new("test".to_string());
+            	},
                 SwarmEvent::NewListenAddr { address, .. } => {
                     println!("Local node is listening on {address}");
                 }
