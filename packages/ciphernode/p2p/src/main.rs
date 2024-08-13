@@ -63,7 +63,43 @@ async fn main() -> Result<(), Box<dyn Error>> {
     swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
     swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
-
+    loop {
+        select! {
+            Ok(Some(line)) = stdin.next_line() => {
+                if let Err(e) = swarm
+                    .behaviour_mut().gossipsub
+                    .publish(topic.clone(), line.as_bytes()) {
+                    println!("Publish error: {e:?}");
+                }
+            }
+            event = swarm.select_next_some() => match event {
+                SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
+                    for (peer_id, _multiaddr) in list {
+                        println!("mDNS discovered a new peer: {peer_id}");
+                        swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                    }
+                },
+                SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
+                    for (peer_id, _multiaddr) in list {
+                        println!("mDNS discover peer has expired: {peer_id}");
+                        swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                    }
+                },
+                SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                    propagation_source: peer_id,
+                    message_id: id,
+                    message,
+                })) => println!(
+                        "Got message: '{}' with id: {id} from peer: {peer_id}",
+                        String::from_utf8_lossy(&message.data),
+                    ),
+                SwarmEvent::NewListenAddr { address, .. } => {
+                    println!("Local node is listening on {address}");
+                }
+                _ => {}
+            }
+        }
+    }
 
     println!("Hello, cipher world!");
     Ok(())
