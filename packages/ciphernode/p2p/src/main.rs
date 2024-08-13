@@ -53,6 +53,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
+    let topic = gossipsub::IdentTopic::new("enclave-keygen-01");
+
+    swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
+
+    // Read full lines from stdin
+    let mut stdin = io::BufReader::new(io::stdin()).lines();
+
+    swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
+    swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
+
+
+
     println!("Hello, cipher world!");
     Ok(())
 }
