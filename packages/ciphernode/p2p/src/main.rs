@@ -14,6 +14,18 @@ struct MyBehaviour {
     mdns: mdns::tokio::Behaviour,
 }
 
+pub struct EnclaveRouter {
+	pub address: String,
+	behaviour: MyBehaviour,
+}
+
+impl EnclaveRouter {
+    pub fn new(address: String) -> Self {
+        Self { address }
+    }
+}
+
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let _ = tracing_subscriber::fmt()
