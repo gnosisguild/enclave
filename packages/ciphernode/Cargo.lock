@@ -906,6 +906,7 @@ dependencies = [
  "fhe-traits",
  "fhe-util",
  "libp2p",
+ "p2p",
  "rand",
  "rand_chacha",
  "secp256k1",

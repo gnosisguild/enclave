@@ -1,7 +1,10 @@
-// use p2p::EnclaveRouter;
 use std::error::Error;
-use tokio;
 
+use p2p::EnclaveRouter;
+use tokio::{
+    self,
+    io::{self, AsyncBufReadExt, BufReader},
+};
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
      /\__\         /\  \         /\__\                       /\  \          ___          /\__\    
@@ -19,20 +22,30 @@ const OWO: &str = r#"
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-	// boot up p2p network
+    // boot up p2p network
 
-	// boot up ether client
+    // boot up ether client
 
-	// start main loop
+    // start main loop
 
-	//let ether = eth::EtherClient::new("test".to_string());
+    //let ether = eth::EtherClient::new("test".to_string());
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
-
-    // let mut p2p = EnclaveRouter::new()?;
-    // p2p.connect_swarm("mdns".to_string())?;
-    // p2p.join_topic("enclave-keygen-01")?;
-    // p2p.start().await?;
     println!("Hello, cipher world!");
-    Ok(())
+
+    let (mut p2p, tx, mut rx) = EnclaveRouter::new()?;
+    p2p.connect_swarm("mdns".to_string())?;
+    p2p.join_topic("enclave-keygen-01")?;
+    let mut stdin = BufReader::new(io::stdin()).lines();
+    tokio::spawn(async move { p2p.start().await });
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            println!("msg: {}", String::from_utf8(msg).unwrap());
+        }
+    });
+    loop {
+        if let Ok(Some(line)) = stdin.next_line().await {
+            tx.send(line.as_bytes().to_vec().clone()).await.unwrap();
+        }
+    }
 }
