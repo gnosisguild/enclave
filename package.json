@@ -21,5 +21,6 @@
     "evm:test": "cd packages/evm && yarn test",
     "evm:coverage": "cd packages/evm && yarn coverage",
     "preinstall": "yarn evm:install"
-  }
+  },
+  "dependencies": {}
 }

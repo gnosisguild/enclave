@@ -696,7 +696,7 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      mine(1, { interval: 1000 });
+      const _ = mine(1, { interval: 1000 });
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
@@ -746,7 +746,7 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      mine(1, { interval: 1000 });
+      const _ = mine(1, { interval: 1000 });
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
@@ -954,10 +954,10 @@ describe("Enclave", function () {
 
       await enclave.activate(0);
 
-      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
+      await expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
       let e3 = await enclave.getE3(0);
       expect(e3.inputs[0]).to.equal(inputData);
-      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
+      await expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
       e3 = await enclave.getE3(0);
       expect(e3.inputs[1]).to.equal(inputData);
     });
@@ -1011,7 +1011,7 @@ describe("Enclave", function () {
 
   describe("publishCiphertextOutput()", function () {
     it("reverts if E3 does not exist", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave } = await loadFixture(setup);
 
       await expect(enclave.publishCiphertextOutput(0, "0x"))
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
@@ -1173,7 +1173,7 @@ describe("Enclave", function () {
 
   describe("publishPlaintextOutput()", function () {
     it("reverts if E3 does not exist", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave } = await loadFixture(setup);
       const e3Id = 0;
 
       await expect(enclave.publishPlaintextOutput(e3Id, "0x"))
@@ -1330,7 +1330,7 @@ describe("Enclave", function () {
       await enclave.activate(e3Id);
       await mine(2, { interval: request.duration });
       await enclave.publishCiphertextOutput(e3Id, "0x1337");
-      expect(await enclave.publishPlaintextOutput(e3Id, "0x1337"))
+      await expect(await enclave.publishPlaintextOutput(e3Id, "0x1337"))
         .to.emit(enclave, "PlaintextOutputPublished")
         .withArgs(e3Id, "0x1337");
     });
