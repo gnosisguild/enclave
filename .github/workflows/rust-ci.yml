@@ -1,0 +1,26 @@
+name: Rust Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.81.0
+        override: true
+    
+    - name: Run tests
+      run: |
+        cd ./packages/ciphernode/
+        cargo test
