@@ -4,14 +4,14 @@
 
 use futures::stream::StreamExt;
 use libp2p::{
-    gossipsub, identity, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux, Swarm,
+    gossipsub, identity, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux,
 };
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tokio::{io, io::AsyncBufReadExt, select};
+use tokio::{io, select};
 use tracing_subscriber::EnvFilter;
 
 #[derive(NetworkBehaviour)]
@@ -116,9 +116,6 @@ impl EnclaveRouter {
     }
 
     pub async fn start(&mut self) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-        // Read full lines from stdin
-        // let mut stdin = io::BufReader::new(io::stdin()).lines();
-
         self.swarm
             .as_mut()
             .unwrap()
@@ -159,7 +156,6 @@ impl EnclaveRouter {
                             "Got message: '{}' with id: {id} from peer: {peer_id}",
                             String::from_utf8_lossy(&message.data),
                         );
-                        // let node_bfv = bfv::EnclaveBFV::new("test".to_string());
                         self.evt_tx.send(message.data).await?;
                     },
                     SwarmEvent::NewListenAddr { address, .. } => {
