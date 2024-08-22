@@ -1,5 +1,5 @@
 [package]
-name = "core"
+name = "enclave-core"
 version = "0.1.0"
 edition = "2021"
 description = ": coordinates the encryption and decryption of enclave computations"
@@ -13,4 +13,13 @@ libp2p = "0.53.2"
 fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+actix = "0.13.5"
+actix-rt = "2.10.0"
+anyhow = "1.0.86"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+secp256k1 = "0.29.0"
+tokio = { version = "1.39.3", features = ["full"] }
+sha2 = "0.10.8"
+bs58 = "0.5.1"
 
