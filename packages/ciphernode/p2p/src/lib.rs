@@ -130,7 +130,7 @@ impl EnclaveRouter {
         loop {
             select! {
                 Some(line) = self.cmd_rx.recv() => {
-                    println!("Generating Public Key Share");
+                    println!("Receiving input");
                     if let Err(e) = self.swarm.as_mut().unwrap()
                         .behaviour_mut().gossipsub
                         .publish(self.topic.as_mut().unwrap().clone(), line) {
