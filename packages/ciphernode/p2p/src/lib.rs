@@ -10,7 +10,6 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::{io, io::AsyncBufReadExt, select};
 use tracing_subscriber::EnvFilter;
-use bfv::EnclaveBFV;
 
 #[derive(NetworkBehaviour)]
 struct MyBehaviour {
@@ -48,7 +47,7 @@ impl EnclaveRouter {
     	self.identity = Some(keypair);
     }
 
-    pub fn connect_swarm(&mut self, discovery_type: String) -> Result<(&Self), Box<dyn Error>> {
+    pub fn connect_swarm(&mut self, discovery_type: String) -> Result<&Self, Box<dyn Error>> {
     	match discovery_type.as_str() {
     		"mdns" => {
 			    let _ = tracing_subscriber::fmt()
@@ -80,14 +79,14 @@ impl EnclaveRouter {
 		    },
     		_ => println!("Defaulting to MDNS discovery"),
     	}
-    	Ok((self))
+    	Ok(self)
     }
 
-    pub fn join_topic(&mut self, topic_name: &str) -> Result<(&Self), Box<dyn Error>> {
+    pub fn join_topic(&mut self, topic_name: &str) -> Result<&Self, Box<dyn Error>> {
     	let topic = gossipsub::IdentTopic::new(topic_name);
     	self.topic = Some(topic.clone());
     	self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.subscribe(&topic)?;
-    	Ok((self))
+    	Ok(self)
     }
 
     pub async fn start(&mut self) -> Result<(), Box<dyn Error>> {
@@ -138,8 +137,6 @@ impl EnclaveRouter {
 	            }
 	        }
 	    }
-
-	    Ok(())
     }
 }
 
