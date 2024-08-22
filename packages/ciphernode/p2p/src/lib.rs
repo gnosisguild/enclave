@@ -1,3 +1,7 @@
+#![crate_name = "p2p"]
+#![crate_type = "lib"]
+#![warn(missing_docs, unused_imports)]
+
 use futures::stream::StreamExt;
 use libp2p::{gossipsub, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux, identity, Swarm};
 use std::collections::hash_map::DefaultHasher;
@@ -139,14 +143,14 @@ impl EnclaveRouter {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+// #[tokio::main]
+// async fn main() -> Result<(), Box<dyn Error>> {
 
-    let mut p2p = EnclaveRouter::new()?;
-    p2p.connect_swarm("mdns".to_string())?;
-    p2p.join_topic("enclave-keygen-01")?;
-    p2p.start().await?;
+//     let mut p2p = EnclaveRouter::new()?;
+//     p2p.connect_swarm("mdns".to_string())?;
+//     p2p.join_topic("enclave-keygen-01")?;
+//     p2p.start().await?;
 
-    println!("Hello, cipher world!");
-    Ok(())
-}
+//     println!("Hello, cipher world!");
+//     Ok(())
+// }
