@@ -1,5 +1,4 @@
-use eth::EtherClient;
-use p2p::EnclaveRouter;
+// use p2p::EnclaveRouter;
 use std::error::Error;
 use tokio;
 
@@ -30,10 +29,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
 
-    let mut p2p = EnclaveRouter::new()?;
-    p2p.connect_swarm("mdns".to_string())?;
-    p2p.join_topic("enclave-keygen-01")?;
-    p2p.start().await?;
+    // let mut p2p = EnclaveRouter::new()?;
+    // p2p.connect_swarm("mdns".to_string())?;
+    // p2p.join_topic("enclave-keygen-01")?;
+    // p2p.start().await?;
     println!("Hello, cipher world!");
     Ok(())
 }
