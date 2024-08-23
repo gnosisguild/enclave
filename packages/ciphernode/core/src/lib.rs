@@ -10,6 +10,8 @@ mod eventbus;
 mod events;
 mod fhe;
 mod ordered_set;
+mod p2p;
+mod enclave_contract;
 
 // pub struct Core {
 //     pub name: String,
@@ -34,7 +36,7 @@ mod tests {
 
     use crate::{
         ciphernode::Ciphernode,
-        committee::Committee,
+        committee::CommitteeManager,
         data::Data,
         eventbus::{EventBus, GetHistory, Subscribe},
         events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
@@ -94,8 +96,8 @@ mod tests {
         Ok((pk, rng))
     }
 
-    fn setup_committee_manager(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Addr<Committee> {
-        let committee = Committee::new(bus.clone(), fhe.clone()).start();
+    fn setup_committee_manager(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Addr<CommitteeManager> {
+        let committee = CommitteeManager::new(bus.clone(), fhe.clone()).start();
 
         bus.do_send(Subscribe::new(
             "ComputationRequested",
@@ -118,7 +120,7 @@ mod tests {
     }
 
     #[actix::test]
-    async fn test_ciphernode() -> Result<()> {
+    async fn test_public_key_aggregation() -> Result<()> {
         // Setup EventBus
         let bus = EventBus::new(true).start();
 
@@ -199,5 +201,14 @@ mod tests {
         );
 
         Ok(())
+    }
+
+
+    fn test_p2p_event_broadcasting() {
+        // Setup two Vec<u8> channels to simulate libp2p
+        // 1. command channel
+        // 2. event channel
+        // Pass them to the p2p actor
+        // connect the p2p actor to the event bus actor and monitor which events are broadcast 
     }
 }

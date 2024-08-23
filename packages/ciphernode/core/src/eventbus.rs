@@ -22,6 +22,12 @@ impl Subscribe {
 #[rtype(result = "Vec<EnclaveEvent>")]
 pub struct GetHistory;
 
+
+/// Central EventBus for each node. Actors publish events to this bus by sending it EnclaveEvents.
+/// All events sent to this bus are assumed to be published over the network via pubsub.
+/// Other actors such as the P2p and Evm actor connect to outside services and control which events 
+/// actually get published as well as ensure that local events are not rebroadcast locally after 
+/// being published.
 pub struct EventBus {
     capture: bool,
     history: Vec<EnclaveEvent>,
