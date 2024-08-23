@@ -12,7 +12,7 @@ use crate::{
 pub struct CommitteeManager {
     bus: Addr<EventBus>,
     fhe: Addr<Fhe>,
-    aggregators: HashMap<E3id, Addr<CommitteeKey>>,
+    keys: HashMap<E3id, Addr<CommitteeKey>>,
 }
 
 impl Actor for CommitteeManager {
@@ -24,7 +24,7 @@ impl CommitteeManager {
         Self {
             bus,
             fhe,
-            aggregators: HashMap::new(),
+            keys: HashMap::new(),
         }
     }
 }
@@ -35,8 +35,8 @@ impl Handler<EnclaveEvent> for CommitteeManager {
     fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         match event {
             EnclaveEvent::ComputationRequested { data, .. } => {
-                // start up a new aggregator
-                let aggregator = CommitteeKey::new(
+                // start up a new key
+                let key = CommitteeKey::new(
                     self.fhe.clone(),
                     self.bus.clone(),
                     data.e3_id.clone(),
@@ -44,20 +44,20 @@ impl Handler<EnclaveEvent> for CommitteeManager {
                 )
                 .start();
 
-                self.aggregators.insert(data.e3_id, aggregator);
+                self.keys.insert(data.e3_id, key);
             }
             EnclaveEvent::KeyshareCreated { data, .. } => {
-                if let Some(aggregator) = self.aggregators.get(&data.e3_id) {
-                    aggregator.do_send(data);
+                if let Some(key) = self.keys.get(&data.e3_id) {
+                    key.do_send(data);
                 }
             },
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
-                let Some(aggregator) = self.aggregators.get(&data.e3_id) else {
+                let Some(key) = self.keys.get(&data.e3_id) else {
                     return;
                 };
 
-                aggregator.do_send(Die);
-                self.aggregators.remove(&data.e3_id);
+                key.do_send(Die);
+                self.keys.remove(&data.e3_id);
             }
             // _ => (),
         }
