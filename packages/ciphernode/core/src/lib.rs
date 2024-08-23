@@ -203,7 +203,7 @@ mod tests {
         Ok(())
     }
 
-
+    // TODO: Test p2p
     fn test_p2p_event_broadcasting() {
         // Setup two Vec<u8> channels to simulate libp2p
         // 1. command channel
