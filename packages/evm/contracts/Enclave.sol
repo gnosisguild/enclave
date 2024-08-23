@@ -13,6 +13,7 @@ import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { BinaryIMT, BinaryIMTData } from "@zk-kit/imt.sol/BinaryIMT.sol";
 
 contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
@@ -41,7 +42,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         public executionModules;
 
     // Mapping of E3s.
-    mapping(uint256 id => E3 e3) public e3s;
+    mapping(uint256 e3Id => E3 e3) public e3s;
+
+    // Mapping of input merkle trees
+    mapping(uint256 e3Id => BinaryIMTData imt) public inputs;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -175,6 +179,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             plaintextOutput: hex""
         });
         e3s[e3Id] = e3;
+        BinaryIMT.init(inputs[e3Id], 32, 0);
 
         require(
             cyphernodeRegistry.requestCommittee(e3Id, filter, threshold),
@@ -227,8 +232,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
-        // TODO: probably better to accumulate inputs, rather than just dumping them in storage.
         e3s[e3Id].inputs.push(input);
+        BinaryIMT.insert(inputs[e3Id], uint256(keccak256(input)));
+
         emit InputPublished(e3Id, input);
     }
 
