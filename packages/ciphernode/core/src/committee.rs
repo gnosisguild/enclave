@@ -9,17 +9,17 @@ use crate::{
     fhe::Fhe,
 };
 
-pub struct Committee {
+pub struct CommitteeManager {
     bus: Addr<EventBus>,
     fhe: Addr<Fhe>,
     aggregators: HashMap<E3id, Addr<CommitteeKey>>,
 }
 
-impl Actor for Committee {
+impl Actor for CommitteeManager {
     type Context = Context<Self>;
 }
 
-impl Committee {
+impl CommitteeManager {
     pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Self {
         Self {
             bus,
@@ -29,7 +29,7 @@ impl Committee {
     }
 }
 
-impl Handler<EnclaveEvent> for Committee {
+impl Handler<EnclaveEvent> for CommitteeManager {
     type Result = ();
 
     fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {

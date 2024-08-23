@@ -38,6 +38,12 @@ pub struct CommitteeKey {
     state: CommitteeKeyState,
 }
 
+/// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
+/// around a particular e3_id and aggregates the public key based on this and once done broadcasts 
+/// a EnclaveEvent::PublicKeyAggregated event on the event bus. Note events are hashed and
+/// identical events will not be triggered twice.
+/// It is expected to change this mechanism as we work through adversarial scenarios and write tests
+/// for them.
 impl CommitteeKey {
     pub fn new(fhe: Addr<Fhe>, bus: Addr<EventBus>, e3_id: E3id, nodecount: usize) -> Self {
         CommitteeKey {

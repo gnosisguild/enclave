@@ -59,6 +59,9 @@ impl WrappedPublicKeyShare {
     } 
 }
 
+/// Wrapped PublicKey. This is wrapped to provide an inflection point
+/// as we use this library elsewhere we only implement traits as we need them
+/// and avoid exposing underlying structures from fhe.rs
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WrappedPublicKey(pub PublicKey);
 
@@ -80,15 +83,21 @@ impl PartialOrd for WrappedPublicKey {
     }
 }
 
-
+/// Wrapped SecretKey. This is wrapped to provide an inflection point
+/// as we use this library elsewhere we only implement traits as we need them
+/// and avoid exposing underlying structures from fhe.rs
+// We should favor consuming patterns and avoid cloning and copying this value around in memory.
+// Underlying key Zeroizes on drop
 #[derive(PartialEq)]
 pub struct WrappedSecretKey(pub SecretKey);
+
 impl WrappedSecretKey {
     pub fn unsafe_to_vec(&self) -> Vec<u8> {
         serialize_box_i64(self.0.coeffs.clone())
     }
 }
 
+/// Fhe library adaptor. All FHE computations should happen through this actor.
 pub struct Fhe {
     params: Arc<BfvParameters>,
     crp: CommonRandomPoly,
