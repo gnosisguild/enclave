@@ -6,12 +6,12 @@ mod ciphernode;
 mod committee;
 mod committee_key;
 mod data;
+mod enclave_contract;
 mod eventbus;
 mod events;
 mod fhe;
 mod ordered_set;
 mod p2p;
-mod enclave_contract;
 
 // pub struct Core {
 //     pub name: String,
@@ -92,7 +92,11 @@ mod tests {
         mut rng: ChaCha20Rng,
     ) -> Result<(WrappedPublicKeyShare, ChaCha20Rng)> {
         let sk = SecretKey::random(&params, &mut rng);
-        let pk = WrappedPublicKeyShare(PublicKeyShare::new(&sk, crp.clone(), &mut rng)?);
+        let pk = WrappedPublicKeyShare::from_fhe_rs(
+            PublicKeyShare::new(&sk, crp.clone(), &mut rng)?,
+            params.clone(),
+            crp,
+        );
         Ok((pk, rng))
     }
 
@@ -168,7 +172,7 @@ mod tests {
 
         let aggregated: PublicKey = vec![p1.clone(), p2.clone(), p3.clone()]
             .iter()
-            .map(|k| k.0.clone())
+            .map(|k| k.clone_inner())
             .aggregate()?;
 
         assert_eq!(history.len(), 5);
@@ -194,7 +198,7 @@ mod tests {
                     e3_id: e3_id.clone()
                 }),
                 EnclaveEvent::from(PublicKeyAggregated {
-                    pubkey: WrappedPublicKey(aggregated),
+                    pubkey: WrappedPublicKey::from_fhe_rs(aggregated, params),
                     e3_id: e3_id.clone()
                 })
             ]
@@ -209,6 +213,6 @@ mod tests {
         // 1. command channel
         // 2. event channel
         // Pass them to the p2p actor
-        // connect the p2p actor to the event bus actor and monitor which events are broadcast 
+        // connect the p2p actor to the event bus actor and monitor which events are broadcast
     }
 }

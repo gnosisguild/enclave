@@ -1,4 +1,5 @@
 use actix::Message;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fmt,
@@ -7,7 +8,7 @@ use std::{
 
 use crate::fhe::{WrappedPublicKey, WrappedPublicKeyShare};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id(pub String);
 impl fmt::Display for E3id {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -21,7 +22,7 @@ impl E3id {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EventId(pub [u8; 32]);
 
 impl EventId {
@@ -42,8 +43,7 @@ impl fmt::Display for EventId {
     }
 }
 
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub enum EnclaveEvent {
     KeyshareCreated {
@@ -66,11 +66,11 @@ pub enum EnclaveEvent {
 
 impl From<EnclaveEvent> for EventId {
     fn from(value: EnclaveEvent) -> Self {
-       match value {
-           EnclaveEvent::KeyshareCreated { id, .. } => id,
-           EnclaveEvent::ComputationRequested { id, .. } => id,
-           EnclaveEvent::PublicKeyAggregated { id, .. } => id,
-       } 
+        match value {
+            EnclaveEvent::KeyshareCreated { id, .. } => id,
+            EnclaveEvent::ComputationRequested { id, .. } => id,
+            EnclaveEvent::PublicKeyAggregated { id, .. } => id,
+        }
     }
 }
 
@@ -84,7 +84,7 @@ impl From<KeyshareCreated> for EnclaveEvent {
 }
 
 impl From<ComputationRequested> for EnclaveEvent {
-    fn from(data:ComputationRequested) -> Self {
+    fn from(data: ComputationRequested) -> Self {
         EnclaveEvent::ComputationRequested {
             id: EventId::from(data.clone()),
             data: data.clone(),
@@ -92,8 +92,8 @@ impl From<ComputationRequested> for EnclaveEvent {
     }
 }
 
-impl From<PublicKeyAggregated> for EnclaveEvent{
-    fn from(data:PublicKeyAggregated) -> Self {
+impl From<PublicKeyAggregated> for EnclaveEvent {
+    fn from(data: PublicKeyAggregated) -> Self {
         EnclaveEvent::PublicKeyAggregated {
             id: EventId::from(data.clone()),
             data: data.clone(),
@@ -101,21 +101,21 @@ impl From<PublicKeyAggregated> for EnclaveEvent{
     }
 }
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct KeyshareCreated {
     pub pubkey: WrappedPublicKeyShare,
     pub e3_id: E3id,
 }
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct PublicKeyAggregated {
     pub pubkey: WrappedPublicKey,
     pub e3_id: E3id,
 }
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize,Deserialize)]
 #[rtype(result = "()")]
 pub struct ComputationRequested {
     pub e3_id: E3id,
