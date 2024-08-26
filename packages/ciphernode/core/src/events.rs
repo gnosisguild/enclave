@@ -73,6 +73,10 @@ impl EnclaveEvent {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, bincode::Error> {
         bincode::deserialize(bytes)
     }
+
+    pub fn get_id(&self) -> EventId {
+       self.clone().into() 
+    }
 }
 
 impl From<EnclaveEvent> for EventId {
