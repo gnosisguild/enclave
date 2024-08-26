@@ -82,7 +82,7 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKeyShare {
     where
         D: serde::Deserializer<'de>,
     {
-        // Intermediate struct for deserialization
+        // Intermediate struct of bytes for deserialization
         #[derive(serde::Deserialize)]
         struct PublicKeyShareBytes {
             par_bytes: Vec<u8>,
@@ -99,11 +99,12 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKeyShare {
             CommonRandomPoly::deserialize(&crp_bytes, &params).map_err(serde::de::Error::custom)?;
         let inner = PublicKeyShare::deserialize(&bytes, &params, crp.clone())
             .map_err(serde::de::Error::custom)?;
+        // TODO: how do we create an invariant that the deserialized params match the global params?
         std::result::Result::Ok(WrappedPublicKeyShare::from_fhe_rs(inner, params, crp))
     }
 }
 
-/// Serialize to intermediate struct
+/// Serialize to serde bytes representation
 impl serde::Serialize for WrappedPublicKeyShare {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -113,6 +114,7 @@ impl serde::Serialize for WrappedPublicKeyShare {
         let bytes = self.inner.to_bytes();
         let par_bytes = self.params.to_bytes();
         let crp_bytes = self.params.to_bytes();
+        // Intermediate struct of bytes
         let mut state = serializer.serialize_struct("PublicKeyShare", 2)?;
         state.serialize_field("par_bytes", &par_bytes)?;
         state.serialize_field("crp_bytes", &crp_bytes)?;
@@ -148,6 +150,7 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKey {
     where
         D: serde::Deserializer<'de>,
     {
+        // Intermediate struct of bytes for deserialization
         #[derive(serde::Deserialize)]
         struct PublicKeyBytes {
             par: Vec<u8>,
@@ -161,16 +164,16 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKey {
     }
 }
 
-/// Serialize to bytes representation
+/// Serialize to serde bytes representation
 impl serde::Serialize for WrappedPublicKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        // let par = self.0.
         let bytes = self.inner.to_bytes();
         let par_bytes = self.params.to_bytes();
+        // Intermediate struct of bytes
         let mut state = serializer.serialize_struct("PublicKey", 2)?;
         state.serialize_field("par_bytes", &par_bytes)?;
         state.serialize_field("bytes", &bytes)?;
