@@ -1,4 +1,5 @@
 use actix::Message;
+use bincode;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -64,6 +65,16 @@ pub enum EnclaveEvent {
     // CiphernodeDeregistered,
 }
 
+impl EnclaveEvent {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, bincode::Error> {
+        bincode::serialize(self)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, bincode::Error> {
+        bincode::deserialize(bytes)
+    }
+}
+
 impl From<EnclaveEvent> for EventId {
     fn from(value: EnclaveEvent) -> Self {
         match value {
@@ -115,7 +126,7 @@ pub struct PublicKeyAggregated {
     pub e3_id: E3id,
 }
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize,Deserialize)]
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ComputationRequested {
     pub e3_id: E3id,
