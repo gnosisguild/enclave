@@ -9,7 +9,6 @@ use fhe::{
 use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use rand_chacha::ChaCha20Rng;
 use serde::Serializer;
-// use serde::{Deserialize, Serialize};
 
 use crate::ordered_set::OrderedSet;
 
