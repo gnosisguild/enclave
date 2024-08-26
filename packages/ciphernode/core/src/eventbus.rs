@@ -79,9 +79,8 @@ impl Handler<EnclaveEvent> for EventBus {
 
     fn handle(&mut self, event: EnclaveEvent, _: &mut Context<Self>) {
         // Deduplicate by id
-        if self.ids.contains(&event.clone().into()) {
+        if self.ids.contains(&event.get_id()) {
             // We have seen this before
-            println!("Duplicate {}", EventId::from(event));
             return;
         }
 

@@ -32,7 +32,7 @@ mod p2p;
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{sync::Arc, time::Duration};
 
     use crate::{
         ciphernode::Ciphernode,
@@ -41,6 +41,7 @@ mod tests {
         eventbus::{EventBus, GetHistory, Subscribe},
         events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         fhe::{Fhe, WrappedPublicKey, WrappedPublicKeyShare},
+        p2p::P2p,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -50,6 +51,8 @@ mod tests {
     };
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
+    use tokio::sync::Mutex;
+    use tokio::{sync::mpsc::channel, time::sleep};
 
     // Simulating a local node
     fn setup_local_ciphernode(
@@ -207,12 +210,44 @@ mod tests {
         Ok(())
     }
 
-    // TODO: Test p2p
-    fn test_p2p_event_broadcasting() {
-        // Setup two Vec<u8> channels to simulate libp2p
-        // 1. command channel
-        // 2. event channel
-        // Pass them to the p2p actor
-        // connect the p2p actor to the event bus actor and monitor which events are broadcast
+    #[actix::test]
+    async fn test_p2p_event_broadcasting() -> Result<()> {
+        let (tx, mut output) = channel(100); // Transmit byte events to the network
+        let (_, rx) = channel(100); // Receive byte events from the network
+        let bus = EventBus::new(true).start();
+        let _ = P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
+       
+        // Capture messages from output on msgs vec
+        let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
+        let msgs_loop = msgs.clone();
+
+        tokio::spawn(async move {
+            while let Some(msg) = output.recv().await {
+                msgs_loop.lock().await.push(msg);
+            }
+        });
+
+        let evt_1 = EnclaveEvent::from(ComputationRequested {
+            e3_id: E3id::new("1234"),
+            nodecount: 3,
+            threshold: 123,
+            sortition_seed: 123,
+        });
+
+        let evt_2 = EnclaveEvent::from(ComputationRequested {
+            e3_id: E3id::new("1235"),
+            nodecount: 3,
+            threshold: 123,
+            sortition_seed: 123,
+        });
+
+        bus.do_send(evt_1.clone());
+        bus.do_send(evt_2.clone());
+        
+        sleep(Duration::from_millis(1)).await; // need to push to next tick
+
+        assert_eq!(*msgs.lock().await, vec![evt_1.to_bytes()?, evt_2.to_bytes()?], "P2p did not transmit events to the network");
+
+        Ok(())
     }
 }
