@@ -30,11 +30,15 @@ pub struct GetAggregatePublicKey {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WrappedPublicKeyShare {
     inner: PublicKeyShare,
+    // We need to hold copies of the params and crp in order to effectively serialize and
+    // deserialize the wrapped type
     params: Arc<BfvParameters>,
     crp: CommonRandomPoly,
 }
 
 impl WrappedPublicKeyShare {
+    /// Public function to serialize specifically from the wrapped type including types that are
+    /// private from outside the crate
     pub fn from_fhe_rs(
         inner: PublicKeyShare,
         params: Arc<BfvParameters>,
@@ -106,7 +110,6 @@ impl serde::Serialize for WrappedPublicKeyShare {
         S: Serializer,
     {
         use serde::ser::SerializeStruct;
-        // let par = self.0.
         let bytes = self.inner.to_bytes();
         let par_bytes = self.params.to_bytes();
         let crp_bytes = self.params.to_bytes();
@@ -153,11 +156,12 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKey {
         let PublicKeyBytes { par, bytes } = PublicKeyBytes::deserialize(deserializer)?;
         let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap());
         let inner = PublicKey::from_bytes(&bytes, &params).map_err(serde::de::Error::custom)?;
+        // TODO: how do we create an invariant that the deserialized params match the global params?
         std::result::Result::Ok(WrappedPublicKey::from_fhe_rs(inner, params))
     }
 }
 
-/// Serialize to intermediate struct
+/// Serialize to bytes representation
 impl serde::Serialize for WrappedPublicKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
