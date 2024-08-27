@@ -1,16 +1,16 @@
 use std::{cmp::Ordering, hash::Hash, mem, sync::Arc};
 
+use crate::ordered_set::OrderedSet;
 use actix::{Actor, Context, Handler, Message};
 use anyhow::*;
 use fhe::{
-    bfv::{BfvParameters, PublicKey, SecretKey},
+    bfv::{BfvParameters, BfvParametersBuilder, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
 };
 use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
+use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use serde::Serializer;
-
-use crate::ordered_set::OrderedSet;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Result<(WrappedSecretKey, WrappedPublicKeyShare)>")]
@@ -231,6 +231,20 @@ impl Fhe {
         rng: ChaCha20Rng,
     ) -> Result<Self> {
         Ok(Self { params, crp, rng })
+    }
+    pub fn try_default() -> Result<Self> {
+        let moduli = &vec![0x3FFFFFFF000001];
+        let degree = 2048usize;
+        let plaintext_modulus = 1032193u64;
+        let mut rng = ChaCha20Rng::from_entropy();
+        let params = BfvParametersBuilder::new()
+            .set_degree(degree)
+            .set_plaintext_modulus(plaintext_modulus)
+            .set_moduli(&moduli)
+            .build_arc()?;
+        let crp = CommonRandomPoly::new(&params, &mut rng)?;
+
+        Ok(Fhe::new(params, crp, rng)?)
     }
 }
 
