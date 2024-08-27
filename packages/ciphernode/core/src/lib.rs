@@ -214,7 +214,7 @@ mod tests {
     async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
         // Setup elements in test
         let (tx, mut output) = channel(100); // Transmit byte events to the network
-        let (_, rx) = channel(100); // Receive byte events from the network
+        let (input, rx) = channel(100); // Receive byte events from the network
         let bus = EventBus::new(true).start();
         P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
 
@@ -224,7 +224,8 @@ mod tests {
 
         tokio::spawn(async move {
             while let Some(msg) = output.recv().await {
-                msgs_loop.lock().await.push(msg);
+                msgs_loop.lock().await.push(msg.clone());
+                let _ = input.send(msg).await; // loopback to simulate a rebroadcast message
             }
         });
 
@@ -244,14 +245,19 @@ mod tests {
 
         bus.do_send(evt_1.clone());
         bus.do_send(evt_2.clone());
-
+        
         sleep(Duration::from_millis(1)).await; // need to push to next tick
+
+        // check the history of the event bus
+        let history = bus.send(GetHistory).await?;
 
         assert_eq!(
             *msgs.lock().await,
             vec![evt_1.to_bytes()?, evt_2.to_bytes()?],
             "P2p did not transmit events to the network"
         );
+
+        assert_eq!(history, vec![evt_1, evt_2], "P2p must not retransmit forwarded event to event bus");
 
         Ok(())
     }
