@@ -9,7 +9,7 @@ use fhe::{
     bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
-use fhe_traits::{FheDecoder, Serialize as FheSerialize, DeserializeParametrized};
+use fhe_traits::{FheDecoder, Serialize as FheSerialize, Deserialize, DeserializeParametrized};
 use rand::{Rng, rngs::OsRng, thread_rng};
 use util::timeit::{timeit};
 
@@ -44,7 +44,30 @@ impl EnclaveBFV {
         Self { pk_share, sk_share, params, crp }
     }
 
-    pub fn get_pk_bytes(&mut self) -> Vec<u8> {
+    pub fn serialize_pk(&mut self) -> Vec<u8> {
     	self.pk_share.to_bytes()
+    }
+
+    pub fn deserialize_pk(&mut self, bytes: Vec<u8>, par_bytes: Vec<u8>, crp_bytes: Vec<u8>) -> PublicKeyShare {
+    	let params = Arc::new(BfvParameters::try_deserialize(&par_bytes).unwrap());
+    	let crp = CommonRandomPoly::deserialize(&crp_bytes, &params).unwrap();
+    	PublicKeyShare::deserialize(&bytes, &params, crp.clone()).unwrap()
+    }
+
+    pub fn serialize_crp(&mut self) -> Vec<u8> {
+    	self.crp.to_bytes()
+    }
+
+    pub fn deserialize_crp(&mut self, bytes: Vec<u8>, par_bytes: Vec<u8>) -> CommonRandomPoly {
+    	let params = Arc::new(BfvParameters::try_deserialize(&par_bytes).unwrap());
+    	CommonRandomPoly::deserialize(&bytes, &params).unwrap()
+    }
+
+    pub fn serialize_params(&mut self) -> Vec<u8> {
+    	self.params.to_bytes()
+    }
+
+    pub fn deserialize_params(&mut self, par_bytes: Vec<u8>) -> Arc<BfvParameters> {
+    	Arc::new(BfvParameters::try_deserialize(&par_bytes).unwrap())
     }
 }
