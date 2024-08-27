@@ -37,7 +37,7 @@ mod tests {
     use crate::{
         ciphernode::Ciphernode,
         committee::CommitteeManager,
-        data::Data,
+        data::{Data, GetLog},
         eventbus::{EventBus, GetHistory, Subscribe},
         events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         fhe::{Fhe, WrappedPublicKey, WrappedPublicKeyShare},
@@ -211,12 +211,13 @@ mod tests {
     }
 
     #[actix::test]
-    async fn test_p2p_event_broadcasting() -> Result<()> {
+    async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
+        // Setup elements in test
         let (tx, mut output) = channel(100); // Transmit byte events to the network
         let (_, rx) = channel(100); // Receive byte events from the network
         let bus = EventBus::new(true).start();
-        let _ = P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
-       
+        P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
+
         // Capture messages from output on msgs vec
         let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
         let msgs_loop = msgs.clone();
@@ -243,10 +244,43 @@ mod tests {
 
         bus.do_send(evt_1.clone());
         bus.do_send(evt_2.clone());
-        
+
         sleep(Duration::from_millis(1)).await; // need to push to next tick
 
-        assert_eq!(*msgs.lock().await, vec![evt_1.to_bytes()?, evt_2.to_bytes()?], "P2p did not transmit events to the network");
+        assert_eq!(
+            *msgs.lock().await,
+            vec![evt_1.to_bytes()?, evt_2.to_bytes()?],
+            "P2p did not transmit events to the network"
+        );
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
+        // Setup elements in test
+        let (tx, _) = channel(100); // Transmit byte events to the network
+        let (input, rx) = channel(100); // Receive byte events from the network
+        let bus = EventBus::new(true).start();
+        P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
+
+        // Capture messages from output on msgs vec
+        let event = EnclaveEvent::from(ComputationRequested {
+            e3_id: E3id::new("1235"),
+            nodecount: 3,
+            threshold: 123,
+            sortition_seed: 123,
+        });
+
+        // lets send an event from the network
+        let _ = input.send(event.to_bytes()?).await;
+
+        sleep(Duration::from_millis(1)).await; // need to push to next tick
+
+        // check the history of the event bus
+        let history = bus.send(GetHistory).await?;
+
+        assert_eq!(history, vec![event]);
 
         Ok(())
     }
