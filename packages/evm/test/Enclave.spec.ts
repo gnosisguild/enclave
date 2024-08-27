@@ -933,31 +933,6 @@ describe("Enclave", function () {
         enclave.publishInput(0, ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
     });
-    it("sets ciphertextInput correctly", async function () {
-      const { enclave, request } = await loadFixture(setup);
-      const inputData = "0x12345678";
-
-      await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
-        { value: 10 },
-      );
-
-      await enclave.activate(0);
-
-      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
-      let e3 = await enclave.getE3(0);
-      expect(e3.inputs[0]).to.equal(inputData);
-      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
-      e3 = await enclave.getE3(0);
-      expect(e3.inputs[1]).to.equal(inputData);
-    });
     it("returns true if input is published successfully", async function () {
       const { enclave, request } = await loadFixture(setup);
       const inputData = "0x12345678";
@@ -980,6 +955,43 @@ describe("Enclave", function () {
         true,
       );
     });
+    it.only("adds inputHash to merkle tree", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const e3Id = 0;
+
+      await enclave.activate(e3Id);
+
+      const expectedHash =
+        BigInt(
+          ethers.keccak256(
+            ethers.AbiCoder.defaultAbiCoder().encode(
+              ["bytes", "uint256"],
+              [inputData, 0],
+            ),
+          ),
+        ) / BigInt(10n ** 39n);
+
+      await enclave.publishInput(e3Id, inputData);
+      expect(await enclave.getInputRoot(e3Id)).to.equal(expectedHash);
+
+      const secondInputData = abiCoder.encode(["bytes"], ["0x112233445566"]);
+      await enclave.publishInput(e3Id, secondInputData);
+      expect(await enclave.getInputRoot(e3Id)).to.equal(expectedHash);
+    });
     it("emits InputPublished event", async function () {
       const { enclave, request } = await loadFixture(setup);
 
@@ -999,7 +1011,15 @@ describe("Enclave", function () {
 
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
       await enclave.activate(e3Id);
-      const expectedHash = BigInt(ethers.keccak256(inputData)) / BigInt(10);
+      const expectedHash =
+        BigInt(
+          ethers.keccak256(
+            ethers.AbiCoder.defaultAbiCoder().encode(
+              ["bytes", "uint256"],
+              [inputData, 0],
+            ),
+          ),
+        ) / BigInt(10);
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")

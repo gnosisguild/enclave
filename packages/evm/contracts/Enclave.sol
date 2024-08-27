@@ -13,9 +13,14 @@ import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import { BinaryIMT, BinaryIMTData } from "@zk-kit/imt.sol/BinaryIMT.sol";
+import {
+    InternalLeanIMT,
+    LeanIMTData
+} from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
 contract Enclave is IEnclave, OwnableUpgradeable {
+    using InternalLeanIMT for LeanIMTData;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //
@@ -45,7 +50,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(uint256 e3Id => E3 e3) public e3s;
 
     // Mapping of input merkle trees
-    mapping(uint256 e3Id => BinaryIMTData imt) public inputs;
+    mapping(uint256 e3Id => LeanIMTData imt) public inputs;
+
+    // Mapping counting the number of inputs for each E3.
+    mapping(uint256 e3Id => uint256) public inputCount;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -175,12 +183,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             inputValidator: inputValidator,
             outputVerifier: outputVerifier,
             committeePublicKey: hex"",
-            inputs: new bytes[](0),
             ciphertextOutput: hex"",
             plaintextOutput: hex""
         });
         e3s[e3Id] = e3;
-        BinaryIMT.initWithDefaultZeroes(inputs[e3Id], 32);
 
         require(
             cyphernodeRegistry.requestCommittee(e3Id, filter, threshold),
@@ -233,11 +239,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
-        e3s[e3Id].inputs.push(input);
-        // note: hash is divided by ten to make the hash smaller than the snark scalar field.
+        // note: hash is divided by 10 ** 39 to make the hash smaller than the snark scalar field.
         // TODO: Not sure if this is a bad idea ¯\_(ツ)_/¯
-        uint256 inputHash = uint256(keccak256(input)) / 10;
-        BinaryIMT.insert(inputs[e3Id], inputHash);
+        uint256 inputHash = uint256(
+            keccak256(abi.encode(input, inputCount[e3Id]))
+        ) / 10 ** 39;
+        inputCount[e3Id]++;
+        inputs[e3Id]._insert(inputHash);
 
         emit InputPublished(e3Id, input, inputHash);
     }
@@ -377,5 +385,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3.computationModule != IComputationModule(address(0)),
             E3DoesNotExist(e3Id)
         );
+    }
+
+    function getInputRoot(uint256 e3Id) public view returns (uint256) {
+        return InternalLeanIMT._root(inputs[e3Id]);
     }
 }
