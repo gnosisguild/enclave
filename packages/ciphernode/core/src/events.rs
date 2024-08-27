@@ -1,3 +1,4 @@
+use crate::fhe::{WrappedPublicKey, WrappedPublicKeyShare};
 use actix::Message;
 use bincode;
 use serde::{Deserialize, Serialize};
@@ -6,8 +7,6 @@ use std::{
     fmt,
     hash::{DefaultHasher, Hash, Hasher},
 };
-
-use crate::fhe::{WrappedPublicKey, WrappedPublicKeyShare};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id(pub String);
@@ -20,6 +19,12 @@ impl fmt::Display for E3id {
 impl E3id {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
+    }
+}
+
+impl From<u32> for E3id {
+    fn from(value: u32) -> Self {
+        E3id::new(value.to_string())
     }
 }
 
@@ -75,7 +80,7 @@ impl EnclaveEvent {
     }
 
     pub fn get_id(&self) -> EventId {
-       self.clone().into() 
+        self.clone().into()
     }
 }
 
@@ -113,6 +118,12 @@ impl From<PublicKeyAggregated> for EnclaveEvent {
             id: EventId::from(data.clone()),
             data: data.clone(),
         }
+    }
+}
+
+impl fmt::Display for EnclaveEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&format!("{}({})", self.event_type(), self.get_id()))
     }
 }
 
@@ -163,7 +174,18 @@ impl EnclaveEvent {
 #[cfg(test)]
 mod tests {
 
-    use crate::events::extract_enclave_event_name;
+    use std::error::Error;
+
+    use fhe::{
+        bfv::{BfvParametersBuilder, SecretKey},
+        mbfv::{CommonRandomPoly, PublicKeyShare},
+    };
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha20Rng;
+
+    use crate::{events::extract_enclave_event_name, E3id, KeyshareCreated, WrappedPublicKeyShare};
+
+    use super::EnclaveEvent;
 
     #[test]
     fn test_extract_enum_name() {
@@ -175,5 +197,30 @@ mod tests {
             extract_enclave_event_name("CommitteeSelected(SomeStruct { t: 8 })"),
             "CommitteeSelected"
         );
+    }
+
+    #[test]
+    fn test_deserialization() -> Result<(), Box<dyn Error>> {
+        let moduli = &vec![0x3FFFFFFF000001];
+        let degree = 2048usize;
+        let plaintext_modulus = 1032193u64;
+        let mut rng = ChaCha20Rng::from_entropy();
+        let params = BfvParametersBuilder::new()
+            .set_degree(degree)
+            .set_plaintext_modulus(plaintext_modulus)
+            .set_moduli(&moduli)
+            .build_arc()?;
+        let crp = CommonRandomPoly::new(&params, &mut rng)?;
+        let sk_share = { SecretKey::random(&params, &mut rng) };
+        let pk_share = { PublicKeyShare::new(&sk_share, crp.clone(), &mut rng)? };
+        let pubkey = WrappedPublicKeyShare::from_fhe_rs(pk_share, params.clone(), crp.clone());
+        let kse = EnclaveEvent::from(KeyshareCreated {
+            e3_id: E3id::from(1001),
+            pubkey,
+        });
+        let kse_bytes = kse.to_bytes()?;
+        let _ = EnclaveEvent::from_bytes(&kse_bytes.clone());
+        // deserialization occurred without panic!
+        Ok(())
     }
 }

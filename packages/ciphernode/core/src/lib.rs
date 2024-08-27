@@ -12,6 +12,19 @@ mod events;
 mod fhe;
 mod ordered_set;
 mod p2p;
+mod logger;
+
+// TODO: this is too permissive
+pub use data::*;
+pub use ciphernode::*;
+pub use committee::*;
+pub use committee_key::*;
+pub use eventbus::*;
+pub use events::*;
+pub use fhe::*;
+pub use p2p::*;
+pub use actix::prelude::*;
+pub use logger::*;
 
 pub use data::*;
 pub use ciphernode::*;

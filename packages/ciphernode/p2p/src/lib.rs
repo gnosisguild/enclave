@@ -127,7 +127,6 @@ impl EnclaveRouter {
         loop {
             select! {
                 Some(line) = self.cmd_rx.recv() => {
-                    println!("Receiving input");
                     if let Err(e) = self.swarm.as_mut().unwrap()
                         .behaviour_mut().gossipsub
                         .publish(self.topic.as_mut().unwrap().clone(), line) {
@@ -153,9 +152,9 @@ impl EnclaveRouter {
                         message,
                     })) => {
                         println!(
-                            "Got message: '{}' with id: {id} from peer: {peer_id}",
-                            String::from_utf8_lossy(&message.data),
+                            "Got message with id: {id} from peer: {peer_id}",
                         );
+                        println!("{:?}", message);
                         self.evt_tx.send(message.data).await?;
                     },
                     SwarmEvent::NewListenAddr { address, .. } => {

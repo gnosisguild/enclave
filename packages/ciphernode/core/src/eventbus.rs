@@ -83,7 +83,7 @@ impl Handler<EnclaveEvent> for EventBus {
             // We have seen this before
             return;
         }
-
+        
         // TODO: How can we ensure the event we see is coming in in the correct order?
         if let Some(listeners) = self.listeners.get("*") {
             for listener in listeners {

@@ -3,6 +3,7 @@ use crate::{
     eventbus::EventBus,
     events::{ComputationRequested, EnclaveEvent, KeyshareCreated},
     fhe::{Fhe, GenerateKeyshare},
+    Subscribe,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -20,6 +21,12 @@ impl Actor for Ciphernode {
 impl Ciphernode {
     pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>) -> Self {
         Self { bus, fhe, data }
+    }
+
+    pub fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>) -> Addr<Self> {
+        let node = Ciphernode::new(bus.clone(), fhe, data).start();
+        bus.do_send(Subscribe::new("ComputationRequested", node.clone().into()));
+        node
     }
 }
 
@@ -74,7 +81,6 @@ async fn on_computation_requested(
 
     // broadcast the KeyshareCreated message
     let event = EnclaveEvent::from(KeyshareCreated { pubkey, e3_id });
-
     bus.do_send(event);
 
     Ok(())
