@@ -931,6 +931,7 @@ version = "0.1.0"
 dependencies = [
  "actix-rt",
  "async-std",
+ "bfv",
  "enclave-core",
  "eth",
  "fhe",
