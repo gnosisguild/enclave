@@ -2,12 +2,7 @@ use std::{collections::HashSet, error::Error};
 
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
-/// 1. Sending and Recieving Vec<u8> messages with libp2p
-/// 2. Converting between Vec<u8> and EnclaveEvents::Xxxxxxxxx()
-/// 3. Broadcasting over the local eventbus
-/// 4. Listening to the local eventbus for messages to be published to libp2p
 use actix::prelude::*;
-use anyhow::anyhow;
 use p2p::EnclaveRouter;
 use tokio::sync::mpsc::{Receiver, Sender};
 

@@ -7,6 +7,7 @@ use crate::{
     eventbus::EventBus,
     events::{E3id, EnclaveEvent},
     fhe::Fhe,
+    Subscribe,
 };
 
 pub struct CommitteeManager {
@@ -26,6 +27,16 @@ impl CommitteeManager {
             fhe,
             keys: HashMap::new(),
         }
+    }
+
+    pub fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Addr<Self> {
+        let addr = CommitteeManager::new(bus.clone(), fhe).start();
+        bus.do_send(Subscribe::new(
+            "ComputationRequested",
+            addr.clone().recipient(),
+        ));
+        bus.do_send(Subscribe::new("KeyshareCreated", addr.clone().into()));
+        addr
     }
 }
 
@@ -50,7 +61,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
                 if let Some(key) = self.keys.get(&data.e3_id) {
                     key.do_send(data);
                 }
-            },
+            }
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
                 let Some(key) = self.keys.get(&data.e3_id) else {
                     return;
@@ -58,8 +69,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
 
                 key.do_send(Die);
                 self.keys.remove(&data.e3_id);
-            }
-            // _ => (),
+            } // _ => (),
         }
     }
 }

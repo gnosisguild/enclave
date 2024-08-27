@@ -113,7 +113,7 @@ impl serde::Serialize for WrappedPublicKeyShare {
         use serde::ser::SerializeStruct;
         let bytes = self.inner.to_bytes();
         let par_bytes = self.params.to_bytes();
-        let crp_bytes = self.params.to_bytes();
+        let crp_bytes = self.crp.to_bytes();
         // Intermediate struct of bytes
         let mut state = serializer.serialize_struct("PublicKeyShare", 2)?;
         state.serialize_field("par_bytes", &par_bytes)?;
@@ -122,6 +122,7 @@ impl serde::Serialize for WrappedPublicKeyShare {
         state.end()
     }
 }
+
 
 /// Wrapped PublicKey. This is wrapped to provide an inflection point
 /// as we use this library elsewhere we only implement traits as we need them
