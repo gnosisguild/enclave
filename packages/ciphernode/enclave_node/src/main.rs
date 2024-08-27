@@ -34,7 +34,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("\n\n\n\n");
     println!("Hello, cipher world!");
 
-    let new_bfv = EnclaveBFV::new(4096, 4096, vec![0xffffee001, 0xffffc4001, 0x1ffffe0001]);
+    let mut new_bfv = EnclaveBFV::new(4096, 4096, vec![0xffffee001, 0xffffc4001, 0x1ffffe0001]);
+    let pk_bytes = new_bfv.get_pk_bytes();
 
     let (mut p2p, tx, mut rx) = EnclaveRouter::new()?;
     p2p.connect_swarm("mdns".to_string())?;

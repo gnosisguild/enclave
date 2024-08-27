@@ -14,9 +14,10 @@ use rand::{Rng, rngs::OsRng, thread_rng};
 use util::timeit::{timeit};
 
 pub struct EnclaveBFV {
-    pk_share: PublicKeyShare,
-    params: Arc<BfvParameters>,
-    crp: CommonRandomPoly,
+    pub pk_share: PublicKeyShare,
+    sk_share: SecretKey,
+    pub params: Arc<BfvParameters>,
+    pub crp: CommonRandomPoly,
 }
 
 impl EnclaveBFV {
@@ -36,13 +37,14 @@ impl EnclaveBFV {
 	    );
 
 	    let crp = CommonRandomPoly::new(&params, &mut thread_rng()).unwrap();
-	    //let crp_bytes = crp.to_bytes();
-        let sk_share_1 = SecretKey::random(&params, &mut OsRng);
-        let pk_share_1 = PublicKeyShare::new(&sk_share_1, crp.clone(), &mut thread_rng()).unwrap();
-        // serialize pk_share
-        let pk_share = pk_share_1.to_bytes();
-        let sk_share = sk_share_1.coeffs.into_vec();
+	    //TODO: save encrypted sk_share to disk?
+        let sk_share = SecretKey::random(&params, &mut OsRng);
+        let pk_share = PublicKeyShare::new(&sk_share, crp.clone(), &mut thread_rng()).unwrap();
 
-        Self { pk_share: pk_share_1, params, crp }
+        Self { pk_share, sk_share, params, crp }
+    }
+
+    pub fn get_pk_bytes(&mut self) -> Vec<u8> {
+    	self.pk_share.to_bytes()
     }
 }
