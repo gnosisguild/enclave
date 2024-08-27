@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
     let _node = Ciphernode::new(bus.clone(), fhe.clone(), data.clone()).start();
     let (_, h) = P2p::spawn_libp2p(bus.clone())?;
-    println!("CipherAg");
+    println!("Ciphernode");
     let _ = tokio::join!(h);
     Ok(())
 }
