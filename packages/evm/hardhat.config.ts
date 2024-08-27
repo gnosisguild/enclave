@@ -77,6 +77,7 @@ const config: HardhatUserConfig = {
         mnemonic,
       },
       chainId: chainIds.hardhat,
+      allowUnlimitedContractSize: true,
     },
     ganache: {
       accounts: {

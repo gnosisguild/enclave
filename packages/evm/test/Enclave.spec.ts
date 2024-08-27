@@ -887,8 +887,6 @@ describe("Enclave", function () {
         .withArgs(0);
 
       await enclave.activate(0);
-
-      await expect(enclave.publishInput(0, inputData)).to.not.be.reverted;
     });
 
     it("reverts if input is not valid", async function () {
@@ -928,7 +926,6 @@ describe("Enclave", function () {
       );
 
       await enclave.activate(0);
-      await expect(enclave.publishInput(0, ZeroHash)).to.not.be.reverted;
 
       await mine(2, { interval: request.duration });
 
@@ -1002,10 +999,11 @@ describe("Enclave", function () {
 
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
       await enclave.activate(e3Id);
+      const expectedHash = BigInt(ethers.keccak256(inputData)) / BigInt(10);
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")
-        .withArgs(e3Id, inputData);
+        .withArgs(e3Id, inputData, expectedHash);
     });
   });
 

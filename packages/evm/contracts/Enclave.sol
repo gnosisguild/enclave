@@ -158,6 +158,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(address(inputValidator) != address(0), InvalidComputation());
 
         // TODO: validate that the requested computation can be performed by the given execution module.
+        // Perhaps the execution module should be returned by the computation module?
         IOutputVerifier outputVerifier = executionModule.validate(emParams);
         require(
             address(outputVerifier) != address(0),
@@ -179,7 +180,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             plaintextOutput: hex""
         });
         e3s[e3Id] = e3;
-        BinaryIMT.init(inputs[e3Id], 32, 0);
+        BinaryIMT.initWithDefaultZeroes(inputs[e3Id], 32);
 
         require(
             cyphernodeRegistry.requestCommittee(e3Id, filter, threshold),
@@ -233,9 +234,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
         e3s[e3Id].inputs.push(input);
-        BinaryIMT.insert(inputs[e3Id], uint256(keccak256(input)));
+        // note: hash is divided by ten to make the hash smaller than the snark scalar field.
+        // TODO: Not sure if this is a bad idea ¯\_(ツ)_/¯
+        uint256 inputHash = uint256(keccak256(input)) / 10;
+        BinaryIMT.insert(inputs[e3Id], inputHash);
 
-        emit InputPublished(e3Id, input);
+        emit InputPublished(e3Id, input, inputHash);
     }
 
     function publishCiphertextOutput(

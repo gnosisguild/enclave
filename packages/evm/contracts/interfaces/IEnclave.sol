@@ -38,7 +38,7 @@ interface IEnclave {
     /// successfully published.
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded input data.
-    event InputPublished(uint256 indexed e3Id, bytes data);
+    event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash);
 
     /// @notice This event MUST be emitted when the plaintext output of an Encrypted Execution Environment (E3)
     /// is successfully published.
