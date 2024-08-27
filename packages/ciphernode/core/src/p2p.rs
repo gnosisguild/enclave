@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, error::Error};
 
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -7,6 +7,8 @@ use std::collections::HashSet;
 /// 3. Broadcasting over the local eventbus
 /// 4. Listening to the local eventbus for messages to be published to libp2p
 use actix::prelude::*;
+use anyhow::anyhow;
+use p2p::EnclaveRouter;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::{
@@ -63,6 +65,24 @@ impl P2p {
 
         // Return the address
         p2p
+    }
+
+    pub fn spawn_libp2p(
+        bus: Addr<EventBus>,
+    ) -> Result<
+        (
+            Addr<Self>,
+            tokio::task::JoinHandle<()>,
+        ),
+        Box<dyn Error>,
+    > {
+        let (mut libp2p, tx, rx) = EnclaveRouter::new()?;
+        libp2p.connect_swarm("mdns".to_string())?;
+        libp2p.join_topic("enclave-keygen-01")?;
+
+        let p2p_addr = Self::spawn_and_listen(bus, tx, rx);
+        let handle = tokio::spawn(async move { libp2p.start().await.unwrap() });
+        Ok((p2p_addr, handle))
     }
 }
 

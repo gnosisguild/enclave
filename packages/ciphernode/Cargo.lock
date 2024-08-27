@@ -929,7 +929,9 @@ dependencies = [
 name = "enclave_node"
 version = "0.1.0"
 dependencies = [
+ "actix-rt",
  "async-std",
+ "enclave-core",
  "eth",
  "fhe",
  "fhe-traits",
