@@ -1012,14 +1012,7 @@ describe("Enclave", function () {
 
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
       await enclave.activate(e3Id);
-      const expectedHash = hash(
-        BigInt(
-          ethers.keccak256(
-            ethers.AbiCoder.defaultAbiCoder().encode(["bytes"], [inputData]),
-          ),
-        ),
-        BigInt(0),
-      );
+      const expectedHash = hash(BigInt(ethers.keccak256(inputData)), BigInt(0));
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")
