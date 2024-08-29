@@ -1,14 +1,9 @@
 #![crate_name = "eth"]
 #![crate_type = "lib"]
-#![warn(missing_docs, unused_imports)]
+// #![warn(missing_docs, unused_imports)]
 
+mod listener;
+mod manager;
 
-pub struct EtherClient {
-	pub address: String,
-}
-
-impl EtherClient {
-    pub fn new(address: String) -> Self {
-        Self { address }
-    }
-}
+pub use listener::*;
+pub use manager::*;
