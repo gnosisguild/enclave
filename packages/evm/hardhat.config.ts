@@ -117,6 +117,16 @@ const config: HardhatUserConfig = {
       },
       viaIR: true,
     },
+    overrides: {
+      "node_modules/poseidon-solidity/PoseidonT3.sol": {
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 2 ** 32 - 1,
+          },
+        },
+      },
+    },
   },
   typechain: {
     outDir: "types",

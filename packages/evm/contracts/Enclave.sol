@@ -243,11 +243,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: Not sure if this is a bad idea ¯\_(ツ)_/¯
         uint256 inputHash = uint256(
             keccak256(abi.encode(input, inputCount[e3Id]))
-        ) / 10 ** 39;
+        ) / 10;
         inputCount[e3Id]++;
         inputs[e3Id]._insert(inputHash);
 
-        emit InputPublished(e3Id, input, inputHash);
+        emit InputPublished(e3Id, input, inputHash, inputCount[e3Id] - 1);
     }
 
     function publishCiphertextOutput(

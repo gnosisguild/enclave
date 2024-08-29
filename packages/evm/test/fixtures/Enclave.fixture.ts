@@ -13,40 +13,8 @@ export async function deployEnclaveFixture({
   registry: string;
   maxDuration?: number;
 }) {
-  if ((await ethers.provider.getCode(proxy.address)) === "0x") {
-    // fund the keyless account
-    await owner.sendTransaction({
-      to: proxy.from,
-      value: proxy.gas,
-    });
-
-    // then send the presigned transaction deploying the proxy
-    await ethers.provider.broadcastTransaction(proxy.tx);
-  }
-
-  // Then deploy the hasher, if needed
-  if ((await ethers.provider.getCode(PoseidonT3.address)) === "0x") {
-    await owner.sendTransaction({
-      to: proxy.address,
-      data: PoseidonT3.data,
-    });
-  }
-
-  const poseidonDeployment = await await ethers.getContractAt(
-    "PoseidonT3",
-    proxy.address,
-  );
-
-  const imtDeployment = await (
-    await ethers.getContractFactory(
-      "InternalLeanIMT",
-      // , {
-      //   libraries: {
-      //     PoseidonT3: await poseidonDeployment.getAddress(),
-      //   },
-      // }
-    )
-  ).deploy();
+  const poseidonFactory = await ethers.getContractFactory("PoseidonT3");
+  const poseidonDeployment = await poseidonFactory.deploy();
 
   const deployment = await (
     await ethers.getContractFactory(

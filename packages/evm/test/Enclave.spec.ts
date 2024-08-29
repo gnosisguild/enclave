@@ -3,9 +3,11 @@ import {
   mine,
   time,
 } from "@nomicfoundation/hardhat-network-helpers";
+import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { ZeroHash } from "ethers";
 import { ethers } from "hardhat";
+import { poseidon2 } from "poseidon-lite";
 
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
 import { deployComputationModuleFixture } from "./fixtures/MockComputationModule.fixture";
@@ -955,9 +957,15 @@ describe("Enclave", function () {
         true,
       );
     });
-    it.only("adds inputHash to merkle tree", async function () {
+    it("adds inputHash to merkle tree", async function () {
       const { enclave, request } = await loadFixture(setup);
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
+
+      // Hash function used to compute the tree nodes.
+      const hash = (a, b) => poseidon2([a, b]);
+
+      // To create an instance of a LeanIMT, you must provide the hash function.
+      const tree = new LeanIMT(hash);
 
       await enclave.request(
         request.filter,
@@ -975,7 +983,7 @@ describe("Enclave", function () {
 
       await enclave.activate(e3Id);
 
-      const expectedHash =
+      tree.insert(
         BigInt(
           ethers.keccak256(
             ethers.AbiCoder.defaultAbiCoder().encode(
@@ -983,14 +991,25 @@ describe("Enclave", function () {
               [inputData, 0],
             ),
           ),
-        ) / BigInt(10n ** 39n);
+        ) / BigInt(10),
+      );
 
       await enclave.publishInput(e3Id, inputData);
-      expect(await enclave.getInputRoot(e3Id)).to.equal(expectedHash);
+      expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
 
       const secondInputData = abiCoder.encode(["bytes"], ["0x112233445566"]);
+      tree.insert(
+        BigInt(
+          ethers.keccak256(
+            ethers.AbiCoder.defaultAbiCoder().encode(
+              ["bytes", "uint256"],
+              [secondInputData, 1],
+            ),
+          ),
+        ) / BigInt(10),
+      );
       await enclave.publishInput(e3Id, secondInputData);
-      expect(await enclave.getInputRoot(e3Id)).to.equal(expectedHash);
+      expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
     });
     it("emits InputPublished event", async function () {
       const { enclave, request } = await loadFixture(setup);
@@ -1023,7 +1042,7 @@ describe("Enclave", function () {
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")
-        .withArgs(e3Id, inputData, expectedHash);
+        .withArgs(e3Id, inputData, expectedHash, 0);
     });
   });
 
