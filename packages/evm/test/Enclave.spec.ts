@@ -23,6 +23,9 @@ const AddressSix = "0x0000000000000000000000000000000000000006";
 const FilterFail = AddressTwo;
 const FilterOkay = AddressSix;
 
+// Hash function used to compute the tree nodes.
+const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
+
 describe("Enclave", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
@@ -961,9 +964,6 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
 
-      // Hash function used to compute the tree nodes.
-      const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
-
       // To create an instance of a LeanIMT, you must provide the hash function.
       const tree = new LeanIMT(hash);
 
@@ -984,14 +984,14 @@ describe("Enclave", function () {
       await enclave.activate(e3Id);
 
       tree.insert(
-        BigInt(
-          ethers.keccak256(
-            ethers.AbiCoder.defaultAbiCoder().encode(
-              ["bytes", "uint256"],
-              [inputData, 0],
+        hash(
+          BigInt(
+            ethers.keccak256(
+              ethers.AbiCoder.defaultAbiCoder().encode(["bytes"], [inputData]),
             ),
           ),
-        ) / BigInt(10),
+          BigInt(0),
+        ),
       );
 
       await enclave.publishInput(e3Id, inputData);
@@ -999,14 +999,17 @@ describe("Enclave", function () {
 
       const secondInputData = abiCoder.encode(["bytes"], ["0x112233445566"]);
       tree.insert(
-        BigInt(
-          ethers.keccak256(
-            ethers.AbiCoder.defaultAbiCoder().encode(
-              ["bytes", "uint256"],
-              [secondInputData, 1],
+        hash(
+          BigInt(
+            ethers.keccak256(
+              ethers.AbiCoder.defaultAbiCoder().encode(
+                ["bytes"],
+                [secondInputData],
+              ),
             ),
           ),
-        ) / BigInt(10),
+          BigInt(1),
+        ),
       );
       await enclave.publishInput(e3Id, secondInputData);
       expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
@@ -1030,15 +1033,14 @@ describe("Enclave", function () {
 
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
       await enclave.activate(e3Id);
-      const expectedHash =
+      const expectedHash = hash(
         BigInt(
           ethers.keccak256(
-            ethers.AbiCoder.defaultAbiCoder().encode(
-              ["bytes", "uint256"],
-              [inputData, 0],
-            ),
+            ethers.AbiCoder.defaultAbiCoder().encode(["bytes"], [inputData]),
           ),
-        ) / BigInt(10);
+        ),
+        BigInt(0),
+      );
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")

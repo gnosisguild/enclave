@@ -15,7 +15,8 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {
     InternalLeanIMT,
-    LeanIMTData
+    LeanIMTData,
+    PoseidonT3
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
 contract Enclave is IEnclave, OwnableUpgradeable {
@@ -239,11 +240,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
-        // note: hash is divided by 10 to make the hash smaller than the snark scalar field.
-        // TODO: Not sure if this is a bad idea ¯\_(ツ)_/¯
-        uint256 inputHash = uint256(
-            keccak256(abi.encode(input, inputCount[e3Id]))
-        ) / 10;
+        uint256 inputHash = PoseidonT3.hash(
+            [uint256(keccak256(abi.encode(input))), inputCount[e3Id]]
+        );
+
         inputCount[e3Id]++;
         inputs[e3Id]._insert(inputHash);
 
