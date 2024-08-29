@@ -268,7 +268,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CiphertextOutputAlreadyPublished(e3Id)
         );
         bytes memory output;
-        (output, success) = e3.outputVerifier.verify(e3Id, data);
+        (output, success) = e3.computationModule.verify(e3Id, data);
         require(success, InvalidOutput(output));
         e3s[e3Id].ciphertextOutput = output;
 
@@ -291,7 +291,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             PlaintextOutputAlreadyPublished(e3Id)
         );
         bytes memory output;
-        (output, success) = e3.computationModule.verify(e3Id, data);
+        (output, success) = e3.outputVerifier.verify(e3Id, data);
         require(success, InvalidOutput(output));
         e3s[e3Id].plaintextOutput = output;
 
