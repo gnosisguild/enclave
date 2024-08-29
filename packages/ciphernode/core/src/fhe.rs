@@ -4,13 +4,15 @@ use crate::ordered_set::OrderedSet;
 use actix::{Actor, Context, Handler, Message};
 use anyhow::*;
 use fhe::{
-    bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, PublicKey, SecretKey},
-    mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
+    bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, Plaintext, PublicKey, SecretKey},
+    mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
 use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use serde::Serializer;
+
+// TODO: remove all this wrapping and serialization/deserialization code by ensuring everything from fhe.rs has a to_bytes() and deserialize() -> T methods and return only Vec<u8> outside of this actor
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Result<(WrappedSecretKey, WrappedPublicKeyShare)>")]
@@ -22,6 +24,19 @@ pub struct GenerateKeyshare {
 #[rtype(result = "Result<(WrappedPublicKey)>")]
 pub struct GetAggregatePublicKey {
     pub keyshares: OrderedSet<WrappedPublicKeyShare>,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "Result<(WrappedPlaintext)>")]
+pub struct GetAggregatePlaintext {
+    pub decryptions: OrderedSet<WrappedDecryptionShare>,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "Result<(WrappedDecryptionShare)>")]
+pub struct DecryptCiphertext {
+    pub unsafe_secret: WrappedSecretKey,
+    pub ciphertext: WrappedCiphertext,
 }
 
 /// Wrapped PublicKeyShare. This is wrapped to provide an inflection point
@@ -115,7 +130,7 @@ impl serde::Serialize for WrappedPublicKeyShare {
         let par_bytes = self.params.to_bytes();
         let crp_bytes = self.crp.to_bytes();
         // Intermediate struct of bytes
-        let mut state = serializer.serialize_struct("PublicKeyShare", 2)?;
+        let mut state = serializer.serialize_struct("PublicKeyShare", 3)?;
         state.serialize_field("par_bytes", &par_bytes)?;
         state.serialize_field("crp_bytes", &crp_bytes)?;
         state.serialize_field("bytes", &bytes)?;
@@ -157,7 +172,7 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKey {
             bytes: Vec<u8>,
         }
         let PublicKeyBytes { par, bytes } = PublicKeyBytes::deserialize(deserializer)?;
-        let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap());
+        let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap()); // TODO: fix errors
         let inner = PublicKey::from_bytes(&bytes, &params).map_err(serde::de::Error::custom)?;
         // TODO: how do we create an invariant that the deserialized params match the global params?
         std::result::Result::Ok(WrappedPublicKey::from_fhe_rs(inner, params))
@@ -204,12 +219,39 @@ impl PartialOrd for WrappedPublicKey {
 /// and avoid exposing underlying structures from fhe.rs
 // We should favor consuming patterns and avoid cloning and copying this value around in memory.
 // Underlying key Zeroizes on drop
-#[derive(PartialEq)]
-pub struct WrappedSecretKey(pub SecretKey);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WrappedSecretKey {
+    inner: SecretKey,
+    params: Arc<BfvParameters>,
+}
 
 impl WrappedSecretKey {
-    pub fn unsafe_to_vec(&self) -> Vec<u8> {
-        serialize_box_i64(self.0.coeffs.clone())
+    pub fn from_fhe_rs(inner: SecretKey, params: Arc<BfvParameters>) -> Self {
+        Self { inner, params }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SecretKeyData {
+    coeffs: Box<[i64]>,
+    par: Vec<u8>,
+}
+
+impl WrappedSecretKey {
+    pub fn unsafe_serialize(&self) -> Result<Vec<u8>> {
+        Ok(bincode::serialize(&SecretKeyData {
+            coeffs: self.inner.coeffs.clone(),
+            par: self.params.clone().to_bytes(),
+        })?)
+    }
+
+    pub fn deserialize(bytes: Vec<u8>) -> Result<WrappedSecretKey> {
+        let SecretKeyData { coeffs, par } = bincode::deserialize(&bytes)?;
+        let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap());
+        Ok(WrappedSecretKey::from_fhe_rs(
+            SecretKey::new(coeffs.to_vec(), &params),
+            params,
+        ))
     }
 }
 
@@ -267,6 +309,51 @@ impl serde::Serialize for WrappedCiphertext {
         state.end()
     }
 }
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub struct WrappedDecryptionShare {
+    inner: Vec<u8>,
+    params: Vec<u8>,
+    ct: Vec<u8>,
+}
+
+impl WrappedDecryptionShare {
+    pub fn from_fhe_rs(
+        inner: DecryptionShare,
+        params: Arc<BfvParameters>,
+        ct: Arc<Ciphertext>,
+    ) -> Self {
+        // Have to serialize immediately in order to clone etc.
+        let inner_bytes = inner.to_bytes();
+        let params_bytes = params.to_bytes();
+        let ct_bytes = ct.to_bytes();
+        Self {
+            inner: inner_bytes,
+            params: params_bytes,
+            ct: ct_bytes,
+        }
+    }
+
+    pub fn try_inner(self) -> Result<DecryptionShare> {
+        let params = Arc::new(BfvParameters::try_deserialize(&self.params)?);
+        let ct = Arc::new(Ciphertext::from_bytes(&self.ct, &params)?);
+        Ok(DecryptionShare::deserialize(&self.inner, &params, ct)?)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WrappedPlaintext {
+    inner: Plaintext,
+}
+
+impl WrappedPlaintext {
+    pub fn from_fhe_rs(inner: Plaintext /* params: Arc<BfvParameters> */) -> Self {
+        Self { inner }
+    }
+}
+
 /// Fhe library adaptor. All FHE computations should happen through this actor.
 pub struct Fhe {
     params: Arc<BfvParameters>,
@@ -308,8 +395,27 @@ impl Handler<GenerateKeyshare> for Fhe {
         let sk_share = { SecretKey::random(&self.params, &mut self.rng) };
         let pk_share = { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut self.rng)? };
         Ok((
-            WrappedSecretKey(sk_share),
+            WrappedSecretKey::from_fhe_rs(sk_share, self.params.clone()),
             WrappedPublicKeyShare::from_fhe_rs(pk_share, self.params.clone(), self.crp.clone()),
+        ))
+    }
+}
+
+impl Handler<DecryptCiphertext> for Fhe {
+    type Result = Result<WrappedDecryptionShare>;
+    fn handle(&mut self, msg: DecryptCiphertext, _: &mut Self::Context) -> Self::Result {
+        let DecryptCiphertext {
+            unsafe_secret, // TODO: fix security issues with sending secrets between actors
+            ciphertext,
+        } = msg;
+
+        let ct = Arc::new(ciphertext.inner);
+        let inner = DecryptionShare::new(&unsafe_secret.inner, &ct, &mut self.rng).unwrap();
+
+        Ok(WrappedDecryptionShare::from_fhe_rs(
+            inner,
+            ciphertext.params,
+            ct.clone(),
         ))
     }
 }
@@ -327,11 +433,17 @@ impl Handler<GetAggregatePublicKey> for Fhe {
     }
 }
 
-pub fn serialize_box_i64(boxed: Box<[i64]>) -> Vec<u8> {
-    let vec = boxed.into_vec();
-    let mut bytes = Vec::with_capacity(vec.len() * mem::size_of::<i64>());
-    for &num in &vec {
-        bytes.extend_from_slice(&num.to_le_bytes());
+impl Handler<GetAggregatePlaintext> for Fhe {
+    type Result = Result<WrappedPlaintext>;
+    fn handle(&mut self, msg: GetAggregatePlaintext, _: &mut Self::Context) -> Self::Result {
+        let plaintext: Plaintext = msg
+            .decryptions
+            .iter()
+            .map(|k| k.clone().try_inner())
+            .collect::<Result<Vec<_>>>()? // NOTE: not optimal
+            .into_iter()
+            .aggregate()?;
+
+        Ok(WrappedPlaintext::from_fhe_rs(plaintext))
     }
-    bytes
 }

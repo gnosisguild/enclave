@@ -66,13 +66,14 @@ mod tests {
         events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         fhe::{Fhe, WrappedPublicKey, WrappedPublicKeyShare},
         p2p::P2p,
-        DecryptionRequested, ResetHistory, WrappedCiphertext,
+        DecryptionRequested, DecryptionshareCreated, ResetHistory, WrappedCiphertext,
+        WrappedDecryptionShare,
     };
     use actix::prelude::*;
     use anyhow::*;
     use fhe::{
         bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey},
-        mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
+        mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
     };
     use fhe_traits::{FheEncoder, FheEncrypter};
     use rand::SeedableRng;
@@ -81,7 +82,7 @@ mod tests {
     use tokio::{sync::mpsc::channel, time::sleep};
 
     // Simulating a local node
-    fn setup_local_ciphernode(
+    async fn setup_local_ciphernode(
         bus: Addr<EventBus>,
         fhe: Addr<Fhe>,
         logging: bool,
@@ -90,13 +91,10 @@ mod tests {
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
 
         // create ciphernode actor for managing ciphernode flow
-        let node = Ciphernode::new(bus.clone(), fhe.clone(), data.clone()).start();
-
-        // subscribe for computation requested events from the event bus
-        bus.do_send(Subscribe::new("ComputationRequested", node.clone().into()));
+        let node = Ciphernode::attach(bus.clone(), fhe.clone(), data.clone()).await;
 
         // setup the committee manager to generate the comittee public keys
-        setup_committee_manager(bus.clone(), fhe);
+        CommitteeManager::attach(bus.clone(), fhe.clone());
         (node, data)
     }
 
@@ -119,26 +117,14 @@ mod tests {
         params: Arc<BfvParameters>,
         crp: CommonRandomPoly,
         mut rng: ChaCha20Rng,
-    ) -> Result<(WrappedPublicKeyShare, ChaCha20Rng)> {
+    ) -> Result<(WrappedPublicKeyShare, ChaCha20Rng, SecretKey)> {
         let sk = SecretKey::random(&params, &mut rng);
         let pk = WrappedPublicKeyShare::from_fhe_rs(
             PublicKeyShare::new(&sk, crp.clone(), &mut rng)?,
             params.clone(),
             crp,
         );
-        Ok((pk, rng))
-    }
-
-    fn setup_committee_manager(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Addr<CommitteeManager> {
-        let committee = CommitteeManager::new(bus.clone(), fhe.clone()).start();
-
-        bus.do_send(Subscribe::new(
-            "ComputationRequested",
-            committee.clone().into(),
-        ));
-        bus.do_send(Subscribe::new("KeyshareCreated", committee.clone().into()));
-
-        committee
+        Ok((pk, rng, sk))
     }
 
     fn setup_global_fhe_actor(
@@ -170,9 +156,9 @@ mod tests {
             ChaCha20Rng::seed_from_u64(42),
         )?;
 
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true);
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true);
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true);
+        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
+        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
+        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
 
         let e3_id = E3id::new("1234");
 
@@ -200,9 +186,9 @@ mod tests {
 
         // Passing rng through function chain to ensure it matches usage in system above
         let rng = ChaCha20Rng::seed_from_u64(42);
-        let (p1, rng) = generate_pk_share(params.clone(), crp.clone(), rng)?;
-        let (p2, rng) = generate_pk_share(params.clone(), crp.clone(), rng)?;
-        let (p3, _) = generate_pk_share(params.clone(), crp.clone(), rng)?;
+        let (p1, rng, sk1) = generate_pk_share(params.clone(), crp.clone(), rng)?;
+        let (p2, rng, sk2) = generate_pk_share(params.clone(), crp.clone(), rng)?;
+        let (p3, mut rng, sk3) = generate_pk_share(params.clone(), crp.clone(), rng)?;
 
         let pubkey: PublicKey = vec![p1.clone(), p2.clone(), p3.clone()]
             .iter()
@@ -248,10 +234,53 @@ mod tests {
 
         let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
 
-        bus.do_send(EnclaveEvent::from(DecryptionRequested {
-            ciphertext: WrappedCiphertext::from_fhe_rs(ciphertext, params),
+        let event = EnclaveEvent::from(DecryptionRequested {
+            ciphertext: WrappedCiphertext::from_fhe_rs(ciphertext.clone(), params.clone()),
             e3_id: e3_id.clone(),
-        }));
+        });
+
+        let arc_ct = Arc::new(ciphertext);
+
+        let ds1 = WrappedDecryptionShare::from_fhe_rs(
+            DecryptionShare::new(&sk1, &arc_ct, &mut rng).unwrap(),
+            params.clone(),
+            arc_ct.clone(),
+        );
+        let ds2 = WrappedDecryptionShare::from_fhe_rs(
+            DecryptionShare::new(&sk2, &arc_ct, &mut rng).unwrap(),
+            params.clone(),
+            arc_ct.clone(),
+        );
+        let ds3 = WrappedDecryptionShare::from_fhe_rs(
+            DecryptionShare::new(&sk3, &arc_ct, &mut rng).unwrap(),
+            params.clone(),
+            arc_ct.clone(),
+        );
+
+        // let ds1 = sk1
+        bus.send(event.clone()).await?;
+
+        let history = bus.send(GetHistory).await?;
+
+        assert_eq!(
+            history,
+            vec![
+                event.clone(),
+                EnclaveEvent::from(DecryptionshareCreated {
+                    decryption_share: ds1.clone(),
+                    e3_id: e3_id.clone(),
+                }),
+                EnclaveEvent::from(DecryptionshareCreated {
+                    decryption_share: ds2.clone(),
+                    e3_id: e3_id.clone(),
+                }),
+                EnclaveEvent::from(DecryptionshareCreated {
+                    decryption_share: ds3.clone(),
+                    e3_id: e3_id.clone(),
+                }),
+                // TODO: aggregate plaintext
+            ]
+        );
 
         Ok(())
     }

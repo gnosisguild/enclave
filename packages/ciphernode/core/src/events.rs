@@ -1,6 +1,6 @@
 use crate::{
     fhe::{WrappedPublicKey, WrappedPublicKeyShare},
-    WrappedCiphertext,
+    WrappedCiphertext, WrappedDecryptionShare,
 };
 use actix::Message;
 use bincode;
@@ -70,6 +70,10 @@ pub enum EnclaveEvent {
     DecryptionRequested {
         id: EventId,
         data: DecryptionRequested
+    },
+    DecryptionshareCreated {
+        id: EventId,
+        data: DecryptionshareCreated
     }
     // CommitteeSelected,
     // OutputDecrypted,
@@ -98,6 +102,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::ComputationRequested { id, .. } => id,
             EnclaveEvent::PublicKeyAggregated { id, .. } => id,
             EnclaveEvent::DecryptionRequested { id, .. } => id,
+            EnclaveEvent::DecryptionshareCreated { id, .. } => id
         }
     }
 }
@@ -139,7 +144,14 @@ impl From<DecryptionRequested> for EnclaveEvent {
     }
 }
 
-
+impl From<DecryptionshareCreated> for EnclaveEvent {
+    fn from(data: DecryptionshareCreated) -> Self {
+        EnclaveEvent::DecryptionshareCreated {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
 
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -152,6 +164,14 @@ impl fmt::Display for EnclaveEvent {
 pub struct KeyshareCreated {
     pub pubkey: WrappedPublicKeyShare,
     pub e3_id: E3id,
+}
+
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "anyhow::Result<()>")]
+pub struct  DecryptionshareCreated {
+    pub decryption_share: WrappedDecryptionShare,
+    pub e3_id: E3id
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

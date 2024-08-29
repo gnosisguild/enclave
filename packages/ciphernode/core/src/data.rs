@@ -20,7 +20,7 @@ impl Insert {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Option<Vec<u8>>")]
-pub struct Get(Vec<u8>);
+pub struct Get(pub Vec<u8>);
 impl Get {
     fn key(&self) -> Vec<u8> {
         self.0.clone()

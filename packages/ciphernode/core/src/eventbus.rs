@@ -26,11 +26,10 @@ pub struct GetHistory;
 #[rtype(result = "()")]
 pub struct ResetHistory;
 
-
 /// Central EventBus for each node. Actors publish events to this bus by sending it EnclaveEvents.
 /// All events sent to this bus are assumed to be published over the network via pubsub.
-/// Other actors such as the P2p and Evm actor connect to outside services and control which events 
-/// actually get published as well as ensure that local events are not rebroadcast locally after 
+/// Other actors such as the P2p and Evm actor connect to outside services and control which events
+/// actually get published as well as ensure that local events are not rebroadcast locally after
 /// being published.
 pub struct EventBus {
     capture: bool,
@@ -85,7 +84,6 @@ impl Handler<ResetHistory> for EventBus {
     }
 }
 
-
 impl Handler<EnclaveEvent> for EventBus {
     type Result = ();
 
@@ -95,7 +93,7 @@ impl Handler<EnclaveEvent> for EventBus {
             // We have seen this before
             return;
         }
-        
+
         // TODO: How can we ensure the event we see is coming in in the correct order?
         if let Some(listeners) = self.listeners.get("*") {
             for listener in listeners {
