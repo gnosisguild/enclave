@@ -241,7 +241,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
         uint256 inputHash = PoseidonT3.hash(
-            [uint256(keccak256(abi.encode(input))), inputCount[e3Id]]
+            [uint256(keccak256(input)), inputCount[e3Id]]
         );
 
         inputCount[e3Id]++;

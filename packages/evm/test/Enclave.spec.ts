@@ -983,34 +983,13 @@ describe("Enclave", function () {
 
       await enclave.activate(e3Id);
 
-      tree.insert(
-        hash(
-          BigInt(
-            ethers.keccak256(
-              ethers.AbiCoder.defaultAbiCoder().encode(["bytes"], [inputData]),
-            ),
-          ),
-          BigInt(0),
-        ),
-      );
+      tree.insert(hash(BigInt(ethers.keccak256(inputData)), BigInt(0)));
 
       await enclave.publishInput(e3Id, inputData);
       expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
 
       const secondInputData = abiCoder.encode(["bytes"], ["0x112233445566"]);
-      tree.insert(
-        hash(
-          BigInt(
-            ethers.keccak256(
-              ethers.AbiCoder.defaultAbiCoder().encode(
-                ["bytes"],
-                [secondInputData],
-              ),
-            ),
-          ),
-          BigInt(1),
-        ),
-      );
+      tree.insert(hash(BigInt(ethers.keccak256(secondInputData)), BigInt(1)));
       await enclave.publishInput(e3Id, secondInputData);
       expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
     });
