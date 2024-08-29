@@ -1,7 +1,7 @@
 use crate::{
     eventbus::EventBus,
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
-    fhe::{Fhe, GetAggregatePublicKey, WrappedPublicKey, WrappedPublicKeyShare}, ordered_set::OrderedSet,
+    fhe::{Fhe, GetAggregatePublicKey}, ordered_set::OrderedSet, wrapped::{WrappedPublicKey, WrappedPublicKeyShare},
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};

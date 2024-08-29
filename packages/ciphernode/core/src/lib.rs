@@ -13,6 +13,7 @@ mod fhe;
 mod logger;
 mod ordered_set;
 mod p2p;
+mod wrapped;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -56,18 +57,16 @@ pub use p2p::*;
 // TODO: move these out to a test folder
 #[cfg(test)]
 mod tests {
-    use std::{sync::Arc, time::Duration};
-
     use crate::{
         ciphernode::Ciphernode,
         committee::CommitteeManager,
         data::{Data, GetLog},
         eventbus::{EventBus, GetHistory, Subscribe},
         events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
-        fhe::{Fhe, WrappedPublicKey, WrappedPublicKeyShare},
+        fhe::Fhe,
         p2p::P2p,
-        DecryptionRequested, DecryptionshareCreated, ResetHistory, WrappedCiphertext,
-        WrappedDecryptionShare,
+        wrapped::{WrappedCiphertext, WrappedDecryptionShare, WrappedPublicKey, WrappedPublicKeyShare},
+        DecryptionRequested, DecryptionshareCreated, ResetHistory,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -78,6 +77,7 @@ mod tests {
     use fhe_traits::{FheEncoder, FheEncrypter};
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
+    use std::{sync::Arc, time::Duration};
     use tokio::sync::Mutex;
     use tokio::{sync::mpsc::channel, time::sleep};
 

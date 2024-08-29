@@ -1,7 +1,4 @@
-use crate::{
-    fhe::{WrappedPublicKey, WrappedPublicKeyShare},
-    WrappedCiphertext, WrappedDecryptionShare,
-};
+use crate::wrapped::{WrappedCiphertext, WrappedDecryptionShare, WrappedPublicKey, WrappedPublicKeyShare};
 use actix::Message;
 use bincode;
 use serde::{Deserialize, Serialize};
@@ -69,16 +66,15 @@ pub enum EnclaveEvent {
     },
     DecryptionRequested {
         id: EventId,
-        data: DecryptionRequested
+        data: DecryptionRequested,
     },
     DecryptionshareCreated {
         id: EventId,
-        data: DecryptionshareCreated
-    }
-    // CommitteeSelected,
-    // OutputDecrypted,
-    // CiphernodeRegistered,
-    // CiphernodeDeregistered,
+        data: DecryptionshareCreated,
+    }, // CommitteeSelected,
+       // OutputDecrypted,
+       // CiphernodeRegistered,
+       // CiphernodeDeregistered,
 }
 
 impl EnclaveEvent {
@@ -102,7 +98,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::ComputationRequested { id, .. } => id,
             EnclaveEvent::PublicKeyAggregated { id, .. } => id,
             EnclaveEvent::DecryptionRequested { id, .. } => id,
-            EnclaveEvent::DecryptionshareCreated { id, .. } => id
+            EnclaveEvent::DecryptionshareCreated { id, .. } => id,
         }
     }
 }
@@ -133,7 +129,6 @@ impl From<PublicKeyAggregated> for EnclaveEvent {
         }
     }
 }
-
 
 impl From<DecryptionRequested> for EnclaveEvent {
     fn from(data: DecryptionRequested) -> Self {
@@ -166,12 +161,11 @@ pub struct KeyshareCreated {
     pub e3_id: E3id,
 }
 
-
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "anyhow::Result<()>")]
-pub struct  DecryptionshareCreated {
+pub struct DecryptionshareCreated {
     pub decryption_share: WrappedDecryptionShare,
-    pub e3_id: E3id
+    pub e3_id: E3id,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -230,7 +224,7 @@ mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
-    use crate::{events::extract_enclave_event_name, E3id, KeyshareCreated, WrappedPublicKeyShare};
+    use crate::{events::extract_enclave_event_name, wrapped::WrappedPublicKeyShare, E3id, KeyshareCreated};
 
     use super::EnclaveEvent;
 
