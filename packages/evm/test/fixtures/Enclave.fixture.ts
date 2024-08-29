@@ -17,19 +17,11 @@ export async function deployEnclaveFixture({
   const poseidonDeployment = await poseidonFactory.deploy();
 
   const deployment = await (
-    await ethers.getContractFactory(
-      "Enclave",
-      {
-        libraries: {
-          PoseidonT3: await poseidonDeployment.getAddress(),
-        },
+    await ethers.getContractFactory("Enclave", {
+      libraries: {
+        PoseidonT3: await poseidonDeployment.getAddress(),
       },
-      // , {
-      //   libraries: {
-      //     InternalLeanIMT: await imtDeployment.getAddress(),
-      //   },
-      // }
-    )
+    })
   ).deploy(owner, registry, maxDuration);
 
   return Enclave__factory.connect(await deployment.getAddress(), owner);
