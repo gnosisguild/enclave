@@ -3,7 +3,8 @@ use crate::{
     eventbus::EventBus,
     events::{ComputationRequested, EnclaveEvent, KeyshareCreated},
     fhe::{Fhe, GenerateKeyshare},
-    DecryptionRequested, Subscribe,
+    DecryptCiphertext, DecryptionRequested, DecryptionshareCreated, Get, Subscribe,
+    WrappedSecretKey,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -23,9 +24,10 @@ impl Ciphernode {
         Self { bus, fhe, data }
     }
 
-    pub fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>) -> Addr<Self> {
+    pub async fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>) -> Addr<Self> {
         let node = Ciphernode::new(bus.clone(), fhe, data).start();
-        bus.do_send(Subscribe::new("ComputationRequested", node.clone().into()));
+        let _ = bus.send(Subscribe::new("ComputationRequested", node.clone().into())).await;
+        let _ = bus.send(Subscribe::new("DecryptionRequested", node.clone().into())).await;
         node
     }
 }
@@ -36,6 +38,7 @@ impl Handler<EnclaveEvent> for Ciphernode {
     fn handle(&mut self, event: EnclaveEvent, ctx: &mut Context<Self>) -> Self::Result {
         match event {
             EnclaveEvent::ComputationRequested { data, .. } => ctx.address().do_send(data),
+            EnclaveEvent::DecryptionRequested { data, .. } => ctx.address().do_send(data),
             _ => (),
         }
     }
@@ -50,6 +53,21 @@ impl Handler<ComputationRequested> for Ciphernode {
         let bus = self.bus.clone();
         Box::pin(async {
             on_computation_requested(fhe, data, bus, event)
+                .await
+                .unwrap()
+        })
+    }
+}
+
+impl Handler<DecryptionRequested> for Ciphernode {
+    type Result = ResponseFuture<()>;
+
+    fn handle(&mut self, event: DecryptionRequested, _: &mut Context<Self>) -> Self::Result {
+        let fhe = self.fhe.clone();
+        let data = self.data.clone();
+        let bus = self.bus.clone();
+        Box::pin(async {
+            on_decryption_requested(fhe, data, bus, event)
                 .await
                 .unwrap()
         })
@@ -71,7 +89,10 @@ async fn on_computation_requested(
     // reencrypt secretkey locally with env var - this is so we don't have to serialize a secret
     // best practice would be as you boot up a node you enter in a configured password from
     // which we derive a kdf which gets used to generate this key
-    data.do_send(Insert(format!("{}/sk", e3_id).into(), sk.unsafe_to_vec()));
+    data.do_send(Insert(
+        format!("{}/sk", e3_id).into(),
+        sk.unsafe_serialize()?,
+    ));
 
     // save public key against e3_id/pk
     data.do_send(Insert(
@@ -95,8 +116,25 @@ async fn on_decryption_requested(
     let DecryptionRequested { e3_id, ciphertext } = event;
 
     // get secret key by id from data
+    let Some(sk_bytes) = data.send(Get(format!("{}/sk", e3_id).into())).await? else {
+        return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
+    };
 
-    // TODO: Complete this
+    let unsafe_secret = WrappedSecretKey::deserialize(sk_bytes)?;
+
+    let decryption_share = fhe
+        .send(DecryptCiphertext {
+            ciphertext,
+            unsafe_secret,
+        })
+        .await??;
+
+    let event = EnclaveEvent::from(DecryptionshareCreated {
+        e3_id,
+        decryption_share,
+    });
+
+    bus.do_send(event);
 
     Ok(())
 }

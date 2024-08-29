@@ -69,7 +69,10 @@ impl Handler<EnclaveEvent> for CommitteeManager {
 
                 key.do_send(Die);
                 self.keys.remove(&data.e3_id);
-            },
+            }
+            EnclaveEvent::DecryptionRequested { .. } => {
+                // TODO: launch new plaintext aggregator
+            }
             _ => (),
         }
     }
