@@ -69,7 +69,8 @@ impl Handler<EnclaveEvent> for CommitteeManager {
 
                 key.do_send(Die);
                 self.keys.remove(&data.e3_id);
-            } // _ => (),
+            },
+            _ => (),
         }
     }
 }

@@ -1,4 +1,7 @@
-use crate::fhe::{WrappedPublicKey, WrappedPublicKeyShare};
+use crate::{
+    fhe::{WrappedPublicKey, WrappedPublicKeyShare},
+    WrappedCiphertext,
+};
 use actix::Message;
 use bincode;
 use serde::{Deserialize, Serialize};
@@ -64,6 +67,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: PublicKeyAggregated,
     },
+    DecryptionRequested {
+        id: EventId,
+        data: DecryptionRequested
+    }
     // CommitteeSelected,
     // OutputDecrypted,
     // CiphernodeRegistered,
@@ -90,6 +97,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::KeyshareCreated { id, .. } => id,
             EnclaveEvent::ComputationRequested { id, .. } => id,
             EnclaveEvent::PublicKeyAggregated { id, .. } => id,
+            EnclaveEvent::DecryptionRequested { id, .. } => id,
         }
     }
 }
@@ -120,6 +128,18 @@ impl From<PublicKeyAggregated> for EnclaveEvent {
         }
     }
 }
+
+
+impl From<DecryptionRequested> for EnclaveEvent {
+    fn from(data: DecryptionRequested) -> Self {
+        EnclaveEvent::DecryptionRequested {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
+
+
 
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -152,6 +172,13 @@ pub struct ComputationRequested {
     // execution_model_type: ??, // TODO:
     // input_deadline: ??, // TODO:
     // availability_duration: ??, // TODO:
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct DecryptionRequested {
+    pub e3_id: E3id,
+    pub ciphertext: WrappedCiphertext,
 }
 
 fn extract_enclave_event_name(s: &str) -> &str {

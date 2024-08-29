@@ -3,7 +3,7 @@ use crate::{
     eventbus::EventBus,
     events::{ComputationRequested, EnclaveEvent, KeyshareCreated},
     fhe::{Fhe, GenerateKeyshare},
-    Subscribe,
+    DecryptionRequested, Subscribe,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -82,6 +82,21 @@ async fn on_computation_requested(
     // broadcast the KeyshareCreated message
     let event = EnclaveEvent::from(KeyshareCreated { pubkey, e3_id });
     bus.do_send(event);
+
+    Ok(())
+}
+
+async fn on_decryption_requested(
+    fhe: Addr<Fhe>,
+    data: Addr<Data>,
+    bus: Addr<EventBus>,
+    event: DecryptionRequested,
+) -> Result<()> {
+    let DecryptionRequested { e3_id, ciphertext } = event;
+
+    // get secret key by id from data
+
+    // TODO: Complete this
 
     Ok(())
 }
