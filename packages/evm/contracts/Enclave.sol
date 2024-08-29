@@ -388,6 +388,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     function getInputRoot(uint256 e3Id) public view returns (uint256) {
+        require(
+            e3s[e3Id].computationModule != IComputationModule(address(0)),
+            E3DoesNotExist(e3Id)
+        );
         return InternalLeanIMT._root(inputs[e3Id]);
     }
 }
