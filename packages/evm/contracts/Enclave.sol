@@ -239,7 +239,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
-        // note: hash is divided by 10 ** 39 to make the hash smaller than the snark scalar field.
+        // note: hash is divided by 10 to make the hash smaller than the snark scalar field.
         // TODO: Not sure if this is a bad idea ¯\_(ツ)_/¯
         uint256 inputHash = uint256(
             keccak256(abi.encode(input, inputCount[e3Id]))
