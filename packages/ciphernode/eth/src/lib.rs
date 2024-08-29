@@ -1,6 +1,6 @@
 #![crate_name = "eth"]
 #![crate_type = "lib"]
-#![warn(missing_docs, unused_imports)]
+// #![warn(missing_docs, unused_imports)]
 
 mod listener;
 mod manager;

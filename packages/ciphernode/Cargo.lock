@@ -1897,6 +1897,7 @@ name = "enclave_node"
 version = "0.1.0"
 dependencies = [
  "actix-rt",
+ "alloy",
  "async-std",
  "bfv",
  "enclave-core",
@@ -1940,14 +1941,13 @@ dependencies = [
 name = "eth"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "alloy",
  "alloy-primitives 0.6.4",
  "alloy-sol-types 0.6.4",
  "async-std",
+ "enclave-core",
  "eyre",
- "fhe",
- "fhe-traits",
- "fhe-util",
  "futures-util",
 ]
 
