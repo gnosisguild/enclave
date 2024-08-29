@@ -10,31 +10,31 @@ mod enclave_contract;
 mod eventbus;
 mod events;
 mod fhe;
+mod logger;
 mod ordered_set;
 mod p2p;
-mod logger;
 
 // TODO: this is too permissive
-pub use data::*;
+pub use actix::prelude::*;
 pub use ciphernode::*;
 pub use committee::*;
 pub use committee_key::*;
+pub use data::*;
 pub use eventbus::*;
 pub use events::*;
 pub use fhe::*;
-pub use p2p::*;
-pub use actix::prelude::*;
 pub use logger::*;
+pub use p2p::*;
 
-pub use data::*;
+pub use actix::prelude::*;
 pub use ciphernode::*;
 pub use committee::*;
 pub use committee_key::*;
+pub use data::*;
 pub use eventbus::*;
 pub use events::*;
 pub use fhe::*;
 pub use p2p::*;
-pub use actix::prelude::*;
 
 // pub struct Core {
 //     pub name: String,
@@ -53,6 +53,7 @@ pub use actix::prelude::*;
 //     }
 // }
 
+// TODO: move these out to a test folder
 #[cfg(test)]
 mod tests {
     use std::{sync::Arc, time::Duration};
@@ -65,13 +66,15 @@ mod tests {
         events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         fhe::{Fhe, WrappedPublicKey, WrappedPublicKeyShare},
         p2p::P2p,
+        DecryptionRequested, ResetHistory, WrappedCiphertext,
     };
     use actix::prelude::*;
     use anyhow::*;
     use fhe::{
-        bfv::{BfvParameters, BfvParametersBuilder, PublicKey, SecretKey},
+        bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey},
         mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
     };
+    use fhe_traits::{FheEncoder, FheEncrypter};
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use tokio::sync::Mutex;
@@ -144,24 +147,29 @@ mod tests {
         plaintext_modulus: u64,
         rng1: ChaCha20Rng,
         rng2: ChaCha20Rng,
-    ) -> Result<Addr<Fhe>> {
+    ) -> Result<(Addr<Fhe>, Arc<BfvParameters>, CommonRandomPoly)> {
         let (params, crp) = setup_bfv_params(&moduli, degree, plaintext_modulus, rng1)?;
-        Ok(Fhe::new(params, crp, rng2)?.start())
+        Ok((
+            Fhe::new(params.clone(), crp.clone(), rng2)?.start(),
+            params,
+            crp,
+        ))
     }
 
     #[actix::test]
-    async fn test_public_key_aggregation() -> Result<()> {
+    async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         // Setup EventBus
         let bus = EventBus::new(true).start();
 
         // Setup global FHE actor
-        let fhe = setup_global_fhe_actor(
+        let (fhe, ..) = setup_global_fhe_actor(
             &vec![0x3FFFFFFF000001],
             2048,
             1032193,
             ChaCha20Rng::seed_from_u64(42),
             ChaCha20Rng::seed_from_u64(42),
         )?;
+
         setup_local_ciphernode(bus.clone(), fhe.clone(), true);
         setup_local_ciphernode(bus.clone(), fhe.clone(), true);
         setup_local_ciphernode(bus.clone(), fhe.clone(), true);
@@ -196,7 +204,7 @@ mod tests {
         let (p2, rng) = generate_pk_share(params.clone(), crp.clone(), rng)?;
         let (p3, _) = generate_pk_share(params.clone(), crp.clone(), rng)?;
 
-        let aggregated: PublicKey = vec![p1.clone(), p2.clone(), p3.clone()]
+        let pubkey: PublicKey = vec![p1.clone(), p2.clone(), p3.clone()]
             .iter()
             .map(|k| k.clone_inner())
             .aggregate()?;
@@ -224,11 +232,26 @@ mod tests {
                     e3_id: e3_id.clone()
                 }),
                 EnclaveEvent::from(PublicKeyAggregated {
-                    pubkey: WrappedPublicKey::from_fhe_rs(aggregated, params),
+                    pubkey: WrappedPublicKey::from_fhe_rs(pubkey.clone(), params.clone()),
                     e3_id: e3_id.clone()
                 })
             ]
         );
+
+        // Aggregate decryption
+        bus.send(ResetHistory).await?;
+
+        let yes = 12376213u64;
+        let no = 873827u64;
+
+        let pt = Plaintext::try_encode(&vec![yes, no], Encoding::poly(), &params)?;
+
+        let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
+
+        bus.do_send(EnclaveEvent::from(DecryptionRequested {
+            ciphertext: WrappedCiphertext::from_fhe_rs(ciphertext, params),
+            e3_id: e3_id.clone(),
+        }));
 
         Ok(())
     }
@@ -268,7 +291,7 @@ mod tests {
 
         bus.do_send(evt_1.clone());
         bus.do_send(evt_2.clone());
-        
+
         sleep(Duration::from_millis(1)).await; // need to push to next tick
 
         // check the history of the event bus
@@ -280,7 +303,11 @@ mod tests {
             "P2p did not transmit events to the network"
         );
 
-        assert_eq!(history, vec![evt_1, evt_2], "P2p must not retransmit forwarded event to event bus");
+        assert_eq!(
+            history,
+            vec![evt_1, evt_2],
+            "P2p must not retransmit forwarded event to event bus"
+        );
 
         Ok(())
     }

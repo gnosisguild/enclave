@@ -22,6 +22,10 @@ impl Subscribe {
 #[rtype(result = "Vec<EnclaveEvent>")]
 pub struct GetHistory;
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct ResetHistory;
+
 
 /// Central EventBus for each node. Actors publish events to this bus by sending it EnclaveEvents.
 /// All events sent to this bus are assumed to be published over the network via pubsub.
@@ -73,6 +77,14 @@ impl Handler<GetHistory> for EventBus {
         self.history.clone()
     }
 }
+impl Handler<ResetHistory> for EventBus {
+    type Result = ();
+
+    fn handle(&mut self, _: ResetHistory, _: &mut Context<Self>) {
+        self.history.clear()
+    }
+}
+
 
 impl Handler<EnclaveEvent> for EventBus {
     type Result = ();
