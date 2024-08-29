@@ -962,7 +962,7 @@ describe("Enclave", function () {
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
 
       // Hash function used to compute the tree nodes.
-      const hash = (a, b) => poseidon2([a, b]);
+      const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
       // To create an instance of a LeanIMT, you must provide the hash function.
       const tree = new LeanIMT(hash);
