@@ -7,9 +7,6 @@ use fhe_traits::{Deserialize, Serialize};
 use serde::Serializer;
 use std::sync::Arc;
 
-/// Wrapped PublicKeyShare. This is wrapped to provide an inflection point
-/// as we use this library elsewhere we only implement traits as we need them
-/// and avoid exposing underlying structures from fhe.rs
 pub struct PublicKeyShareSerializer {
     inner: PublicKeyShare,
     // We need to hold copies of the params and crp in order to effectively serialize and

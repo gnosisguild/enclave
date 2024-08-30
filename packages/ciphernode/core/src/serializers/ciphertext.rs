@@ -4,9 +4,6 @@ use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use serde::Serializer;
 use std::sync::Arc;
 
-/// Wrapped Ciphertext. This is wrapped to provide an inflection point
-/// as we use this library elsewhere we only implement traits as we need them
-/// and avoid exposing underlying structures from fhe.rs
 pub struct CiphertextSerializer {
     pub inner: Ciphertext,
     pub params: Arc<BfvParameters>,

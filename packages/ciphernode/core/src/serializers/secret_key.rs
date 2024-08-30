@@ -3,11 +3,6 @@ use fhe::bfv::{BfvParameters, SecretKey};
 use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// Wrapped SecretKey. This is wrapped to provide an inflection point
-/// as we use this library elsewhere we only implement traits as we need them
-/// and avoid exposing underlying structures from fhe.rs
-// We should favor consuming patterns and avoid cloning and copying this value around in memory.
-// Underlying key Zeroizes on drop
 pub struct SecretKeySerializer {
     pub inner: SecretKey,
     pub params: Arc<BfvParameters>,

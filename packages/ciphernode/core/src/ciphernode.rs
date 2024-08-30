@@ -3,7 +3,7 @@ use crate::{
     eventbus::EventBus,
     events::{ComputationRequested, EnclaveEvent, KeyshareCreated},
     fhe::{Fhe, GenerateKeyshare},
-    wrapped::SecretKeySerializer,
+    serializers::SecretKeySerializer,
     DecryptCiphertext, DecryptionRequested, DecryptionshareCreated, Get, Subscribe,
 };
 use actix::prelude::*;

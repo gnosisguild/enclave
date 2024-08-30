@@ -1,6 +1,6 @@
 use crate::{
     ordered_set::OrderedSet,
-    wrapped::{
+    serializers::{
         CiphertextSerializer, DecryptionShareSerializer, PlaintextSerializer, PublicKeySerializer,
         PublicKeyShareSerializer, SecretKeySerializer,
     },
