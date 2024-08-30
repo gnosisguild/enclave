@@ -215,7 +215,7 @@ impl EnclaveEvent {
 mod tests {
     use super::EnclaveEvent;
     use crate::{
-        events::extract_enclave_event_name, wrapped::PublicKeyShareSerializer, E3id, KeyshareCreated,
+        events::extract_enclave_event_name, serializers::PublicKeyShareSerializer, E3id, KeyshareCreated,
     };
     use fhe::{
         bfv::{BfvParametersBuilder, SecretKey},

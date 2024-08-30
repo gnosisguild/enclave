@@ -13,7 +13,7 @@ mod fhe;
 mod logger;
 mod ordered_set;
 mod p2p;
-mod wrapped;
+mod serializers;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -65,7 +65,7 @@ mod tests {
         events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         fhe::Fhe,
         p2p::P2p,
-        wrapped::{
+        serializers::{
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer, PublicKeyShareSerializer,
         },
         DecryptionRequested, DecryptionshareCreated, ResetHistory,
