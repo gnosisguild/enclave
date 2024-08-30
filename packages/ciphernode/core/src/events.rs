@@ -215,7 +215,7 @@ impl EnclaveEvent {
 mod tests {
     use super::EnclaveEvent;
     use crate::{
-        events::extract_enclave_event_name, wrapped::WrappedPublicKeyShare, E3id, KeyshareCreated,
+        events::extract_enclave_event_name, wrapped::PublicKeyShareSerializer, E3id, KeyshareCreated,
     };
     use fhe::{
         bfv::{BfvParametersBuilder, SecretKey},
@@ -251,7 +251,7 @@ mod tests {
         let crp = CommonRandomPoly::new(&params, &mut rng)?;
         let sk_share = { SecretKey::random(&params, &mut rng) };
         let pk_share = { PublicKeyShare::new(&sk_share, crp.clone(), &mut rng)? };
-        let pubkey = WrappedPublicKeyShare::from_fhe_rs(pk_share, params.clone(), crp.clone())?;
+        let pubkey = PublicKeyShareSerializer::to_bytes(pk_share, params.clone(), crp.clone())?;
         let kse = EnclaveEvent::from(KeyshareCreated {
             e3_id: E3id::from(1001),
             pubkey,

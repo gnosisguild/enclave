@@ -1,17 +1,16 @@
-use std::{cmp::Ordering, hash::Hash, sync::Arc};
-use fhe_traits::{Deserialize, Serialize};
+use anyhow::*;
 use fhe::{
     bfv::BfvParameters,
     mbfv::{CommonRandomPoly, PublicKeyShare},
 };
+use fhe_traits::{Deserialize, Serialize};
 use serde::Serializer;
-use anyhow::*;
+use std::sync::Arc;
 
 /// Wrapped PublicKeyShare. This is wrapped to provide an inflection point
 /// as we use this library elsewhere we only implement traits as we need them
 /// and avoid exposing underlying structures from fhe.rs
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WrappedPublicKeyShare {
+pub struct PublicKeyShareSerializer {
     inner: PublicKeyShare,
     // We need to hold copies of the params and crp in order to effectively serialize and
     // deserialize the wrapped type
@@ -19,10 +18,10 @@ pub struct WrappedPublicKeyShare {
     crp: CommonRandomPoly,
 }
 
-impl WrappedPublicKeyShare {
+impl PublicKeyShareSerializer {
     /// Public function to serialize specifically from the wrapped type including types that are
     /// private from outside the crate
-    pub fn from_fhe_rs(
+    pub fn to_bytes(
         inner: PublicKeyShare,
         params: Arc<BfvParameters>,
         crp: CommonRandomPoly,
@@ -31,42 +30,14 @@ impl WrappedPublicKeyShare {
         Ok(bincode::serialize(&value)?)
     }
 
-    pub fn from_bytes(bytes:&[u8]) -> Result<PublicKeyShare> {
-        let wpk:Self = bincode::deserialize(&bytes)?;
+    pub fn from_bytes(bytes: &[u8]) -> Result<PublicKeyShare> {
+        let wpk: Self = bincode::deserialize(&bytes)?;
         Ok(wpk.inner)
-    }
-
-    pub fn clone_inner(&self) -> PublicKeyShare {
-        self.inner.clone()
     }
 }
 
-// impl Ord for WrappedPublicKeyShare {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         self.inner.to_bytes().cmp(&other.inner.to_bytes())
-//     }
-// }
-//
-// impl PartialOrd for WrappedPublicKeyShare {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
-//
-// impl From<WrappedPublicKeyShare> for Vec<u8> {
-//     fn from(share: WrappedPublicKeyShare) -> Self {
-//         share.inner.to_bytes()
-//     }
-// }
-//
-// impl Hash for WrappedPublicKeyShare {
-//     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-//         self.inner.to_bytes().hash(state)
-//     }
-// }
-
-/// Deserialize from serde to WrappedPublicKeyShare
-impl<'de> serde::Deserialize<'de> for WrappedPublicKeyShare {
+/// Deserialize from serde to PublicKeyShareSerializer
+impl<'de> serde::Deserialize<'de> for PublicKeyShareSerializer {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -89,12 +60,12 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKeyShare {
         let inner = PublicKeyShare::deserialize(&bytes, &params, crp.clone())
             .map_err(serde::de::Error::custom)?;
         // TODO: how do we create an invariant that the deserialized params match the global params?
-        std::result::Result::Ok(Self {inner, params, crp})
+        std::result::Result::Ok(Self { inner, params, crp })
     }
 }
 
 /// Serialize to serde bytes representation
-impl serde::Serialize for WrappedPublicKeyShare {
+impl serde::Serialize for PublicKeyShareSerializer {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

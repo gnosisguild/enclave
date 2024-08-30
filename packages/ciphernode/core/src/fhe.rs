@@ -1,8 +1,8 @@
 use crate::{
     ordered_set::OrderedSet,
     wrapped::{
-        WrappedCiphertext, WrappedDecryptionShare, WrappedPlaintext, WrappedPublicKey,
-        WrappedPublicKeyShare, WrappedSecretKey,
+        CiphertextSerializer, DecryptionShareSerializer, PlaintextSerializer, PublicKeySerializer,
+        PublicKeyShareSerializer, SecretKeySerializer,
     },
 };
 use actix::{Actor, Context, Handler, Message};
@@ -28,7 +28,7 @@ pub struct GetAggregatePublicKey {
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "Result<(WrappedPlaintext)>")]
+#[rtype(result = "Result<(PlaintextSerializer)>")]
 pub struct GetAggregatePlaintext {
     pub decryptions: OrderedSet<Vec<u8>>,
 }
@@ -81,8 +81,8 @@ impl Handler<GenerateKeyshare> for Fhe {
         let sk_share = { SecretKey::random(&self.params, &mut self.rng) };
         let pk_share = { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut self.rng)? };
         Ok((
-            WrappedSecretKey::from_fhe_rs(sk_share, self.params.clone())?,
-            WrappedPublicKeyShare::from_fhe_rs(pk_share, self.params.clone(), self.crp.clone())?,
+            SecretKeySerializer::to_bytes(sk_share, self.params.clone())?,
+            PublicKeyShareSerializer::to_bytes(pk_share, self.params.clone(), self.crp.clone())?,
         ))
     }
 }
@@ -95,14 +95,13 @@ impl Handler<DecryptCiphertext> for Fhe {
             ciphertext,
         } = msg;
 
-        let secret_key = WrappedSecretKey::deserialize(unsafe_secret)?.inner;
-        let wct: WrappedCiphertext = bincode::deserialize(&ciphertext)?;
-        let ct: Arc<Ciphertext> = Arc::new(wct.inner);
+        let secret_key = SecretKeySerializer::from_bytes(&unsafe_secret)?;
+        let ct = Arc::new(CiphertextSerializer::from_bytes(&ciphertext)?);
         let inner = DecryptionShare::new(&secret_key, &ct, &mut self.rng).unwrap();
 
-        Ok(WrappedDecryptionShare::from_fhe_rs(
+        Ok(DecryptionShareSerializer::to_bytes(
             inner,
-            wct.params,
+            self.params.clone(),
             ct.clone(),
         )?)
     }
@@ -115,12 +114,12 @@ impl Handler<GetAggregatePublicKey> for Fhe {
         let public_key: PublicKey = msg
             .keyshares
             .iter()
-            .map(|k| WrappedPublicKeyShare::from_bytes(k))
+            .map(|k| PublicKeyShareSerializer::from_bytes(k))
             .collect::<Result<Vec<_>>>()?
             .into_iter()
             .aggregate()?;
 
-        Ok(WrappedPublicKey::from_fhe_rs(
+        Ok(PublicKeySerializer::to_bytes(
             public_key,
             self.params.clone(),
         )?)
@@ -129,7 +128,7 @@ impl Handler<GetAggregatePublicKey> for Fhe {
 
 // TODO: add this once we have decryption aggregation ready
 // impl Handler<GetAggregatePlaintext> for Fhe {
-//     type Result = Result<WrappedPlaintext>;
+//     type Result = Result<PlaintextSerializer>;
 //     fn handle(&mut self, msg: GetAggregatePlaintext, _: &mut Self::Context) -> Self::Result {
 //         let plaintext: Plaintext = msg
 //             .decryptions
@@ -139,6 +138,6 @@ impl Handler<GetAggregatePublicKey> for Fhe {
 //             .into_iter()
 //             .aggregate()?;
 //
-//         Ok(WrappedPlaintext::from_fhe_rs(plaintext))
+//         Ok(PlaintextSerializer::to_bytes(plaintext))
 //     }
 // }

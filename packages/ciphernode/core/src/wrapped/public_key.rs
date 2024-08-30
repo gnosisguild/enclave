@@ -2,36 +2,30 @@ use anyhow::*;
 use fhe::bfv::{BfvParameters, PublicKey};
 use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use serde::Serializer;
-use std::{cmp::Ordering, hash::Hash, sync::Arc};
+use std::sync::Arc;
+
 /// Wrapped PublicKey. This is wrapped to provide an inflection point
 /// as we use this library elsewhere we only implement traits as we need them
 /// and avoid exposing underlying structures from fhe.rs
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WrappedPublicKey {
+pub struct PublicKeySerializer {
     inner: PublicKey,
     params: Arc<BfvParameters>,
 }
 
-impl WrappedPublicKey {
-    pub fn from_fhe_rs(inner: PublicKey, params: Arc<BfvParameters>) -> Result<Vec<u8>> {
+impl PublicKeySerializer {
+    pub fn to_bytes(inner: PublicKey, params: Arc<BfvParameters>) -> Result<Vec<u8>> {
         let value = Self { inner, params };
         Ok(bincode::serialize(&value)?)
     }
 
-    pub fn from_bytes(bytes:Vec<u8>) -> Result<PublicKey> {
-        let wpk:WrappedPublicKey = bincode::deserialize(&bytes)?;
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<PublicKey> {
+        let wpk: PublicKeySerializer = bincode::deserialize(&bytes)?;
         Ok(wpk.inner)
     }
 }
 
-// impl fhe_traits::Serialize for WrappedPublicKey {
-//     fn to_bytes(&self) -> Vec<u8> {
-//         self.inner.to_bytes()
-//     }
-// }
-
-/// Deserialize from serde to WrappedPublicKey
-impl<'de> serde::Deserialize<'de> for WrappedPublicKey {
+/// Deserialize from serde to PublicKeySerializer
+impl<'de> serde::Deserialize<'de> for PublicKeySerializer {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -51,7 +45,7 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKey {
 }
 
 /// Serialize to serde bytes representation
-impl serde::Serialize for WrappedPublicKey {
+impl serde::Serialize for PublicKeySerializer {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -67,19 +61,19 @@ impl serde::Serialize for WrappedPublicKey {
     }
 }
 
-// impl Hash for WrappedPublicKey {
+// impl Hash for PublicKeySerializer {
 //     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
 //         self.inner.to_bytes().hash(state)
 //     }
 // }
 //
-// impl Ord for WrappedPublicKey {
+// impl Ord for PublicKeySerializer {
 //     fn cmp(&self, other: &Self) -> Ordering {
 //         self.inner.to_bytes().cmp(&other.inner.to_bytes())
 //     }
 // }
 //
-// impl PartialOrd for WrappedPublicKey {
+// impl PartialOrd for PublicKeySerializer {
 //     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 //         Some(self.cmp(other))
 //     }

@@ -8,16 +8,19 @@ use std::sync::Arc;
 /// and avoid exposing underlying structures from fhe.rs
 // We should favor consuming patterns and avoid cloning and copying this value around in memory.
 // Underlying key Zeroizes on drop
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WrappedSecretKey {
+pub struct SecretKeySerializer {
     pub inner: SecretKey,
     pub params: Arc<BfvParameters>,
 }
 
-impl WrappedSecretKey {
-    pub fn from_fhe_rs(inner: SecretKey, params: Arc<BfvParameters>) -> Result<Vec<u8>> {
+impl SecretKeySerializer {
+    pub fn to_bytes(inner: SecretKey, params: Arc<BfvParameters>) -> Result<Vec<u8>> {
         let value = Self { inner, params };
         Ok(value.unsafe_serialize()?)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<SecretKey> {
+        Ok(Self::deserialize(bytes)?.inner)
     }
 }
 
@@ -27,7 +30,7 @@ struct SecretKeyData {
     par: Vec<u8>,
 }
 
-impl WrappedSecretKey {
+impl SecretKeySerializer {
     pub fn unsafe_serialize(&self) -> Result<Vec<u8>> {
         Ok(bincode::serialize(&SecretKeyData {
             coeffs: self.inner.coeffs.clone(),
@@ -35,7 +38,7 @@ impl WrappedSecretKey {
         })?)
     }
 
-    pub fn deserialize(bytes: Vec<u8>) -> Result<WrappedSecretKey> {
+    pub fn deserialize(bytes: &[u8]) -> Result<SecretKeySerializer> {
         let SecretKeyData { coeffs, par } = bincode::deserialize(&bytes)?;
         let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap());
         Ok(Self {
