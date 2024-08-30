@@ -1,4 +1,3 @@
-
 use actix::{Actor, Context};
 
 /// Manage an internal web3 instance and express protocol specific behaviour through the events it
@@ -9,8 +8,6 @@ use actix::{Actor, Context};
 /// Accept eventbus events and forward as appropriate contract calls as required
 pub struct EnclaveContract;
 
-impl Actor for EnclaveContract{
+impl Actor for EnclaveContract {
     type Context = Context<Self>;
 }
-
-

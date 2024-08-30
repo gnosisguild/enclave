@@ -60,12 +60,14 @@ mod tests {
     use crate::{
         ciphernode::Ciphernode,
         committee::CommitteeManager,
-        data::{Data, GetLog},
-        eventbus::{EventBus, GetHistory, Subscribe},
+        data::Data,
+        eventbus::{EventBus, GetHistory},
         events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         fhe::Fhe,
         p2p::P2p,
-        wrapped::{WrappedCiphertext, WrappedDecryptionShare, WrappedPublicKey, WrappedPublicKeyShare},
+        wrapped::{
+            CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer, PublicKeyShareSerializer,
+        },
         DecryptionRequested, DecryptionshareCreated, ResetHistory,
     };
     use actix::prelude::*;
@@ -117,13 +119,13 @@ mod tests {
         params: Arc<BfvParameters>,
         crp: CommonRandomPoly,
         mut rng: ChaCha20Rng,
-    ) -> Result<(WrappedPublicKeyShare, ChaCha20Rng, SecretKey)> {
+    ) -> Result<(Vec<u8>, ChaCha20Rng, SecretKey)> {
         let sk = SecretKey::random(&params, &mut rng);
-        let pk = WrappedPublicKeyShare::from_fhe_rs(
+        let pk = PublicKeyShareSerializer::to_bytes(
             PublicKeyShare::new(&sk, crp.clone(), &mut rng)?,
             params.clone(),
             crp,
-        );
+        )?;
         Ok((pk, rng, sk))
     }
 
@@ -192,7 +194,7 @@ mod tests {
 
         let pubkey: PublicKey = vec![p1.clone(), p2.clone(), p3.clone()]
             .iter()
-            .map(|k| k.clone_inner())
+            .map(|k| PublicKeyShareSerializer::from_bytes(k).unwrap())
             .aggregate()?;
 
         assert_eq!(history.len(), 5);
@@ -218,7 +220,7 @@ mod tests {
                     e3_id: e3_id.clone()
                 }),
                 EnclaveEvent::from(PublicKeyAggregated {
-                    pubkey: WrappedPublicKey::from_fhe_rs(pubkey.clone(), params.clone()),
+                    pubkey: PublicKeySerializer::to_bytes(pubkey.clone(), params.clone())?,
                     e3_id: e3_id.clone()
                 })
             ]
@@ -235,27 +237,27 @@ mod tests {
         let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
 
         let event = EnclaveEvent::from(DecryptionRequested {
-            ciphertext: WrappedCiphertext::from_fhe_rs(ciphertext.clone(), params.clone()),
+            ciphertext: CiphertextSerializer::to_bytes(ciphertext.clone(), params.clone())?,
             e3_id: e3_id.clone(),
         });
 
         let arc_ct = Arc::new(ciphertext);
 
-        let ds1 = WrappedDecryptionShare::from_fhe_rs(
+        let ds1 = DecryptionShareSerializer::to_bytes(
             DecryptionShare::new(&sk1, &arc_ct, &mut rng).unwrap(),
             params.clone(),
             arc_ct.clone(),
-        );
-        let ds2 = WrappedDecryptionShare::from_fhe_rs(
+        )?;
+        let ds2 = DecryptionShareSerializer::to_bytes(
             DecryptionShare::new(&sk2, &arc_ct, &mut rng).unwrap(),
             params.clone(),
             arc_ct.clone(),
-        );
-        let ds3 = WrappedDecryptionShare::from_fhe_rs(
+        )?;
+        let ds3 = DecryptionShareSerializer::to_bytes(
             DecryptionShare::new(&sk3, &arc_ct, &mut rng).unwrap(),
             params.clone(),
             arc_ct.clone(),
-        );
+        )?;
 
         // let ds1 = sk1
         bus.send(event.clone()).await?;

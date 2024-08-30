@@ -1,7 +1,8 @@
 use crate::{
     eventbus::EventBus,
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
-    fhe::{Fhe, GetAggregatePublicKey}, ordered_set::OrderedSet, wrapped::{WrappedPublicKey, WrappedPublicKeyShare},
+    fhe::{Fhe, GetAggregatePublicKey},
+    ordered_set::OrderedSet,
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
@@ -10,21 +11,21 @@ use anyhow::{anyhow, Result};
 pub enum CommitteeKeyState {
     Collecting {
         nodecount: usize,
-        keyshares: OrderedSet<WrappedPublicKeyShare>,
+        keyshares: OrderedSet<Vec<u8>>,
     },
     Computing {
-        keyshares: OrderedSet<WrappedPublicKeyShare>,
+        keyshares: OrderedSet<Vec<u8>>,
     },
     Complete {
-        public_key: WrappedPublicKey,
-        keyshares: OrderedSet<WrappedPublicKeyShare>,
+        public_key: Vec<u8>,
+        keyshares: OrderedSet<Vec<u8>>,
     },
 }
 
 #[derive(Message)]
 #[rtype(result = "anyhow::Result<()>")]
 struct ComputeAggregate {
-    pub keyshares: OrderedSet<WrappedPublicKeyShare>,
+    pub keyshares: OrderedSet<Vec<u8>>,
 }
 
 #[derive(Message)]
@@ -39,7 +40,7 @@ pub struct CommitteeKey {
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
-/// around a particular e3_id and aggregates the public key based on this and once done broadcasts 
+/// around a particular e3_id and aggregates the public key based on this and once done broadcasts
 /// a EnclaveEvent::PublicKeyAggregated event on the event bus. Note events are hashed and
 /// identical events will not be triggered twice.
 /// It is expected to change this mechanism as we work through adversarial scenarios and write tests
@@ -57,7 +58,7 @@ impl CommitteeKey {
         }
     }
 
-    pub fn add_keyshare(&mut self, keyshare: WrappedPublicKeyShare) -> Result<CommitteeKeyState> {
+    pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<CommitteeKeyState> {
         let CommitteeKeyState::Collecting {
             nodecount,
             keyshares,
@@ -76,7 +77,7 @@ impl CommitteeKey {
         Ok(self.state.clone())
     }
 
-    pub fn set_pubkey(&mut self, pubkey: WrappedPublicKey) -> Result<CommitteeKeyState> {
+    pub fn set_pubkey(&mut self, pubkey: Vec<u8>) -> Result<CommitteeKeyState> {
         let CommitteeKeyState::Computing { keyshares } = &mut self.state else {
             return Ok(self.state.clone());
         };
@@ -129,7 +130,7 @@ impl Handler<ComputeAggregate> for CommitteeKey {
 
     fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
         // Futures are awkward in Actix from what I can tell we should try and structure events so
-        // that futures that don't reuire access to self filre like the following...
+        // that futures that don't require access to self like the following...
         Box::pin(
             // Run the async future.
             self.fhe

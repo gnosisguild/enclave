@@ -1,31 +1,31 @@
+use anyhow::*;
 use fhe::bfv::{BfvParameters, Ciphertext};
 use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use serde::Serializer;
-use std::{hash::Hash, sync::Arc};
+use std::sync::Arc;
 
 /// Wrapped Ciphertext. This is wrapped to provide an inflection point
 /// as we use this library elsewhere we only implement traits as we need them
 /// and avoid exposing underlying structures from fhe.rs
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WrappedCiphertext {
+pub struct CiphertextSerializer {
     pub inner: Ciphertext,
     pub params: Arc<BfvParameters>,
 }
 
-impl WrappedCiphertext {
-    pub fn from_fhe_rs(inner: Ciphertext, params: Arc<BfvParameters>) -> Self {
-        Self { inner, params }
+impl CiphertextSerializer {
+    pub fn to_bytes(inner: Ciphertext, params: Arc<BfvParameters>) -> Result<Vec<u8>> {
+        let value = Self { inner, params };
+        Ok(bincode::serialize(&value)?)
+    }
+
+    pub fn from_bytes(bytes:&[u8]) -> Result<Ciphertext>{
+        let wct: Self = bincode::deserialize(&bytes)?;
+        Ok(wct.inner)
     }
 }
 
-impl Hash for WrappedCiphertext {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.inner.to_bytes().hash(state)
-    }
-}
-
-/// Deserialize from serde to WrappedPublicKey
-impl<'de> serde::Deserialize<'de> for WrappedCiphertext {
+/// Deserialize from serde to PublicKeySerializer
+impl<'de> serde::Deserialize<'de> for CiphertextSerializer {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -39,10 +39,10 @@ impl<'de> serde::Deserialize<'de> for WrappedCiphertext {
         let DeserializedBytes { par, bytes } = DeserializedBytes::deserialize(deserializer)?;
         let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap());
         let inner = Ciphertext::from_bytes(&bytes, &params).map_err(serde::de::Error::custom)?;
-        std::result::Result::Ok(WrappedCiphertext::from_fhe_rs(inner, params))
+        std::result::Result::Ok(Self { inner, params })
     }
 }
-impl serde::Serialize for WrappedCiphertext {
+impl serde::Serialize for CiphertextSerializer {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
