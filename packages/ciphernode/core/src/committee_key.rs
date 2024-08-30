@@ -1,7 +1,8 @@
 use crate::{
     eventbus::EventBus,
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
-    fhe::{Fhe, GetAggregatePublicKey}, ordered_set::OrderedSet, 
+    fhe::{Fhe, GetAggregatePublicKey},
+    ordered_set::OrderedSet,
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
@@ -39,7 +40,7 @@ pub struct CommitteeKey {
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
-/// around a particular e3_id and aggregates the public key based on this and once done broadcasts 
+/// around a particular e3_id and aggregates the public key based on this and once done broadcasts
 /// a EnclaveEvent::PublicKeyAggregated event on the event bus. Note events are hashed and
 /// identical events will not be triggered twice.
 /// It is expected to change this mechanism as we work through adversarial scenarios and write tests

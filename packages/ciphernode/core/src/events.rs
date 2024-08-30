@@ -213,19 +213,17 @@ impl EnclaveEvent {
 
 #[cfg(test)]
 mod tests {
-
-    use std::error::Error;
-
+    use super::EnclaveEvent;
+    use crate::{
+        events::extract_enclave_event_name, wrapped::WrappedPublicKeyShare, E3id, KeyshareCreated,
+    };
     use fhe::{
         bfv::{BfvParametersBuilder, SecretKey},
         mbfv::{CommonRandomPoly, PublicKeyShare},
     };
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
-
-    use crate::{events::extract_enclave_event_name, wrapped::WrappedPublicKeyShare, E3id, KeyshareCreated};
-
-    use super::EnclaveEvent;
+    use std::error::Error;
 
     #[test]
     fn test_extract_enum_name() {

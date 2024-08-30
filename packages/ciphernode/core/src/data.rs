@@ -17,7 +17,6 @@ impl Insert {
     }
 }
 
-
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Option<Vec<u8>>")]
 pub struct Get(pub Vec<u8>);
@@ -59,7 +58,6 @@ impl Data {
 impl Handler<Insert> for Data {
     type Result = ();
     fn handle(&mut self, event: Insert, _: &mut Self::Context) {
-
         // insert data into sled
         self.db.insert(event.key(), event.value());
 

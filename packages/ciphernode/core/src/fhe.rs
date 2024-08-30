@@ -27,11 +27,11 @@ pub struct GetAggregatePublicKey {
     pub keyshares: OrderedSet<Vec<u8>>,
 }
 
-// #[derive(Message, Clone, Debug, PartialEq, Eq)]
-// #[rtype(result = "Result<(WrappedPlaintext)>")]
-// pub struct GetAggregatePlaintext {
-//     pub decryptions: OrderedSet<WrappedDecryptionShare>,
-// }
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+#[rtype(result = "Result<(WrappedPlaintext)>")]
+pub struct GetAggregatePlaintext {
+    pub decryptions: OrderedSet<Vec<u8>>,
+}
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "Result<(Vec<u8>)>")]
@@ -127,6 +127,7 @@ impl Handler<GetAggregatePublicKey> for Fhe {
     }
 }
 
+// TODO: add this once we have decryption aggregation ready
 // impl Handler<GetAggregatePlaintext> for Fhe {
 //     type Result = Result<WrappedPlaintext>;
 //     fn handle(&mut self, msg: GetAggregatePlaintext, _: &mut Self::Context) -> Self::Result {

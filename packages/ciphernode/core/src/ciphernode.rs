@@ -114,16 +114,14 @@ async fn on_decryption_requested(
     let DecryptionRequested { e3_id, ciphertext } = event;
 
     // get secret key by id from data
-    let Some(sk_bytes) = data.send(Get(format!("{}/sk", e3_id).into())).await? else {
+    let Some(unsafe_secret) = data.send(Get(format!("{}/sk", e3_id).into())).await? else {
         return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
     };
-
-    // let unsafe_secret = WrappedSecretKey::deserialize(sk_bytes)?;
 
     let decryption_share = fhe
         .send(DecryptCiphertext {
             ciphertext,
-            unsafe_secret: sk_bytes,
+            unsafe_secret,
         })
         .await??;
 
