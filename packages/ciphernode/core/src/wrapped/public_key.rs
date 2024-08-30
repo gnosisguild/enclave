@@ -1,8 +1,8 @@
+use anyhow::*;
 use fhe::bfv::{BfvParameters, PublicKey};
 use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use serde::Serializer;
 use std::{cmp::Ordering, hash::Hash, sync::Arc};
-
 /// Wrapped PublicKey. This is wrapped to provide an inflection point
 /// as we use this library elsewhere we only implement traits as we need them
 /// and avoid exposing underlying structures from fhe.rs
@@ -13,16 +13,22 @@ pub struct WrappedPublicKey {
 }
 
 impl WrappedPublicKey {
-    pub fn from_fhe_rs(inner: PublicKey, params: Arc<BfvParameters>) -> Self {
-        Self { inner, params }
+    pub fn from_fhe_rs(inner: PublicKey, params: Arc<BfvParameters>) -> Result<Vec<u8>> {
+        let value = Self { inner, params };
+        Ok(bincode::serialize(&value)?)
+    }
+
+    pub fn from_bytes(bytes:Vec<u8>) -> Result<PublicKey> {
+        let wpk:WrappedPublicKey = bincode::deserialize(&bytes)?;
+        Ok(wpk.inner)
     }
 }
 
-impl fhe_traits::Serialize for WrappedPublicKey {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.inner.to_bytes()
-    }
-}
+// impl fhe_traits::Serialize for WrappedPublicKey {
+//     fn to_bytes(&self) -> Vec<u8> {
+//         self.inner.to_bytes()
+//     }
+// }
 
 /// Deserialize from serde to WrappedPublicKey
 impl<'de> serde::Deserialize<'de> for WrappedPublicKey {
@@ -40,7 +46,7 @@ impl<'de> serde::Deserialize<'de> for WrappedPublicKey {
         let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap()); // TODO: fix errors
         let inner = PublicKey::from_bytes(&bytes, &params).map_err(serde::de::Error::custom)?;
         // TODO: how do we create an invariant that the deserialized params match the global params?
-        std::result::Result::Ok(WrappedPublicKey::from_fhe_rs(inner, params))
+        std::result::Result::Ok(Self { inner, params })
     }
 }
 
@@ -61,20 +67,20 @@ impl serde::Serialize for WrappedPublicKey {
     }
 }
 
-impl Hash for WrappedPublicKey {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.inner.to_bytes().hash(state)
-    }
-}
-
-impl Ord for WrappedPublicKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.inner.to_bytes().cmp(&other.inner.to_bytes())
-    }
-}
-
-impl PartialOrd for WrappedPublicKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
+// impl Hash for WrappedPublicKey {
+//     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+//         self.inner.to_bytes().hash(state)
+//     }
+// }
+//
+// impl Ord for WrappedPublicKey {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         self.inner.to_bytes().cmp(&other.inner.to_bytes())
+//     }
+// }
+//
+// impl PartialOrd for WrappedPublicKey {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }

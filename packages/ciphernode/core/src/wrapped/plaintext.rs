@@ -7,6 +7,6 @@ pub struct WrappedPlaintext {
 
 impl WrappedPlaintext {
     pub fn from_fhe_rs(inner: Plaintext /* params: Arc<BfvParameters> */) -> Self {
-        Self { inner }
+        Self { inner }  
     }
 }

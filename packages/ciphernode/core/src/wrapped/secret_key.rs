@@ -15,8 +15,9 @@ pub struct WrappedSecretKey {
 }
 
 impl WrappedSecretKey {
-    pub fn from_fhe_rs(inner: SecretKey, params: Arc<BfvParameters>) -> Self {
-        Self { inner, params }
+    pub fn from_fhe_rs(inner: SecretKey, params: Arc<BfvParameters>) -> Result<Vec<u8>> {
+        let value = Self { inner, params };
+        Ok(value.unsafe_serialize()?)
     }
 }
 
@@ -37,9 +38,9 @@ impl WrappedSecretKey {
     pub fn deserialize(bytes: Vec<u8>) -> Result<WrappedSecretKey> {
         let SecretKeyData { coeffs, par } = bincode::deserialize(&bytes)?;
         let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap());
-        Ok(WrappedSecretKey::from_fhe_rs(
-            SecretKey::new(coeffs.to_vec(), &params),
+        Ok(Self {
+            inner: SecretKey::new(coeffs.to_vec(), &params),
             params,
-        ))
+        })
     }
 }

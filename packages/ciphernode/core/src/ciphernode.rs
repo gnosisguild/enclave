@@ -1,5 +1,10 @@
 use crate::{
-    data::{Data, Insert}, eventbus::EventBus, events::{ComputationRequested, EnclaveEvent, KeyshareCreated}, fhe::{Fhe, GenerateKeyshare}, wrapped::WrappedSecretKey, DecryptCiphertext, DecryptionRequested, DecryptionshareCreated, Get, Subscribe
+    data::{Data, Insert},
+    eventbus::EventBus,
+    events::{ComputationRequested, EnclaveEvent, KeyshareCreated},
+    fhe::{Fhe, GenerateKeyshare},
+    wrapped::WrappedSecretKey,
+    DecryptCiphertext, DecryptionRequested, DecryptionshareCreated, Get, Subscribe,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -21,8 +26,12 @@ impl Ciphernode {
 
     pub async fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>) -> Addr<Self> {
         let node = Ciphernode::new(bus.clone(), fhe, data).start();
-        let _ = bus.send(Subscribe::new("ComputationRequested", node.clone().into())).await;
-        let _ = bus.send(Subscribe::new("DecryptionRequested", node.clone().into())).await;
+        let _ = bus
+            .send(Subscribe::new("ComputationRequested", node.clone().into()))
+            .await;
+        let _ = bus
+            .send(Subscribe::new("DecryptionRequested", node.clone().into()))
+            .await;
         node
     }
 }
@@ -84,16 +93,10 @@ async fn on_computation_requested(
     // reencrypt secretkey locally with env var - this is so we don't have to serialize a secret
     // best practice would be as you boot up a node you enter in a configured password from
     // which we derive a kdf which gets used to generate this key
-    data.do_send(Insert(
-        format!("{}/sk", e3_id).into(),
-        sk.unsafe_serialize()?,
-    ));
+    data.do_send(Insert(format!("{}/sk", e3_id).into(), sk));
 
     // save public key against e3_id/pk
-    data.do_send(Insert(
-        format!("{}/pk", e3_id).into(),
-        pubkey.clone().into(),
-    ));
+    data.do_send(Insert(format!("{}/pk", e3_id).into(), pubkey.clone()));
 
     // broadcast the KeyshareCreated message
     let event = EnclaveEvent::from(KeyshareCreated { pubkey, e3_id });
@@ -115,12 +118,12 @@ async fn on_decryption_requested(
         return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
     };
 
-    let unsafe_secret = WrappedSecretKey::deserialize(sk_bytes)?;
+    // let unsafe_secret = WrappedSecretKey::deserialize(sk_bytes)?;
 
     let decryption_share = fhe
         .send(DecryptCiphertext {
             ciphertext,
-            unsafe_secret,
+            unsafe_secret: sk_bytes,
         })
         .await??;
 

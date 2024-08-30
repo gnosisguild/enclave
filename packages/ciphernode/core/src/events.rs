@@ -1,4 +1,3 @@
-use crate::wrapped::{WrappedCiphertext, WrappedDecryptionShare, WrappedPublicKey, WrappedPublicKeyShare};
 use actix::Message;
 use bincode;
 use serde::{Deserialize, Serialize};
@@ -157,21 +156,21 @@ impl fmt::Display for EnclaveEvent {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct KeyshareCreated {
-    pub pubkey: WrappedPublicKeyShare,
+    pub pubkey: Vec<u8>,
     pub e3_id: E3id,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct DecryptionshareCreated {
-    pub decryption_share: WrappedDecryptionShare,
+    pub decryption_share: Vec<u8>,
     pub e3_id: E3id,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct PublicKeyAggregated {
-    pub pubkey: WrappedPublicKey,
+    pub pubkey: Vec<u8>,
     pub e3_id: E3id,
 }
 
@@ -192,7 +191,7 @@ pub struct ComputationRequested {
 #[rtype(result = "()")]
 pub struct DecryptionRequested {
     pub e3_id: E3id,
-    pub ciphertext: WrappedCiphertext,
+    pub ciphertext: Vec<u8>,
 }
 
 fn extract_enclave_event_name(s: &str) -> &str {
@@ -254,7 +253,7 @@ mod tests {
         let crp = CommonRandomPoly::new(&params, &mut rng)?;
         let sk_share = { SecretKey::random(&params, &mut rng) };
         let pk_share = { PublicKeyShare::new(&sk_share, crp.clone(), &mut rng)? };
-        let pubkey = WrappedPublicKeyShare::from_fhe_rs(pk_share, params.clone(), crp.clone());
+        let pubkey = WrappedPublicKeyShare::from_fhe_rs(pk_share, params.clone(), crp.clone())?;
         let kse = EnclaveEvent::from(KeyshareCreated {
             e3_id: E3id::from(1001),
             pubkey,

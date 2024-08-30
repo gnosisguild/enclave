@@ -2,6 +2,7 @@ use fhe::bfv::{BfvParameters, Ciphertext};
 use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use serde::Serializer;
 use std::{hash::Hash, sync::Arc};
+use anyhow::*;
 
 /// Wrapped Ciphertext. This is wrapped to provide an inflection point
 /// as we use this library elsewhere we only implement traits as we need them
@@ -13,8 +14,9 @@ pub struct WrappedCiphertext {
 }
 
 impl WrappedCiphertext {
-    pub fn from_fhe_rs(inner: Ciphertext, params: Arc<BfvParameters>) -> Self {
-        Self { inner, params }
+    pub fn from_fhe_rs(inner: Ciphertext, params: Arc<BfvParameters>) -> Result<Vec<u8>> {
+        let value = Self { inner, params };
+        Ok(bincode::serialize(&value)?)
     }
 }
 
@@ -39,7 +41,7 @@ impl<'de> serde::Deserialize<'de> for WrappedCiphertext {
         let DeserializedBytes { par, bytes } = DeserializedBytes::deserialize(deserializer)?;
         let params = Arc::new(BfvParameters::try_deserialize(&par).unwrap());
         let inner = Ciphertext::from_bytes(&bytes, &params).map_err(serde::de::Error::custom)?;
-        std::result::Result::Ok(WrappedCiphertext::from_fhe_rs(inner, params))
+        std::result::Result::Ok(Self {inner, params})
     }
 }
 impl serde::Serialize for WrappedCiphertext {
