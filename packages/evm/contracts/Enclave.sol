@@ -13,8 +13,15 @@ import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    InternalLeanIMT,
+    LeanIMTData,
+    PoseidonT3
+} from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
 contract Enclave is IEnclave, OwnableUpgradeable {
+    using InternalLeanIMT for LeanIMTData;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //
@@ -41,7 +48,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         public executionModules;
 
     // Mapping of E3s.
-    mapping(uint256 id => E3 e3) public e3s;
+    mapping(uint256 e3Id => E3 e3) public e3s;
+
+    // Mapping of input merkle trees
+    mapping(uint256 e3Id => LeanIMTData imt) public inputs;
+
+    // Mapping counting the number of inputs for each E3.
+    mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -154,6 +167,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(address(inputValidator) != address(0), InvalidComputation());
 
         // TODO: validate that the requested computation can be performed by the given execution module.
+        // Perhaps the execution module should be returned by the computation module?
         IOutputVerifier outputVerifier = executionModule.validate(emParams);
         require(
             address(outputVerifier) != address(0),
@@ -170,7 +184,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             inputValidator: inputValidator,
             outputVerifier: outputVerifier,
             committeePublicKey: hex"",
-            inputs: new bytes[](0),
             ciphertextOutput: hex"",
             plaintextOutput: hex""
         });
@@ -227,9 +240,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory input;
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
-        // TODO: probably better to accumulate inputs, rather than just dumping them in storage.
-        e3s[e3Id].inputs.push(input);
-        emit InputPublished(e3Id, input);
+        uint256 inputHash = PoseidonT3.hash(
+            [uint256(keccak256(input)), inputCounts[e3Id]]
+        );
+
+        inputCounts[e3Id]++;
+        inputs[e3Id]._insert(inputHash);
+
+        emit InputPublished(e3Id, input, inputHash, inputCounts[e3Id] - 1);
     }
 
     function publishCiphertextOutput(
@@ -250,7 +268,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CiphertextOutputAlreadyPublished(e3Id)
         );
         bytes memory output;
-        (output, success) = e3.outputVerifier.verify(e3Id, data);
+        (output, success) = e3.computationModule.verify(e3Id, data);
         require(success, InvalidOutput(output));
         e3s[e3Id].ciphertextOutput = output;
 
@@ -273,7 +291,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             PlaintextOutputAlreadyPublished(e3Id)
         );
         bytes memory output;
-        (output, success) = e3.computationModule.verify(e3Id, data);
+        (output, success) = e3.outputVerifier.verify(e3Id, data);
         require(success, InvalidOutput(output));
         e3s[e3Id].plaintextOutput = output;
 
@@ -367,5 +385,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3.computationModule != IComputationModule(address(0)),
             E3DoesNotExist(e3Id)
         );
+    }
+
+    function getInputRoot(uint256 e3Id) public view returns (uint256) {
+        require(
+            e3s[e3Id].computationModule != IComputationModule(address(0)),
+            E3DoesNotExist(e3Id)
+        );
+        return InternalLeanIMT._root(inputs[e3Id]);
     }
 }

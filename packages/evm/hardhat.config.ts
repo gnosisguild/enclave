@@ -77,6 +77,7 @@ const config: HardhatUserConfig = {
         mnemonic,
       },
       chainId: chainIds.hardhat,
+      allowUnlimitedContractSize: true,
     },
     ganache: {
       accounts: {
@@ -115,6 +116,16 @@ const config: HardhatUserConfig = {
         runs: 800,
       },
       viaIR: true,
+    },
+    overrides: {
+      "node_modules/poseidon-solidity/PoseidonT3.sol": {
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 2 ** 32 - 1,
+          },
+        },
+      },
     },
   },
   typechain: {

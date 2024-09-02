@@ -38,7 +38,12 @@ interface IEnclave {
     /// successfully published.
     /// @param e3Id ID of the E3.
     /// @param data ABI encoded input data.
-    event InputPublished(uint256 indexed e3Id, bytes data);
+    event InputPublished(
+        uint256 indexed e3Id,
+        bytes data,
+        uint256 inputHash,
+        uint256 index
+    );
 
     /// @notice This event MUST be emitted when the plaintext output of an Encrypted Execution Environment (E3)
     /// is successfully published.
@@ -171,4 +176,10 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @return e3 The struct representing the requested E3.
     function getE3(uint256 e3Id) external view returns (E3 memory e3);
+
+    /// @notice This function returns root of the input merkle tree for a given E3.
+    /// @dev This function MUST revert if the E3 does not exist.
+    /// @param e3Id ID of the E3.
+    /// @return root The root of the input merkle tree.
+    function getInputRoot(uint256 e3Id) external view returns (uint256 root);
 }

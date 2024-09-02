@@ -16,6 +16,7 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
         }
     }
 
+    // solhint-disable no-empty-blocks
     function publishCommittee(
         uint256,
         bytes calldata,
@@ -50,6 +51,7 @@ contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
         }
     }
 
+    // solhint-disable no-empty-blocks
     function publishCommittee(
         uint256,
         bytes calldata,

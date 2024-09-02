@@ -3,9 +3,11 @@ import {
   mine,
   time,
 } from "@nomicfoundation/hardhat-network-helpers";
+import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { ZeroHash } from "ethers";
 import { ethers } from "hardhat";
+import { poseidon2 } from "poseidon-lite";
 
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
 import { deployComputationModuleFixture } from "./fixtures/MockComputationModule.fixture";
@@ -20,6 +22,9 @@ const AddressSix = "0x0000000000000000000000000000000000000006";
 
 const FilterFail = AddressTwo;
 const FilterOkay = AddressSix;
+
+// Hash function used to compute the tree nodes.
+const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
 describe("Enclave", function () {
   async function setup() {
@@ -679,10 +684,10 @@ describe("Enclave", function () {
     });
     it("reverts if E3 start has expired", async function () {
       const { enclave, request } = await loadFixture(setup);
-      const startTime = [await time.latest(), (await time.latest()) + 1] as [
-        number,
-        number,
-      ];
+      const startTime = [
+        (await time.latest()) + 1,
+        (await time.latest()) + 1000,
+      ] as [number, number];
 
       await enclave.request(
         request.filter,
@@ -696,7 +701,7 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      mine(1, { interval: 1000 });
+      await mine(2, { interval: 2000 });
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
@@ -746,7 +751,7 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      mine(1, { interval: 1000 });
+      await mine(1, { interval: 1000 });
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
@@ -887,8 +892,6 @@ describe("Enclave", function () {
         .withArgs(0);
 
       await enclave.activate(0);
-
-      await expect(enclave.publishInput(0, inputData)).to.not.be.reverted;
     });
 
     it("reverts if input is not valid", async function () {
@@ -928,38 +931,12 @@ describe("Enclave", function () {
       );
 
       await enclave.activate(0);
-      await expect(enclave.publishInput(0, ZeroHash)).to.not.be.reverted;
 
       await mine(2, { interval: request.duration });
 
       await expect(
         enclave.publishInput(0, ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
-    });
-    it("sets ciphertextInput correctly", async function () {
-      const { enclave, request } = await loadFixture(setup);
-      const inputData = "0x12345678";
-
-      await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
-        { value: 10 },
-      );
-
-      await enclave.activate(0);
-
-      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
-      let e3 = await enclave.getE3(0);
-      expect(e3.inputs[0]).to.equal(inputData);
-      expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
-      e3 = await enclave.getE3(0);
-      expect(e3.inputs[1]).to.equal(inputData);
     });
     it("returns true if input is published successfully", async function () {
       const { enclave, request } = await loadFixture(setup);
@@ -983,6 +960,39 @@ describe("Enclave", function () {
         true,
       );
     });
+    it("adds inputHash to merkle tree", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
+
+      // To create an instance of a LeanIMT, you must provide the hash function.
+      const tree = new LeanIMT(hash);
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.startTime,
+        request.duration,
+        request.computationModule,
+        request.cMParams,
+        request.executionModule,
+        request.eMParams,
+        { value: 10 },
+      );
+
+      const e3Id = 0;
+
+      await enclave.activate(e3Id);
+
+      tree.insert(hash(BigInt(ethers.keccak256(inputData)), BigInt(0)));
+
+      await enclave.publishInput(e3Id, inputData);
+      expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
+
+      const secondInputData = abiCoder.encode(["bytes"], ["0x112233445566"]);
+      tree.insert(hash(BigInt(ethers.keccak256(secondInputData)), BigInt(1)));
+      await enclave.publishInput(e3Id, secondInputData);
+      expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
+    });
     it("emits InputPublished event", async function () {
       const { enclave, request } = await loadFixture(setup);
 
@@ -1002,16 +1012,17 @@ describe("Enclave", function () {
 
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
       await enclave.activate(e3Id);
+      const expectedHash = hash(BigInt(ethers.keccak256(inputData)), BigInt(0));
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")
-        .withArgs(e3Id, inputData);
+        .withArgs(e3Id, inputData, expectedHash, 0);
     });
   });
 
   describe("publishCiphertextOutput()", function () {
     it("reverts if E3 does not exist", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave } = await loadFixture(setup);
 
       await expect(enclave.publishCiphertextOutput(0, "0x"))
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
@@ -1173,7 +1184,7 @@ describe("Enclave", function () {
 
   describe("publishPlaintextOutput()", function () {
     it("reverts if E3 does not exist", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave } = await loadFixture(setup);
       const e3Id = 0;
 
       await expect(enclave.publishPlaintextOutput(e3Id, "0x"))
@@ -1330,7 +1341,7 @@ describe("Enclave", function () {
       await enclave.activate(e3Id);
       await mine(2, { interval: request.duration });
       await enclave.publishCiphertextOutput(e3Id, "0x1337");
-      expect(await enclave.publishPlaintextOutput(e3Id, "0x1337"))
+      await expect(enclave.publishPlaintextOutput(e3Id, "0x1337"))
         .to.emit(enclave, "PlaintextOutputPublished")
         .withArgs(e3Id, "0x1337");
     });
