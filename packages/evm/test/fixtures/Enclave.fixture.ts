@@ -1,6 +1,5 @@
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { ethers } from "hardhat";
-import { PoseidonT3, proxy } from "poseidon-solidity";
 
 import { Enclave__factory } from "../../types/factories/contracts/Enclave__factory";
 

@@ -54,7 +54,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(uint256 e3Id => LeanIMTData imt) public inputs;
 
     // Mapping counting the number of inputs for each E3.
-    mapping(uint256 e3Id => uint256) public inputCount;
+    mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -241,13 +241,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         (input, success) = e3.inputValidator.validate(msg.sender, data);
         require(success, InvalidInput());
         uint256 inputHash = PoseidonT3.hash(
-            [uint256(keccak256(input)), inputCount[e3Id]]
+            [uint256(keccak256(input)), inputCounts[e3Id]]
         );
 
-        inputCount[e3Id]++;
+        inputCounts[e3Id]++;
         inputs[e3Id]._insert(inputHash);
 
-        emit InputPublished(e3Id, input, inputHash, inputCount[e3Id] - 1);
+        emit InputPublished(e3Id, input, inputHash, inputCounts[e3Id] - 1);
     }
 
     function publishCiphertextOutput(
