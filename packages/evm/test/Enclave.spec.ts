@@ -684,10 +684,10 @@ describe("Enclave", function () {
     });
     it("reverts if E3 start has expired", async function () {
       const { enclave, request } = await loadFixture(setup);
-      const startTime = [await time.latest(), (await time.latest()) + 1] as [
-        number,
-        number,
-      ];
+      const startTime = [
+        (await time.latest()) + 1,
+        (await time.latest()) + 1000,
+      ] as [number, number];
 
       await enclave.request(
         request.filter,
@@ -701,7 +701,7 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      mine(1, { interval: 1000 });
+      await mine(2, { interval: 2000 });
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
