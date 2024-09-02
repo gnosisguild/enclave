@@ -70,7 +70,13 @@ pub enum EnclaveEvent {
     DecryptionshareCreated {
         id: EventId,
         data: DecryptionshareCreated,
-    }, // CommitteeSelected,
+    }, 
+DecryptedOutputPublished {
+    id: EventId,
+    data: DecryptedOutputPublished
+    }
+
+    // CommitteeSelected,
        // OutputDecrypted,
        // CiphernodeRegistered,
        // CiphernodeDeregistered,
@@ -98,6 +104,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::PublicKeyAggregated { id, .. } => id,
             EnclaveEvent::DecryptionRequested { id, .. } => id,
             EnclaveEvent::DecryptionshareCreated { id, .. } => id,
+            EnclaveEvent::DecryptedOutputPublished { id, .. } => id,
         }
     }
 }
@@ -147,6 +154,14 @@ impl From<DecryptionshareCreated> for EnclaveEvent {
     }
 }
 
+impl From<DecryptedOutputPublished> for EnclaveEvent {
+    fn from(data: DecryptedOutputPublished) -> Self {
+        EnclaveEvent::DecryptedOutputPublished {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{}({})", self.event_type(), self.get_id()))
@@ -191,7 +206,14 @@ pub struct ComputationRequested {
 #[rtype(result = "()")]
 pub struct DecryptionRequested {
     pub e3_id: E3id,
-    pub ciphertext: Vec<u8>,
+    pub ciphertext: Vec<u8>
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct DecryptedOutputPublished {
+    pub e3_id: E3id,
+    pub decrypted_output: Vec<u8>
 }
 
 fn extract_enclave_event_name(s: &str) -> &str {

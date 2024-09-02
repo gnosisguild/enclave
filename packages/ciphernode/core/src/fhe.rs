@@ -1,16 +1,17 @@
 use crate::{
     ordered_set::OrderedSet,
     serializers::{
-        CiphertextSerializer, DecryptionShareSerializer, PlaintextSerializer, PublicKeySerializer,
+        CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
         PublicKeyShareSerializer, SecretKeySerializer,
     },
 };
 use actix::{Actor, Context, Handler, Message};
 use anyhow::*;
 use fhe::{
-    bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, Plaintext, PublicKey, SecretKey},
+    bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
+use fhe_traits::FheDecoder;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::{hash::Hash, sync::Arc};
@@ -28,7 +29,7 @@ pub struct GetAggregatePublicKey {
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "Result<(PlaintextSerializer)>")]
+#[rtype(result = "Result<(Vec<u8>)>")]
 pub struct GetAggregatePlaintext {
     pub decryptions: OrderedSet<Vec<u8>>,
 }
@@ -126,18 +127,24 @@ impl Handler<GetAggregatePublicKey> for Fhe {
     }
 }
 
-// TODO: add this once we have decryption aggregation ready
-// impl Handler<GetAggregatePlaintext> for Fhe {
-//     type Result = Result<PlaintextSerializer>;
-//     fn handle(&mut self, msg: GetAggregatePlaintext, _: &mut Self::Context) -> Self::Result {
-//         let plaintext: Plaintext = msg
-//             .decryptions
-//             .iter()
-//             .map(|k| k.clone().try_inner())
-//             .collect::<Result<Vec<_>>>()? // NOTE: not optimal
-//             .into_iter()
-//             .aggregate()?;
-//
-//         Ok(PlaintextSerializer::to_bytes(plaintext))
-//     }
-// }
+impl Handler<GetAggregatePlaintext> for Fhe {
+    type Result = Result<Vec<u8>>;
+    fn handle(&mut self, msg: GetAggregatePlaintext, _: &mut Self::Context) -> Self::Result {
+        let plaintext: Plaintext = msg
+            .decryptions
+            .iter()
+            .map(|k| DecryptionShareSerializer::from_bytes(k))
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .aggregate()?;
+
+        // XXX: how do we know what the expected output of the plaintext is in order to decrypt
+        // here for serialization?
+        // This would be dependent on the computation that is running.
+        // For now assuming testcase of Vec<u64>
+        // This could be determined based on the "program" config
+        let decoded = Vec::<u64>::try_decode(&plaintext, Encoding::poly())?;
+        let decoded = &decoded[0..2]; // TODO: this will be computation dependent
+        Ok(bincode::serialize(&decoded)?)
+    }
+}

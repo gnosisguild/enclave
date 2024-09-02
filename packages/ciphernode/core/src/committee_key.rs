@@ -2,7 +2,7 @@ use crate::{
     eventbus::EventBus,
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
     fhe::{Fhe, GetAggregatePublicKey},
-    ordered_set::OrderedSet,
+    ordered_set::OrderedSet, Die,
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
@@ -27,10 +27,6 @@ pub enum CommitteeKeyState {
 struct ComputeAggregate {
     pub keyshares: OrderedSet<Vec<u8>>,
 }
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct Die;
 
 pub struct CommitteeKey {
     fhe: Addr<Fhe>,

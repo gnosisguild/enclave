@@ -6,6 +6,7 @@ mod ciphernode;
 mod committee;
 mod committee_key;
 mod data;
+mod decryption;
 mod enclave_contract;
 mod eventbus;
 mod events;
@@ -66,9 +67,10 @@ mod tests {
         fhe::Fhe,
         p2p::P2p,
         serializers::{
-            CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer, PublicKeyShareSerializer,
+            CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
+            PublicKeyShareSerializer,
         },
-        DecryptionRequested, DecryptionshareCreated, ResetHistory,
+        DecryptedOutputPublished, DecryptionRequested, DecryptionshareCreated, ResetHistory,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -229,10 +231,15 @@ mod tests {
         // Aggregate decryption
         bus.send(ResetHistory).await?;
 
-        let yes = 12376213u64;
+        // TODO: 
+        // Making these values large (especially the yes value) requires changing 
+        // the params we use here - as we tune the FHE we need to take care
+        let yes = 1234u64;
         let no = 873827u64;
 
-        let pt = Plaintext::try_encode(&vec![yes, no], Encoding::poly(), &params)?;
+        let raw_plaintext = vec![yes, no];
+        let expected_raw_plaintext = bincode::serialize(&raw_plaintext)?;
+        let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
 
         let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
 
@@ -280,7 +287,10 @@ mod tests {
                     decryption_share: ds3.clone(),
                     e3_id: e3_id.clone(),
                 }),
-                // TODO: aggregate plaintext
+                EnclaveEvent::from(DecryptedOutputPublished {
+                    e3_id: e3_id.clone(),
+                    decrypted_output: expected_raw_plaintext.clone()
+                })
             ]
         );
 
