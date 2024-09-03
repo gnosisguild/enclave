@@ -3,7 +3,7 @@ use crate::{
     eventbus::EventBus,
     events::{CommitteeRequested, EnclaveEvent, KeyshareCreated},
     fhe::{Fhe, GenerateKeyshare},
-    DecryptCiphertext, DecryptionRequested, DecryptionshareCreated, Get, Subscribe,
+    CiphertextOutputPublished, DecryptCiphertext, DecryptionshareCreated, Get, Subscribe,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -29,7 +29,10 @@ impl Ciphernode {
             .send(Subscribe::new("CommitteeRequested", node.clone().into()))
             .await;
         let _ = bus
-            .send(Subscribe::new("DecryptionRequested", node.clone().into()))
+            .send(Subscribe::new(
+                "CiphertextOutputPublished",
+                node.clone().into(),
+            ))
             .await;
         node
     }
@@ -41,7 +44,7 @@ impl Handler<EnclaveEvent> for Ciphernode {
     fn handle(&mut self, event: EnclaveEvent, ctx: &mut Context<Self>) -> Self::Result {
         match event {
             EnclaveEvent::CommitteeRequested { data, .. } => ctx.address().do_send(data),
-            EnclaveEvent::DecryptionRequested { data, .. } => ctx.address().do_send(data),
+            EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.address().do_send(data),
             _ => (),
         }
     }
@@ -54,18 +57,14 @@ impl Handler<CommitteeRequested> for Ciphernode {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
-        Box::pin(async {
-            on_committee_requested(fhe, data, bus, event)
-                .await
-                .unwrap()
-        })
+        Box::pin(async { on_committee_requested(fhe, data, bus, event).await.unwrap() })
     }
 }
 
-impl Handler<DecryptionRequested> for Ciphernode {
+impl Handler<CiphertextOutputPublished> for Ciphernode {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, event: DecryptionRequested, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, event: CiphertextOutputPublished, _: &mut Context<Self>) -> Self::Result {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
@@ -108,9 +107,12 @@ async fn on_decryption_requested(
     fhe: Addr<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
-    event: DecryptionRequested,
+    event: CiphertextOutputPublished,
 ) -> Result<()> {
-    let DecryptionRequested { e3_id, ciphertext } = event;
+    let CiphertextOutputPublished {
+        e3_id,
+        ciphertext_output,
+    } = event;
 
     // get secret key by id from data
     let Some(unsafe_secret) = data.send(Get(format!("{}/sk", e3_id).into())).await? else {
@@ -119,7 +121,7 @@ async fn on_decryption_requested(
 
     let decryption_share = fhe
         .send(DecryptCiphertext {
-            ciphertext,
+            ciphertext: ciphertext_output,
             unsafe_secret,
         })
         .await??;

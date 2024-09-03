@@ -70,7 +70,7 @@ mod tests {
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
             PublicKeyShareSerializer,
         },
-        DecryptedOutputPublished, DecryptionRequested, DecryptionshareCreated, ResetHistory,
+        DecryptedOutputPublished, CiphertextOutputPublished, DecryptionshareCreated, ResetHistory,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -243,8 +243,8 @@ mod tests {
 
         let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
 
-        let event = EnclaveEvent::from(DecryptionRequested {
-            ciphertext: CiphertextSerializer::to_bytes(ciphertext.clone(), params.clone())?,
+        let event = EnclaveEvent::from(CiphertextOutputPublished {
+            ciphertext_output: CiphertextSerializer::to_bytes(ciphertext.clone(), params.clone())?,
             e3_id: e3_id.clone(),
         });
 

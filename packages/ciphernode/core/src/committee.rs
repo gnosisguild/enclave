@@ -49,7 +49,7 @@ impl CommitteeManager {
             addr.clone().recipient(),
         ));
         bus.do_send(Subscribe::new("KeyshareCreated", addr.clone().into()));
-        bus.do_send(Subscribe::new("DecryptionRequested", addr.clone().into()));
+        bus.do_send(Subscribe::new("CiphertextOutputPublished", addr.clone().into()));
         bus.do_send(Subscribe::new("DecryptionshareCreated", addr.clone().into()));
         bus.do_send(Subscribe::new("DecryptionOutputPublished", addr.clone().into()));
         addr
@@ -92,7 +92,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
                 key.do_send(Die);
                 self.keys.remove(&data.e3_id);
             }
-            EnclaveEvent::DecryptionRequested { data, .. } => {
+            EnclaveEvent::CiphertextOutputPublished { data, .. } => {
                 let Some(meta) = self.meta.get(&data.e3_id) else {
                     // TODO: setup proper logger / telemetry
                     println!("E3Id not found in committee");
