@@ -55,9 +55,9 @@ pub enum EnclaveEvent {
         id: EventId,
         data: KeyshareCreated,
     },
-    ComputationRequested {
+    CommitteeRequested {
         id: EventId,
-        data: ComputationRequested,
+        data: CommitteeRequested,
     },
     PublicKeyAggregated {
         id: EventId,
@@ -100,7 +100,7 @@ impl From<EnclaveEvent> for EventId {
     fn from(value: EnclaveEvent) -> Self {
         match value {
             EnclaveEvent::KeyshareCreated { id, .. } => id,
-            EnclaveEvent::ComputationRequested { id, .. } => id,
+            EnclaveEvent::CommitteeRequested { id, .. } => id,
             EnclaveEvent::PublicKeyAggregated { id, .. } => id,
             EnclaveEvent::DecryptionRequested { id, .. } => id,
             EnclaveEvent::DecryptionshareCreated { id, .. } => id,
@@ -118,9 +118,9 @@ impl From<KeyshareCreated> for EnclaveEvent {
     }
 }
 
-impl From<ComputationRequested> for EnclaveEvent {
-    fn from(data: ComputationRequested) -> Self {
-        EnclaveEvent::ComputationRequested {
+impl From<CommitteeRequested> for EnclaveEvent {
+    fn from(data: CommitteeRequested) -> Self {
+        EnclaveEvent::CommitteeRequested {
             id: EventId::from(data.clone()),
             data: data.clone(),
         }
@@ -191,7 +191,7 @@ pub struct PublicKeyAggregated {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct ComputationRequested {
+pub struct CommitteeRequested {
     pub e3_id: E3id,
     pub nodecount: usize,
     pub threshold: usize,

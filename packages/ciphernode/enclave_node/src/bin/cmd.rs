@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use enclave_core::Actor;
-use enclave_core::ComputationRequested;
+use enclave_core::CommitteeRequested;
 use enclave_core::E3id;
 use enclave_core::EnclaveEvent;
 use enclave_core::EventBus;
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             match line.as_str() {
                 "test" => {
                     id += 1;
-                    bus.do_send(EnclaveEvent::from(ComputationRequested {
+                    bus.do_send(EnclaveEvent::from(CommitteeRequested {
                         e3_id: E3id::from(id),
                         nodecount: 3,
                         threshold: 3,

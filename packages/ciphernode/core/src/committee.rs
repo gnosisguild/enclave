@@ -45,7 +45,7 @@ impl CommitteeManager {
     pub fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Addr<Self> {
         let addr = CommitteeManager::new(bus.clone(), fhe).start();
         bus.do_send(Subscribe::new(
-            "ComputationRequested",
+            "CommitteeRequested",
             addr.clone().recipient(),
         ));
         bus.do_send(Subscribe::new("KeyshareCreated", addr.clone().into()));
@@ -61,7 +61,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
 
     fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         match event {
-            EnclaveEvent::ComputationRequested { data, .. } => {
+            EnclaveEvent::CommitteeRequested { data, .. } => {
                 // start up a new key
                 let key = CommitteeKey::new(
                     self.fhe.clone(),
