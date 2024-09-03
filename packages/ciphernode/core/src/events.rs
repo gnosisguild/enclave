@@ -55,17 +55,17 @@ pub enum EnclaveEvent {
         id: EventId,
         data: KeyshareCreated,
     },
-    ComputationRequested {
+    CommitteeRequested {
         id: EventId,
-        data: ComputationRequested,
+        data: CommitteeRequested,
     },
     PublicKeyAggregated {
         id: EventId,
         data: PublicKeyAggregated,
     },
-    DecryptionRequested {
+    CiphertextOutputPublished {
         id: EventId,
-        data: DecryptionRequested,
+        data: CiphertextOutputPublished,
     },
     DecryptionshareCreated {
         id: EventId,
@@ -100,9 +100,9 @@ impl From<EnclaveEvent> for EventId {
     fn from(value: EnclaveEvent) -> Self {
         match value {
             EnclaveEvent::KeyshareCreated { id, .. } => id,
-            EnclaveEvent::ComputationRequested { id, .. } => id,
+            EnclaveEvent::CommitteeRequested { id, .. } => id,
             EnclaveEvent::PublicKeyAggregated { id, .. } => id,
-            EnclaveEvent::DecryptionRequested { id, .. } => id,
+            EnclaveEvent::CiphertextOutputPublished { id, .. } => id,
             EnclaveEvent::DecryptionshareCreated { id, .. } => id,
             EnclaveEvent::DecryptedOutputPublished { id, .. } => id,
         }
@@ -118,9 +118,9 @@ impl From<KeyshareCreated> for EnclaveEvent {
     }
 }
 
-impl From<ComputationRequested> for EnclaveEvent {
-    fn from(data: ComputationRequested) -> Self {
-        EnclaveEvent::ComputationRequested {
+impl From<CommitteeRequested> for EnclaveEvent {
+    fn from(data: CommitteeRequested) -> Self {
+        EnclaveEvent::CommitteeRequested {
             id: EventId::from(data.clone()),
             data: data.clone(),
         }
@@ -136,9 +136,9 @@ impl From<PublicKeyAggregated> for EnclaveEvent {
     }
 }
 
-impl From<DecryptionRequested> for EnclaveEvent {
-    fn from(data: DecryptionRequested) -> Self {
-        EnclaveEvent::DecryptionRequested {
+impl From<CiphertextOutputPublished> for EnclaveEvent {
+    fn from(data: CiphertextOutputPublished) -> Self {
+        EnclaveEvent::CiphertextOutputPublished {
             id: EventId::from(data.clone()),
             data: data.clone(),
         }
@@ -191,7 +191,7 @@ pub struct PublicKeyAggregated {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct ComputationRequested {
+pub struct CommitteeRequested {
     pub e3_id: E3id,
     pub nodecount: usize,
     pub threshold: usize,
@@ -204,9 +204,9 @@ pub struct ComputationRequested {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct DecryptionRequested {
+pub struct CiphertextOutputPublished {
     pub e3_id: E3id,
-    pub ciphertext: Vec<u8>
+    pub ciphertext_output: Vec<u8>
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

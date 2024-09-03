@@ -63,14 +63,14 @@ mod tests {
         committee::CommitteeManager,
         data::Data,
         eventbus::{EventBus, GetHistory},
-        events::{ComputationRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
+        events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         fhe::Fhe,
         p2p::P2p,
         serializers::{
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
             PublicKeyShareSerializer,
         },
-        DecryptedOutputPublished, DecryptionRequested, DecryptionshareCreated, ResetHistory,
+        DecryptedOutputPublished, CiphertextOutputPublished, DecryptionshareCreated, ResetHistory,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -166,7 +166,7 @@ mod tests {
 
         let e3_id = E3id::new("1234");
 
-        let event = EnclaveEvent::from(ComputationRequested {
+        let event = EnclaveEvent::from(CommitteeRequested {
             e3_id: e3_id.clone(),
             nodecount: 3,
             threshold: 123,
@@ -203,7 +203,7 @@ mod tests {
         assert_eq!(
             history,
             vec![
-                EnclaveEvent::from(ComputationRequested {
+                EnclaveEvent::from(CommitteeRequested {
                     e3_id: e3_id.clone(),
                     nodecount: 3,
                     threshold: 123,
@@ -243,8 +243,8 @@ mod tests {
 
         let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
 
-        let event = EnclaveEvent::from(DecryptionRequested {
-            ciphertext: CiphertextSerializer::to_bytes(ciphertext.clone(), params.clone())?,
+        let event = EnclaveEvent::from(CiphertextOutputPublished {
+            ciphertext_output: CiphertextSerializer::to_bytes(ciphertext.clone(), params.clone())?,
             e3_id: e3_id.clone(),
         });
 
@@ -316,14 +316,14 @@ mod tests {
             }
         });
 
-        let evt_1 = EnclaveEvent::from(ComputationRequested {
+        let evt_1 = EnclaveEvent::from(CommitteeRequested {
             e3_id: E3id::new("1234"),
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
         });
 
-        let evt_2 = EnclaveEvent::from(ComputationRequested {
+        let evt_2 = EnclaveEvent::from(CommitteeRequested {
             e3_id: E3id::new("1235"),
             nodecount: 3,
             threshold: 123,
@@ -362,7 +362,7 @@ mod tests {
         P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
 
         // Capture messages from output on msgs vec
-        let event = EnclaveEvent::from(ComputationRequested {
+        let event = EnclaveEvent::from(CommitteeRequested {
             e3_id: E3id::new("1235"),
             nodecount: 3,
             threshold: 123,

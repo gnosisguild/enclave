@@ -1,9 +1,9 @@
 use crate::{
     data::{Data, Insert},
     eventbus::EventBus,
-    events::{ComputationRequested, EnclaveEvent, KeyshareCreated},
+    events::{CommitteeRequested, EnclaveEvent, KeyshareCreated},
     fhe::{Fhe, GenerateKeyshare},
-    DecryptCiphertext, DecryptionRequested, DecryptionshareCreated, Get, Subscribe,
+    CiphertextOutputPublished, DecryptCiphertext, DecryptionshareCreated, Get, Subscribe,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -26,10 +26,13 @@ impl Ciphernode {
     pub async fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>) -> Addr<Self> {
         let node = Ciphernode::new(bus.clone(), fhe, data).start();
         let _ = bus
-            .send(Subscribe::new("ComputationRequested", node.clone().into()))
+            .send(Subscribe::new("CommitteeRequested", node.clone().into()))
             .await;
         let _ = bus
-            .send(Subscribe::new("DecryptionRequested", node.clone().into()))
+            .send(Subscribe::new(
+                "CiphertextOutputPublished",
+                node.clone().into(),
+            ))
             .await;
         node
     }
@@ -40,32 +43,28 @@ impl Handler<EnclaveEvent> for Ciphernode {
 
     fn handle(&mut self, event: EnclaveEvent, ctx: &mut Context<Self>) -> Self::Result {
         match event {
-            EnclaveEvent::ComputationRequested { data, .. } => ctx.address().do_send(data),
-            EnclaveEvent::DecryptionRequested { data, .. } => ctx.address().do_send(data),
+            EnclaveEvent::CommitteeRequested { data, .. } => ctx.address().do_send(data),
+            EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.address().do_send(data),
             _ => (),
         }
     }
 }
 
-impl Handler<ComputationRequested> for Ciphernode {
+impl Handler<CommitteeRequested> for Ciphernode {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, event: ComputationRequested, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, event: CommitteeRequested, _: &mut Context<Self>) -> Self::Result {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
-        Box::pin(async {
-            on_computation_requested(fhe, data, bus, event)
-                .await
-                .unwrap()
-        })
+        Box::pin(async { on_committee_requested(fhe, data, bus, event).await.unwrap() })
     }
 }
 
-impl Handler<DecryptionRequested> for Ciphernode {
+impl Handler<CiphertextOutputPublished> for Ciphernode {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, event: DecryptionRequested, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, event: CiphertextOutputPublished, _: &mut Context<Self>) -> Self::Result {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
@@ -77,13 +76,13 @@ impl Handler<DecryptionRequested> for Ciphernode {
     }
 }
 
-async fn on_computation_requested(
+async fn on_committee_requested(
     fhe: Addr<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
-    event: ComputationRequested,
+    event: CommitteeRequested,
 ) -> Result<()> {
-    let ComputationRequested { e3_id, .. } = event;
+    let CommitteeRequested { e3_id, .. } = event;
     // generate keyshare
     let (sk, pubkey) = fhe.send(GenerateKeyshare {}).await??;
 
@@ -108,9 +107,12 @@ async fn on_decryption_requested(
     fhe: Addr<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
-    event: DecryptionRequested,
+    event: CiphertextOutputPublished,
 ) -> Result<()> {
-    let DecryptionRequested { e3_id, ciphertext } = event;
+    let CiphertextOutputPublished {
+        e3_id,
+        ciphertext_output,
+    } = event;
 
     // get secret key by id from data
     let Some(unsafe_secret) = data.send(Get(format!("{}/sk", e3_id).into())).await? else {
@@ -119,7 +121,7 @@ async fn on_decryption_requested(
 
     let decryption_share = fhe
         .send(DecryptCiphertext {
-            ciphertext,
+            ciphertext: ciphertext_output,
             unsafe_secret,
         })
         .await??;

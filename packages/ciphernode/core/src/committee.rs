@@ -45,11 +45,11 @@ impl CommitteeManager {
     pub fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Addr<Self> {
         let addr = CommitteeManager::new(bus.clone(), fhe).start();
         bus.do_send(Subscribe::new(
-            "ComputationRequested",
+            "CommitteeRequested",
             addr.clone().recipient(),
         ));
         bus.do_send(Subscribe::new("KeyshareCreated", addr.clone().into()));
-        bus.do_send(Subscribe::new("DecryptionRequested", addr.clone().into()));
+        bus.do_send(Subscribe::new("CiphertextOutputPublished", addr.clone().into()));
         bus.do_send(Subscribe::new("DecryptionshareCreated", addr.clone().into()));
         bus.do_send(Subscribe::new("DecryptionOutputPublished", addr.clone().into()));
         addr
@@ -61,7 +61,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
 
     fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         match event {
-            EnclaveEvent::ComputationRequested { data, .. } => {
+            EnclaveEvent::CommitteeRequested { data, .. } => {
                 // start up a new key
                 let key = CommitteeKey::new(
                     self.fhe.clone(),
@@ -92,7 +92,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
                 key.do_send(Die);
                 self.keys.remove(&data.e3_id);
             }
-            EnclaveEvent::DecryptionRequested { data, .. } => {
+            EnclaveEvent::CiphertextOutputPublished { data, .. } => {
                 let Some(meta) = self.meta.get(&data.e3_id) else {
                     // TODO: setup proper logger / telemetry
                     println!("E3Id not found in committee");
