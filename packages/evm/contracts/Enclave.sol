@@ -171,13 +171,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
 
         e3 = E3({
+            seed: keccak256(abi.encode(block.prevrandao, e3Id)),
             threshold: threshold,
             startWindow: startWindow,
             duration: duration,
             expiration: 0,
             e3Program: e3Program,
-            computeProvider: computeProvider,
+            e3ProgramParams: e3ProgramParams,
             inputValidator: inputValidator,
+            computeProvider: computeProvider,
             decryptionVerifier: decryptionVerifier,
             committeePublicKey: hex"",
             ciphertextOutput: hex"",

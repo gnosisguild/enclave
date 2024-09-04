@@ -64,12 +64,12 @@ describe("Enclave", function () {
         ],
         duration: time.duration.days(30),
         e3Program: await e3Program.getAddress(),
-        cMParams: abiCoder.encode(
+        e3ProgramParams: abiCoder.encode(
           ["address"],
           [await inputValidator.getAddress()],
         ),
         computeProvider: await computeProvider.getAddress(),
-        eMParams: abiCoder.encode(
+        computeProviderParams: abiCoder.encode(
           ["address"],
           [await decryptionVerifier.getAddress()],
         ),
@@ -195,9 +195,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       const e3 = await enclave.getE3(0);
@@ -205,12 +205,13 @@ describe("Enclave", function () {
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
+      expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
       expect(e3.inputValidator).to.equal(
-        abiCoder.decode(["address"], request.cMParams)[0],
+        abiCoder.decode(["address"], request.e3ProgramParams)[0],
       );
       expect(e3.computeProvider).to.equal(request.computeProvider);
       expect(e3.decryptionVerifier).to.equal(
-        abiCoder.decode(["address"], request.eMParams)[0],
+        abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
       expect(e3.committeePublicKey).to.equal("0x");
       expect(e3.ciphertextOutput).to.equal("0x");
@@ -410,9 +411,9 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          request.cMParams,
+          request.e3ProgramParams,
           request.computeProvider,
-          request.eMParams,
+          request.computeProviderParams,
         ),
       ).to.be.revertedWithCustomError(enclave, "PaymentRequired");
     });
@@ -425,9 +426,9 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          request.cMParams,
+          request.e3ProgramParams,
           request.computeProvider,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
@@ -441,9 +442,9 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          request.cMParams,
+          request.e3ProgramParams,
           request.computeProvider,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
@@ -457,9 +458,9 @@ describe("Enclave", function () {
           request.startTime,
           0,
           request.e3Program,
-          request.cMParams,
+          request.e3ProgramParams,
           request.computeProvider,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
@@ -473,9 +474,9 @@ describe("Enclave", function () {
           request.startTime,
           time.duration.days(31),
           request.e3Program,
-          request.cMParams,
+          request.e3ProgramParams,
           request.computeProvider,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
@@ -489,9 +490,9 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           ethers.ZeroAddress,
-          request.cMParams,
+          request.e3ProgramParams,
           request.computeProvider,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       )
@@ -507,9 +508,9 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          request.cMParams,
+          request.e3ProgramParams,
           ethers.ZeroAddress,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       )
@@ -528,7 +529,7 @@ describe("Enclave", function () {
           request.e3Program,
           ZeroHash,
           request.computeProvider,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidComputation");
@@ -542,7 +543,7 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          request.cMParams,
+          request.e3ProgramParams,
           request.computeProvider,
           ZeroHash,
           { value: 10 },
@@ -558,9 +559,9 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          request.cMParams,
+          request.e3ProgramParams,
           request.computeProvider,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
@@ -573,9 +574,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       const e3 = await enclave.getE3(0);
@@ -584,11 +585,11 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.inputValidator).to.equal(
-        abiCoder.decode(["address"], request.cMParams)[0],
+        abiCoder.decode(["address"], request.e3ProgramParams)[0],
       );
       expect(e3.computeProvider).to.equal(request.computeProvider);
       expect(e3.decryptionVerifier).to.equal(
-        abiCoder.decode(["address"], request.eMParams)[0],
+        abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
       expect(e3.committeePublicKey).to.equal("0x");
       expect(e3.ciphertextOutput).to.equal("0x");
@@ -602,9 +603,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       const e3 = await enclave.getE3(0);
@@ -638,9 +639,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -663,9 +664,9 @@ describe("Enclave", function () {
         startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -687,9 +688,9 @@ describe("Enclave", function () {
         startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -713,9 +714,9 @@ describe("Enclave", function () {
         startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -737,9 +738,9 @@ describe("Enclave", function () {
         startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -759,9 +760,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -792,9 +793,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -818,9 +819,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -837,9 +838,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -870,9 +871,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -895,9 +896,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -916,9 +917,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -940,9 +941,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -965,9 +966,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -994,9 +995,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -1030,9 +1031,9 @@ describe("Enclave", function () {
         request.startTime,
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await expect(enclave.publishCiphertextOutput(e3Id, "0x"))
@@ -1047,9 +1048,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       const block = await tx.getBlock();
@@ -1073,9 +1074,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1098,9 +1099,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1119,9 +1120,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1140,9 +1141,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1161,9 +1162,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1193,9 +1194,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await expect(enclave.publishPlaintextOutput(e3Id, "0x"))
@@ -1212,9 +1213,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1232,9 +1233,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1258,9 +1259,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1280,9 +1281,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1303,9 +1304,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1325,9 +1326,9 @@ describe("Enclave", function () {
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
         request.e3Program,
-        request.cMParams,
+        request.e3ProgramParams,
         request.computeProvider,
-        request.eMParams,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
