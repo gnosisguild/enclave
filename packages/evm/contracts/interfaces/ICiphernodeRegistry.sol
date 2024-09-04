@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
 interface ICiphernodeRegistry {
     /// @notice This event MUST be emitted when a committee is selected for an E3.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
 import { IInputValidator } from "./IInputValidator.sol";
 import { IComputeProvider } from "./IComputeProvider.sol";

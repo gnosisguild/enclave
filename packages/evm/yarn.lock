@@ -2999,7 +2999,7 @@ hardhat@^2.22.0:
     raw-body "^2.4.1"
     resolve "1.17.0"
     semver "^6.3.0"
-    solc "0.8.26"
+    solc "0.8.27"
     source-map-support "^0.5.13"
     stacktrace-parser "^0.1.10"
     tsort "0.0.1"
@@ -4313,9 +4313,9 @@ slice-ansi@^4.0.0:
     astral-regex "^2.0.0"
     is-fullwidth-code-point "^3.0.0"
 
-solc@0.8.26:
-  version "0.8.26"
-  resolved "https://registry.yarnpkg.com/solc/-/solc-0.8.26.tgz#afc78078953f6ab3e727c338a2fefcd80dd5b01a"
+solc@0.8.27:
+  version "0.8.27"
+  resolved "https://registry.yarnpkg.com/solc/-/solc-0.8.27.tgz#afc78078953f6ab3e727c338a2fefcd80dd5b01a"
   integrity sha512-yiPQNVf5rBFHwN6SIf3TUUvVAFKcQqmSUFeq+fb6pNRCo0ZCgpYOZDi3BVoezCPIAcKrVYd/qXlBLUP9wVrZ9g==
   dependencies:
     command-exists "^1.2.8"

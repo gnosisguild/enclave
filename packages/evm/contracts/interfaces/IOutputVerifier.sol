@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
 interface IOutputVerifier {
     /// @notice This function should be called by the Enclave contract to verify the output of a computation.
