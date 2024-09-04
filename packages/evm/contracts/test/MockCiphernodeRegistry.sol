@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
-import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
+import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 
-contract MockCyphernodeRegistry is ICyphernodeRegistry {
+contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function requestCommittee(
         uint256,
         address filter,
@@ -33,12 +33,12 @@ contract MockCyphernodeRegistry is ICyphernodeRegistry {
         }
     }
 
-    function isCyphernodeEligible(address) external pure returns (bool) {
+    function isCiphernodeEligible(address) external pure returns (bool) {
         return false;
     }
 }
 
-contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
+contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function requestCommittee(
         uint256,
         address filter,
@@ -62,7 +62,7 @@ contract MockCyphernodeRegistryEmptyKey is ICyphernodeRegistry {
         return hex"";
     }
 
-    function isCyphernodeEligible(address) external pure returns (bool) {
+    function isCiphernodeEligible(address) external pure returns (bool) {
         return false;
     }
 }

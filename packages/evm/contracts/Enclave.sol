@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
 import {
     IEnclave,
     E3,
-    IComputationModule,
-    IExecutionModule
+    IE3Program,
+    IComputeProvider
 } from "./interfaces/IEnclave.sol";
-import { ICyphernodeRegistry } from "./interfaces/ICyphernodeRegistry.sol";
+import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
-import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
+import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -28,24 +28,24 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    ICyphernodeRegistry public cyphernodeRegistry; // address of the Cyphernode registry.
+    ICiphernodeRegistry public ciphernodeRegistry; // address of the Ciphernode registry.
     uint256 public maxDuration; // maximum duration of a computation in seconds.
     uint256 public nexte3Id; // ID of the next E3.
     uint256 public requests; // total number of requests made to Enclave.
 
-    // TODO: should computation and execution modules be explicitly allowed?
+    // TODO: should computation and compute providers be explicitly allowed?
     // My intuition is that an allowlist is required since they impose slashing conditions.
     // But perhaps this is one place where node pools might be utilized, allowing nodes to
     // opt in to being selected for specific computations, along with the corresponding slashing conditions.
     // This would reduce the governance overhead for Enclave.
 
-    // Mapping of allowed computation modules.
-    mapping(IComputationModule computationModule => bool allowed)
+    // Mapping of allowed E3 Programs.
+    mapping(IE3Program computationModule => bool allowed)
         public computationModules;
 
-    // Mapping of allowed execution modules.
-    mapping(IExecutionModule executionModule => bool allowed)
-        public executionModules;
+    // Mapping of allowed compute providers.
+    mapping(IComputeProvider computeProvider => bool allowed)
+        public computeProviders;
 
     // Mapping of E3s.
     mapping(uint256 e3Id => E3 e3) public e3s;
@@ -63,7 +63,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     error CommitteeSelectionFailed();
-    error ComputationModuleNotAllowed(IComputationModule computationModule);
+    error E3ProgramNotAllowed(IE3Program computationModule);
     error E3AlreadyActivated(uint256 e3Id);
     error E3Expired();
     error E3NotActivated(uint256 e3Id);
@@ -74,8 +74,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputation();
-    error InvalidExecutionModuleSetup();
-    error InvalidCyphernodeRegistry(ICyphernodeRegistry cyphernodeRegistry);
+    error InvalidComputeProviderSetup();
+    error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
     error InvalidInput();
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
@@ -96,22 +96,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _maxDuration The maximum duration of a computation in seconds
     constructor(
         address _owner,
-        ICyphernodeRegistry _cyphernodeRegistry,
+        ICiphernodeRegistry _ciphernodeRegistry,
         uint256 _maxDuration
     ) {
-        initialize(_owner, _cyphernodeRegistry, _maxDuration);
+        initialize(_owner, _ciphernodeRegistry, _maxDuration);
     }
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
     function initialize(
         address _owner,
-        ICyphernodeRegistry _cyphernodeRegistry,
+        ICiphernodeRegistry _ciphernodeRegistry,
         uint256 _maxDuration
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
-        setCyphernodeRegistry(_cyphernodeRegistry);
+        setCiphernodeRegistry(_ciphernodeRegistry);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -126,13 +126,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint32[2] calldata threshold,
         uint256[2] calldata startWindow,
         uint256 duration,
-        IComputationModule computationModule,
+        IE3Program computationModule,
         bytes memory computationParams,
-        IExecutionModule executionModule,
+        IComputeProvider computeProvider,
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
-        // TODO: should payment checks be somewhere else? Perhaps in the computation module or cyphernode registry?
+        // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
         require(msg.value > 0, PaymentRequired(msg.value));
         require(
             threshold[1] >= threshold[0] && threshold[0] > 0,
@@ -150,11 +150,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         require(
             computationModules[computationModule],
-            ComputationModuleNotAllowed(computationModule)
+            E3ProgramNotAllowed(computationModule)
         );
         require(
-            executionModules[executionModule],
-            ModuleNotEnabled(address(executionModule))
+            computeProviders[computeProvider],
+            ModuleNotEnabled(address(computeProvider))
         );
 
         // TODO: should IDs be incremental or produced deterministically?
@@ -166,12 +166,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         require(address(inputValidator) != address(0), InvalidComputation());
 
-        // TODO: validate that the requested computation can be performed by the given execution module.
-        // Perhaps the execution module should be returned by the computation module?
-        IOutputVerifier outputVerifier = executionModule.validate(emParams);
+        // TODO: validate that the requested computation can be performed by the given compute provider.
+        // Perhaps the compute provider should be returned by the E3 Program?
+        IDecryptionVerifier decryptionVerifier = computeProvider.validate(
+            emParams
+        );
         require(
-            address(outputVerifier) != address(0),
-            InvalidExecutionModuleSetup()
+            address(decryptionVerifier) != address(0),
+            InvalidComputeProviderSetup()
         );
 
         e3 = E3({
@@ -180,9 +182,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             duration: duration,
             expiration: 0,
             computationModule: computationModule,
-            executionModule: executionModule,
+            computeProvider: computeProvider,
             inputValidator: inputValidator,
-            outputVerifier: outputVerifier,
+            decryptionVerifier: decryptionVerifier,
             committeePublicKey: hex"",
             ciphertextOutput: hex"",
             plaintextOutput: hex""
@@ -190,7 +192,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3s[e3Id] = e3;
 
         require(
-            cyphernodeRegistry.requestCommittee(e3Id, filter, threshold),
+            ciphernodeRegistry.requestCommittee(e3Id, filter, threshold),
             CommitteeSelectionFailed()
         );
 
@@ -199,7 +201,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3s[e3Id],
             filter,
             computationModule,
-            executionModule
+            computeProvider
         );
     }
 
@@ -212,7 +214,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: handle what happens to the payment if the start window has passed.
         require(e3.startWindow[1] >= block.timestamp, E3Expired());
 
-        bytes memory publicKey = cyphernodeRegistry.committeePublicKey(e3Id);
+        bytes memory publicKey = ciphernodeRegistry.committeePublicKey(e3Id);
         // Note: This check feels weird
         require(publicKey.length > 0, CommitteeSelectionFailed());
 
@@ -291,7 +293,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             PlaintextOutputAlreadyPublished(e3Id)
         );
         bytes memory output;
-        (output, success) = e3.outputVerifier.verify(e3Id, data);
+        (output, success) = e3.decryptionVerifier.verify(e3Id, data);
         require(success, InvalidOutput(output));
         e3s[e3Id].plaintextOutput = output;
 
@@ -312,21 +314,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit MaxDurationSet(_maxDuration);
     }
 
-    function setCyphernodeRegistry(
-        ICyphernodeRegistry _cyphernodeRegistry
+    function setCiphernodeRegistry(
+        ICiphernodeRegistry _ciphernodeRegistry
     ) public onlyOwner returns (bool success) {
         require(
-            address(_cyphernodeRegistry) != address(0) &&
-                _cyphernodeRegistry != cyphernodeRegistry,
-            InvalidCyphernodeRegistry(_cyphernodeRegistry)
+            address(_ciphernodeRegistry) != address(0) &&
+                _ciphernodeRegistry != ciphernodeRegistry,
+            InvalidCiphernodeRegistry(_ciphernodeRegistry)
         );
-        cyphernodeRegistry = _cyphernodeRegistry;
+        ciphernodeRegistry = _ciphernodeRegistry;
         success = true;
-        emit CyphernodeRegistrySet(address(_cyphernodeRegistry));
+        emit CiphernodeRegistrySet(address(_ciphernodeRegistry));
     }
 
-    function enableComputationModule(
-        IComputationModule computationModule
+    function enableE3Program(
+        IE3Program computationModule
     ) public onlyOwner returns (bool success) {
         require(
             !computationModules[computationModule],
@@ -334,23 +336,23 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         computationModules[computationModule] = true;
         success = true;
-        emit ComputationModuleEnabled(computationModule);
+        emit E3ProgramEnabled(computationModule);
     }
 
-    function enableExecutionModule(
-        IExecutionModule executionModule
+    function enableComputeProvider(
+        IComputeProvider computeProvider
     ) public onlyOwner returns (bool success) {
         require(
-            !executionModules[executionModule],
-            ModuleAlreadyEnabled(address(executionModule))
+            !computeProviders[computeProvider],
+            ModuleAlreadyEnabled(address(computeProvider))
         );
-        executionModules[executionModule] = true;
+        computeProviders[computeProvider] = true;
         success = true;
-        emit ExecutionModuleEnabled(executionModule);
+        emit ComputeProviderEnabled(computeProvider);
     }
 
-    function disableComputationModule(
-        IComputationModule computationModule
+    function disableE3Program(
+        IE3Program computationModule
     ) public onlyOwner returns (bool success) {
         require(
             computationModules[computationModule],
@@ -358,19 +360,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         delete computationModules[computationModule];
         success = true;
-        emit ComputationModuleDisabled(computationModule);
+        emit E3ProgramDisabled(computationModule);
     }
 
-    function disableExecutionModule(
-        IExecutionModule executionModule
+    function disableComputeProvider(
+        IComputeProvider computeProvider
     ) public onlyOwner returns (bool success) {
         require(
-            executionModules[executionModule],
-            ModuleNotEnabled(address(executionModule))
+            computeProviders[computeProvider],
+            ModuleNotEnabled(address(computeProvider))
         );
-        delete executionModules[executionModule];
+        delete computeProviders[computeProvider];
         success = true;
-        emit ExecutionModuleDisabled(executionModule);
+        emit ComputeProviderDisabled(computeProvider);
     }
 
     ////////////////////////////////////////////////////////////
@@ -382,14 +384,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function getE3(uint256 e3Id) public view returns (E3 memory e3) {
         e3 = e3s[e3Id];
         require(
-            e3.computationModule != IComputationModule(address(0)),
+            e3.computationModule != IE3Program(address(0)),
             E3DoesNotExist(e3Id)
         );
     }
 
     function getInputRoot(uint256 e3Id) public view returns (uint256) {
         require(
-            e3s[e3Id].computationModule != IComputationModule(address(0)),
+            e3s[e3Id].computationModule != IE3Program(address(0)),
             E3DoesNotExist(e3Id)
         );
         return InternalLeanIMT._root(inputs[e3Id]);

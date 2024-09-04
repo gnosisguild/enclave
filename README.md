@@ -22,8 +22,8 @@ sequenceDiagram
     participant Enclave
     participant Ciphernode Registry
     participant Ciphernodes
-    participant Computation Module
-    participant Execution Module
+    participant E3 Program
+    participant Compute Provider
 
     loop Each computation request
         Requester ->> Enclave: Request computation
@@ -39,16 +39,16 @@ sequenceDiagram
 
             loop Each input
                 Data Providers ->> Enclave: Publish inputs
-                Enclave ->> Computation Module: Validate inputs
-                activate Computation Module
-                    Computation Module -->> Enclave: 👌
-                deactivate Computation Module
+                Enclave ->> E3 Program: Validate inputs
+                activate E3 Program
+                    E3 Program -->> Enclave: 👌
+                deactivate E3 Program
             end
 
-            Enclave ->> Execution Module: Request execution
-            activate Execution Module
-            Execution Module -->> Enclave: Publish ciphertext output
-            deactivate Execution Module
+            Enclave ->> Compute Provider: Request execution
+            activate Compute Provider
+            Compute Provider -->> Enclave: Publish ciphertext output
+            deactivate Compute Provider
 
             Enclave -->> Ciphernodes: Request plaintext output
             activate Ciphernodes
@@ -60,6 +60,77 @@ sequenceDiagram
         deactivate Enclave
     end
 
+```
+
+---
+
+```mermaid
+sequenceDiagram
+    participant Owner
+    participant Enclave
+    participant CiphernodeRegistry
+    participant E3Program
+    participant ComputeProvider
+
+    Owner->>Enclave: deploy(owner, ciphernodeRegistry, maxDuration)
+    Enclave->>Enclave: initialize()
+    Owner->>Enclave: enableE3Program()
+    Owner->>Enclave: enableComputeProvider()
+
+    User->>Enclave: request(parameters)
+    Enclave->>E3Program: validate(computationParams)
+    E3Program-->>Enclave: inputValidator
+    Enclave->>ComputeProvider: validate(emParams)
+    ComputeProvider-->>Enclave: decryptionVerifier
+    Enclave->>CiphernodeRegistry: requestCommittee(e3Id, filter, threshold)
+    CiphernodeRegistry-->>Enclave: success
+    Enclave-->>User: e3Id, E3 struct
+```
+
+---
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Enclave
+    participant CiphernodeRegistry
+    participant E3Program
+    participant ComputeProvider
+    participant InputValidator
+    participant DecryptionVerifier
+
+    User->>Enclave: request(parameters)
+    Enclave->>E3Program: validate(computationParams)
+    E3Program-->>Enclave: inputValidator
+    Enclave->>ComputeProvider: validate(emParams)
+    ComputeProvider-->>Enclave: decryptionVerifier
+    Enclave->>CiphernodeRegistry: requestCommittee(e3Id, filter, threshold)
+    CiphernodeRegistry-->>Enclave: success
+    Enclave-->>User: e3Id, E3 struct
+
+    User->>Enclave: activate(e3Id)
+    Enclave->>CiphernodeRegistry: committeePublicKey(e3Id)
+    CiphernodeRegistry-->>Enclave: publicKey
+    Enclave->>Enclave: Set expiration and committeePublicKey
+    Enclave-->>User: success
+
+    User->>Enclave: publishInput(e3Id, data)
+    Enclave->>InputValidator: validate(msg.sender, data)
+    InputValidator-->>Enclave: input, success
+    Enclave->>Enclave: Store input
+    Enclave-->>User: success
+
+    User->>Enclave: publishCiphertextOutput(e3Id, data)
+    Enclave->>DecryptionVerifier: verify(e3Id, data)
+    DecryptionVerifier-->>Enclave: output, success
+    Enclave->>Enclave: Store ciphertextOutput
+    Enclave-->>User: success
+
+    User->>Enclave: publishPlaintextOutput(e3Id, data)
+    Enclave->>E3Program: verify(e3Id, data)
+    E3Program-->>Enclave: output, success
+    Enclave->>Enclave: Store plaintextOutput
+    Enclave-->>User: success
 ```
 
 ## Security and Liability

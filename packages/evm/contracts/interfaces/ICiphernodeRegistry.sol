@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
-interface ICyphernodeRegistry {
+interface ICiphernodeRegistry {
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
     /// @param filter Address of the contract that will coordinate committee selection.
@@ -21,13 +21,13 @@ interface ICyphernodeRegistry {
     /// @param enclave Address of the enclave contract.
     event EnclaveSet(address indexed enclave);
 
-    /// @notice This event MUST be emitted when a cyphernode is added to the registry.
-    event CyphernodeAdded(address indexed node);
+    /// @notice This event MUST be emitted when a ciphernode is added to the registry.
+    event CiphernodeAdded(address indexed node);
 
-    /// @notice This event MUST be emitted when a cyphernode is removed from the registry.
-    event CyphernodeRemoved(address indexed node);
+    /// @notice This event MUST be emitted when a ciphernode is removed from the registry.
+    event CiphernodeRemoved(address indexed node);
 
-    function isCyphernodeEligible(address cyphernode) external returns (bool);
+    function isCiphernodeEligible(address ciphernode) external returns (bool);
 
     /// @notice Initiates the committee selection process for a specified E3.
     /// @dev This function MUST revert when not called by the Enclave contract.
