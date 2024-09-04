@@ -26,7 +26,7 @@ sequenceDiagram
     participant DecryptionVerifier
 
     Users->>Enclave: request(parameters)
-    Enclave->>E3Program: validate(computationParams)
+    Enclave->>E3Program: validate(e3ProgramParams)
     E3Program-->>Enclave: inputValidator
     Enclave->>ComputeProvider: validate(emParams)
     ComputeProvider-->>Enclave: decryptionVerifier
