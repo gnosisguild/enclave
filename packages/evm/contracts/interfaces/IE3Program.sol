@@ -3,7 +3,7 @@ pragma solidity >=0.8.26;
 
 import { IInputValidator } from "./IInputValidator.sol";
 
-interface IComputationModule {
+interface IE3Program {
     /// @notice This function should be called by the Enclave contract to validate the computation parameters.
     /// @param params ABI encoded computation parameters.
     /// @return inputValidator The input validator to be used for the computation.

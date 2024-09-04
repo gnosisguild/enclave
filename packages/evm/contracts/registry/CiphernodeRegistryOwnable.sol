@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
+import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
+contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //
@@ -16,7 +16,7 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
 
     address public enclave;
 
-    mapping(address cyphernode => bool isEnabled) public isEnabled;
+    mapping(address ciphernode => bool isEnabled) public isEnabled;
 
     mapping(uint256 e3Id => IRegistryFilter filter) public requests;
     mapping(uint256 e3Id => bytes publicKey) public publicKeys;
@@ -31,7 +31,7 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
     error CommitteeAlreadyPublished();
     error CommitteeDoesNotExist();
     error CommitteeNotPublished();
-    error CyphernodeNotEnabled(address node);
+    error CiphernodeNotEnabled(address node);
     error OnlyEnclave();
 
     ////////////////////////////////////////////////////////////
@@ -91,10 +91,10 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         // only to be published by the filter
         require(address(requests[e3Id]) == msg.sender, CommitteeDoesNotExist());
 
-        // for (uint256 i = 0; i < cyphernodes.length; i++) {
+        // for (uint256 i = 0; i < ciphernodes.length; i++) {
         //     require(
-        //         isEnabled[cyphernodes[i]] == true,
-        //         CyphernodeNotEnabled(cyphernodes[i])
+        //         isEnabled[ciphernodes[i]] == true,
+        //         CiphernodeNotEnabled(ciphernodes[i])
         //     );
         // }
 
@@ -113,17 +113,17 @@ contract CyphernodeRegistryOwnable is ICyphernodeRegistry, OwnableUpgradeable {
         emit EnclaveSet(_enclave);
     }
 
-    function addCyphernode(address node) external onlyOwner {
+    function addCiphernode(address node) external onlyOwner {
         isEnabled[node] = true;
-        emit CyphernodeAdded(node);
+        emit CiphernodeAdded(node);
     }
 
-    function removeCyphernode(address node) external onlyOwner {
+    function removeCiphernode(address node) external onlyOwner {
         isEnabled[node] = false;
-        emit CyphernodeRemoved(node);
+        emit CiphernodeRemoved(node);
     }
 
-    function isCyphernodeEligible(address node) external view returns (bool) {
+    function isCiphernodeEligible(address node) external view returns (bool) {
         return isEnabled[node];
     }
 

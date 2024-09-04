@@ -3,7 +3,7 @@ import type { TaskArguments } from "hardhat/types";
 
 task("task:deployEnclave", "Deploys Enclave contract")
   .addParam("owner", "Account that will own this contract")
-  .addParam("registry", "Address of the cyphernode registry")
+  .addParam("registry", "Address of the ciphernode registry")
   .addParam("maxDuration", "The maximum duration of a computation in seconds")
   .setAction(async function (taskArguments: TaskArguments, { ethers }) {
     const signers = await ethers.getSigners();

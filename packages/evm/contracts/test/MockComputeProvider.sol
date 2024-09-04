@@ -2,11 +2,11 @@
 pragma solidity >=0.8.26;
 
 import {
-    IExecutionModule,
+    IComputeProvider,
     IOutputVerifier
-} from "../interfaces/IExecutionModule.sol";
+} from "../interfaces/IComputeProvider.sol";
 
-contract MockExecutionModule is IExecutionModule {
+contract MockComputeProvider is IComputeProvider {
     error invalidParams();
 
     function validate(

@@ -9,7 +9,7 @@ import {
 interface IRegistry {
     function publishCommittee(
         uint256 e3Id,
-        address[] calldata cyphernodes,
+        address[] calldata ciphernodes,
         bytes calldata publicKey
     ) external;
 }

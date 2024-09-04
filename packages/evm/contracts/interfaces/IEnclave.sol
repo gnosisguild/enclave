@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.26;
 
-import { E3, IComputationModule, IExecutionModule } from "./IE3.sol";
+import { E3, IE3Program, IComputeProvider } from "./IE3.sol";
 
 interface IEnclave {
     ////////////////////////////////////////////////////////////
@@ -13,15 +13,15 @@ interface IEnclave {
     /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully requested.
     /// @param e3Id ID of the E3.
     /// @param e3 Details of the E3.
-    /// @param filter Address of the pool of nodes from which the Cypher Node committee was selected.
+    /// @param filter Address of the pool of nodes from which the Cipher Node committee was selected.
     /// @param computationModule Address of the Computation module selected.
-    /// @param executionModule  Address of the execution module selected.
+    /// @param computeProvider  Address of the compute provider selected.
     event E3Requested(
         uint256 e3Id,
         E3 e3,
         address filter,
-        IComputationModule indexed computationModule,
-        IExecutionModule indexed executionModule
+        IE3Program indexed computationModule,
+        IComputeProvider indexed computeProvider
     );
 
     /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.
@@ -64,25 +64,25 @@ interface IEnclave {
     /// @param maxDuration The maximum duration of a computation in seconds.
     event MaxDurationSet(uint256 maxDuration);
 
-    /// @notice This event MUST be emitted any time the CyphernodeRegistry is set.
-    /// @param cyphernodeRegistry The address of the CyphernodeRegistry contract.
-    event CyphernodeRegistrySet(address cyphernodeRegistry);
+    /// @notice This event MUST be emitted any time the CiphernodeRegistry is set.
+    /// @param ciphernodeRegistry The address of the CiphernodeRegistry contract.
+    event CiphernodeRegistrySet(address ciphernodeRegistry);
 
-    /// @notice This event MUST be emitted any time a computation module is enabled.
-    /// @param computationModule The address of the computation module.
-    event ComputationModuleEnabled(IComputationModule computationModule);
+    /// @notice This event MUST be emitted any time a E3 Program is enabled.
+    /// @param computationModule The address of the E3 Program.
+    event E3ProgramEnabled(IE3Program computationModule);
 
-    /// @notice This event MUST be emitted any time a computation module is disabled.
-    /// @param computationModule The address of the computation module.
-    event ComputationModuleDisabled(IComputationModule computationModule);
+    /// @notice This event MUST be emitted any time a E3 Program is disabled.
+    /// @param computationModule The address of the E3 Program.
+    event E3ProgramDisabled(IE3Program computationModule);
 
-    /// @notice This event MUST be emitted any time an execution module is enabled.
-    /// @param executionModule The address of the execution module.
-    event ExecutionModuleEnabled(IExecutionModule executionModule);
+    /// @notice This event MUST be emitted any time an compute provider is enabled.
+    /// @param computeProvider The address of the compute provider.
+    event ComputeProviderEnabled(IComputeProvider computeProvider);
 
-    /// @notice This event MUST be emitted any time an execution module is disabled.
-    /// @param executionModule The address of the execution module.
-    event ExecutionModuleDisabled(IExecutionModule executionModule);
+    /// @notice This event MUST be emitted any time an compute provider is disabled.
+    /// @param computeProvider The address of the compute provider.
+    event ComputeProviderDisabled(IComputeProvider computeProvider);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -95,10 +95,10 @@ interface IEnclave {
     /// @param filter IDs of the pool of nodes from which to select the committee.
     /// @param threshold The M/N threshold for the committee.
     /// @param duration The duration of the computation in seconds.
-    /// @param computationModule Address of the computation module.
+    /// @param computationModule Address of the E3 Program.
     /// @param computationParams ABI encoded computation parameters.
-    /// @param executionModule Address of the execution module.
-    /// @param emParams ABI encoded execution module parameters.
+    /// @param computeProvider Address of the compute provider.
+    /// @param emParams ABI encoded compute provider parameters.
     /// @return e3Id ID of the E3.
     /// @return e3 The E3 struct.
     function request(
@@ -106,9 +106,9 @@ interface IEnclave {
         uint32[2] calldata threshold,
         uint256[2] calldata startWindow,
         uint256 duration,
-        IComputationModule computationModule,
+        IE3Program computationModule,
         bytes memory computationParams,
-        IExecutionModule executionModule,
+        IComputeProvider computeProvider,
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3);
 
