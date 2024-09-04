@@ -3,7 +3,7 @@ pragma solidity >=0.8.27;
 
 import {
     IComputeProvider,
-    IOutputVerifier
+    IDecryptionVerifier
 } from "../interfaces/IComputeProvider.sol";
 
 contract MockComputeProvider is IComputeProvider {
@@ -11,12 +11,12 @@ contract MockComputeProvider is IComputeProvider {
 
     function validate(
         bytes memory params
-    ) external pure returns (IOutputVerifier outputVerifier) {
+    ) external pure returns (IDecryptionVerifier decryptionVerifier) {
         require(params.length == 32, invalidParams());
         // solhint-disable no-inline-assembly
         assembly {
-            outputVerifier := mload(add(params, 32))
+            decryptionVerifier := mload(add(params, 32))
         }
-        (outputVerifier) = abi.decode(params, (IOutputVerifier));
+        (decryptionVerifier) = abi.decode(params, (IDecryptionVerifier));
     }
 }

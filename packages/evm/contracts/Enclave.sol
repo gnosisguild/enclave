@@ -9,7 +9,7 @@ import {
 } from "./interfaces/IEnclave.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
-import { IOutputVerifier } from "./interfaces/IOutputVerifier.sol";
+import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -168,9 +168,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         // TODO: validate that the requested computation can be performed by the given compute provider.
         // Perhaps the compute provider should be returned by the E3 Program?
-        IOutputVerifier outputVerifier = computeProvider.validate(emParams);
+        IDecryptionVerifier decryptionVerifier = computeProvider.validate(
+            emParams
+        );
         require(
-            address(outputVerifier) != address(0),
+            address(decryptionVerifier) != address(0),
             InvalidComputeProviderSetup()
         );
 
@@ -182,7 +184,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             computationModule: computationModule,
             computeProvider: computeProvider,
             inputValidator: inputValidator,
-            outputVerifier: outputVerifier,
+            decryptionVerifier: decryptionVerifier,
             committeePublicKey: hex"",
             ciphertextOutput: hex"",
             plaintextOutput: hex""
@@ -291,7 +293,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             PlaintextOutputAlreadyPublished(e3Id)
         );
         bytes memory output;
-        (output, success) = e3.outputVerifier.verify(e3Id, data);
+        (output, success) = e3.decryptionVerifier.verify(e3Id, data);
         require(success, InvalidOutput(output));
         e3s[e3Id].plaintextOutput = output;
 

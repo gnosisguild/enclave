@@ -81,7 +81,7 @@ sequenceDiagram
     Enclave->>E3Program: validate(computationParams)
     E3Program-->>Enclave: inputValidator
     Enclave->>ComputeProvider: validate(emParams)
-    ComputeProvider-->>Enclave: outputVerifier
+    ComputeProvider-->>Enclave: decryptionVerifier
     Enclave->>CiphernodeRegistry: requestCommittee(e3Id, filter, threshold)
     CiphernodeRegistry-->>Enclave: success
     Enclave-->>User: e3Id, E3 struct
@@ -97,13 +97,13 @@ sequenceDiagram
     participant E3Program
     participant ComputeProvider
     participant InputValidator
-    participant OutputVerifier
+    participant DecryptionVerifier
 
     User->>Enclave: request(parameters)
     Enclave->>E3Program: validate(computationParams)
     E3Program-->>Enclave: inputValidator
     Enclave->>ComputeProvider: validate(emParams)
-    ComputeProvider-->>Enclave: outputVerifier
+    ComputeProvider-->>Enclave: decryptionVerifier
     Enclave->>CiphernodeRegistry: requestCommittee(e3Id, filter, threshold)
     CiphernodeRegistry-->>Enclave: success
     Enclave-->>User: e3Id, E3 struct
@@ -121,8 +121,8 @@ sequenceDiagram
     Enclave-->>User: success
 
     User->>Enclave: publishCiphertextOutput(e3Id, data)
-    Enclave->>OutputVerifier: verify(e3Id, data)
-    OutputVerifier-->>Enclave: output, success
+    Enclave->>DecryptionVerifier: verify(e3Id, data)
+    DecryptionVerifier-->>Enclave: output, success
     Enclave->>Enclave: Store ciphertextOutput
     Enclave-->>User: success
 

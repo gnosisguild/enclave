@@ -4,7 +4,7 @@ pragma solidity >=0.8.27;
 import { IInputValidator } from "./IInputValidator.sol";
 import { IComputeProvider } from "./IComputeProvider.sol";
 import { IE3Program } from "./IE3Program.sol";
-import { IOutputVerifier } from "./IOutputVerifier.sol";
+import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 
 /// @title E3 struct
 /// @notice This struct represents an E3 computation.
@@ -15,7 +15,7 @@ import { IOutputVerifier } from "./IOutputVerifier.sol";
 /// @param computationModule Address of the E3 Program contract.
 /// @param computeProvider Address of the compute provider contract.
 /// @param inputValidator Address of the input validator contract.
-/// @param outputVerifier Address of the output verifier contract.
+/// @param decryptionVerifier Address of the output verifier contract.
 /// @param committeeId ID of the selected committee.
 /// @param ciphertextOutput Encrypted output data.
 /// @param plaintextOutput Decrypted output data.
@@ -27,7 +27,7 @@ struct E3 {
     IE3Program computationModule;
     IComputeProvider computeProvider;
     IInputValidator inputValidator;
-    IOutputVerifier outputVerifier;
+    IDecryptionVerifier decryptionVerifier;
     bytes committeePublicKey;
     bytes ciphertextOutput;
     bytes plaintextOutput;

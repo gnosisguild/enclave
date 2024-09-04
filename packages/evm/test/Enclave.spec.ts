@@ -12,9 +12,9 @@ import { poseidon2 } from "poseidon-lite";
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
 import { deployCiphernodeRegistryFixture } from "./fixtures/MockCiphernodeRegistry.fixture";
 import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fixture";
+import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
 import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
-import { deployOutputVerifierFixture } from "./fixtures/MockOutputVerifier.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -32,7 +32,7 @@ describe("Enclave", function () {
 
     const registry = await deployCiphernodeRegistryFixture();
     const computationModule = await deployE3ProgramFixture();
-    const outputVerifier = await deployOutputVerifierFixture();
+    const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
     const inputValidator = await deployInputValidatorFixture();
 
@@ -50,7 +50,7 @@ describe("Enclave", function () {
       enclave,
       mocks: {
         computationModule,
-        outputVerifier,
+        decryptionVerifier,
         computeProvider,
         inputValidator,
         registry,
@@ -71,7 +71,7 @@ describe("Enclave", function () {
         computeProvider: await computeProvider.getAddress(),
         eMParams: abiCoder.encode(
           ["address"],
-          [await outputVerifier.getAddress()],
+          [await decryptionVerifier.getAddress()],
         ),
       },
     };
@@ -209,7 +209,7 @@ describe("Enclave", function () {
         abiCoder.decode(["address"], request.cMParams)[0],
       );
       expect(e3.computeProvider).to.equal(request.computeProvider);
-      expect(e3.outputVerifier).to.equal(
+      expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.eMParams)[0],
       );
       expect(e3.committeePublicKey).to.equal("0x");
@@ -592,7 +592,7 @@ describe("Enclave", function () {
         abiCoder.decode(["address"], request.cMParams)[0],
       );
       expect(e3.computeProvider).to.equal(request.computeProvider);
-      expect(e3.outputVerifier).to.equal(
+      expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.eMParams)[0],
       );
       expect(e3.committeePublicKey).to.equal("0x");
