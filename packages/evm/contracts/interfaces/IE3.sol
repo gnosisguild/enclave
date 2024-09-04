@@ -12,7 +12,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 /// @param startWindow Start window for the computation: index zero is minimum, index 1 is the maxium.
 /// @param duration Duration of the E3.
 /// @param expiration Timestamp when committee duties expire.
-/// @param computationModule Address of the E3 Program contract.
+/// @param e3Program Address of the E3 Program contract.
 /// @param computeProvider Address of the compute provider contract.
 /// @param inputValidator Address of the input validator contract.
 /// @param decryptionVerifier Address of the output verifier contract.
@@ -24,7 +24,7 @@ struct E3 {
     uint256[2] startWindow;
     uint256 duration;
     uint256 expiration;
-    IE3Program computationModule;
+    IE3Program e3Program;
     IComputeProvider computeProvider;
     IInputValidator inputValidator;
     IDecryptionVerifier decryptionVerifier;

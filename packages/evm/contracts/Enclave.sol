@@ -40,8 +40,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     // This would reduce the governance overhead for Enclave.
 
     // Mapping of allowed E3 Programs.
-    mapping(IE3Program computationModule => bool allowed)
-        public computationModules;
+    mapping(IE3Program e3Program => bool allowed) public e3Programs;
 
     // Mapping of allowed compute providers.
     mapping(IComputeProvider computeProvider => bool allowed)
@@ -63,7 +62,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     error CommitteeSelectionFailed();
-    error E3ProgramNotAllowed(IE3Program computationModule);
+    error E3ProgramNotAllowed(IE3Program e3Program);
     error E3AlreadyActivated(uint256 e3Id);
     error E3Expired();
     error E3NotActivated(uint256 e3Id);
@@ -126,8 +125,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint32[2] calldata threshold,
         uint256[2] calldata startWindow,
         uint256 duration,
-        IE3Program computationModule,
-        bytes memory computationParams,
+        IE3Program e3Program,
+        bytes memory e3ProgramParams,
         IComputeProvider computeProvider,
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
@@ -148,10 +147,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             duration > 0 && duration <= maxDuration,
             InvalidDuration(duration)
         );
-        require(
-            computationModules[computationModule],
-            E3ProgramNotAllowed(computationModule)
-        );
+        require(e3Programs[e3Program], E3ProgramNotAllowed(e3Program));
         require(
             computeProviders[computeProvider],
             ModuleNotEnabled(address(computeProvider))
@@ -161,9 +157,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3Id = nexte3Id;
         nexte3Id++;
 
-        IInputValidator inputValidator = computationModule.validate(
-            computationParams
-        );
+        IInputValidator inputValidator = e3Program.validate(e3ProgramParams);
         require(address(inputValidator) != address(0), InvalidComputation());
 
         // TODO: validate that the requested computation can be performed by the given compute provider.
@@ -181,7 +175,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             startWindow: startWindow,
             duration: duration,
             expiration: 0,
-            computationModule: computationModule,
+            e3Program: e3Program,
             computeProvider: computeProvider,
             inputValidator: inputValidator,
             decryptionVerifier: decryptionVerifier,
@@ -196,13 +190,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CommitteeSelectionFailed()
         );
 
-        emit E3Requested(
-            e3Id,
-            e3s[e3Id],
-            filter,
-            computationModule,
-            computeProvider
-        );
+        emit E3Requested(e3Id, e3s[e3Id], filter, e3Program, computeProvider);
     }
 
     function activate(uint256 e3Id) external returns (bool success) {
@@ -270,7 +258,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CiphertextOutputAlreadyPublished(e3Id)
         );
         bytes memory output;
-        (output, success) = e3.computationModule.verify(e3Id, data);
+        (output, success) = e3.e3Program.verify(e3Id, data);
         require(success, InvalidOutput(output));
         e3s[e3Id].ciphertextOutput = output;
 
@@ -328,15 +316,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     function enableE3Program(
-        IE3Program computationModule
+        IE3Program e3Program
     ) public onlyOwner returns (bool success) {
         require(
-            !computationModules[computationModule],
-            ModuleAlreadyEnabled(address(computationModule))
+            !e3Programs[e3Program],
+            ModuleAlreadyEnabled(address(e3Program))
         );
-        computationModules[computationModule] = true;
+        e3Programs[e3Program] = true;
         success = true;
-        emit E3ProgramEnabled(computationModule);
+        emit E3ProgramEnabled(e3Program);
     }
 
     function enableComputeProvider(
@@ -352,15 +340,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     }
 
     function disableE3Program(
-        IE3Program computationModule
+        IE3Program e3Program
     ) public onlyOwner returns (bool success) {
-        require(
-            computationModules[computationModule],
-            ModuleNotEnabled(address(computationModule))
-        );
-        delete computationModules[computationModule];
+        require(e3Programs[e3Program], ModuleNotEnabled(address(e3Program)));
+        delete e3Programs[e3Program];
         success = true;
-        emit E3ProgramDisabled(computationModule);
+        emit E3ProgramDisabled(e3Program);
     }
 
     function disableComputeProvider(
@@ -383,15 +368,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function getE3(uint256 e3Id) public view returns (E3 memory e3) {
         e3 = e3s[e3Id];
-        require(
-            e3.computationModule != IE3Program(address(0)),
-            E3DoesNotExist(e3Id)
-        );
+        require(e3.e3Program != IE3Program(address(0)), E3DoesNotExist(e3Id));
     }
 
     function getInputRoot(uint256 e3Id) public view returns (uint256) {
         require(
-            e3s[e3Id].computationModule != IE3Program(address(0)),
+            e3s[e3Id].e3Program != IE3Program(address(0)),
             E3DoesNotExist(e3Id)
         );
         return InternalLeanIMT._root(inputs[e3Id]);

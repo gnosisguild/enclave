@@ -31,7 +31,7 @@ describe("Enclave", function () {
     const [owner, notTheOwner] = await ethers.getSigners();
 
     const registry = await deployCiphernodeRegistryFixture();
-    const computationModule = await deployE3ProgramFixture();
+    const e3Program = await deployE3ProgramFixture();
     const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
     const inputValidator = await deployInputValidatorFixture();
@@ -41,7 +41,7 @@ describe("Enclave", function () {
       registry: await registry.getAddress(),
     });
 
-    await enclave.enableE3Program(await computationModule.getAddress());
+    await enclave.enableE3Program(await e3Program.getAddress());
     await enclave.enableComputeProvider(await computeProvider.getAddress());
 
     return {
@@ -49,7 +49,7 @@ describe("Enclave", function () {
       notTheOwner,
       enclave,
       mocks: {
-        computationModule,
+        e3Program,
         decryptionVerifier,
         computeProvider,
         inputValidator,
@@ -63,7 +63,7 @@ describe("Enclave", function () {
           number,
         ],
         duration: time.duration.days(30),
-        computationModule: await computationModule.getAddress(),
+        e3Program: await e3Program.getAddress(),
         cMParams: abiCoder.encode(
           ["address"],
           [await inputValidator.getAddress()],
@@ -194,7 +194,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -204,7 +204,7 @@ describe("Enclave", function () {
 
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
-      expect(e3.computationModule).to.equal(request.computationModule);
+      expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.inputValidator).to.equal(
         abiCoder.decode(["address"], request.cMParams)[0],
       );
@@ -223,31 +223,29 @@ describe("Enclave", function () {
       const {
         notTheOwner,
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
 
-      await expect(
-        enclave.connect(notTheOwner).enableE3Program(computationModule),
-      )
+      await expect(enclave.connect(notTheOwner).enableE3Program(e3Program))
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
     it("reverts if E3 Program is already enabled", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
 
-      await expect(enclave.enableE3Program(computationModule))
+      await expect(enclave.enableE3Program(e3Program))
         .to.be.revertedWithCustomError(enclave, "ModuleAlreadyEnabled")
-        .withArgs(computationModule);
+        .withArgs(e3Program);
     });
     it("enables E3 Program correctly", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      const enabled = await enclave.computationModules(computationModule);
+      const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.true;
     });
     it("returns true if E3 Program is enabled successfully", async function () {
@@ -268,11 +266,9 @@ describe("Enclave", function () {
       const {
         notTheOwner,
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      await expect(
-        enclave.connect(notTheOwner).disableE3Program(computationModule),
-      )
+      await expect(enclave.connect(notTheOwner).disableE3Program(e3Program))
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
@@ -285,31 +281,30 @@ describe("Enclave", function () {
     it("disables E3 Program correctly", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      await enclave.disableE3Program(computationModule);
+      await enclave.disableE3Program(e3Program);
 
-      const enabled = await enclave.computationModules(computationModule);
+      const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.false;
     });
     it("returns true if E3 Program is disabled successfully", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      const result =
-        await enclave.disableE3Program.staticCall(computationModule);
+      const result = await enclave.disableE3Program.staticCall(e3Program);
 
       expect(result).to.be.true;
     });
     it("emits E3ProgramDisabled event", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      await expect(enclave.disableE3Program(computationModule))
+      await expect(enclave.disableE3Program(e3Program))
         .to.emit(enclave, "E3ProgramDisabled")
-        .withArgs(computationModule);
+        .withArgs(e3Program);
     });
   });
 
@@ -414,7 +409,7 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
+          request.e3Program,
           request.cMParams,
           request.computeProvider,
           request.eMParams,
@@ -429,7 +424,7 @@ describe("Enclave", function () {
           [0, 2],
           request.startTime,
           request.duration,
-          request.computationModule,
+          request.e3Program,
           request.cMParams,
           request.computeProvider,
           request.eMParams,
@@ -445,7 +440,7 @@ describe("Enclave", function () {
           [3, 2],
           request.startTime,
           request.duration,
-          request.computationModule,
+          request.e3Program,
           request.cMParams,
           request.computeProvider,
           request.eMParams,
@@ -461,7 +456,7 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           0,
-          request.computationModule,
+          request.e3Program,
           request.cMParams,
           request.computeProvider,
           request.eMParams,
@@ -477,7 +472,7 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           time.duration.days(31),
-          request.computationModule,
+          request.e3Program,
           request.cMParams,
           request.computeProvider,
           request.eMParams,
@@ -511,7 +506,7 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
+          request.e3Program,
           request.cMParams,
           ethers.ZeroAddress,
           request.eMParams,
@@ -530,7 +525,7 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
+          request.e3Program,
           ZeroHash,
           request.computeProvider,
           request.eMParams,
@@ -546,7 +541,7 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
+          request.e3Program,
           request.cMParams,
           request.computeProvider,
           ZeroHash,
@@ -562,7 +557,7 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
+          request.e3Program,
           request.cMParams,
           request.computeProvider,
           request.eMParams,
@@ -577,7 +572,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -587,7 +582,7 @@ describe("Enclave", function () {
 
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
-      expect(e3.computationModule).to.equal(request.computationModule);
+      expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.inputValidator).to.equal(
         abiCoder.decode(["address"], request.cMParams)[0],
       );
@@ -606,7 +601,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -620,7 +615,7 @@ describe("Enclave", function () {
           0,
           e3,
           request.filter,
-          request.computationModule,
+          request.e3Program,
           request.computeProvider,
         );
     });
@@ -642,7 +637,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -667,7 +662,7 @@ describe("Enclave", function () {
         request.threshold,
         startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -691,7 +686,7 @@ describe("Enclave", function () {
         request.threshold,
         startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -717,7 +712,7 @@ describe("Enclave", function () {
         request.threshold,
         startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -741,7 +736,7 @@ describe("Enclave", function () {
         request.threshold,
         startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -763,7 +758,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -796,7 +791,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -822,7 +817,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -841,7 +836,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -874,7 +869,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -899,7 +894,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -920,7 +915,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -944,7 +939,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -969,7 +964,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -998,7 +993,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1034,7 +1029,7 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1051,7 +1046,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1077,7 +1072,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1102,7 +1097,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1123,7 +1118,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1144,7 +1139,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1165,7 +1160,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1197,7 +1192,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1216,7 +1211,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1236,7 +1231,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1262,7 +1257,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1284,7 +1279,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1307,7 +1302,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,
@@ -1329,7 +1324,7 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
+        request.e3Program,
         request.cMParams,
         request.computeProvider,
         request.eMParams,

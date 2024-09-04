@@ -14,13 +14,13 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @param e3 Details of the E3.
     /// @param filter Address of the pool of nodes from which the Cipher Node committee was selected.
-    /// @param computationModule Address of the Computation module selected.
+    /// @param e3Program Address of the Computation module selected.
     /// @param computeProvider  Address of the compute provider selected.
     event E3Requested(
         uint256 e3Id,
         E3 e3,
         address filter,
-        IE3Program indexed computationModule,
+        IE3Program indexed e3Program,
         IComputeProvider indexed computeProvider
     );
 
@@ -69,12 +69,12 @@ interface IEnclave {
     event CiphernodeRegistrySet(address ciphernodeRegistry);
 
     /// @notice This event MUST be emitted any time a E3 Program is enabled.
-    /// @param computationModule The address of the E3 Program.
-    event E3ProgramEnabled(IE3Program computationModule);
+    /// @param e3Program The address of the E3 Program.
+    event E3ProgramEnabled(IE3Program e3Program);
 
     /// @notice This event MUST be emitted any time a E3 Program is disabled.
-    /// @param computationModule The address of the E3 Program.
-    event E3ProgramDisabled(IE3Program computationModule);
+    /// @param e3Program The address of the E3 Program.
+    event E3ProgramDisabled(IE3Program e3Program);
 
     /// @notice This event MUST be emitted any time an compute provider is enabled.
     /// @param computeProvider The address of the compute provider.
@@ -95,8 +95,8 @@ interface IEnclave {
     /// @param filter IDs of the pool of nodes from which to select the committee.
     /// @param threshold The M/N threshold for the committee.
     /// @param duration The duration of the computation in seconds.
-    /// @param computationModule Address of the E3 Program.
-    /// @param computationParams ABI encoded computation parameters.
+    /// @param e3Program Address of the E3 Program.
+    /// @param e3ProgramParams ABI encoded computation parameters.
     /// @param computeProvider Address of the compute provider.
     /// @param emParams ABI encoded compute provider parameters.
     /// @return e3Id ID of the E3.
@@ -106,8 +106,8 @@ interface IEnclave {
         uint32[2] calldata threshold,
         uint256[2] calldata startWindow,
         uint256 duration,
-        IE3Program computationModule,
-        bytes memory computationParams,
+        IE3Program e3Program,
+        bytes memory e3ProgramParams,
         IComputeProvider computeProvider,
         bytes memory emParams
     ) external payable returns (uint256 e3Id, E3 memory e3);
