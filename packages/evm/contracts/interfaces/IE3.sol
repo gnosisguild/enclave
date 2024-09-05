@@ -20,7 +20,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 /// @param ciphertextOutput Encrypted output data.
 /// @param plaintextOutput Decrypted output data.
 struct E3 {
-    bytes32 seed;
+    uint256 seed;
     uint32[2] threshold;
     uint256[2] startWindow;
     uint256 duration;

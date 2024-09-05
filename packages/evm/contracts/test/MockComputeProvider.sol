@@ -10,6 +10,8 @@ contract MockComputeProvider is IComputeProvider {
     error invalidParams();
 
     function validate(
+        uint256,
+        uint256,
         bytes memory params
     ) external pure returns (IDecryptionVerifier decryptionVerifier) {
         require(params.length == 32, invalidParams());

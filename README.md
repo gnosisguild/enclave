@@ -28,7 +28,7 @@ sequenceDiagram
     Users->>Enclave: request(parameters)
     Enclave->>E3Program: validate(e3ProgramParams)
     E3Program-->>Enclave: inputValidator
-    Enclave->>ComputeProvider: validate(emParams)
+    Enclave->>ComputeProvider: validate(computeProviderParams)
     ComputeProvider-->>Enclave: decryptionVerifier
     Enclave->>CiphernodeRegistry: requestCommittee(e3Id, filter, threshold)
     CiphernodeRegistry-->>Enclave: success

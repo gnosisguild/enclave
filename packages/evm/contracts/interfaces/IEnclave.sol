@@ -98,7 +98,7 @@ interface IEnclave {
     /// @param e3Program Address of the E3 Program.
     /// @param e3ProgramParams ABI encoded computation parameters.
     /// @param computeProvider Address of the compute provider.
-    /// @param emParams ABI encoded compute provider parameters.
+    /// @param computeProviderParams ABI encoded compute provider parameters.
     /// @return e3Id ID of the E3.
     /// @return e3 The E3 struct.
     function request(
@@ -109,7 +109,7 @@ interface IEnclave {
         IE3Program e3Program,
         bytes memory e3ProgramParams,
         IComputeProvider computeProvider,
-        bytes memory emParams
+        bytes memory computeProviderParams
     ) external payable returns (uint256 e3Id, E3 memory e3);
 
     /// @notice This function should be called to activate an Encrypted Execution Environment (E3) once it has been
