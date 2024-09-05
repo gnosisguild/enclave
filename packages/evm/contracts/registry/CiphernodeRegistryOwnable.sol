@@ -26,6 +26,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     LeanIMTData public ciphernodes;
 
     mapping(uint256 e3Id => IRegistryFilter filter) public requests;
+    mapping(uint256 e3Id => uint256 root) public roots;
     mapping(uint256 e3Id => bytes publicKey) public publicKeys;
 
     ////////////////////////////////////////////////////////////
@@ -84,6 +85,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             CommitteeAlreadyRequested()
         );
         requests[e3Id] = IRegistryFilter(filter);
+        roots[e3Id] = root();
 
         IRegistryFilter(filter).requestCommittee(e3Id, threshold);
         emit CommitteeRequested(e3Id, filter, threshold);
@@ -161,5 +163,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function isEnabled(address node) public view returns (bool) {
         return ciphernodes._has(uint256(bytes32(bytes20(node))));
+    }
+
+    function root() public view returns (uint256) {
+        return (ciphernodes._root());
+    }
+
+    function rootAt(uint256 e3Id) public view returns (uint256) {
+        return roots[e3Id];
     }
 }
