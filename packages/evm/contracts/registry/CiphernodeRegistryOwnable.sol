@@ -6,8 +6,15 @@ import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    InternalLeanIMT,
+    LeanIMTData,
+    PoseidonT3
+} from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
 contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
+    using InternalLeanIMT for LeanIMTData;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //
@@ -15,8 +22,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     address public enclave;
-
-    mapping(address ciphernode => bool isEnabled) public isEnabled;
+    uint256 public numCiphernodes;
+    LeanIMTData public ciphernodes;
 
     mapping(uint256 e3Id => IRegistryFilter filter) public requests;
     mapping(uint256 e3Id => bytes publicKey) public publicKeys;
@@ -91,13 +98,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         // only to be published by the filter
         require(address(requests[e3Id]) == msg.sender, CommitteeDoesNotExist());
 
-        // for (uint256 i = 0; i < ciphernodes.length; i++) {
-        //     require(
-        //         isEnabled[ciphernodes[i]] == true,
-        //         CiphernodeNotEnabled(ciphernodes[i])
-        //     );
-        // }
-
         publicKeys[e3Id] = publicKey;
         emit CommitteePublished(e3Id, publicKey);
     }
@@ -114,17 +114,36 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     function addCiphernode(address node) external onlyOwner {
-        isEnabled[node] = true;
-        emit CiphernodeAdded(node);
+        uint256 ciphernode = uint256(bytes32(bytes20(node)));
+        ciphernodes._insert(ciphernode);
+        numCiphernodes++;
+        emit CiphernodeAdded(
+            node,
+            ciphernodes._indexOf(ciphernode),
+            numCiphernodes,
+            ciphernodes.size
+        );
     }
 
-    function removeCiphernode(address node) external onlyOwner {
-        isEnabled[node] = false;
-        emit CiphernodeRemoved(node);
+    function removeCiphernode(
+        address node,
+        uint256[] calldata siblingNodes
+    ) external onlyOwner {
+        uint256 ciphernode = uint256(bytes32(bytes20(node)));
+        ciphernodes._remove(ciphernode, siblingNodes);
+        uint256 index = ciphernodes._indexOf(ciphernode);
+        numCiphernodes--;
+        emit CiphernodeAdded(
+            node,
+            ciphernodes._indexOf(ciphernode),
+            numCiphernodes,
+            ciphernodes.size
+        );
+        emit CiphernodeRemoved(node, index, numCiphernodes, ciphernodes.size);
     }
 
     function isCiphernodeEligible(address node) external view returns (bool) {
-        return isEnabled[node];
+        return isEnabled(node);
     }
 
     ////////////////////////////////////////////////////////////
@@ -138,5 +157,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) external view returns (bytes memory publicKey) {
         publicKey = publicKeys[e3Id];
         require(publicKey.length > 0, CommitteeNotPublished());
+    }
+
+    function isEnabled(address node) public view returns (bool) {
+        return ciphernodes._has(uint256(bytes32(bytes20(node))));
     }
 }

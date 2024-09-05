@@ -22,10 +22,28 @@ interface ICiphernodeRegistry {
     event EnclaveSet(address indexed enclave);
 
     /// @notice This event MUST be emitted when a ciphernode is added to the registry.
-    event CiphernodeAdded(address indexed node);
+    /// @param node Address of the ciphernode.
+    /// @param index Index of the ciphernode in the registry.
+    /// @param numNodes Number of ciphernodes in the registry.
+    /// @param size Size of the registry.
+    event CiphernodeAdded(
+        address indexed node,
+        uint256 index,
+        uint256 numNodes,
+        uint256 size
+    );
 
     /// @notice This event MUST be emitted when a ciphernode is removed from the registry.
-    event CiphernodeRemoved(address indexed node);
+    /// @param node Address of the ciphernode.
+    /// @param index Index of the ciphernode in the registry.
+    /// @param numNodes Number of ciphernodes in the registry.
+    /// @param size Size of the registry.
+    event CiphernodeRemoved(
+        address indexed node,
+        uint256 index,
+        uint256 numNodes,
+        uint256 size
+    );
 
     function isCiphernodeEligible(address ciphernode) external returns (bool);
 
