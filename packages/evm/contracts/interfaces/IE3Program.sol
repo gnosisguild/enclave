@@ -5,9 +5,13 @@ import { IInputValidator } from "./IInputValidator.sol";
 
 interface IE3Program {
     /// @notice This function should be called by the Enclave contract to validate the computation parameters.
+    /// @param e3Id ID of the E3.
+    /// @param seed Seed for the computation.
     /// @param params ABI encoded computation parameters.
     /// @return inputValidator The input validator to be used for the computation.
     function validate(
+        uint256 e3Id,
+        uint256 seed,
         bytes calldata params
     ) external returns (IInputValidator inputValidator);
 

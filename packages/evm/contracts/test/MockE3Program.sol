@@ -7,6 +7,8 @@ contract MockE3Program is IE3Program {
     error invalidParams(bytes params);
 
     function validate(
+        uint256,
+        uint256,
         bytes memory params
     ) external pure returns (IInputValidator inputValidator) {
         require(params.length == 32, "invalid params");

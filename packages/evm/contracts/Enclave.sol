@@ -128,7 +128,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         IE3Program e3Program,
         bytes memory e3ProgramParams,
         IComputeProvider computeProvider,
-        bytes memory emParams
+        bytes memory computeProviderParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
         // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
@@ -156,14 +156,21 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: should IDs be incremental or produced deterministically?
         e3Id = nexte3Id;
         nexte3Id++;
+        uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        IInputValidator inputValidator = e3Program.validate(e3ProgramParams);
+        IInputValidator inputValidator = e3Program.validate(
+            e3Id,
+            seed,
+            e3ProgramParams
+        );
         require(address(inputValidator) != address(0), InvalidComputation());
 
         // TODO: validate that the requested computation can be performed by the given compute provider.
         // Perhaps the compute provider should be returned by the E3 Program?
         IDecryptionVerifier decryptionVerifier = computeProvider.validate(
-            emParams
+            e3Id,
+            seed,
+            computeProviderParams
         );
         require(
             address(decryptionVerifier) != address(0),
@@ -171,7 +178,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
 
         e3 = E3({
-            seed: keccak256(abi.encode(block.prevrandao, e3Id)),
+            seed: seed,
             threshold: threshold,
             startWindow: startWindow,
             duration: duration,

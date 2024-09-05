@@ -7,6 +7,8 @@ interface IComputeProvider {
     /// @notice This function should be called by the Enclave contract to validate the compute provider parameters.
     /// @param params ABI encoded compute provider parameters.
     function validate(
+        uint256 e3Id,
+        uint256 seed,
         bytes calldata params
     ) external returns (IDecryptionVerifier decryptionVerifier);
 }
