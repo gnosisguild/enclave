@@ -11,6 +11,7 @@ use tokio::{
     io::{self, AsyncBufReadExt, BufReader},
 };
 
+/// Note this is untestable so it may break as we change our API
 #[actix_rt::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let bus = EventBus::new(true).start();

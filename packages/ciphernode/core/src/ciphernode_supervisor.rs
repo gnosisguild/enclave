@@ -1,10 +1,13 @@
-use std::collections::HashMap;
-
-use actix::{Actor, Addr, Context, Handler, Message};
-
 use crate::{
-    eventbus::EventBus, events::{E3id, EnclaveEvent}, fhe::Fhe, plaintext_aggregator::PlaintextAggregator, publickey_aggregator::{self, PublicKeyAggregator}, Subscribe
+    eventbus::EventBus,
+    events::{E3id, EnclaveEvent},
+    fhe::Fhe,
+    plaintext_aggregator::PlaintextAggregator,
+    publickey_aggregator::PublicKeyAggregator,
+    Subscribe,
 };
+use actix::prelude::*;
+use std::collections::HashMap;
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -55,10 +58,7 @@ impl CiphernodeSupervisor {
             "DecryptionshareCreated",
             addr.clone().into(),
         ));
-        bus.do_send(Subscribe::new(
-            "PlaintextAggregated",
-            addr.clone().into(),
-        ));
+        bus.do_send(Subscribe::new("PlaintextAggregated", addr.clone().into()));
         addr
     }
 }
@@ -84,7 +84,8 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
                         nodecount: data.nodecount.clone(),
                     },
                 );
-                self.publickey_aggregators.insert(data.e3_id, publickey_aggregator);
+                self.publickey_aggregators
+                    .insert(data.e3_id, publickey_aggregator);
             }
             EnclaveEvent::KeyshareCreated { data, .. } => {
                 if let Some(key) = self.publickey_aggregators.get(&data.e3_id) {
@@ -114,7 +115,8 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
                 )
                 .start();
 
-                self.plaintext_aggregators.insert(data.e3_id, plaintext_aggregator);
+                self.plaintext_aggregators
+                    .insert(data.e3_id, plaintext_aggregator);
             }
             EnclaveEvent::DecryptionshareCreated { data, .. } => {
                 if let Some(decryption) = self.plaintext_aggregators.get(&data.e3_id) {
@@ -128,7 +130,8 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
 
                 addr.do_send(Die);
                 self.plaintext_aggregators.remove(&data.e3_id);
-            }
+            },
+            _ => ()
         }
     }
 }

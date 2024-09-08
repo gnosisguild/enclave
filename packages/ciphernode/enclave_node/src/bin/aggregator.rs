@@ -6,6 +6,7 @@ use enclave_core::P2p;
 use enclave_core::SimpleLogger;
 use std::error::Error;
 
+/// Note this is untestable so it may break as we change our API
 #[actix_rt::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let fhe = Fhe::try_default()?.start();
