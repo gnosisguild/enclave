@@ -70,16 +70,19 @@ pub enum EnclaveEvent {
     DecryptionshareCreated {
         id: EventId,
         data: DecryptionshareCreated,
-    }, 
-PlaintextAggregated {
-    id: EventId,
-    data: PlaintextAggregated
-    }
-
+    },
+    PlaintextAggregated {
+        id: EventId,
+        data: PlaintextAggregated,
+    },
+    CiphernodeSelected {
+        id: EventId,
+        data: CiphernodeSelected,
+    },
     // CommitteeSelected,
-       // OutputDecrypted,
-       // CiphernodeRegistered,
-       // CiphernodeDeregistered,
+    // OutputDecrypted,
+    // CiphernodeRegistered,
+    // CiphernodeDeregistered,
 }
 
 impl EnclaveEvent {
@@ -105,6 +108,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphertextOutputPublished { id, .. } => id,
             EnclaveEvent::DecryptionshareCreated { id, .. } => id,
             EnclaveEvent::PlaintextAggregated { id, .. } => id,
+            EnclaveEvent::CiphernodeSelected { id, .. } => id,
         }
     }
 }
@@ -162,6 +166,16 @@ impl From<PlaintextAggregated> for EnclaveEvent {
         }
     }
 }
+
+impl From<CiphernodeSelected> for EnclaveEvent {
+    fn from(data: CiphernodeSelected) -> Self {
+        EnclaveEvent::CiphernodeSelected {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
+
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{}({})", self.event_type(), self.get_id()))
@@ -204,16 +218,24 @@ pub struct CommitteeRequested {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
+pub struct CiphernodeSelected {
+    pub e3_id: E3id,
+    pub nodecount: usize,
+    pub threshold: usize,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
 pub struct CiphertextOutputPublished {
     pub e3_id: E3id,
-    pub ciphertext_output: Vec<u8>
+    pub ciphertext_output: Vec<u8>,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct PlaintextAggregated {
     pub e3_id: E3id,
-    pub decrypted_output: Vec<u8>
+    pub decrypted_output: Vec<u8>,
 }
 
 fn extract_enclave_event_name(s: &str) -> &str {
@@ -237,7 +259,8 @@ impl EnclaveEvent {
 mod tests {
     use super::EnclaveEvent;
     use crate::{
-        events::extract_enclave_event_name, serializers::PublicKeyShareSerializer, E3id, KeyshareCreated,
+        events::extract_enclave_event_name, serializers::PublicKeyShareSerializer, E3id,
+        KeyshareCreated,
     };
     use fhe::{
         bfv::{BfvParametersBuilder, SecretKey},

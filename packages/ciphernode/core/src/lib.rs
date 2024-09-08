@@ -15,6 +15,7 @@ mod logger;
 mod ordered_set;
 mod p2p;
 mod serializers;
+mod ciphernode_selector;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -31,6 +32,7 @@ pub use p2p::*;
 pub use actix::prelude::*;
 pub use ciphernode::*;
 pub use ciphernode_supervisor::*;
+pub use ciphernode_selector::*;
 pub use publickey_aggregator::*;
 pub use data::*;
 pub use eventbus::*;
@@ -38,39 +40,14 @@ pub use events::*;
 pub use fhe::*;
 pub use p2p::*;
 
-// pub struct Core {
-//     pub name: String,
-// }
-//
-// impl Core {
-//     fn new(name: String) -> Self {
-//         Self { name }
-//     }
-//
-//     fn run() {
-//         actix::run(async move {
-//             sleep(Duration::from_millis(100)).await;
-//             actix::System::current().stop();
-//         });
-//     }
-// }
-
 // TODO: move these out to a test folder
 #[cfg(test)]
 mod tests {
     use crate::{
-        ciphernode::Ciphernode,
-        ciphernode_supervisor::CiphernodeSupervisor,
-        data::Data,
-        eventbus::{EventBus, GetHistory},
-        events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
-        fhe::Fhe,
-        p2p::P2p,
-        serializers::{
+        ciphernode::Ciphernode, ciphernode_selector::CiphernodeSelector, ciphernode_supervisor::CiphernodeSupervisor, data::Data, eventbus::{EventBus, GetHistory}, events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated}, fhe::Fhe, p2p::P2p, serializers::{
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
             PublicKeyShareSerializer,
-        },
-        PlaintextAggregated, CiphertextOutputPublished, DecryptionshareCreated, ResetHistory,
+        }, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, PlaintextAggregated, ResetHistory
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -91,10 +68,13 @@ mod tests {
         fhe: Addr<Fhe>,
         logging: bool,
     ) -> (Addr<Ciphernode>, Addr<Data>) {
+
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
 
         // create ciphernode actor for managing ciphernode flow
+        CiphernodeSelector::attach(bus.clone());
+
         let node = Ciphernode::attach(bus.clone(), fhe.clone(), data.clone()).await;
 
         // setup the committee manager to generate the comittee public keys
@@ -199,7 +179,7 @@ mod tests {
             .map(|k| PublicKeyShareSerializer::from_bytes(k).unwrap())
             .aggregate()?;
 
-        assert_eq!(history.len(), 5);
+        assert_eq!(history.len(), 6);
         assert_eq!(
             history,
             vec![
@@ -208,6 +188,11 @@ mod tests {
                     nodecount: 3,
                     threshold: 123,
                     sortition_seed: 123,
+                }),
+                EnclaveEvent::from(CiphernodeSelected {
+                    e3_id: e3_id.clone(),
+                    nodecount: 3,
+                    threshold: 123,
                 }),
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p1.clone(),
