@@ -4,9 +4,9 @@
 
 mod ciphernode;
 mod committee;
-mod committee_key;
+mod publickey_aggregator;
 mod data;
-mod decryption;
+mod plaintext_aggregator;
 mod enclave_contract;
 mod eventbus;
 mod events;
@@ -20,7 +20,7 @@ mod serializers;
 pub use actix::prelude::*;
 pub use ciphernode::*;
 pub use committee::*;
-pub use committee_key::*;
+pub use publickey_aggregator::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
@@ -31,7 +31,7 @@ pub use p2p::*;
 pub use actix::prelude::*;
 pub use ciphernode::*;
 pub use committee::*;
-pub use committee_key::*;
+pub use publickey_aggregator::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
@@ -70,7 +70,7 @@ mod tests {
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
             PublicKeyShareSerializer,
         },
-        DecryptedOutputPublished, CiphertextOutputPublished, DecryptionshareCreated, ResetHistory,
+        PlaintextAggregated, CiphertextOutputPublished, DecryptionshareCreated, ResetHistory,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -287,7 +287,7 @@ mod tests {
                     decryption_share: ds3.clone(),
                     e3_id: e3_id.clone(),
                 }),
-                EnclaveEvent::from(DecryptedOutputPublished {
+                EnclaveEvent::from(PlaintextAggregated {
                     e3_id: e3_id.clone(),
                     decrypted_output: expected_raw_plaintext.clone()
                 })

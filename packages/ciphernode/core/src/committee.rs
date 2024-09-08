@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use actix::{Actor, Addr, Context, Handler, Message};
 
 use crate::{
-    committee_key::{CommitteeKey},
-    decryption::Decryption,
+    plaintext_aggregator::PlaintextAggregator,
     eventbus::EventBus,
     events::{E3id, EnclaveEvent},
     fhe::Fhe,
+    publickey_aggregator::PublicKeyAggregator,
     Subscribe,
 };
 
@@ -22,8 +22,8 @@ pub struct CommitteeManager {
     bus: Addr<EventBus>,
     fhe: Addr<Fhe>,
 
-    keys: HashMap<E3id, Addr<CommitteeKey>>,
-    decryptions: HashMap<E3id, Addr<Decryption>>,
+    keys: HashMap<E3id, Addr<PublicKeyAggregator>>,
+    decryptions: HashMap<E3id, Addr<PlaintextAggregator>>,
     meta: HashMap<E3id, CommitteeMeta>,
 }
 
@@ -49,9 +49,18 @@ impl CommitteeManager {
             addr.clone().recipient(),
         ));
         bus.do_send(Subscribe::new("KeyshareCreated", addr.clone().into()));
-        bus.do_send(Subscribe::new("CiphertextOutputPublished", addr.clone().into()));
-        bus.do_send(Subscribe::new("DecryptionshareCreated", addr.clone().into()));
-        bus.do_send(Subscribe::new("DecryptionOutputPublished", addr.clone().into()));
+        bus.do_send(Subscribe::new(
+            "CiphertextOutputPublished",
+            addr.clone().into(),
+        ));
+        bus.do_send(Subscribe::new(
+            "DecryptionshareCreated",
+            addr.clone().into(),
+        ));
+        bus.do_send(Subscribe::new(
+            "PlaintextAggregated",
+            addr.clone().into(),
+        ));
         addr
     }
 }
@@ -63,7 +72,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
         match event {
             EnclaveEvent::CommitteeRequested { data, .. } => {
                 // start up a new key
-                let key = CommitteeKey::new(
+                let key = PublicKeyAggregator::new(
                     self.fhe.clone(),
                     self.bus.clone(),
                     data.e3_id.clone(),
@@ -99,7 +108,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
                     return;
                 };
                 // start up a new key
-                let key = Decryption::new(
+                let key = PlaintextAggregator::new(
                     self.fhe.clone(),
                     self.bus.clone(),
                     data.e3_id.clone(),
@@ -114,7 +123,7 @@ impl Handler<EnclaveEvent> for CommitteeManager {
                     decryption.do_send(data);
                 }
             }
-            EnclaveEvent::DecryptedOutputPublished { data, .. } => {
+            EnclaveEvent::PlaintextAggregated { data, .. } => {
                 let Some(addr) = self.decryptions.get(&data.e3_id) else {
                     return;
                 };
