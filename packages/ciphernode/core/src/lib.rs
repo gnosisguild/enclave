@@ -3,10 +3,9 @@
 // #![warn(missing_docs, unused_imports)]
 
 mod ciphernode;
+mod ciphernode_selector;
 mod ciphernode_supervisor;
-mod publickey_aggregator;
 mod data;
-mod plaintext_aggregator;
 mod enclave_contract;
 mod eventbus;
 mod events;
@@ -14,40 +13,51 @@ mod fhe;
 mod logger;
 mod ordered_set;
 mod p2p;
+mod plaintext_aggregator;
+mod publickey_aggregator;
 mod serializers;
-mod ciphernode_selector;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
 pub use ciphernode_supervisor::*;
-pub use publickey_aggregator::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
 pub use fhe::*;
 pub use logger::*;
 pub use p2p::*;
+pub use publickey_aggregator::*;
 
 pub use actix::prelude::*;
 pub use ciphernode::*;
-pub use ciphernode_supervisor::*;
 pub use ciphernode_selector::*;
-pub use publickey_aggregator::*;
+pub use ciphernode_supervisor::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
 pub use fhe::*;
 pub use p2p::*;
+pub use publickey_aggregator::*;
 
 // TODO: move these out to a test folder
 #[cfg(test)]
 mod tests {
     use crate::{
-        ciphernode::Ciphernode, ciphernode_selector::CiphernodeSelector, ciphernode_supervisor::CiphernodeSupervisor, data::Data, eventbus::{EventBus, GetHistory}, events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated}, fhe::Fhe, p2p::P2p, serializers::{
+        ciphernode::Ciphernode,
+        ciphernode_selector::CiphernodeSelector,
+        ciphernode_supervisor::CiphernodeSupervisor,
+        data::Data,
+        eventbus::{EventBus, GetHistory},
+        events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
+        fhe::Fhe,
+        p2p::P2p,
+        serializers::{
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
             PublicKeyShareSerializer,
-        }, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, PlaintextAggregated, ResetHistory
+        },
+        CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, PlaintextAggregated,
+        ResetHistory,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -68,7 +78,6 @@ mod tests {
         fhe: Addr<Fhe>,
         logging: bool,
     ) -> (Addr<Ciphernode>, Addr<Data>) {
-
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
 
@@ -216,8 +225,8 @@ mod tests {
         // Aggregate decryption
         bus.send(ResetHistory).await?;
 
-        // TODO: 
-        // Making these values large (especially the yes value) requires changing 
+        // TODO:
+        // Making these values large (especially the yes value) requires changing
         // the params we use here - as we tune the FHE we need to take care
         let yes = 1234u64;
         let no = 873827u64;
@@ -298,6 +307,9 @@ mod tests {
             while let Some(msg) = output.recv().await {
                 msgs_loop.lock().await.push(msg.clone());
                 let _ = input.send(msg).await; // loopback to simulate a rebroadcast message
+                                               // if this  manages to broadcast an event to the
+                                               // event bus we will expect to see an extra event on
+                                               // the bus
             }
         });
 
@@ -315,8 +327,16 @@ mod tests {
             sortition_seed: 123,
         });
 
+        // This is a local event which should not be broadcast to the network
+        let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
+            e3_id: E3id::new("1235"),
+            nodecount: 3,
+            threshold: 123,
+        });
+
         bus.do_send(evt_1.clone());
         bus.do_send(evt_2.clone());
+        bus.do_send(local_evt_3.clone());
 
         sleep(Duration::from_millis(1)).await; // need to push to next tick
 
@@ -325,13 +345,13 @@ mod tests {
 
         assert_eq!(
             *msgs.lock().await,
-            vec![evt_1.to_bytes()?, evt_2.to_bytes()?],
-            "P2p did not transmit events to the network"
+            vec![evt_1.to_bytes()?, evt_2.to_bytes()?], // notice no local events
+            "P2p did not transmit correct events to the network"
         );
 
         assert_eq!(
             history,
-            vec![evt_1, evt_2],
+            vec![evt_1, evt_2, local_evt_3],
             "P2p must not retransmit forwarded event to event bus"
         );
 
