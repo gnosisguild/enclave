@@ -64,13 +64,7 @@ impl P2p {
 
     pub fn spawn_libp2p(
         bus: Addr<EventBus>,
-    ) -> Result<
-        (
-            Addr<Self>,
-            tokio::task::JoinHandle<()>,
-        ),
-        Box<dyn Error>,
-    > {
+    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<()>), Box<dyn Error>> {
         let (mut libp2p, tx, rx) = EnclaveRouter::new()?;
         libp2p.connect_swarm("mdns".to_string())?;
         libp2p.join_topic("enclave-keygen-01")?;
@@ -104,7 +98,14 @@ impl Handler<EnclaveEvent> for P2p {
         let evt = event.clone();
         Box::pin(async move {
             let id: EventId = evt.clone().into();
+
+            // if we have seen this event before dont rebroadcast
             if sent_events.contains(&id) {
+                return;
+            }
+
+            // Ignore events that should be considered local
+            if evt.is_local_only() {
                 return;
             }
 

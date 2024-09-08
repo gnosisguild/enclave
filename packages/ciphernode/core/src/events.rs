@@ -97,6 +97,13 @@ impl EnclaveEvent {
     pub fn get_id(&self) -> EventId {
         self.clone().into()
     }
+
+    pub fn is_local_only(&self) -> bool {
+        match self {
+            EnclaveEvent::CiphernodeSelected { .. } => true,
+            _ => false,
+        }
+    }
 }
 
 impl From<EnclaveEvent> for EventId {
