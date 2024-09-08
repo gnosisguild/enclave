@@ -1,11 +1,11 @@
 use crate::{
-    ordered_set::OrderedSet, DecryptedOutputPublished, DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, Fhe, GetAggregatePlaintext
+    ordered_set::OrderedSet, PlaintextAggregated, DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, Fhe, GetAggregatePlaintext
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
 
 #[derive(Debug, Clone)]
-pub enum DecryptionState {
+pub enum PlaintextAggregatorState {
     Collecting {
         nodecount: usize,
         shares: OrderedSet<Vec<u8>>,
@@ -25,34 +25,34 @@ struct ComputeAggregate {
     pub shares: OrderedSet<Vec<u8>>,
 }
 
-pub struct Decryption {
+pub struct PlaintextAggregator {
     fhe: Addr<Fhe>,
     bus: Addr<EventBus>,
     e3_id: E3id,
-    state: DecryptionState,
+    state: PlaintextAggregatorState,
 }
 
-impl Decryption {
+impl PlaintextAggregator {
     pub fn new(fhe: Addr<Fhe>, bus: Addr<EventBus>, e3_id: E3id, nodecount: usize) -> Self {
-        Decryption {
+        PlaintextAggregator {
             fhe,
             bus,
             e3_id,
-            state: DecryptionState::Collecting {
+            state: PlaintextAggregatorState::Collecting {
                 nodecount,
                 shares: OrderedSet::new(),
             },
         }
     }
 
-    pub fn add_share(&mut self, share: Vec<u8>) -> Result<DecryptionState> {
-        let DecryptionState::Collecting { nodecount, shares } = &mut self.state else {
+    pub fn add_share(&mut self, share: Vec<u8>) -> Result<PlaintextAggregatorState> {
+        let PlaintextAggregatorState::Collecting { nodecount, shares } = &mut self.state else {
             return Err(anyhow::anyhow!("Can only add share in Collecting state"));
         };
 
         shares.insert(share);
         if shares.len() == *nodecount {
-            return Ok(DecryptionState::Computing {
+            return Ok(PlaintextAggregatorState::Computing {
                 shares: shares.clone(),
             });
         }
@@ -60,22 +60,22 @@ impl Decryption {
         Ok(self.state.clone())
     }
 
-    pub fn set_decryption(&mut self, decrypted: Vec<u8>) -> Result<DecryptionState> {
-        let DecryptionState::Computing { shares } = &mut self.state else {
+    pub fn set_decryption(&mut self, decrypted: Vec<u8>) -> Result<PlaintextAggregatorState> {
+        let PlaintextAggregatorState::Computing { shares } = &mut self.state else {
             return Ok(self.state.clone());
         };
 
         let shares = shares.to_owned();
 
-        Ok(DecryptionState::Complete { decrypted, shares })
+        Ok(PlaintextAggregatorState::Complete { decrypted, shares })
     }
 }
 
-impl Actor for Decryption {
+impl Actor for PlaintextAggregator {
     type Context = Context<Self>;
 }
 
-impl Handler<DecryptionshareCreated> for Decryption {
+impl Handler<DecryptionshareCreated> for PlaintextAggregator {
     type Result = Result<()>;
     fn handle(&mut self, event: DecryptionshareCreated, ctx: &mut Self::Context) -> Self::Result {
         if event.e3_id != self.e3_id {
@@ -83,7 +83,7 @@ impl Handler<DecryptionshareCreated> for Decryption {
                 "Wrong e3_id sent to aggregator. This should not happen."
             ));
         }
-        let DecryptionState::Collecting { .. } = self.state else {
+        let PlaintextAggregatorState::Collecting { .. } = self.state else {
             return Err(anyhow!(
                 "Aggregator has been closed for collecting keyshares."
             ));
@@ -93,7 +93,7 @@ impl Handler<DecryptionshareCreated> for Decryption {
         self.state = self.add_share(event.decryption_share)?;
 
         // Check the state and if it has changed to the computing
-        if let DecryptionState::Computing { shares } = &self.state {
+        if let PlaintextAggregatorState::Computing { shares } = &self.state {
             ctx.address().do_send(ComputeAggregate {
                 shares: shares.clone(),
             })
@@ -103,7 +103,7 @@ impl Handler<DecryptionshareCreated> for Decryption {
     }
 }
 
-impl Handler<ComputeAggregate> for Decryption {
+impl Handler<ComputeAggregate> for PlaintextAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
     fn handle(&mut self, msg: ComputeAggregate, ctx: &mut Self::Context) -> Self::Result {
         Box::pin(
@@ -118,7 +118,7 @@ impl Handler<ComputeAggregate> for Decryption {
                     act.state = act.set_decryption(decrypted_output.clone())?;
 
                     // Dispatch the PublicKeyAggregated event
-                    let event = EnclaveEvent::from(DecryptedOutputPublished {
+                    let event = EnclaveEvent::from(PlaintextAggregated {
                         decrypted_output,
                         e3_id: act.e3_id.clone(),
                     });
@@ -131,7 +131,7 @@ impl Handler<ComputeAggregate> for Decryption {
     }
 }
 
-impl Handler<Die> for Decryption {
+impl Handler<Die> for PlaintextAggregator {
     type Result = ();
 
     fn handle(&mut self, _msg: Die, ctx: &mut Context<Self>) {

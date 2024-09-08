@@ -8,7 +8,7 @@ use actix::prelude::*;
 use anyhow::{anyhow, Result};
 
 #[derive(Debug, Clone)]
-pub enum CommitteeKeyState {
+pub enum PublicKeyAggregatorState {
     Collecting {
         nodecount: usize,
         keyshares: OrderedSet<Vec<u8>>,
@@ -28,11 +28,11 @@ struct ComputeAggregate {
     pub keyshares: OrderedSet<Vec<u8>>,
 }
 
-pub struct CommitteeKey {
+pub struct PublicKeyAggregator {
     fhe: Addr<Fhe>,
     bus: Addr<EventBus>,
     e3_id: E3id,
-    state: CommitteeKeyState,
+    state: PublicKeyAggregatorState,
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
@@ -41,21 +41,21 @@ pub struct CommitteeKey {
 /// identical events will not be triggered twice.
 /// It is expected to change this mechanism as we work through adversarial scenarios and write tests
 /// for them.
-impl CommitteeKey {
+impl PublicKeyAggregator {
     pub fn new(fhe: Addr<Fhe>, bus: Addr<EventBus>, e3_id: E3id, nodecount: usize) -> Self {
-        CommitteeKey {
+        PublicKeyAggregator {
             fhe,
             bus,
             e3_id,
-            state: CommitteeKeyState::Collecting {
+            state: PublicKeyAggregatorState::Collecting {
                 nodecount,
                 keyshares: OrderedSet::new(),
             },
         }
     }
 
-    pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<CommitteeKeyState> {
-        let CommitteeKeyState::Collecting {
+    pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<PublicKeyAggregatorState> {
+        let PublicKeyAggregatorState::Collecting {
             nodecount,
             keyshares,
         } = &mut self.state
@@ -65,7 +65,7 @@ impl CommitteeKey {
 
         keyshares.insert(keyshare);
         if keyshares.len() == *nodecount {
-            return Ok(CommitteeKeyState::Computing {
+            return Ok(PublicKeyAggregatorState::Computing {
                 keyshares: keyshares.clone(),
             });
         }
@@ -73,25 +73,25 @@ impl CommitteeKey {
         Ok(self.state.clone())
     }
 
-    pub fn set_pubkey(&mut self, pubkey: Vec<u8>) -> Result<CommitteeKeyState> {
-        let CommitteeKeyState::Computing { keyshares } = &mut self.state else {
+    pub fn set_pubkey(&mut self, pubkey: Vec<u8>) -> Result<PublicKeyAggregatorState> {
+        let PublicKeyAggregatorState::Computing { keyshares } = &mut self.state else {
             return Ok(self.state.clone());
         };
 
         let keyshares = keyshares.to_owned();
 
-        Ok(CommitteeKeyState::Complete {
+        Ok(PublicKeyAggregatorState::Complete {
             public_key: pubkey,
             keyshares,
         })
     }
 }
 
-impl Actor for CommitteeKey {
+impl Actor for PublicKeyAggregator {
     type Context = Context<Self>;
 }
 
-impl Handler<KeyshareCreated> for CommitteeKey {
+impl Handler<KeyshareCreated> for PublicKeyAggregator {
     type Result = Result<()>;
 
     fn handle(&mut self, event: KeyshareCreated, ctx: &mut Self::Context) -> Self::Result {
@@ -101,7 +101,7 @@ impl Handler<KeyshareCreated> for CommitteeKey {
             ));
         }
 
-        let CommitteeKeyState::Collecting { .. } = self.state else {
+        let PublicKeyAggregatorState::Collecting { .. } = self.state else {
             return Err(anyhow!(
                 "Aggregator has been closed for collecting keyshares."
             ));
@@ -111,7 +111,7 @@ impl Handler<KeyshareCreated> for CommitteeKey {
         self.state = self.add_keyshare(event.pubkey)?;
 
         // Check the state and if it has changed to the computing
-        if let CommitteeKeyState::Computing { keyshares } = &self.state {
+        if let PublicKeyAggregatorState::Computing { keyshares } = &self.state {
             ctx.address().do_send(ComputeAggregate {
                 keyshares: keyshares.clone(),
             })
@@ -121,7 +121,7 @@ impl Handler<KeyshareCreated> for CommitteeKey {
     }
 }
 
-impl Handler<ComputeAggregate> for CommitteeKey {
+impl Handler<ComputeAggregate> for PublicKeyAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
 
     fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
@@ -160,7 +160,7 @@ impl Handler<ComputeAggregate> for CommitteeKey {
     }
 }
 
-impl Handler<Die> for CommitteeKey {
+impl Handler<Die> for PublicKeyAggregator {
     type Result = ();
 
     fn handle(&mut self, _msg: Die, ctx: &mut Context<Self>) {
