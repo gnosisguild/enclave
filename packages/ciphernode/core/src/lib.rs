@@ -327,7 +327,6 @@ mod tests {
             sortition_seed: 123,
         });
 
-        // This is a local event which should not be broadcast to the network
         let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
             e3_id: E3id::new("1235"),
             nodecount: 3,
@@ -336,7 +335,7 @@ mod tests {
 
         bus.do_send(evt_1.clone());
         bus.do_send(evt_2.clone());
-        bus.do_send(local_evt_3.clone());
+        bus.do_send(local_evt_3.clone()); // This is a local event which should not be broadcast to the network
 
         sleep(Duration::from_millis(1)).await; // need to push to next tick
 
@@ -351,7 +350,8 @@ mod tests {
 
         assert_eq!(
             history,
-            vec![evt_1, evt_2, local_evt_3],
+            vec![evt_1, evt_2, local_evt_3], // all local events that have been broadcast but no
+                                             // events from the loopback
             "P2p must not retransmit forwarded event to event bus"
         );
 
