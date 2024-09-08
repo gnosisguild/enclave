@@ -18,7 +18,7 @@ pub struct Die;
 struct CommitteeMeta {
     nodecount: usize,
 }
-pub struct CommitteeManager {
+pub struct CiphernodeSupervisor {
     bus: Addr<EventBus>,
     fhe: Addr<Fhe>,
 
@@ -27,11 +27,11 @@ pub struct CommitteeManager {
     meta: HashMap<E3id, CommitteeMeta>,
 }
 
-impl Actor for CommitteeManager {
+impl Actor for CiphernodeSupervisor {
     type Context = Context<Self>;
 }
 
-impl CommitteeManager {
+impl CiphernodeSupervisor {
     pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Self {
         Self {
             bus,
@@ -43,7 +43,7 @@ impl CommitteeManager {
     }
 
     pub fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Addr<Self> {
-        let addr = CommitteeManager::new(bus.clone(), fhe).start();
+        let addr = CiphernodeSupervisor::new(bus.clone(), fhe).start();
         bus.do_send(Subscribe::new(
             "CommitteeRequested",
             addr.clone().recipient(),
@@ -65,7 +65,7 @@ impl CommitteeManager {
     }
 }
 
-impl Handler<EnclaveEvent> for CommitteeManager {
+impl Handler<EnclaveEvent> for CiphernodeSupervisor {
     type Result = ();
 
     fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
