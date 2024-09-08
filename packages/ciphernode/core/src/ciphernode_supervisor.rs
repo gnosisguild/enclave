@@ -3,27 +3,25 @@ use std::collections::HashMap;
 use actix::{Actor, Addr, Context, Handler, Message};
 
 use crate::{
-    plaintext_aggregator::PlaintextAggregator,
-    eventbus::EventBus,
-    events::{E3id, EnclaveEvent},
-    fhe::Fhe,
-    publickey_aggregator::PublicKeyAggregator,
-    Subscribe,
+    eventbus::EventBus, events::{E3id, EnclaveEvent}, fhe::Fhe, plaintext_aggregator::PlaintextAggregator, publickey_aggregator::{self, PublicKeyAggregator}, Subscribe
 };
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct Die;
 
+// CommitteeMeta
+// Storing metadata around the committee eg threshold / nodecount
 struct CommitteeMeta {
     nodecount: usize,
 }
+
 pub struct CiphernodeSupervisor {
     bus: Addr<EventBus>,
     fhe: Addr<Fhe>,
 
-    keys: HashMap<E3id, Addr<PublicKeyAggregator>>,
-    decryptions: HashMap<E3id, Addr<PlaintextAggregator>>,
+    publickey_aggregators: HashMap<E3id, Addr<PublicKeyAggregator>>,
+    plaintext_aggregators: HashMap<E3id, Addr<PlaintextAggregator>>,
     meta: HashMap<E3id, CommitteeMeta>,
 }
 
@@ -36,8 +34,8 @@ impl CiphernodeSupervisor {
         Self {
             bus,
             fhe,
-            keys: HashMap::new(),
-            decryptions: HashMap::new(),
+            publickey_aggregators: HashMap::new(),
+            plaintext_aggregators: HashMap::new(),
             meta: HashMap::new(),
         }
     }
@@ -72,7 +70,7 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
         match event {
             EnclaveEvent::CommitteeRequested { data, .. } => {
                 // start up a new key
-                let key = PublicKeyAggregator::new(
+                let publickey_aggregator = PublicKeyAggregator::new(
                     self.fhe.clone(),
                     self.bus.clone(),
                     data.e3_id.clone(),
@@ -86,20 +84,20 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
                         nodecount: data.nodecount.clone(),
                     },
                 );
-                self.keys.insert(data.e3_id, key);
+                self.publickey_aggregators.insert(data.e3_id, publickey_aggregator);
             }
             EnclaveEvent::KeyshareCreated { data, .. } => {
-                if let Some(key) = self.keys.get(&data.e3_id) {
+                if let Some(key) = self.publickey_aggregators.get(&data.e3_id) {
                     key.do_send(data);
                 }
             }
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
-                let Some(key) = self.keys.get(&data.e3_id) else {
+                let Some(publickey_aggregator) = self.publickey_aggregators.get(&data.e3_id) else {
                     return;
                 };
 
-                key.do_send(Die);
-                self.keys.remove(&data.e3_id);
+                publickey_aggregator.do_send(Die);
+                self.publickey_aggregators.remove(&data.e3_id);
             }
             EnclaveEvent::CiphertextOutputPublished { data, .. } => {
                 let Some(meta) = self.meta.get(&data.e3_id) else {
@@ -108,7 +106,7 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
                     return;
                 };
                 // start up a new key
-                let key = PlaintextAggregator::new(
+                let plaintext_aggregator = PlaintextAggregator::new(
                     self.fhe.clone(),
                     self.bus.clone(),
                     data.e3_id.clone(),
@@ -116,20 +114,20 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
                 )
                 .start();
 
-                self.decryptions.insert(data.e3_id, key);
+                self.plaintext_aggregators.insert(data.e3_id, plaintext_aggregator);
             }
             EnclaveEvent::DecryptionshareCreated { data, .. } => {
-                if let Some(decryption) = self.decryptions.get(&data.e3_id) {
+                if let Some(decryption) = self.plaintext_aggregators.get(&data.e3_id) {
                     decryption.do_send(data);
                 }
             }
             EnclaveEvent::PlaintextAggregated { data, .. } => {
-                let Some(addr) = self.decryptions.get(&data.e3_id) else {
+                let Some(addr) = self.plaintext_aggregators.get(&data.e3_id) else {
                     return;
                 };
 
                 addr.do_send(Die);
-                self.decryptions.remove(&data.e3_id);
+                self.plaintext_aggregators.remove(&data.e3_id);
             }
         }
     }
