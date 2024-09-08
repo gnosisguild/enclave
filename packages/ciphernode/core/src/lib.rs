@@ -3,7 +3,7 @@
 // #![warn(missing_docs, unused_imports)]
 
 mod ciphernode;
-mod committee;
+mod ciphernode_supervisor;
 mod publickey_aggregator;
 mod data;
 mod plaintext_aggregator;
@@ -19,7 +19,7 @@ mod serializers;
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
-pub use committee::*;
+pub use ciphernode_supervisor::*;
 pub use publickey_aggregator::*;
 pub use data::*;
 pub use eventbus::*;
@@ -30,7 +30,7 @@ pub use p2p::*;
 
 pub use actix::prelude::*;
 pub use ciphernode::*;
-pub use committee::*;
+pub use ciphernode_supervisor::*;
 pub use publickey_aggregator::*;
 pub use data::*;
 pub use eventbus::*;
@@ -60,7 +60,7 @@ pub use p2p::*;
 mod tests {
     use crate::{
         ciphernode::Ciphernode,
-        committee::CommitteeManager,
+        ciphernode_supervisor::CiphernodeSupervisor,
         data::Data,
         eventbus::{EventBus, GetHistory},
         events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
@@ -98,7 +98,7 @@ mod tests {
         let node = Ciphernode::attach(bus.clone(), fhe.clone(), data.clone()).await;
 
         // setup the committee manager to generate the comittee public keys
-        CommitteeManager::attach(bus.clone(), fhe.clone());
+        CiphernodeSupervisor::attach(bus.clone(), fhe.clone());
         (node, data)
     }
 
