@@ -28,6 +28,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         nodecount: 3,
                         threshold: 3,
                         sortition_seed: 100,
+                        degree: 2048,
+                        plaintext_modulus: 1032193,
+                        moduli: vec![0x3FFFFFFF000001],
                     }));
                 }
                 _ => println!("Unknown command"),

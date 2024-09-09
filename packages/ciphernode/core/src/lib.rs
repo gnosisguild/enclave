@@ -131,7 +131,11 @@ mod tests {
 
         // Setup global FHE actor
         let rng = ChaCha20Rng::seed_from_u64(42);
-        let (fhe, ..) = setup_global_fhe_actor(&vec![0x3FFFFFFF000001], 2048, 1032193, rng)?;
+        let degree = 2048;
+        let plaintext_modulus = 1032193;
+        let moduli = vec![0x3FFFFFFF000001];
+
+        let (fhe, ..) = setup_global_fhe_actor(&moduli, degree, plaintext_modulus, rng)?;
 
         setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
         setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
@@ -144,6 +148,9 @@ mod tests {
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
+            degree,
+            plaintext_modulus,
+            moduli: moduli.clone(),
         });
 
         // Send the computation requested event
@@ -176,6 +183,9 @@ mod tests {
                     nodecount: 3,
                     threshold: 123,
                     sortition_seed: 123,
+                    degree,
+                    plaintext_modulus,
+                    moduli
                 }),
                 EnclaveEvent::from(CiphernodeSelected {
                     e3_id: e3_id.clone(),
@@ -297,6 +307,9 @@ mod tests {
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            moduli: vec![0x3FFFFFFF000001],
         });
 
         let evt_2 = EnclaveEvent::from(CommitteeRequested {
@@ -304,6 +317,9 @@ mod tests {
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            moduli: vec![0x3FFFFFFF000001],
         });
 
         let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
@@ -351,6 +367,9 @@ mod tests {
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            moduli: vec![0x3FFFFFFF000001],
         });
 
         // lets send an event from the network
