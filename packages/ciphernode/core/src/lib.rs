@@ -20,23 +20,13 @@ mod serializers;
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
-pub use ciphernode_supervisor::*;
-pub use data::*;
-pub use eventbus::*;
-pub use events::*;
-pub use fhe::*;
-pub use logger::*;
-pub use p2p::*;
-pub use publickey_aggregator::*;
-
-pub use actix::prelude::*;
-pub use ciphernode::*;
 pub use ciphernode_selector::*;
 pub use ciphernode_supervisor::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
 pub use fhe::*;
+pub use logger::*;
 pub use p2p::*;
 pub use publickey_aggregator::*;
 
@@ -124,12 +114,11 @@ mod tests {
         moduli: &[u64],
         degree: usize,
         plaintext_modulus: u64,
-        rng1: ChaCha20Rng,
-        rng2: ChaCha20Rng,
+        rng: ChaCha20Rng,
     ) -> Result<(Addr<Fhe>, Arc<BfvParameters>, CommonRandomPoly)> {
-        let (params, crp) = setup_bfv_params(&moduli, degree, plaintext_modulus, rng1)?;
+        let (params, crp) = setup_bfv_params(&moduli, degree, plaintext_modulus, rng.clone())?;
         Ok((
-            Fhe::new(params.clone(), crp.clone(), rng2)?.start(),
+            Fhe::new(params.clone(), crp.clone(), rng)?.start(),
             params,
             crp,
         ))
@@ -141,13 +130,8 @@ mod tests {
         let bus = EventBus::new(true).start();
 
         // Setup global FHE actor
-        let (fhe, ..) = setup_global_fhe_actor(
-            &vec![0x3FFFFFFF000001],
-            2048,
-            1032193,
-            ChaCha20Rng::seed_from_u64(42),
-            ChaCha20Rng::seed_from_u64(42),
-        )?;
+        let rng = ChaCha20Rng::seed_from_u64(42);
+        let (fhe, ..) = setup_global_fhe_actor(&vec![0x3FFFFFFF000001], 2048, 1032193, rng)?;
 
         setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
         setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
@@ -170,15 +154,10 @@ mod tests {
 
         let history = bus.send(GetHistory).await?;
 
-        let (params, crp) = setup_bfv_params(
-            &vec![0x3FFFFFFF000001],
-            2048,
-            1032193,
-            ChaCha20Rng::seed_from_u64(42),
-        )?;
+        let rng = ChaCha20Rng::seed_from_u64(42);
+        let (params, crp) = setup_bfv_params(&vec![0x3FFFFFFF000001], 2048, 1032193, rng.clone())?;
 
         // Passing rng through function chain to ensure it matches usage in system above
-        let rng = ChaCha20Rng::seed_from_u64(42);
         let (p1, rng, sk1) = generate_pk_share(params.clone(), crp.clone(), rng)?;
         let (p2, rng, sk2) = generate_pk_share(params.clone(), crp.clone(), rng)?;
         let (p3, mut rng, sk3) = generate_pk_share(params.clone(), crp.clone(), rng)?;
@@ -351,7 +330,7 @@ mod tests {
         assert_eq!(
             history,
             vec![evt_1, evt_2, local_evt_3], // all local events that have been broadcast but no
-                                             // events from the loopback
+            // events from the loopback
             "P2p must not retransmit forwarded event to event bus"
         );
 
