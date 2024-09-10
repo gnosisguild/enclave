@@ -11,6 +11,7 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 eth = { path = "../eth" }
 p2p = { path = "../p2p" }
 bfv = { path = "../bfv" }
+sortition = { path = "../sortition" }
 enclave-core = { path = "../core" }
 async-std = "1.12.0"
 fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
