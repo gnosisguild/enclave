@@ -65,20 +65,19 @@ mod tests {
     // Simulating a local node
     async fn setup_local_ciphernode(
         bus: Addr<EventBus>,
-        fhe: Addr<Fhe>,
         logging: bool,
-    ) -> (Addr<Ciphernode>, Addr<Data>) {
+        rng: ChaCha20Rng,
+    ) {
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
 
         // create ciphernode actor for managing ciphernode flow
         CiphernodeSelector::attach(bus.clone());
 
-        let node = Ciphernode::attach(bus.clone(), fhe.clone(), data.clone()).await;
+        // let node = Ciphernode::attach(bus.clone(), fhe.clone(), data.clone()).await;
 
         // setup the committee manager to generate the comittee public keys
-        CiphernodeSupervisor::attach(bus.clone(), fhe.clone());
-        (node, data)
+        CiphernodeSupervisor::attach(bus.clone(), data.clone(), rng);
     }
 
     fn setup_bfv_params(
@@ -135,11 +134,11 @@ mod tests {
         let plaintext_modulus = 1032193;
         let moduli = vec![0x3FFFFFFF000001];
 
-        let (fhe, ..) = setup_global_fhe_actor(&moduli, degree, plaintext_modulus, rng)?;
+        // let (fhe, ..) = setup_global_fhe_actor(&moduli, degree, plaintext_modulus, rng)?;
 
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
+        setup_local_ciphernode(bus.clone(),  true, rng.clone()).await;
+        setup_local_ciphernode(bus.clone(),true, rng.clone()).await;
+        setup_local_ciphernode(bus.clone(), true, rng.clone()).await;
 
         let e3_id = E3id::new("1234");
 

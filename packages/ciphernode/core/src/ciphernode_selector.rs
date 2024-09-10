@@ -1,6 +1,6 @@
 use actix::prelude::*;
 
-use crate::{CiphernodeSelected, CommitteeRequested, EnclaveEvent, EventBus, Subscribe};
+use crate::{CiphernodeSelected, EnclaveEvent, EventBus, Subscribe};
 
 pub struct CiphernodeSelector {
     bus: Addr<EventBus>,

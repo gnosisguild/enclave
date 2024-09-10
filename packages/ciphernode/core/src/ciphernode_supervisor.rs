@@ -1,12 +1,8 @@
 use crate::{
-    eventbus::EventBus,
-    events::{E3id, EnclaveEvent},
-    fhe::Fhe,
-    plaintext_aggregator::PlaintextAggregator,
-    publickey_aggregator::PublicKeyAggregator,
-    Subscribe,
+    eventbus::EventBus, events::{E3id, EnclaveEvent}, fhe::Fhe, plaintext_aggregator::PlaintextAggregator, publickey_aggregator::PublicKeyAggregator, Ciphernode, CommitteeRequested, Data, Subscribe
 };
 use actix::prelude::*;
+use rand_chacha::ChaCha20Rng;
 use std::collections::HashMap;
 
 #[derive(Message)]
@@ -19,10 +15,16 @@ struct CommitteeMeta {
     nodecount: usize,
 }
 
+struct CiphernodeSystem {
+    fhe: Addr<Fhe>,
+    ciphernode: Addr<Ciphernode>,
+}
+
+
 pub struct CiphernodeSupervisor {
     bus: Addr<EventBus>,
-    fhe: Addr<Fhe>,
-
+    data: Addr<Data>,
+    rng: ChaCha20Rng,
     publickey_aggregators: HashMap<E3id, Addr<PublicKeyAggregator>>,
     plaintext_aggregators: HashMap<E3id, Addr<PlaintextAggregator>>,
     meta: HashMap<E3id, CommitteeMeta>,
@@ -33,18 +35,19 @@ impl Actor for CiphernodeSupervisor {
 }
 
 impl CiphernodeSupervisor {
-    pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Self {
+    pub fn new(bus: Addr<EventBus>, data: Addr<Data>, rng: ChaCha20Rng) -> Self {
         Self {
             bus,
-            fhe,
+            data,
+            rng,
             publickey_aggregators: HashMap::new(),
             plaintext_aggregators: HashMap::new(),
             meta: HashMap::new(),
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>) -> Addr<Self> {
-        let addr = CiphernodeSupervisor::new(bus.clone(), fhe).start();
+    pub fn attach(bus: Addr<EventBus>, data: Addr<Data>, rng: ChaCha20Rng) -> Addr<Self> {
+        let addr = CiphernodeSupervisor::new(bus.clone(), data, rng).start();
         bus.do_send(Subscribe::new(
             "CommitteeRequested",
             addr.clone().recipient(),
@@ -69,15 +72,25 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
     fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         match event {
             EnclaveEvent::CommitteeRequested { data, .. } => {
+                let CommitteeRequested {
+                    degree,
+                    moduli,
+                    plaintext_modulus,
+                    ..
+                } = data;
+
+                let fhe =
+                    Fhe::from_raw_params(&moduli, degree, plaintext_modulus, self.rng).unwrap().start();
+                
                 // start up a new key
                 let publickey_aggregator = PublicKeyAggregator::new(
-                    self.fhe.clone(),
+                    fhe.clone(),
                     self.bus.clone(),
                     data.e3_id.clone(),
                     data.nodecount,
                 )
                 .start();
-
+                
                 self.meta.insert(
                     data.e3_id.clone(),
                     CommitteeMeta {
@@ -130,8 +143,8 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
 
                 addr.do_send(Die);
                 self.plaintext_aggregators.remove(&data.e3_id);
-            },
-            _ => ()
+            }
+            _ => (),
         }
     }
 }
