@@ -2,10 +2,14 @@ use std::error::Error;
 
 use p2p::EnclaveRouter;
 use bfv::EnclaveBFV;
+use sortition::DistanceSortition;
 use tokio::{
     self,
     io::{self, AsyncBufReadExt, BufReader},
 };
+
+use alloy_primitives::{address};
+
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
      /\__\         /\  \         /\__\                       /\  \          ___          /\__\    
@@ -33,6 +37,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
     println!("Hello, cipher world!");
+
+    let mut committee = DistanceSortition::new(12, vec![address!("d8da6bf26964af9d7eed9e03e53415d37aa96045")], 10);
+    committee.get_committee();
 
     let mut new_bfv = EnclaveBFV::new(4096, 4096, vec![0xffffee001, 0xffffc4001, 0x1ffffe0001]);
     let pk_bytes = new_bfv.serialize_pk();

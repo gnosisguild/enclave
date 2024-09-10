@@ -19,5 +19,6 @@ fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-b
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 tokio = { version = "1.38", features = ["full"] }
 actix-rt = "2.10.0"
+alloy-primitives = { version = "0.6", default-features = false, features = ["rlp", "serde", "std"] }
 
 alloy = { version = "0.2.1", features = ["full"] }
