@@ -8,6 +8,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
+  // Deploy Enclave contract
+
   const enclave = await deploy("Enclave", {
     from: deployer,
     args: [deployer, addressOne, THIRTY_DAYS_IN_SECONDS],
@@ -15,6 +17,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
 
   console.log(`Enclave contract: `, enclave.address);
+
+  // Deploy CyphernodeRegistryOwnable contract
 
   const cypherNodeRegistry = await deploy("CyphernodeRegistryOwnable", {
     from: deployer,
@@ -27,15 +31,25 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     cypherNodeRegistry.address,
   );
 
+  // Deploy NaiveRegistryFilter contract
+
+  const naiveRegistryFilter = await deploy("NaiveRegistryFilter", {
+    from: deployer,
+    args: [deployer, cypherNodeRegistry.address],
+    log: true,
+  });
+
+  console.log(`NaiveRegistryFilter contract: `, naiveRegistryFilter.address);
+
   // set registry in enclave
   const enclaveContract = await hre.ethers.getContractAt(
     "Enclave",
     enclave.address,
   );
 
-  const setRegistryAddress = await enclaveContract.cyphernodeRegistry();
+  const registryAddress = await enclaveContract.cyphernodeRegistry();
 
-  if (setRegistryAddress === cypherNodeRegistry.address) {
+  if (registryAddress === cypherNodeRegistry.address) {
     console.log(`Enclave contract already has registry`);
     return;
   }
