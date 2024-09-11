@@ -13,24 +13,20 @@ impl DistanceSortition {
     }
 
     pub fn get_committee(&mut self) -> Vec<Address> {
-        let hashed = self.registered_nodes.iter()
+        let scores = self.registered_nodes.iter()
             .map(|address|
                 {
                     let concat = address.to_string() + &self.random_seed.to_string();
-                    let hash = keccak256(concat);
-                    hash.to_string()
-                })
-            .collect::<Vec<String>>();
-
-        let numeric = hashed.iter()
-            .map(|hash|
-                {
+                    let hash = keccak256(concat).to_string();
                     let without_prefix = hash.trim_start_matches("0x");
-                    let z = BigInt::from_str_radix(without_prefix, 16);
-                    println!("{:?}", z);
-                    z.unwrap()
+                    let z = BigInt::from_str_radix(without_prefix, 16).unwrap();
+                    let score = z - BigInt::from(self.random_seed);
+                    (score, *address)
                 })
-            .collect::<Vec<BigInt>>();
+            .collect::<Vec<(BigInt, Address)>>();
+
+        println!("{:?}", scores);
+
         self.registered_nodes.clone()
     }
 }
