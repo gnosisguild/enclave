@@ -29,8 +29,8 @@ impl Handler<EnclaveEvent> for Registry {
 
         match msg.clone() {
             EnclaveEvent::CommitteeRequested { .. } => {
-                let fhe_creator = self.fhe_creator();
-                let fhe = store(&e3_id, &mut self.fhes, fhe_creator);
+                let fhe_factory = self.fhe_factory();
+                let fhe = store(&e3_id, &mut self.fhes, fhe_factory);
 
                 let public_key_sequencer_factory = self.public_key_sequencer_factory(e3_id.clone(), fhe.clone());
                 store(&e3_id, &mut self.public_keys, public_key_sequencer_factory);
@@ -53,7 +53,7 @@ impl Handler<EnclaveEvent> for Registry {
 }
 
 impl Registry {
-    fn fhe_creator(&self) -> impl FnOnce() -> Addr<Fhe> {
+    fn fhe_factory(&self) -> impl FnOnce() -> Addr<Fhe> {
         let rng = self.rng.clone();
         move || {
             let moduli = &vec![0x3FFFFFFF000001];

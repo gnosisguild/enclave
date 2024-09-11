@@ -4,7 +4,7 @@
 
 use actix::prelude::*;
 
-use crate::{Data, E3id, EnclaveEvent, EventBus, Fhe, PublicKeyAggregator};
+use crate::{E3id, EnclaveEvent, EventBus, Fhe, PublicKeyAggregator};
 
 pub struct PublicKeySequencer {
     fhe: Addr<Fhe>,
@@ -15,7 +15,7 @@ pub struct PublicKeySequencer {
 }
 
 impl PublicKeySequencer {
-   pub fn new(fhe: Addr<Fhe>, e3_id: E3id, bus: Addr<EventBus>, nodecount: usize) -> Self {
+    pub fn new(fhe: Addr<Fhe>, e3_id: E3id, bus: Addr<EventBus>, nodecount: usize) -> Self {
         Self {
             fhe,
             e3_id,
