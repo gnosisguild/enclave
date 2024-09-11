@@ -120,6 +120,20 @@ impl From<EnclaveEvent> for EventId {
     }
 }
 
+impl From<EnclaveEvent> for E3id {
+    fn from(value: EnclaveEvent) -> Self {
+        match value {
+            EnclaveEvent::KeyshareCreated { data, .. } => data.e3_id,
+            EnclaveEvent::CommitteeRequested { data, .. } => data.e3_id,
+            EnclaveEvent::PublicKeyAggregated { data, .. } => data.e3_id,
+            EnclaveEvent::CiphertextOutputPublished { data, .. } => data.e3_id,
+            EnclaveEvent::DecryptionshareCreated { data, .. } => data.e3_id,
+            EnclaveEvent::PlaintextAggregated { data, .. } => data.e3_id,
+            EnclaveEvent::CiphernodeSelected { data, .. } => data.e3_id,
+        }
+    }
+}
+
 impl From<KeyshareCreated> for EnclaveEvent {
     fn from(data: KeyshareCreated) -> Self {
         EnclaveEvent::KeyshareCreated {

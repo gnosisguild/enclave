@@ -4,9 +4,9 @@
 
 use actix::prelude::*;
 
-use crate::{Data, E3id, EnclaveEvent, EventBus, Fhe, PlaintextAggregator};
+use crate::{E3id, EnclaveEvent, EventBus, Fhe, PlaintextAggregator};
 
-pub struct CiphernodeSequencer {
+pub struct PlaintextSequencer {
     fhe: Addr<Fhe>,
     e3_id: E3id,
     bus: Addr<EventBus>,
@@ -14,20 +14,20 @@ pub struct CiphernodeSequencer {
     child: Option<Addr<PlaintextAggregator>>,
 }
 
-impl Actor for CiphernodeSequencer {
+impl Actor for PlaintextSequencer {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for CiphernodeSequencer {
+impl Handler<EnclaveEvent> for PlaintextSequencer {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         let fhe = self.fhe.clone();
         let bus = self.bus.clone();
         let nodecount = self.nodecount;
         let e3_id = self.e3_id.clone();
-        let sink = self.child.get_or_insert_with(|| {
-            PlaintextAggregator::new(fhe, bus, e3_id, nodecount).start()
-        });
+        let sink = self
+            .child
+            .get_or_insert_with(|| PlaintextAggregator::new(fhe, bus, e3_id, nodecount).start());
         sink.do_send(msg);
     }
 }

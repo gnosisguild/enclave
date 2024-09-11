@@ -89,7 +89,7 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
             }
             EnclaveEvent::KeyshareCreated { data, .. } => {
                 if let Some(key) = self.publickey_aggregators.get(&data.e3_id) {
-                    key.do_send(data);
+                    key.do_send(EnclaveEvent::from(data));
                 }
             }
             EnclaveEvent::PublicKeyAggregated { data, .. } => {

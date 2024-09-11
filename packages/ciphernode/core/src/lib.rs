@@ -18,6 +18,8 @@ mod publickey_aggregator;
 mod serializers;
 mod ciphernode_sequencer;
 mod plaintext_sequencer;
+mod publickey_sequencer;
+mod registry;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -30,8 +32,11 @@ pub use fhe::*;
 pub use logger::*;
 pub use p2p::*;
 pub use publickey_aggregator::*;
+pub use publickey_sequencer::*;
+pub use plaintext_sequencer::*;
 pub use plaintext_aggregator::*;
 pub use ciphernode_selector::*;
+pub use ciphernode_sequencer::*;
 
 // TODO: move these out to a test folder
 #[cfg(test)]

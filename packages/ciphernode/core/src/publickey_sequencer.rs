@@ -14,6 +14,18 @@ pub struct PublicKeySequencer {
     child: Option<Addr<PublicKeyAggregator>>,
 }
 
+impl PublicKeySequencer {
+    fn new(fhe: Addr<Fhe>, e3_id: E3id, bus: Addr<EventBus>, nodecount: usize) -> Self {
+        Self {
+            fhe,
+            e3_id,
+            bus,
+            nodecount,
+            child: None,
+        }
+    }
+}
+
 impl Actor for PublicKeySequencer {
     type Context = Context<Self>;
 }
@@ -25,9 +37,9 @@ impl Handler<EnclaveEvent> for PublicKeySequencer {
         let bus = self.bus.clone();
         let nodecount = self.nodecount;
         let e3_id = self.e3_id.clone();
-        let sink = self.child.get_or_insert_with(|| {
-            PublicKeyAggregator::new(fhe, bus, e3_id, nodecount).start()
-        });
+        let sink = self
+            .child
+            .get_or_insert_with(|| PublicKeyAggregator::new(fhe, bus, e3_id, nodecount).start());
         sink.do_send(msg);
     }
 }

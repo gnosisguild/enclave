@@ -104,7 +104,7 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
 
         // Check the state and if it has changed to the computing
         if let PlaintextAggregatorState::Computing { shares } = &self.state {
-            ctx.address().do_send(ComputeAggregate {
+            ctx.notify(ComputeAggregate {
                 shares: shares.clone(),
             })
         }
