@@ -10,6 +10,7 @@ path = "src/lib.rs"
 
 [dependencies]
 num = "0.4.3"
+rand = "0.8.5"
 
 # Core
 enclave-core = { path = "../core" }
