@@ -32,18 +32,18 @@ impl Handler<EnclaveEvent> for Registry {
                 let fhe_creator = self.fhe_creator();
                 let fhe = store(&e3_id, &mut self.fhes, fhe_creator);
 
-                let public_key_creator = self.public_key_creator(e3_id.clone(), fhe.clone());
-                store(&e3_id, &mut self.public_keys, public_key_creator);
+                let public_key_sequencer_factory = self.public_key_sequencer_factory(e3_id.clone(), fhe.clone());
+                store(&e3_id, &mut self.public_keys, public_key_sequencer_factory);
 
-                let ciphernode_creator = self.ciphernode_creator(fhe.clone());
-                store(&e3_id, &mut self.ciphernodes, ciphernode_creator);
+                let ciphernode_sequencer_factory = self.ciphernode_sequencer_factory(fhe.clone());
+                store(&e3_id, &mut self.ciphernodes, ciphernode_sequencer_factory);
             }
             EnclaveEvent::CiphertextOutputPublished { .. } => {
                 let Some(fhe) = self.fhes.get(&e3_id) else {
                     return;
                 };
-                let plaintext_creator = self.plaintext_creator(e3_id.clone(), fhe.clone());
-                store(&e3_id, &mut self.plaintexts, plaintext_creator);
+                let plaintext_sequencer_factory = self.plaintext_sequencer_factory(e3_id.clone(), fhe.clone());
+                store(&e3_id, &mut self.plaintexts, plaintext_sequencer_factory);
             }
             _ => (),
         };
@@ -65,7 +65,7 @@ impl Registry {
         }
     }
 
-    fn public_key_creator(
+    fn public_key_sequencer_factory(
         &self,
         e3_id: E3id,
         fhe: Addr<Fhe>,
@@ -75,13 +75,13 @@ impl Registry {
         move || PublicKeySequencer::new(fhe, e3_id, bus, nodecount).start()
     }
 
-    fn ciphernode_creator(&self, fhe: Addr<Fhe>) -> impl FnOnce() -> Addr<CiphernodeSequencer> {
+    fn ciphernode_sequencer_factory(&self, fhe: Addr<Fhe>) -> impl FnOnce() -> Addr<CiphernodeSequencer> {
         let data = self.data.clone();
         let bus = self.bus.clone();
         move || CiphernodeSequencer::new(fhe, data, bus).start()
     }
 
-    fn plaintext_creator(
+    fn plaintext_sequencer_factory(
         &self,
         e3_id: E3id,
         fhe: Addr<Fhe>,
