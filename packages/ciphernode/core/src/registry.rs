@@ -29,10 +29,21 @@ impl Handler<EnclaveEvent> for Registry {
 
         match msg.clone() {
             EnclaveEvent::CommitteeRequested { .. } => {
-                self.create_committee_actors(&e3_id);
+                let fhe_creator = self.fhe_creator();
+                let fhe = store(&e3_id, &mut self.fhes, fhe_creator);
+
+                let public_key_creator = self.public_key_creator(e3_id.clone(), fhe.clone());
+                store(&e3_id, &mut self.public_keys, public_key_creator);
+
+                let ciphernode_creator = self.ciphernode_creator(fhe.clone());
+                store(&e3_id, &mut self.ciphernodes, ciphernode_creator);
             }
             EnclaveEvent::CiphertextOutputPublished { .. } => {
-                self.create_plaintext_actor(&e3_id);
+                let Some(fhe) = self.fhes.get(&e3_id) else {
+                    return;
+                };
+                let plaintext_creator = self.plaintext_creator(e3_id.clone(), fhe.clone());
+                store(&e3_id, &mut self.plaintexts, plaintext_creator);
             }
             _ => (),
         };
@@ -42,50 +53,42 @@ impl Handler<EnclaveEvent> for Registry {
 }
 
 impl Registry {
-    fn create_committee_actors(&mut self, e3_id: &E3id) {
-        let fhe = self.create_or_get_fhe(e3_id);
-        self.create_or_get_public_key_sequencer(e3_id, fhe.clone());
-        self.create_or_get_ciphernode_sequencer(e3_id, fhe);
-    }
-
-    fn create_or_get_fhe(&mut self, e3_id: &E3id) -> Addr<Fhe> {
-        self.fhes
-            .entry(e3_id.clone())
-            .or_insert_with(|| {
-                let moduli = &vec![0x3FFFFFFF000001];
-                let degree = 2048;
-                let plaintext_modulus = 1032193;
-                Fhe::from_raw_params(moduli, degree, plaintext_modulus, self.rng.clone())
-                    .unwrap()
-                    .start()
-            })
-            .clone()
-    }
-
-    fn create_or_get_public_key_sequencer(&mut self, e3_id: &E3id, fhe: Addr<Fhe>) {
-        self.public_keys.entry(e3_id.clone()).or_insert_with(|| {
-            PublicKeySequencer::new(fhe, e3_id.clone(), self.bus.clone(), self.nodecount).start()
-        });
-    }
-
-    fn create_or_get_ciphernode_sequencer(&mut self, e3_id: &E3id, fhe: Addr<Fhe>) {
-        self.ciphernodes.entry(e3_id.clone()).or_insert_with(|| {
-            CiphernodeSequencer::new(fhe, self.data.clone(), self.bus.clone()).start()
-        });
-    }
-
-    fn create_plaintext_actor(&mut self, e3_id: &E3id) {
-        if let Some(fhe) = self.fhes.get(e3_id) {
-            self.plaintexts.entry(e3_id.clone()).or_insert_with(|| {
-                PlaintextSequencer::new(
-                    fhe.clone(),
-                    e3_id.clone(),
-                    self.bus.clone(),
-                    self.nodecount,
-                )
+    fn fhe_creator(&self) -> impl FnOnce() -> Addr<Fhe> {
+        let rng = self.rng.clone();
+        move || {
+            let moduli = &vec![0x3FFFFFFF000001];
+            let degree = 2048;
+            let plaintext_modulus = 1032193;
+            Fhe::from_raw_params(moduli, degree, plaintext_modulus, rng)
+                .unwrap()
                 .start()
-            });
         }
+    }
+
+    fn public_key_creator(
+        &self,
+        e3_id: E3id,
+        fhe: Addr<Fhe>,
+    ) -> impl FnOnce() -> Addr<PublicKeySequencer> {
+        let bus = self.bus.clone();
+        let nodecount = self.nodecount;
+        move || PublicKeySequencer::new(fhe, e3_id, bus, nodecount).start()
+    }
+
+    fn ciphernode_creator(&self, fhe: Addr<Fhe>) -> impl FnOnce() -> Addr<CiphernodeSequencer> {
+        let data = self.data.clone();
+        let bus = self.bus.clone();
+        move || CiphernodeSequencer::new(fhe, data, bus).start()
+    }
+
+    fn plaintext_creator(
+        &self,
+        e3_id: E3id,
+        fhe: Addr<Fhe>,
+    ) -> impl FnOnce() -> Addr<PlaintextSequencer> {
+        let bus = self.bus.clone();
+        let nodecount = self.nodecount;
+        move || PlaintextSequencer::new(fhe, e3_id, bus, nodecount).start()
     }
 
     fn forward_message(&self, e3_id: &E3id, msg: EnclaveEvent) {
@@ -101,4 +104,12 @@ impl Registry {
             act.do_send(msg.clone());
         }
     }
+}
+
+fn store<T, F>(e3_id: &E3id, map: &mut HashMap<E3id, Addr<T>>, creator: F) -> Addr<T>
+where
+    T: Actor<Context = Context<T>>,
+    F: FnOnce() -> Addr<T>,
+{
+    map.entry(e3_id.clone()).or_insert_with(creator).clone()
 }
