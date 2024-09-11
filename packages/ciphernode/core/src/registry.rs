@@ -1,20 +1,51 @@
+// TODO: spawn and supervise child actors
+// TODO: vertically modularize this so there is a registry for each function that get rolled up into one based
+// on config
 use crate::{
     CiphernodeSequencer, Data, E3id, EnclaveEvent, EventBus, Fhe, PlaintextSequencer,
-    PublicKeySequencer,
+    PublicKeySequencer, Subscribe,
 };
 use actix::prelude::*;
 use rand_chacha::ChaCha20Rng;
 use std::collections::HashMap;
+
+#[derive(Clone)]
+struct CommitteeMeta {
+    nodecount: usize,
+}
 
 pub struct Registry {
     bus: Addr<EventBus>,
     ciphernodes: HashMap<E3id, Addr<CiphernodeSequencer>>,
     data: Addr<Data>,
     fhes: HashMap<E3id, Addr<Fhe>>,
-    nodecount: usize,
     plaintexts: HashMap<E3id, Addr<PlaintextSequencer>>,
+    meta: HashMap<E3id, CommitteeMeta>,
     public_keys: HashMap<E3id, Addr<PublicKeySequencer>>,
     rng: ChaCha20Rng,
+}
+
+impl Registry {
+    pub fn new(bus: Addr<EventBus>, data: Addr<Data>, rng: ChaCha20Rng) -> Self {
+        Self {
+            bus,
+            data,
+            rng,
+            ciphernodes: HashMap::new(),
+            plaintexts: HashMap::new(),
+            public_keys: HashMap::new(),
+            meta: HashMap::new(),
+            fhes: HashMap::new(),
+        }
+    }
+
+    pub async fn attach(bus: Addr<EventBus>, data: Addr<Data>, rng: ChaCha20Rng) -> Addr<Self> {
+        let addr = Registry::new(bus.clone(), data, rng).start();
+        bus.send(Subscribe::new("*", addr.clone().into()))
+            .await
+            .unwrap();
+        addr
+    }
 }
 
 impl Actor for Registry {
@@ -25,14 +56,21 @@ impl Handler<EnclaveEvent> for Registry {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
+        println!("HANDLING ENCLAVE EVENTS {}", msg.event_type());
         let e3_id = E3id::from(msg.clone());
 
         match msg.clone() {
-            EnclaveEvent::CommitteeRequested { .. } => {
+            EnclaveEvent::CommitteeRequested { data, .. } => {
                 let fhe_factory = self.fhe_factory();
                 let fhe = store(&e3_id, &mut self.fhes, fhe_factory);
+                let meta = CommitteeMeta {
+                    nodecount: data.nodecount,
+                };
 
-                let public_key_sequencer_factory = self.public_key_sequencer_factory(e3_id.clone(), fhe.clone());
+                self.meta.entry(e3_id.clone()).or_insert(meta.clone());
+
+                let public_key_sequencer_factory =
+                    self.public_key_sequencer_factory(e3_id.clone(), meta.clone(), fhe.clone());
                 store(&e3_id, &mut self.public_keys, public_key_sequencer_factory);
 
                 let ciphernode_sequencer_factory = self.ciphernode_sequencer_factory(fhe.clone());
@@ -42,7 +80,13 @@ impl Handler<EnclaveEvent> for Registry {
                 let Some(fhe) = self.fhes.get(&e3_id) else {
                     return;
                 };
-                let plaintext_sequencer_factory = self.plaintext_sequencer_factory(e3_id.clone(), fhe.clone());
+
+                let Some(meta) = self.meta.get(&e3_id) else {
+                    return;
+                };
+
+                let plaintext_sequencer_factory =
+                    self.plaintext_sequencer_factory(e3_id.clone(), meta.clone(), fhe.clone());
                 store(&e3_id, &mut self.plaintexts, plaintext_sequencer_factory);
             }
             _ => (),
@@ -68,14 +112,18 @@ impl Registry {
     fn public_key_sequencer_factory(
         &self,
         e3_id: E3id,
+        meta: CommitteeMeta,
         fhe: Addr<Fhe>,
     ) -> impl FnOnce() -> Addr<PublicKeySequencer> {
         let bus = self.bus.clone();
-        let nodecount = self.nodecount;
+        let nodecount = meta.nodecount;
         move || PublicKeySequencer::new(fhe, e3_id, bus, nodecount).start()
     }
 
-    fn ciphernode_sequencer_factory(&self, fhe: Addr<Fhe>) -> impl FnOnce() -> Addr<CiphernodeSequencer> {
+    fn ciphernode_sequencer_factory(
+        &self,
+        fhe: Addr<Fhe>,
+    ) -> impl FnOnce() -> Addr<CiphernodeSequencer> {
         let data = self.data.clone();
         let bus = self.bus.clone();
         move || CiphernodeSequencer::new(fhe, data, bus).start()
@@ -84,28 +132,33 @@ impl Registry {
     fn plaintext_sequencer_factory(
         &self,
         e3_id: E3id,
+        meta: CommitteeMeta,
         fhe: Addr<Fhe>,
     ) -> impl FnOnce() -> Addr<PlaintextSequencer> {
         let bus = self.bus.clone();
-        let nodecount = self.nodecount;
+        let nodecount = meta.nodecount;
         move || PlaintextSequencer::new(fhe, e3_id, bus, nodecount).start()
     }
 
     fn forward_message(&self, e3_id: &E3id, msg: EnclaveEvent) {
         if let Some(act) = self.public_keys.get(&e3_id) {
+            println!("forwarding to publickey {}", msg.event_type());
             act.clone().recipient().do_send(msg.clone());
         }
 
         if let Some(act) = self.plaintexts.get(&e3_id) {
+            println!("forwarding to plaintext {}", msg.event_type());
             act.do_send(msg.clone());
         }
 
         if let Some(act) = self.ciphernodes.get(&e3_id) {
+            println!("forwarding to ciphernode {}", msg.event_type());
             act.do_send(msg.clone());
         }
     }
 }
 
+// Store on a hashmap a Addr<T> from the factory F
 fn store<T, F>(e3_id: &E3id, map: &mut HashMap<E3id, Addr<T>>, creator: F) -> Addr<T>
 where
     T: Actor<Context = Context<T>>,

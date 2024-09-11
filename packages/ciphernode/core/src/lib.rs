@@ -4,6 +4,7 @@
 
 mod ciphernode;
 mod ciphernode_selector;
+mod ciphernode_sequencer;
 mod ciphernode_supervisor;
 mod data;
 mod enclave_contract;
@@ -14,16 +15,17 @@ mod logger;
 mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
-mod publickey_aggregator;
-mod serializers;
-mod ciphernode_sequencer;
 mod plaintext_sequencer;
+mod publickey_aggregator;
 mod publickey_sequencer;
 mod registry;
+mod serializers;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
+pub use ciphernode_selector::*;
+pub use ciphernode_sequencer::*;
 pub use ciphernode_supervisor::*;
 pub use data::*;
 pub use eventbus::*;
@@ -31,12 +33,11 @@ pub use events::*;
 pub use fhe::*;
 pub use logger::*;
 pub use p2p::*;
+pub use plaintext_aggregator::*;
+pub use plaintext_sequencer::*;
 pub use publickey_aggregator::*;
 pub use publickey_sequencer::*;
-pub use plaintext_sequencer::*;
-pub use plaintext_aggregator::*;
-pub use ciphernode_selector::*;
-pub use ciphernode_sequencer::*;
+pub use registry::*;
 
 // TODO: move these out to a test folder
 #[cfg(test)]
@@ -55,7 +56,7 @@ mod tests {
             PublicKeyShareSerializer,
         },
         CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, PlaintextAggregated,
-        ResetHistory,
+        Registry, ResetHistory,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -71,22 +72,14 @@ mod tests {
     use tokio::{sync::mpsc::channel, time::sleep};
 
     // Simulating a local node
-    async fn setup_local_ciphernode(
-        bus: Addr<EventBus>,
-        fhe: Addr<Fhe>,
-        logging: bool,
-    ) -> (Addr<Ciphernode>, Addr<Data>) {
+    async fn setup_local_ciphernode(bus: Addr<EventBus>, rng:mut ChaCha20Rng, logging: bool) -> ChaCha20Rng {
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
 
         // create ciphernode actor for managing ciphernode flow
         CiphernodeSelector::attach(bus.clone());
-
-        let node = Ciphernode::attach(bus.clone(), fhe.clone(), data.clone()).await;
-
-        // setup the committee manager to generate the comittee public keys
-        CiphernodeSupervisor::attach(bus.clone(), fhe.clone());
-        (node, data)
+        Registry::attach(bus.clone(), data.clone(), rng).await;
+        rng
     }
 
     fn setup_bfv_params(
@@ -138,18 +131,12 @@ mod tests {
         // Setup EventBus
         let bus = EventBus::new(true).start();
 
-        // Setup global FHE actor
-        let (fhe, ..) = setup_global_fhe_actor(
-            &vec![0x3FFFFFFF000001],
-            2048,
-            1032193,
-            ChaCha20Rng::seed_from_u64(42),
-            ChaCha20Rng::seed_from_u64(42),
-        )?;
-
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
+        let rng = ChaCha20Rng::seed_from_u64(42);
+        // XXX: issues with rngs causing each keyshare to be exactly the same so they get
+        // duplicated
+        setup_local_ciphernode(bus.clone(), rng, true).await;
+        setup_local_ciphernode(bus.clone(), rng, true).await;
+        setup_local_ciphernode(bus.clone(), rng, true).await;
 
         let e3_id = E3id::new("1234");
 
@@ -349,7 +336,7 @@ mod tests {
         assert_eq!(
             history,
             vec![evt_1, evt_2, local_evt_3], // all local events that have been broadcast but no
-                                             // events from the loopback
+            // events from the loopback
             "P2p must not retransmit forwarded event to event bus"
         );
 
