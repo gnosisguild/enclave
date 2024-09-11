@@ -7,7 +7,7 @@ use crate::{
 };
 use actix::prelude::*;
 use rand_chacha::ChaCha20Rng;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 #[derive(Clone)]
 struct CommitteeMeta {
@@ -22,11 +22,11 @@ pub struct Registry {
     plaintexts: HashMap<E3id, Addr<PlaintextSequencer>>,
     meta: HashMap<E3id, CommitteeMeta>,
     public_keys: HashMap<E3id, Addr<PublicKeySequencer>>,
-    rng: ChaCha20Rng,
+    rng: Arc<Mutex<ChaCha20Rng>>,
 }
 
 impl Registry {
-    pub fn new(bus: Addr<EventBus>, data: Addr<Data>, rng: ChaCha20Rng) -> Self {
+    pub fn new(bus: Addr<EventBus>, data: Addr<Data>, rng: Arc<Mutex<ChaCha20Rng>>) -> Self {
         Self {
             bus,
             data,
@@ -39,7 +39,7 @@ impl Registry {
         }
     }
 
-    pub async fn attach(bus: Addr<EventBus>, data: Addr<Data>, rng: ChaCha20Rng) -> Addr<Self> {
+    pub async fn attach(bus: Addr<EventBus>, data: Addr<Data>, rng: Arc<Mutex<ChaCha20Rng>>) -> Addr<Self> {
         let addr = Registry::new(bus.clone(), data, rng).start();
         bus.send(Subscribe::new("*", addr.clone().into()))
             .await
@@ -56,7 +56,7 @@ impl Handler<EnclaveEvent> for Registry {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
-        println!("HANDLING ENCLAVE EVENTS {}", msg.event_type());
+        // println!("HANDLING ENCLAVE EVENTS {}", msg.event_type());
         let e3_id = E3id::from(msg.clone());
 
         match msg.clone() {
@@ -142,17 +142,17 @@ impl Registry {
 
     fn forward_message(&self, e3_id: &E3id, msg: EnclaveEvent) {
         if let Some(act) = self.public_keys.get(&e3_id) {
-            println!("forwarding to publickey {}", msg.event_type());
+            // println!("forwarding to publickey {}", msg.event_type());
             act.clone().recipient().do_send(msg.clone());
         }
 
         if let Some(act) = self.plaintexts.get(&e3_id) {
-            println!("forwarding to plaintext {}", msg.event_type());
+            // println!("forwarding to plaintext {}", msg.event_type());
             act.do_send(msg.clone());
         }
 
         if let Some(act) = self.ciphernodes.get(&e3_id) {
-            println!("forwarding to ciphernode {}", msg.event_type());
+            // println!("forwarding to ciphernode {}", msg.event_type());
             act.do_send(msg.clone());
         }
     }

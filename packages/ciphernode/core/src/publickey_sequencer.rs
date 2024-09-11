@@ -39,7 +39,7 @@ impl Handler<EnclaveEvent> for PublicKeySequencer {
         let dest = self
             .child
             .get_or_insert_with(|| PublicKeyAggregator::new(fhe, bus, e3_id, nodecount).start());
-        println!("Sending to PublicKeyAggregator {}", msg.event_type());
+        // println!("Sending to PublicKeyAggregator {}", msg.event_type());
         dest.do_send(msg);
     }
 }
