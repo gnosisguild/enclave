@@ -127,7 +127,7 @@ mod tests {
     ) -> Result<(Addr<Fhe>, Arc<BfvParameters>, CommonRandomPoly)> {
         let (params, crp) = setup_bfv_params(&moduli, degree, plaintext_modulus, rng1)?;
         Ok((
-            Fhe::new(params.clone(), crp.clone(), rng2)?.start(),
+            Fhe::new(params.clone(), crp.clone(), rng2).start(),
             params,
             crp,
         ))

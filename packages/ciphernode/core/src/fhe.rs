@@ -53,18 +53,30 @@ impl Actor for Fhe {
 }
 
 impl Fhe {
-    pub fn new(
-        params: Arc<BfvParameters>,
-        crp: CommonRandomPoly,
-        rng: ChaCha20Rng,
-    ) -> Result<Self> {
-        Ok(Self { params, crp, rng })
+    pub fn new(params: Arc<BfvParameters>, crp: CommonRandomPoly, rng: ChaCha20Rng) -> Self {
+        Self { params, crp, rng }
     }
-    pub fn try_default() -> Result<Self> {
+
+     pub fn try_default() -> Result<Self> {
         let moduli = &vec![0x3FFFFFFF000001];
         let degree = 2048usize;
         let plaintext_modulus = 1032193u64;
-        let mut rng = ChaCha20Rng::from_entropy();
+        let rng = ChaCha20Rng::from_entropy();
+
+        Ok(Fhe::from_raw_params(
+            moduli,
+            degree,
+            plaintext_modulus,
+            rng,
+        )?)
+    }
+
+    pub fn from_raw_params(
+        moduli: &[u64],
+        degree: usize,
+        plaintext_modulus: u64,
+        mut rng: ChaCha20Rng,
+    ) -> Result<Self> {
         let params = BfvParametersBuilder::new()
             .set_degree(degree)
             .set_plaintext_modulus(plaintext_modulus)
@@ -72,7 +84,7 @@ impl Fhe {
             .build_arc()?;
         let crp = CommonRandomPoly::new(&params, &mut rng)?;
 
-        Ok(Fhe::new(params, crp, rng)?)
+        Ok(Fhe::new(params, crp, rng))
     }
 }
 
