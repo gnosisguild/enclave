@@ -4,7 +4,7 @@ use actix::prelude::*;
 use rand_chacha::ChaCha20Rng;
 
 use crate::{
-    Ciphernode, CiphernodeSequencer, Data, E3id, EnclaveEvent, EventBus, Fhe, PlaintextSequencer,
+    CiphernodeSequencer, Data, E3id, EnclaveEvent, EventBus, Fhe, PlaintextSequencer,
     PublicKeySequencer,
 };
 
@@ -25,7 +25,7 @@ impl Actor for Registry {
 
 impl Handler<EnclaveEvent> for Registry {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         let e3_id = E3id::from(msg.clone());
         let mut fhes = self.fhes.clone();
         let bus = self.bus.clone();
@@ -66,6 +66,7 @@ impl Handler<EnclaveEvent> for Registry {
             _ => (),
         };
 
+        // Can I iterate over each of these?
         if let Some(act) = public_keys.get(&e3_id) {
             act.do_send(msg.clone());
         }
@@ -76,6 +77,6 @@ impl Handler<EnclaveEvent> for Registry {
 
         if let Some(act) = ciphernodes.get(&e3_id) {
             act.do_send(msg.clone());
-        }        
+        }
     }
 }
