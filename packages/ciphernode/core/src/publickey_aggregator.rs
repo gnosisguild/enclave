@@ -91,6 +91,16 @@ impl Actor for PublicKeyAggregator {
     type Context = Context<Self>;
 }
 
+impl Handler<EnclaveEvent> for PublicKeyAggregator {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            EnclaveEvent::KeyshareCreated { data, .. } => ctx.notify(data),
+            _ => ()
+        }
+    }
+}
+
 impl Handler<KeyshareCreated> for PublicKeyAggregator {
     type Result = Result<()>;
 
@@ -112,7 +122,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
         // Check the state and if it has changed to the computing
         if let PublicKeyAggregatorState::Computing { keyshares } = &self.state {
-            ctx.address().do_send(ComputeAggregate {
+            ctx.notify(ComputeAggregate {
                 keyshares: keyshares.clone(),
             })
         }

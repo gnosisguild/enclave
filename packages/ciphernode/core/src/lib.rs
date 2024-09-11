@@ -16,6 +16,10 @@ mod p2p;
 mod plaintext_aggregator;
 mod publickey_aggregator;
 mod serializers;
+mod ciphernode_sequencer;
+mod plaintext_sequencer;
+mod publickey_sequencer;
+mod registry;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -28,17 +32,11 @@ pub use fhe::*;
 pub use logger::*;
 pub use p2p::*;
 pub use publickey_aggregator::*;
-
-pub use actix::prelude::*;
-pub use ciphernode::*;
+pub use publickey_sequencer::*;
+pub use plaintext_sequencer::*;
+pub use plaintext_aggregator::*;
 pub use ciphernode_selector::*;
-pub use ciphernode_supervisor::*;
-pub use data::*;
-pub use eventbus::*;
-pub use events::*;
-pub use fhe::*;
-pub use p2p::*;
-pub use publickey_aggregator::*;
+pub use ciphernode_sequencer::*;
 
 // TODO: move these out to a test folder
 #[cfg(test)]
@@ -129,7 +127,7 @@ mod tests {
     ) -> Result<(Addr<Fhe>, Arc<BfvParameters>, CommonRandomPoly)> {
         let (params, crp) = setup_bfv_params(&moduli, degree, plaintext_modulus, rng1)?;
         Ok((
-            Fhe::new(params.clone(), crp.clone(), rng2)?.start(),
+            Fhe::new(params.clone(), crp.clone(), rng2).start(),
             params,
             crp,
         ))
