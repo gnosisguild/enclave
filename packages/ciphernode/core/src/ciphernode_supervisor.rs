@@ -120,7 +120,7 @@ impl Handler<EnclaveEvent> for CiphernodeSupervisor {
             }
             EnclaveEvent::DecryptionshareCreated { data, .. } => {
                 if let Some(decryption) = self.plaintext_aggregators.get(&data.e3_id) {
-                    decryption.do_send(data);
+                    decryption.do_send(EnclaveEvent::from(data));
                 }
             }
             EnclaveEvent::PlaintextAggregated { data, .. } => {

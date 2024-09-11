@@ -75,6 +75,16 @@ impl Actor for PlaintextAggregator {
     type Context = Context<Self>;
 }
 
+impl Handler<EnclaveEvent> for PlaintextAggregator {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            EnclaveEvent::DecryptionshareCreated { data, .. } => ctx.notify(data),
+            _ => ()
+        }
+    }
+}
+
 impl Handler<DecryptionshareCreated> for PlaintextAggregator {
     type Result = Result<()>;
     fn handle(&mut self, event: DecryptionshareCreated, ctx: &mut Self::Context) -> Self::Result {
