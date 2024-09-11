@@ -24,9 +24,7 @@ impl DistanceSortition {
                     (score, *address)
                 })
             .collect::<Vec<(BigInt, Address)>>();
-
-        println!("{:?}", scores);
-
+            
         scores.sort_by(|a, b| a.0.cmp(&b.0));
         let result = scores[0..self.size].to_vec();
         result
