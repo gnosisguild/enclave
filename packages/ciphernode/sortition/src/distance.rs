@@ -12,8 +12,8 @@ impl DistanceSortition {
         Self { random_seed, registered_nodes, size }
     }
 
-    pub fn get_committee(&mut self) -> Vec<Address> {
-        let scores = self.registered_nodes.iter()
+    pub fn get_committee(&mut self) -> Vec<(BigInt, Address)> {
+        let mut scores = self.registered_nodes.iter()
             .map(|address|
                 {
                     let concat = address.to_string() + &self.random_seed.to_string();
@@ -27,6 +27,8 @@ impl DistanceSortition {
 
         println!("{:?}", scores);
 
-        self.registered_nodes.clone()
+        scores.sort_by(|a, b| a.0.cmp(&b.0));
+        let result = scores[0..self.size].to_vec();
+        result
     }
 }
