@@ -15,7 +15,7 @@ pub struct PublicKeySequencer {
 }
 
 impl PublicKeySequencer {
-    fn new(fhe: Addr<Fhe>, e3_id: E3id, bus: Addr<EventBus>, nodecount: usize) -> Self {
+   pub fn new(fhe: Addr<Fhe>, e3_id: E3id, bus: Addr<EventBus>, nodecount: usize) -> Self {
         Self {
             fhe,
             e3_id,

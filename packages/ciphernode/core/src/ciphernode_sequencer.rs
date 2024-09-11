@@ -10,9 +10,18 @@ pub struct CiphernodeSequencer {
     fhe: Addr<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
-    ciphernode: Option<Addr<Ciphernode>>,
+    child: Option<Addr<Ciphernode>>,
 }
-
+impl CiphernodeSequencer {
+   pub fn new(fhe: Addr<Fhe>, data: Addr<Data>, bus: Addr<EventBus>) -> Self {
+        Self {
+            fhe,
+            bus,
+            data,
+            child: None,
+        }
+    }
+}
 impl Actor for CiphernodeSequencer {
     type Context = Context<Self>;
 }
@@ -24,7 +33,7 @@ impl Handler<EnclaveEvent> for CiphernodeSequencer {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let sink = self
-            .ciphernode
+            .child
             .get_or_insert_with(|| Ciphernode::new(bus, fhe, data).start());
         sink.do_send(msg);
     }

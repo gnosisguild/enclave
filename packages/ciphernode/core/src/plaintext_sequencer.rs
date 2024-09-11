@@ -13,7 +13,17 @@ pub struct PlaintextSequencer {
     nodecount: usize,
     child: Option<Addr<PlaintextAggregator>>,
 }
-
+impl PlaintextSequencer {
+   pub fn new(fhe: Addr<Fhe>, e3_id: E3id, bus: Addr<EventBus>, nodecount: usize) -> Self {
+        Self {
+            fhe,
+            e3_id,
+            bus,
+            nodecount,
+            child: None,
+        }
+    }
+}
 impl Actor for PlaintextSequencer {
     type Context = Context<Self>;
 }
