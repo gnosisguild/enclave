@@ -2,7 +2,7 @@ use crate::{
     eventbus::EventBus,
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
     fhe::{Fhe, GetAggregatePublicKey},
-    ordered_set::OrderedSet, Die,
+    ordered_set::OrderedSet,
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
@@ -171,10 +171,4 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
     }
 }
 
-impl Handler<Die> for PublicKeyAggregator {
-    type Result = ();
 
-    fn handle(&mut self, _msg: Die, ctx: &mut Context<Self>) {
-        ctx.stop();
-    }
-}

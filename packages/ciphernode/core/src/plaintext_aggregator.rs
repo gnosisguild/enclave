@@ -1,5 +1,5 @@
 use crate::{
-    ordered_set::OrderedSet, PlaintextAggregated, DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, Fhe, GetAggregatePlaintext
+    ordered_set::OrderedSet, PlaintextAggregated, DecryptionshareCreated, E3id, EnclaveEvent, EventBus, Fhe, GetAggregatePlaintext
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
@@ -140,10 +140,4 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
     }
 }
 
-impl Handler<Die> for PlaintextAggregator {
-    type Result = ();
 
-    fn handle(&mut self, _msg: Die, ctx: &mut Context<Self>) {
-        ctx.stop();
-    }
-}

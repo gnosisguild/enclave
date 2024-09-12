@@ -5,7 +5,6 @@
 mod ciphernode;
 mod ciphernode_selector;
 mod ciphernode_sequencer;
-mod ciphernode_supervisor;
 mod data;
 mod enclave_contract;
 mod eventbus;
@@ -26,7 +25,6 @@ pub use actix::prelude::*;
 pub use ciphernode::*;
 pub use ciphernode_selector::*;
 pub use ciphernode_sequencer::*;
-pub use ciphernode_supervisor::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
@@ -43,13 +41,10 @@ pub use registry::*;
 #[cfg(test)]
 mod tests {
     use crate::{
-        ciphernode::Ciphernode,
         ciphernode_selector::CiphernodeSelector,
-        ciphernode_supervisor::CiphernodeSupervisor,
         data::Data,
         eventbus::{EventBus, GetHistory},
         events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
-        fhe::Fhe,
         p2p::P2p,
         serializers::{
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
@@ -112,20 +107,6 @@ mod tests {
         Ok((pk, sk))
     }
 
-    // fn setup_global_fhe_actor(
-    //     moduli: &[u64],
-    //     degree: usize,
-    //     plaintext_modulus: u64,
-    //     rng: SharedRng,
-    // ) -> Result<(Addr<Fhe>, Arc<BfvParameters>, CommonRandomPoly)> {
-    //     let (params, crp) = setup_bfv_params(&moduli, degree, plaintext_modulus, rng.clone())?;
-    //     Ok((
-    //         Fhe::new(params.clone(), crp.clone(), rng.clone()).start(),
-    //         params,
-    //         crp,
-    //     ))
-    // }
-    //
     struct NewParamsWithCrp {
         pub moduli: Vec<u64>,
         pub degree: usize,
