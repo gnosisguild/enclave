@@ -62,9 +62,12 @@ impl PublicKeyAggregator {
         else {
             return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
         };
+        // println!("add_keyshare");
 
         keyshares.insert(keyshare);
+        // println!("got {} keyshares",keyshares.len());
         if keyshares.len() == *nodecount {
+            // println!("LEN IS REACHED!! {}", nodecount);
             return Ok(PublicKeyAggregatorState::Computing {
                 keyshares: keyshares.clone(),
             });
@@ -105,6 +108,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
     type Result = Result<()>;
 
     fn handle(&mut self, event: KeyshareCreated, ctx: &mut Self::Context) -> Self::Result {
+
         if event.e3_id != self.e3_id {
             return Err(anyhow!(
                 "Wrong e3_id sent to aggregator. This should not happen."
@@ -116,12 +120,14 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
                 "Aggregator has been closed for collecting keyshares."
             ));
         };
+        // println!("Handle KeyshareCreated!!!!");
 
         // add the keyshare and
         self.state = self.add_keyshare(event.pubkey)?;
 
         // Check the state and if it has changed to the computing
         if let PublicKeyAggregatorState::Computing { keyshares } = &self.state {
+            // println!("state going to computing...");
             ctx.notify(ComputeAggregate {
                 keyshares: keyshares.clone(),
             })

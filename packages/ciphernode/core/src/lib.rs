@@ -4,6 +4,7 @@
 
 mod ciphernode;
 mod ciphernode_selector;
+mod ciphernode_sequencer;
 mod ciphernode_supervisor;
 mod data;
 mod enclave_contract;
@@ -14,16 +15,17 @@ mod logger;
 mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
-mod publickey_aggregator;
-mod serializers;
-mod ciphernode_sequencer;
 mod plaintext_sequencer;
+mod publickey_aggregator;
 mod publickey_sequencer;
 mod registry;
+mod serializers;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
+pub use ciphernode_selector::*;
+pub use ciphernode_sequencer::*;
 pub use ciphernode_supervisor::*;
 pub use data::*;
 pub use eventbus::*;
@@ -31,12 +33,11 @@ pub use events::*;
 pub use fhe::*;
 pub use logger::*;
 pub use p2p::*;
+pub use plaintext_aggregator::*;
+pub use plaintext_sequencer::*;
 pub use publickey_aggregator::*;
 pub use publickey_sequencer::*;
-pub use plaintext_sequencer::*;
-pub use plaintext_aggregator::*;
-pub use ciphernode_selector::*;
-pub use ciphernode_sequencer::*;
+pub use registry::*;
 
 // TODO: move these out to a test folder
 #[cfg(test)]
@@ -55,7 +56,7 @@ mod tests {
             PublicKeyShareSerializer,
         },
         CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, PlaintextAggregated,
-        ResetHistory,
+        Registry, ResetHistory, SharedRng,
     };
     use actix::prelude::*;
     use anyhow::*;
@@ -63,7 +64,7 @@ mod tests {
         bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey},
         mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
     };
-    use fhe_traits::{FheEncoder, FheEncrypter};
+    use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use std::{sync::Arc, time::Duration};
@@ -71,66 +72,82 @@ mod tests {
     use tokio::{sync::mpsc::channel, time::sleep};
 
     // Simulating a local node
-    async fn setup_local_ciphernode(
-        bus: Addr<EventBus>,
-        fhe: Addr<Fhe>,
-        logging: bool,
-    ) -> (Addr<Ciphernode>, Addr<Data>) {
+    async fn setup_local_ciphernode(bus: Addr<EventBus>, rng: SharedRng, logging: bool) {
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
 
         // create ciphernode actor for managing ciphernode flow
         CiphernodeSelector::attach(bus.clone());
-
-        let node = Ciphernode::attach(bus.clone(), fhe.clone(), data.clone()).await;
-
-        // setup the committee manager to generate the comittee public keys
-        CiphernodeSupervisor::attach(bus.clone(), fhe.clone());
-        (node, data)
+        Registry::attach(bus.clone(), data.clone(), rng).await;
     }
 
     fn setup_bfv_params(
         moduli: &[u64],
         degree: usize,
         plaintext_modulus: u64,
-        mut rng: ChaCha20Rng,
-    ) -> Result<(Arc<BfvParameters>, CommonRandomPoly)> {
-        let params = BfvParametersBuilder::new()
+    ) -> Arc<BfvParameters> {
+        BfvParametersBuilder::new()
             .set_degree(degree)
             .set_plaintext_modulus(plaintext_modulus)
             .set_moduli(&moduli)
-            .build_arc()?;
-        let crp = CommonRandomPoly::new(&params, &mut rng)?;
-        Ok((params, crp))
+            .build_arc()
+            .unwrap()
+    }
+
+    fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
+        CommonRandomPoly::new(&params, &mut *rng.lock().unwrap()).unwrap()
     }
 
     fn generate_pk_share(
         params: Arc<BfvParameters>,
         crp: CommonRandomPoly,
-        mut rng: ChaCha20Rng,
-    ) -> Result<(Vec<u8>, ChaCha20Rng, SecretKey)> {
-        let sk = SecretKey::random(&params, &mut rng);
+        rng: SharedRng,
+    ) -> Result<(Vec<u8>, SecretKey)> {
+        let sk = SecretKey::random(&params, &mut *rng.lock().unwrap());
         let pk = PublicKeyShareSerializer::to_bytes(
-            PublicKeyShare::new(&sk, crp.clone(), &mut rng)?,
+            PublicKeyShare::new(&sk, crp.clone(), &mut *rng.lock().unwrap())?,
             params.clone(),
             crp,
         )?;
-        Ok((pk, rng, sk))
+        Ok((pk, sk))
     }
 
-    fn setup_global_fhe_actor(
+    // fn setup_global_fhe_actor(
+    //     moduli: &[u64],
+    //     degree: usize,
+    //     plaintext_modulus: u64,
+    //     rng: SharedRng,
+    // ) -> Result<(Addr<Fhe>, Arc<BfvParameters>, CommonRandomPoly)> {
+    //     let (params, crp) = setup_bfv_params(&moduli, degree, plaintext_modulus, rng.clone())?;
+    //     Ok((
+    //         Fhe::new(params.clone(), crp.clone(), rng.clone()).start(),
+    //         params,
+    //         crp,
+    //     ))
+    // }
+    //
+    struct NewParamsWithCrp {
+        pub moduli: Vec<u64>,
+        pub degree: usize,
+        pub plaintext_modulus: u64,
+        pub crp_bytes: Vec<u8>,
+        pub params: Arc<BfvParameters>,
+    }
+    fn setup_crp_params(
         moduli: &[u64],
         degree: usize,
         plaintext_modulus: u64,
-        rng1: ChaCha20Rng,
-        rng2: ChaCha20Rng,
-    ) -> Result<(Addr<Fhe>, Arc<BfvParameters>, CommonRandomPoly)> {
-        let (params, crp) = setup_bfv_params(&moduli, degree, plaintext_modulus, rng1)?;
-        Ok((
-            Fhe::new(params.clone(), crp.clone(), rng2).start(),
+        rng: SharedRng,
+    ) -> NewParamsWithCrp {
+        let params = setup_bfv_params(moduli, degree, plaintext_modulus);
+        let crp = set_up_crp(params.clone(), rng);
+        NewParamsWithCrp {
+            moduli: moduli.to_vec(),
+            degree,
+            plaintext_modulus,
+            crp_bytes: crp.to_bytes(),
             params,
-            crp,
-        ))
+        }
     }
 
     #[actix::test]
@@ -138,26 +155,30 @@ mod tests {
         // Setup EventBus
         let bus = EventBus::new(true).start();
 
-        // Setup global FHE actor
-        let (fhe, ..) = setup_global_fhe_actor(
-            &vec![0x3FFFFFFF000001],
-            2048,
-            1032193,
-            ChaCha20Rng::seed_from_u64(42),
-            ChaCha20Rng::seed_from_u64(42),
-        )?;
-
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
-        setup_local_ciphernode(bus.clone(), fhe.clone(), true).await;
+        let rng = Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42)));
+        setup_local_ciphernode(bus.clone(), rng.clone(), true).await;
+        setup_local_ciphernode(bus.clone(), rng.clone(), true).await;
+        setup_local_ciphernode(bus.clone(), rng.clone(), true).await;
 
         let e3_id = E3id::new("1234");
+
+        let NewParamsWithCrp {
+            moduli,
+            degree,
+            plaintext_modulus,
+            crp_bytes,
+            params,
+        } = setup_crp_params(&vec![0x3FFFFFFF000001], 2048, 1032193, Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42))));
 
         let event = EnclaveEvent::from(CommitteeRequested {
             e3_id: e3_id.clone(),
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
+            moduli: moduli.clone(),
+            degree,
+            plaintext_modulus,
+            crp: crp_bytes.clone(),
         });
 
         // Send the computation requested event
@@ -168,18 +189,14 @@ mod tests {
 
         let history = bus.send(GetHistory).await?;
 
-        let (params, crp) = setup_bfv_params(
-            &vec![0x3FFFFFFF000001],
-            2048,
-            1032193,
-            ChaCha20Rng::seed_from_u64(42),
-        )?;
+        let rng_test = Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42)));
+
+        let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
 
         // Passing rng through function chain to ensure it matches usage in system above
-        let rng = ChaCha20Rng::seed_from_u64(42);
-        let (p1, rng, sk1) = generate_pk_share(params.clone(), crp.clone(), rng)?;
-        let (p2, rng, sk2) = generate_pk_share(params.clone(), crp.clone(), rng)?;
-        let (p3, mut rng, sk3) = generate_pk_share(params.clone(), crp.clone(), rng)?;
+        let (p1, sk1) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
+        let (p2, sk2) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
+        let (p3, sk3) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
 
         let pubkey: PublicKey = vec![p1.clone(), p2.clone(), p3.clone()]
             .iter()
@@ -195,6 +212,10 @@ mod tests {
                     nodecount: 3,
                     threshold: 123,
                     sortition_seed: 123,
+                    moduli,
+                    degree,
+                    plaintext_modulus,
+                    crp: crp_bytes,
                 }),
                 EnclaveEvent::from(CiphernodeSelected {
                     e3_id: e3_id.clone(),
@@ -243,17 +264,17 @@ mod tests {
         let arc_ct = Arc::new(ciphertext);
 
         let ds1 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk1, &arc_ct, &mut rng).unwrap(),
+            DecryptionShare::new(&sk1, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
             params.clone(),
             arc_ct.clone(),
         )?;
         let ds2 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk2, &arc_ct, &mut rng).unwrap(),
+            DecryptionShare::new(&sk2, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
             params.clone(),
             arc_ct.clone(),
         )?;
         let ds3 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk3, &arc_ct, &mut rng).unwrap(),
+            DecryptionShare::new(&sk3, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
             params.clone(),
             arc_ct.clone(),
         )?;
@@ -261,8 +282,10 @@ mod tests {
         // let ds1 = sk1
         bus.send(event.clone()).await?;
 
+        sleep(Duration::from_millis(1)).await; // need to push to next tick
         let history = bus.send(GetHistory).await?;
 
+        assert_eq!(history.len(), 5);
         assert_eq!(
             history,
             vec![
@@ -316,6 +339,10 @@ mod tests {
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
+            moduli: vec![0x3FFFFFFF000001],
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            crp: vec![1, 2, 3, 4],
         });
 
         let evt_2 = EnclaveEvent::from(CommitteeRequested {
@@ -323,6 +350,10 @@ mod tests {
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
+            moduli: vec![0x3FFFFFFF000001],
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            crp: vec![1, 2, 3, 4],
         });
 
         let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
@@ -349,7 +380,7 @@ mod tests {
         assert_eq!(
             history,
             vec![evt_1, evt_2, local_evt_3], // all local events that have been broadcast but no
-                                             // events from the loopback
+            // events from the loopback
             "P2p must not retransmit forwarded event to event bus"
         );
 
@@ -370,6 +401,10 @@ mod tests {
             nodecount: 3,
             threshold: 123,
             sortition_seed: 123,
+            moduli: vec![0x3FFFFFFF000001],
+            degree: 2048,
+            plaintext_modulus: 1032193,
+            crp: vec![1, 2, 3, 4],
         });
 
         // lets send an event from the network
