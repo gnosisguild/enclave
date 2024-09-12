@@ -63,7 +63,9 @@ impl Handler<EnclaveEvent> for Registry {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
-        let e3_id = E3id::from(msg.clone());
+        let Some(e3_id) = msg.get_e3_id() else {
+            return;
+        };
 
         match msg.clone() {
             EnclaveEvent::CommitteeRequested { data, .. } => {
