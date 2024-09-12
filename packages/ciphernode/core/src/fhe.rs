@@ -101,7 +101,6 @@ impl Fhe {
             .set_plaintext_modulus(plaintext_modulus)
             .set_moduli(&moduli)
             .build_arc()?;
-        println!("Create CommonRandomPoly");
 
         Ok(Fhe::new(params.clone(), CommonRandomPoly::deserialize(crp, &params)?, rng))
     }
@@ -110,9 +109,7 @@ impl Fhe {
 impl Handler<GenerateKeyshare> for Fhe {
     type Result = Result<(Vec<u8>, Vec<u8>)>;
     fn handle(&mut self, _event: GenerateKeyshare, _: &mut Self::Context) -> Self::Result {
-        println!("Create SecretKey");
         let sk_share = { SecretKey::random(&self.params, &mut *self.rng.lock().unwrap()) };
-        println!("Create PublicKeyShare");
         let pk_share =
             { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut *self.rng.lock().unwrap())? };
         Ok((
@@ -132,7 +129,6 @@ impl Handler<DecryptCiphertext> for Fhe {
 
         let secret_key = SecretKeySerializer::from_bytes(&unsafe_secret)?;
         let ct = Arc::new(CiphertextSerializer::from_bytes(&ciphertext)?);
-        println!("Create DecryptionSHare");
         let inner = DecryptionShare::new(&secret_key, &ct, &mut *self.rng.lock().unwrap()).unwrap();
 
         Ok(DecryptionShareSerializer::to_bytes(

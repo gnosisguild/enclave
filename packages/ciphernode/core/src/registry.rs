@@ -63,7 +63,6 @@ impl Handler<EnclaveEvent> for Registry {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
-        // println!("HANDLING ENCLAVE EVENTS {}", msg.event_type());
         let e3_id = E3id::from(msg.clone());
 
         match msg.clone() {
@@ -160,17 +159,14 @@ impl Registry {
 
     fn forward_message(&self, e3_id: &E3id, msg: EnclaveEvent) {
         if let Some(act) = self.public_keys.get(&e3_id) {
-            // println!("forwarding to publickey {}", msg.event_type());
             act.clone().recipient().do_send(msg.clone());
         }
 
         if let Some(act) = self.plaintexts.get(&e3_id) {
-            // println!("forwarding to plaintext {}", msg.event_type());
             act.do_send(msg.clone());
         }
 
         if let Some(act) = self.ciphernodes.get(&e3_id) {
-            // println!("forwarding to ciphernode {}", msg.event_type());
             act.do_send(msg.clone());
         }
     }
