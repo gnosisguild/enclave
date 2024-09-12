@@ -28,7 +28,7 @@ impl Actor for CiphernodeSequencer {
 
 impl Handler<EnclaveEvent> for CiphernodeSequencer {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         let bus = self.bus.clone();
         let fhe = self.fhe.clone();
         let data = self.data.clone();

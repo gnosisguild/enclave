@@ -11,10 +11,13 @@ use fhe::{
     bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
-use fhe_traits::FheDecoder;
+use fhe_traits::{FheDecoder, Serialize};
 use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
-use std::{hash::Hash, sync::Arc};
+use rand_chacha::{ChaCha20Rng, ChaCha8Rng};
+use std::{
+    hash::Hash,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Result<(Vec<u8>, Vec<u8>)>")]
@@ -41,11 +44,13 @@ pub struct DecryptCiphertext {
     pub ciphertext: Vec<u8>,
 }
 
+pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
+
 /// Fhe library adaptor. All FHE computations should happen through this actor.
 pub struct Fhe {
     params: Arc<BfvParameters>,
     crp: CommonRandomPoly,
-    rng: ChaCha20Rng,
+    rng: SharedRng,
 }
 
 impl Actor for Fhe {
@@ -53,20 +58,33 @@ impl Actor for Fhe {
 }
 
 impl Fhe {
-    pub fn new(params: Arc<BfvParameters>, crp: CommonRandomPoly, rng: ChaCha20Rng) -> Self {
+    pub fn new(params: Arc<BfvParameters>, crp: CommonRandomPoly, rng: SharedRng) -> Self {
         Self { params, crp, rng }
     }
 
-     pub fn try_default() -> Result<Self> {
+    // Deprecated
+    pub fn try_default() -> Result<Self> {
+        // TODO: The production bootstrapping of this will involve receiving a crp bytes and param
+        // input form the event
         let moduli = &vec![0x3FFFFFFF000001];
         let degree = 2048usize;
         let plaintext_modulus = 1032193u64;
-        let rng = ChaCha20Rng::from_entropy();
+        let rng = Arc::new(Mutex::new(ChaCha20Rng::from_entropy()));
+        let crp = CommonRandomPoly::new(
+            &BfvParametersBuilder::new()
+                .set_degree(degree)
+                .set_plaintext_modulus(plaintext_modulus)
+                .set_moduli(&moduli)
+                .build_arc()?,
+            &mut *rng.lock().unwrap(),
+        )?
+        .to_bytes();
 
         Ok(Fhe::from_raw_params(
             moduli,
             degree,
             plaintext_modulus,
+            &crp,
             rng,
         )?)
     }
@@ -75,24 +93,25 @@ impl Fhe {
         moduli: &[u64],
         degree: usize,
         plaintext_modulus: u64,
-        mut rng: ChaCha20Rng,
+        crp: &[u8],
+        rng: Arc<Mutex<ChaCha20Rng>>,
     ) -> Result<Self> {
         let params = BfvParametersBuilder::new()
             .set_degree(degree)
             .set_plaintext_modulus(plaintext_modulus)
             .set_moduli(&moduli)
             .build_arc()?;
-        let crp = CommonRandomPoly::new(&params, &mut rng)?;
 
-        Ok(Fhe::new(params, crp, rng))
+        Ok(Fhe::new(params.clone(), CommonRandomPoly::deserialize(crp, &params)?, rng))
     }
 }
 
 impl Handler<GenerateKeyshare> for Fhe {
     type Result = Result<(Vec<u8>, Vec<u8>)>;
     fn handle(&mut self, _event: GenerateKeyshare, _: &mut Self::Context) -> Self::Result {
-        let sk_share = { SecretKey::random(&self.params, &mut self.rng) };
-        let pk_share = { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut self.rng)? };
+        let sk_share = { SecretKey::random(&self.params, &mut *self.rng.lock().unwrap()) };
+        let pk_share =
+            { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut *self.rng.lock().unwrap())? };
         Ok((
             SecretKeySerializer::to_bytes(sk_share, self.params.clone())?,
             PublicKeyShareSerializer::to_bytes(pk_share, self.params.clone(), self.crp.clone())?,
@@ -110,7 +129,7 @@ impl Handler<DecryptCiphertext> for Fhe {
 
         let secret_key = SecretKeySerializer::from_bytes(&unsafe_secret)?;
         let ct = Arc::new(CiphertextSerializer::from_bytes(&ciphertext)?);
-        let inner = DecryptionShare::new(&secret_key, &ct, &mut self.rng).unwrap();
+        let inner = DecryptionShare::new(&secret_key, &ct, &mut *self.rng.lock().unwrap()).unwrap();
 
         Ok(DecryptionShareSerializer::to_bytes(
             inner,
@@ -153,8 +172,10 @@ impl Handler<GetAggregatePlaintext> for Fhe {
         // XXX: how do we know what the expected output of the plaintext is in order to decrypt
         // here for serialization?
         // This would be dependent on the computation that is running.
-        // For now assuming testcase of Vec<u64>
-        // This could be determined based on the "program" config
+        // For now assuming testcase of Vec<u64> and currently represents a "HARDCODED" program
+        // output format of Vec<u64>
+        // This could be determined based on the "program" config events
+
         let decoded = Vec::<u64>::try_decode(&plaintext, Encoding::poly())?;
         let decoded = &decoded[0..2]; // TODO: this will be computation dependent
         Ok(bincode::serialize(&decoded)?)

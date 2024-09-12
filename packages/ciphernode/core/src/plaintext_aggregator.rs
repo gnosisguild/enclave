@@ -132,7 +132,6 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
                         decrypted_output,
                         e3_id: act.e3_id.clone(),
                     });
-
                     act.bus.do_send(event);
 
                     Ok(())

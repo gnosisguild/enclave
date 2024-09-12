@@ -105,6 +105,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
     type Result = Result<()>;
 
     fn handle(&mut self, event: KeyshareCreated, ctx: &mut Self::Context) -> Self::Result {
+
         if event.e3_id != self.e3_id {
             return Err(anyhow!(
                 "Wrong e3_id sent to aggregator. This should not happen."

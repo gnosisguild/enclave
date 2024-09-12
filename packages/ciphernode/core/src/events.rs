@@ -231,6 +231,11 @@ pub struct CommitteeRequested {
     pub nodecount: usize,
     pub threshold: usize,
     pub sortition_seed: u32,
+    // fhe params
+    pub moduli: Vec<u64>,
+    pub degree: usize,
+    pub plaintext_modulus: u64,
+    pub crp: Vec<u8>
     // computation_type: ??, // TODO:
     // execution_model_type: ??, // TODO:
     // input_deadline: ??, // TODO:
