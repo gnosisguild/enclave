@@ -88,6 +88,7 @@ impl Handler<EnclaveEvent> for PlaintextAggregator {
 impl Handler<DecryptionshareCreated> for PlaintextAggregator {
     type Result = Result<()>;
     fn handle(&mut self, event: DecryptionshareCreated, ctx: &mut Self::Context) -> Self::Result {
+        println!("Plaintext Aggregator received! DecryptionshareCreated");
         if event.e3_id != self.e3_id {
             return Err(anyhow!(
                 "Wrong e3_id sent to aggregator. This should not happen."
@@ -132,7 +133,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
                         decrypted_output,
                         e3_id: act.e3_id.clone(),
                     });
-
+                    println!("SENDING EVENT!!!");
                     act.bus.do_send(event);
 
                     Ok(())

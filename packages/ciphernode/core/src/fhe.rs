@@ -11,9 +11,9 @@ use fhe::{
     bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
-use fhe_traits::FheDecoder;
+use fhe_traits::{FheDecoder, Serialize};
 use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
+use rand_chacha::{ChaCha20Rng, ChaCha8Rng};
 use std::{
     hash::Hash,
     sync::{Arc, Mutex},
@@ -62,16 +62,29 @@ impl Fhe {
         Self { params, crp, rng }
     }
 
+    // Deprecated
     pub fn try_default() -> Result<Self> {
+        // TODO: The production bootstrapping of this will involve receiving a crp bytes and param
+        // input form the event
         let moduli = &vec![0x3FFFFFFF000001];
         let degree = 2048usize;
         let plaintext_modulus = 1032193u64;
         let rng = Arc::new(Mutex::new(ChaCha20Rng::from_entropy()));
+        let crp = CommonRandomPoly::new(
+            &BfvParametersBuilder::new()
+                .set_degree(degree)
+                .set_plaintext_modulus(plaintext_modulus)
+                .set_moduli(&moduli)
+                .build_arc()?,
+            &mut *rng.lock().unwrap(),
+        )?
+        .to_bytes();
 
         Ok(Fhe::from_raw_params(
             moduli,
             degree,
             plaintext_modulus,
+            &crp,
             rng,
         )?)
     }
@@ -80,6 +93,7 @@ impl Fhe {
         moduli: &[u64],
         degree: usize,
         plaintext_modulus: u64,
+        crp: &[u8],
         rng: Arc<Mutex<ChaCha20Rng>>,
     ) -> Result<Self> {
         let params = BfvParametersBuilder::new()
@@ -88,9 +102,8 @@ impl Fhe {
             .set_moduli(&moduli)
             .build_arc()?;
         println!("Create CommonRandomPoly");
-        let crp = CommonRandomPoly::new(&params, &mut *rng.lock().unwrap())?;
 
-        Ok(Fhe::new(params, crp, rng))
+        Ok(Fhe::new(params.clone(), CommonRandomPoly::deserialize(crp, &params)?, rng))
     }
 }
 

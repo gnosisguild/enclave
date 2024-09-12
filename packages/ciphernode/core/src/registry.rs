@@ -2,12 +2,15 @@
 // TODO: vertically modularize this so there is a registry for each function that get rolled up into one based
 // on config
 use crate::{
-    CiphernodeSequencer, Data, E3id, EnclaveEvent, EventBus, Fhe, PlaintextSequencer,
-    PublicKeySequencer, Subscribe,
+    CiphernodeSequencer, CommitteeRequested, Data, E3id, EnclaveEvent, EventBus, Fhe,
+    PlaintextSequencer, PublicKeySequencer, Subscribe,
 };
 use actix::prelude::*;
 use rand_chacha::ChaCha20Rng;
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Clone)]
 struct CommitteeMeta {
@@ -39,7 +42,11 @@ impl Registry {
         }
     }
 
-    pub async fn attach(bus: Addr<EventBus>, data: Addr<Data>, rng: Arc<Mutex<ChaCha20Rng>>) -> Addr<Self> {
+    pub async fn attach(
+        bus: Addr<EventBus>,
+        data: Addr<Data>,
+        rng: Arc<Mutex<ChaCha20Rng>>,
+    ) -> Addr<Self> {
         let addr = Registry::new(bus.clone(), data, rng).start();
         bus.send(Subscribe::new("*", addr.clone().into()))
             .await
@@ -61,7 +68,15 @@ impl Handler<EnclaveEvent> for Registry {
 
         match msg.clone() {
             EnclaveEvent::CommitteeRequested { data, .. } => {
-                let fhe_factory = self.fhe_factory();
+                let CommitteeRequested {
+                    degree,
+                    moduli,
+                    plaintext_modulus,
+                    crp,
+                    ..
+                } = data;
+
+                let fhe_factory = self.fhe_factory(moduli, degree, plaintext_modulus, crp);
                 let fhe = store(&e3_id, &mut self.fhes, fhe_factory);
                 let meta = CommitteeMeta {
                     nodecount: data.nodecount,
@@ -97,13 +112,16 @@ impl Handler<EnclaveEvent> for Registry {
 }
 
 impl Registry {
-    fn fhe_factory(&self) -> impl FnOnce() -> Addr<Fhe> {
+    fn fhe_factory(
+        &self,
+        moduli: Vec<u64>,
+        degree: usize,
+        plaintext_modulus: u64,
+        crp: Vec<u8>,
+    ) -> impl FnOnce() -> Addr<Fhe> {
         let rng = self.rng.clone();
         move || {
-            let moduli = &vec![0x3FFFFFFF000001];
-            let degree = 2048;
-            let plaintext_modulus = 1032193;
-            Fhe::from_raw_params(moduli, degree, plaintext_modulus, rng)
+            Fhe::from_raw_params(&moduli, degree, plaintext_modulus, &crp, rng)
                 .unwrap()
                 .start()
         }
