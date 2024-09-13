@@ -82,8 +82,8 @@ mod tests {
 
         // create ciphernode actor for managing ciphernode flow
         let sortition = Sortition::attach(bus.clone());
-        CiphernodeSelector::attach(bus.clone(), sortition, addr);
-        Registry::attach(bus.clone(), data.clone(), rng).await;
+        CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
+        Registry::attach(bus.clone(), data.clone(), sortition, rng, addr).await;
     }
 
     fn setup_bfv_params(
@@ -253,14 +253,17 @@ mod tests {
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p1.clone(),
                     e3_id: e3_id.clone(),
+                    node: eth_addrs[0]
                 }),
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p2.clone(),
                     e3_id: e3_id.clone(),
+                    node: eth_addrs[1]
                 }),
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p3.clone(),
-                    e3_id: e3_id.clone()
+                    e3_id: e3_id.clone(),
+                    node: eth_addrs[2]
                 }),
                 EnclaveEvent::from(PublicKeyAggregated {
                     pubkey: PublicKeySerializer::to_bytes(pubkey.clone(), params.clone())?,
@@ -321,14 +324,17 @@ mod tests {
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds1.clone(),
                     e3_id: e3_id.clone(),
+                    node: eth_addrs[0]
                 }),
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds2.clone(),
                     e3_id: e3_id.clone(),
+                    node: eth_addrs[1]
                 }),
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds3.clone(),
                     e3_id: e3_id.clone(),
+                    node: eth_addrs[2]
                 }),
                 EnclaveEvent::from(PlaintextAggregated {
                     e3_id: e3_id.clone(),

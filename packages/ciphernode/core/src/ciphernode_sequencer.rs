@@ -3,6 +3,7 @@
 // TODO: if the ciphernode fails restart the node by replaying all stored events back to it
 
 use actix::prelude::*;
+use alloy_primitives::Address;
 
 use crate::{Ciphernode, Data, EnclaveEvent, EventBus, Fhe};
 
@@ -11,14 +12,16 @@ pub struct CiphernodeSequencer {
     data: Addr<Data>,
     bus: Addr<EventBus>,
     child: Option<Addr<Ciphernode>>,
+    address: Address,
 }
 impl CiphernodeSequencer {
-   pub fn new(fhe: Addr<Fhe>, data: Addr<Data>, bus: Addr<EventBus>) -> Self {
+   pub fn new(fhe: Addr<Fhe>, data: Addr<Data>, bus: Addr<EventBus>, address:Address) -> Self {
         Self {
             fhe,
             bus,
             data,
             child: None,
+            address
         }
     }
 }
@@ -32,9 +35,10 @@ impl Handler<EnclaveEvent> for CiphernodeSequencer {
         let bus = self.bus.clone();
         let fhe = self.fhe.clone();
         let data = self.data.clone();
+        let address = self.address;
         let sink = self
             .child
-            .get_or_insert_with(|| Ciphernode::new(bus, fhe, data).start());
+            .get_or_insert_with(|| Ciphernode::new(bus, fhe, data, address).start());
         sink.do_send(msg);
     }
 }
