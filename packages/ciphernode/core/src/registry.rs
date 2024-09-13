@@ -208,10 +208,10 @@ impl Registry {
         if let Some(act) = self.public_keys.get(e3_id) {
             let msgs = self.get_msgs(e3_id.clone(), "public_keys");
             let recipient = act.clone().recipient();
+            recipient.do_send(msg.clone());
             for m in msgs {
                 recipient.do_send(m);
             }
-            recipient.do_send(msg.clone());
         } else {
             self.store_msg(e3_id.clone(), msg.clone(), "public_keys");
         }
@@ -219,10 +219,10 @@ impl Registry {
         if let Some(act) = self.plaintexts.get(e3_id) {
             let msgs = self.get_msgs(e3_id.clone(), "plaintexts");
             let recipient = act.clone().recipient();
+            recipient.do_send(msg.clone());
             for m in msgs {
                 recipient.do_send(m);
             }
-            recipient.do_send(msg.clone());
         } else {
             self.store_msg(e3_id.clone(), msg.clone(), "plaintexts");
         }
@@ -230,10 +230,10 @@ impl Registry {
         if let Some(act) = self.ciphernodes.get(e3_id) {
             let msgs = self.get_msgs(e3_id.clone(), "ciphernodes");
             let recipient = act.clone().recipient();
+            recipient.do_send(msg.clone());
             for m in msgs {
                 recipient.do_send(m);
             }
-            recipient.do_send(msg.clone());
         } else {
             self.store_msg(e3_id.clone(), msg.clone(), "ciphernodes");
         }
