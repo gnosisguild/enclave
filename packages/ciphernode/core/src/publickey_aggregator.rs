@@ -121,6 +121,8 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
             nodecount, seed, ..
         } = self.state.clone()
         else {
+            println!("Aggregator has been closed for collecting keyshares."); // TODO: log properly
+
             return Box::pin(fut::ready(Ok(())));
         };
 
@@ -150,11 +152,6 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
                         println!("Wrong e3_id sent to aggregator. This should not happen.");
                         return Ok(());
                     }
-
-                    let PublicKeyAggregatorState::Collecting { .. } = act.state else {
-                        println!("Aggregator has been closed for collecting keyshares."); // TODO: log properly
-                        return Ok(());
-                    };
 
                     // add the keyshare and
                     act.state = act.add_keyshare(pubkey)?;

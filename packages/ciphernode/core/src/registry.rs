@@ -16,6 +16,7 @@ use std::{
 #[derive(Clone)]
 struct CommitteeMeta {
     nodecount: usize,
+    seed: u64,
 }
 
 pub struct Registry {
@@ -95,12 +96,17 @@ impl Handler<EnclaveEvent> for Registry {
                 let fhe = store(&e3_id, &mut self.fhes, fhe_factory);
                 let meta = CommitteeMeta {
                     nodecount: data.nodecount,
+                    seed: data.sortition_seed,
                 };
 
                 self.meta.entry(e3_id.clone()).or_insert(meta.clone());
 
-                let public_key_sequencer_factory =
-                    self.public_key_sequencer_factory(e3_id.clone(), meta.clone(), fhe.clone(), sortition_seed);
+                let public_key_sequencer_factory = self.public_key_sequencer_factory(
+                    e3_id.clone(),
+                    meta.clone(),
+                    fhe.clone(),
+                    sortition_seed,
+                );
                 store(&e3_id, &mut self.public_keys, public_key_sequencer_factory);
 
                 let ciphernode_sequencer_factory = self.ciphernode_sequencer_factory(fhe.clone());
@@ -172,8 +178,10 @@ impl Registry {
         fhe: Addr<Fhe>,
     ) -> impl FnOnce() -> Addr<PlaintextSequencer> {
         let bus = self.bus.clone();
+        let sortition = self.sortition.clone();
         let nodecount = meta.nodecount;
-        move || PlaintextSequencer::new(fhe, e3_id, bus, nodecount).start()
+        let seed = meta.seed;
+        move || PlaintextSequencer::new(fhe, e3_id, bus, sortition, nodecount, seed).start()
     }
 
     fn forward_message(&self, e3_id: &E3id, msg: EnclaveEvent) {
