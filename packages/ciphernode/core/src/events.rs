@@ -95,10 +95,11 @@ pub enum EnclaveEvent {
     CiphernodeRemoved {
         id: EventId,
         data: CiphernodeRemoved,
-    }, // CommitteeSelected,
-       // OutputDecrypted,
-       // CiphernodeRegistered,
-       // CiphernodeDeregistered,
+    },
+    // CommitteeSelected,
+    // OutputDecrypted,
+    // CiphernodeRegistered,
+    // CiphernodeDeregistered,
 }
 
 impl EnclaveEvent {
@@ -115,6 +116,7 @@ impl EnclaveEvent {
     }
 
     pub fn is_local_only(&self) -> bool {
+        // Add a list of local events
         match self {
             EnclaveEvent::CiphernodeSelected { .. } => true,
             _ => false,
@@ -267,14 +269,16 @@ pub struct CommitteeRequested {
     pub nodecount: usize,
     pub threshold: usize,
     pub sortition_seed: u64, // Should actually be much larger eg [u8;32]
+
     // fhe params
     pub moduli: Vec<u64>,
     pub degree: usize,
     pub plaintext_modulus: u64,
-    pub crp: Vec<u8>, // computation_type: ??, // TODO:
-                      // execution_model_type: ??, // TODO:
-                      // input_deadline: ??, // TODO:
-                      // availability_duration: ??, // TODO:
+    pub crp: Vec<u8>,
+    // computation_type: ??, // TODO:
+    // execution_model_type: ??, // TODO:
+    // input_deadline: ??, // TODO:
+    // availability_duration: ??, // TODO:
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
