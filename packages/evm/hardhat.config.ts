@@ -1,4 +1,5 @@
 import "@nomicfoundation/hardhat-toolbox";
+import dotenv from "dotenv";
 import "hardhat-deploy";
 import type { HardhatUserConfig } from "hardhat/config";
 import { vars } from "hardhat/config";
@@ -7,10 +8,17 @@ import type { NetworkUserConfig } from "hardhat/types";
 import "./tasks/accounts";
 import "./tasks/enclave";
 
-// Run 'npx hardhat vars setup' to see the list of variables that need to be set
+dotenv.config();
 
-const mnemonic: string = vars.get("MNEMONIC");
-const infuraApiKey: string = vars.get("INFURA_API_KEY");
+const { INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY } = process.env;
+if (!INFURA_KEY || !MNEMONIC || !ETHERSCAN_API_KEY) {
+  console.error(
+    "Please set the INFURA_KEY, MNEMONIC, and ETHERSCAN_API_KEY environment variables",
+  );
+  process.exit(1);
+}
+const mnemonic: string = MNEMONIC;
+const infuraApiKey: string = INFURA_KEY;
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -58,11 +66,11 @@ const config: HardhatUserConfig = {
       arbitrumOne: vars.get("ARBISCAN_API_KEY", ""),
       avalanche: vars.get("SNOWTRACE_API_KEY", ""),
       bsc: vars.get("BSCSCAN_API_KEY", ""),
-      mainnet: vars.get("ETHERSCAN_API_KEY", ""),
+      mainnet: ETHERSCAN_API_KEY,
       optimisticEthereum: vars.get("OPTIMISM_API_KEY", ""),
       polygon: vars.get("POLYGONSCAN_API_KEY", ""),
       polygonMumbai: vars.get("POLYGONSCAN_API_KEY", ""),
-      sepolia: vars.get("ETHERSCAN_API_KEY", ""),
+      sepolia: ETHERSCAN_API_KEY,
     },
   },
   gasReporter: {

@@ -14,7 +14,7 @@ interface IRegistry {
     ) external;
 }
 
-contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
+contract MockNaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     struct Committee {
         address[] nodes;
         uint32[2] threshold;

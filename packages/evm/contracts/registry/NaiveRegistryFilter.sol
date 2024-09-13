@@ -53,8 +53,8 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    constructor(address _owner, address _enclave) {
-        initialize(_owner, _enclave);
+    constructor(address _owner, address _registry) {
+        initialize(_owner, _registry);
     }
 
     function initialize(address _owner, address _registry) public initializer {
