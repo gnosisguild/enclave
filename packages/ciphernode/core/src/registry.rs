@@ -2,8 +2,9 @@
 // TODO: vertically modularize this so there is a registry for each function that get rolled up into one based
 // on config
 use crate::{
-    CiphernodeSequencer, CommitteeRequested, Data, E3id, EnclaveEvent, EventBus, Fhe,
-    PlaintextSequencer, PublicKeySequencer, Sortition, Subscribe,
+    Ciphernode, CommitteeRequested, Data, E3id, EnclaveEvent, EventBus, Fhe,
+    PlaintextAggregator, PublicKeyAggregator, Sortition,
+    Subscribe,
 };
 use actix::prelude::*;
 use alloy_primitives::Address;
@@ -21,14 +22,15 @@ struct CommitteeMeta {
 
 pub struct Registry {
     bus: Addr<EventBus>,
-    ciphernodes: HashMap<E3id, Addr<CiphernodeSequencer>>,
+    ciphernodes: HashMap<E3id, Addr<Ciphernode>>,
     data: Addr<Data>,
     sortition: Addr<Sortition>,
     address: Address,
     fhes: HashMap<E3id, Addr<Fhe>>,
-    plaintexts: HashMap<E3id, Addr<PlaintextSequencer>>,
+    plaintexts: HashMap<E3id, Addr<PlaintextAggregator>>,
+    buffers: HashMap<E3id, HashMap<String, Vec<EnclaveEvent>>>,
     meta: HashMap<E3id, CommitteeMeta>,
-    public_keys: HashMap<E3id, Addr<PublicKeySequencer>>,
+    public_keys: HashMap<E3id, Addr<PublicKeyAggregator>>,
     rng: Arc<Mutex<ChaCha20Rng>>,
 }
 
@@ -49,6 +51,7 @@ impl Registry {
             ciphernodes: HashMap::new(),
             plaintexts: HashMap::new(),
             public_keys: HashMap::new(),
+            buffers: HashMap::new(),
             meta: HashMap::new(),
             fhes: HashMap::new(),
         }
@@ -101,16 +104,16 @@ impl Handler<EnclaveEvent> for Registry {
 
                 self.meta.entry(e3_id.clone()).or_insert(meta.clone());
 
-                let public_key_sequencer_factory = self.public_key_sequencer_factory(
+                let public_key_factory = self.public_key_factory(
                     e3_id.clone(),
                     meta.clone(),
                     fhe.clone(),
                     sortition_seed,
                 );
-                store(&e3_id, &mut self.public_keys, public_key_sequencer_factory);
+                store(&e3_id, &mut self.public_keys, public_key_factory);
 
-                let ciphernode_sequencer_factory = self.ciphernode_sequencer_factory(fhe.clone());
-                store(&e3_id, &mut self.ciphernodes, ciphernode_sequencer_factory);
+                let ciphernode_factory = self.ciphernode_factory(fhe.clone());
+                store(&e3_id, &mut self.ciphernodes, ciphernode_factory);
             }
             EnclaveEvent::CiphertextOutputPublished { .. } => {
                 let Some(fhe) = self.fhes.get(&e3_id) else {
@@ -121,9 +124,9 @@ impl Handler<EnclaveEvent> for Registry {
                     return;
                 };
 
-                let plaintext_sequencer_factory =
-                    self.plaintext_sequencer_factory(e3_id.clone(), meta.clone(), fhe.clone());
-                store(&e3_id, &mut self.plaintexts, plaintext_sequencer_factory);
+                let plaintext_factory =
+                    self.plaintext_factory(e3_id.clone(), meta.clone(), fhe.clone());
+                store(&e3_id, &mut self.plaintexts, plaintext_factory);
             }
             _ => (),
         };
@@ -148,53 +151,91 @@ impl Registry {
         }
     }
 
-    fn public_key_sequencer_factory(
+    fn public_key_factory(
         &self,
         e3_id: E3id,
         meta: CommitteeMeta,
         fhe: Addr<Fhe>,
         seed: u64,
-    ) -> impl FnOnce() -> Addr<PublicKeySequencer> {
+    ) -> impl FnOnce() -> Addr<PublicKeyAggregator> {
         let bus = self.bus.clone();
         let nodecount = meta.nodecount;
         let sortition = self.sortition.clone();
-        move || PublicKeySequencer::new(fhe, e3_id, sortition, bus, nodecount, seed).start()
+        move || PublicKeyAggregator::new(fhe, bus, sortition, e3_id, nodecount, seed).start()
     }
 
-    fn ciphernode_sequencer_factory(
-        &self,
-        fhe: Addr<Fhe>,
-    ) -> impl FnOnce() -> Addr<CiphernodeSequencer> {
+    fn ciphernode_factory(&self, fhe: Addr<Fhe>) -> impl FnOnce() -> Addr<Ciphernode> {
         let data = self.data.clone();
         let bus = self.bus.clone();
         let address = self.address;
-        move || CiphernodeSequencer::new(fhe, data, bus, address).start()
+        move || Ciphernode::new(bus, fhe, data, address).start()
     }
 
-    fn plaintext_sequencer_factory(
+    fn plaintext_factory(
         &self,
         e3_id: E3id,
         meta: CommitteeMeta,
         fhe: Addr<Fhe>,
-    ) -> impl FnOnce() -> Addr<PlaintextSequencer> {
+    ) -> impl FnOnce() -> Addr<PlaintextAggregator> {
         let bus = self.bus.clone();
         let sortition = self.sortition.clone();
         let nodecount = meta.nodecount;
         let seed = meta.seed;
-        move || PlaintextSequencer::new(fhe, e3_id, bus, sortition, nodecount, seed).start()
+        move || PlaintextAggregator::new(fhe, bus, sortition, e3_id, nodecount, seed).start()
     }
 
-    fn forward_message(&self, e3_id: &E3id, msg: EnclaveEvent) {
+    fn store_msg(&mut self, e3_id: E3id, msg: EnclaveEvent, key: &str) {
+        self.buffers
+            .entry(e3_id)
+            .or_default()
+            .entry(key.to_owned())
+            .or_default()
+            .push(msg);
+    }
+
+    fn get_msgs(&self, e3_id: E3id, key: &str) -> Vec<EnclaveEvent> {
+        self.buffers
+            .get(&e3_id)
+            .and_then(|inner_map| inner_map.get(key))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn forward_message(&mut self, e3_id: &E3id, msg: EnclaveEvent) {
+        // Buffer events for each thing that has not been created
+        // TODO: Needs tidying up
+        // TODO: use an enum for the buffer keys
         if let Some(act) = self.public_keys.get(e3_id) {
-            act.clone().recipient().do_send(msg.clone());
+            let msgs = self.get_msgs(e3_id.clone(), "public_keys");
+            let recipient = act.clone().recipient();
+            for m in msgs {
+                recipient.do_send(m);
+            }
+            recipient.do_send(msg.clone());
+        } else {
+            self.store_msg(e3_id.clone(), msg.clone(), "public_keys");
         }
 
         if let Some(act) = self.plaintexts.get(e3_id) {
-            act.do_send(msg.clone());
+            let msgs = self.get_msgs(e3_id.clone(), "plaintexts");
+            let recipient = act.clone().recipient();
+            for m in msgs {
+                recipient.do_send(m);
+            }
+            recipient.do_send(msg.clone());
+        } else {
+            self.store_msg(e3_id.clone(), msg.clone(), "plaintexts");
         }
 
         if let Some(act) = self.ciphernodes.get(e3_id) {
-            act.do_send(msg.clone());
+            let msgs = self.get_msgs(e3_id.clone(), "ciphernodes");
+            let recipient = act.clone().recipient();
+            for m in msgs {
+                recipient.do_send(m);
+            }
+            recipient.do_send(msg.clone());
+        } else {
+            self.store_msg(e3_id.clone(), msg.clone(), "ciphernodes");
         }
     }
 }

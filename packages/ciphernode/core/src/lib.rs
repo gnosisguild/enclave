@@ -4,7 +4,6 @@
 
 mod ciphernode;
 mod ciphernode_selector;
-mod ciphernode_sequencer;
 mod data;
 mod enclave_contract;
 mod eventbus;
@@ -14,9 +13,7 @@ mod logger;
 mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
-mod plaintext_sequencer;
 mod publickey_aggregator;
-mod publickey_sequencer;
 mod registry;
 mod serializers;
 mod sortition;
@@ -25,7 +22,6 @@ mod sortition;
 pub use actix::prelude::*;
 pub use ciphernode::*;
 pub use ciphernode_selector::*;
-pub use ciphernode_sequencer::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
@@ -33,9 +29,7 @@ pub use fhe::*;
 pub use logger::*;
 pub use p2p::*;
 pub use plaintext_aggregator::*;
-pub use plaintext_sequencer::*;
 pub use publickey_aggregator::*;
-pub use publickey_sequencer::*;
 pub use registry::*;
 pub use sortition::*;
 
