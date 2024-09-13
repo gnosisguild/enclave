@@ -1,11 +1,20 @@
 use actix::Message;
-use bincode;
+use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fmt,
     hash::{DefaultHasher, Hash, Hasher},
 };
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct EthAddr(pub Vec<u8>);
+
+impl From<Address> for EthAddr {
+    fn from(value: Address) -> Self {
+        Self(value.to_vec())
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id(pub String);
@@ -79,6 +88,14 @@ pub enum EnclaveEvent {
         id: EventId,
         data: CiphernodeSelected,
     },
+    CiphernodeAdded {
+        id: EventId,
+        data: CiphernodeAdded,
+    },
+    CiphernodeRemoved {
+        id: EventId,
+        data: CiphernodeRemoved,
+    },
     // CommitteeSelected,
     // OutputDecrypted,
     // CiphernodeRegistered,
@@ -99,6 +116,7 @@ impl EnclaveEvent {
     }
 
     pub fn is_local_only(&self) -> bool {
+        // Add a list of local events
         match self {
             EnclaveEvent::CiphernodeSelected { .. } => true,
             _ => false,
@@ -116,20 +134,23 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::DecryptionshareCreated { id, .. } => id,
             EnclaveEvent::PlaintextAggregated { id, .. } => id,
             EnclaveEvent::CiphernodeSelected { id, .. } => id,
+            EnclaveEvent::CiphernodeAdded { id, .. } => id,
+            EnclaveEvent::CiphernodeRemoved { id, .. } => id,
         }
     }
 }
 
-impl From<EnclaveEvent> for E3id {
-    fn from(value: EnclaveEvent) -> Self {
-        match value {
-            EnclaveEvent::KeyshareCreated { data, .. } => data.e3_id,
-            EnclaveEvent::CommitteeRequested { data, .. } => data.e3_id,
-            EnclaveEvent::PublicKeyAggregated { data, .. } => data.e3_id,
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => data.e3_id,
-            EnclaveEvent::DecryptionshareCreated { data, .. } => data.e3_id,
-            EnclaveEvent::PlaintextAggregated { data, .. } => data.e3_id,
-            EnclaveEvent::CiphernodeSelected { data, .. } => data.e3_id,
+impl EnclaveEvent {
+    pub fn get_e3_id(&self) -> Option<E3id> {
+        match self.clone() {
+            EnclaveEvent::KeyshareCreated { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteeRequested { data, .. } => Some(data.e3_id),
+            EnclaveEvent::PublicKeyAggregated { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CiphertextOutputPublished { data, .. } => Some(data.e3_id),
+            EnclaveEvent::DecryptionshareCreated { data, .. } => Some(data.e3_id),
+            EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
+            _ => None,
         }
     }
 }
@@ -197,6 +218,23 @@ impl From<CiphernodeSelected> for EnclaveEvent {
     }
 }
 
+impl From<CiphernodeAdded> for EnclaveEvent {
+    fn from(data: CiphernodeAdded) -> Self {
+        EnclaveEvent::CiphernodeAdded {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
+
+impl From<CiphernodeRemoved> for EnclaveEvent {
+    fn from(data: CiphernodeRemoved) -> Self {
+        EnclaveEvent::CiphernodeRemoved {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{}({})", self.event_type(), self.get_id()))
@@ -230,12 +268,13 @@ pub struct CommitteeRequested {
     pub e3_id: E3id,
     pub nodecount: usize,
     pub threshold: usize,
-    pub sortition_seed: u32,
+    pub sortition_seed: u64, // Should actually be much larger eg [u8;32]
+
     // fhe params
     pub moduli: Vec<u64>,
     pub degree: usize,
     pub plaintext_modulus: u64,
-    pub crp: Vec<u8>
+    pub crp: Vec<u8>,
     // computation_type: ??, // TODO:
     // execution_model_type: ??, // TODO:
     // input_deadline: ??, // TODO:
@@ -262,6 +301,22 @@ pub struct CiphertextOutputPublished {
 pub struct PlaintextAggregated {
     pub e3_id: E3id,
     pub decrypted_output: Vec<u8>,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct CiphernodeAdded {
+    pub address: Address,
+    pub index: usize,
+    pub num_nodes: usize,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct CiphernodeRemoved {
+    pub address: Address,
+    pub index: usize,
+    pub num_nodes: usize,
 }
 
 fn extract_enclave_event_name(s: &str) -> &str {
