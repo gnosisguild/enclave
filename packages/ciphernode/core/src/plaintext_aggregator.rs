@@ -1,5 +1,6 @@
 use crate::{
-    ordered_set::OrderedSet, PlaintextAggregated, DecryptionshareCreated, E3id, EnclaveEvent, EventBus, Fhe, GetAggregatePlaintext
+    ordered_set::OrderedSet, DecryptionshareCreated, E3id, EnclaveEvent, EventBus, Fhe,
+    GetAggregatePlaintext, GetHasNode, PlaintextAggregated, Sortition,
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
@@ -9,6 +10,7 @@ pub enum PlaintextAggregatorState {
     Collecting {
         nodecount: usize,
         shares: OrderedSet<Vec<u8>>,
+        seed: u64,
     },
     Computing {
         shares: OrderedSet<Vec<u8>>,
@@ -28,25 +30,38 @@ struct ComputeAggregate {
 pub struct PlaintextAggregator {
     fhe: Addr<Fhe>,
     bus: Addr<EventBus>,
+    sortition: Addr<Sortition>,
     e3_id: E3id,
     state: PlaintextAggregatorState,
 }
 
 impl PlaintextAggregator {
-    pub fn new(fhe: Addr<Fhe>, bus: Addr<EventBus>, e3_id: E3id, nodecount: usize) -> Self {
+    pub fn new(
+        fhe: Addr<Fhe>,
+        bus: Addr<EventBus>,
+        sortition: Addr<Sortition>,
+        e3_id: E3id,
+        nodecount: usize,
+        seed: u64,
+    ) -> Self {
         PlaintextAggregator {
             fhe,
             bus,
+            sortition,
             e3_id,
             state: PlaintextAggregatorState::Collecting {
                 nodecount,
                 shares: OrderedSet::new(),
+                seed,
             },
         }
     }
 
     pub fn add_share(&mut self, share: Vec<u8>) -> Result<PlaintextAggregatorState> {
-        let PlaintextAggregatorState::Collecting { nodecount, shares } = &mut self.state else {
+        let PlaintextAggregatorState::Collecting {
+            nodecount, shares, ..
+        } = &mut self.state
+        else {
             return Err(anyhow::anyhow!("Can only add share in Collecting state"));
         };
 
@@ -78,44 +93,68 @@ impl Actor for PlaintextAggregator {
 impl Handler<EnclaveEvent> for PlaintextAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::DecryptionshareCreated { data, .. } => ctx.notify(data),
-            _ => ()
+        if let EnclaveEvent::DecryptionshareCreated { data, .. } = msg {
+            ctx.notify(data)
         }
     }
 }
 
 impl Handler<DecryptionshareCreated> for PlaintextAggregator {
-    type Result = Result<()>;
-    fn handle(&mut self, event: DecryptionshareCreated, ctx: &mut Self::Context) -> Self::Result {
-        if event.e3_id != self.e3_id {
-            return Err(anyhow!(
-                "Wrong e3_id sent to aggregator. This should not happen."
-            ));
-        }
-        let PlaintextAggregatorState::Collecting { .. } = self.state else {
-            return Err(anyhow!(
-                "Aggregator has been closed for collecting keyshares."
-            ));
+    type Result = ResponseActFuture<Self, Result<()>>;
+
+    fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
+        let PlaintextAggregatorState::Collecting {
+            nodecount, seed, ..
+        } = self.state
+        else {
+            println!("Aggregator has been closed for collecting.");
+            return Box::pin(fut::ready(Ok(())));
         };
 
-        // add the keyshare and
-        self.state = self.add_share(event.decryption_share)?;
+        let size = nodecount;
+        let address = event.node;
+        let e3_id = event.e3_id.clone();
+        let decryption_share = event.decryption_share.clone();
 
-        // Check the state and if it has changed to the computing
-        if let PlaintextAggregatorState::Computing { shares } = &self.state {
-            ctx.notify(ComputeAggregate {
-                shares: shares.clone(),
-            })
-        }
+        Box::pin(
+            self.sortition
+                .send(GetHasNode {
+                    address,
+                    size,
+                    seed,
+                })
+                .into_actor(self)
+                .map(move |res, act, ctx| {
+                    let has_node = res?;
+                    if !has_node {
+                        println!("Node not found in committee"); // TODO: log properly
+                        return Ok(());
+                    }
 
-        Ok(())
+                    if e3_id != act.e3_id {
+                        println!("Wrong e3_id sent to aggregator. This should not happen.");
+                        return Ok(());
+                    }
+
+                    // add the keyshare and
+                    act.state = act.add_share(decryption_share)?;
+
+                    // Check the state and if it has changed to the computing
+                    if let PlaintextAggregatorState::Computing { shares } = &act.state {
+                        ctx.notify(ComputeAggregate {
+                            shares: shares.clone(),
+                        })
+                    }
+
+                    Ok(())
+                }),
+        )
     }
 }
 
 impl Handler<ComputeAggregate> for PlaintextAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
-    fn handle(&mut self, msg: ComputeAggregate, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
         Box::pin(
             self.fhe
                 .send(GetAggregatePlaintext {
@@ -139,5 +178,3 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
         )
     }
 }
-
-
