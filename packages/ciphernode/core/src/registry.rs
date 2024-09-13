@@ -3,9 +3,10 @@
 // on config
 use crate::{
     CiphernodeSequencer, CommitteeRequested, Data, E3id, EnclaveEvent, EventBus, Fhe,
-    PlaintextSequencer, PublicKeySequencer, Subscribe,
+    PlaintextSequencer, PublicKeySequencer, Sortition, Subscribe,
 };
 use actix::prelude::*;
+use alloy_primitives::Address;
 use rand_chacha::ChaCha20Rng;
 use std::{
     collections::HashMap,
@@ -21,6 +22,8 @@ pub struct Registry {
     bus: Addr<EventBus>,
     ciphernodes: HashMap<E3id, Addr<CiphernodeSequencer>>,
     data: Addr<Data>,
+    sortition: Addr<Sortition>,
+    address: Address,
     fhes: HashMap<E3id, Addr<Fhe>>,
     plaintexts: HashMap<E3id, Addr<PlaintextSequencer>>,
     meta: HashMap<E3id, CommitteeMeta>,
@@ -29,11 +32,19 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub fn new(bus: Addr<EventBus>, data: Addr<Data>, rng: Arc<Mutex<ChaCha20Rng>>) -> Self {
+    pub fn new(
+        bus: Addr<EventBus>,
+        data: Addr<Data>,
+        sortition: Addr<Sortition>,
+        rng: Arc<Mutex<ChaCha20Rng>>,
+        address: Address,
+    ) -> Self {
         Self {
             bus,
             data,
+            sortition,
             rng,
+            address,
             ciphernodes: HashMap::new(),
             plaintexts: HashMap::new(),
             public_keys: HashMap::new(),
@@ -45,9 +56,11 @@ impl Registry {
     pub async fn attach(
         bus: Addr<EventBus>,
         data: Addr<Data>,
+        sortition: Addr<Sortition>,
         rng: Arc<Mutex<ChaCha20Rng>>,
+        address: Address,
     ) -> Addr<Self> {
-        let addr = Registry::new(bus.clone(), data, rng).start();
+        let addr = Registry::new(bus.clone(), data, sortition, rng, address).start();
         bus.send(Subscribe::new("*", addr.clone().into()))
             .await
             .unwrap();
@@ -74,6 +87,7 @@ impl Handler<EnclaveEvent> for Registry {
                     moduli,
                     plaintext_modulus,
                     crp,
+                    sortition_seed,
                     ..
                 } = data;
 
@@ -86,7 +100,7 @@ impl Handler<EnclaveEvent> for Registry {
                 self.meta.entry(e3_id.clone()).or_insert(meta.clone());
 
                 let public_key_sequencer_factory =
-                    self.public_key_sequencer_factory(e3_id.clone(), meta.clone(), fhe.clone());
+                    self.public_key_sequencer_factory(e3_id.clone(), meta.clone(), fhe.clone(), sortition_seed);
                 store(&e3_id, &mut self.public_keys, public_key_sequencer_factory);
 
                 let ciphernode_sequencer_factory = self.ciphernode_sequencer_factory(fhe.clone());
@@ -133,10 +147,12 @@ impl Registry {
         e3_id: E3id,
         meta: CommitteeMeta,
         fhe: Addr<Fhe>,
+        seed: u64,
     ) -> impl FnOnce() -> Addr<PublicKeySequencer> {
         let bus = self.bus.clone();
         let nodecount = meta.nodecount;
-        move || PublicKeySequencer::new(fhe, e3_id, bus, nodecount).start()
+        let sortition = self.sortition.clone();
+        move || PublicKeySequencer::new(fhe, e3_id, sortition, bus, nodecount, seed).start()
     }
 
     fn ciphernode_sequencer_factory(
@@ -145,7 +161,8 @@ impl Registry {
     ) -> impl FnOnce() -> Addr<CiphernodeSequencer> {
         let data = self.data.clone();
         let bus = self.bus.clone();
-        move || CiphernodeSequencer::new(fhe, data, bus).start()
+        let address = self.address;
+        move || CiphernodeSequencer::new(fhe, data, bus, address).start()
     }
 
     fn plaintext_sequencer_factory(
@@ -160,15 +177,15 @@ impl Registry {
     }
 
     fn forward_message(&self, e3_id: &E3id, msg: EnclaveEvent) {
-        if let Some(act) = self.public_keys.get(&e3_id) {
+        if let Some(act) = self.public_keys.get(e3_id) {
             act.clone().recipient().do_send(msg.clone());
         }
 
-        if let Some(act) = self.plaintexts.get(&e3_id) {
+        if let Some(act) = self.plaintexts.get(e3_id) {
             act.do_send(msg.clone());
         }
 
-        if let Some(act) = self.ciphernodes.get(&e3_id) {
+        if let Some(act) = self.ciphernodes.get(e3_id) {
             act.do_send(msg.clone());
         }
     }

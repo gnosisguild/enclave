@@ -3,15 +3,17 @@ use crate::{
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
     fhe::{Fhe, GetAggregatePublicKey},
     ordered_set::OrderedSet,
+    GetHasNode, Sortition,
 };
 use actix::prelude::*;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 #[derive(Debug, Clone)]
 pub enum PublicKeyAggregatorState {
     Collecting {
         nodecount: usize,
         keyshares: OrderedSet<Vec<u8>>,
+        seed: u64,
     },
     Computing {
         keyshares: OrderedSet<Vec<u8>>,
@@ -31,6 +33,7 @@ struct ComputeAggregate {
 pub struct PublicKeyAggregator {
     fhe: Addr<Fhe>,
     bus: Addr<EventBus>,
+    sortition: Addr<Sortition>,
     e3_id: E3id,
     state: PublicKeyAggregatorState,
 }
@@ -42,14 +45,23 @@ pub struct PublicKeyAggregator {
 /// It is expected to change this mechanism as we work through adversarial scenarios and write tests
 /// for them.
 impl PublicKeyAggregator {
-    pub fn new(fhe: Addr<Fhe>, bus: Addr<EventBus>, e3_id: E3id, nodecount: usize) -> Self {
+    pub fn new(
+        fhe: Addr<Fhe>,
+        bus: Addr<EventBus>,
+        sortition: Addr<Sortition>,
+        e3_id: E3id,
+        nodecount: usize,
+        seed: u64,
+    ) -> Self {
         PublicKeyAggregator {
             fhe,
             bus,
             e3_id,
+            sortition,
             state: PublicKeyAggregatorState::Collecting {
                 nodecount,
                 keyshares: OrderedSet::new(),
+                seed,
             },
         }
     }
@@ -58,6 +70,7 @@ impl PublicKeyAggregator {
         let PublicKeyAggregatorState::Collecting {
             nodecount,
             keyshares,
+            ..
         } = &mut self.state
         else {
             return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
@@ -94,41 +107,68 @@ impl Actor for PublicKeyAggregator {
 impl Handler<EnclaveEvent> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::KeyshareCreated { data, .. } => ctx.notify(data),
-            _ => ()
+        if let EnclaveEvent::KeyshareCreated { data, .. } = msg {
+            ctx.notify(data)
         }
     }
 }
 
 impl Handler<KeyshareCreated> for PublicKeyAggregator {
-    type Result = Result<()>;
+    type Result = ResponseActFuture<Self, Result<()>>;
 
-    fn handle(&mut self, event: KeyshareCreated, ctx: &mut Self::Context) -> Self::Result {
-
-        if event.e3_id != self.e3_id {
-            return Err(anyhow!(
-                "Wrong e3_id sent to aggregator. This should not happen."
-            ));
-        }
-
-        let PublicKeyAggregatorState::Collecting { .. } = self.state else {
-            return Err(anyhow!(
-                "Aggregator has been closed for collecting keyshares."
-            ));
+    fn handle(&mut self, event: KeyshareCreated, _: &mut Self::Context) -> Self::Result {
+        let PublicKeyAggregatorState::Collecting {
+            nodecount, seed, ..
+        } = self.state.clone()
+        else {
+            return Box::pin(fut::ready(Ok(())));
         };
 
-        // add the keyshare and
-        self.state = self.add_keyshare(event.pubkey)?;
+        let size = nodecount;
+        let address = event.node;
+        let e3_id = event.e3_id.clone();
+        let pubkey = event.pubkey.clone();
 
-        // Check the state and if it has changed to the computing
-        if let PublicKeyAggregatorState::Computing { keyshares } = &self.state {
-            ctx.notify(ComputeAggregate {
-                keyshares: keyshares.clone(),
-            })
-        }
+        Box::pin(
+            self.sortition
+                .send(GetHasNode {
+                    address,
+                    size,
+                    seed,
+                })
+                .into_actor(self)
+                .map(move |res, act, ctx| {
+                    // NOTE: Returning Ok(()) on errors as we probably dont need a result type here since
+                    // we will not be doing a send
+                    let has_node = res?;
+                    if !has_node {
+                        println!("Node not found in committee"); // TODO: log properly
+                        return Ok(());
+                    }
 
-        Ok(())
+                    if e3_id != act.e3_id {
+                        println!("Wrong e3_id sent to aggregator. This should not happen.");
+                        return Ok(());
+                    }
+
+                    let PublicKeyAggregatorState::Collecting { .. } = act.state else {
+                        println!("Aggregator has been closed for collecting keyshares."); // TODO: log properly
+                        return Ok(());
+                    };
+
+                    // add the keyshare and
+                    act.state = act.add_keyshare(pubkey)?;
+
+                    // Check the state and if it has changed to the computing
+                    if let PublicKeyAggregatorState::Computing { keyshares } = &act.state {
+                        ctx.notify(ComputeAggregate {
+                            keyshares: keyshares.clone(),
+                        })
+                    }
+
+                    Ok(())
+                }),
+        )
     }
 }
 
@@ -170,5 +210,3 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
         )
     }
 }
-
-
