@@ -2,9 +2,8 @@
 // TODO: vertically modularize this so there is a registry for each function that get rolled up into one based
 // on config
 use crate::{
-    Ciphernode, CommitteeRequested, Data, E3id, EnclaveEvent, EventBus, Fhe,
-    PlaintextAggregator, PublicKeyAggregator, Sortition,
-    Subscribe,
+    Ciphernode, CommitteeRequested, Data, E3id, EnclaveEvent, EventBus, Fhe, PlaintextAggregator,
+    PublicKeyAggregator, Sortition, Subscribe,
 };
 use actix::prelude::*;
 use alloy_primitives::Address;
@@ -193,20 +192,20 @@ impl Registry {
             .push(msg);
     }
 
-    fn get_msgs(&self, e3_id: E3id, key: &str) -> Vec<EnclaveEvent> {
+    fn take_msgs(&mut self, e3_id: E3id, key: &str) -> Vec<EnclaveEvent> {
         self.buffers
-            .get(&e3_id)
-            .and_then(|inner_map| inner_map.get(key))
-            .cloned()
+            .get_mut(&e3_id)
+            .and_then(|inner_map| inner_map.get_mut(key))
+            .map(std::mem::take)
             .unwrap_or_default()
     }
 
     fn forward_message(&mut self, e3_id: &E3id, msg: EnclaveEvent) {
         // Buffer events for each thing that has not been created
-        // TODO: Needs tidying up
+        // TODO: Needs tidying up as this is verbose and repeats
         // TODO: use an enum for the buffer keys
-        if let Some(act) = self.public_keys.get(e3_id) {
-            let msgs = self.get_msgs(e3_id.clone(), "public_keys");
+        if let Some(act) = self.public_keys.clone().get(e3_id) {
+            let msgs = self.take_msgs(e3_id.clone(), "public_keys");
             let recipient = act.clone().recipient();
             recipient.do_send(msg.clone());
             for m in msgs {
@@ -216,8 +215,8 @@ impl Registry {
             self.store_msg(e3_id.clone(), msg.clone(), "public_keys");
         }
 
-        if let Some(act) = self.plaintexts.get(e3_id) {
-            let msgs = self.get_msgs(e3_id.clone(), "plaintexts");
+        if let Some(act) = self.plaintexts.clone().get(e3_id) {
+            let msgs = self.take_msgs(e3_id.clone(), "plaintexts");
             let recipient = act.clone().recipient();
             recipient.do_send(msg.clone());
             for m in msgs {
@@ -227,8 +226,8 @@ impl Registry {
             self.store_msg(e3_id.clone(), msg.clone(), "plaintexts");
         }
 
-        if let Some(act) = self.ciphernodes.get(e3_id) {
-            let msgs = self.get_msgs(e3_id.clone(), "ciphernodes");
+        if let Some(act) = self.ciphernodes.clone().get(e3_id) {
+            let msgs = self.take_msgs(e3_id.clone(), "ciphernodes");
             let recipient = act.clone().recipient();
             recipient.do_send(msg.clone());
             for m in msgs {
