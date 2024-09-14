@@ -9,7 +9,6 @@ coverage
 dist
 node_modules
 types
-deployments
 
 # files
 *.env

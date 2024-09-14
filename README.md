@@ -17,49 +17,46 @@ Enclave employs a modular architecture involving numerous actors and participant
 
 ```mermaid
 sequenceDiagram
-    actor Requester
-    actor Data Providers
+    participant Users
     participant Enclave
-    participant Ciphernode Registry
-    participant Ciphernodes
-    participant Computation Module
-    participant Execution Module
+    participant CiphernodeRegistry
+    participant E3Program
+    participant ComputeProvider
+    participant InputValidator
+    participant DecryptionVerifier
 
-    loop Each computation request
-        Requester ->> Enclave: Request computation
-        activate Enclave
-            Enclave ->> Ciphernode Registry: Select Committee
-            activate Ciphernode Registry
-                Ciphernode Registry -->> Ciphernodes: Key Setup
-                activate Ciphernodes
-                    Ciphernodes -->> Ciphernode Registry: Publish shared keys
-                deactivate Ciphernodes
-                Ciphernode Registry -->> Enclave: Publish Committee
-            deactivate Ciphernode Registry
+    Users->>Enclave: request(parameters)
+    Enclave->>E3Program: validate(e3ProgramParams)
+    E3Program-->>Enclave: inputValidator
+    Enclave->>ComputeProvider: validate(computeProviderParams)
+    ComputeProvider-->>Enclave: decryptionVerifier
+    Enclave->>CiphernodeRegistry: requestCommittee(e3Id, filter, threshold)
+    CiphernodeRegistry-->>Enclave: success
+    Enclave-->>Users: e3Id, E3 struct
 
-            loop Each input
-                Data Providers ->> Enclave: Publish inputs
-                Enclave ->> Computation Module: Validate inputs
-                activate Computation Module
-                    Computation Module -->> Enclave: 👌
-                deactivate Computation Module
-            end
+    Users->>Enclave: activate(e3Id)
+    Enclave->>CiphernodeRegistry: committeePublicKey(e3Id)
+    CiphernodeRegistry-->>Enclave: publicKey
+    Enclave->>Enclave: Set expiration and committeePublicKey
+    Enclave-->>Users: success
 
-            Enclave ->> Execution Module: Request execution
-            activate Execution Module
-            Execution Module -->> Enclave: Publish ciphertext output
-            deactivate Execution Module
+    Users->>Enclave: publishInput(e3Id, data)
+    Enclave->>InputValidator: validate(msg.sender, data)
+    InputValidator-->>Enclave: input, success
+    Enclave->>Enclave: Store input
+    Enclave-->>Users: success
 
-            Enclave -->> Ciphernodes: Request plaintext output
-            activate Ciphernodes
-                Ciphernodes ->> Enclave: Publish plaintext output
-            deactivate Ciphernodes
+    Users->>Enclave: publishCiphertextOutput(e3Id, data)
+    Enclave->>DecryptionVerifier: verify(e3Id, data)
+    DecryptionVerifier-->>Enclave: output, success
+    Enclave->>Enclave: Store ciphertextOutput
+    Enclave-->>Users: success
 
-            Requester -->> Enclave: Get plaintext
-            Enclave -->> Requester: Returns plaintext
-        deactivate Enclave
-    end
-
+    Users->>Enclave: publishPlaintextOutput(e3Id, data)
+    Enclave->>E3Program: verify(e3Id, data)
+    E3Program-->>Enclave: output, success
+    Enclave->>Enclave: Store plaintextOutput
+    Enclave-->>Users: success
 ```
 
 ## Security and Liability

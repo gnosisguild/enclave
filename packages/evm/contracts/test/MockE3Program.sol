@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
-import {
-    IComputationModule,
-    IInputValidator
-} from "../interfaces/IComputationModule.sol";
+import { IE3Program, IInputValidator } from "../interfaces/IE3Program.sol";
 
-contract MockComputationModule is IComputationModule {
+contract MockE3Program is IE3Program {
     error invalidParams(bytes params);
 
     function validate(
+        uint256,
+        uint256,
         bytes memory params
     ) external pure returns (IInputValidator inputValidator) {
         require(params.length == 32, "invalid params");

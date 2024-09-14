@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
-import { ICyphernodeRegistry } from "../interfaces/ICyphernodeRegistry.sol";
+import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import {
     OwnableUpgradeable
@@ -53,8 +53,8 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    constructor(address _owner, address _enclave) {
-        initialize(_owner, _enclave);
+    constructor(address _owner, address _registry) {
+        initialize(_owner, _registry);
     }
 
     function initialize(address _owner, address _registry) public initializer {
@@ -91,7 +91,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         );
         committee.nodes = nodes;
         committee.publicKey = publicKey;
-        ICyphernodeRegistry(registry).publishCommittee(
+        ICiphernodeRegistry(registry).publishCommittee(
             e3Id,
             abi.encode(nodes),
             publicKey
