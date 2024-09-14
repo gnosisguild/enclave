@@ -11,18 +11,15 @@ dotenv.config();
 
 const { INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY } = process.env;
 
-if (!process.env.TYPECHAIN) {
-  // NOTE: enabling typechain compilation without ENV vars
-  if (!INFURA_KEY || !MNEMONIC || !ETHERSCAN_API_KEY) {
-    console.error(
-      "Please set the INFURA_KEY, MNEMONIC, and ETHERSCAN_API_KEY environment variables",
-    );
-    process.exit(1);
-  }
+if (!INFURA_KEY || !MNEMONIC || !ETHERSCAN_API_KEY) {
+  console.error(
+    "Please set the INFURA_KEY, MNEMONIC, and ETHERSCAN_API_KEY environment variables",
+  );
 }
 
-const mnemonic: string = MNEMONIC || "";
-const infuraApiKey: string = INFURA_KEY || "";
+// Setting defaults so that tests will run
+const mnemonic = MNEMONIC || "test test test test test test test test test test test junk";
+const infuraApiKey = INFURA_KEY || "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
