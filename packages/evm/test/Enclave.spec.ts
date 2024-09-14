@@ -3,16 +3,18 @@ import {
   mine,
   time,
 } from "@nomicfoundation/hardhat-network-helpers";
+import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { ZeroHash } from "ethers";
 import { ethers } from "hardhat";
+import { poseidon2 } from "poseidon-lite";
 
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
-import { deployComputationModuleFixture } from "./fixtures/MockComputationModule.fixture";
-import { deployCyphernodeRegistryFixture } from "./fixtures/MockCyphernodeRegistry.fixture";
-import { deployExecutionModuleFixture } from "./fixtures/MockExecutionModule.fixture";
+import { deployCiphernodeRegistryFixture } from "./fixtures/MockCiphernodeRegistry.fixture";
+import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fixture";
+import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
+import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
 import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
-import { deployOutputVerifierFixture } from "./fixtures/MockOutputVerifier.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -21,14 +23,17 @@ const AddressSix = "0x0000000000000000000000000000000000000006";
 const FilterFail = AddressTwo;
 const FilterOkay = AddressSix;
 
+// Hash function used to compute the tree nodes.
+const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
+
 describe("Enclave", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
 
-    const registry = await deployCyphernodeRegistryFixture();
-    const computationModule = await deployComputationModuleFixture();
-    const outputVerifier = await deployOutputVerifierFixture();
-    const executionModule = await deployExecutionModuleFixture();
+    const registry = await deployCiphernodeRegistryFixture();
+    const e3Program = await deployE3ProgramFixture();
+    const decryptionVerifier = await deployDecryptionVerifierFixture();
+    const computeProvider = await deployComputeProviderFixture();
     const inputValidator = await deployInputValidatorFixture();
 
     const enclave = await deployEnclaveFixture({
@@ -36,17 +41,17 @@ describe("Enclave", function () {
       registry: await registry.getAddress(),
     });
 
-    await enclave.enableComputationModule(await computationModule.getAddress());
-    await enclave.enableExecutionModule(await executionModule.getAddress());
+    await enclave.enableE3Program(await e3Program.getAddress());
+    await enclave.enableComputeProvider(await computeProvider.getAddress());
 
     return {
       owner,
       notTheOwner,
       enclave,
       mocks: {
-        computationModule,
-        outputVerifier,
-        executionModule,
+        e3Program,
+        decryptionVerifier,
+        computeProvider,
         inputValidator,
         registry,
       },
@@ -58,15 +63,15 @@ describe("Enclave", function () {
           number,
         ],
         duration: time.duration.days(30),
-        computationModule: await computationModule.getAddress(),
-        cMParams: abiCoder.encode(
+        e3Program: await e3Program.getAddress(),
+        e3ProgramParams: abiCoder.encode(
           ["address"],
           [await inputValidator.getAddress()],
         ),
-        executionModule: await executionModule.getAddress(),
-        eMParams: abiCoder.encode(
+        computeProvider: await computeProvider.getAddress(),
+        computeProviderParams: abiCoder.encode(
           ["address"],
-          [await outputVerifier.getAddress()],
+          [await decryptionVerifier.getAddress()],
         ),
       },
     };
@@ -79,16 +84,16 @@ describe("Enclave", function () {
         owner: someSigner,
         registry: AddressTwo,
       });
-      expect(await enclave.cyphernodeRegistry()).to.equal(AddressTwo);
+      expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
     });
 
-    it("correctly sets cyphernodeRegistry address", async function () {
+    it("correctly sets ciphernodeRegistry address", async function () {
       const [aSigner] = await ethers.getSigners();
       const enclave = await deployEnclaveFixture({
         owner: aSigner,
         registry: AddressTwo,
       });
-      expect(await enclave.cyphernodeRegistry()).to.equal(AddressTwo);
+      expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
     });
 
     it("correctly sets max duration", async function () {
@@ -127,49 +132,49 @@ describe("Enclave", function () {
     });
   });
 
-  describe("setCyphernodeRegistry()", function () {
+  describe("setCiphernodeRegistry()", function () {
     it("reverts if not called by owner", async function () {
       const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
-        enclave.connect(notTheOwner).setCyphernodeRegistry(AddressTwo),
+        enclave.connect(notTheOwner).setCiphernodeRegistry(AddressTwo),
       )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
     it("reverts if given address(0)", async function () {
       const { enclave } = await loadFixture(setup);
-      await expect(enclave.setCyphernodeRegistry(ethers.ZeroAddress))
-        .to.be.revertedWithCustomError(enclave, "InvalidCyphernodeRegistry")
+      await expect(enclave.setCiphernodeRegistry(ethers.ZeroAddress))
+        .to.be.revertedWithCustomError(enclave, "InvalidCiphernodeRegistry")
         .withArgs(ethers.ZeroAddress);
     });
-    it("reverts if given address is the same as the current cyphernodeRegistry", async function () {
+    it("reverts if given address is the same as the current ciphernodeRegistry", async function () {
       const {
         enclave,
         mocks: { registry },
       } = await loadFixture(setup);
-      await expect(enclave.setCyphernodeRegistry(registry))
-        .to.be.revertedWithCustomError(enclave, "InvalidCyphernodeRegistry")
+      await expect(enclave.setCiphernodeRegistry(registry))
+        .to.be.revertedWithCustomError(enclave, "InvalidCiphernodeRegistry")
         .withArgs(registry);
     });
-    it("sets cyphernodeRegistry correctly", async function () {
+    it("sets ciphernodeRegistry correctly", async function () {
       const { enclave } = await loadFixture(setup);
 
-      expect(await enclave.cyphernodeRegistry()).to.not.equal(AddressTwo);
-      await enclave.setCyphernodeRegistry(AddressTwo);
-      expect(await enclave.cyphernodeRegistry()).to.equal(AddressTwo);
+      expect(await enclave.ciphernodeRegistry()).to.not.equal(AddressTwo);
+      await enclave.setCiphernodeRegistry(AddressTwo);
+      expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
     });
-    it("returns true if cyphernodeRegistry is set successfully", async function () {
+    it("returns true if ciphernodeRegistry is set successfully", async function () {
       const { enclave } = await loadFixture(setup);
 
-      const result = await enclave.setCyphernodeRegistry.staticCall(AddressTwo);
+      const result = await enclave.setCiphernodeRegistry.staticCall(AddressTwo);
       expect(result).to.be.true;
     });
-    it("emits CyphernodeRegistrySet event", async function () {
+    it("emits CiphernodeRegistrySet event", async function () {
       const { enclave } = await loadFixture(setup);
 
-      await expect(enclave.setCyphernodeRegistry(AddressTwo))
-        .to.emit(enclave, "CyphernodeRegistrySet")
+      await expect(enclave.setCiphernodeRegistry(AddressTwo))
+        .to.emit(enclave, "CiphernodeRegistrySet")
         .withArgs(AddressTwo);
     });
   });
@@ -189,23 +194,24 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       const e3 = await enclave.getE3(0);
 
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
-      expect(e3.computationModule).to.equal(request.computationModule);
+      expect(e3.e3Program).to.equal(request.e3Program);
+      expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
       expect(e3.inputValidator).to.equal(
-        abiCoder.decode(["address"], request.cMParams)[0],
+        abiCoder.decode(["address"], request.e3ProgramParams)[0],
       );
-      expect(e3.executionModule).to.equal(request.executionModule);
-      expect(e3.outputVerifier).to.equal(
-        abiCoder.decode(["address"], request.eMParams)[0],
+      expect(e3.computeProvider).to.equal(request.computeProvider);
+      expect(e3.decryptionVerifier).to.equal(
+        abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
       expect(e3.committeePublicKey).to.equal("0x");
       expect(e3.ciphertextOutput).to.equal("0x");
@@ -213,193 +219,185 @@ describe("Enclave", function () {
     });
   });
 
-  describe("enableComputationModule()", function () {
+  describe("enableE3Program()", function () {
     it("reverts if not called by owner", async function () {
       const {
         notTheOwner,
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
 
-      await expect(
-        enclave.connect(notTheOwner).enableComputationModule(computationModule),
-      )
+      await expect(enclave.connect(notTheOwner).enableE3Program(e3Program))
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("reverts if computation module is already enabled", async function () {
+    it("reverts if E3 Program is already enabled", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
 
-      await expect(enclave.enableComputationModule(computationModule))
+      await expect(enclave.enableE3Program(e3Program))
         .to.be.revertedWithCustomError(enclave, "ModuleAlreadyEnabled")
-        .withArgs(computationModule);
+        .withArgs(e3Program);
     });
-    it("enables computation module correctly", async function () {
+    it("enables E3 Program correctly", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      const enabled = await enclave.computationModules(computationModule);
+      const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.true;
     });
-    it("returns true if computation module is enabled successfully", async function () {
+    it("returns true if E3 Program is enabled successfully", async function () {
       const { enclave } = await loadFixture(setup);
-      const result =
-        await enclave.enableComputationModule.staticCall(AddressTwo);
+      const result = await enclave.enableE3Program.staticCall(AddressTwo);
       expect(result).to.be.true;
     });
-    it("emits ComputationModuleEnabled event", async function () {
+    it("emits E3ProgramEnabled event", async function () {
       const { enclave } = await loadFixture(setup);
-      await expect(enclave.enableComputationModule(AddressTwo))
-        .to.emit(enclave, "ComputationModuleEnabled")
+      await expect(enclave.enableE3Program(AddressTwo))
+        .to.emit(enclave, "E3ProgramEnabled")
         .withArgs(AddressTwo);
     });
   });
 
-  describe("disableComputationModule()", function () {
+  describe("disableE3Program()", function () {
     it("reverts if not called by owner", async function () {
       const {
         notTheOwner,
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      await expect(
-        enclave
-          .connect(notTheOwner)
-          .disableComputationModule(computationModule),
-      )
+      await expect(enclave.connect(notTheOwner).disableE3Program(e3Program))
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("reverts if computation module is not enabled", async function () {
+    it("reverts if E3 Program is not enabled", async function () {
       const { enclave } = await loadFixture(setup);
-      await expect(enclave.disableComputationModule(AddressTwo))
+      await expect(enclave.disableE3Program(AddressTwo))
         .to.be.revertedWithCustomError(enclave, "ModuleNotEnabled")
         .withArgs(AddressTwo);
     });
-    it("disables computation module correctly", async function () {
+    it("disables E3 Program correctly", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      await enclave.disableComputationModule(computationModule);
+      await enclave.disableE3Program(e3Program);
 
-      const enabled = await enclave.computationModules(computationModule);
+      const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.false;
     });
-    it("returns true if computation module is disabled successfully", async function () {
+    it("returns true if E3 Program is disabled successfully", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      const result =
-        await enclave.disableComputationModule.staticCall(computationModule);
+      const result = await enclave.disableE3Program.staticCall(e3Program);
 
       expect(result).to.be.true;
     });
-    it("emits ComputationModuleDisabled event", async function () {
+    it("emits E3ProgramDisabled event", async function () {
       const {
         enclave,
-        mocks: { computationModule },
+        mocks: { e3Program },
       } = await loadFixture(setup);
-      await expect(enclave.disableComputationModule(computationModule))
-        .to.emit(enclave, "ComputationModuleDisabled")
-        .withArgs(computationModule);
+      await expect(enclave.disableE3Program(e3Program))
+        .to.emit(enclave, "E3ProgramDisabled")
+        .withArgs(e3Program);
     });
   });
 
-  describe("enableExecutionModule()", function () {
+  describe("enableComputeProvider()", function () {
     it("reverts if not called by owner", async function () {
       const { notTheOwner, enclave } = await loadFixture(setup);
       await expect(
-        enclave.connect(notTheOwner).enableExecutionModule(AddressTwo),
+        enclave.connect(notTheOwner).enableComputeProvider(AddressTwo),
       )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner.address);
     });
-    it("reverts if execution module is already enabled", async function () {
+    it("reverts if compute provider is already enabled", async function () {
       const {
         enclave,
-        mocks: { executionModule },
+        mocks: { computeProvider },
       } = await loadFixture(setup);
-      await expect(enclave.enableExecutionModule(executionModule))
+      await expect(enclave.enableComputeProvider(computeProvider))
         .to.be.revertedWithCustomError(enclave, "ModuleAlreadyEnabled")
-        .withArgs(executionModule);
+        .withArgs(computeProvider);
     });
-    it("enables execution module correctly", async function () {
+    it("enables compute provider correctly", async function () {
       const {
         enclave,
-        mocks: { executionModule },
+        mocks: { computeProvider },
       } = await loadFixture(setup);
-      const enabled = await enclave.executionModules(executionModule);
+      const enabled = await enclave.computeProviders(computeProvider);
       expect(enabled).to.be.true;
     });
-    it("returns true if execution module is enabled successfully", async function () {
+    it("returns true if compute provider is enabled successfully", async function () {
       const { enclave } = await loadFixture(setup);
-      const result = await enclave.enableExecutionModule.staticCall(AddressTwo);
+      const result = await enclave.enableComputeProvider.staticCall(AddressTwo);
 
       expect(result).to.be.true;
     });
-    it("emits ExecutionModuleEnabled event", async function () {
+    it("emits ComputeProviderEnabled event", async function () {
       const { enclave } = await loadFixture(setup);
-      await expect(enclave.enableExecutionModule(AddressTwo))
-        .to.emit(enclave, "ExecutionModuleEnabled")
+      await expect(enclave.enableComputeProvider(AddressTwo))
+        .to.emit(enclave, "ComputeProviderEnabled")
         .withArgs(AddressTwo);
     });
   });
 
-  describe("disableExecutionModule()", function () {
+  describe("disableComputeProvider()", function () {
     it("reverts if not called by owner", async function () {
       const {
         notTheOwner,
         enclave,
-        mocks: { executionModule },
+        mocks: { computeProvider },
       } = await loadFixture(setup);
 
       await expect(
-        enclave.connect(notTheOwner).disableExecutionModule(executionModule),
+        enclave.connect(notTheOwner).disableComputeProvider(computeProvider),
       )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("reverts if execution module is not enabled", async function () {
+    it("reverts if compute provider is not enabled", async function () {
       const { enclave } = await loadFixture(setup);
-      await expect(enclave.disableExecutionModule(AddressTwo))
+      await expect(enclave.disableComputeProvider(AddressTwo))
         .to.be.revertedWithCustomError(enclave, "ModuleNotEnabled")
         .withArgs(AddressTwo);
     });
-    it("disables execution module correctly", async function () {
+    it("disables compute provider correctly", async function () {
       const {
         enclave,
-        mocks: { executionModule },
+        mocks: { computeProvider },
       } = await loadFixture(setup);
 
-      expect(await enclave.executionModules(executionModule)).to.be.true;
-      await enclave.disableExecutionModule(executionModule);
-      expect(await enclave.executionModules(executionModule)).to.be.false;
+      expect(await enclave.computeProviders(computeProvider)).to.be.true;
+      await enclave.disableComputeProvider(computeProvider);
+      expect(await enclave.computeProviders(computeProvider)).to.be.false;
     });
-    it("returns true if execution module is disabled successfully", async function () {
+    it("returns true if compute provider is disabled successfully", async function () {
       const {
         enclave,
-        mocks: { executionModule },
+        mocks: { computeProvider },
       } = await loadFixture(setup);
       const result =
-        await enclave.disableExecutionModule.staticCall(executionModule);
+        await enclave.disableComputeProvider.staticCall(computeProvider);
 
       expect(result).to.be.true;
     });
-    it("emits ExecutionModuleDisabled event", async function () {
+    it("emits ComputeProviderDisabled event", async function () {
       const {
         enclave,
-        mocks: { executionModule },
+        mocks: { computeProvider },
       } = await loadFixture(setup);
 
-      await expect(enclave.disableExecutionModule(executionModule))
-        .to.emit(enclave, "ExecutionModuleDisabled")
-        .withArgs(executionModule);
+      await expect(enclave.disableComputeProvider(computeProvider))
+        .to.emit(enclave, "ComputeProviderDisabled")
+        .withArgs(computeProvider);
     });
   });
 
@@ -412,10 +410,10 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
-          request.cMParams,
-          request.executionModule,
-          request.eMParams,
+          request.e3Program,
+          request.e3ProgramParams,
+          request.computeProvider,
+          request.computeProviderParams,
         ),
       ).to.be.revertedWithCustomError(enclave, "PaymentRequired");
     });
@@ -427,10 +425,10 @@ describe("Enclave", function () {
           [0, 2],
           request.startTime,
           request.duration,
-          request.computationModule,
-          request.cMParams,
-          request.executionModule,
-          request.eMParams,
+          request.e3Program,
+          request.e3ProgramParams,
+          request.computeProvider,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
@@ -443,10 +441,10 @@ describe("Enclave", function () {
           [3, 2],
           request.startTime,
           request.duration,
-          request.computationModule,
-          request.cMParams,
-          request.executionModule,
-          request.eMParams,
+          request.e3Program,
+          request.e3ProgramParams,
+          request.computeProvider,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
@@ -459,10 +457,10 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           0,
-          request.computationModule,
-          request.cMParams,
-          request.executionModule,
-          request.eMParams,
+          request.e3Program,
+          request.e3ProgramParams,
+          request.computeProvider,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
@@ -475,15 +473,15 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           time.duration.days(31),
-          request.computationModule,
-          request.cMParams,
-          request.executionModule,
-          request.eMParams,
+          request.e3Program,
+          request.e3ProgramParams,
+          request.computeProvider,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
     });
-    it("reverts if computation module is not enabled", async function () {
+    it("reverts if E3 Program is not enabled", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -492,16 +490,16 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           ethers.ZeroAddress,
-          request.cMParams,
-          request.executionModule,
-          request.eMParams,
+          request.e3ProgramParams,
+          request.computeProvider,
+          request.computeProviderParams,
           { value: 10 },
         ),
       )
-        .to.be.revertedWithCustomError(enclave, "ComputationModuleNotAllowed")
+        .to.be.revertedWithCustomError(enclave, "E3ProgramNotAllowed")
         .withArgs(ethers.ZeroAddress);
     });
-    it("reverts if execution module is not enabled", async function () {
+    it("reverts if compute provider is not enabled", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -509,17 +507,17 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
-          request.cMParams,
+          request.e3Program,
+          request.e3ProgramParams,
           ethers.ZeroAddress,
-          request.eMParams,
+          request.computeProviderParams,
           { value: 10 },
         ),
       )
         .to.be.revertedWithCustomError(enclave, "ModuleNotEnabled")
         .withArgs(ethers.ZeroAddress);
     });
-    it("reverts if input computation module does not return input validator address", async function () {
+    it("reverts if input E3 Program does not return input validator address", async function () {
       const { enclave, request } = await loadFixture(setup);
 
       await expect(
@@ -528,15 +526,15 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
+          request.e3Program,
           ZeroHash,
-          request.executionModule,
-          request.eMParams,
+          request.computeProvider,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidComputation");
     });
-    it("reverts if input execution module does not return output verifier address", async function () {
+    it("reverts if input compute provider does not return output verifier address", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -544,13 +542,13 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
-          request.cMParams,
-          request.executionModule,
+          request.e3Program,
+          request.e3ProgramParams,
+          request.computeProvider,
           ZeroHash,
           { value: 10 },
         ),
-      ).to.be.revertedWithCustomError(enclave, "InvalidExecutionModuleSetup");
+      ).to.be.revertedWithCustomError(enclave, "InvalidComputeProviderSetup");
     });
     it("reverts if committee selection fails", async function () {
       const { enclave, request } = await loadFixture(setup);
@@ -560,10 +558,10 @@ describe("Enclave", function () {
           request.threshold,
           request.startTime,
           request.duration,
-          request.computationModule,
-          request.cMParams,
-          request.executionModule,
-          request.eMParams,
+          request.e3Program,
+          request.e3ProgramParams,
+          request.computeProvider,
+          request.computeProviderParams,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
@@ -575,23 +573,23 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       const e3 = await enclave.getE3(0);
 
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
-      expect(e3.computationModule).to.equal(request.computationModule);
+      expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.inputValidator).to.equal(
-        abiCoder.decode(["address"], request.cMParams)[0],
+        abiCoder.decode(["address"], request.e3ProgramParams)[0],
       );
-      expect(e3.executionModule).to.equal(request.executionModule);
-      expect(e3.outputVerifier).to.equal(
-        abiCoder.decode(["address"], request.eMParams)[0],
+      expect(e3.computeProvider).to.equal(request.computeProvider);
+      expect(e3.decryptionVerifier).to.equal(
+        abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
       expect(e3.committeePublicKey).to.equal("0x");
       expect(e3.ciphertextOutput).to.equal("0x");
@@ -604,10 +602,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       const e3 = await enclave.getE3(0);
@@ -618,8 +616,8 @@ describe("Enclave", function () {
           0,
           e3,
           request.filter,
-          request.computationModule,
-          request.executionModule,
+          request.e3Program,
+          request.computeProvider,
         );
     });
   });
@@ -640,10 +638,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -665,10 +663,10 @@ describe("Enclave", function () {
         request.threshold,
         startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -679,31 +677,31 @@ describe("Enclave", function () {
     });
     it("reverts if E3 start has expired", async function () {
       const { enclave, request } = await loadFixture(setup);
-      const startTime = [await time.latest(), (await time.latest()) + 1] as [
-        number,
-        number,
-      ];
+      const startTime = [
+        (await time.latest()) + 1,
+        (await time.latest()) + 1000,
+      ] as [number, number];
 
       await enclave.request(
         request.filter,
         request.threshold,
         startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
-      const _ = mine(1, { interval: 1000 });
+      await mine(2, { interval: 2000 });
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
         "E3Expired",
       );
     });
-    it("reverts if cyphernodeRegistry does not return a public key", async function () {
+    it("reverts if ciphernodeRegistry does not return a public key", async function () {
       const { enclave, request } = await loadFixture(setup);
       const startTime = [
         (await time.latest()) + 1000,
@@ -715,10 +713,10 @@ describe("Enclave", function () {
         request.threshold,
         startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -739,21 +737,21 @@ describe("Enclave", function () {
         request.threshold,
         startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
-      const _ = mine(1, { interval: 1000 });
+      await mine(1, { interval: 1000 });
 
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
         "E3Expired",
       );
     });
-    it("reverts if cyphernodeRegistry does not return a public key", async function () {
+    it("reverts if ciphernodeRegistry does not return a public key", async function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
@@ -761,25 +759,25 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
-      const prevRegistry = await enclave.cyphernodeRegistry();
-      const nextRegistry = await deployCyphernodeRegistryFixture(
-        "MockCyphernodeRegistryEmptyKey",
+      const prevRegistry = await enclave.ciphernodeRegistry();
+      const nextRegistry = await deployCiphernodeRegistryFixture(
+        "MockCiphernodeRegistryEmptyKey",
       );
 
-      await enclave.setCyphernodeRegistry(nextRegistry);
+      await enclave.setCiphernodeRegistry(nextRegistry);
       await expect(enclave.activate(0)).to.be.revertedWithCustomError(
         enclave,
         "CommitteeSelectionFailed",
       );
 
-      await enclave.setCyphernodeRegistry(prevRegistry);
+      await enclave.setCiphernodeRegistry(prevRegistry);
       await expect(enclave.activate(0)).to.not.be.reverted;
     });
     it("sets committeePublicKey correctly", async () => {
@@ -794,10 +792,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -820,10 +818,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -839,10 +837,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -872,10 +870,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -887,8 +885,6 @@ describe("Enclave", function () {
         .withArgs(0);
 
       await enclave.activate(0);
-
-      await expect(enclave.publishInput(0, inputData)).to.not.be.reverted;
     });
 
     it("reverts if input is not valid", async function () {
@@ -899,10 +895,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -920,46 +916,20 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
       await enclave.activate(0);
-      await expect(enclave.publishInput(0, ZeroHash)).to.not.be.reverted;
 
       await mine(2, { interval: request.duration });
 
       await expect(
         enclave.publishInput(0, ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
-    });
-    it("sets ciphertextInput correctly", async function () {
-      const { enclave, request } = await loadFixture(setup);
-      const inputData = "0x12345678";
-
-      await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
-        { value: 10 },
-      );
-
-      await enclave.activate(0);
-
-      await expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
-      let e3 = await enclave.getE3(0);
-      expect(e3.inputs[0]).to.equal(inputData);
-      await expect(await enclave.publishInput(0, inputData)).to.not.be.reverted;
-      e3 = await enclave.getE3(0);
-      expect(e3.inputs[1]).to.equal(inputData);
     });
     it("returns true if input is published successfully", async function () {
       const { enclave, request } = await loadFixture(setup);
@@ -970,10 +940,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -983,6 +953,40 @@ describe("Enclave", function () {
         true,
       );
     });
+
+    it("adds inputHash to merkle tree", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
+
+      // To create an instance of a LeanIMT, you must provide the hash function.
+      const tree = new LeanIMT(hash);
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.startTime,
+        request.duration,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
+        { value: 10 },
+      );
+
+      const e3Id = 0;
+
+      await enclave.activate(e3Id);
+
+      tree.insert(hash(BigInt(ethers.keccak256(inputData)), BigInt(0)));
+
+      await enclave.publishInput(e3Id, inputData);
+      expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
+
+      const secondInputData = abiCoder.encode(["bytes"], ["0x112233445566"]);
+      tree.insert(hash(BigInt(ethers.keccak256(secondInputData)), BigInt(1)));
+      await enclave.publishInput(e3Id, secondInputData);
+      expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
+    });
     it("emits InputPublished event", async function () {
       const { enclave, request } = await loadFixture(setup);
 
@@ -991,10 +995,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
 
@@ -1002,10 +1006,11 @@ describe("Enclave", function () {
 
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
       await enclave.activate(e3Id);
+      const expectedHash = hash(BigInt(ethers.keccak256(inputData)), BigInt(0));
 
       await expect(enclave.publishInput(e3Id, inputData))
         .to.emit(enclave, "InputPublished")
-        .withArgs(e3Id, inputData);
+        .withArgs(e3Id, inputData, expectedHash, 0);
     });
   });
 
@@ -1026,10 +1031,10 @@ describe("Enclave", function () {
         request.threshold,
         request.startTime,
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await expect(enclave.publishCiphertextOutput(e3Id, "0x"))
@@ -1043,10 +1048,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       const block = await tx.getBlock();
@@ -1069,10 +1074,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1094,10 +1099,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1115,10 +1120,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1136,10 +1141,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1157,10 +1162,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1189,10 +1194,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await expect(enclave.publishPlaintextOutput(e3Id, "0x"))
@@ -1208,10 +1213,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1228,10 +1233,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1254,10 +1259,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1276,10 +1281,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1299,10 +1304,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);
@@ -1321,10 +1326,10 @@ describe("Enclave", function () {
         request.threshold,
         [await time.latest(), (await time.latest()) + 100],
         request.duration,
-        request.computationModule,
-        request.cMParams,
-        request.executionModule,
-        request.eMParams,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProvider,
+        request.computeProviderParams,
         { value: 10 },
       );
       await enclave.activate(e3Id);

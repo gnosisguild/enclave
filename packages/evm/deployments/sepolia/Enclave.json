@@ -1,0 +1,1757 @@
+{
+  "address": "0x083b0AE25fD41469Fd8857027B40e3f49A169375",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        },
+        {
+          "internalType": "contract ICyphernodeRegistry",
+          "name": "_cyphernodeRegistry",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_maxDuration",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "CiphertextOutputAlreadyPublished",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "CiphertextOutputNotPublished",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "CommitteeSelectionFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        }
+      ],
+      "name": "ComputationModuleNotAllowed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "E3AlreadyActivated",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "E3DoesNotExist",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "E3Expired",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "E3NotActivated",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "E3NotReady",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "expiration",
+          "type": "uint256"
+        }
+      ],
+      "name": "InputDeadlineNotPassed",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "expiration",
+          "type": "uint256"
+        }
+      ],
+      "name": "InputDeadlinePassed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidComputation",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract ICyphernodeRegistry",
+          "name": "cyphernodeRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "InvalidCyphernodeRegistry",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "duration",
+          "type": "uint256"
+        }
+      ],
+      "name": "InvalidDuration",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidExecutionModuleSetup",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidInitialization",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidInput",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "output",
+          "type": "bytes"
+        }
+      ],
+      "name": "InvalidOutput",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidStartWindow",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint32[2]",
+          "name": "threshold",
+          "type": "uint32[2]"
+        }
+      ],
+      "name": "InvalidThreshold",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "module",
+          "type": "address"
+        }
+      ],
+      "name": "ModuleAlreadyEnabled",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "module",
+          "type": "address"
+        }
+      ],
+      "name": "ModuleNotEnabled",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotInitializing",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "value",
+          "type": "uint256"
+        }
+      ],
+      "name": "PaymentRequired",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "PlaintextOutputAlreadyPublished",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "ciphertextOutput",
+          "type": "bytes"
+        }
+      ],
+      "name": "CiphertextOutputPublished",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        }
+      ],
+      "name": "ComputationModuleDisabled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        }
+      ],
+      "name": "ComputationModuleEnabled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "cyphernodeRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "CyphernodeRegistrySet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "expiration",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "committeePublicKey",
+          "type": "bytes"
+        }
+      ],
+      "name": "E3Activated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint32[2]",
+              "name": "threshold",
+              "type": "uint32[2]"
+            },
+            {
+              "internalType": "uint256[2]",
+              "name": "startWindow",
+              "type": "uint256[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "duration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "expiration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "contract IComputationModule",
+              "name": "computationModule",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IExecutionModule",
+              "name": "executionModule",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IInputValidator",
+              "name": "inputValidator",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IOutputVerifier",
+              "name": "outputVerifier",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "committeePublicKey",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes[]",
+              "name": "inputs",
+              "type": "bytes[]"
+            },
+            {
+              "internalType": "bytes",
+              "name": "ciphertextOutput",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "plaintextOutput",
+              "type": "bytes"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct E3",
+          "name": "e3",
+          "type": "tuple"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "filter",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "contract IExecutionModule",
+          "name": "executionModule",
+          "type": "address"
+        }
+      ],
+      "name": "E3Requested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "contract IExecutionModule",
+          "name": "executionModule",
+          "type": "address"
+        }
+      ],
+      "name": "ExecutionModuleDisabled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "contract IExecutionModule",
+          "name": "executionModule",
+          "type": "address"
+        }
+      ],
+      "name": "ExecutionModuleEnabled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "version",
+          "type": "uint64"
+        }
+      ],
+      "name": "Initialized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "InputPublished",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "maxDuration",
+          "type": "uint256"
+        }
+      ],
+      "name": "MaxDurationSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "plaintextOutput",
+          "type": "bytes"
+        }
+      ],
+      "name": "PlaintextOutputPublished",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "activate",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        }
+      ],
+      "name": "computationModules",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cyphernodeRegistry",
+      "outputs": [
+        {
+          "internalType": "contract ICyphernodeRegistry",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        }
+      ],
+      "name": "disableComputationModule",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IExecutionModule",
+          "name": "executionModule",
+          "type": "address"
+        }
+      ],
+      "name": "disableExecutionModule",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        }
+      ],
+      "name": "e3s",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "duration",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "expiration",
+          "type": "uint256"
+        },
+        {
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IExecutionModule",
+          "name": "executionModule",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IInputValidator",
+          "name": "inputValidator",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IOutputVerifier",
+          "name": "outputVerifier",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "committeePublicKey",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "ciphertextOutput",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "plaintextOutput",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        }
+      ],
+      "name": "enableComputationModule",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IExecutionModule",
+          "name": "executionModule",
+          "type": "address"
+        }
+      ],
+      "name": "enableExecutionModule",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IExecutionModule",
+          "name": "executionModule",
+          "type": "address"
+        }
+      ],
+      "name": "executionModules",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "allowed",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getE3",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint32[2]",
+              "name": "threshold",
+              "type": "uint32[2]"
+            },
+            {
+              "internalType": "uint256[2]",
+              "name": "startWindow",
+              "type": "uint256[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "duration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "expiration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "contract IComputationModule",
+              "name": "computationModule",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IExecutionModule",
+              "name": "executionModule",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IInputValidator",
+              "name": "inputValidator",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IOutputVerifier",
+              "name": "outputVerifier",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "committeePublicKey",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes[]",
+              "name": "inputs",
+              "type": "bytes[]"
+            },
+            {
+              "internalType": "bytes",
+              "name": "ciphertextOutput",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "plaintextOutput",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct E3",
+          "name": "e3",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        },
+        {
+          "internalType": "contract ICyphernodeRegistry",
+          "name": "_cyphernodeRegistry",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_maxDuration",
+          "type": "uint256"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "maxDuration",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "nexte3Id",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "publishCiphertextOutput",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "publishInput",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "publishPlaintextOutput",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "filter",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32[2]",
+          "name": "threshold",
+          "type": "uint32[2]"
+        },
+        {
+          "internalType": "uint256[2]",
+          "name": "startWindow",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256",
+          "name": "duration",
+          "type": "uint256"
+        },
+        {
+          "internalType": "contract IComputationModule",
+          "name": "computationModule",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "computationParams",
+          "type": "bytes"
+        },
+        {
+          "internalType": "contract IExecutionModule",
+          "name": "executionModule",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "emParams",
+          "type": "bytes"
+        }
+      ],
+      "name": "request",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint32[2]",
+              "name": "threshold",
+              "type": "uint32[2]"
+            },
+            {
+              "internalType": "uint256[2]",
+              "name": "startWindow",
+              "type": "uint256[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "duration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "expiration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "contract IComputationModule",
+              "name": "computationModule",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IExecutionModule",
+              "name": "executionModule",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IInputValidator",
+              "name": "inputValidator",
+              "type": "address"
+            },
+            {
+              "internalType": "contract IOutputVerifier",
+              "name": "outputVerifier",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "committeePublicKey",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes[]",
+              "name": "inputs",
+              "type": "bytes[]"
+            },
+            {
+              "internalType": "bytes",
+              "name": "ciphertextOutput",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "plaintextOutput",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct E3",
+          "name": "e3",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "requests",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract ICyphernodeRegistry",
+          "name": "_cyphernodeRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "setCyphernodeRegistry",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_maxDuration",
+          "type": "uint256"
+        }
+      ],
+      "name": "setMaxDuration",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x2e2dae8a05e34e82484cfaec005240ec707a4c0c6b6a4f6bcf8fb0f45c0c5b6f",
+  "receipt": {
+    "to": null,
+    "from": "0x485E60C486671E932fd9C53d4110cdEab1E7F0eb",
+    "contractAddress": "0x083b0AE25fD41469Fd8857027B40e3f49A169375",
+    "transactionIndex": 286,
+    "gasUsed": "2071049",
+    "logsBloom": "0x00000000000000000000000000000100000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000100000000000000000020000000000000000000800000000000000200000000800000000400000000008000000000800000000000000000000000880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002004000000000000000020000000000000000000020000000001200000000800000000000000000000000000",
+    "blockHash": "0x516557b80e512cc5ad78bd83f7668e4d4f1dc08eb95582806d98fb0569c0517b",
+    "transactionHash": "0x2e2dae8a05e34e82484cfaec005240ec707a4c0c6b6a4f6bcf8fb0f45c0c5b6f",
+    "logs": [
+      {
+        "transactionIndex": 286,
+        "blockNumber": 6662691,
+        "transactionHash": "0x2e2dae8a05e34e82484cfaec005240ec707a4c0c6b6a4f6bcf8fb0f45c0c5b6f",
+        "address": "0x083b0AE25fD41469Fd8857027B40e3f49A169375",
+        "topics": [
+          "0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x000000000000000000000000485e60c486671e932fd9c53d4110cdeab1e7f0eb"
+        ],
+        "data": "0x",
+        "logIndex": 369,
+        "blockHash": "0x516557b80e512cc5ad78bd83f7668e4d4f1dc08eb95582806d98fb0569c0517b"
+      },
+      {
+        "transactionIndex": 286,
+        "blockNumber": 6662691,
+        "transactionHash": "0x2e2dae8a05e34e82484cfaec005240ec707a4c0c6b6a4f6bcf8fb0f45c0c5b6f",
+        "address": "0x083b0AE25fD41469Fd8857027B40e3f49A169375",
+        "topics": [
+          "0xba0716ba1ee2ea8ecc4c64119b4537cdb42a99d82acf92af5b87607b8b523552"
+        ],
+        "data": "0x0000000000000000000000000000000000000000000000000000000000278d00",
+        "logIndex": 370,
+        "blockHash": "0x516557b80e512cc5ad78bd83f7668e4d4f1dc08eb95582806d98fb0569c0517b"
+      },
+      {
+        "transactionIndex": 286,
+        "blockNumber": 6662691,
+        "transactionHash": "0x2e2dae8a05e34e82484cfaec005240ec707a4c0c6b6a4f6bcf8fb0f45c0c5b6f",
+        "address": "0x083b0AE25fD41469Fd8857027B40e3f49A169375",
+        "topics": [
+          "0x016ea868599173c3163f65dea5e4677b2be5f0ececb4ec15d1166a27de35a533"
+        ],
+        "data": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "logIndex": 371,
+        "blockHash": "0x516557b80e512cc5ad78bd83f7668e4d4f1dc08eb95582806d98fb0569c0517b"
+      },
+      {
+        "transactionIndex": 286,
+        "blockNumber": 6662691,
+        "transactionHash": "0x2e2dae8a05e34e82484cfaec005240ec707a4c0c6b6a4f6bcf8fb0f45c0c5b6f",
+        "address": "0x083b0AE25fD41469Fd8857027B40e3f49A169375",
+        "topics": [
+          "0xc7f505b2f371ae2175ee4913f4499e1f2633a7b5936321eed1cdaeb6115181d2"
+        ],
+        "data": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "logIndex": 372,
+        "blockHash": "0x516557b80e512cc5ad78bd83f7668e4d4f1dc08eb95582806d98fb0569c0517b"
+      }
+    ],
+    "blockNumber": 6662691,
+    "cumulativeGasUsed": "25038564",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0x485E60C486671E932fd9C53d4110cdEab1E7F0eb",
+    "0x0000000000000000000000000000000000000001",
+    2592000
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "d0e6e4f19028714f394c36db62dff2be",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.26+commit.8a97fa7a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_owner\",\"type\":\"address\"},{\"internalType\":\"contract ICyphernodeRegistry\",\"name\":\"_cyphernodeRegistry\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_maxDuration\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"}],\"name\":\"CiphertextOutputAlreadyPublished\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"}],\"name\":\"CiphertextOutputNotPublished\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"CommitteeSelectionFailed\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"}],\"name\":\"ComputationModuleNotAllowed\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"}],\"name\":\"E3AlreadyActivated\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"}],\"name\":\"E3DoesNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"E3Expired\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"}],\"name\":\"E3NotActivated\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"E3NotReady\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"expiration\",\"type\":\"uint256\"}],\"name\":\"InputDeadlineNotPassed\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"expiration\",\"type\":\"uint256\"}],\"name\":\"InputDeadlinePassed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidComputation\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"contract ICyphernodeRegistry\",\"name\":\"cyphernodeRegistry\",\"type\":\"address\"}],\"name\":\"InvalidCyphernodeRegistry\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"}],\"name\":\"InvalidDuration\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidExecutionModuleSetup\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidInitialization\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidInput\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"output\",\"type\":\"bytes\"}],\"name\":\"InvalidOutput\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidStartWindow\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint32[2]\",\"name\":\"threshold\",\"type\":\"uint32[2]\"}],\"name\":\"InvalidThreshold\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"ModuleAlreadyEnabled\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"module\",\"type\":\"address\"}],\"name\":\"ModuleNotEnabled\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotInitializing\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"OwnableInvalidOwner\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"}],\"name\":\"OwnableUnauthorizedAccount\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"PaymentRequired\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"}],\"name\":\"PlaintextOutputAlreadyPublished\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"ciphertextOutput\",\"type\":\"bytes\"}],\"name\":\"CiphertextOutputPublished\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"}],\"name\":\"ComputationModuleDisabled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"}],\"name\":\"ComputationModuleEnabled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"cyphernodeRegistry\",\"type\":\"address\"}],\"name\":\"CyphernodeRegistrySet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"expiration\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"committeePublicKey\",\"type\":\"bytes\"}],\"name\":\"E3Activated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint32[2]\",\"name\":\"threshold\",\"type\":\"uint32[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"startWindow\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"expiration\",\"type\":\"uint256\"},{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"},{\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"},{\"internalType\":\"contract IInputValidator\",\"name\":\"inputValidator\",\"type\":\"address\"},{\"internalType\":\"contract IOutputVerifier\",\"name\":\"outputVerifier\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"committeePublicKey\",\"type\":\"bytes\"},{\"internalType\":\"bytes[]\",\"name\":\"inputs\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes\",\"name\":\"ciphertextOutput\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"plaintextOutput\",\"type\":\"bytes\"}],\"indexed\":false,\"internalType\":\"struct E3\",\"name\":\"e3\",\"type\":\"tuple\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"filter\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"}],\"name\":\"E3Requested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"}],\"name\":\"ExecutionModuleDisabled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"}],\"name\":\"ExecutionModuleEnabled\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint64\",\"name\":\"version\",\"type\":\"uint64\"}],\"name\":\"Initialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"InputPublished\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"maxDuration\",\"type\":\"uint256\"}],\"name\":\"MaxDurationSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"plaintextOutput\",\"type\":\"bytes\"}],\"name\":\"PlaintextOutputPublished\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"}],\"name\":\"activate\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"}],\"name\":\"computationModules\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"cyphernodeRegistry\",\"outputs\":[{\"internalType\":\"contract ICyphernodeRegistry\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"}],\"name\":\"disableComputationModule\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"}],\"name\":\"disableExecutionModule\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"}],\"name\":\"e3s\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"expiration\",\"type\":\"uint256\"},{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"},{\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"},{\"internalType\":\"contract IInputValidator\",\"name\":\"inputValidator\",\"type\":\"address\"},{\"internalType\":\"contract IOutputVerifier\",\"name\":\"outputVerifier\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"committeePublicKey\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"ciphertextOutput\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"plaintextOutput\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"}],\"name\":\"enableComputationModule\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"}],\"name\":\"enableExecutionModule\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"}],\"name\":\"executionModules\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"}],\"name\":\"getE3\",\"outputs\":[{\"components\":[{\"internalType\":\"uint32[2]\",\"name\":\"threshold\",\"type\":\"uint32[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"startWindow\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"expiration\",\"type\":\"uint256\"},{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"},{\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"},{\"internalType\":\"contract IInputValidator\",\"name\":\"inputValidator\",\"type\":\"address\"},{\"internalType\":\"contract IOutputVerifier\",\"name\":\"outputVerifier\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"committeePublicKey\",\"type\":\"bytes\"},{\"internalType\":\"bytes[]\",\"name\":\"inputs\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes\",\"name\":\"ciphertextOutput\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"plaintextOutput\",\"type\":\"bytes\"}],\"internalType\":\"struct E3\",\"name\":\"e3\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_owner\",\"type\":\"address\"},{\"internalType\":\"contract ICyphernodeRegistry\",\"name\":\"_cyphernodeRegistry\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"_maxDuration\",\"type\":\"uint256\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"maxDuration\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nexte3Id\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"publishCiphertextOutput\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"publishInput\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"publishPlaintextOutput\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"filter\",\"type\":\"address\"},{\"internalType\":\"uint32[2]\",\"name\":\"threshold\",\"type\":\"uint32[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"startWindow\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"},{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"computationParams\",\"type\":\"bytes\"},{\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"emParams\",\"type\":\"bytes\"}],\"name\":\"request\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"e3Id\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint32[2]\",\"name\":\"threshold\",\"type\":\"uint32[2]\"},{\"internalType\":\"uint256[2]\",\"name\":\"startWindow\",\"type\":\"uint256[2]\"},{\"internalType\":\"uint256\",\"name\":\"duration\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"expiration\",\"type\":\"uint256\"},{\"internalType\":\"contract IComputationModule\",\"name\":\"computationModule\",\"type\":\"address\"},{\"internalType\":\"contract IExecutionModule\",\"name\":\"executionModule\",\"type\":\"address\"},{\"internalType\":\"contract IInputValidator\",\"name\":\"inputValidator\",\"type\":\"address\"},{\"internalType\":\"contract IOutputVerifier\",\"name\":\"outputVerifier\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"committeePublicKey\",\"type\":\"bytes\"},{\"internalType\":\"bytes[]\",\"name\":\"inputs\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes\",\"name\":\"ciphertextOutput\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"plaintextOutput\",\"type\":\"bytes\"}],\"internalType\":\"struct E3\",\"name\":\"e3\",\"type\":\"tuple\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"requests\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract ICyphernodeRegistry\",\"name\":\"_cyphernodeRegistry\",\"type\":\"address\"}],\"name\":\"setCyphernodeRegistry\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_maxDuration\",\"type\":\"uint256\"}],\"name\":\"setMaxDuration\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"errors\":{\"InvalidInitialization()\":[{\"details\":\"The contract is already initialized.\"}],\"NotInitializing()\":[{\"details\":\"The contract is not initializing.\"}],\"OwnableInvalidOwner(address)\":[{\"details\":\"The owner is not a valid owner account. (eg. `address(0)`)\"}],\"OwnableUnauthorizedAccount(address)\":[{\"details\":\"The caller account is not authorized to perform an operation.\"}]},\"events\":{\"CiphertextOutputPublished(uint256,bytes)\":{\"params\":{\"ciphertextOutput\":\"ABI encoded ciphertext output.\",\"e3Id\":\"ID of the E3.\"}},\"ComputationModuleDisabled(address)\":{\"params\":{\"computationModule\":\"The address of the computation module.\"}},\"ComputationModuleEnabled(address)\":{\"params\":{\"computationModule\":\"The address of the computation module.\"}},\"CyphernodeRegistrySet(address)\":{\"params\":{\"cyphernodeRegistry\":\"The address of the CyphernodeRegistry contract.\"}},\"E3Activated(uint256,uint256,bytes)\":{\"params\":{\"committeePublicKey\":\"Public key of the committee.\",\"e3Id\":\"ID of the E3.\",\"expiration\":\"Timestamp when committee duties expire.\"}},\"E3Requested(uint256,(uint32[2],uint256[2],uint256,uint256,address,address,address,address,bytes,bytes[],bytes,bytes),address,address,address)\":{\"params\":{\"computationModule\":\"Address of the Computation module selected.\",\"e3\":\"Details of the E3.\",\"e3Id\":\"ID of the E3.\",\"executionModule\":\"Address of the execution module selected.\",\"filter\":\"Address of the pool of nodes from which the Cypher Node committee was selected.\"}},\"ExecutionModuleDisabled(address)\":{\"params\":{\"executionModule\":\"The address of the execution module.\"}},\"ExecutionModuleEnabled(address)\":{\"params\":{\"executionModule\":\"The address of the execution module.\"}},\"Initialized(uint64)\":{\"details\":\"Triggered when the contract has been initialized or reinitialized.\"},\"InputPublished(uint256,bytes)\":{\"params\":{\"data\":\"ABI encoded input data.\",\"e3Id\":\"ID of the E3.\"}},\"MaxDurationSet(uint256)\":{\"params\":{\"maxDuration\":\"The maximum duration of a computation in seconds.\"}},\"PlaintextOutputPublished(uint256,bytes)\":{\"params\":{\"e3Id\":\"ID of the E3.\",\"plaintextOutput\":\"ABI encoded plaintext output.\"}}},\"kind\":\"dev\",\"methods\":{\"activate(uint256)\":{\"details\":\"This function MUST emit the E3Activated event.This function MUST revert if the given E3 has not yet been requested.This function MUST revert if the selected node committee has not yet published a public key.\",\"params\":{\"e3Id\":\"ID of the E3.\"}},\"constructor\":{\"params\":{\"_maxDuration\":\"The maximum duration of a computation in seconds\",\"_owner\":\"The owner of this contract\"}},\"getE3(uint256)\":{\"details\":\"This function MUST revert if the E3 does not exist.\",\"params\":{\"e3Id\":\"ID of the E3.\"},\"returns\":{\"e3\":\"The struct representing the requested E3.\"}},\"initialize(address,address,uint256)\":{\"params\":{\"_maxDuration\":\"The maximum duration of a computation in seconds\",\"_owner\":\"The owner of this contract\"}},\"owner()\":{\"details\":\"Returns the address of the current owner.\"},\"publishCiphertextOutput(uint256,bytes)\":{\"details\":\"This function MUST emit the CiphertextOutputPublished event.\",\"params\":{\"data\":\"ABI encoded output data to verify.\",\"e3Id\":\"ID of the E3.\"},\"returns\":{\"success\":\"True if the output was successfully published.\"}},\"publishInput(uint256,bytes)\":{\"details\":\"This function MUST revert if the E3 is not yet activated.This function MUST emit the InputPublished event.\",\"params\":{\"data\":\"ABI encoded input data to publish.\",\"e3Id\":\"ID of the E3.\"},\"returns\":{\"success\":\"True if the input was successfully published.\"}},\"publishPlaintextOutput(uint256,bytes)\":{\"details\":\"This function MUST revert if the output has not been published.This function MUST emit the PlaintextOutputPublished event.\",\"params\":{\"data\":\"ABI encoded output data to decrypt.\",\"e3Id\":\"ID of the E3.\"},\"returns\":{\"success\":\"True if the output was successfully decrypted.\"}},\"renounceOwnership()\":{\"details\":\"Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner.\"},\"request(address,uint32[2],uint256[2],uint256,address,bytes,address,bytes)\":{\"details\":\"This function MUST emit the E3Requested event.\",\"params\":{\"computationModule\":\"Address of the computation module.\",\"computationParams\":\"ABI encoded computation parameters.\",\"duration\":\"The duration of the computation in seconds.\",\"emParams\":\"ABI encoded execution module parameters.\",\"executionModule\":\"Address of the execution module.\",\"filter\":\"IDs of the pool of nodes from which to select the committee.\",\"threshold\":\"The M/N threshold for the committee.\"},\"returns\":{\"e3\":\"The E3 struct.\",\"e3Id\":\"ID of the E3.\"}},\"setMaxDuration(uint256)\":{\"params\":{\"_maxDuration\":\"The maximum duration of a computation in seconds.\"},\"returns\":{\"success\":\"True if the max duration was successfully set.\"}},\"transferOwnership(address)\":{\"details\":\"Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner.\"}},\"version\":1},\"userdoc\":{\"events\":{\"CiphertextOutputPublished(uint256,bytes)\":{\"notice\":\"This event MUST be emitted when the ciphertext output of an Encrypted Execution Environment (E3) is successfully published.\"},\"ComputationModuleDisabled(address)\":{\"notice\":\"This event MUST be emitted any time a computation module is disabled.\"},\"ComputationModuleEnabled(address)\":{\"notice\":\"This event MUST be emitted any time a computation module is enabled.\"},\"CyphernodeRegistrySet(address)\":{\"notice\":\"This event MUST be emitted any time the CyphernodeRegistry is set.\"},\"E3Activated(uint256,uint256,bytes)\":{\"notice\":\"This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.\"},\"E3Requested(uint256,(uint32[2],uint256[2],uint256,uint256,address,address,address,address,bytes,bytes[],bytes,bytes),address,address,address)\":{\"notice\":\"This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully requested.\"},\"ExecutionModuleDisabled(address)\":{\"notice\":\"This event MUST be emitted any time an execution module is disabled.\"},\"ExecutionModuleEnabled(address)\":{\"notice\":\"This event MUST be emitted any time an execution module is enabled.\"},\"InputPublished(uint256,bytes)\":{\"notice\":\"This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is successfully published.\"},\"MaxDurationSet(uint256)\":{\"notice\":\"This event MUST be emitted any time the `maxDuration` is set.\"},\"PlaintextOutputPublished(uint256,bytes)\":{\"notice\":\"This event MUST be emitted when the plaintext output of an Encrypted Execution Environment (E3) is successfully published.\"}},\"kind\":\"user\",\"methods\":{\"activate(uint256)\":{\"notice\":\"This function should be called to activate an Encrypted Execution Environment (E3) once it has been initialized and is ready for input.\"},\"getE3(uint256)\":{\"notice\":\"This function should be called to retrieve the details of an Encrypted Execution Environment (E3).\"},\"publishCiphertextOutput(uint256,bytes)\":{\"notice\":\"This function should be called to publish output data for an Encrypted Execution Environment (E3).\"},\"publishInput(uint256,bytes)\":{\"notice\":\"This function should be called to publish input data for Encrypted Execution Environment (E3).\"},\"publishPlaintextOutput(uint256,bytes)\":{\"notice\":\"This function publishes the plaintext output of an Encrypted Execution Environment (E3).\"},\"request(address,uint32[2],uint256[2],uint256,address,bytes,address,bytes)\":{\"notice\":\"This function should be called to request a computation within an Encrypted Execution Environment (E3).\"},\"setMaxDuration(uint256)\":{\"notice\":\"This function should be called to set the maximum duration of requested computations.\"}},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/Enclave.sol\":\"Enclave\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"none\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":800},\"remappings\":[],\"viaIR\":true},\"sources\":{\"@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (access/Ownable.sol)\\n\\npragma solidity ^0.8.20;\\n\\nimport {ContextUpgradeable} from \\\"../utils/ContextUpgradeable.sol\\\";\\nimport {Initializable} from \\\"../proxy/utils/Initializable.sol\\\";\\n\\n/**\\n * @dev Contract module which provides a basic access control mechanism, where\\n * there is an account (an owner) that can be granted exclusive access to\\n * specific functions.\\n *\\n * The initial owner is set to the address provided by the deployer. This can\\n * later be changed with {transferOwnership}.\\n *\\n * This module is used through inheritance. It will make available the modifier\\n * `onlyOwner`, which can be applied to your functions to restrict their use to\\n * the owner.\\n */\\nabstract contract OwnableUpgradeable is Initializable, ContextUpgradeable {\\n    /// @custom:storage-location erc7201:openzeppelin.storage.Ownable\\n    struct OwnableStorage {\\n        address _owner;\\n    }\\n\\n    // keccak256(abi.encode(uint256(keccak256(\\\"openzeppelin.storage.Ownable\\\")) - 1)) & ~bytes32(uint256(0xff))\\n    bytes32 private constant OwnableStorageLocation = 0x9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c199300;\\n\\n    function _getOwnableStorage() private pure returns (OwnableStorage storage $) {\\n        assembly {\\n            $.slot := OwnableStorageLocation\\n        }\\n    }\\n\\n    /**\\n     * @dev The caller account is not authorized to perform an operation.\\n     */\\n    error OwnableUnauthorizedAccount(address account);\\n\\n    /**\\n     * @dev The owner is not a valid owner account. (eg. `address(0)`)\\n     */\\n    error OwnableInvalidOwner(address owner);\\n\\n    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);\\n\\n    /**\\n     * @dev Initializes the contract setting the address provided by the deployer as the initial owner.\\n     */\\n    function __Ownable_init(address initialOwner) internal onlyInitializing {\\n        __Ownable_init_unchained(initialOwner);\\n    }\\n\\n    function __Ownable_init_unchained(address initialOwner) internal onlyInitializing {\\n        if (initialOwner == address(0)) {\\n            revert OwnableInvalidOwner(address(0));\\n        }\\n        _transferOwnership(initialOwner);\\n    }\\n\\n    /**\\n     * @dev Throws if called by any account other than the owner.\\n     */\\n    modifier onlyOwner() {\\n        _checkOwner();\\n        _;\\n    }\\n\\n    /**\\n     * @dev Returns the address of the current owner.\\n     */\\n    function owner() public view virtual returns (address) {\\n        OwnableStorage storage $ = _getOwnableStorage();\\n        return $._owner;\\n    }\\n\\n    /**\\n     * @dev Throws if the sender is not the owner.\\n     */\\n    function _checkOwner() internal view virtual {\\n        if (owner() != _msgSender()) {\\n            revert OwnableUnauthorizedAccount(_msgSender());\\n        }\\n    }\\n\\n    /**\\n     * @dev Leaves the contract without owner. It will not be possible to call\\n     * `onlyOwner` functions. Can only be called by the current owner.\\n     *\\n     * NOTE: Renouncing ownership will leave the contract without an owner,\\n     * thereby disabling any functionality that is only available to the owner.\\n     */\\n    function renounceOwnership() public virtual onlyOwner {\\n        _transferOwnership(address(0));\\n    }\\n\\n    /**\\n     * @dev Transfers ownership of the contract to a new account (`newOwner`).\\n     * Can only be called by the current owner.\\n     */\\n    function transferOwnership(address newOwner) public virtual onlyOwner {\\n        if (newOwner == address(0)) {\\n            revert OwnableInvalidOwner(address(0));\\n        }\\n        _transferOwnership(newOwner);\\n    }\\n\\n    /**\\n     * @dev Transfers ownership of the contract to a new account (`newOwner`).\\n     * Internal function without access restriction.\\n     */\\n    function _transferOwnership(address newOwner) internal virtual {\\n        OwnableStorage storage $ = _getOwnableStorage();\\n        address oldOwner = $._owner;\\n        $._owner = newOwner;\\n        emit OwnershipTransferred(oldOwner, newOwner);\\n    }\\n}\\n\",\"keccak256\":\"0xc163fcf9bb10138631a9ba5564df1fa25db9adff73bd9ee868a8ae1858fe093a\",\"license\":\"MIT\"},\"@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.0) (proxy/utils/Initializable.sol)\\n\\npragma solidity ^0.8.20;\\n\\n/**\\n * @dev This is a base contract to aid in writing upgradeable contracts, or any kind of contract that will be deployed\\n * behind a proxy. Since proxied contracts do not make use of a constructor, it's common to move constructor logic to an\\n * external initializer function, usually called `initialize`. It then becomes necessary to protect this initializer\\n * function so it can only be called once. The {initializer} modifier provided by this contract will have this effect.\\n *\\n * The initialization functions use a version number. Once a version number is used, it is consumed and cannot be\\n * reused. This mechanism prevents re-execution of each \\\"step\\\" but allows the creation of new initialization steps in\\n * case an upgrade adds a module that needs to be initialized.\\n *\\n * For example:\\n *\\n * [.hljs-theme-light.nopadding]\\n * ```solidity\\n * contract MyToken is ERC20Upgradeable {\\n *     function initialize() initializer public {\\n *         __ERC20_init(\\\"MyToken\\\", \\\"MTK\\\");\\n *     }\\n * }\\n *\\n * contract MyTokenV2 is MyToken, ERC20PermitUpgradeable {\\n *     function initializeV2() reinitializer(2) public {\\n *         __ERC20Permit_init(\\\"MyToken\\\");\\n *     }\\n * }\\n * ```\\n *\\n * TIP: To avoid leaving the proxy in an uninitialized state, the initializer function should be called as early as\\n * possible by providing the encoded function call as the `_data` argument to {ERC1967Proxy-constructor}.\\n *\\n * CAUTION: When used with inheritance, manual care must be taken to not invoke a parent initializer twice, or to ensure\\n * that all initializers are idempotent. This is not verified automatically as constructors are by Solidity.\\n *\\n * [CAUTION]\\n * ====\\n * Avoid leaving a contract uninitialized.\\n *\\n * An uninitialized contract can be taken over by an attacker. This applies to both a proxy and its implementation\\n * contract, which may impact the proxy. To prevent the implementation contract from being used, you should invoke\\n * the {_disableInitializers} function in the constructor to automatically lock it when it is deployed:\\n *\\n * [.hljs-theme-light.nopadding]\\n * ```\\n * /// @custom:oz-upgrades-unsafe-allow constructor\\n * constructor() {\\n *     _disableInitializers();\\n * }\\n * ```\\n * ====\\n */\\nabstract contract Initializable {\\n    /**\\n     * @dev Storage of the initializable contract.\\n     *\\n     * It's implemented on a custom ERC-7201 namespace to reduce the risk of storage collisions\\n     * when using with upgradeable contracts.\\n     *\\n     * @custom:storage-location erc7201:openzeppelin.storage.Initializable\\n     */\\n    struct InitializableStorage {\\n        /**\\n         * @dev Indicates that the contract has been initialized.\\n         */\\n        uint64 _initialized;\\n        /**\\n         * @dev Indicates that the contract is in the process of being initialized.\\n         */\\n        bool _initializing;\\n    }\\n\\n    // keccak256(abi.encode(uint256(keccak256(\\\"openzeppelin.storage.Initializable\\\")) - 1)) & ~bytes32(uint256(0xff))\\n    bytes32 private constant INITIALIZABLE_STORAGE = 0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;\\n\\n    /**\\n     * @dev The contract is already initialized.\\n     */\\n    error InvalidInitialization();\\n\\n    /**\\n     * @dev The contract is not initializing.\\n     */\\n    error NotInitializing();\\n\\n    /**\\n     * @dev Triggered when the contract has been initialized or reinitialized.\\n     */\\n    event Initialized(uint64 version);\\n\\n    /**\\n     * @dev A modifier that defines a protected initializer function that can be invoked at most once. In its scope,\\n     * `onlyInitializing` functions can be used to initialize parent contracts.\\n     *\\n     * Similar to `reinitializer(1)`, except that in the context of a constructor an `initializer` may be invoked any\\n     * number of times. This behavior in the constructor can be useful during testing and is not expected to be used in\\n     * production.\\n     *\\n     * Emits an {Initialized} event.\\n     */\\n    modifier initializer() {\\n        // solhint-disable-next-line var-name-mixedcase\\n        InitializableStorage storage $ = _getInitializableStorage();\\n\\n        // Cache values to avoid duplicated sloads\\n        bool isTopLevelCall = !$._initializing;\\n        uint64 initialized = $._initialized;\\n\\n        // Allowed calls:\\n        // - initialSetup: the contract is not in the initializing state and no previous version was\\n        //                 initialized\\n        // - construction: the contract is initialized at version 1 (no reininitialization) and the\\n        //                 current contract is just being deployed\\n        bool initialSetup = initialized == 0 && isTopLevelCall;\\n        bool construction = initialized == 1 && address(this).code.length == 0;\\n\\n        if (!initialSetup && !construction) {\\n            revert InvalidInitialization();\\n        }\\n        $._initialized = 1;\\n        if (isTopLevelCall) {\\n            $._initializing = true;\\n        }\\n        _;\\n        if (isTopLevelCall) {\\n            $._initializing = false;\\n            emit Initialized(1);\\n        }\\n    }\\n\\n    /**\\n     * @dev A modifier that defines a protected reinitializer function that can be invoked at most once, and only if the\\n     * contract hasn't been initialized to a greater version before. In its scope, `onlyInitializing` functions can be\\n     * used to initialize parent contracts.\\n     *\\n     * A reinitializer may be used after the original initialization step. This is essential to configure modules that\\n     * are added through upgrades and that require initialization.\\n     *\\n     * When `version` is 1, this modifier is similar to `initializer`, except that functions marked with `reinitializer`\\n     * cannot be nested. If one is invoked in the context of another, execution will revert.\\n     *\\n     * Note that versions can jump in increments greater than 1; this implies that if multiple reinitializers coexist in\\n     * a contract, executing them in the right order is up to the developer or operator.\\n     *\\n     * WARNING: Setting the version to 2**64 - 1 will prevent any future reinitialization.\\n     *\\n     * Emits an {Initialized} event.\\n     */\\n    modifier reinitializer(uint64 version) {\\n        // solhint-disable-next-line var-name-mixedcase\\n        InitializableStorage storage $ = _getInitializableStorage();\\n\\n        if ($._initializing || $._initialized >= version) {\\n            revert InvalidInitialization();\\n        }\\n        $._initialized = version;\\n        $._initializing = true;\\n        _;\\n        $._initializing = false;\\n        emit Initialized(version);\\n    }\\n\\n    /**\\n     * @dev Modifier to protect an initialization function so that it can only be invoked by functions with the\\n     * {initializer} and {reinitializer} modifiers, directly or indirectly.\\n     */\\n    modifier onlyInitializing() {\\n        _checkInitializing();\\n        _;\\n    }\\n\\n    /**\\n     * @dev Reverts if the contract is not in an initializing state. See {onlyInitializing}.\\n     */\\n    function _checkInitializing() internal view virtual {\\n        if (!_isInitializing()) {\\n            revert NotInitializing();\\n        }\\n    }\\n\\n    /**\\n     * @dev Locks the contract, preventing any future reinitialization. This cannot be part of an initializer call.\\n     * Calling this in the constructor of a contract will prevent that contract from being initialized or reinitialized\\n     * to any version. It is recommended to use this to lock implementation contracts that are designed to be called\\n     * through proxies.\\n     *\\n     * Emits an {Initialized} event the first time it is successfully executed.\\n     */\\n    function _disableInitializers() internal virtual {\\n        // solhint-disable-next-line var-name-mixedcase\\n        InitializableStorage storage $ = _getInitializableStorage();\\n\\n        if ($._initializing) {\\n            revert InvalidInitialization();\\n        }\\n        if ($._initialized != type(uint64).max) {\\n            $._initialized = type(uint64).max;\\n            emit Initialized(type(uint64).max);\\n        }\\n    }\\n\\n    /**\\n     * @dev Returns the highest version that has been initialized. See {reinitializer}.\\n     */\\n    function _getInitializedVersion() internal view returns (uint64) {\\n        return _getInitializableStorage()._initialized;\\n    }\\n\\n    /**\\n     * @dev Returns `true` if the contract is currently initializing. See {onlyInitializing}.\\n     */\\n    function _isInitializing() internal view returns (bool) {\\n        return _getInitializableStorage()._initializing;\\n    }\\n\\n    /**\\n     * @dev Returns a pointer to the storage namespace.\\n     */\\n    // solhint-disable-next-line var-name-mixedcase\\n    function _getInitializableStorage() private pure returns (InitializableStorage storage $) {\\n        assembly {\\n            $.slot := INITIALIZABLE_STORAGE\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0x631188737069917d2f909d29ce62c4d48611d326686ba6683e26b72a23bfac0b\",\"license\":\"MIT\"},\"@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\n// OpenZeppelin Contracts (last updated v5.0.1) (utils/Context.sol)\\n\\npragma solidity ^0.8.20;\\nimport {Initializable} from \\\"../proxy/utils/Initializable.sol\\\";\\n\\n/**\\n * @dev Provides information about the current execution context, including the\\n * sender of the transaction and its data. While these are generally available\\n * via msg.sender and msg.data, they should not be accessed in such a direct\\n * manner, since when dealing with meta-transactions the account sending and\\n * paying for execution may not be the actual sender (as far as an application\\n * is concerned).\\n *\\n * This contract is only required for intermediate, library-like contracts.\\n */\\nabstract contract ContextUpgradeable is Initializable {\\n    function __Context_init() internal onlyInitializing {\\n    }\\n\\n    function __Context_init_unchained() internal onlyInitializing {\\n    }\\n    function _msgSender() internal view virtual returns (address) {\\n        return msg.sender;\\n    }\\n\\n    function _msgData() internal view virtual returns (bytes calldata) {\\n        return msg.data;\\n    }\\n\\n    function _contextSuffixLength() internal view virtual returns (uint256) {\\n        return 0;\\n    }\\n}\\n\",\"keccak256\":\"0xdbef5f0c787055227243a7318ef74c8a5a1108ca3a07f2b3a00ef67769e1e397\",\"license\":\"MIT\"},\"contracts/Enclave.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.26;\\n\\nimport {\\n    IEnclave,\\n    E3,\\n    IComputationModule,\\n    IExecutionModule\\n} from \\\"./interfaces/IEnclave.sol\\\";\\nimport { ICyphernodeRegistry } from \\\"./interfaces/ICyphernodeRegistry.sol\\\";\\nimport { IInputValidator } from \\\"./interfaces/IInputValidator.sol\\\";\\nimport { IOutputVerifier } from \\\"./interfaces/IOutputVerifier.sol\\\";\\nimport {\\n    OwnableUpgradeable\\n} from \\\"@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol\\\";\\n\\ncontract Enclave is IEnclave, OwnableUpgradeable {\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                 Storage Variables                      //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    ICyphernodeRegistry public cyphernodeRegistry; // address of the Cyphernode registry.\\n    uint256 public maxDuration; // maximum duration of a computation in seconds.\\n    uint256 public nexte3Id; // ID of the next E3.\\n    uint256 public requests; // total number of requests made to Enclave.\\n\\n    // TODO: should computation and execution modules be explicitly allowed?\\n    // My intuition is that an allowlist is required since they impose slashing conditions.\\n    // But perhaps this is one place where node pools might be utilized, allowing nodes to\\n    // opt in to being selected for specific computations, along with the corresponding slashing conditions.\\n    // This would reduce the governance overhead for Enclave.\\n\\n    // Mapping of allowed computation modules.\\n    mapping(IComputationModule computationModule => bool allowed)\\n        public computationModules;\\n\\n    // Mapping of allowed execution modules.\\n    mapping(IExecutionModule executionModule => bool allowed)\\n        public executionModules;\\n\\n    // Mapping of E3s.\\n    mapping(uint256 id => E3 e3) public e3s;\\n\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                        Errors                          //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    error CommitteeSelectionFailed();\\n    error ComputationModuleNotAllowed(IComputationModule computationModule);\\n    error E3AlreadyActivated(uint256 e3Id);\\n    error E3Expired();\\n    error E3NotActivated(uint256 e3Id);\\n    error E3NotReady();\\n    error E3DoesNotExist(uint256 e3Id);\\n    error ModuleAlreadyEnabled(address module);\\n    error ModuleNotEnabled(address module);\\n    error InputDeadlinePassed(uint256 e3Id, uint256 expiration);\\n    error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);\\n    error InvalidComputation();\\n    error InvalidExecutionModuleSetup();\\n    error InvalidCyphernodeRegistry(ICyphernodeRegistry cyphernodeRegistry);\\n    error InvalidInput();\\n    error InvalidDuration(uint256 duration);\\n    error InvalidOutput(bytes output);\\n    error InvalidStartWindow();\\n    error InvalidThreshold(uint32[2] threshold);\\n    error CiphertextOutputAlreadyPublished(uint256 e3Id);\\n    error CiphertextOutputNotPublished(uint256 e3Id);\\n    error PaymentRequired(uint256 value);\\n    error PlaintextOutputAlreadyPublished(uint256 e3Id);\\n\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                   Initialization                       //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    /// @param _owner The owner of this contract\\n    /// @param _maxDuration The maximum duration of a computation in seconds\\n    constructor(\\n        address _owner,\\n        ICyphernodeRegistry _cyphernodeRegistry,\\n        uint256 _maxDuration\\n    ) {\\n        initialize(_owner, _cyphernodeRegistry, _maxDuration);\\n    }\\n\\n    /// @param _owner The owner of this contract\\n    /// @param _maxDuration The maximum duration of a computation in seconds\\n    function initialize(\\n        address _owner,\\n        ICyphernodeRegistry _cyphernodeRegistry,\\n        uint256 _maxDuration\\n    ) public initializer {\\n        __Ownable_init(msg.sender);\\n        setMaxDuration(_maxDuration);\\n        setCyphernodeRegistry(_cyphernodeRegistry);\\n        if (_owner != owner()) transferOwnership(_owner);\\n    }\\n\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                  Core Entrypoints                      //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    function request(\\n        address filter,\\n        uint32[2] calldata threshold,\\n        uint256[2] calldata startWindow,\\n        uint256 duration,\\n        IComputationModule computationModule,\\n        bytes memory computationParams,\\n        IExecutionModule executionModule,\\n        bytes memory emParams\\n    ) external payable returns (uint256 e3Id, E3 memory e3) {\\n        // TODO: allow for other payment methods or only native tokens?\\n        // TODO: should payment checks be somewhere else? Perhaps in the computation module or cyphernode registry?\\n        require(msg.value > 0, PaymentRequired(msg.value));\\n        require(\\n            threshold[1] >= threshold[0] && threshold[0] > 0,\\n            InvalidThreshold(threshold)\\n        );\\n        require(\\n            // TODO: do we need a minimum start window to allow time for committee selection?\\n            startWindow[1] >= startWindow[0] &&\\n                startWindow[1] >= block.timestamp,\\n            InvalidStartWindow()\\n        );\\n        require(\\n            duration > 0 && duration <= maxDuration,\\n            InvalidDuration(duration)\\n        );\\n        require(\\n            computationModules[computationModule],\\n            ComputationModuleNotAllowed(computationModule)\\n        );\\n        require(\\n            executionModules[executionModule],\\n            ModuleNotEnabled(address(executionModule))\\n        );\\n\\n        // TODO: should IDs be incremental or produced deterministically?\\n        e3Id = nexte3Id;\\n        nexte3Id++;\\n\\n        IInputValidator inputValidator = computationModule.validate(\\n            computationParams\\n        );\\n        require(address(inputValidator) != address(0), InvalidComputation());\\n\\n        // TODO: validate that the requested computation can be performed by the given execution module.\\n        IOutputVerifier outputVerifier = executionModule.validate(emParams);\\n        require(\\n            address(outputVerifier) != address(0),\\n            InvalidExecutionModuleSetup()\\n        );\\n\\n        e3 = E3({\\n            threshold: threshold,\\n            startWindow: startWindow,\\n            duration: duration,\\n            expiration: 0,\\n            computationModule: computationModule,\\n            executionModule: executionModule,\\n            inputValidator: inputValidator,\\n            outputVerifier: outputVerifier,\\n            committeePublicKey: hex\\\"\\\",\\n            inputs: new bytes[](0),\\n            ciphertextOutput: hex\\\"\\\",\\n            plaintextOutput: hex\\\"\\\"\\n        });\\n        e3s[e3Id] = e3;\\n\\n        require(\\n            cyphernodeRegistry.requestCommittee(e3Id, filter, threshold),\\n            CommitteeSelectionFailed()\\n        );\\n\\n        emit E3Requested(\\n            e3Id,\\n            e3s[e3Id],\\n            filter,\\n            computationModule,\\n            executionModule\\n        );\\n    }\\n\\n    function activate(uint256 e3Id) external returns (bool success) {\\n        // Note: we could load this into a storage pointer, and do the sets there\\n        // Requires a mew internal _getter that returns storage\\n        E3 memory e3 = getE3(e3Id);\\n        require(e3.expiration == 0, E3AlreadyActivated(e3Id));\\n        require(e3.startWindow[0] <= block.timestamp, E3NotReady());\\n        // TODO: handle what happens to the payment if the start window has passed.\\n        require(e3.startWindow[1] >= block.timestamp, E3Expired());\\n\\n        bytes memory publicKey = cyphernodeRegistry.committeePublicKey(e3Id);\\n        // Note: This check feels weird\\n        require(publicKey.length > 0, CommitteeSelectionFailed());\\n\\n        e3s[e3Id].expiration = block.timestamp + e3.duration;\\n        e3s[e3Id].committeePublicKey = publicKey;\\n\\n        emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);\\n\\n        return true;\\n    }\\n\\n    function publishInput(\\n        uint256 e3Id,\\n        bytes memory data\\n    ) external returns (bool success) {\\n        E3 memory e3 = getE3(e3Id);\\n\\n        // Note: if we make 0 a no expiration, this has to be refactored\\n        require(e3.expiration > 0, E3NotActivated(e3Id));\\n        // TODO: should we have an input window, including both a start and end timestamp?\\n        require(\\n            e3.expiration > block.timestamp,\\n            InputDeadlinePassed(e3Id, e3.expiration)\\n        );\\n        bytes memory input;\\n        (input, success) = e3.inputValidator.validate(msg.sender, data);\\n        require(success, InvalidInput());\\n        // TODO: probably better to accumulate inputs, rather than just dumping them in storage.\\n        e3s[e3Id].inputs.push(input);\\n        emit InputPublished(e3Id, input);\\n    }\\n\\n    function publishCiphertextOutput(\\n        uint256 e3Id,\\n        bytes memory data\\n    ) external returns (bool success) {\\n        E3 memory e3 = getE3(e3Id);\\n        // Note: if we make 0 a no expiration, this has to be refactored\\n        require(e3.expiration > 0, E3NotActivated(e3Id));\\n        require(\\n            e3.expiration <= block.timestamp,\\n            InputDeadlineNotPassed(e3Id, e3.expiration)\\n        );\\n        // TODO: should the output verifier be able to change its mind?\\n        //i.e. should we be able to call this multiple times?\\n        require(\\n            e3.ciphertextOutput.length == 0,\\n            CiphertextOutputAlreadyPublished(e3Id)\\n        );\\n        bytes memory output;\\n        (output, success) = e3.outputVerifier.verify(e3Id, data);\\n        require(success, InvalidOutput(output));\\n        e3s[e3Id].ciphertextOutput = output;\\n\\n        emit CiphertextOutputPublished(e3Id, output);\\n    }\\n\\n    function publishPlaintextOutput(\\n        uint256 e3Id,\\n        bytes memory data\\n    ) external returns (bool success) {\\n        E3 memory e3 = getE3(e3Id);\\n        // Note: if we make 0 a no expiration, this has to be refactored\\n        require(e3.expiration > 0, E3NotActivated(e3Id));\\n        require(\\n            e3.ciphertextOutput.length > 0,\\n            CiphertextOutputNotPublished(e3Id)\\n        );\\n        require(\\n            e3.plaintextOutput.length == 0,\\n            PlaintextOutputAlreadyPublished(e3Id)\\n        );\\n        bytes memory output;\\n        (output, success) = e3.computationModule.verify(e3Id, data);\\n        require(success, InvalidOutput(output));\\n        e3s[e3Id].plaintextOutput = output;\\n\\n        emit PlaintextOutputPublished(e3Id, output);\\n    }\\n\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                   Set Functions                        //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    function setMaxDuration(\\n        uint256 _maxDuration\\n    ) public onlyOwner returns (bool success) {\\n        maxDuration = _maxDuration;\\n        success = true;\\n        emit MaxDurationSet(_maxDuration);\\n    }\\n\\n    function setCyphernodeRegistry(\\n        ICyphernodeRegistry _cyphernodeRegistry\\n    ) public onlyOwner returns (bool success) {\\n        require(\\n            address(_cyphernodeRegistry) != address(0) &&\\n                _cyphernodeRegistry != cyphernodeRegistry,\\n            InvalidCyphernodeRegistry(_cyphernodeRegistry)\\n        );\\n        cyphernodeRegistry = _cyphernodeRegistry;\\n        success = true;\\n        emit CyphernodeRegistrySet(address(_cyphernodeRegistry));\\n    }\\n\\n    function enableComputationModule(\\n        IComputationModule computationModule\\n    ) public onlyOwner returns (bool success) {\\n        require(\\n            !computationModules[computationModule],\\n            ModuleAlreadyEnabled(address(computationModule))\\n        );\\n        computationModules[computationModule] = true;\\n        success = true;\\n        emit ComputationModuleEnabled(computationModule);\\n    }\\n\\n    function enableExecutionModule(\\n        IExecutionModule executionModule\\n    ) public onlyOwner returns (bool success) {\\n        require(\\n            !executionModules[executionModule],\\n            ModuleAlreadyEnabled(address(executionModule))\\n        );\\n        executionModules[executionModule] = true;\\n        success = true;\\n        emit ExecutionModuleEnabled(executionModule);\\n    }\\n\\n    function disableComputationModule(\\n        IComputationModule computationModule\\n    ) public onlyOwner returns (bool success) {\\n        require(\\n            computationModules[computationModule],\\n            ModuleNotEnabled(address(computationModule))\\n        );\\n        delete computationModules[computationModule];\\n        success = true;\\n        emit ComputationModuleDisabled(computationModule);\\n    }\\n\\n    function disableExecutionModule(\\n        IExecutionModule executionModule\\n    ) public onlyOwner returns (bool success) {\\n        require(\\n            executionModules[executionModule],\\n            ModuleNotEnabled(address(executionModule))\\n        );\\n        delete executionModules[executionModule];\\n        success = true;\\n        emit ExecutionModuleDisabled(executionModule);\\n    }\\n\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                   Get Functions                        //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    function getE3(uint256 e3Id) public view returns (E3 memory e3) {\\n        e3 = e3s[e3Id];\\n        require(\\n            e3.computationModule != IComputationModule(address(0)),\\n            E3DoesNotExist(e3Id)\\n        );\\n    }\\n}\\n\",\"keccak256\":\"0xc37015e312c621b75b924d32d19b43682ffb94ef3319326b75ca1a4e36454700\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/IComputationModule.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.26;\\n\\nimport { IInputValidator } from \\\"./IInputValidator.sol\\\";\\n\\ninterface IComputationModule {\\n    /// @notice This function should be called by the Enclave contract to validate the computation parameters.\\n    /// @param params ABI encoded computation parameters.\\n    /// @return inputValidator The input validator to be used for the computation.\\n    function validate(\\n        bytes calldata params\\n    ) external returns (IInputValidator inputValidator);\\n\\n    /// @notice This function should be called by the Enclave contract to verify the decrypted output of an E3.\\n    /// @param e3Id ID of the E3.\\n    /// @param outputData ABI encoded output data to be verified.\\n    /// @return output The output data to be published.\\n    /// @return success Whether the output data is valid.\\n    function verify(\\n        uint256 e3Id,\\n        bytes memory outputData\\n    ) external returns (bytes memory output, bool success);\\n}\\n\",\"keccak256\":\"0x9e65874df81985a203a0f3bea12996cb66f9e57663beed3e93f849414a5c4d0d\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/ICyphernodeRegistry.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.26;\\n\\ninterface ICyphernodeRegistry {\\n    /// @notice This event MUST be emitted when a committee is selected for an E3.\\n    /// @param e3Id ID of the E3 for which the committee was selected.\\n    /// @param filter Address of the contract that will coordinate committee selection.\\n    /// @param threshold The M/N threshold for the committee.\\n    event CommitteeRequested(\\n        uint256 indexed e3Id,\\n        address filter,\\n        uint32[2] threshold\\n    );\\n\\n    /// @notice This event MUST be emitted when a committee is selected for an E3.\\n    /// @param e3Id ID of the E3 for which the committee was selected.\\n    /// @param publicKey Public key of the committee.\\n    event CommitteePublished(uint256 indexed e3Id, bytes publicKey);\\n\\n    /// @notice This event MUST be emitted when `enclave` is set.\\n    /// @param enclave Address of the enclave contract.\\n    event EnclaveSet(address indexed enclave);\\n\\n    /// @notice This event MUST be emitted when a cyphernode is added to the registry.\\n    event CyphernodeAdded(address indexed node);\\n\\n    /// @notice This event MUST be emitted when a cyphernode is removed from the registry.\\n    event CyphernodeRemoved(address indexed node);\\n\\n    function isCyphernodeEligible(address cyphernode) external returns (bool);\\n\\n    /// @notice Initiates the committee selection process for a specified E3.\\n    /// @dev This function MUST revert when not called by the Enclave contract.\\n    /// @param e3Id ID of the E3 for which to select the committee.\\n    /// @param filter The address of the filter responsible for the committee selection process.\\n    /// @param threshold The M/N threshold for the committee.\\n    /// @return success True if committee selection was successfully initiated.\\n    function requestCommittee(\\n        uint256 e3Id,\\n        address filter,\\n        uint32[2] calldata threshold\\n    ) external returns (bool success);\\n\\n    /// @notice Publishes the public key resulting from the committee selection process.\\n    /// @dev This function MUST revert if not called by the previously selected filter.\\n    /// @param e3Id ID of the E3 for which to select the committee.\\n    /// @param publicKey The public key generated by the selected committee.\\n    function publishCommittee(\\n        uint256 e3Id,\\n        bytes calldata proof,\\n        bytes calldata publicKey\\n    ) external;\\n\\n    /// @notice This function should be called by the Enclave contract to get the public key of a committee.\\n    /// @dev This function MUST revert if no committee has been requested for the given E3.\\n    /// @dev This function MUST revert if the committee has not yet published a public key.\\n    /// @param e3Id ID of the E3 for which to get the committee public key.\\n    /// @return publicKey The public key of the committee.\\n    function committeePublicKey(\\n        uint256 e3Id\\n    ) external view returns (bytes memory);\\n}\\n\",\"keccak256\":\"0x60af5d66db32528f5032fe083218f180ab83f3199bcf090bed7249c28bc18104\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/IE3.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.26;\\n\\nimport { IInputValidator } from \\\"./IInputValidator.sol\\\";\\nimport { IExecutionModule } from \\\"./IExecutionModule.sol\\\";\\nimport { IComputationModule } from \\\"./IComputationModule.sol\\\";\\nimport { IOutputVerifier } from \\\"./IOutputVerifier.sol\\\";\\n\\n/// @title E3 struct\\n/// @notice This struct represents an E3 computation.\\n/// @param threshold M/N threshold for the committee.\\n/// @param startWindow Start window for the computation: index zero is minimum, index 1 is the maxium.\\n/// @param duration Duration of the E3.\\n/// @param expiration Timestamp when committee duties expire.\\n/// @param computationModule Address of the computation module contract.\\n/// @param executionModule Address of the execution module contract.\\n/// @param inputValidator Address of the input validator contract.\\n/// @param outputVerifier Address of the output verifier contract.\\n/// @param committeeId ID of the selected committee.\\n/// @param ciphertextOutput Encrypted output data.\\n/// @param plaintextOutput Decrypted output data.\\nstruct E3 {\\n    uint32[2] threshold;\\n    uint256[2] startWindow;\\n    uint256 duration;\\n    uint256 expiration;\\n    IComputationModule computationModule;\\n    IExecutionModule executionModule;\\n    IInputValidator inputValidator;\\n    IOutputVerifier outputVerifier;\\n    bytes committeePublicKey;\\n    bytes[] inputs;\\n    bytes ciphertextOutput;\\n    bytes plaintextOutput;\\n}\\n\",\"keccak256\":\"0x6013398b086073328305a2f33edd3027ed82b3fb7e802627f88ac7781a2c1125\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/IEnclave.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.26;\\n\\nimport { E3, IComputationModule, IExecutionModule } from \\\"./IE3.sol\\\";\\n\\ninterface IEnclave {\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                         Events                         //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully requested.\\n    /// @param e3Id ID of the E3.\\n    /// @param e3 Details of the E3.\\n    /// @param filter Address of the pool of nodes from which the Cypher Node committee was selected.\\n    /// @param computationModule Address of the Computation module selected.\\n    /// @param executionModule  Address of the execution module selected.\\n    event E3Requested(\\n        uint256 e3Id,\\n        E3 e3,\\n        address filter,\\n        IComputationModule indexed computationModule,\\n        IExecutionModule indexed executionModule\\n    );\\n\\n    /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.\\n    /// @param e3Id ID of the E3.\\n    /// @param expiration Timestamp when committee duties expire.\\n    /// @param committeePublicKey Public key of the committee.\\n    event E3Activated(\\n        uint256 e3Id,\\n        uint256 expiration,\\n        bytes committeePublicKey\\n    );\\n\\n    /// @notice This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is\\n    /// successfully published.\\n    /// @param e3Id ID of the E3.\\n    /// @param data ABI encoded input data.\\n    event InputPublished(uint256 indexed e3Id, bytes data);\\n\\n    /// @notice This event MUST be emitted when the plaintext output of an Encrypted Execution Environment (E3)\\n    /// is successfully published.\\n    /// @param e3Id ID of the E3.\\n    /// @param plaintextOutput ABI encoded plaintext output.\\n    event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);\\n\\n    /// @notice This event MUST be emitted when the ciphertext output of an Encrypted Execution Environment (E3)\\n    /// is successfully published.\\n    /// @param e3Id ID of the E3.\\n    /// @param ciphertextOutput ABI encoded ciphertext output.\\n    event CiphertextOutputPublished(\\n        uint256 indexed e3Id,\\n        bytes ciphertextOutput\\n    );\\n\\n    /// @notice This event MUST be emitted any time the `maxDuration` is set.\\n    /// @param maxDuration The maximum duration of a computation in seconds.\\n    event MaxDurationSet(uint256 maxDuration);\\n\\n    /// @notice This event MUST be emitted any time the CyphernodeRegistry is set.\\n    /// @param cyphernodeRegistry The address of the CyphernodeRegistry contract.\\n    event CyphernodeRegistrySet(address cyphernodeRegistry);\\n\\n    /// @notice This event MUST be emitted any time a computation module is enabled.\\n    /// @param computationModule The address of the computation module.\\n    event ComputationModuleEnabled(IComputationModule computationModule);\\n\\n    /// @notice This event MUST be emitted any time a computation module is disabled.\\n    /// @param computationModule The address of the computation module.\\n    event ComputationModuleDisabled(IComputationModule computationModule);\\n\\n    /// @notice This event MUST be emitted any time an execution module is enabled.\\n    /// @param executionModule The address of the execution module.\\n    event ExecutionModuleEnabled(IExecutionModule executionModule);\\n\\n    /// @notice This event MUST be emitted any time an execution module is disabled.\\n    /// @param executionModule The address of the execution module.\\n    event ExecutionModuleDisabled(IExecutionModule executionModule);\\n\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                  Core Entrypoints                      //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).\\n    /// @dev This function MUST emit the E3Requested event.\\n    /// @param filter IDs of the pool of nodes from which to select the committee.\\n    /// @param threshold The M/N threshold for the committee.\\n    /// @param duration The duration of the computation in seconds.\\n    /// @param computationModule Address of the computation module.\\n    /// @param computationParams ABI encoded computation parameters.\\n    /// @param executionModule Address of the execution module.\\n    /// @param emParams ABI encoded execution module parameters.\\n    /// @return e3Id ID of the E3.\\n    /// @return e3 The E3 struct.\\n    function request(\\n        address filter,\\n        uint32[2] calldata threshold,\\n        uint256[2] calldata startWindow,\\n        uint256 duration,\\n        IComputationModule computationModule,\\n        bytes memory computationParams,\\n        IExecutionModule executionModule,\\n        bytes memory emParams\\n    ) external payable returns (uint256 e3Id, E3 memory e3);\\n\\n    /// @notice This function should be called to activate an Encrypted Execution Environment (E3) once it has been\\n    /// initialized and is ready for input.\\n    /// @dev This function MUST emit the E3Activated event.\\n    /// @dev This function MUST revert if the given E3 has not yet been requested.\\n    /// @dev This function MUST revert if the selected node committee has not yet published a public key.\\n    /// @param e3Id ID of the E3.\\n    function activate(uint256 e3Id) external returns (bool success);\\n\\n    /// @notice This function should be called to publish input data for Encrypted Execution Environment (E3).\\n    /// @dev This function MUST revert if the E3 is not yet activated.\\n    /// @dev This function MUST emit the InputPublished event.\\n    /// @param e3Id ID of the E3.\\n    /// @param data ABI encoded input data to publish.\\n    /// @return success True if the input was successfully published.\\n    function publishInput(\\n        uint256 e3Id,\\n        bytes calldata data\\n    ) external returns (bool success);\\n\\n    /// @notice This function should be called to publish output data for an Encrypted Execution Environment (E3).\\n    /// @dev This function MUST emit the CiphertextOutputPublished event.\\n    /// @param e3Id ID of the E3.\\n    /// @param data ABI encoded output data to verify.\\n    /// @return success True if the output was successfully published.\\n    function publishCiphertextOutput(\\n        uint256 e3Id,\\n        bytes memory data\\n    ) external returns (bool success);\\n\\n    /// @notice This function publishes the plaintext output of an Encrypted Execution Environment (E3).\\n    /// @dev This function MUST revert if the output has not been published.\\n    /// @dev This function MUST emit the PlaintextOutputPublished event.\\n    /// @param e3Id ID of the E3.\\n    /// @param data ABI encoded output data to decrypt.\\n    /// @return success True if the output was successfully decrypted.\\n    function publishPlaintextOutput(\\n        uint256 e3Id,\\n        bytes memory data\\n    ) external returns (bool success);\\n\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                   Set Functions                        //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    /// @notice This function should be called to set the maximum duration of requested computations.\\n    /// @param _maxDuration The maximum duration of a computation in seconds.\\n    /// @return success True if the max duration was successfully set.\\n    function setMaxDuration(\\n        uint256 _maxDuration\\n    ) external returns (bool success);\\n\\n    ////////////////////////////////////////////////////////////\\n    //                                                        //\\n    //                   Get Functions                        //\\n    //                                                        //\\n    ////////////////////////////////////////////////////////////\\n\\n    /// @notice This function should be called to retrieve the details of an Encrypted Execution Environment (E3).\\n    /// @dev This function MUST revert if the E3 does not exist.\\n    /// @param e3Id ID of the E3.\\n    /// @return e3 The struct representing the requested E3.\\n    function getE3(uint256 e3Id) external view returns (E3 memory e3);\\n}\\n\",\"keccak256\":\"0x706e77d517e9d275fa68844f902ac74ae5c508443732da519423018e75426bb4\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/IExecutionModule.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.26;\\n\\nimport { IOutputVerifier } from \\\"./IOutputVerifier.sol\\\";\\n\\ninterface IExecutionModule {\\n    /// @notice This function should be called by the Enclave contract to validate the execution module parameters.\\n    /// @param params ABI encoded execution module parameters.\\n    function validate(\\n        bytes calldata params\\n    ) external returns (IOutputVerifier outputVerifier);\\n}\\n\",\"keccak256\":\"0x6cd6024b4459f94dde07b70e4f784078cbd4ab71d28c3b41316d3590d7c9bcf8\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/IInputValidator.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.26;\\n\\ninterface IInputValidator {\\n    /// @notice This function should be called by the Enclave contract to validate the input parameters.\\n    /// @param params ABI encoded input parameters.\\n    /// @return input The input data to be published.\\n    /// @return success Whether the input parameters are valid.\\n    function validate(\\n        address sender,\\n        bytes memory params\\n    ) external returns (bytes memory input, bool success);\\n}\\n\",\"keccak256\":\"0x8faeb82309f9a353636ef4ad1ca34a181a8161ccd287dd7c3150c0d6251cd656\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/IOutputVerifier.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.26;\\n\\ninterface IOutputVerifier {\\n    /// @notice This function should be called by the Enclave contract to verify the output of a computation.\\n    /// @param e3Id ID of the E3.\\n    /// @param data ABI encoded output data to be verified.\\n    /// @return output Ciphertext output of the given computation.\\n    function verify(\\n        uint256 e3Id,\\n        bytes memory data\\n    ) external view returns (bytes memory output, bool success);\\n}\\n\",\"keccak256\":\"0x09648c77f96c17a0d4143a11feb5c6aec15c70029cb483335a0bd9d6224769e8\",\"license\":\"LGPL-3.0-only\"}},\"version\":1}",
+  "bytecode": "0x6080346102a457601f61265838819003918201601f19168301916001600160401b038311848410176102a9578084926060946040528339810103126102a45780516001600160a01b0381168082036102a45760208301516001600160a01b03811693908490036102a457604090810151600080516020612638833981519152549182901c60ff161594916001600160401b0381168015908161029c575b6001149081610292575b159081610289575b50610278576001600160401b03198116600117600080516020612638833981519152557fba0716ba1ee2ea8ecc4c64119b4537cdb42a99d82acf92af5b87607b8b523552916020918761024d575b50610105610335565b61010d610335565b610116336102bf565b61011e610363565b80600155604051908152a1610131610363565b80151580610238575b1561022457600080546001600160a01b031916821790556040519081527f016ea868599173c3163f65dea5e4677b2be5f0ececb4ec15d1166a27de35a53390602090a1600080516020612618833981519152546001600160a01b03160361020d575b506101b1575b60405161227e908161039a8239f35b68ff0000000000000000196000805160206126388339815191525416600080516020612638833981519152557fc7f505b2f371ae2175ee4913f4499e1f2633a7b5936321eed1cdaeb6115181d2602060405160018152a16101a2565b61021e90610219610363565b6102bf565b3861019c565b63157970a560e21b60005260045260246000fd5b506000546001600160a01b031681141561013a565b6001600160481b031916680100000000000000011760008051602061263883398151915255386100fc565b63f92ee8a960e01b60005260046000fd5b905015386100ae565b303b1591506100a6565b87915061009c565b600080fd5b634e487b7160e01b600052604160045260246000fd5b6001600160a01b0316801561031f5760008051602061261883398151915280546001600160a01b0319811683179091556001600160a01b03167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3565b631e4fbdf760e01b600052600060045260246000fd5b60ff6000805160206126388339815191525460401c161561035257565b631afcd79f60e31b60005260046000fd5b600080516020612618833981519152546001600160a01b0316330361038457565b63118cdaa760e01b6000523360045260246000fdfe6080604052600436101561001257600080fd5b60003560e01c806309e098de146116c6578063115dfcbb146116875780631794bb3c146114615780632c27e1371461143a5780634017daf01461132e578063406ed35c146112fb578063594dfe61146109f95780636db5c8fd146109db578063715018a61461094257806376c932d514610903578063784b2830146107a657806378b41acd146107835780638da5cb5b1461073d578063a8873c6b146106ab578063af378f1014610619578063b260c42a14610469578063b74cb2db1461044b578063cb6496171461042d578063cf0f34c414610405578063d016b08d14610265578063d3c59355146101d7578063f14ea7b8146101495763f2fde38b1461011957600080fd5b34610144576020366003190112610144576101426101356118db565b61013d6121e9565b612143565b005b600080fd5b34610144576020366003190112610144577f39a3e67e141e4afa4c0f050632f57cfa9ccab94319143265fb278752551b0ca860206001600160a01b0361018d6118db565b6101956121e9565b1680600052600482526101b08160ff60406000205416612030565b8060005260048252604060002060ff198154169055604051908152a1602060405160018152f35b34610144576020366003190112610144577fe48e78a7419c5652baf40c86a4d7548a04ec3f569d4e6204e5a1e1890acbfaf460206001600160a01b0361021b6118db565b6102236121e9565b16806000526005825261023e8160ff60406000205416612030565b8060005260058252604060002060ff198154169055604051908152a1602060405160018152f35b3461014457610273366118a8565b61027c82611e0e565b6060810161028d8482511515611b69565b51428111156103ed57506102d76000926001600160a01b0360c085940151169060405194858094819363caf9278560e01b83523360048401526040602484015260448301906119d1565b03925af180156103e1576000916000916103bc575b50156103ab57816000526006602052600a60406000200180549168010000000000000000831015610395576001830180835583101561037f5761035d817fabf12c38379be7b560558cae3ceec83b3762653f7dd74e875af2ea6aeac7eaa89461037194600052602060002001611c69565b6040519182916020835260208301906119d1565b0390a2602060405160018152f35b634e487b7160e01b600052603260045260246000fd5b634e487b7160e01b600052604160045260246000fd5b63b4fa3fb360e01b60005260046000fd5b90506103db91503d806000833e6103d38183611823565b810190611bd4565b836102ec565b6040513d6000823e3d90fd5b8363142c294360e31b60005260045260245260446000fd5b34610144576020366003190112610144576020610423600435612107565b6040519015158152f35b34610144576000366003190112610144576020600254604051908152f35b34610144576000366003190112610144576020600354604051908152f35b346101445760203660031901126101445760043561048681611e0e565b60608101918251610605576020820180515142106105f45760204291510151106105e357602460006001600160a01b0381541660405192838092630e82f3b760e41b82528660048301525afa9081156103e15760009161059b575b5080511561058a57604083015142019081421161057457600083815260066020526040902060048101929092557f50df9e2c9fc5a7f4a07e403fa0300b88fcc8c6943bdff4b8ae71f55b7fd95f8994610566926101009261054491600901611c69565b51930151604051938493845260208401526060604084015260608301906119d1565b0390a1602060405160018152f35b634e487b7160e01b600052601160045260246000fd5b630d8dbe2560e01b60005260046000fd5b903d8082843e6105ab8184611823565b8201916020818403126105df5780519167ffffffffffffffff83116105dc57506105d6929101611b85565b846104e1565b80fd5b5080fd5b633d82a7cd60e11b60005260046000fd5b63a0750b5160e01b60005260046000fd5b633e26347b60e21b60005260045260246000fd5b34610144576020366003190112610144577fe5df1e46acc6e102c34b0f812f6557dba66de2e5fed10b64103b5d744083ee3160206001600160a01b0361065d6118db565b6106656121e9565b1680600052600482526106818160ff60406000205416156120e1565b80600052600482526040600020600160ff19825416179055604051908152a1602060405160018152f35b34610144576020366003190112610144577fcf75d44d74f911d2ec243ed8b390c2e4c69f2f2f372a197c0665e72843d49c0d60206001600160a01b036106ef6118db565b6106f76121e9565b1680600052600582526107138160ff60406000205416156120e1565b80600052600582526040600020600160ff19825416179055604051908152a1602060405160018152f35b346101445760003660031901126101445760206001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c1993005416604051908152f35b346101445760203660031901126101445760206104236107a16118db565b612056565b34610144576107b4366118a8565b6107bd82611e0e565b606081016107ce8482511515611b69565b514281116108eb5750610140810151516108d65761081392916001600160a01b0360e060009301511660405180809681946321614b3960e21b83528760048401611c0a565b03915afa9081156103e1576020926000908193610893575b506108868161085b7f7cc27e4a5626cbc4f8ba1a927b0448de55e6a114bc87660331270c5109ade0719386611c21565b836000526006865261087481600b604060002001611c69565b604051918291878352878301906119d1565b0390a26040519015158152f35b61088693506108cd907f7cc27e4a5626cbc4f8ba1a927b0448de55e6a114bc87660331270c5109ade071923d8091833e6103d38183611823565b9390915061082b565b82637eb9cea960e11b60005260045260246000fd5b836370c05fb960e11b60005260045260245260446000fd5b34610144576020366003190112610144576001600160a01b036109246118db565b166000526004602052602060ff604060002054166040519015158152f35b346101445760003660031901126101445761095b6121e9565b60006001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c199300546001600160a01b031981167f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c19930055167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e08280a3005b34610144576000366003190112610144576020600154604051908152f35b61014036600319011261014457610a0e6118db565b36606411610144573660a4116101445760a4359060c4356001600160a01b03811681036101445760e43567ffffffffffffffff811161014457610a55903690600401611861565b9061010435936001600160a01b0385168503610144576101243567ffffffffffffffff811161014457610a8c903690600401611861565b91610a95611d6a565b5034156112e65760443563ffffffff811690818103610144575063ffffffff610abc611fd5565b161115806112d0575b156112b25760843560643581101590816112a7575b5015611296578115158061128a575b15611275576001600160a01b038116600052600460205260ff6040600020541615611257576001600160a01b0386166000526005602052610b3b6001600160a01b03871660ff60406000205416612030565b600254936000198514610574576020610b7691600187016002556040518093819263c16e50ef60e01b835284600484015260248301906119d1565b038160006001600160a01b0387165af19081156103e15760009161120e575b506001600160a01b03169283156111fd576020610bcd916040518093819263c16e50ef60e01b835284600484015260248301906119d1565b038160006001600160a01b038c165af19081156103e1576000916111b4575b506001600160a01b03169485156111a357604051602096610c0d8883611823565b6000825260405195610c1e87611806565b6040958651610c2d8882611823565b60248b825b6064831061118b5750505088528651610c4b8882611823565b60648b825b60a4831061117b5750905089015286880152600060608801526001600160a01b03851660808801526001600160a01b038a1660a088015260c087015260e08601528351610c9d8882611823565b600081526101008601526101208501528251610cb98782611823565b600081526101408501528251610ccf8782611823565b60008152610160850152846000526006865282600020845160009060005b89600282106111535750505081558685015160005b6002811061113e575050838501516003820155606085015160048201556001600160a01b036080860151166001600160a01b036005830191166001600160a01b03198254161790556001600160a01b0360a0860151166001600160a01b036006830191166001600160a01b03198254161790556001600160a01b0360c0860151166001600160a01b036007830191166001600160a01b03198254161790556001600160a01b0360e0860151166001600160a01b036008830191166001600160a01b0319825416179055610ddd61010086015160098301611c69565b610120850151805190680100000000000000008211610395578890600a84015483600a8601558084106110b5575b5001600a830160005288600020896000925b848410611097575050505050610e4e90610e3f610140870151600b8301611c69565b600c6101608701519101611c69565b6000866001600160a01b036084818454169487519485938492639ccb58d560e01b84528c60048501521696876024840152610e8b60448401611ff9565b5af190811561108c57600091611057575b501561058a57846000526006865282600020835190868252606088830152610ed8606083018263ffffffff602091548181168452821c16910152565b610ee860a0830160018301611de6565b600381015460e083015260048101546101008301526001600160a01b036005820154166101208301526001600160a01b036006820154166101408301526001600160a01b036007820154166101608301526001600160a01b036008820154166101808301526101c06101a0830152610f6761022083016009830161192b565b600a820190605f19848203016101c085015281548082528a8201918b8260051b820101936000528b600020926000915b83831061102c575050505050916001600160a01b0380611028999a9b6110098495600c610ff57fdb6ad92217850c3c041086cc44cbec591badf6afe93d864e7f4ea4ba1bcf604199605f19898203016101e08a0152600b840161192b565b878103605f1901610200890152910161192b565b9689850152169516930390a380805195869586528501528301906119f6565b0390f35b90919293948d60016110488193601f198682030187528961192b565b97019301930191939290610f97565b90508681813d8311611085575b61106e8183611823565b810103126101445761107f90611bc7565b88610e9c565b503d611064565b84513d6000823e3d90fd5b600191816110a784935186611c69565b019201920191908a90610e1d565b600a850160005282600020908482015b81830181106110d5575050610e0b565b6001919293946110e582546118f1565b806110f8575b505001908b9392916110c5565b601f81118414611110575050600081555b8c8f6110eb565b83601f61112c9385600052600020920160051c82019101611c52565b8060005260008d812081835555611109565b60019089835193019282828601015501610d02565b829363ffffffff6001939451169063ffffffff8560051b92831b921b19161793019101610ced565b82358152918101918d9101610c50565b819061119684611fe8565b8152019101908c90610c32565b63f72c404960e01b60005260046000fd5b6020813d6020116111f5575b816111cd60209383611823565b810103126105df5751906001600160a01b03821682036105dc57506001600160a01b03610bec565b3d91506111c0565b630fdfa71f60e31b60005260046000fd5b6020813d60201161124f575b8161122760209383611823565b810103126105df5751906001600160a01b03821682036105dc57506001600160a01b03610b95565b3d915061121a565b6001600160a01b0390631e505a8160e01b6000521660045260246000fd5b506313b783af60e21b60005260045260246000fd5b50600154821115610ae9565b6308594fb760e01b60005260046000fd5b905042111587610ada565b604051633744092160e21b81526044906112ce60048201611ff9565bfd5b5063ffffffff6112de611fd5565b161515610ac5565b638c4fcd9360e01b6000523460045260246000fd5b346101445760203660031901126101445761102861131a600435611e0e565b6040519182916020835260208301906119f6565b3461014457602036600319011261014457600435600052600660205260406000206003810154611028600c61142b60048501549461141d6001600160a01b036005830154166001600160a01b036006840154166001600160a01b036007850154166001600160a01b0360088601541691604051936113ba856113b38160098b0161192b565b0386611823565b6113e9604051976113d9896113d281600b850161192b565b038a611823565b6113d2604051809c81930161192b565b6040519b8c9b8c5260208c015260408b015260608a0152608089015260a088015261012060c08801526101208701906119d1565b9085820360e08701526119d1565b908382036101008501526119d1565b346101445760003660031901126101445760206001600160a01b0360005416604051908152f35b346101445760603660031901126101445761147a6118db565b602435906001600160a01b0382168203610144577ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a005460ff8160401c16159267ffffffffffffffff82168015908161167f575b6001149081611675575b15908161166c575b5061165b5767ffffffffffffffff1982166001177ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a005561154a918461161c575b50611528612231565b611530612231565b61153933612143565b611544604435612107565b50612056565b506001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c19930054166001600160a01b0382160361160a575b5061158d57005b68ff0000000000000000197ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a0054167ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00557fc7f505b2f371ae2175ee4913f4499e1f2633a7b5936321eed1cdaeb6115181d2602060405160018152a1005b6116169061013d6121e9565b81611586565b68ffffffffffffffffff191668010000000000000001177ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00558461151f565b63f92ee8a960e01b60005260046000fd5b905015856114df565b303b1591506114d7565b8591506114cd565b34610144576020366003190112610144576001600160a01b036116a86118db565b166000526005602052602060ff604060002054166040519015158152f35b34610144576116d4366118a8565b6116dd82611e0e565b6116ed8360608301511515611b69565b61014081015151156117f157610160810151516117dc57611738600093926001600160a01b0360808694015116906040519586809481936321614b3960e21b83528860048401611c0a565b03925af19081156103e1576020926000908193611799575b50610886816117807f02a24c3402076671e129905ba4579d884b1f94ded1c07fc03d26d11b60bca1699386611c21565b836000526006865261087481600c604060002001611c69565b61088693506117d3907f02a24c3402076671e129905ba4579d884b1f94ded1c07fc03d26d11b60bca169923d8091833e6103d38183611823565b93909150611750565b826360ec327960e01b60005260045260246000fd5b8263032c20ef60e21b60005260045260246000fd5b610180810190811067ffffffffffffffff82111761039557604052565b90601f8019910116810190811067ffffffffffffffff82111761039557604052565b67ffffffffffffffff811161039557601f01601f191660200190565b81601f820112156101445780359061187882611845565b926118866040519485611823565b8284526020838301011161014457816000926020809301838601378301015290565b90604060031983011261014457600435916024359067ffffffffffffffff8211610144576118d891600401611861565b90565b600435906001600160a01b038216820361014457565b90600182811c92168015611921575b602083101461190b57565b634e487b7160e01b600052602260045260246000fd5b91607f1691611900565b6000929181549161193b836118f1565b8083529260018116908115611991575060011461195757505050565b60009081526020812093945091925b838310611977575060209250010190565b600181602092949394548385870101520191019190611966565b915050602093945060ff929192191683830152151560051b010190565b60005b8381106119c15750506000910152565b81810151838201526020016119b1565b906020916119ea815180928185528580860191016119ae565b601f01601f1916010190565b80519192916000845b60028210611b4d5750505060208101516000604085015b60028210611b375750505060408101516080840152606081015160a08401526001600160a01b0360808201511660c08401526001600160a01b0360a08201511660e08401526001600160a01b0360c0820151166101008401526001600160a01b0360e082015116610120840152611aa06101008201516101c06101408601526101c08501906119d1565b9261012082015193818103610160830152845180825260208201906020808260051b8501019701916000905b828210611b09575050505050610160611af76118d894956101408501518482036101808601526119d1565b920151906101a08184039101526119d1565b9091929397602080611b27600193601f198d820301865288516119d1565b9a96019493919091019101611acc565b6020806001928551815201930191019091611a16565b60208060019263ffffffff8651168152019301910190916119ff565b15611b715750565b63166b4d0360e01b60005260045260246000fd5b81601f82011215610144578051611b9b81611845565b92611ba96040519485611823565b81845260208284010111610144576118d891602080850191016119ae565b5190811515820361014457565b91906040838203126101445782519067ffffffffffffffff821161014457611c036020916118d8938601611b85565b9301611bc7565b6040906118d89392815281602082015201906119d1565b15611c295750565b604051632f9f8ab960e01b815260206004820152908190611c4e9060248301906119d1565b0390fd5b818110611c5d575050565b60008155600101611c52565b919091825167ffffffffffffffff811161039557611c8782546118f1565b601f8111611d2d575b506020601f8211600114611ccb5781929394600092611cc0575b50508160011b916000199060031b1c1916179055565b015190503880611caa565b601f1982169083600052806000209160005b818110611d1557509583600195969710611cfc575b505050811b019055565b015160001960f88460031b161c19169055388080611cf2565b9192602060018192868b015181550194019201611cdd565b611d5a90836000526020600020601f840160051c81019160208510611d60575b601f0160051c0190611c52565b38611c90565b9091508190611d4d565b60405190611d7782611806565b606061016083600060408051611d8d8282611823565b8136823783528051611d9f8282611823565b81368237602084015282015260008382015260006080820152600060a0820152600060c0820152600060e08201528261010082015282610120820152826101408201520152565b906000905b60028210611df857505050565b6001602081928554815201930191019091611deb565b90611e17611d6a565b50816000526006602052604060002091604051611e3381611806565b604051611e51818663ffffffff602091548181168452821c16910152565b611e5c604082611823565b8152604051611e6e8160018701611de6565b611e79604082611823565b602082015260038401546040820152600484015460608201526001600160a01b0360058501541693608082019485526001600160a01b0360068201541660a08301526001600160a01b0360078201541660c08301526001600160a01b0360088201541660e0830152604051611efc81611ef5816009860161192b565b0382611823565b610100830152600a8101805467ffffffffffffffff81116103955760208160051b0191611f2c6040519384611823565b818352602083019060005260206000206000915b838310611fb05750505050611f8b8392600c926101206001600160a01b03960152604051611f7581611ef581600b860161192b565b610140850152611ef5604051809481930161192b565b61016082015293511615611f9c5750565b63cd6f4a4f60e01b60005260045260246000fd5b600160208192604051611fc781611ef5818961192b565b815201920192019190611f40565b60243563ffffffff811681036101445790565b359063ffffffff8216820361014457565b6024906000905b6002821061200d57505050565b60208060019263ffffffff61202187611fe8565b16815201930191019091612000565b156120385750565b6001600160a01b03906321ac7c5f60e01b6000521660045260246000fd5b6001600160a01b03906120676121e9565b16801515806120cc575b156120b8576020817f016ea868599173c3163f65dea5e4677b2be5f0ececb4ec15d1166a27de35a533926001600160a01b03196000541617600055604051908152a1600190565b63157970a560e21b60005260045260246000fd5b506001600160a01b0360005416811415612071565b156120e95750565b6001600160a01b039063b29d459560e01b6000521660045260246000fd5b60207fba0716ba1ee2ea8ecc4c64119b4537cdb42a99d82acf92af5b87607b8b523552916121336121e9565b80600155604051908152a1600190565b6001600160a01b031680156121d3576001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c19930054826001600160a01b03198216177f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c19930055167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3565b631e4fbdf760e01b600052600060045260246000fd5b6001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c1993005416330361221c57565b63118cdaa760e01b6000523360045260246000fd5b60ff7ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a005460401c161561226057565b631afcd79f60e31b60005260046000fdfea164736f6c634300081a000a9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c199300f0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00",
+  "deployedBytecode": "0x6080604052600436101561001257600080fd5b60003560e01c806309e098de146116c6578063115dfcbb146116875780631794bb3c146114615780632c27e1371461143a5780634017daf01461132e578063406ed35c146112fb578063594dfe61146109f95780636db5c8fd146109db578063715018a61461094257806376c932d514610903578063784b2830146107a657806378b41acd146107835780638da5cb5b1461073d578063a8873c6b146106ab578063af378f1014610619578063b260c42a14610469578063b74cb2db1461044b578063cb6496171461042d578063cf0f34c414610405578063d016b08d14610265578063d3c59355146101d7578063f14ea7b8146101495763f2fde38b1461011957600080fd5b34610144576020366003190112610144576101426101356118db565b61013d6121e9565b612143565b005b600080fd5b34610144576020366003190112610144577f39a3e67e141e4afa4c0f050632f57cfa9ccab94319143265fb278752551b0ca860206001600160a01b0361018d6118db565b6101956121e9565b1680600052600482526101b08160ff60406000205416612030565b8060005260048252604060002060ff198154169055604051908152a1602060405160018152f35b34610144576020366003190112610144577fe48e78a7419c5652baf40c86a4d7548a04ec3f569d4e6204e5a1e1890acbfaf460206001600160a01b0361021b6118db565b6102236121e9565b16806000526005825261023e8160ff60406000205416612030565b8060005260058252604060002060ff198154169055604051908152a1602060405160018152f35b3461014457610273366118a8565b61027c82611e0e565b6060810161028d8482511515611b69565b51428111156103ed57506102d76000926001600160a01b0360c085940151169060405194858094819363caf9278560e01b83523360048401526040602484015260448301906119d1565b03925af180156103e1576000916000916103bc575b50156103ab57816000526006602052600a60406000200180549168010000000000000000831015610395576001830180835583101561037f5761035d817fabf12c38379be7b560558cae3ceec83b3762653f7dd74e875af2ea6aeac7eaa89461037194600052602060002001611c69565b6040519182916020835260208301906119d1565b0390a2602060405160018152f35b634e487b7160e01b600052603260045260246000fd5b634e487b7160e01b600052604160045260246000fd5b63b4fa3fb360e01b60005260046000fd5b90506103db91503d806000833e6103d38183611823565b810190611bd4565b836102ec565b6040513d6000823e3d90fd5b8363142c294360e31b60005260045260245260446000fd5b34610144576020366003190112610144576020610423600435612107565b6040519015158152f35b34610144576000366003190112610144576020600254604051908152f35b34610144576000366003190112610144576020600354604051908152f35b346101445760203660031901126101445760043561048681611e0e565b60608101918251610605576020820180515142106105f45760204291510151106105e357602460006001600160a01b0381541660405192838092630e82f3b760e41b82528660048301525afa9081156103e15760009161059b575b5080511561058a57604083015142019081421161057457600083815260066020526040902060048101929092557f50df9e2c9fc5a7f4a07e403fa0300b88fcc8c6943bdff4b8ae71f55b7fd95f8994610566926101009261054491600901611c69565b51930151604051938493845260208401526060604084015260608301906119d1565b0390a1602060405160018152f35b634e487b7160e01b600052601160045260246000fd5b630d8dbe2560e01b60005260046000fd5b903d8082843e6105ab8184611823565b8201916020818403126105df5780519167ffffffffffffffff83116105dc57506105d6929101611b85565b846104e1565b80fd5b5080fd5b633d82a7cd60e11b60005260046000fd5b63a0750b5160e01b60005260046000fd5b633e26347b60e21b60005260045260246000fd5b34610144576020366003190112610144577fe5df1e46acc6e102c34b0f812f6557dba66de2e5fed10b64103b5d744083ee3160206001600160a01b0361065d6118db565b6106656121e9565b1680600052600482526106818160ff60406000205416156120e1565b80600052600482526040600020600160ff19825416179055604051908152a1602060405160018152f35b34610144576020366003190112610144577fcf75d44d74f911d2ec243ed8b390c2e4c69f2f2f372a197c0665e72843d49c0d60206001600160a01b036106ef6118db565b6106f76121e9565b1680600052600582526107138160ff60406000205416156120e1565b80600052600582526040600020600160ff19825416179055604051908152a1602060405160018152f35b346101445760003660031901126101445760206001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c1993005416604051908152f35b346101445760203660031901126101445760206104236107a16118db565b612056565b34610144576107b4366118a8565b6107bd82611e0e565b606081016107ce8482511515611b69565b514281116108eb5750610140810151516108d65761081392916001600160a01b0360e060009301511660405180809681946321614b3960e21b83528760048401611c0a565b03915afa9081156103e1576020926000908193610893575b506108868161085b7f7cc27e4a5626cbc4f8ba1a927b0448de55e6a114bc87660331270c5109ade0719386611c21565b836000526006865261087481600b604060002001611c69565b604051918291878352878301906119d1565b0390a26040519015158152f35b61088693506108cd907f7cc27e4a5626cbc4f8ba1a927b0448de55e6a114bc87660331270c5109ade071923d8091833e6103d38183611823565b9390915061082b565b82637eb9cea960e11b60005260045260246000fd5b836370c05fb960e11b60005260045260245260446000fd5b34610144576020366003190112610144576001600160a01b036109246118db565b166000526004602052602060ff604060002054166040519015158152f35b346101445760003660031901126101445761095b6121e9565b60006001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c199300546001600160a01b031981167f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c19930055167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e08280a3005b34610144576000366003190112610144576020600154604051908152f35b61014036600319011261014457610a0e6118db565b36606411610144573660a4116101445760a4359060c4356001600160a01b03811681036101445760e43567ffffffffffffffff811161014457610a55903690600401611861565b9061010435936001600160a01b0385168503610144576101243567ffffffffffffffff811161014457610a8c903690600401611861565b91610a95611d6a565b5034156112e65760443563ffffffff811690818103610144575063ffffffff610abc611fd5565b161115806112d0575b156112b25760843560643581101590816112a7575b5015611296578115158061128a575b15611275576001600160a01b038116600052600460205260ff6040600020541615611257576001600160a01b0386166000526005602052610b3b6001600160a01b03871660ff60406000205416612030565b600254936000198514610574576020610b7691600187016002556040518093819263c16e50ef60e01b835284600484015260248301906119d1565b038160006001600160a01b0387165af19081156103e15760009161120e575b506001600160a01b03169283156111fd576020610bcd916040518093819263c16e50ef60e01b835284600484015260248301906119d1565b038160006001600160a01b038c165af19081156103e1576000916111b4575b506001600160a01b03169485156111a357604051602096610c0d8883611823565b6000825260405195610c1e87611806565b6040958651610c2d8882611823565b60248b825b6064831061118b5750505088528651610c4b8882611823565b60648b825b60a4831061117b5750905089015286880152600060608801526001600160a01b03851660808801526001600160a01b038a1660a088015260c087015260e08601528351610c9d8882611823565b600081526101008601526101208501528251610cb98782611823565b600081526101408501528251610ccf8782611823565b60008152610160850152846000526006865282600020845160009060005b89600282106111535750505081558685015160005b6002811061113e575050838501516003820155606085015160048201556001600160a01b036080860151166001600160a01b036005830191166001600160a01b03198254161790556001600160a01b0360a0860151166001600160a01b036006830191166001600160a01b03198254161790556001600160a01b0360c0860151166001600160a01b036007830191166001600160a01b03198254161790556001600160a01b0360e0860151166001600160a01b036008830191166001600160a01b0319825416179055610ddd61010086015160098301611c69565b610120850151805190680100000000000000008211610395578890600a84015483600a8601558084106110b5575b5001600a830160005288600020896000925b848410611097575050505050610e4e90610e3f610140870151600b8301611c69565b600c6101608701519101611c69565b6000866001600160a01b036084818454169487519485938492639ccb58d560e01b84528c60048501521696876024840152610e8b60448401611ff9565b5af190811561108c57600091611057575b501561058a57846000526006865282600020835190868252606088830152610ed8606083018263ffffffff602091548181168452821c16910152565b610ee860a0830160018301611de6565b600381015460e083015260048101546101008301526001600160a01b036005820154166101208301526001600160a01b036006820154166101408301526001600160a01b036007820154166101608301526001600160a01b036008820154166101808301526101c06101a0830152610f6761022083016009830161192b565b600a820190605f19848203016101c085015281548082528a8201918b8260051b820101936000528b600020926000915b83831061102c575050505050916001600160a01b0380611028999a9b6110098495600c610ff57fdb6ad92217850c3c041086cc44cbec591badf6afe93d864e7f4ea4ba1bcf604199605f19898203016101e08a0152600b840161192b565b878103605f1901610200890152910161192b565b9689850152169516930390a380805195869586528501528301906119f6565b0390f35b90919293948d60016110488193601f198682030187528961192b565b97019301930191939290610f97565b90508681813d8311611085575b61106e8183611823565b810103126101445761107f90611bc7565b88610e9c565b503d611064565b84513d6000823e3d90fd5b600191816110a784935186611c69565b019201920191908a90610e1d565b600a850160005282600020908482015b81830181106110d5575050610e0b565b6001919293946110e582546118f1565b806110f8575b505001908b9392916110c5565b601f81118414611110575050600081555b8c8f6110eb565b83601f61112c9385600052600020920160051c82019101611c52565b8060005260008d812081835555611109565b60019089835193019282828601015501610d02565b829363ffffffff6001939451169063ffffffff8560051b92831b921b19161793019101610ced565b82358152918101918d9101610c50565b819061119684611fe8565b8152019101908c90610c32565b63f72c404960e01b60005260046000fd5b6020813d6020116111f5575b816111cd60209383611823565b810103126105df5751906001600160a01b03821682036105dc57506001600160a01b03610bec565b3d91506111c0565b630fdfa71f60e31b60005260046000fd5b6020813d60201161124f575b8161122760209383611823565b810103126105df5751906001600160a01b03821682036105dc57506001600160a01b03610b95565b3d915061121a565b6001600160a01b0390631e505a8160e01b6000521660045260246000fd5b506313b783af60e21b60005260045260246000fd5b50600154821115610ae9565b6308594fb760e01b60005260046000fd5b905042111587610ada565b604051633744092160e21b81526044906112ce60048201611ff9565bfd5b5063ffffffff6112de611fd5565b161515610ac5565b638c4fcd9360e01b6000523460045260246000fd5b346101445760203660031901126101445761102861131a600435611e0e565b6040519182916020835260208301906119f6565b3461014457602036600319011261014457600435600052600660205260406000206003810154611028600c61142b60048501549461141d6001600160a01b036005830154166001600160a01b036006840154166001600160a01b036007850154166001600160a01b0360088601541691604051936113ba856113b38160098b0161192b565b0386611823565b6113e9604051976113d9896113d281600b850161192b565b038a611823565b6113d2604051809c81930161192b565b6040519b8c9b8c5260208c015260408b015260608a0152608089015260a088015261012060c08801526101208701906119d1565b9085820360e08701526119d1565b908382036101008501526119d1565b346101445760003660031901126101445760206001600160a01b0360005416604051908152f35b346101445760603660031901126101445761147a6118db565b602435906001600160a01b0382168203610144577ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a005460ff8160401c16159267ffffffffffffffff82168015908161167f575b6001149081611675575b15908161166c575b5061165b5767ffffffffffffffff1982166001177ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a005561154a918461161c575b50611528612231565b611530612231565b61153933612143565b611544604435612107565b50612056565b506001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c19930054166001600160a01b0382160361160a575b5061158d57005b68ff0000000000000000197ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a0054167ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00557fc7f505b2f371ae2175ee4913f4499e1f2633a7b5936321eed1cdaeb6115181d2602060405160018152a1005b6116169061013d6121e9565b81611586565b68ffffffffffffffffff191668010000000000000001177ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00558461151f565b63f92ee8a960e01b60005260046000fd5b905015856114df565b303b1591506114d7565b8591506114cd565b34610144576020366003190112610144576001600160a01b036116a86118db565b166000526005602052602060ff604060002054166040519015158152f35b34610144576116d4366118a8565b6116dd82611e0e565b6116ed8360608301511515611b69565b61014081015151156117f157610160810151516117dc57611738600093926001600160a01b0360808694015116906040519586809481936321614b3960e21b83528860048401611c0a565b03925af19081156103e1576020926000908193611799575b50610886816117807f02a24c3402076671e129905ba4579d884b1f94ded1c07fc03d26d11b60bca1699386611c21565b836000526006865261087481600c604060002001611c69565b61088693506117d3907f02a24c3402076671e129905ba4579d884b1f94ded1c07fc03d26d11b60bca169923d8091833e6103d38183611823565b93909150611750565b826360ec327960e01b60005260045260246000fd5b8263032c20ef60e21b60005260045260246000fd5b610180810190811067ffffffffffffffff82111761039557604052565b90601f8019910116810190811067ffffffffffffffff82111761039557604052565b67ffffffffffffffff811161039557601f01601f191660200190565b81601f820112156101445780359061187882611845565b926118866040519485611823565b8284526020838301011161014457816000926020809301838601378301015290565b90604060031983011261014457600435916024359067ffffffffffffffff8211610144576118d891600401611861565b90565b600435906001600160a01b038216820361014457565b90600182811c92168015611921575b602083101461190b57565b634e487b7160e01b600052602260045260246000fd5b91607f1691611900565b6000929181549161193b836118f1565b8083529260018116908115611991575060011461195757505050565b60009081526020812093945091925b838310611977575060209250010190565b600181602092949394548385870101520191019190611966565b915050602093945060ff929192191683830152151560051b010190565b60005b8381106119c15750506000910152565b81810151838201526020016119b1565b906020916119ea815180928185528580860191016119ae565b601f01601f1916010190565b80519192916000845b60028210611b4d5750505060208101516000604085015b60028210611b375750505060408101516080840152606081015160a08401526001600160a01b0360808201511660c08401526001600160a01b0360a08201511660e08401526001600160a01b0360c0820151166101008401526001600160a01b0360e082015116610120840152611aa06101008201516101c06101408601526101c08501906119d1565b9261012082015193818103610160830152845180825260208201906020808260051b8501019701916000905b828210611b09575050505050610160611af76118d894956101408501518482036101808601526119d1565b920151906101a08184039101526119d1565b9091929397602080611b27600193601f198d820301865288516119d1565b9a96019493919091019101611acc565b6020806001928551815201930191019091611a16565b60208060019263ffffffff8651168152019301910190916119ff565b15611b715750565b63166b4d0360e01b60005260045260246000fd5b81601f82011215610144578051611b9b81611845565b92611ba96040519485611823565b81845260208284010111610144576118d891602080850191016119ae565b5190811515820361014457565b91906040838203126101445782519067ffffffffffffffff821161014457611c036020916118d8938601611b85565b9301611bc7565b6040906118d89392815281602082015201906119d1565b15611c295750565b604051632f9f8ab960e01b815260206004820152908190611c4e9060248301906119d1565b0390fd5b818110611c5d575050565b60008155600101611c52565b919091825167ffffffffffffffff811161039557611c8782546118f1565b601f8111611d2d575b506020601f8211600114611ccb5781929394600092611cc0575b50508160011b916000199060031b1c1916179055565b015190503880611caa565b601f1982169083600052806000209160005b818110611d1557509583600195969710611cfc575b505050811b019055565b015160001960f88460031b161c19169055388080611cf2565b9192602060018192868b015181550194019201611cdd565b611d5a90836000526020600020601f840160051c81019160208510611d60575b601f0160051c0190611c52565b38611c90565b9091508190611d4d565b60405190611d7782611806565b606061016083600060408051611d8d8282611823565b8136823783528051611d9f8282611823565b81368237602084015282015260008382015260006080820152600060a0820152600060c0820152600060e08201528261010082015282610120820152826101408201520152565b906000905b60028210611df857505050565b6001602081928554815201930191019091611deb565b90611e17611d6a565b50816000526006602052604060002091604051611e3381611806565b604051611e51818663ffffffff602091548181168452821c16910152565b611e5c604082611823565b8152604051611e6e8160018701611de6565b611e79604082611823565b602082015260038401546040820152600484015460608201526001600160a01b0360058501541693608082019485526001600160a01b0360068201541660a08301526001600160a01b0360078201541660c08301526001600160a01b0360088201541660e0830152604051611efc81611ef5816009860161192b565b0382611823565b610100830152600a8101805467ffffffffffffffff81116103955760208160051b0191611f2c6040519384611823565b818352602083019060005260206000206000915b838310611fb05750505050611f8b8392600c926101206001600160a01b03960152604051611f7581611ef581600b860161192b565b610140850152611ef5604051809481930161192b565b61016082015293511615611f9c5750565b63cd6f4a4f60e01b60005260045260246000fd5b600160208192604051611fc781611ef5818961192b565b815201920192019190611f40565b60243563ffffffff811681036101445790565b359063ffffffff8216820361014457565b6024906000905b6002821061200d57505050565b60208060019263ffffffff61202187611fe8565b16815201930191019091612000565b156120385750565b6001600160a01b03906321ac7c5f60e01b6000521660045260246000fd5b6001600160a01b03906120676121e9565b16801515806120cc575b156120b8576020817f016ea868599173c3163f65dea5e4677b2be5f0ececb4ec15d1166a27de35a533926001600160a01b03196000541617600055604051908152a1600190565b63157970a560e21b60005260045260246000fd5b506001600160a01b0360005416811415612071565b156120e95750565b6001600160a01b039063b29d459560e01b6000521660045260246000fd5b60207fba0716ba1ee2ea8ecc4c64119b4537cdb42a99d82acf92af5b87607b8b523552916121336121e9565b80600155604051908152a1600190565b6001600160a01b031680156121d3576001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c19930054826001600160a01b03198216177f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c19930055167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0600080a3565b631e4fbdf760e01b600052600060045260246000fd5b6001600160a01b037f9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c1993005416330361221c57565b63118cdaa760e01b6000523360045260246000fd5b60ff7ff0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a005460401c161561226057565b631afcd79f60e31b60005260046000fdfea164736f6c634300081a000a",
+  "devdoc": {
+    "errors": {
+      "InvalidInitialization()": [
+        {
+          "details": "The contract is already initialized."
+        }
+      ],
+      "NotInitializing()": [
+        {
+          "details": "The contract is not initializing."
+        }
+      ],
+      "OwnableInvalidOwner(address)": [
+        {
+          "details": "The owner is not a valid owner account. (eg. `address(0)`)"
+        }
+      ],
+      "OwnableUnauthorizedAccount(address)": [
+        {
+          "details": "The caller account is not authorized to perform an operation."
+        }
+      ]
+    },
+    "events": {
+      "CiphertextOutputPublished(uint256,bytes)": {
+        "params": {
+          "ciphertextOutput": "ABI encoded ciphertext output.",
+          "e3Id": "ID of the E3."
+        }
+      },
+      "ComputationModuleDisabled(address)": {
+        "params": {
+          "computationModule": "The address of the computation module."
+        }
+      },
+      "ComputationModuleEnabled(address)": {
+        "params": {
+          "computationModule": "The address of the computation module."
+        }
+      },
+      "CyphernodeRegistrySet(address)": {
+        "params": {
+          "cyphernodeRegistry": "The address of the CyphernodeRegistry contract."
+        }
+      },
+      "E3Activated(uint256,uint256,bytes)": {
+        "params": {
+          "committeePublicKey": "Public key of the committee.",
+          "e3Id": "ID of the E3.",
+          "expiration": "Timestamp when committee duties expire."
+        }
+      },
+      "E3Requested(uint256,(uint32[2],uint256[2],uint256,uint256,address,address,address,address,bytes,bytes[],bytes,bytes),address,address,address)": {
+        "params": {
+          "computationModule": "Address of the Computation module selected.",
+          "e3": "Details of the E3.",
+          "e3Id": "ID of the E3.",
+          "executionModule": "Address of the execution module selected.",
+          "filter": "Address of the pool of nodes from which the Cypher Node committee was selected."
+        }
+      },
+      "ExecutionModuleDisabled(address)": {
+        "params": {
+          "executionModule": "The address of the execution module."
+        }
+      },
+      "ExecutionModuleEnabled(address)": {
+        "params": {
+          "executionModule": "The address of the execution module."
+        }
+      },
+      "Initialized(uint64)": {
+        "details": "Triggered when the contract has been initialized or reinitialized."
+      },
+      "InputPublished(uint256,bytes)": {
+        "params": {
+          "data": "ABI encoded input data.",
+          "e3Id": "ID of the E3."
+        }
+      },
+      "MaxDurationSet(uint256)": {
+        "params": {
+          "maxDuration": "The maximum duration of a computation in seconds."
+        }
+      },
+      "PlaintextOutputPublished(uint256,bytes)": {
+        "params": {
+          "e3Id": "ID of the E3.",
+          "plaintextOutput": "ABI encoded plaintext output."
+        }
+      }
+    },
+    "kind": "dev",
+    "methods": {
+      "activate(uint256)": {
+        "details": "This function MUST emit the E3Activated event.This function MUST revert if the given E3 has not yet been requested.This function MUST revert if the selected node committee has not yet published a public key.",
+        "params": {
+          "e3Id": "ID of the E3."
+        }
+      },
+      "constructor": {
+        "params": {
+          "_maxDuration": "The maximum duration of a computation in seconds",
+          "_owner": "The owner of this contract"
+        }
+      },
+      "getE3(uint256)": {
+        "details": "This function MUST revert if the E3 does not exist.",
+        "params": {
+          "e3Id": "ID of the E3."
+        },
+        "returns": {
+          "e3": "The struct representing the requested E3."
+        }
+      },
+      "initialize(address,address,uint256)": {
+        "params": {
+          "_maxDuration": "The maximum duration of a computation in seconds",
+          "_owner": "The owner of this contract"
+        }
+      },
+      "owner()": {
+        "details": "Returns the address of the current owner."
+      },
+      "publishCiphertextOutput(uint256,bytes)": {
+        "details": "This function MUST emit the CiphertextOutputPublished event.",
+        "params": {
+          "data": "ABI encoded output data to verify.",
+          "e3Id": "ID of the E3."
+        },
+        "returns": {
+          "success": "True if the output was successfully published."
+        }
+      },
+      "publishInput(uint256,bytes)": {
+        "details": "This function MUST revert if the E3 is not yet activated.This function MUST emit the InputPublished event.",
+        "params": {
+          "data": "ABI encoded input data to publish.",
+          "e3Id": "ID of the E3."
+        },
+        "returns": {
+          "success": "True if the input was successfully published."
+        }
+      },
+      "publishPlaintextOutput(uint256,bytes)": {
+        "details": "This function MUST revert if the output has not been published.This function MUST emit the PlaintextOutputPublished event.",
+        "params": {
+          "data": "ABI encoded output data to decrypt.",
+          "e3Id": "ID of the E3."
+        },
+        "returns": {
+          "success": "True if the output was successfully decrypted."
+        }
+      },
+      "renounceOwnership()": {
+        "details": "Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner."
+      },
+      "request(address,uint32[2],uint256[2],uint256,address,bytes,address,bytes)": {
+        "details": "This function MUST emit the E3Requested event.",
+        "params": {
+          "computationModule": "Address of the computation module.",
+          "computationParams": "ABI encoded computation parameters.",
+          "duration": "The duration of the computation in seconds.",
+          "emParams": "ABI encoded execution module parameters.",
+          "executionModule": "Address of the execution module.",
+          "filter": "IDs of the pool of nodes from which to select the committee.",
+          "threshold": "The M/N threshold for the committee."
+        },
+        "returns": {
+          "e3": "The E3 struct.",
+          "e3Id": "ID of the E3."
+        }
+      },
+      "setMaxDuration(uint256)": {
+        "params": {
+          "_maxDuration": "The maximum duration of a computation in seconds."
+        },
+        "returns": {
+          "success": "True if the max duration was successfully set."
+        }
+      },
+      "transferOwnership(address)": {
+        "details": "Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner."
+      }
+    },
+    "version": 1
+  },
+  "userdoc": {
+    "events": {
+      "CiphertextOutputPublished(uint256,bytes)": {
+        "notice": "This event MUST be emitted when the ciphertext output of an Encrypted Execution Environment (E3) is successfully published."
+      },
+      "ComputationModuleDisabled(address)": {
+        "notice": "This event MUST be emitted any time a computation module is disabled."
+      },
+      "ComputationModuleEnabled(address)": {
+        "notice": "This event MUST be emitted any time a computation module is enabled."
+      },
+      "CyphernodeRegistrySet(address)": {
+        "notice": "This event MUST be emitted any time the CyphernodeRegistry is set."
+      },
+      "E3Activated(uint256,uint256,bytes)": {
+        "notice": "This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated."
+      },
+      "E3Requested(uint256,(uint32[2],uint256[2],uint256,uint256,address,address,address,address,bytes,bytes[],bytes,bytes),address,address,address)": {
+        "notice": "This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully requested."
+      },
+      "ExecutionModuleDisabled(address)": {
+        "notice": "This event MUST be emitted any time an execution module is disabled."
+      },
+      "ExecutionModuleEnabled(address)": {
+        "notice": "This event MUST be emitted any time an execution module is enabled."
+      },
+      "InputPublished(uint256,bytes)": {
+        "notice": "This event MUST be emitted when an input to an Encrypted Execution Environment (E3) is successfully published."
+      },
+      "MaxDurationSet(uint256)": {
+        "notice": "This event MUST be emitted any time the `maxDuration` is set."
+      },
+      "PlaintextOutputPublished(uint256,bytes)": {
+        "notice": "This event MUST be emitted when the plaintext output of an Encrypted Execution Environment (E3) is successfully published."
+      }
+    },
+    "kind": "user",
+    "methods": {
+      "activate(uint256)": {
+        "notice": "This function should be called to activate an Encrypted Execution Environment (E3) once it has been initialized and is ready for input."
+      },
+      "getE3(uint256)": {
+        "notice": "This function should be called to retrieve the details of an Encrypted Execution Environment (E3)."
+      },
+      "publishCiphertextOutput(uint256,bytes)": {
+        "notice": "This function should be called to publish output data for an Encrypted Execution Environment (E3)."
+      },
+      "publishInput(uint256,bytes)": {
+        "notice": "This function should be called to publish input data for Encrypted Execution Environment (E3)."
+      },
+      "publishPlaintextOutput(uint256,bytes)": {
+        "notice": "This function publishes the plaintext output of an Encrypted Execution Environment (E3)."
+      },
+      "request(address,uint32[2],uint256[2],uint256,address,bytes,address,bytes)": {
+        "notice": "This function should be called to request a computation within an Encrypted Execution Environment (E3)."
+      },
+      "setMaxDuration(uint256)": {
+        "notice": "This function should be called to set the maximum duration of requested computations."
+      }
+    },
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 516,
+        "contract": "contracts/Enclave.sol:Enclave",
+        "label": "cyphernodeRegistry",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_contract(ICyphernodeRegistry)1570"
+      },
+      {
+        "astId": 518,
+        "contract": "contracts/Enclave.sol:Enclave",
+        "label": "maxDuration",
+        "offset": 0,
+        "slot": "1",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 520,
+        "contract": "contracts/Enclave.sol:Enclave",
+        "label": "nexte3Id",
+        "offset": 0,
+        "slot": "2",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 522,
+        "contract": "contracts/Enclave.sol:Enclave",
+        "label": "requests",
+        "offset": 0,
+        "slot": "3",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 527,
+        "contract": "contracts/Enclave.sol:Enclave",
+        "label": "computationModules",
+        "offset": 0,
+        "slot": "4",
+        "type": "t_mapping(t_contract(IComputationModule)1495,t_bool)"
+      },
+      {
+        "astId": 532,
+        "contract": "contracts/Enclave.sol:Enclave",
+        "label": "executionModules",
+        "offset": 0,
+        "slot": "5",
+        "type": "t_mapping(t_contract(IExecutionModule)1802,t_bool)"
+      },
+      {
+        "astId": 537,
+        "contract": "contracts/Enclave.sol:Enclave",
+        "label": "e3s",
+        "offset": 0,
+        "slot": "6",
+        "type": "t_mapping(t_uint256,t_struct(E3)1615_storage)"
+      }
+    ],
+    "types": {
+      "t_array(t_bytes_storage)dyn_storage": {
+        "base": "t_bytes_storage",
+        "encoding": "dynamic_array",
+        "label": "bytes[]",
+        "numberOfBytes": "32"
+      },
+      "t_array(t_uint256)2_storage": {
+        "base": "t_uint256",
+        "encoding": "inplace",
+        "label": "uint256[2]",
+        "numberOfBytes": "64"
+      },
+      "t_array(t_uint32)2_storage": {
+        "base": "t_uint32",
+        "encoding": "inplace",
+        "label": "uint32[2]",
+        "numberOfBytes": "32"
+      },
+      "t_bool": {
+        "encoding": "inplace",
+        "label": "bool",
+        "numberOfBytes": "1"
+      },
+      "t_bytes_storage": {
+        "encoding": "bytes",
+        "label": "bytes",
+        "numberOfBytes": "32"
+      },
+      "t_contract(IComputationModule)1495": {
+        "encoding": "inplace",
+        "label": "contract IComputationModule",
+        "numberOfBytes": "20"
+      },
+      "t_contract(ICyphernodeRegistry)1570": {
+        "encoding": "inplace",
+        "label": "contract ICyphernodeRegistry",
+        "numberOfBytes": "20"
+      },
+      "t_contract(IExecutionModule)1802": {
+        "encoding": "inplace",
+        "label": "contract IExecutionModule",
+        "numberOfBytes": "20"
+      },
+      "t_contract(IInputValidator)1817": {
+        "encoding": "inplace",
+        "label": "contract IInputValidator",
+        "numberOfBytes": "20"
+      },
+      "t_contract(IOutputVerifier)1832": {
+        "encoding": "inplace",
+        "label": "contract IOutputVerifier",
+        "numberOfBytes": "20"
+      },
+      "t_mapping(t_contract(IComputationModule)1495,t_bool)": {
+        "encoding": "mapping",
+        "key": "t_contract(IComputationModule)1495",
+        "label": "mapping(contract IComputationModule => bool)",
+        "numberOfBytes": "32",
+        "value": "t_bool"
+      },
+      "t_mapping(t_contract(IExecutionModule)1802,t_bool)": {
+        "encoding": "mapping",
+        "key": "t_contract(IExecutionModule)1802",
+        "label": "mapping(contract IExecutionModule => bool)",
+        "numberOfBytes": "32",
+        "value": "t_bool"
+      },
+      "t_mapping(t_uint256,t_struct(E3)1615_storage)": {
+        "encoding": "mapping",
+        "key": "t_uint256",
+        "label": "mapping(uint256 => struct E3)",
+        "numberOfBytes": "32",
+        "value": "t_struct(E3)1615_storage"
+      },
+      "t_struct(E3)1615_storage": {
+        "encoding": "inplace",
+        "label": "struct E3",
+        "members": [
+          {
+            "astId": 1585,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "threshold",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_array(t_uint32)2_storage"
+          },
+          {
+            "astId": 1589,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "startWindow",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)2_storage"
+          },
+          {
+            "astId": 1591,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "duration",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_uint256"
+          },
+          {
+            "astId": 1593,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "expiration",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256"
+          },
+          {
+            "astId": 1596,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "computationModule",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_contract(IComputationModule)1495"
+          },
+          {
+            "astId": 1599,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "executionModule",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_contract(IExecutionModule)1802"
+          },
+          {
+            "astId": 1602,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "inputValidator",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_contract(IInputValidator)1817"
+          },
+          {
+            "astId": 1605,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "outputVerifier",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_contract(IOutputVerifier)1832"
+          },
+          {
+            "astId": 1607,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "committeePublicKey",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_bytes_storage"
+          },
+          {
+            "astId": 1610,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "inputs",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_array(t_bytes_storage)dyn_storage"
+          },
+          {
+            "astId": 1612,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "ciphertextOutput",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_bytes_storage"
+          },
+          {
+            "astId": 1614,
+            "contract": "contracts/Enclave.sol:Enclave",
+            "label": "plaintextOutput",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_bytes_storage"
+          }
+        ],
+        "numberOfBytes": "416"
+      },
+      "t_uint256": {
+        "encoding": "inplace",
+        "label": "uint256",
+        "numberOfBytes": "32"
+      },
+      "t_uint32": {
+        "encoding": "inplace",
+        "label": "uint32",
+        "numberOfBytes": "4"
+      }
+    }
+  }
+}

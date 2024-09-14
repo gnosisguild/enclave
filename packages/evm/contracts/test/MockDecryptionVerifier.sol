@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.8.26;
+pragma solidity >=0.8.27;
 
-import { IOutputVerifier } from "../interfaces/IOutputVerifier.sol";
+import { IDecryptionVerifier } from "../interfaces/IDecryptionVerifier.sol";
 
-contract MockOutputVerifier is IOutputVerifier {
+contract MockDecryptionVerifier is IDecryptionVerifier {
     function verify(
         uint256,
         bytes memory data
