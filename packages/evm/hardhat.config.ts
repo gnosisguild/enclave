@@ -18,7 +18,8 @@ if (!INFURA_KEY || !MNEMONIC || !ETHERSCAN_API_KEY) {
 }
 
 // Setting defaults so that tests will run
-const mnemonic = MNEMONIC || "test test test test test test test test test test test junk";
+const mnemonic =
+  MNEMONIC || "test test test test test test test test test test test junk";
 const infuraApiKey = INFURA_KEY || "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
 
 const chainIds = {
