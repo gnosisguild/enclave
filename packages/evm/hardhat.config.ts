@@ -11,7 +11,8 @@ dotenv.config();
 
 const { INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY } = process.env;
 
-if (!process.env.TYPECHAIN) { // NOTE: enabling typechain compilation without ENV vars
+if (!process.env.TYPECHAIN) {
+  // NOTE: enabling typechain compilation without ENV vars
   if (!INFURA_KEY || !MNEMONIC || !ETHERSCAN_API_KEY) {
     console.error(
       "Please set the INFURA_KEY, MNEMONIC, and ETHERSCAN_API_KEY environment variables",
