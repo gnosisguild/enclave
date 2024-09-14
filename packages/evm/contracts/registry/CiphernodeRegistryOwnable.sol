@@ -8,8 +8,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {
     InternalLeanIMT,
-    LeanIMTData,
-    PoseidonT3
+    LeanIMTData
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
 contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
