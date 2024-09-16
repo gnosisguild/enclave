@@ -6,6 +6,7 @@ import { vars } from "hardhat/config";
 import type { NetworkUserConfig } from "hardhat/types";
 
 import "./tasks/accounts";
+import "./tasks/ciphernode";
 
 dotenv.config();
 
