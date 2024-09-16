@@ -1,14 +1,9 @@
 // TODO: spawn and supervise child actors
-// TODO: vertically modularize this so there is a registry for each function that get rolled up into one based
-// on config
 use crate::{
-    Ciphernode, CiphernodeRegistry, CommitteeRequested, Data, E3id, EnclaveEvent, EventBus, Fhe,
-    PlaintextAggregator, PlaintextRegistry, PublicKeyAggregator, PublicKeyRegistry, Sortition,
-    Subscribe,
+    CiphernodeRegistry, CommitteeRequested, E3id, EnclaveEvent, EventBus, Fhe, PlaintextRegistry,
+    PublicKeyRegistry, Subscribe,
 };
 use actix::prelude::*;
-use alloy_primitives::Address;
-use fhe::mbfv::PublicKeySwitchShare;
 use rand_chacha::ChaCha20Rng;
 use std::{
     collections::HashMap,
@@ -36,7 +31,6 @@ pub struct CommitteeMeta {
 }
 
 pub struct Registry {
-    bus: Addr<EventBus>,
     fhes: HashMap<E3id, Addr<Fhe>>,
     meta: HashMap<E3id, CommitteeMeta>,
     public_key: Option<Addr<PublicKeyRegistry>>,
@@ -47,14 +41,12 @@ pub struct Registry {
 
 impl Registry {
     pub fn new(
-        bus: Addr<EventBus>,
         rng: Arc<Mutex<ChaCha20Rng>>,
         public_key: Option<Addr<PublicKeyRegistry>>,
         plaintext: Option<Addr<PlaintextRegistry>>,
         ciphernode: Option<Addr<CiphernodeRegistry>>,
     ) -> Self {
         Self {
-            bus,
             rng,
             public_key,
             plaintext,
@@ -72,7 +64,7 @@ impl Registry {
         plaintext: Option<Addr<PlaintextRegistry>>,
         ciphernode: Option<Addr<CiphernodeRegistry>>,
     ) -> Addr<Self> {
-        let addr = Registry::new(bus.clone(), rng, public_key, plaintext, ciphernode).start();
+        let addr = Registry::new(rng, public_key, plaintext, ciphernode).start();
         bus.send(Subscribe::new("*", addr.clone().into()))
             .await
             .unwrap();
