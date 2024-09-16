@@ -2,7 +2,6 @@
 pragma solidity >=0.8.27;
 
 import { IInputValidator } from "./IInputValidator.sol";
-import { IComputeProvider } from "./IComputeProvider.sol";
 import { IE3Program } from "./IE3Program.sol";
 import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 
@@ -28,7 +27,6 @@ struct E3 {
     IE3Program e3Program;
     bytes e3ProgramParams;
     IInputValidator inputValidator;
-    IComputeProvider computeProvider;
     IDecryptionVerifier decryptionVerifier;
     bytes committeePublicKey;
     bytes ciphertextOutput;

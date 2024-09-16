@@ -4,14 +4,14 @@ import type { TaskArguments } from "hardhat/types";
 task("ciphernode:add", "Register a ciphernode to the registry")
   .addParam("ciphernodeAddress", "address of ciphernode to register")
   .setAction(async function (taskArguments: TaskArguments, hre) {
-    const registry = await hre.deployments.get("CyphernodeRegistryOwnable");
+    const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
 
     const registryContract = await hre.ethers.getContractAt(
-      "CyphernodeRegistryOwnable",
+      "CiphernodeRegistryOwnable",
       registry.address,
     );
 
-    const tx = await registryContract.addCyphernode(
+    const tx = await registryContract.addCiphernode(
       taskArguments.ciphernodeAddress,
     );
     await tx.wait();
@@ -22,14 +22,14 @@ task("ciphernode:add", "Register a ciphernode to the registry")
 task("ciphernode:remove", "Remove a ciphernode from the registry")
   .addParam("ciphernodeAddress", "address of ciphernode to remove")
   .setAction(async function (taskArguments: TaskArguments, hre) {
-    const registry = await hre.deployments.get("CyphernodeRegistryOwnable");
+    const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
 
     const registryContract = await hre.ethers.getContractAt(
-      "CyphernodeRegistryOwnable",
+      "CiphernodeRegistryOwnable",
       registry.address,
     );
 
-    const tx = await registryContract.removeCyphernode(
+    const tx = await registryContract.removeCiphernode(
       taskArguments.ciphernodeAddress,
     );
     await tx.wait();
