@@ -3,6 +3,7 @@
 // #![warn(missing_docs, unused_imports)]
 
 mod ciphernode;
+mod ciphernode_registry;
 mod ciphernode_selector;
 mod data;
 mod enclave_contract;
@@ -10,10 +11,14 @@ mod eventbus;
 mod events;
 mod fhe;
 mod logger;
+mod main_aggregator;
+mod main_ciphernode;
 mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
+mod plaintext_registry;
 mod publickey_aggregator;
+mod publickey_registry;
 mod registry;
 mod serializers;
 mod sortition;
@@ -21,15 +26,20 @@ mod sortition;
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
+pub use ciphernode_registry::*;
 pub use ciphernode_selector::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
 pub use fhe::*;
 pub use logger::*;
+pub use main_aggregator::*;
+pub use main_ciphernode::*;
 pub use p2p::*;
 pub use plaintext_aggregator::*;
+pub use plaintext_registry::*;
 pub use publickey_aggregator::*;
+pub use publickey_registry::*;
 pub use registry::*;
 pub use sortition::*;
 
@@ -46,8 +56,9 @@ mod tests {
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
             PublicKeyShareSerializer,
         },
-        CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-        PlaintextAggregated, Registry, ResetHistory, SharedRng, Sortition,
+        CiphernodeAdded, CiphernodeRegistry, CiphernodeSelected, CiphertextOutputPublished,
+        DecryptionshareCreated, PlaintextAggregated, PlaintextRegistry, PublicKeyRegistry,
+        Registry, ResetHistory, SharedRng, Sortition,
     };
     use actix::prelude::*;
     use alloy_primitives::Address;
@@ -77,7 +88,14 @@ mod tests {
         // create ciphernode actor for managing ciphernode flow
         let sortition = Sortition::attach(bus.clone());
         CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
-        Registry::attach(bus.clone(), data.clone(), sortition, rng, addr).await;
+        Registry::attach(
+            bus.clone(),
+            rng,
+            Some(PublicKeyRegistry::attach(bus.clone(), sortition.clone())),
+            Some(PlaintextRegistry::attach(bus.clone(), sortition.clone())),
+            Some(CiphernodeRegistry::attach(bus.clone(), data, addr)),
+        )
+        .await;
     }
 
     fn setup_bfv_params(
