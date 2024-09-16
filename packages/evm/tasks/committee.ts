@@ -1,5 +1,5 @@
 import { task, types } from "hardhat/config";
-import type { ProviderRpcError, TaskArguments } from "hardhat/types";
+import type { TaskArguments } from "hardhat/types";
 
 task("committee:new", "Request a new ciphernode committee")
   .addOptionalParam(
