@@ -69,18 +69,17 @@ const config: HardhatUserConfig = {
       arbitrumOne: vars.get("ARBISCAN_API_KEY", ""),
       avalanche: vars.get("SNOWTRACE_API_KEY", ""),
       bsc: vars.get("BSCSCAN_API_KEY", ""),
-      mainnet: ETHERSCAN_API_KEY,
+      mainnet: ETHERSCAN_API_KEY || "",
       optimisticEthereum: vars.get("OPTIMISM_API_KEY", ""),
       polygon: vars.get("POLYGONSCAN_API_KEY", ""),
       polygonMumbai: vars.get("POLYGONSCAN_API_KEY", ""),
-      sepolia: ETHERSCAN_API_KEY,
+      sepolia: ETHERSCAN_API_KEY || "",
     },
   },
   gasReporter: {
     currency: "USD",
     enabled: process.env.REPORT_GAS ? true : false,
     excludeContracts: [],
-    src: "./contracts",
   },
   networks: {
     hardhat: {
@@ -130,6 +129,7 @@ const config: HardhatUserConfig = {
     },
     overrides: {
       "node_modules/poseidon-solidity/PoseidonT3.sol": {
+        version: "0.7.0",
         settings: {
           optimizer: {
             enabled: true,
