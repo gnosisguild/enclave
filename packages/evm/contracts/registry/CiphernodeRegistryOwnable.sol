@@ -115,7 +115,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     function addCiphernode(address node) external onlyOwner {
-        uint256 ciphernode = uint256(bytes32(bytes20(node)));
+        uint160 ciphernode = uint160(node);
         ciphernodes._insert(ciphernode);
         numCiphernodes++;
         emit CiphernodeAdded(
