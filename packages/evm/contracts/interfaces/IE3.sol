@@ -2,7 +2,6 @@
 pragma solidity >=0.8.27;
 
 import { IInputValidator } from "./IInputValidator.sol";
-import { IComputeProvider } from "./IComputeProvider.sol";
 import { IE3Program } from "./IE3Program.sol";
 import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 
