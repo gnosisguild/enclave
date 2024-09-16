@@ -39,9 +39,10 @@ impl Handler<InitializeWithEnclaveEvent> for CiphernodeRegistry {
         let EnclaveEvent::CommitteeRequested { data, .. } = event else {
             return;
         };
-
         let ciphernode_factory = self.ciphernode_factory(fhe.clone());
-        store(&data.e3_id, &mut self.ciphernodes, ciphernode_factory);
+        self.ciphernodes
+            .entry(data.e3_id.clone())
+            .or_insert_with(ciphernode_factory);
     }
 }
 
@@ -88,13 +89,4 @@ impl CiphernodeRegistry {
             self.store_msg(e3_id.clone(), msg.clone());
         }
     }
-}
-
-// Store on a hashmap a Addr<T> from the factory F
-fn store<T, F>(e3_id: &E3id, map: &mut HashMap<E3id, Addr<T>>, creator: F) -> Addr<T>
-where
-    T: Actor<Context = Context<T>>,
-    F: FnOnce() -> Addr<T>,
-{
-    map.entry(e3_id.clone()).or_insert_with(creator).clone()
 }

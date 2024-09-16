@@ -64,6 +64,7 @@ impl Registry {
         }
     }
 
+    // TODO: use a builder pattern to manage the Option<Registry>
     pub async fn attach(
         bus: Addr<EventBus>,
         rng: Arc<Mutex<ChaCha20Rng>>,
