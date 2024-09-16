@@ -1,20 +1,36 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { IE3Program, IInputValidator } from "../interfaces/IE3Program.sol";
+import {
+    IE3Program,
+    IInputValidator,
+    IDecryptionVerifier
+} from "../interfaces/IE3Program.sol";
 
 contract MockE3Program is IE3Program {
-    error invalidParams(bytes params);
+    error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
 
     function validate(
         uint256,
         uint256,
-        bytes memory params
-    ) external pure returns (IInputValidator inputValidator) {
-        require(params.length == 32, "invalid params");
+        bytes memory e3ProgramParams,
+        bytes memory computeProviderParams
+    )
+        external
+        pure
+        returns (
+            IInputValidator inputValidator,
+            IDecryptionVerifier decryptionVerifier
+        )
+    {
+        require(
+            e3ProgramParams.length == 32 && computeProviderParams.length == 32,
+            invalidParams(e3ProgramParams, computeProviderParams)
+        );
         // solhint-disable no-inline-assembly
         assembly {
-            inputValidator := mload(add(params, 32))
+            inputValidator := mload(add(e3ProgramParams, 32))
+            decryptionVerifier := mload(add(computeProviderParams, 32))
         }
     }
 

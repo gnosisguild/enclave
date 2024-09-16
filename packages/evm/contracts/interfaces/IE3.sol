@@ -28,7 +28,6 @@ struct E3 {
     IE3Program e3Program;
     bytes e3ProgramParams;
     IInputValidator inputValidator;
-    IComputeProvider computeProvider;
     IDecryptionVerifier decryptionVerifier;
     bytes committeePublicKey;
     bytes ciphertextOutput;

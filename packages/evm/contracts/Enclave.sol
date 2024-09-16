@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import {
-    IEnclave,
-    E3,
-    IE3Program,
-    IComputeProvider
-} from "./interfaces/IEnclave.sol";
+import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
@@ -33,18 +28,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     uint256 public nexte3Id; // ID of the next E3.
     uint256 public requests; // total number of requests made to Enclave.
 
-    // TODO: should computation and compute providers be explicitly allowed?
-    // My intuition is that an allowlist is required since they impose slashing conditions.
-    // But perhaps this is one place where node pools might be utilized, allowing nodes to
-    // opt in to being selected for specific computations, along with the corresponding slashing conditions.
-    // This would reduce the governance overhead for Enclave.
-
     // Mapping of allowed E3 Programs.
     mapping(IE3Program e3Program => bool allowed) public e3Programs;
-
-    // Mapping of allowed compute providers.
-    mapping(IComputeProvider computeProvider => bool allowed)
-        public computeProviders;
 
     // Mapping of E3s.
     mapping(uint256 e3Id => E3 e3) public e3s;
@@ -72,8 +57,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error ModuleNotEnabled(address module);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-    error InvalidComputation();
-    error InvalidComputeProviderSetup();
+    error InvalidComputationRequest(
+        IInputValidator inputValidator,
+        IDecryptionVerifier decryptionVerifier
+    );
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
     error InvalidInput();
     error InvalidDuration(uint256 duration);
@@ -127,7 +114,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 duration,
         IE3Program e3Program,
         bytes memory e3ProgramParams,
-        IComputeProvider computeProvider,
         bytes memory computeProviderParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
@@ -148,33 +134,25 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidDuration(duration)
         );
         require(e3Programs[e3Program], E3ProgramNotAllowed(e3Program));
-        require(
-            computeProviders[computeProvider],
-            ModuleNotEnabled(address(computeProvider))
-        );
 
         // TODO: should IDs be incremental or produced deterministically?
         e3Id = nexte3Id;
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        IInputValidator inputValidator = e3Program.validate(
-            e3Id,
-            seed,
-            e3ProgramParams
-        );
-        require(address(inputValidator) != address(0), InvalidComputation());
-
-        // TODO: validate that the requested computation can be performed by the given compute provider.
-        // Perhaps the compute provider should be returned by the E3 Program?
-        IDecryptionVerifier decryptionVerifier = computeProvider.validate(
-            e3Id,
-            seed,
-            computeProviderParams
-        );
+        (
+            IInputValidator inputValidator,
+            IDecryptionVerifier decryptionVerifier
+        ) = e3Program.validate(
+                e3Id,
+                seed,
+                e3ProgramParams,
+                computeProviderParams
+            );
         require(
-            address(decryptionVerifier) != address(0),
-            InvalidComputeProviderSetup()
+            address(inputValidator) != address(0) &&
+                address(decryptionVerifier) != address(0),
+            InvalidComputationRequest(inputValidator, decryptionVerifier)
         );
 
         e3 = E3({
@@ -186,7 +164,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3Program: e3Program,
             e3ProgramParams: e3ProgramParams,
             inputValidator: inputValidator,
-            computeProvider: computeProvider,
             decryptionVerifier: decryptionVerifier,
             committeePublicKey: hex"",
             ciphertextOutput: hex"",
@@ -199,7 +176,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CommitteeSelectionFailed()
         );
 
-        emit E3Requested(e3Id, e3s[e3Id], filter, e3Program, computeProvider);
+        emit E3Requested(e3Id, e3s[e3Id], filter, e3Program);
     }
 
     function activate(uint256 e3Id) external returns (bool success) {
@@ -336,18 +313,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3ProgramEnabled(e3Program);
     }
 
-    function enableComputeProvider(
-        IComputeProvider computeProvider
-    ) public onlyOwner returns (bool success) {
-        require(
-            !computeProviders[computeProvider],
-            ModuleAlreadyEnabled(address(computeProvider))
-        );
-        computeProviders[computeProvider] = true;
-        success = true;
-        emit ComputeProviderEnabled(computeProvider);
-    }
-
     function disableE3Program(
         IE3Program e3Program
     ) public onlyOwner returns (bool success) {
@@ -355,18 +320,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         delete e3Programs[e3Program];
         success = true;
         emit E3ProgramDisabled(e3Program);
-    }
-
-    function disableComputeProvider(
-        IComputeProvider computeProvider
-    ) public onlyOwner returns (bool success) {
-        require(
-            computeProviders[computeProvider],
-            ModuleNotEnabled(address(computeProvider))
-        );
-        delete computeProviders[computeProvider];
-        success = true;
-        emit ComputeProviderDisabled(computeProvider);
     }
 
     ////////////////////////////////////////////////////////////

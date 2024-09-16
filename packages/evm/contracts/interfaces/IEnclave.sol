@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { E3, IE3Program, IComputeProvider } from "./IE3.sol";
+import { E3, IE3Program } from "./IE3.sol";
 
 interface IEnclave {
     ////////////////////////////////////////////////////////////
@@ -15,13 +15,11 @@ interface IEnclave {
     /// @param e3 Details of the E3.
     /// @param filter Address of the pool of nodes from which the Cipher Node committee was selected.
     /// @param e3Program Address of the Computation module selected.
-    /// @param computeProvider  Address of the compute provider selected.
     event E3Requested(
         uint256 e3Id,
         E3 e3,
         address filter,
-        IE3Program indexed e3Program,
-        IComputeProvider indexed computeProvider
+        IE3Program indexed e3Program
     );
 
     /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.
@@ -76,14 +74,6 @@ interface IEnclave {
     /// @param e3Program The address of the E3 Program.
     event E3ProgramDisabled(IE3Program e3Program);
 
-    /// @notice This event MUST be emitted any time an compute provider is enabled.
-    /// @param computeProvider The address of the compute provider.
-    event ComputeProviderEnabled(IComputeProvider computeProvider);
-
-    /// @notice This event MUST be emitted any time an compute provider is disabled.
-    /// @param computeProvider The address of the compute provider.
-    event ComputeProviderDisabled(IComputeProvider computeProvider);
-
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Core Entrypoints                      //
@@ -97,7 +87,6 @@ interface IEnclave {
     /// @param duration The duration of the computation in seconds.
     /// @param e3Program Address of the E3 Program.
     /// @param e3ProgramParams ABI encoded computation parameters.
-    /// @param computeProvider Address of the compute provider.
     /// @param computeProviderParams ABI encoded compute provider parameters.
     /// @return e3Id ID of the E3.
     /// @return e3 The E3 struct.
@@ -108,7 +97,6 @@ interface IEnclave {
         uint256 duration,
         IE3Program e3Program,
         bytes memory e3ProgramParams,
-        IComputeProvider computeProvider,
         bytes memory computeProviderParams
     ) external payable returns (uint256 e3Id, E3 memory e3);
 
