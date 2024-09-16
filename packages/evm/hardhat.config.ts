@@ -129,7 +129,7 @@ const config: HardhatUserConfig = {
     },
     overrides: {
       "node_modules/poseidon-solidity/PoseidonT3.sol": {
-        version: "0.8.27",
+        version: "0.7.0",
         settings: {
           optimizer: {
             enabled: true,
