@@ -1,11 +1,14 @@
 import { task, types } from "hardhat/config";
 import type { TaskArguments } from "hardhat/types";
 
-task("committee:new", "Request a new ciphernode committee")
+task(
+  "committee:new",
+  "Request a new ciphernode committee, will use E3 mock contracts by default",
+)
   .addOptionalParam(
     "filter",
     "address of filter contract to use",
-    "0x0000000000000000000000000000000000000006",
+    undefined,
     types.string,
   )
   .addOptionalParam(
@@ -41,7 +44,7 @@ task("committee:new", "Request a new ciphernode committee")
   .addOptionalParam(
     "e3Address",
     "address of the E3 program",
-    "0x95E366f13c16976A26339aBe7992a1AB523388f5",
+    undefined,
     types.string,
   )
   .addOptionalParam(
@@ -64,34 +67,49 @@ task("committee:new", "Request a new ciphernode committee")
       enclave.address,
     );
 
+    let e3Address = taskArguments.e3Address;
+    if (!e3Address) {
+      const mockE3Program = await hre.deployments.get("MockE3Program");
+      if (!mockE3Program) {
+        throw new Error("MockE3Program not deployed");
+      }
+      e3Address = mockE3Program.address;
+    }
+
+    let filterAddress = taskArguments.filter;
+    if (!filterAddress) {
+      const naiveRegistryFilter = await hre.deployments.get(
+        "NaiveRegistryFilter",
+      );
+      if (!naiveRegistryFilter) {
+        throw new Error("NaiveRegistryFilter not deployed");
+      }
+      filterAddress = naiveRegistryFilter.address;
+    }
+
     try {
-      const enableE3Tx = await enclaveContract.enableE3Program(
-        taskArguments.e3Address,
-      );
+      const enableE3Tx = await enclaveContract.enableE3Program(e3Address);
       await enableE3Tx.wait();
-    } catch (e: unknown) {
-      console.log(
-        "E3 program enabling failed, probably already enabled: ",
-        e.message,
-      );
+    } catch (e) {
+      console.log("E3 program enabling failed, probably already enabled: ", e);
     }
 
     console.log(
       "requesting committee...",
-      taskArguments.filter,
+      filterAddress,
       [taskArguments.thresholdQuorum, taskArguments.thresholdTotal],
       [taskArguments.windowStart, taskArguments.windowEnd],
       taskArguments.duration,
-      taskArguments.e3Address,
+      e3Address,
       taskArguments.e3Params,
       taskArguments.computeParams,
     );
     const tx = await enclaveContract.request(
-      taskArguments.filter,
+      filterAddress,
       [taskArguments.thresholdQuorum, taskArguments.thresholdTotal],
       [taskArguments.windowStart, taskArguments.windowEnd],
       taskArguments.duration,
-      taskArguments.e3Address,
+      e3Address,
       taskArguments.e3Params,
       taskArguments.computeParams,
       // 1 ETH
