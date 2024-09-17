@@ -7,7 +7,7 @@ import type { NetworkUserConfig } from "hardhat/types";
 
 import "./tasks/accounts";
 import "./tasks/ciphernode";
-import "./tasks/committee";
+import "./tasks/enclave";
 
 dotenv.config();
 
@@ -89,13 +89,6 @@ const config: HardhatUserConfig = {
       },
       chainId: chainIds.hardhat,
       allowUnlimitedContractSize: true,
-    },
-    ganache: {
-      accounts: {
-        mnemonic,
-      },
-      chainId: chainIds.ganache,
-      url: "http://localhost:8545",
     },
     arbitrum: getChainConfig("arbitrum-mainnet"),
     avalanche: getChainConfig("avalanche"),
