@@ -1,4 +1,3 @@
-use alloy_primitives::Address;
 use clap::Parser;
 use enclave_core::MainAggregator;
 

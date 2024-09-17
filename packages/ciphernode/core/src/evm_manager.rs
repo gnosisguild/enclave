@@ -9,6 +9,7 @@ use alloy::{
     rpc::types::{BlockNumberOrTag, Filter},
     transports::BoxTransport,
 };
+use anyhow::Result;
 use std::sync::Arc;
 
 pub struct EvmContractManager {
@@ -28,11 +29,10 @@ impl EvmContractManager {
     }
 
     pub async fn attach(bus: Addr<EventBus>, rpc_url: &str) -> Addr<Self> {
-        let addr = EvmContractManager::new(bus.clone(), rpc_url)
+        EvmContractManager::new(bus.clone(), rpc_url)
             .await
             .unwrap()
-            .start();
-        addr
+            .start()
     }
 
     fn add_listener(&self, contract_address: Address) -> Addr<EvmEventListener> {
@@ -40,8 +40,7 @@ impl EvmContractManager {
             .address(contract_address)
             .from_block(BlockNumberOrTag::Latest);
         let listener = EvmEventListener::new(self.provider.clone(), filter, self.bus.clone());
-        let addr = listener.start();
-        addr
+        listener.start()
     }
 }
 

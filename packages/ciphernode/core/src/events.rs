@@ -246,7 +246,7 @@ impl fmt::Display for EnclaveEvent {
 pub struct KeyshareCreated {
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
-    pub node: Address
+    pub node: Address,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -254,7 +254,7 @@ pub struct KeyshareCreated {
 pub struct DecryptionshareCreated {
     pub decryption_share: Vec<u8>,
     pub e3_id: E3id,
-    pub node: Address
+    pub node: Address,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -269,7 +269,6 @@ pub struct PublicKeyAggregated {
 pub struct CommitteeRequested {
     pub e3_id: E3id,
     pub nodecount: usize,
-    pub threshold: usize,
     pub sortition_seed: u64, // Should actually be much larger eg [u8;32]
 
     // fhe params
@@ -277,6 +276,7 @@ pub struct CommitteeRequested {
     pub degree: usize,
     pub plaintext_modulus: u64,
     pub crp: Vec<u8>,
+    // threshold: usize, // TODO:
     // computation_type: ??, // TODO:
     // execution_model_type: ??, // TODO:
     // input_deadline: ??, // TODO:
@@ -288,7 +288,6 @@ pub struct CommitteeRequested {
 pub struct CiphernodeSelected {
     pub e3_id: E3id,
     pub nodecount: usize,
-    pub threshold: usize,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -384,7 +383,7 @@ mod tests {
         let kse = EnclaveEvent::from(KeyshareCreated {
             e3_id: E3id::from(1001),
             pubkey,
-            node: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
+            node: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"),
         });
         let kse_bytes = kse.to_bytes()?;
         let _ = EnclaveEvent::from_bytes(&kse_bytes.clone());

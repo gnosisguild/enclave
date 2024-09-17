@@ -8,7 +8,10 @@ mod ciphernode_selector;
 mod data;
 mod enclave_contract;
 mod eventbus;
-mod events;
+pub mod events;
+mod evm;
+mod evm_listener;
+mod evm_manager;
 mod fhe;
 mod logger;
 mod main_aggregator;
@@ -22,6 +25,7 @@ mod publickey_aggregator;
 mod publickey_orchestrator;
 mod serializers;
 mod sortition;
+mod utils;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -56,6 +60,7 @@ mod tests {
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
             PublicKeyShareSerializer,
         },
+        utils::{setup_crp_params, ParamsWithCrp},
         CiphernodeAdded, CiphernodeOrchestrator, CiphernodeSelected, CiphertextOutputPublished,
         DecryptionshareCreated, Orchestrator, PlaintextAggregated, PlaintextOrchestrator,
         PublicKeyOrchestrator, ResetHistory, SharedRng, Sortition,
@@ -64,10 +69,10 @@ mod tests {
     use alloy_primitives::Address;
     use anyhow::*;
     use fhe::{
-        bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey},
+        bfv::{BfvParameters, Encoding, Plaintext, PublicKey, SecretKey},
         mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
     };
-    use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
+    use fhe_traits::{FheEncoder, FheEncrypter};
     use rand::Rng;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -102,23 +107,6 @@ mod tests {
             .await;
     }
 
-    fn setup_bfv_params(
-        moduli: &[u64],
-        degree: usize,
-        plaintext_modulus: u64,
-    ) -> Arc<BfvParameters> {
-        BfvParametersBuilder::new()
-            .set_degree(degree)
-            .set_plaintext_modulus(plaintext_modulus)
-            .set_moduli(moduli)
-            .build_arc()
-            .unwrap()
-    }
-
-    fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
-        CommonRandomPoly::new(&params, &mut *rng.lock().unwrap()).unwrap()
-    }
-
     fn generate_pk_share(
         params: Arc<BfvParameters>,
         crp: CommonRandomPoly,
@@ -131,30 +119,6 @@ mod tests {
             crp,
         )?;
         Ok((pk, sk))
-    }
-
-    struct NewParamsWithCrp {
-        pub moduli: Vec<u64>,
-        pub degree: usize,
-        pub plaintext_modulus: u64,
-        pub crp_bytes: Vec<u8>,
-        pub params: Arc<BfvParameters>,
-    }
-    fn setup_crp_params(
-        moduli: &[u64],
-        degree: usize,
-        plaintext_modulus: u64,
-        rng: SharedRng,
-    ) -> NewParamsWithCrp {
-        let params = setup_bfv_params(moduli, degree, plaintext_modulus);
-        let crp = set_up_crp(params.clone(), rng);
-        NewParamsWithCrp {
-            moduli: moduli.to_vec(),
-            degree,
-            plaintext_modulus,
-            crp_bytes: crp.to_bytes(),
-            params,
-        }
     }
 
     #[actix::test]
@@ -174,7 +138,7 @@ mod tests {
 
         let e3_id = E3id::new("1234");
 
-        let NewParamsWithCrp {
+        let ParamsWithCrp {
             moduli,
             degree,
             plaintext_modulus,
@@ -214,7 +178,6 @@ mod tests {
         let event = EnclaveEvent::from(CommitteeRequested {
             e3_id: e3_id.clone(),
             nodecount: 3,
-            threshold: 123,
             sortition_seed: 123,
             moduli: moduli.clone(),
             degree,
@@ -254,7 +217,6 @@ mod tests {
                 EnclaveEvent::from(CommitteeRequested {
                     e3_id: e3_id.clone(),
                     nodecount: 3,
-                    threshold: 123,
                     sortition_seed: 123,
                     moduli,
                     degree,
@@ -264,7 +226,6 @@ mod tests {
                 EnclaveEvent::from(CiphernodeSelected {
                     e3_id: e3_id.clone(),
                     nodecount: 3,
-                    threshold: 123,
                 }),
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p1.clone(),
@@ -387,7 +348,6 @@ mod tests {
         let evt_1 = EnclaveEvent::from(CommitteeRequested {
             e3_id: E3id::new("1234"),
             nodecount: 3,
-            threshold: 123,
             sortition_seed: 123,
             moduli: vec![0x3FFFFFFF000001],
             degree: 2048,
@@ -398,7 +358,6 @@ mod tests {
         let evt_2 = EnclaveEvent::from(CommitteeRequested {
             e3_id: E3id::new("1235"),
             nodecount: 3,
-            threshold: 123,
             sortition_seed: 123,
             moduli: vec![0x3FFFFFFF000001],
             degree: 2048,
@@ -409,7 +368,6 @@ mod tests {
         let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
             e3_id: E3id::new("1235"),
             nodecount: 3,
-            threshold: 123,
         });
 
         bus.do_send(evt_1.clone());
@@ -449,7 +407,6 @@ mod tests {
         let event = EnclaveEvent::from(CommitteeRequested {
             e3_id: E3id::new("1235"),
             nodecount: 3,
-            threshold: 123,
             sortition_seed: 123,
             moduli: vec![0x3FFFFFFF000001],
             degree: 2048,

@@ -67,7 +67,6 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
                     e3_id: data.e3_id,
                     nodecount: data.nodecount,
-                    threshold: data.threshold,
                 }));
             }
         })
