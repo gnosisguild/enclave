@@ -88,8 +88,7 @@ impl Orchestrator {
         OrchestratorBuilder::new(bus, rng)
     }
 
-    // TODO: use a builder pattern to manage the Option<Orchestrator>
-    pub async fn attach(
+    async fn attach(
         bus: Addr<EventBus>,
         rng: Arc<Mutex<ChaCha20Rng>>,
         public_key: Option<Addr<PublicKeyOrchestrator>>,
