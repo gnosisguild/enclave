@@ -31,7 +31,7 @@ pub fn setup_crp_params(
     }
 }
 
-fn setup_bfv_params(moduli: &[u64], degree: usize, plaintext_modulus: u64) -> Arc<BfvParameters> {
+pub fn setup_bfv_params(moduli: &[u64], degree: usize, plaintext_modulus: u64) -> Arc<BfvParameters> {
     BfvParametersBuilder::new()
         .set_degree(degree)
         .set_plaintext_modulus(plaintext_modulus)
@@ -40,6 +40,6 @@ fn setup_bfv_params(moduli: &[u64], degree: usize, plaintext_modulus: u64) -> Ar
         .unwrap()
 }
 
-fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
+pub fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
     CommonRandomPoly::new(&params, &mut *rng.lock().unwrap()).unwrap()
 }

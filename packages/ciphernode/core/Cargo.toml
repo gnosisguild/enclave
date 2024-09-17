@@ -31,3 +31,5 @@ futures-util = "0.3"
 alloy = { version = "0.3.3", features = ["full"] }
 alloy-primitives = { version = "0.6", default-features = false, features = ["rlp", "serde", "std"] }
 alloy-sol-types = { version = "0.6" }
+base64 = "0.22.1"
+base91 = "0.1.0"

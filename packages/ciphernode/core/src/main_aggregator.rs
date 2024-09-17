@@ -1,6 +1,9 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{EventBus, Orchestrator, P2p, PlaintextOrchestrator, PublicKeyOrchestrator, Sortition};
+use crate::{
+    EventBus, Orchestrator, P2p, PlaintextOrchestrator, PublicKeyOrchestrator, SimpleLogger,
+    Sortition,
+};
 use actix::{Actor, Addr, Context};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
@@ -50,6 +53,9 @@ impl MainAggregator {
             .await;
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
+
+        SimpleLogger::attach("AGGREGATOR", bus.clone());
+
         let main_addr = MainAggregator::new(bus, sortition, orchestrator, p2p_addr).start();
         (main_addr, join_handle)
     }

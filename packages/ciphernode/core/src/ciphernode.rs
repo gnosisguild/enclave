@@ -14,7 +14,7 @@ pub struct Ciphernode {
     fhe: Addr<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
-    address: Address
+    address: Address,
 }
 
 impl Actor for Ciphernode {
@@ -23,10 +23,20 @@ impl Actor for Ciphernode {
 
 impl Ciphernode {
     pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>, address: Address) -> Self {
-        Self { bus, fhe, data, address }
+        Self {
+            bus,
+            fhe,
+            data,
+            address,
+        }
     }
 
-    pub async fn attach(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>, address: Address) -> Addr<Self> {
+    pub async fn attach(
+        bus: Addr<EventBus>,
+        fhe: Addr<Fhe>,
+        data: Addr<Data>,
+        address: Address,
+    ) -> Addr<Self> {
         let node = Ciphernode::new(bus.clone(), fhe, data, address).start();
         let _ = bus
             .send(Subscribe::new("CiphernodeSelected", node.clone().into()))
@@ -61,7 +71,11 @@ impl Handler<CiphernodeSelected> for Ciphernode {
         let data = self.data.clone();
         let bus = self.bus.clone();
         let address = self.address;
-        Box::pin(async move { on_ciphernode_selected(fhe, data, bus, event, address).await.unwrap() })
+        Box::pin(async move {
+            on_ciphernode_selected(fhe, data, bus, event, address)
+                .await
+                .unwrap()
+        })
     }
 }
 
@@ -69,6 +83,7 @@ impl Handler<CiphertextOutputPublished> for Ciphernode {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, event: CiphertextOutputPublished, _: &mut Context<Self>) -> Self::Result {
+        println!("Ciphernode::CiphertextOutputPublished");
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
@@ -86,9 +101,12 @@ async fn on_ciphernode_selected(
     data: Addr<Data>,
     bus: Addr<EventBus>,
     event: CiphernodeSelected,
-    address: Address
+    address: Address,
 ) -> Result<()> {
     let CiphernodeSelected { e3_id, .. } = event;
+
+    println!("\n\nGENERATING KEY!\n\n");
+
     // generate keyshare
     let (sk, pubkey) = fhe.send(GenerateKeyshare {}).await??;
 
@@ -103,7 +121,11 @@ async fn on_ciphernode_selected(
     data.do_send(Insert(format!("{}/pk", e3_id).into(), pubkey.clone()));
 
     // broadcast the KeyshareCreated message
-    let event = EnclaveEvent::from(KeyshareCreated { pubkey, e3_id, node: address });
+    let event = EnclaveEvent::from(KeyshareCreated {
+        pubkey,
+        e3_id,
+        node: address,
+    });
     bus.do_send(event);
 
     Ok(())
@@ -114,7 +136,7 @@ async fn on_decryption_requested(
     data: Addr<Data>,
     bus: Addr<EventBus>,
     event: CiphertextOutputPublished,
-    address: Address
+    address: Address,
 ) -> Result<()> {
     let CiphertextOutputPublished {
         e3_id,
@@ -126,6 +148,8 @@ async fn on_decryption_requested(
         return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
     };
 
+    println!("\n\nDECRYPTING!\n\n");
+
     let decryption_share = fhe
         .send(DecryptCiphertext {
             ciphertext: ciphertext_output,
@@ -136,7 +160,7 @@ async fn on_decryption_requested(
     let event = EnclaveEvent::from(DecryptionshareCreated {
         e3_id,
         decryption_share,
-        node: address
+        node: address,
     });
 
     bus.do_send(event);

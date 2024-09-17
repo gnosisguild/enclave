@@ -36,7 +36,7 @@ impl Handler<InitializeWithEnclaveEvent> for CiphernodeOrchestrator {
     type Result = ();
     fn handle(&mut self, msg: InitializeWithEnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let InitializeWithEnclaveEvent { fhe, event, .. } = msg;
-        let EnclaveEvent::CommitteeRequested { data, .. } = event else {
+        let EnclaveEvent::CiphernodeSelected { data, .. } = event else {
             return;
         };
         let ciphernode_factory = self.ciphernode_factory(fhe.clone());
@@ -53,6 +53,7 @@ impl Handler<EnclaveEvent> for CiphernodeOrchestrator {
         let Some(e3_id) = msg.get_e3_id() else {
             return;
         };
+
         self.forward_message(&e3_id, msg);
     }
 }

@@ -99,10 +99,14 @@ impl Fhe {
         let params = BfvParametersBuilder::new()
             .set_degree(degree)
             .set_plaintext_modulus(plaintext_modulus)
-            .set_moduli(&moduli)
+            .set_moduli(moduli)
             .build_arc()?;
 
-        Ok(Fhe::new(params.clone(), CommonRandomPoly::deserialize(crp, &params)?, rng))
+        Ok(Fhe::new(
+            params.clone(),
+            CommonRandomPoly::deserialize(crp, &params)?,
+            rng,
+        ))
     }
 }
 
@@ -151,10 +155,7 @@ impl Handler<GetAggregatePublicKey> for Fhe {
             .into_iter()
             .aggregate()?;
 
-        Ok(PublicKeySerializer::to_bytes(
-            public_key,
-            self.params.clone(),
-        )?)
+        Ok(public_key.to_bytes())
     }
 }
 
