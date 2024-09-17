@@ -43,7 +43,7 @@ impl MainCiphernode {
         }
     }
 
-    pub async fn attach(address: Address) -> (Addr<Self>, JoinHandle<()>) {
+    pub async fn attach(address: Address, rpc_url:String) -> (Addr<Self>, JoinHandle<()>) {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));

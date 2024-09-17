@@ -1,4 +1,7 @@
-use crate::{EventListener, StartListening};
+use crate::{
+    evm_listener::{EvmEventListener, StartListening},
+    EventBus,
+};
 use actix::{Actor, Addr, Context, Handler, Message};
 use alloy::{
     primitives::Address,
@@ -6,17 +9,15 @@ use alloy::{
     rpc::types::{BlockNumberOrTag, Filter},
     transports::BoxTransport,
 };
-use enclave_core::EventBus;
-use eyre::Result;
 use std::sync::Arc;
 
-pub struct ContractManager {
+pub struct EvmContractManager {
     bus: Addr<EventBus>,
     provider: Arc<RootProvider<BoxTransport>>,
-    listeners: Vec<Addr<EventListener>>,
+    listeners: Vec<Addr<EvmEventListener>>,
 }
 
-impl ContractManager {
+impl EvmContractManager {
     async fn new(bus: Addr<EventBus>, rpc_url: &str) -> Result<Self> {
         let provider = ProviderBuilder::new().on_builtin(rpc_url).await?;
         Ok(Self {
@@ -27,32 +28,35 @@ impl ContractManager {
     }
 
     pub async fn attach(bus: Addr<EventBus>, rpc_url: &str) -> Addr<Self> {
-        let addr = ContractManager::new(bus.clone(), rpc_url).await.unwrap().start();
+        let addr = EvmContractManager::new(bus.clone(), rpc_url)
+            .await
+            .unwrap()
+            .start();
         addr
     }
 
-    fn add_listener(&self, contract_address: Address) -> Addr<EventListener> {
+    fn add_listener(&self, contract_address: Address) -> Addr<EvmEventListener> {
         let filter = Filter::new()
             .address(contract_address)
             .from_block(BlockNumberOrTag::Latest);
-        let listener = EventListener::new(self.provider.clone(), filter, self.bus.clone());
+        let listener = EvmEventListener::new(self.provider.clone(), filter, self.bus.clone());
         let addr = listener.start();
         addr
     }
 }
 
-impl Actor for ContractManager {
+impl Actor for EvmContractManager {
     type Context = Context<Self>;
 }
 
 #[derive(Message)]
-#[rtype(result = "Addr<EventListener>")]
+#[rtype(result = "Addr<EvmEventListener>")]
 pub struct AddListener {
     pub contract_address: Address,
 }
 
-impl Handler<AddListener> for ContractManager {
-    type Result = Addr<EventListener>;
+impl Handler<AddListener> for EvmContractManager {
+    type Result = Addr<EvmEventListener>;
 
     fn handle(&mut self, msg: AddListener, _ctx: &mut Self::Context) -> Self::Result {
         let listener = self.add_listener(msg.contract_address);
@@ -61,7 +65,7 @@ impl Handler<AddListener> for ContractManager {
     }
 }
 
-impl Handler<StartListening> for ContractManager {
+impl Handler<StartListening> for EvmContractManager {
     type Result = ();
 
     fn handle(&mut self, _: StartListening, _ctx: &mut Self::Context) -> Self::Result {
@@ -70,3 +74,4 @@ impl Handler<StartListening> for ContractManager {
         }
     }
 }
+
