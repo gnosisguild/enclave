@@ -5,14 +5,14 @@ use crate::{
 use actix::prelude::*;
 use std::collections::HashMap;
 
-pub struct PublicKeyRegistry {
+pub struct PublicKeyOrchestrator {
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
     buffers: HashMap<E3id, Vec<EnclaveEvent>>,
     public_keys: HashMap<E3id, Addr<PublicKeyAggregator>>,
 }
 
-impl PublicKeyRegistry {
+impl PublicKeyOrchestrator {
     pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> Self {
         Self {
             bus,
@@ -23,15 +23,15 @@ impl PublicKeyRegistry {
     }
 
     pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> Addr<Self> {
-        PublicKeyRegistry::new(bus.clone(), sortition).start()
+        PublicKeyOrchestrator::new(bus.clone(), sortition).start()
     }
 }
 
-impl Actor for PublicKeyRegistry {
+impl Actor for PublicKeyOrchestrator {
     type Context = Context<Self>;
 }
 
-impl Handler<InitializeWithEnclaveEvent> for PublicKeyRegistry {
+impl Handler<InitializeWithEnclaveEvent> for PublicKeyOrchestrator {
     type Result = ();
     fn handle(&mut self, msg: InitializeWithEnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let InitializeWithEnclaveEvent { fhe, event, .. } = msg;
@@ -51,7 +51,7 @@ impl Handler<InitializeWithEnclaveEvent> for PublicKeyRegistry {
     }
 }
 
-impl Handler<EnclaveEvent> for PublicKeyRegistry {
+impl Handler<EnclaveEvent> for PublicKeyOrchestrator {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
@@ -62,7 +62,7 @@ impl Handler<EnclaveEvent> for PublicKeyRegistry {
     }
 }
 
-impl PublicKeyRegistry {
+impl PublicKeyOrchestrator {
     fn public_key_factory(
         &self,
         fhe: Addr<Fhe>,
