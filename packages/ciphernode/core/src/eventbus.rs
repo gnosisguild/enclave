@@ -64,7 +64,7 @@ impl Handler<Subscribe> for EventBus {
     fn handle(&mut self, event: Subscribe, _: &mut Context<Self>) {
         self.listeners
             .entry(event.event_type)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(event.listener);
     }
 }

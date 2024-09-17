@@ -53,6 +53,7 @@ impl Handler<EnclaveEvent> for CiphernodeOrchestrator {
         let Some(e3_id) = msg.get_e3_id() else {
             return;
         };
+
         self.forward_message(&e3_id, msg);
     }
 }

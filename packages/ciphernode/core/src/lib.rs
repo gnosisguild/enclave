@@ -35,6 +35,7 @@ pub use ciphernode_selector::*;
 pub use data::*;
 pub use eventbus::*;
 pub use events::*;
+pub use serializers::*;
 pub use fhe::*;
 pub use logger::*;
 pub use main_aggregator::*;
@@ -46,7 +47,7 @@ pub use plaintext_orchestrator::*;
 pub use publickey_aggregator::*;
 pub use publickey_orchestrator::*;
 pub use sortition::*;
-
+pub use utils::*;
 // TODO: move these out to a test folder
 #[cfg(test)]
 mod tests {
@@ -72,7 +73,7 @@ mod tests {
         bfv::{BfvParameters, Encoding, Plaintext, PublicKey, SecretKey},
         mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
     };
-    use fhe_traits::{FheEncoder, FheEncrypter};
+    use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
     use rand::Rng;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -243,7 +244,7 @@ mod tests {
                     node: eth_addrs[2]
                 }),
                 EnclaveEvent::from(PublicKeyAggregated {
-                    pubkey: PublicKeySerializer::to_bytes(pubkey.clone(), params.clone())?,
+                    pubkey: pubkey.to_bytes(),
                     e3_id: e3_id.clone()
                 })
             ]

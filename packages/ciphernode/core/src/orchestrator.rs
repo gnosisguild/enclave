@@ -123,60 +123,56 @@ impl Handler<EnclaveEvent> for Orchestrator {
             return;
         };
 
-        match msg.clone() {
-            EnclaveEvent::CommitteeRequested { data, .. } => {
-                let CommitteeRequested {
-                    degree,
-                    moduli,
-                    plaintext_modulus,
-                    crp,
-                    ..
-                } = data;
+        {
+            match msg.clone() {
+                EnclaveEvent::CommitteeRequested { data, .. } => {
+                    let CommitteeRequested {
+                        degree,
+                        moduli,
+                        plaintext_modulus,
+                        crp,
+                        ..
+                    } = data;
 
-                let fhe_factory = self.fhe_factory(moduli, degree, plaintext_modulus, crp);
-                let fhe = self.fhes.entry(e3_id.clone()).or_insert_with(fhe_factory);
-                let meta = CommitteeMeta {
-                    nodecount: data.nodecount,
-                    seed: data.sortition_seed,
-                };
-                self.meta.entry(e3_id.clone()).or_insert(meta.clone());
+                    let fhe_factory = self.fhe_factory(moduli, degree, plaintext_modulus, crp);
+                    let fhe = self.fhes.entry(e3_id.clone()).or_insert_with(fhe_factory);
+                    let meta = CommitteeMeta {
+                        nodecount: data.nodecount,
+                        seed: data.sortition_seed,
+                    };
+                    self.meta.entry(e3_id.clone()).or_insert(meta.clone());
 
-                if let Some(addr) = self.public_key.clone() {
-                    addr.do_send(InitializeWithEnclaveEvent {
-                        event: msg.clone(),
-                        fhe: fhe.clone(),
-                        meta: meta.clone(),
-                    })
+                    if let Some(addr) = self.public_key.clone() {
+                        addr.do_send(InitializeWithEnclaveEvent {
+                            event: msg.clone(),
+                            fhe: fhe.clone(),
+                            meta: meta.clone(),
+                        });
+                    }
+
+                    if let Some(addr) = self.ciphernode.clone() {
+                        addr.do_send(InitializeWithEnclaveEvent {
+                            event: msg.clone(),
+                            fhe: fhe.clone(),
+                            meta: meta.clone(),
+                        });
+                    }
                 }
-
-                if let Some(addr) = self.ciphernode.clone() {
-                    addr.do_send(InitializeWithEnclaveEvent {
-                        event: msg.clone(),
-                        fhe: fhe.clone(),
-                        meta: meta.clone(),
-                    })
+                EnclaveEvent::CiphertextOutputPublished { data, .. } => {
+                    if let Some(plaintext) = self.plaintext.clone() {
+                        if let Some(fhe) = self.fhes.get(&data.e3_id) {
+                            if let Some(meta) = self.meta.get(&data.e3_id) {
+                                plaintext.do_send(InitializeWithEnclaveEvent {
+                                    event: msg.clone(),
+                                    fhe: fhe.clone(),
+                                    meta: meta.clone(),
+                                });
+                            };
+                        };
+                    };
                 }
-            }
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => {
-                let Some(plaintext) = self.plaintext.clone() else {
-                    return;
-                };
-
-                let Some(fhe) = self.fhes.get(&data.e3_id) else {
-                    return;
-                };
-
-                let Some(meta) = self.meta.get(&data.e3_id) else {
-                    return;
-                };
-
-                plaintext.do_send(InitializeWithEnclaveEvent {
-                    event: msg.clone(),
-                    fhe: fhe.clone(),
-                    meta: meta.clone(),
-                })
-            }
-            _ => (),
+                _ => (),
+            };
         };
 
         self.forward_message(msg);

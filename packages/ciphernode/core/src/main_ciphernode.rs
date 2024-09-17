@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    CiphernodeOrchestrator, CiphernodeSelector, Data, EventBus, Orchestrator, P2p, Sortition,
+    CiphernodeOrchestrator, CiphernodeSelector, Data, EventBus, Orchestrator, P2p, SimpleLogger, Sortition
 };
 use actix::{Actor, Addr, Context};
 use alloy_primitives::Address;
@@ -45,8 +45,8 @@ impl MainCiphernode {
 
     pub async fn attach(
         address: Address,
-        rpc_url: String,
-        contract_address: Address,
+        // rpc_url: String,
+        // contract_address: Address,
     ) -> (Addr<Self>, JoinHandle<()>) {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -67,6 +67,8 @@ impl MainCiphernode {
 
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
+
+        SimpleLogger::attach(bus.clone());
         let main_addr = MainCiphernode::new(
             address,
             bus,
