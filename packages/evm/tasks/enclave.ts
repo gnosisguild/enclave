@@ -50,7 +50,7 @@ task(
   .addOptionalParam(
     "e3Params",
     "parameters for the E3 program",
-    "0x0000000000000000000000009f3ebc4f6be495901a29bba2ae5a45fb870cdc14",
+    "0x0000000000000000000000004965ceCe27422B8B9557f9b9C841581B8Da60B34",
     types.string,
   )
   .addOptionalParam(
