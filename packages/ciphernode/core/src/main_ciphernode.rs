@@ -43,7 +43,11 @@ impl MainCiphernode {
         }
     }
 
-    pub async fn attach(address: Address, rpc_url:String) -> (Addr<Self>, JoinHandle<()>) {
+    pub async fn attach(
+        address: Address,
+        rpc_url: String,
+        contract_address: Address,
+    ) -> (Addr<Self>, JoinHandle<()>) {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
@@ -51,6 +55,7 @@ impl MainCiphernode {
         let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
         let sortition = Sortition::attach(bus.clone());
         let selector = CiphernodeSelector::attach(bus.clone(), sortition.clone(), address);
+
         let orchestrator = Orchestrator::builder(bus.clone(), rng)
             .ciphernode(CiphernodeOrchestrator::attach(
                 bus.clone(),

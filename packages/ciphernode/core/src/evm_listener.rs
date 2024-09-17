@@ -13,7 +13,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::marker::PhantomData;
 
-use crate::EventBus;
+use crate::{EnclaveEvent, EventBus};
 
 pub trait ContractEvent: Send + Sync + 'static {
     fn process(&self, bus: Addr<EventBus>) -> Result<()>;
@@ -23,7 +23,7 @@ impl<T> ContractEvent for T
 where
     T: SolEvent + Debug + Send + Sync + 'static,
 {
-    fn process(&self, _bus: Addr<EventBus>) -> Result<()> {
+    fn process(&self, bus: Addr<EventBus>) -> Result<()> {
         println!("Processing event: {:?}", self);
         // bus.do_send(EnclaveEvent::from(self));
         Ok(())
