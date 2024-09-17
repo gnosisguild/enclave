@@ -1,7 +1,7 @@
 // TODO: spawn and supervise child actors
 use crate::{
-    CiphernodeOrchestrator, CommitteeRequested, E3id, EnclaveEvent, EventBus, Fhe, PlaintextOrchestrator,
-    PublicKeyOrchestrator, Subscribe,
+    CiphernodeOrchestrator, CommitteeRequested, E3id, EnclaveEvent, EventBus, Fhe,
+    PlaintextOrchestrator, PublicKeyOrchestrator, Subscribe,
 };
 use actix::prelude::*;
 use rand_chacha::ChaCha20Rng;
@@ -30,6 +30,50 @@ pub struct CommitteeMeta {
     pub seed: u64,
 }
 
+pub struct OrchestratorBuilder {
+    bus: Addr<EventBus>,
+    rng: Arc<Mutex<ChaCha20Rng>>,
+    public_key: Option<Addr<PublicKeyOrchestrator>>,
+    plaintext: Option<Addr<PlaintextOrchestrator>>,
+    ciphernode: Option<Addr<CiphernodeOrchestrator>>,
+}
+
+impl OrchestratorBuilder {
+    pub fn new(bus: Addr<EventBus>, rng: Arc<Mutex<ChaCha20Rng>>) -> Self {
+        Self {
+            bus,
+            rng,
+            public_key: None,
+            plaintext: None,
+            ciphernode: None,
+        }
+    }
+
+    pub fn public_key(mut self, value: Addr<PublicKeyOrchestrator>) -> Self {
+        self.public_key = Some(value);
+        self
+    }
+
+    pub fn plaintext(mut self, value: Addr<PlaintextOrchestrator>) -> Self {
+        self.plaintext = Some(value);
+        self
+    }
+
+    pub fn ciphernode(mut self, value: Addr<CiphernodeOrchestrator>) -> Self {
+        self.ciphernode = Some(value);
+        self
+    }
+
+    pub async fn build(self) -> Addr<Orchestrator> {
+        let bus = self.bus;
+        let rng = self.rng;
+        let public_key = self.public_key;
+        let plaintext = self.plaintext;
+        let ciphernode = self.ciphernode;
+        Orchestrator::attach(bus, rng, public_key, plaintext, ciphernode).await
+    }
+}
+
 pub struct Orchestrator {
     fhes: HashMap<E3id, Addr<Fhe>>,
     meta: HashMap<E3id, CommitteeMeta>,
@@ -40,20 +84,8 @@ pub struct Orchestrator {
 }
 
 impl Orchestrator {
-    pub fn new(
-        rng: Arc<Mutex<ChaCha20Rng>>,
-        public_key: Option<Addr<PublicKeyOrchestrator>>,
-        plaintext: Option<Addr<PlaintextOrchestrator>>,
-        ciphernode: Option<Addr<CiphernodeOrchestrator>>,
-    ) -> Self {
-        Self {
-            rng,
-            public_key,
-            plaintext,
-            ciphernode,
-            meta: HashMap::new(),
-            fhes: HashMap::new(),
-        }
+    pub fn builder(bus: Addr<EventBus>, rng: Arc<Mutex<ChaCha20Rng>>) -> OrchestratorBuilder {
+        OrchestratorBuilder::new(bus, rng)
     }
 
     // TODO: use a builder pattern to manage the Option<Orchestrator>
@@ -64,7 +96,15 @@ impl Orchestrator {
         plaintext: Option<Addr<PlaintextOrchestrator>>,
         ciphernode: Option<Addr<CiphernodeOrchestrator>>,
     ) -> Addr<Self> {
-        let addr = Orchestrator::new(rng, public_key, plaintext, ciphernode).start();
+        let addr = Orchestrator {
+            rng,
+            public_key,
+            plaintext,
+            ciphernode,
+            meta: HashMap::new(),
+            fhes: HashMap::new(),
+        }
+        .start();
         bus.send(Subscribe::new("*", addr.clone().into()))
             .await
             .unwrap();

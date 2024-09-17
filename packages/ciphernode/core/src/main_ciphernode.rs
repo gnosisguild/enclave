@@ -1,6 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{CiphernodeOrchestrator, CiphernodeSelector, Data, EventBus, Orchestrator, P2p, Sortition};
+use crate::{
+    CiphernodeOrchestrator, CiphernodeSelector, Data, EventBus, Orchestrator, P2p, Sortition,
+};
 use actix::{Actor, Addr, Context};
 use alloy_primitives::Address;
 use rand::SeedableRng;
@@ -49,18 +51,15 @@ impl MainCiphernode {
         let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
         let sortition = Sortition::attach(bus.clone());
         let selector = CiphernodeSelector::attach(bus.clone(), sortition.clone(), address);
-        let orchestrator = Orchestrator::attach(
-            bus.clone(),
-            rng,
-            None,
-            None,
-            Some(CiphernodeOrchestrator::attach(
+        let orchestrator = Orchestrator::builder(bus.clone(), rng)
+            .ciphernode(CiphernodeOrchestrator::attach(
                 bus.clone(),
                 data.clone(),
                 address,
-            )),
-        )
-        .await;
+            ))
+            .build()
+            .await;
+
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
         let main_addr = MainCiphernode::new(

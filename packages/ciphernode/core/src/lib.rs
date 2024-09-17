@@ -3,7 +3,7 @@
 // #![warn(missing_docs, unused_imports)]
 
 mod ciphernode;
-mod ciphernode_registry;
+mod ciphernode_orchestrator;
 mod ciphernode_selector;
 mod data;
 mod enclave_contract;
@@ -16,17 +16,17 @@ mod main_ciphernode;
 mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
-mod plaintext_registry;
+mod plaintext_orchestrator;
 mod publickey_aggregator;
-mod publickey_registry;
-mod registry;
+mod publickey_orchestrator;
+mod orchestrator;
 mod serializers;
 mod sortition;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
-pub use ciphernode_registry::*;
+pub use ciphernode_orchestrator::*;
 pub use ciphernode_selector::*;
 pub use data::*;
 pub use eventbus::*;
@@ -37,10 +37,10 @@ pub use main_aggregator::*;
 pub use main_ciphernode::*;
 pub use p2p::*;
 pub use plaintext_aggregator::*;
-pub use plaintext_registry::*;
+pub use plaintext_orchestrator::*;
 pub use publickey_aggregator::*;
-pub use publickey_registry::*;
-pub use registry::*;
+pub use publickey_orchestrator::*;
+pub use orchestrator::*;
 pub use sortition::*;
 
 // TODO: move these out to a test folder
