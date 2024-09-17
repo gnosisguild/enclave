@@ -149,13 +149,18 @@ impl Handler<EnclaveEvent> for Orchestrator {
                             meta: meta.clone(),
                         });
                     }
-
+                }
+                EnclaveEvent::CiphernodeSelected { data, .. } => {
                     if let Some(addr) = self.ciphernode.clone() {
-                        addr.do_send(InitializeWithEnclaveEvent {
-                            event: msg.clone(),
-                            fhe: fhe.clone(),
-                            meta: meta.clone(),
-                        });
+                        if let Some(fhe) = self.fhes.get(&data.e3_id) {
+                            if let Some(meta) = self.meta.get(&data.e3_id) {
+                                addr.do_send(InitializeWithEnclaveEvent {
+                                    event: msg.clone(),
+                                    fhe: fhe.clone(),
+                                    meta: meta.clone(),
+                                });
+                            }
+                        }
                     }
                 }
                 EnclaveEvent::CiphertextOutputPublished { data, .. } => {

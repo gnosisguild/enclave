@@ -1,3 +1,4 @@
 #!/bin/sh
 
-cargo run --bin encrypt
+echo "loading..."
+RUSTFLAGS="-A warnings" cargo run --quiet --bin encrypt

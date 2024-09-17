@@ -21,7 +21,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let raw_plaintext = vec![yes, no];
     println!("Encrypting plaintext: {:?}", raw_plaintext);
-    // let expected_raw_plaintext = bincode::serialize(&raw_plaintext)?;
 
     let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
 

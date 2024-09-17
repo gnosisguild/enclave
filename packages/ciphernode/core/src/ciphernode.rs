@@ -83,6 +83,7 @@ impl Handler<CiphertextOutputPublished> for Ciphernode {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, event: CiphertextOutputPublished, _: &mut Context<Self>) -> Self::Result {
+        println!("Ciphernode::CiphertextOutputPublished");
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
@@ -103,6 +104,8 @@ async fn on_ciphernode_selected(
     address: Address,
 ) -> Result<()> {
     let CiphernodeSelected { e3_id, .. } = event;
+
+    println!("\n\nGENERATING KEY!\n\n");
 
     // generate keyshare
     let (sk, pubkey) = fhe.send(GenerateKeyshare {}).await??;
@@ -144,6 +147,8 @@ async fn on_decryption_requested(
     let Some(unsafe_secret) = data.send(Get(format!("{}/sk", e3_id).into())).await? else {
         return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
     };
+
+    println!("\n\nDECRYPTING!\n\n");
 
     let decryption_share = fhe
         .send(DecryptCiphertext {

@@ -17,6 +17,7 @@ struct Args {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let address = Address::parse_checksummed(&args.address, None).expect("Invalid address");
+    println!("LAUNCHING CIPHERNODE: ({})", address);
     // let contract_address = Address::parse_checksummed(&args.contract_address, None).expect("Invalid address");
     let (_, handle) = MainCiphernode::attach(address /*args.rpc, contract_address*/).await;
     let _ = tokio::join!(handle);

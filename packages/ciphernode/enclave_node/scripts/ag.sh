@@ -1,3 +1,3 @@
 #!/bin/sh
-
-cargo run --bin aggregator
+echo "loading..."
+RUSTFLAGS="-A warnings" cargo run --quiet --bin aggregator

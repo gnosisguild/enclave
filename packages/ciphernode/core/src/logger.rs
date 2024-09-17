@@ -1,19 +1,23 @@
 use crate::{EnclaveEvent, EventBus, Subscribe};
 use actix::{Actor, Addr, Context, Handler};
 use base64::prelude::*;
-use fhe::bfv::PublicKey;
-use fhe_traits::DeserializeParametrized;
-use std::{fs, sync::Arc};
+use std::fs;
 
-pub struct SimpleLogger;
+pub struct SimpleLogger {
+    name: String,
+}
 
 impl SimpleLogger {
-    pub fn attach(bus: Addr<EventBus>) -> Addr<Self> {
-        let addr = Self.start();
+    pub fn attach(name: &str, bus: Addr<EventBus>) -> Addr<Self> {
+        let addr = Self {
+            name: name.to_owned(),
+        }
+        .start();
         bus.do_send(Subscribe {
             listener: addr.clone().recipient(),
             event_type: "*".to_string(),
         });
+        println!("[{}]: READY", name);
         addr
     }
 }
@@ -28,15 +32,23 @@ impl Handler<EnclaveEvent> for SimpleLogger {
         match msg.clone() {
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
                 let pubkey_str = BASE64_STANDARD.encode(&data.pubkey);
-                println!("\n\nPUBKEY:\n{}\n\n", pubkey_str);
+                println!(
+                    "\n\nPUBKEY:\n{}...{}\n\nSaved to scripts/pubkey.b64\n\n",
+                    &pubkey_str[..20],
+                    &pubkey_str[pubkey_str.len() - 20..]
+                );
                 fs::write("scripts/pubkey.b64", &pubkey_str).unwrap();
-                println!("{}", msg);
+                println!("[{}]: {}", self.name, msg);
             }
             EnclaveEvent::PlaintextAggregated { data, .. } => {
                 let output: Vec<u64> = bincode::deserialize(&data.decrypted_output).unwrap();
                 println!("\n\nDECRYPTED:\n{:?}\n\n", output);
+                println!("[{}]: {}", self.name, msg);
             }
-            _ => println!("{}", msg),
+            EnclaveEvent::CiphernodeAdded { data, .. } => {
+                println!("[{}]: CiphernodeAdded({})", self.name, data.address);
+            }
+            _ => println!("[{}]: {}", self.name, msg),
         }
     }
 }
