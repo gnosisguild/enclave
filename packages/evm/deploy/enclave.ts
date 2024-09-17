@@ -94,5 +94,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`Enclave contract updated with registry`);
 };
 export default func;
-func.id = "deploy_enclave"; // id required to prevent reexecution
-func.tags = ["Enclave"];
+func.tags = ["enclave"];

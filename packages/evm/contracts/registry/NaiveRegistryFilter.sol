@@ -73,9 +73,8 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         uint256 e3Id,
         uint32[2] calldata threshold
     ) external onlyRegistry returns (bool success) {
-        Committee storage committee = committees[e3Id];
-        require(committee.threshold.length == 0, CommitteeAlreadyExists());
-        committee.threshold = threshold;
+        require(committees[e3Id].threshold[1] == 0, CommitteeAlreadyExists());
+        committees[e3Id].threshold = threshold;
         success = true;
     }
 
