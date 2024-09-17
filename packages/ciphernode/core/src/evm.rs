@@ -102,20 +102,20 @@ impl Evm {
 //         }
 //     }
 // }
-
-impl From<&CommitteeRequested> for EnclaveEvent {
-    fn from(value: CommitteeRequested) -> Self {
-        EnclaveEvent::from(crate::events::CommitteeRequested {
-            e3_id: E3id::from(value.e3Id),
-            nodecount: value.threshold[1] as usize,
-            sortition_seed: thread_rng().next_u64(),
-            // HACK: set params here for event
-            // TODO: pass params with committee requested event
-            crp: Com,
-        })
-    }
-}
-
+//
+// impl From<&CommitteeRequested> for EnclaveEvent {
+//     fn from(value: CommitteeRequested) -> Self {
+//         EnclaveEvent::from(crate::events::CommitteeRequested {
+//             e3_id: E3id::from(value.e3Id),
+//             nodecount: value.threshold[1] as usize,
+//             sortition_seed: thread_rng().next_u64(),
+//             // HACK: set params here for event
+//             // TODO: pass params with committee requested event
+//             crp: Com,
+//         })
+//     }
+// }
+//
 impl Actor for Evm {
     type Context = Context<Self>;
 }
