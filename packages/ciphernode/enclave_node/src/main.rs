@@ -7,6 +7,7 @@ use sortition::DistanceSortition;
 use tokio::{
     self,
     io::{self, AsyncBufReadExt, BufReader},
+    sync::mpsc::{channel, Receiver, Sender},
 };
 
 use alloy_primitives::{address};
@@ -28,12 +29,32 @@ const OWO: &str = r#"
                                                                       
 "#;
 
+async fn send_p2p_msg(
+    p2p_tx: Sender<Vec<u8>>,
+    topic: String,
+    msg_type: String,
+    data: Vec<u8>
+) {
+    let msg_formatted = P2PMessage {
+        topic: topic,
+        msg_type: msg_type,
+        data: data,
+    };
+    let msg_str = serde_json::to_string(&msg_formatted).unwrap();
+    let msg_bytes = msg_str.into_bytes();
+    p2p_tx.send(msg_bytes.clone()).await.unwrap(); 
+}
+
 fn handle_p2p_msg(msg: Vec<u8>) {
     let msg_out_str = str::from_utf8(&msg).unwrap();
     let msg_out_struct: P2PMessage = serde_json::from_str(&msg_out_str).unwrap();
     println!("msg_topic: {}", msg_out_struct.topic);
     println!("msg_type: {}", msg_out_struct.msg_type);
     println!("msg: {}", String::from_utf8(msg_out_struct.data).unwrap());
+}
+
+fn handle_eth_event() {
+    
 }
 
 async fn start_p2p() -> Result<(), Box<dyn Error>> {
