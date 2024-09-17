@@ -8,7 +8,6 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eth = { path = "../eth" }
 p2p = { path = "../p2p" }
 bfv = { path = "../bfv" }
 sortition = { path = "../sortition" }

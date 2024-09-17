@@ -1,2 +1,2 @@
 [workspace]
-members = ["core", "eth", "enclave", "enclave_node", "p2p", "bfv"]
+members = ["core", "enclave", "enclave_node", "p2p", "bfv"]

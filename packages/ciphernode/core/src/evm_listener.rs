@@ -6,13 +6,14 @@ use alloy::{
     sol_types::SolEvent,
     transports::BoxTransport,
 };
-use enclave_core::EventBus;
-use eyre::Result;
+use anyhow::Result;
 use futures_util::stream::StreamExt;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::marker::PhantomData;
+
+use crate::EventBus;
 
 pub trait ContractEvent: Send + Sync + 'static {
     fn process(&self, bus: Addr<EventBus>) -> Result<()>;
@@ -29,14 +30,14 @@ where
     }
 }
 
-pub struct EventListener {
+pub struct EvmEventListener {
     provider: Arc<RootProvider<BoxTransport>>,
     filter: Filter,
     handlers: HashMap<B256, Arc<dyn Fn(Log) -> Result<Box<dyn ContractEvent>> + Send + Sync>>,
     bus: Addr<EventBus>,
 }
 
-impl EventListener {
+impl EvmEventListener {
     pub fn new(
         provider: Arc<RootProvider<BoxTransport>>,
         filter: Filter,
@@ -83,7 +84,7 @@ impl EventListener {
     }
 }
 
-impl Actor for EventListener {
+impl Actor for EvmEventListener {
     type Context = Context<Self>;
 }
 
@@ -107,7 +108,7 @@ where
     }
 }
 
-impl<E> Handler<AddEventHandler<E>> for EventListener
+impl<E> Handler<AddEventHandler<E>> for EvmEventListener
 where
     E: SolEvent + ContractEvent + 'static,
 {
@@ -122,7 +123,7 @@ where
 #[rtype(result = "()")]
 pub struct StartListening;
 
-impl Handler<StartListening> for EventListener {
+impl Handler<StartListening> for EvmEventListener {
     type Result = ();
     fn handle(&mut self, _: StartListening, ctx: &mut Self::Context) -> Self::Result {
         let (provider, filter, handlers, bus) = (
@@ -134,7 +135,7 @@ impl Handler<StartListening> for EventListener {
 
         ctx.spawn(
             async move {
-                let listener = EventListener {
+                let listener = EvmEventListener {
                     provider,
                     filter,
                     handlers,
