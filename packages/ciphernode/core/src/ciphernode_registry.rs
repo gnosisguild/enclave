@@ -4,7 +4,7 @@ use actix::prelude::*;
 use alloy_primitives::Address;
 use std::collections::HashMap;
 
-pub struct CiphernodeRegistry {
+pub struct CiphernodeOrchestrator {
     bus: Addr<EventBus>,
     data: Addr<Data>,
     address: Address,
@@ -12,7 +12,7 @@ pub struct CiphernodeRegistry {
     buffers: HashMap<E3id, Vec<EnclaveEvent>>,
 }
 
-impl CiphernodeRegistry {
+impl CiphernodeOrchestrator {
     pub fn new(bus: Addr<EventBus>, data: Addr<Data>, address: Address) -> Self {
         Self {
             bus,
@@ -24,15 +24,15 @@ impl CiphernodeRegistry {
     }
 
     pub fn attach(bus: Addr<EventBus>, data: Addr<Data>, address: Address) -> Addr<Self> {
-        CiphernodeRegistry::new(bus, data, address).start()
+        CiphernodeOrchestrator::new(bus, data, address).start()
     }
 }
 
-impl Actor for CiphernodeRegistry {
+impl Actor for CiphernodeOrchestrator {
     type Context = Context<Self>;
 }
 
-impl Handler<InitializeWithEnclaveEvent> for CiphernodeRegistry {
+impl Handler<InitializeWithEnclaveEvent> for CiphernodeOrchestrator {
     type Result = ();
     fn handle(&mut self, msg: InitializeWithEnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let InitializeWithEnclaveEvent { fhe, event, .. } = msg;
@@ -46,7 +46,7 @@ impl Handler<InitializeWithEnclaveEvent> for CiphernodeRegistry {
     }
 }
 
-impl Handler<EnclaveEvent> for CiphernodeRegistry {
+impl Handler<EnclaveEvent> for CiphernodeOrchestrator {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
@@ -57,7 +57,7 @@ impl Handler<EnclaveEvent> for CiphernodeRegistry {
     }
 }
 
-impl CiphernodeRegistry {
+impl CiphernodeOrchestrator {
     fn ciphernode_factory(&self, fhe: Addr<Fhe>) -> impl FnOnce() -> Addr<Ciphernode> {
         let data = self.data.clone();
         let bus = self.bus.clone();

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{EventBus, P2p, PlaintextRegistry, PublicKeyRegistry, Registry, Sortition};
+use crate::{EventBus, P2p, PlaintextOrchestrator, PublicKeyOrchestrator, Orchestrator, Sortition};
 use actix::{Actor, Addr, Context};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
@@ -12,7 +12,7 @@ use tokio::task::JoinHandle;
 pub struct MainAggregator {
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
-    registry: Addr<Registry>,
+    orchestrator: Addr<Orchestrator>,
     p2p: Addr<P2p>,
 }
 
@@ -20,13 +20,13 @@ impl MainAggregator {
     pub fn new(
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
-        registry: Addr<Registry>,
+        orchestrator: Addr<Orchestrator>,
         p2p: Addr<P2p>,
     ) -> Self {
         Self {
             bus,
             sortition,
-            registry,
+            orchestrator,
             p2p,
         }
     }
@@ -37,17 +37,17 @@ impl MainAggregator {
         ));
         let bus = EventBus::new(true).start();
         let sortition = Sortition::attach(bus.clone());
-        let registry = Registry::attach(
+        let orchestrator = Orchestrator::attach(
             bus.clone(),
             rng,
-            Some(PublicKeyRegistry::attach(bus.clone(), sortition.clone())),
-            Some(PlaintextRegistry::attach(bus.clone(), sortition.clone())),
+            Some(PublicKeyOrchestrator::attach(bus.clone(), sortition.clone())),
+            Some(PlaintextOrchestrator::attach(bus.clone(), sortition.clone())),
             None,
         )
         .await;
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
-        let main_addr = MainAggregator::new(bus, sortition, registry, p2p_addr).start();
+        let main_addr = MainAggregator::new(bus, sortition, orchestrator, p2p_addr).start();
         (main_addr, join_handle)
     }
 }

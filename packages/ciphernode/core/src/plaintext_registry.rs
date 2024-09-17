@@ -6,14 +6,14 @@ use crate::{
 use actix::prelude::*;
 use std::collections::HashMap;
 
-pub struct PlaintextRegistry {
+pub struct PlaintextOrchestrator {
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
     buffers: HashMap<E3id, Vec<EnclaveEvent>>,
     plaintexts: HashMap<E3id, Addr<PlaintextAggregator>>,
 }
 
-impl PlaintextRegistry {
+impl PlaintextOrchestrator {
     pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> Self {
         Self {
             bus,
@@ -24,15 +24,15 @@ impl PlaintextRegistry {
     }
 
     pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> Addr<Self> {
-        PlaintextRegistry::new(bus.clone(), sortition).start()
+        PlaintextOrchestrator::new(bus.clone(), sortition).start()
     }
 }
 
-impl Actor for PlaintextRegistry {
+impl Actor for PlaintextOrchestrator {
     type Context = Context<Self>;
 }
 
-impl Handler<InitializeWithEnclaveEvent> for PlaintextRegistry {
+impl Handler<InitializeWithEnclaveEvent> for PlaintextOrchestrator {
     type Result = ();
     fn handle(&mut self, msg: InitializeWithEnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let InitializeWithEnclaveEvent { fhe, meta, event } = msg;
@@ -49,7 +49,7 @@ impl Handler<InitializeWithEnclaveEvent> for PlaintextRegistry {
     }
 }
 
-impl Handler<EnclaveEvent> for PlaintextRegistry {
+impl Handler<EnclaveEvent> for PlaintextOrchestrator {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
@@ -60,7 +60,7 @@ impl Handler<EnclaveEvent> for PlaintextRegistry {
     }
 }
 
-impl PlaintextRegistry {
+impl PlaintextOrchestrator {
     fn plaintext_factory(
         &self,
         e3_id: E3id,

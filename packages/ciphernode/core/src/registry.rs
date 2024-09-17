@@ -1,7 +1,7 @@
 // TODO: spawn and supervise child actors
 use crate::{
-    CiphernodeRegistry, CommitteeRequested, E3id, EnclaveEvent, EventBus, Fhe, PlaintextRegistry,
-    PublicKeyRegistry, Subscribe,
+    CiphernodeOrchestrator, CommitteeRequested, E3id, EnclaveEvent, EventBus, Fhe, PlaintextOrchestrator,
+    PublicKeyOrchestrator, Subscribe,
 };
 use actix::prelude::*;
 use rand_chacha::ChaCha20Rng;
@@ -30,21 +30,21 @@ pub struct CommitteeMeta {
     pub seed: u64,
 }
 
-pub struct Registry {
+pub struct Orchestrator {
     fhes: HashMap<E3id, Addr<Fhe>>,
     meta: HashMap<E3id, CommitteeMeta>,
-    public_key: Option<Addr<PublicKeyRegistry>>,
-    plaintext: Option<Addr<PlaintextRegistry>>,
-    ciphernode: Option<Addr<CiphernodeRegistry>>,
+    public_key: Option<Addr<PublicKeyOrchestrator>>,
+    plaintext: Option<Addr<PlaintextOrchestrator>>,
+    ciphernode: Option<Addr<CiphernodeOrchestrator>>,
     rng: Arc<Mutex<ChaCha20Rng>>,
 }
 
-impl Registry {
+impl Orchestrator {
     pub fn new(
         rng: Arc<Mutex<ChaCha20Rng>>,
-        public_key: Option<Addr<PublicKeyRegistry>>,
-        plaintext: Option<Addr<PlaintextRegistry>>,
-        ciphernode: Option<Addr<CiphernodeRegistry>>,
+        public_key: Option<Addr<PublicKeyOrchestrator>>,
+        plaintext: Option<Addr<PlaintextOrchestrator>>,
+        ciphernode: Option<Addr<CiphernodeOrchestrator>>,
     ) -> Self {
         Self {
             rng,
@@ -56,15 +56,15 @@ impl Registry {
         }
     }
 
-    // TODO: use a builder pattern to manage the Option<Registry>
+    // TODO: use a builder pattern to manage the Option<Orchestrator>
     pub async fn attach(
         bus: Addr<EventBus>,
         rng: Arc<Mutex<ChaCha20Rng>>,
-        public_key: Option<Addr<PublicKeyRegistry>>,
-        plaintext: Option<Addr<PlaintextRegistry>>,
-        ciphernode: Option<Addr<CiphernodeRegistry>>,
+        public_key: Option<Addr<PublicKeyOrchestrator>>,
+        plaintext: Option<Addr<PlaintextOrchestrator>>,
+        ciphernode: Option<Addr<CiphernodeOrchestrator>>,
     ) -> Addr<Self> {
-        let addr = Registry::new(rng, public_key, plaintext, ciphernode).start();
+        let addr = Orchestrator::new(rng, public_key, plaintext, ciphernode).start();
         bus.send(Subscribe::new("*", addr.clone().into()))
             .await
             .unwrap();
@@ -72,11 +72,11 @@ impl Registry {
     }
 }
 
-impl Actor for Registry {
+impl Actor for Orchestrator {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for Registry {
+impl Handler<EnclaveEvent> for Orchestrator {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
@@ -144,7 +144,7 @@ impl Handler<EnclaveEvent> for Registry {
     }
 }
 
-impl Registry {
+impl Orchestrator {
     fn fhe_factory(
         &self,
         moduli: Vec<u64>,

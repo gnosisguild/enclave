@@ -56,9 +56,9 @@ mod tests {
             CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
             PublicKeyShareSerializer,
         },
-        CiphernodeAdded, CiphernodeRegistry, CiphernodeSelected, CiphertextOutputPublished,
-        DecryptionshareCreated, PlaintextAggregated, PlaintextRegistry, PublicKeyRegistry,
-        Registry, ResetHistory, SharedRng, Sortition,
+        CiphernodeAdded, CiphernodeOrchestrator, CiphernodeSelected, CiphertextOutputPublished,
+        DecryptionshareCreated, PlaintextAggregated, PlaintextOrchestrator, PublicKeyOrchestrator,
+        Orchestrator, ResetHistory, SharedRng, Sortition,
     };
     use actix::prelude::*;
     use alloy_primitives::Address;
@@ -88,12 +88,12 @@ mod tests {
         // create ciphernode actor for managing ciphernode flow
         let sortition = Sortition::attach(bus.clone());
         CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
-        Registry::attach(
+        Orchestrator::attach(
             bus.clone(),
             rng,
-            Some(PublicKeyRegistry::attach(bus.clone(), sortition.clone())),
-            Some(PlaintextRegistry::attach(bus.clone(), sortition.clone())),
-            Some(CiphernodeRegistry::attach(bus.clone(), data, addr)),
+            Some(PublicKeyOrchestrator::attach(bus.clone(), sortition.clone())),
+            Some(PlaintextOrchestrator::attach(bus.clone(), sortition.clone())),
+            Some(CiphernodeOrchestrator::attach(bus.clone(), data, addr)),
         )
         .await;
     }

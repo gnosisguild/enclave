@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::{CiphernodeRegistry, CiphernodeSelector, Data, EventBus, P2p, Registry, Sortition};
+use crate::{CiphernodeOrchestrator, CiphernodeSelector, Data, EventBus, Orchestrator, P2p, Sortition};
 use actix::{Actor, Addr, Context};
 use alloy_primitives::Address;
 use rand::SeedableRng;
@@ -16,7 +16,7 @@ pub struct MainCiphernode {
     data: Addr<Data>,
     sortition: Addr<Sortition>,
     selector: Addr<CiphernodeSelector>,
-    registry: Addr<Registry>,
+    orchestrator: Addr<Orchestrator>,
     p2p: Addr<P2p>,
 }
 
@@ -27,7 +27,7 @@ impl MainCiphernode {
         data: Addr<Data>,
         sortition: Addr<Sortition>,
         selector: Addr<CiphernodeSelector>,
-        registry: Addr<Registry>,
+        orchestrator: Addr<Orchestrator>,
         p2p: Addr<P2p>,
     ) -> Self {
         Self {
@@ -36,7 +36,7 @@ impl MainCiphernode {
             data,
             sortition,
             selector,
-            registry,
+            orchestrator,
             p2p,
         }
     }
@@ -49,19 +49,30 @@ impl MainCiphernode {
         let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
         let sortition = Sortition::attach(bus.clone());
         let selector = CiphernodeSelector::attach(bus.clone(), sortition.clone(), address);
-        let registry =  Registry::attach(
+        let orchestrator = Orchestrator::attach(
             bus.clone(),
             rng,
             None,
             None,
-            Some(CiphernodeRegistry::attach(bus.clone(), data.clone(), address)),
+            Some(CiphernodeOrchestrator::attach(
+                bus.clone(),
+                data.clone(),
+                address,
+            )),
         )
         .await;
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
-        let main_addr =
-            MainCiphernode::new(address, bus, data, sortition, selector, registry, p2p_addr)
-                .start();
+        let main_addr = MainCiphernode::new(
+            address,
+            bus,
+            data,
+            sortition,
+            selector,
+            orchestrator,
+            p2p_addr,
+        )
+        .start();
         (main_addr, join_handle)
     }
 }
