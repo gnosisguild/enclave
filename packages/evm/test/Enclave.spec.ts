@@ -15,6 +15,7 @@ import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fix
 import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
 import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
+import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -30,16 +31,18 @@ describe("Enclave", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
 
+    const poseidon = await PoseidonT3Fixture();
     const registry = await deployCiphernodeRegistryFixture();
     const e3Program = await deployE3ProgramFixture();
     const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
     const inputValidator = await deployInputValidatorFixture();
 
-    const enclave = await deployEnclaveFixture({
-      owner,
-      registry: await registry.getAddress(),
-    });
+    const enclave = await deployEnclaveFixture(
+      owner.address,
+      await registry.getAddress(),
+      await poseidon.getAddress(),
+    );
 
     await enclave.enableE3Program(await e3Program.getAddress());
 
@@ -47,6 +50,7 @@ describe("Enclave", function () {
       owner,
       notTheOwner,
       enclave,
+      poseidon,
       mocks: {
         e3Program,
         decryptionVerifier,
@@ -77,31 +81,20 @@ describe("Enclave", function () {
 
   describe("constructor / initialize()", function () {
     it("correctly sets owner", async function () {
-      const [, , , someSigner] = await ethers.getSigners();
-      const enclave = await deployEnclaveFixture({
-        owner: someSigner,
-        registry: AddressTwo,
-      });
-      expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
+      const { owner, enclave } = await loadFixture(setup);
+      expect(await enclave.owner()).to.equal(owner.address);
     });
 
     it("correctly sets ciphernodeRegistry address", async function () {
-      const [aSigner] = await ethers.getSigners();
-      const enclave = await deployEnclaveFixture({
-        owner: aSigner,
-        registry: AddressTwo,
-      });
-      expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
+      const { mocks, enclave } = await loadFixture(setup);
+      expect(await enclave.ciphernodeRegistry()).to.equal(
+        await mocks.registry.getAddress(),
+      );
     });
 
     it("correctly sets max duration", async function () {
-      const [aSigner] = await ethers.getSigners();
-      const enclave = await deployEnclaveFixture({
-        owner: aSigner,
-        registry: AddressTwo,
-        maxDuration: 9876,
-      });
-      expect(await enclave.maxDuration()).to.equal(9876);
+      const { enclave } = await loadFixture(setup);
+      expect(await enclave.maxDuration()).to.equal(60 * 60 * 24 * 30);
     });
   });
 

@@ -103,17 +103,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         emit CommitteePublished(e3Id, publicKey);
     }
 
-    ////////////////////////////////////////////////////////////
-    //                                                        //
-    //                   Set Functions                        //
-    //                                                        //
-    ////////////////////////////////////////////////////////////
-
-    function setEnclave(address _enclave) public onlyOwner {
-        enclave = _enclave;
-        emit EnclaveSet(_enclave);
-    }
-
     function addCiphernode(address node) external onlyOwner {
         uint160 ciphernode = uint160(node);
         ciphernodes._insert(ciphernode);
@@ -130,7 +119,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         address node,
         uint256[] calldata siblingNodes
     ) external onlyOwner {
-        uint256 ciphernode = uint256(bytes32(bytes20(node)));
+        uint160 ciphernode = uint160(node);
         ciphernodes._remove(ciphernode, siblingNodes);
         uint256 index = ciphernodes._indexOf(ciphernode);
         numCiphernodes--;
@@ -143,8 +132,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         emit CiphernodeRemoved(node, index, numCiphernodes, ciphernodes.size);
     }
 
-    function isCiphernodeEligible(address node) external view returns (bool) {
-        return isEnabled(node);
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Set Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function setEnclave(address _enclave) public onlyOwner {
+        enclave = _enclave;
+        emit EnclaveSet(_enclave);
     }
 
     ////////////////////////////////////////////////////////////
@@ -160,8 +156,12 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(publicKey.length > 0, CommitteeNotPublished());
     }
 
+    function isCiphernodeEligible(address node) external view returns (bool) {
+        return isEnabled(node);
+    }
+
     function isEnabled(address node) public view returns (bool) {
-        return ciphernodes._has(uint256(bytes32(bytes20(node))));
+        return ciphernodes._has(uint160(node));
     }
 
     function root() public view returns (uint256) {
