@@ -50,13 +50,13 @@ task(
   .addOptionalParam(
     "e3Params",
     "parameters for the E3 program",
-    "0x0000000000000000000000004965ceCe27422B8B9557f9b9C841581B8Da60B34",
+    undefined,
     types.string,
   )
   .addOptionalParam(
     "computeParams",
     "parameters for the compute provider",
-    "0x000000000000000000000000404af1c0780a9269e4d3308a0812fb87bf5fc490",
+    undefined,
     types.string,
   )
   .setAction(async function (taskArguments: TaskArguments, hre) {
@@ -87,6 +87,30 @@ task(
       filterAddress = naiveRegistryFilter.address;
     }
 
+    let e3Params = taskArguments.e3Params;
+    if (!e3Params) {
+      const MockInputValidator =
+        await hre.deployments.get("MockInputValidator");
+      if (!MockInputValidator) {
+        throw new Error("MockInputValidator not deployed");
+      }
+      e3Params = hre.ethers.zeroPadValue(MockInputValidator.address, 32);
+    }
+
+    let computeParams = taskArguments.computeParams;
+    if (!computeParams) {
+      const MockDecryptionVerifier = await hre.deployments.get(
+        "MockDecryptionVerifier",
+      );
+      if (!MockDecryptionVerifier) {
+        throw new Error("MockDecryptionVerifier not deployed");
+      }
+      computeParams = hre.ethers.zeroPadValue(
+        MockDecryptionVerifier.address,
+        32,
+      );
+    }
+
     try {
       const enableE3Tx = await enclaveContract.enableE3Program(e3Address);
       await enableE3Tx.wait();
@@ -100,8 +124,8 @@ task(
       [taskArguments.windowStart, taskArguments.windowEnd],
       taskArguments.duration,
       e3Address,
-      taskArguments.e3Params,
-      taskArguments.computeParams,
+      e3Params,
+      computeParams,
       // 1 ETH
       { value: "1000000000000000000" },
     );
