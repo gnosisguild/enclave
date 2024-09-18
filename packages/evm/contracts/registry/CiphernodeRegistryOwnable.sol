@@ -24,7 +24,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     uint256 public numCiphernodes;
     LeanIMTData public ciphernodes;
 
-    mapping(uint256 e3Id => IRegistryFilter filter) public requests;
+    mapping(uint256 e3Id => IRegistryFilter filter) public filters;
     mapping(uint256 e3Id => uint256 root) public roots;
     mapping(uint256 e3Id => bytes publicKey) public publicKeys;
 
@@ -36,7 +36,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     error CommitteeAlreadyRequested();
     error CommitteeAlreadyPublished();
-    error CommitteeDoesNotExist();
+    error OnlyFilter();
     error CommitteeNotPublished();
     error CiphernodeNotEnabled(address node);
     error OnlyEnclave();
@@ -80,10 +80,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint32[2] calldata threshold
     ) external onlyEnclave returns (bool success) {
         require(
-            requests[e3Id] == IRegistryFilter(address(0)),
+            filters[e3Id] == IRegistryFilter(address(0)),
             CommitteeAlreadyRequested()
         );
-        requests[e3Id] = IRegistryFilter(filter);
+        filters[e3Id] = IRegistryFilter(filter);
         roots[e3Id] = root();
 
         IRegistryFilter(filter).requestCommittee(e3Id, threshold);
@@ -97,7 +97,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes calldata publicKey
     ) external {
         // only to be published by the filter
-        require(address(requests[e3Id]) == msg.sender, CommitteeDoesNotExist());
+        require(address(filters[e3Id]) == msg.sender, OnlyFilter());
 
         publicKeys[e3Id] = publicKey;
         emit CommitteePublished(e3Id, publicKey);
@@ -170,5 +170,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function rootAt(uint256 e3Id) public view returns (uint256) {
         return roots[e3Id];
+    }
+
+    function getFilter(uint256 e3Id) public view returns (IRegistryFilter) {
+        return filters[e3Id];
     }
 }

@@ -14,6 +14,6 @@ export async function naiveRegistryFilterFixture(
 
   return NaiveRegistryFilter__factory.connect(
     await deployment.getAddress(),
-    signer.provider,
+    signer,
   );
 }

@@ -6,7 +6,7 @@ import {
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { ZeroHash } from "ethers";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
 import { deployCiphernodeRegistryOwnableFixture } from "../fixtures/CiphernodeRegistryOwnable.fixture";
@@ -89,18 +89,119 @@ describe.only("CiphernodeRegistryOwnable", function () {
         ),
       ).to.be.revertedWithCustomError(registry, "CommitteeAlreadyRequested");
     });
-    it("stores the registry filter for the given e3Id");
-    it("stores the root of the ciphernode registry at the time of the request");
-    it("requests a committee from the given filter");
-    it("emits a CommitteeRequested event");
-    it("reverts if filter.requestCommittee() fails");
-    it("returns true if the request is successful");
+    it("stores the registry filter for the given e3Id", async function () {
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      expect(await registry.getFilter(request.e3Id)).to.equal(request.filter);
+    });
+    it("stores the root of the ciphernode registry at the time of the request", async function () {
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      expect(await registry.rootAt(request.e3Id)).to.equal(
+        await registry.root(),
+      );
+    });
+    it("requests a committee from the given filter", async function () {
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      expect(await registry.getFilter(request.e3Id)).to.equal(request.filter);
+    });
+    it("emits a CommitteeRequested event", async function () {
+      const { registry, request } = await loadFixture(setup);
+      await expect(
+        registry.requestCommittee(
+          request.e3Id,
+          request.filter,
+          request.threshold,
+        ),
+      )
+        .to.emit(registry, "CommitteeRequested")
+        .withArgs(request.e3Id, request.filter, request.threshold);
+    });
+    it("reverts if filter.requestCommittee() fails", async function () {
+      const { owner, registry, filter, request } = await loadFixture(setup);
+
+      await filter.setRegistry(owner.address);
+      await filter.requestCommittee(request.e3Id, request.threshold);
+      await filter.setRegistry(await registry.getAddress());
+
+      await expect(
+        registry.requestCommittee(
+          request.e3Id,
+          request.filter,
+          request.threshold,
+        ),
+      ).to.be.revertedWithCustomError(filter, "CommitteeAlreadyExists");
+    });
+    it("returns true if the request is successful", async function () {
+      const { registry, request } = await loadFixture(setup);
+      expect(
+        await registry.requestCommittee.staticCall(
+          request.e3Id,
+          request.filter,
+          request.threshold,
+        ),
+      ).to.be.true;
+    });
   });
 
   describe("publishCommittee()", function () {
-    it("reverts if the caller is not the filter for the given e3Id");
-    it("stores the public key of the committee");
-    it("emits a CommitteePublished event");
+    it("reverts if the caller is not the filter for the given e3Id", async function () {
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      await expect(
+        registry.publishCommittee(request.e3Id, "0xc0de", "0xda7a"),
+      ).to.be.revertedWithCustomError(registry, "OnlyFilter");
+    });
+    it("stores the public key of the committee", async function () {
+      const { filter, registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      await filter.publishCommittee(
+        request.e3Id,
+        [AddressOne, AddressTwo],
+        "0xda7a",
+      );
+      expect(await registry.committeePublicKey(request.e3Id)).to.equal(
+        "0xda7a",
+      );
+    });
+    it("emits a CommitteePublished event", async function () {
+      const { filter, registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      expect(
+        await filter.publishCommittee(
+          request.e3Id,
+          [AddressOne, AddressTwo],
+          "0xda7a",
+        ),
+      )
+        .to.emit(registry, "CommitteePublished")
+        .withArgs(request.e3Id, "0xda7a");
+    });
   });
 
   describe("addCiphernode()", function () {
@@ -146,5 +247,9 @@ describe.only("CiphernodeRegistryOwnable", function () {
     it(
       "returns the root of the ciphernode registry merkle tree at the given e3Id",
     );
+  });
+
+  describe("getFilter()", function () {
+    it("returns the registry filter for the given e3Id");
   });
 });
