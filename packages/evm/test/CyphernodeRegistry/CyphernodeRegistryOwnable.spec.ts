@@ -205,10 +205,32 @@ describe.only("CiphernodeRegistryOwnable", function () {
   });
 
   describe("addCiphernode()", function () {
-    it("reverts if the caller is not the owner");
-    it("adds the ciphernode to the registry");
-    it("increments numCiphernodes");
-    it("emits a CiphernodeAdded event");
+    it("reverts if the caller is not the owner", async function () {
+      const { registry, notTheOwner } = await loadFixture(setup);
+      await expect(registry.connect(notTheOwner).addCiphernode(addressThree))
+        .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
+        .withArgs(notTheOwner.address);
+    });
+    it("adds the ciphernode to the registry", async function () {
+      const { registry } = await loadFixture(setup);
+      expect(await registry.addCiphernode(addressThree));
+      expect(await registry.isCiphernodeEligible(addressThree)).to.be.true;
+    });
+    it("increments numCiphernodes", async function () {
+      const { registry } = await loadFixture(setup);
+      const numCiphernodes = await registry.numCiphernodes();
+      expect(await registry.addCiphernode(addressThree));
+      expect(await registry.numCiphernodes()).to.equal(
+        numCiphernodes + BigInt(1),
+      );
+    });
+    it("emits a CiphernodeAdded event", async function () {
+      const { registry } = await loadFixture(setup);
+      const numCiphernodes = await registry.numCiphernodes();
+      expect(await registry.addCiphernode(addressThree))
+        .to.emit(registry, "CiphernodeAdded")
+        .withArgs(addressThree, numCiphernodes + BigInt(1));
+    });
   });
 
   describe("removeCiphernode()", function () {
