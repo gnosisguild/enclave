@@ -1,4 +1,3 @@
-import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { ethers } from "hardhat";
 
 import { Enclave__factory } from "../../types/factories/contracts/Enclave__factory";

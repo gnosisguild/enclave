@@ -55,7 +55,7 @@ describe("CiphernodeRegistryOwnable", function () {
       const poseidonFactory = await ethers.getContractFactory("PoseidonT3");
       const poseidonDeployment = await poseidonFactory.deploy();
       const [deployer] = await ethers.getSigners();
-      let ciphernodeRegistryFactory = await ethers.getContractFactory(
+      const ciphernodeRegistryFactory = await ethers.getContractFactory(
         "CiphernodeRegistryOwnable",
         {
           libraries: {
@@ -63,7 +63,7 @@ describe("CiphernodeRegistryOwnable", function () {
           },
         },
       );
-      let ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
+      const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
         deployer.address,
         AddressTwo,
       );
@@ -191,7 +191,7 @@ describe("CiphernodeRegistryOwnable", function () {
         request.filter,
         request.threshold,
       );
-      expect(
+      await expect(
         await filter.publishCommittee(
           request.e3Id,
           [AddressOne, AddressTwo],
@@ -225,10 +225,16 @@ describe("CiphernodeRegistryOwnable", function () {
     });
     it("emits a CiphernodeAdded event", async function () {
       const { registry } = await loadFixture(setup);
+      const treeSize = await registry.treeSize();
       const numCiphernodes = await registry.numCiphernodes();
-      expect(await registry.addCiphernode(AddressThree))
+      await expect(await registry.addCiphernode(AddressThree))
         .to.emit(registry, "CiphernodeAdded")
-        .withArgs(AddressThree, numCiphernodes + BigInt(1));
+        .withArgs(
+          AddressThree,
+          treeSize,
+          numCiphernodes + BigInt(1),
+          treeSize + BigInt(1),
+        );
     });
   });
 
@@ -285,7 +291,7 @@ describe("CiphernodeRegistryOwnable", function () {
     });
     it("emits an EnclaveSet event", async function () {
       const { registry } = await loadFixture(setup);
-      expect(await registry.setEnclave(AddressThree))
+      await expect(await registry.setEnclave(AddressThree))
         .to.emit(registry, "EnclaveSet")
         .withArgs(AddressThree);
     });
