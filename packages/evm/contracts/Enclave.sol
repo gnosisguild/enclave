@@ -34,11 +34,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     // Mapping of E3s.
     mapping(uint256 e3Id => E3 e3) public e3s;
 
-    // Mapping of input merkle trees
+    // Mapping of input merkle trees.
     mapping(uint256 e3Id => LeanIMTData imt) public inputs;
 
     // Mapping counting the number of inputs for each E3.
     mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
+
+    // Mapping of enabled encryption schemes.
+    mapping(bytes32 encryptionSchemeId => bool enabled)
+        public encryptionSchemes;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -55,6 +59,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error E3DoesNotExist(uint256 e3Id);
     error ModuleAlreadyEnabled(address module);
     error ModuleNotEnabled(address module);
+    error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputationRequest(
@@ -141,6 +146,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
         (
+            bytes32 encryptionSchemeId,
             IInputValidator inputValidator,
             IDecryptionVerifier decryptionVerifier
         ) = e3Program.validate(
@@ -149,6 +155,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
                 e3ProgramParams,
                 computeProviderParams
             );
+        require(
+            encryptionSchemes[encryptionSchemeId],
+            InvalidEncryptionScheme(encryptionSchemeId)
+        );
         require(
             address(inputValidator) != address(0) &&
                 address(decryptionVerifier) != address(0),
@@ -161,6 +171,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             startWindow: startWindow,
             duration: duration,
             expiration: 0,
+            encryptionSchemeId: encryptionSchemeId,
             e3Program: e3Program,
             e3ProgramParams: e3ProgramParams,
             inputValidator: inputValidator,
@@ -322,6 +333,30 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3ProgramDisabled(e3Program);
     }
 
+    function enableEncryptionScheme(
+        bytes32 encryptionSchemeId
+    ) public onlyOwner returns (bool success) {
+        require(
+            !encryptionSchemes[encryptionSchemeId],
+            InvalidEncryptionScheme(encryptionSchemeId)
+        );
+        encryptionSchemes[encryptionSchemeId] = true;
+        success = true;
+        emit EncryptionSchemeEnabled(encryptionSchemeId);
+    }
+
+    function disableEncryptionScheme(
+        bytes32 encryptionSchemeId
+    ) public onlyOwner returns (bool success) {
+        require(
+            encryptionSchemes[encryptionSchemeId],
+            InvalidEncryptionScheme(encryptionSchemeId)
+        );
+        encryptionSchemes[encryptionSchemeId] = false;
+        success = false;
+        emit EncryptionSchemeDisabled(encryptionSchemeId);
+    }
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Get Functions                        //
@@ -339,5 +374,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             E3DoesNotExist(e3Id)
         );
         return InternalLeanIMT._root(inputs[e3Id]);
+    }
+
+    function isEncryptionSchemeEnabled(
+        bytes32 encryptionSchemeId
+    ) public view returns (bool) {
+        return encryptionSchemes[encryptionSchemeId];
     }
 }

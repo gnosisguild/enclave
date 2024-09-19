@@ -10,6 +10,7 @@ interface IE3Program {
     /// @param seed Seed for the computation.
     /// @param e3ProgramParams ABI encoded computation parameters.
     /// @param computeProviderParams ABI encoded compute provider parameters.
+    /// @return encryptionSchemeId ID of the encryption scheme to be used for the computation.
     /// @return inputValidator The input validator to be used for the computation.
     /// @return decryptionVerifier The decryption verifier to be used for the computation.
     function validate(
@@ -20,6 +21,7 @@ interface IE3Program {
     )
         external
         returns (
+            bytes32 encryptionSchemeId,
             IInputValidator inputValidator,
             IDecryptionVerifier decryptionVerifier
         );

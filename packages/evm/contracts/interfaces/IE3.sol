@@ -24,6 +24,7 @@ struct E3 {
     uint256[2] startWindow;
     uint256 duration;
     uint256 expiration;
+    bytes32 encryptionSchemeId;
     IE3Program e3Program;
     bytes e3ProgramParams;
     IInputValidator inputValidator;

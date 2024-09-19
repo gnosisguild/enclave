@@ -66,6 +66,14 @@ interface IEnclave {
     /// @param ciphernodeRegistry The address of the CiphernodeRegistry contract.
     event CiphernodeRegistrySet(address ciphernodeRegistry);
 
+    /// @notice The event MUST be emitted any time an encryption scheme is enabled.
+    /// @param encryptionSchemeId The ID of the encryption scheme that was enabled.
+    event EncryptionSchemeEnabled(bytes32 encryptionSchemeId);
+
+    /// @notice This event MUST be emitted any time an encryption scheme is disabled.
+    /// @param encryptionSchemeId The ID of the encryption scheme that was disabled.
+    event EncryptionSchemeDisabled(bytes32 encryptionSchemeId);
+
     /// @notice This event MUST be emitted any time a E3 Program is enabled.
     /// @param e3Program The address of the E3 Program.
     event E3ProgramEnabled(IE3Program e3Program);

@@ -60,7 +60,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     function initialize(address _owner, address _registry) public initializer {
         __Ownable_init(msg.sender);
         setRegistry(_registry);
-        transferOwnership(_owner);
+        if (_owner != owner()) transferOwnership(_owner);
     }
 
     ////////////////////////////////////////////////////////////
