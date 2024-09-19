@@ -278,41 +278,112 @@ describe.only("CiphernodeRegistryOwnable", function () {
   });
 
   describe("setEnclave()", function () {
-    it("reverts if the caller is not the owner");
-    it("sets the enclave address");
-    it("emits an EnclaveSet event");
+    it("reverts if the caller is not the owner", async function () {
+      const { registry, notTheOwner } = await loadFixture(setup);
+      await expect(
+        registry.connect(notTheOwner).setEnclave(AddressThree),
+      ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
+    });
+    it("sets the enclave address", async function () {
+      const { registry } = await loadFixture(setup);
+      expect(await registry.setEnclave(AddressThree));
+      expect(await registry.enclave()).to.equal(AddressThree);
+    });
+    it("emits an EnclaveSet event", async function () {
+      const { registry } = await loadFixture(setup);
+      expect(await registry.setEnclave(AddressThree))
+        .to.emit(registry, "EnclaveSet")
+        .withArgs(AddressThree);
+    });
   });
 
   describe("committeePublicKey()", function () {
-    it("returns the public key of the committee for the given e3Id");
-    it("reverts if the committee has not been published");
+    it("returns the public key of the committee for the given e3Id", async function () {
+      const { filter, registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      await filter.publishCommittee(
+        request.e3Id,
+        [AddressOne, AddressTwo],
+        "0xda7a",
+      );
+      expect(await registry.committeePublicKey(request.e3Id)).to.equal(
+        "0xda7a",
+      );
+    });
+    it("reverts if the committee has not been published", async function () {
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      await expect(
+        registry.committeePublicKey(request.e3Id),
+      ).to.be.revertedWithCustomError(registry, "CommitteeNotPublished");
+    });
   });
 
   describe("isCiphernodeEligible()", function () {
-    it("returns true if the ciphernode is in the registry");
-    it("returns false if the ciphernode is not in the registry");
+    it("returns true if the ciphernode is in the registry", async function () {
+      const { registry } = await loadFixture(setup);
+      expect(await registry.isCiphernodeEligible(AddressOne)).to.be.true;
+    });
+    it("returns false if the ciphernode is not in the registry", async function () {
+      const { registry } = await loadFixture(setup);
+      expect(await registry.isCiphernodeEligible(AddressThree)).to.be.false;
+    });
   });
 
   describe("isEnabled()", function () {
-    it("returns true if the ciphernode is currently enabled");
-    it("returns false if the ciphernode is not currently enabled");
+    it("returns true if the ciphernode is currently enabled", async function () {
+      const { registry } = await loadFixture(setup);
+      expect(await registry.isEnabled(AddressOne)).to.be.true;
+    });
+    it("returns false if the ciphernode is not currently enabled", async function () {
+      const { registry } = await loadFixture(setup);
+      expect(await registry.isEnabled(AddressThree)).to.be.false;
+    });
   });
 
   describe("root()", function () {
-    it("returns the root of the ciphernode registry merkle tree");
+    it("returns the root of the ciphernode registry merkle tree", async function () {
+      const { registry, tree } = await loadFixture(setup);
+      expect(await registry.root()).to.equal(tree.root);
+    });
   });
 
   describe("rootAt()", function () {
-    it(
-      "returns the root of the ciphernode registry merkle tree at the given e3Id",
-    );
+    it("returns the root of the ciphernode registry merkle tree at the given e3Id", async function () {
+      const { registry, tree, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      expect(await registry.rootAt(request.e3Id)).to.equal(tree.root);
+    });
   });
 
   describe("getFilter()", function () {
-    it("returns the registry filter for the given e3Id");
+    it("returns the registry filter for the given e3Id", async function () {
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(
+        request.e3Id,
+        request.filter,
+        request.threshold,
+      );
+      expect(await registry.getFilter(request.e3Id)).to.equal(request.filter);
+    });
   });
 
   describe("treeSize()", function () {
-    it("returns the size of the ciphernode registry merkle tree");
+    it("returns the size of the ciphernode registry merkle tree", async function () {
+      const { registry, tree } = await loadFixture(setup);
+      expect(await registry.treeSize()).to.equal(tree.size);
+    });
   });
 });
