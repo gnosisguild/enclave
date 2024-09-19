@@ -15,7 +15,7 @@ const AddressThree = "0x0000000000000000000000000000000000000003";
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
-describe.only("CiphernodeRegistryOwnable", function () {
+describe("CiphernodeRegistryOwnable", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
 
