@@ -120,15 +120,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint256[] calldata siblingNodes
     ) external onlyOwner {
         uint160 ciphernode = uint160(node);
-        ciphernodes._remove(ciphernode, siblingNodes);
         uint256 index = ciphernodes._indexOf(ciphernode);
+        ciphernodes._remove(ciphernode, siblingNodes);
         numCiphernodes--;
-        emit CiphernodeAdded(
-            node,
-            ciphernodes._indexOf(ciphernode),
-            numCiphernodes,
-            ciphernodes.size
-        );
         emit CiphernodeRemoved(node, index, numCiphernodes, ciphernodes.size);
     }
 
@@ -174,5 +168,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function getFilter(uint256 e3Id) public view returns (IRegistryFilter) {
         return filters[e3Id];
+    }
+
+    function treeSize() public view returns (uint256) {
+        return ciphernodes.size;
     }
 }

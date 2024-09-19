@@ -16,7 +16,7 @@ import { PoseidonT3Fixture } from "../fixtures/PoseidonT3.fixture";
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
-const addressThree = "0x0000000000000000000000000000000000000003";
+const AddressThree = "0x0000000000000000000000000000000000000003";
 
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
@@ -35,14 +35,19 @@ describe.only("CiphernodeRegistryOwnable", function () {
       owner.address,
       await registry.getAddress(),
     );
+
+    const tree = new LeanIMT(hash);
     await registry.addCiphernode(AddressOne);
+    tree.insert(BigInt(AddressOne));
     await registry.addCiphernode(AddressTwo);
+    tree.insert(BigInt(AddressTwo));
 
     return {
       owner,
       notTheOwner,
       registry,
       filter,
+      tree,
       request: {
         e3Id: 1,
         filter: await filter.getAddress(),
@@ -207,19 +212,19 @@ describe.only("CiphernodeRegistryOwnable", function () {
   describe("addCiphernode()", function () {
     it("reverts if the caller is not the owner", async function () {
       const { registry, notTheOwner } = await loadFixture(setup);
-      await expect(registry.connect(notTheOwner).addCiphernode(addressThree))
+      await expect(registry.connect(notTheOwner).addCiphernode(AddressThree))
         .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner.address);
     });
     it("adds the ciphernode to the registry", async function () {
       const { registry } = await loadFixture(setup);
-      expect(await registry.addCiphernode(addressThree));
-      expect(await registry.isCiphernodeEligible(addressThree)).to.be.true;
+      expect(await registry.addCiphernode(AddressThree));
+      expect(await registry.isCiphernodeEligible(AddressThree)).to.be.true;
     });
     it("increments numCiphernodes", async function () {
       const { registry } = await loadFixture(setup);
       const numCiphernodes = await registry.numCiphernodes();
-      expect(await registry.addCiphernode(addressThree));
+      expect(await registry.addCiphernode(AddressThree));
       expect(await registry.numCiphernodes()).to.equal(
         numCiphernodes + BigInt(1),
       );
@@ -227,17 +232,49 @@ describe.only("CiphernodeRegistryOwnable", function () {
     it("emits a CiphernodeAdded event", async function () {
       const { registry } = await loadFixture(setup);
       const numCiphernodes = await registry.numCiphernodes();
-      expect(await registry.addCiphernode(addressThree))
+      expect(await registry.addCiphernode(AddressThree))
         .to.emit(registry, "CiphernodeAdded")
-        .withArgs(addressThree, numCiphernodes + BigInt(1));
+        .withArgs(AddressThree, numCiphernodes + BigInt(1));
     });
   });
 
   describe("removeCiphernode()", function () {
-    it("reverts if the caller is not the owner");
-    it("removes the ciphernode from the registry");
-    it("decrements numCiphernodes");
-    it("emits a CiphernodeRemoved event");
+    it("reverts if the caller is not the owner", async function () {
+      const { registry, notTheOwner } = await loadFixture(setup);
+      await expect(
+        registry.connect(notTheOwner).removeCiphernode(AddressOne, []),
+      )
+        .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
+        .withArgs(notTheOwner.address);
+    });
+    it("removes the ciphernode from the registry", async function () {
+      const { registry, tree } = await loadFixture(setup);
+      const index = tree.indexOf(BigInt(AddressOne));
+      const proof = tree.generateProof(index);
+      expect(await registry.isEnabled(AddressOne)).to.be.true;
+      expect(await registry.removeCiphernode(AddressOne, proof.siblings));
+      expect(await registry.isEnabled(AddressOne)).to.be.false;
+    });
+    it("decrements numCiphernodes", async function () {
+      const { registry, tree } = await loadFixture(setup);
+      const numCiphernodes = await registry.numCiphernodes();
+      const index = tree.indexOf(BigInt(AddressOne));
+      const proof = tree.generateProof(index);
+      expect(await registry.removeCiphernode(AddressOne, proof.siblings));
+      expect(await registry.numCiphernodes()).to.equal(
+        numCiphernodes - BigInt(1),
+      );
+    });
+    it("emits a CiphernodeRemoved event", async function () {
+      const { registry, tree } = await loadFixture(setup);
+      const numCiphernodes = await registry.numCiphernodes();
+      const size = await registry.treeSize();
+      const index = tree.indexOf(BigInt(AddressOne));
+      const proof = tree.generateProof(index);
+      await expect(registry.removeCiphernode(AddressOne, proof.siblings))
+        .to.emit(registry, "CiphernodeRemoved")
+        .withArgs(AddressOne, index, numCiphernodes - BigInt(1), size);
+    });
   });
 
   describe("setEnclave()", function () {
@@ -273,5 +310,9 @@ describe.only("CiphernodeRegistryOwnable", function () {
 
   describe("getFilter()", function () {
     it("returns the registry filter for the given e3Id");
+  });
+
+  describe("treeSize()", function () {
+    it("returns the size of the ciphernode registry merkle tree");
   });
 });
