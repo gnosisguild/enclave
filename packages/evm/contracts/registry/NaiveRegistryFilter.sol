@@ -106,4 +106,16 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     function setRegistry(address _registry) public onlyOwner {
         registry = _registry;
     }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Get Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function getCommittee(
+        uint256 e3Id
+    ) external view returns (Committee memory) {
+        return committees[e3Id];
+    }
 }

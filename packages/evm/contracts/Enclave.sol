@@ -176,7 +176,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CommitteeSelectionFailed()
         );
 
-        emit E3Requested(e3Id, e3s[e3Id], filter, e3Program);
+        emit E3Requested(e3Id, e3, filter, e3Program);
     }
 
     function activate(uint256 e3Id) external returns (bool success) {
