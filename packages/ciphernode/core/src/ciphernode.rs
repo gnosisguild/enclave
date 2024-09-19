@@ -3,8 +3,8 @@ use crate::{
     eventbus::EventBus,
     events::{EnclaveEvent, KeyshareCreated},
     fhe::{Fhe, GenerateKeyshare},
-    CiphernodeSelected, CiphertextOutputPublished, DecryptCiphertext, DecryptionshareCreated, Get,
-    Subscribe,
+    ActorFactory, CiphernodeSelected, CiphertextOutputPublished, DecryptCiphertext,
+    DecryptionshareCreated, Get,
 };
 use actix::prelude::*;
 use alloy_primitives::Address;
@@ -29,25 +29,6 @@ impl Ciphernode {
             data,
             address,
         }
-    }
-
-    pub async fn attach(
-        bus: Addr<EventBus>,
-        fhe: Addr<Fhe>,
-        data: Addr<Data>,
-        address: Address,
-    ) -> Addr<Self> {
-        let node = Ciphernode::new(bus.clone(), fhe, data, address).start();
-        let _ = bus
-            .send(Subscribe::new("CiphernodeSelected", node.clone().into()))
-            .await;
-        let _ = bus
-            .send(Subscribe::new(
-                "CiphertextOutputPublished",
-                node.clone().into(),
-            ))
-            .await;
-        node
     }
 }
 
@@ -166,4 +147,23 @@ async fn on_decryption_requested(
     bus.do_send(event);
 
     Ok(())
+}
+
+pub struct CiphernodeFactory;
+impl CiphernodeFactory {
+    pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: Address) -> ActorFactory {
+        Box::new(move |ctx, evt| {
+            // Save Ciphernode on CiphernodeSelected
+            let EnclaveEvent::CiphernodeSelected { .. } = evt else {
+                return;
+            };
+
+            let Some(ref fhe) = ctx.fhe else {
+                return;
+            };
+
+            ctx.ciphernode =
+                Some(Ciphernode::new(bus.clone(), fhe.clone(), data.clone(), address).start())
+        })
+    }
 }

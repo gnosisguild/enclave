@@ -1,7 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    CiphernodeOrchestrator, CiphernodeSelector, Data, EventBus, Orchestrator, P2p, SimpleLogger, Sortition
+    CiphernodeFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus,
+    FheFactory, P2p, PlaintextAggregatorFactory, PublicKeyAggregatorFactory, SimpleLogger,
+    Sortition,
 };
 use actix::{Actor, Addr, Context};
 use alloy_primitives::Address;
@@ -18,7 +20,7 @@ pub struct MainCiphernode {
     data: Addr<Data>,
     sortition: Addr<Sortition>,
     selector: Addr<CiphernodeSelector>,
-    orchestrator: Addr<Orchestrator>,
+    e3_manager: Addr<E3RequestManager>,
     p2p: Addr<P2p>,
 }
 
@@ -29,8 +31,8 @@ impl MainCiphernode {
         data: Addr<Data>,
         sortition: Addr<Sortition>,
         selector: Addr<CiphernodeSelector>,
-        orchestrator: Addr<Orchestrator>,
         p2p: Addr<P2p>,
+        e3_manager: Addr<E3RequestManager>,
     ) -> Self {
         Self {
             addr,
@@ -38,7 +40,7 @@ impl MainCiphernode {
             data,
             sortition,
             selector,
-            orchestrator,
+            e3_manager,
             p2p,
         }
     }
@@ -56,27 +58,22 @@ impl MainCiphernode {
         let sortition = Sortition::attach(bus.clone());
         let selector = CiphernodeSelector::attach(bus.clone(), sortition.clone(), address);
 
-        let orchestrator = Orchestrator::builder(bus.clone(), rng)
-            .ciphernode(CiphernodeOrchestrator::attach(
+        let e3_manager = E3RequestManager::builder(bus.clone())
+            .add_hook(CommitteeMetaFactory::create())
+            .add_hook(FheFactory::create(rng.clone()))
+            .add_hook(CiphernodeFactory::create(
                 bus.clone(),
                 data.clone(),
                 address,
             ))
-            .build()
-            .await;
+            .build();
 
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
 
-        SimpleLogger::attach("CIPHERNODE",bus.clone());
+        SimpleLogger::attach("CIPHERNODE", bus.clone());
         let main_addr = MainCiphernode::new(
-            address,
-            bus,
-            data,
-            sortition,
-            selector,
-            orchestrator,
-            p2p_addr,
+            address, bus, data, sortition, selector, p2p_addr, e3_manager,
         )
         .start();
         (main_addr, join_handle)

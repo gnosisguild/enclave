@@ -3,7 +3,7 @@ use crate::{
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
     fhe::{Fhe, GetAggregatePublicKey},
     ordered_set::OrderedSet,
-    GetHasNode, Sortition,
+    ActorFactory, GetHasNode, Sortition,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -205,5 +205,36 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
                     Ok(())
                 }),
         )
+    }
+}
+
+pub struct PublicKeyAggregatorFactory;
+impl PublicKeyAggregatorFactory {
+    pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> ActorFactory {
+        Box::new(move |ctx, evt| {
+            // Saving the publickey aggregator with deps on CommitteeRequested
+            let EnclaveEvent::CommitteeRequested { data, .. } = evt else {
+                return;
+            };
+
+            let Some(ref fhe) = ctx.fhe else {
+                return;
+            };
+            let Some(ref meta) = ctx.meta else {
+                return;
+            };
+
+            ctx.publickey = Some(
+                PublicKeyAggregator::new(
+                    fhe.clone(),
+                    bus.clone(),
+                    sortition.clone(),
+                    data.e3_id,
+                    meta.nodecount,
+                    meta.seed,
+                )
+                .start(),
+            );
+        })
     }
 }
