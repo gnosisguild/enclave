@@ -36,9 +36,10 @@ contract MockE3Program is IE3Program {
 
     function verify(
         uint256,
+        bytes32,
         bytes memory data
-    ) external pure returns (bytes memory output, bool success) {
-        output = data;
-        if (output.length > 0) success = true;
+    ) external pure returns (bool success) {
+        data;
+        if (data.length > 0) success = true;
     }
 }
