@@ -4,6 +4,7 @@ use crate::{
         CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
         PublicKeyShareSerializer, SecretKeySerializer,
     },
+    ActorFactory, CommitteeRequested, EnclaveEvent,
 };
 use actix::{Actor, Context, Handler, Message};
 use anyhow::*;
@@ -180,5 +181,31 @@ impl Handler<GetAggregatePlaintext> for Fhe {
         let decoded = Vec::<u64>::try_decode(&plaintext, Encoding::poly())?;
         let decoded = &decoded[0..2]; // TODO: this will be computation dependent
         Ok(bincode::serialize(&decoded)?)
+    }
+}
+
+pub struct FheFactory;
+
+impl FheFactory {
+    pub fn create(rng: Arc<Mutex<ChaCha20Rng>>) -> ActorFactory {
+        Box::new(move |ctx, evt| {
+            // Saving the fhe on Committee Requested
+            let EnclaveEvent::CommitteeRequested { data, .. } = evt else {
+                return;
+            };
+            let CommitteeRequested {
+                degree,
+                moduli,
+                plaintext_modulus,
+                crp,
+                ..
+            } = data;
+
+            ctx.fhe = Some(
+                Fhe::from_raw_params(&moduli, degree, plaintext_modulus, &crp, rng.clone())
+                    .unwrap()
+                    .start(),
+            );
+        })
     }
 }

@@ -3,9 +3,10 @@
 // #![warn(missing_docs, unused_imports)]
 
 mod ciphernode;
-mod ciphernode_orchestrator;
 mod ciphernode_selector;
+mod committee_meta;
 mod data;
+mod e3_request;
 mod enclave_contract;
 mod eventbus;
 pub mod events;
@@ -16,13 +17,10 @@ mod fhe;
 mod logger;
 mod main_aggregator;
 mod main_ciphernode;
-mod orchestrator;
 mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
-mod plaintext_orchestrator;
 mod publickey_aggregator;
-mod publickey_orchestrator;
 mod serializers;
 mod sortition;
 mod utils;
@@ -30,24 +28,23 @@ mod utils;
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
-pub use ciphernode_orchestrator::*;
 pub use ciphernode_selector::*;
+pub use committee_meta::*;
 pub use data::*;
+pub use e3_request::*;
 pub use eventbus::*;
 pub use events::*;
-pub use serializers::*;
 pub use fhe::*;
 pub use logger::*;
 pub use main_aggregator::*;
 pub use main_ciphernode::*;
-pub use orchestrator::*;
 pub use p2p::*;
 pub use plaintext_aggregator::*;
-pub use plaintext_orchestrator::*;
 pub use publickey_aggregator::*;
-pub use publickey_orchestrator::*;
+pub use serializers::*;
 pub use sortition::*;
 pub use utils::*;
+
 // TODO: move these out to a test folder
 #[cfg(test)]
 mod tests {
@@ -57,14 +54,12 @@ mod tests {
         eventbus::{EventBus, GetHistory},
         events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         p2p::P2p,
-        serializers::{
-            CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
-            PublicKeyShareSerializer,
-        },
+        serializers::{CiphertextSerializer, DecryptionShareSerializer, PublicKeyShareSerializer},
         utils::{setup_crp_params, ParamsWithCrp},
-        CiphernodeAdded, CiphernodeOrchestrator, CiphernodeSelected, CiphertextOutputPublished,
-        DecryptionshareCreated, Orchestrator, PlaintextAggregated, PlaintextOrchestrator,
-        PublicKeyOrchestrator, ResetHistory, SharedRng, Sortition,
+        CiphernodeAdded, CiphernodeFactory, CiphernodeSelected, CiphertextOutputPublished,
+        CommitteeMetaFactory, DecryptionshareCreated, E3RequestManager, FheFactory,
+        PlaintextAggregated, PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory,
+        SharedRng, Sortition,
     };
     use actix::prelude::*;
     use alloy_primitives::Address;
@@ -94,18 +89,24 @@ mod tests {
         // create ciphernode actor for managing ciphernode flow
         let sortition = Sortition::attach(bus.clone());
         CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
-        Orchestrator::builder(bus.clone(), rng)
-            .public_key(PublicKeyOrchestrator::attach(
+
+        E3RequestManager::builder(bus.clone())
+            .add_hook(CommitteeMetaFactory::create())
+            .add_hook(FheFactory::create(rng.clone()))
+            .add_hook(PublicKeyAggregatorFactory::create(
                 bus.clone(),
                 sortition.clone(),
             ))
-            .plaintext(PlaintextOrchestrator::attach(
+            .add_hook(PlaintextAggregatorFactory::create(
                 bus.clone(),
                 sortition.clone(),
             ))
-            .ciphernode(CiphernodeOrchestrator::attach(bus.clone(), data, addr))
-            .build()
-            .await;
+            .add_hook(CiphernodeFactory::create(
+                bus.clone(),
+                data.clone(),
+                addr,
+            ))
+            .build();
     }
 
     fn generate_pk_share(
