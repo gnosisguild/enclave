@@ -1,19 +1,13 @@
-import {
-  loadFixture,
-  mine,
-  time,
-} from "@nomicfoundation/hardhat-network-helpers";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { ZeroHash } from "ethers";
-import { ethers, network } from "hardhat";
+import { ethers } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
 import { deployCiphernodeRegistryOwnableFixture } from "../fixtures/CiphernodeRegistryOwnable.fixture";
 import { naiveRegistryFilterFixture } from "../fixtures/NaiveRegistryFilter.fixture";
 import { PoseidonT3Fixture } from "../fixtures/PoseidonT3.fixture";
 
-const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressThree = "0x0000000000000000000000000000000000000003";
