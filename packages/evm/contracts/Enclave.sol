@@ -239,7 +239,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function publishCiphertextOutput(
         uint256 e3Id,
-        bytes memory data
+        bytes memory ciphertextOutput,
+        bytes memory proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         // Note: if we make 0 a no expiration, this has to be refactored
@@ -251,38 +252,43 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: should the output verifier be able to change its mind?
         //i.e. should we be able to call this multiple times?
         require(
-            e3.ciphertextOutput.length == 0,
+            e3.ciphertextOutput == bytes32(0),
             CiphertextOutputAlreadyPublished(e3Id)
         );
-        bytes memory output;
-        (output, success) = e3.e3Program.verify(e3Id, data);
-        require(success, InvalidOutput(output));
-        e3s[e3Id].ciphertextOutput = output;
+        bytes32 ciphertextOutputHash = keccak256(ciphertextOutput);
+        (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
+        require(success, InvalidOutput(ciphertextOutput));
+        e3s[e3Id].ciphertextOutput = ciphertextOutputHash;
 
-        emit CiphertextOutputPublished(e3Id, output);
+        emit CiphertextOutputPublished(e3Id, ciphertextOutput);
     }
 
     function publishPlaintextOutput(
         uint256 e3Id,
-        bytes memory data
+        bytes memory plaintextOutput,
+        bytes memory proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
         require(
-            e3.ciphertextOutput.length > 0,
+            e3.ciphertextOutput != bytes32(0),
             CiphertextOutputNotPublished(e3Id)
         );
         require(
-            e3.plaintextOutput.length == 0,
+            e3.plaintextOutput == bytes32(0),
             PlaintextOutputAlreadyPublished(e3Id)
         );
-        bytes memory output;
-        (output, success) = e3.decryptionVerifier.verify(e3Id, data);
-        require(success, InvalidOutput(output));
-        e3s[e3Id].plaintextOutput = output;
+        bytes32 plaintextOutputHash = keccak256(plaintextOutput);
+        (success) = e3.decryptionVerifier.verify(
+            e3Id,
+            plaintextOutputHash,
+            proof
+        );
+        require(success, InvalidOutput(plaintextOutput));
+        e3s[e3Id].plaintextOutput = plaintextOutputHash;
 
-        emit PlaintextOutputPublished(e3Id, output);
+        emit PlaintextOutputPublished(e3Id, plaintextOutput);
     }
 
     ////////////////////////////////////////////////////////////

@@ -30,6 +30,6 @@ struct E3 {
     IInputValidator inputValidator;
     IDecryptionVerifier decryptionVerifier;
     bytes committeePublicKey;
-    bytes ciphertextOutput;
-    bytes plaintextOutput;
+    bytes32 ciphertextOutput;
+    bytes32 plaintextOutput;
 }
