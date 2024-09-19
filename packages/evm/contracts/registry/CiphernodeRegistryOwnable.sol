@@ -65,7 +65,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function initialize(address _owner, address _enclave) public initializer {
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
-        transferOwnership(_owner);
+        if (_owner != owner()) transferOwnership(_owner);
     }
 
     ////////////////////////////////////////////////////////////
