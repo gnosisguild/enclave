@@ -20,6 +20,10 @@ import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressSix = "0x0000000000000000000000000000000000000006";
+const encryptionSchemeId =
+  "0x0000000000000000000000000000000000000000000000000000000000000001";
+const newEncryptionSchemeId =
+  "0x0000000000000000000000000000000000000000000000000000000000000002";
 
 const FilterFail = AddressTwo;
 const FilterOkay = AddressSix;
@@ -44,6 +48,7 @@ describe("Enclave", function () {
       await poseidon.getAddress(),
     );
 
+    await enclave.enableEncryptionScheme(encryptionSchemeId);
     await enclave.enableE3Program(await e3Program.getAddress());
 
     return {
@@ -205,6 +210,87 @@ describe("Enclave", function () {
       expect(e3.committeePublicKey).to.equal("0x");
       expect(e3.ciphertextOutput).to.equal("0x");
       expect(e3.plaintextOutput).to.equal("0x");
+    });
+  });
+
+  describe("isEncryptionSchemeEnabled()", function () {
+    it("returns true if encryption scheme is enabled", async function () {
+      const { enclave } = await loadFixture(setup);
+      expect(await enclave.isEncryptionSchemeEnabled(encryptionSchemeId)).to.be
+        .true;
+    });
+    it("returns false if encryption scheme is not enabled", async function () {
+      const { enclave } = await loadFixture(setup);
+      expect(await enclave.isEncryptionSchemeEnabled(newEncryptionSchemeId)).to
+        .be.false;
+    });
+  });
+
+  describe("enableEncryptionScheme()", function () {
+    it("reverts if caller is not owner", async function () {
+      const { enclave, notTheOwner } = await loadFixture(setup);
+
+      await expect(
+        enclave.connect(notTheOwner).enableEncryptionScheme(encryptionSchemeId),
+      )
+        .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
+        .withArgs(notTheOwner);
+    });
+    it("reverts if encryption scheme is already enabled", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      await expect(enclave.enableEncryptionScheme(encryptionSchemeId))
+        .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
+        .withArgs(encryptionSchemeId);
+    });
+    it("enabled encryption scheme", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      expect(await enclave.enableEncryptionScheme(newEncryptionSchemeId));
+      expect(await enclave.isEncryptionSchemeEnabled(newEncryptionSchemeId)).to
+        .be.true;
+    });
+    it("emits EncryptionSchemeEnabled", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      await expect(await enclave.enableEncryptionScheme(newEncryptionSchemeId))
+        .to.emit(enclave, "EncryptionSchemeEnabled")
+        .withArgs(newEncryptionSchemeId);
+    });
+  });
+
+  describe("disableEncryptionScheme()", function () {
+    it("reverts if caller is not owner", async function () {
+      const { enclave, notTheOwner } = await loadFixture(setup);
+
+      await expect(
+        enclave
+          .connect(notTheOwner)
+          .disableEncryptionScheme(encryptionSchemeId),
+      )
+        .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
+        .withArgs(notTheOwner);
+    });
+    it("reverts if encryption scheme is not already enabled", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      await expect(enclave.disableEncryptionScheme(newEncryptionSchemeId))
+        .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
+        .withArgs(newEncryptionSchemeId);
+    });
+    it("disables encryption scheme", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      expect(await enclave.disableEncryptionScheme(encryptionSchemeId));
+      expect(await enclave.isEncryptionSchemeEnabled(encryptionSchemeId)).to.be
+        .false;
+    });
+    it("emits EncryptionSchemeDisabled", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      await expect(await enclave.disableEncryptionScheme(encryptionSchemeId))
+        .to.emit(enclave, "EncryptionSchemeDisabled")
+        .withArgs(encryptionSchemeId);
     });
   });
 
@@ -390,7 +476,25 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3ProgramNotAllowed")
         .withArgs(ethers.ZeroAddress);
     });
-    it("reverts if input E3 Program does not return input validator address", async function () {
+    it("reverts if given encryption scheme is not enabled", async function () {
+      const { enclave, request } = await loadFixture(setup);
+      await enclave.disableEncryptionScheme(encryptionSchemeId);
+      await expect(
+        enclave.request(
+          request.filter,
+          request.threshold,
+          request.startTime,
+          request.duration,
+          request.e3Program,
+          ZeroHash,
+          request.computeProviderParams,
+          { value: 10 },
+        ),
+      )
+        .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
+        .withArgs(encryptionSchemeId);
+    });
+    it("reverts if given E3 Program does not return input validator address", async function () {
       const { enclave, request } = await loadFixture(setup);
 
       await expect(
@@ -406,7 +510,7 @@ describe("Enclave", function () {
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidComputationRequest");
     });
-    it("reverts if input compute provider does not return output verifier address", async function () {
+    it("reverts if given compute provider does not return output verifier address", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
