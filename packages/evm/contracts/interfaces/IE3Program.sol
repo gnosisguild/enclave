@@ -12,7 +12,6 @@ interface IE3Program {
     /// @param computeProviderParams ABI encoded compute provider parameters.
     /// @return encryptionSchemeId ID of the encryption scheme to be used for the computation.
     /// @return inputValidator The input validator to be used for the computation.
-    /// @return decryptionVerifier The decryption verifier to be used for the computation.
     function validate(
         uint256 e3Id,
         uint256 seed,
@@ -20,11 +19,7 @@ interface IE3Program {
         bytes calldata computeProviderParams
     )
         external
-        returns (
-            bytes32 encryptionSchemeId,
-            IInputValidator inputValidator,
-            IDecryptionVerifier decryptionVerifier
-        );
+        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator);
 
     /// @notice This function should be called by the Enclave contract to verify the decrypted output of an E3.
     /// @param e3Id ID of the E3.

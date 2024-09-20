@@ -52,7 +52,10 @@ describe("Enclave", function () {
       await poseidon.getAddress(),
     );
 
-    await enclave.enableEncryptionScheme(encryptionSchemeId);
+    await enclave.setDecryptionVerifier(
+      encryptionSchemeId,
+      await decryptionVerifier.getAddress(),
+    );
     await enclave.enableE3Program(await e3Program.getAddress());
 
     return {
@@ -217,47 +220,79 @@ describe("Enclave", function () {
     });
   });
 
-  describe("isEncryptionSchemeEnabled()", function () {
+  describe("getDecryptionVerifier()", function () {
     it("returns true if encryption scheme is enabled", async function () {
-      const { enclave } = await loadFixture(setup);
-      expect(await enclave.isEncryptionSchemeEnabled(encryptionSchemeId)).to.be
-        .true;
+      const { enclave, mocks } = await loadFixture(setup);
+      expect(await enclave.getDecryptionVerifier(encryptionSchemeId)).to.equal(
+        await mocks.decryptionVerifier.getAddress(),
+      );
     });
     it("returns false if encryption scheme is not enabled", async function () {
       const { enclave } = await loadFixture(setup);
-      expect(await enclave.isEncryptionSchemeEnabled(newEncryptionSchemeId)).to
-        .be.false;
+      expect(
+        await enclave.getDecryptionVerifier(newEncryptionSchemeId),
+      ).to.equal(ethers.ZeroAddress);
     });
   });
 
-  describe("enableEncryptionScheme()", function () {
+  describe("setDecryptionVerifier()", function () {
     it("reverts if caller is not owner", async function () {
-      const { enclave, notTheOwner } = await loadFixture(setup);
+      const { enclave, notTheOwner, mocks } = await loadFixture(setup);
 
       await expect(
-        enclave.connect(notTheOwner).enableEncryptionScheme(encryptionSchemeId),
+        enclave
+          .connect(notTheOwner)
+          .setDecryptionVerifier(
+            encryptionSchemeId,
+            await mocks.decryptionVerifier.getAddress(),
+          ),
       )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
     it("reverts if encryption scheme is already enabled", async function () {
-      const { enclave } = await loadFixture(setup);
+      const { enclave, mocks } = await loadFixture(setup);
 
-      await expect(enclave.enableEncryptionScheme(encryptionSchemeId))
+      await expect(
+        enclave.setDecryptionVerifier(
+          encryptionSchemeId,
+          await mocks.decryptionVerifier.getAddress(),
+        ),
+      )
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
         .withArgs(encryptionSchemeId);
     });
-    it("enabled encryption scheme", async function () {
-      const { enclave } = await loadFixture(setup);
+    it("enabled decryption verifier", async function () {
+      const { enclave, mocks } = await loadFixture(setup);
 
-      expect(await enclave.enableEncryptionScheme(newEncryptionSchemeId));
-      expect(await enclave.isEncryptionSchemeEnabled(newEncryptionSchemeId)).to
-        .be.true;
+      expect(
+        await enclave.setDecryptionVerifier(
+          newEncryptionSchemeId,
+          await mocks.decryptionVerifier.getAddress(),
+        ),
+      );
+      expect(
+        await enclave.getDecryptionVerifier(newEncryptionSchemeId),
+      ).to.equal(await mocks.decryptionVerifier.getAddress());
+    });
+    it("returns true if decryption verifier is enabled successfully", async function () {
+      const { enclave, mocks } = await loadFixture(setup);
+
+      const result = await enclave.setDecryptionVerifier.staticCall(
+        newEncryptionSchemeId,
+        await mocks.decryptionVerifier.getAddress(),
+      );
+      expect(result).to.be.true;
     });
     it("emits EncryptionSchemeEnabled", async function () {
-      const { enclave } = await loadFixture(setup);
+      const { enclave, mocks } = await loadFixture(setup);
 
-      await expect(await enclave.enableEncryptionScheme(newEncryptionSchemeId))
+      await expect(
+        await enclave.setDecryptionVerifier(
+          newEncryptionSchemeId,
+          await mocks.decryptionVerifier.getAddress(),
+        ),
+      )
         .to.emit(enclave, "EncryptionSchemeEnabled")
         .withArgs(newEncryptionSchemeId);
     });
@@ -286,8 +321,16 @@ describe("Enclave", function () {
       const { enclave } = await loadFixture(setup);
 
       expect(await enclave.disableEncryptionScheme(encryptionSchemeId));
-      expect(await enclave.isEncryptionSchemeEnabled(encryptionSchemeId)).to.be
-        .false;
+      expect(await enclave.getDecryptionVerifier(encryptionSchemeId)).to.equal(
+        ethers.ZeroAddress,
+      );
+    });
+    it("returns true if encryption scheme is disabled successfully", async function () {
+      const { enclave } = await loadFixture(setup);
+
+      const result =
+        await enclave.disableEncryptionScheme.staticCall(encryptionSchemeId);
+      expect(result).to.be.true;
     });
     it("emits EncryptionSchemeDisabled", async function () {
       const { enclave } = await loadFixture(setup);
@@ -510,21 +553,6 @@ describe("Enclave", function () {
           request.e3Program,
           ZeroHash,
           request.computeProviderParams,
-          { value: 10 },
-        ),
-      ).to.be.revertedWithCustomError(enclave, "InvalidComputationRequest");
-    });
-    it("reverts if given compute provider does not return output verifier address", async function () {
-      const { enclave, request } = await loadFixture(setup);
-      await expect(
-        enclave.request(
-          request.filter,
-          request.threshold,
-          request.startTime,
-          request.duration,
-          request.e3Program,
-          request.e3ProgramParams,
-          ZeroHash,
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidComputationRequest");

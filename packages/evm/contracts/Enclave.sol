@@ -41,8 +41,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
 
     // Mapping of enabled encryption schemes.
-    mapping(bytes32 encryptionSchemeId => bool enabled)
-        public encryptionSchemes;
+    mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
+        public decryptionVerifiers;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -62,10 +62,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-    error InvalidComputationRequest(
-        IInputValidator inputValidator,
-        IDecryptionVerifier decryptionVerifier
-    );
+    error InvalidComputationRequest(IInputValidator inputValidator);
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
     error InvalidInput();
     error InvalidDuration(uint256 duration);
@@ -145,24 +142,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        (
-            bytes32 encryptionSchemeId,
-            IInputValidator inputValidator,
-            IDecryptionVerifier decryptionVerifier
-        ) = e3Program.validate(
-                e3Id,
-                seed,
-                e3ProgramParams,
-                computeProviderParams
-            );
+        (bytes32 encryptionSchemeId, IInputValidator inputValidator) = e3Program
+            .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
+        IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
+            encryptionSchemeId
+        ];
         require(
-            encryptionSchemes[encryptionSchemeId],
+            decryptionVerifiers[encryptionSchemeId] !=
+                IDecryptionVerifier(address(0)),
             InvalidEncryptionScheme(encryptionSchemeId)
         );
         require(
-            address(inputValidator) != address(0) &&
-                address(decryptionVerifier) != address(0),
-            InvalidComputationRequest(inputValidator, decryptionVerifier)
+            address(inputValidator) != address(0),
+            InvalidComputationRequest(inputValidator)
         );
 
         e3 = E3({
@@ -339,14 +331,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3ProgramDisabled(e3Program);
     }
 
-    function enableEncryptionScheme(
-        bytes32 encryptionSchemeId
+    function setDecryptionVerifier(
+        bytes32 encryptionSchemeId,
+        IDecryptionVerifier decryptionVerifier
     ) public onlyOwner returns (bool success) {
         require(
-            !encryptionSchemes[encryptionSchemeId],
+            decryptionVerifier != IDecryptionVerifier(address(0)) &&
+                decryptionVerifiers[encryptionSchemeId] != decryptionVerifier,
             InvalidEncryptionScheme(encryptionSchemeId)
         );
-        encryptionSchemes[encryptionSchemeId] = true;
+        decryptionVerifiers[encryptionSchemeId] = decryptionVerifier;
         success = true;
         emit EncryptionSchemeEnabled(encryptionSchemeId);
     }
@@ -355,11 +349,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes32 encryptionSchemeId
     ) public onlyOwner returns (bool success) {
         require(
-            encryptionSchemes[encryptionSchemeId],
+            decryptionVerifiers[encryptionSchemeId] !=
+                IDecryptionVerifier(address(0)),
             InvalidEncryptionScheme(encryptionSchemeId)
         );
-        encryptionSchemes[encryptionSchemeId] = false;
-        success = false;
+        decryptionVerifiers[encryptionSchemeId] = IDecryptionVerifier(
+            address(0)
+        );
+        success = true;
         emit EncryptionSchemeDisabled(encryptionSchemeId);
     }
 
@@ -382,9 +379,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         return InternalLeanIMT._root(inputs[e3Id]);
     }
 
-    function isEncryptionSchemeEnabled(
+    function getDecryptionVerifier(
         bytes32 encryptionSchemeId
-    ) public view returns (bool) {
-        return encryptionSchemes[encryptionSchemeId];
+    ) public view returns (IDecryptionVerifier) {
+        return decryptionVerifiers[encryptionSchemeId];
     }
 }
