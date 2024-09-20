@@ -21,7 +21,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         uint256,
         bytes calldata,
         bytes calldata
-    ) external {}
+    ) external {} // solhint-disable-line no-empty-blocks
 
     function committeePublicKey(
         uint256 e3Id
@@ -56,7 +56,7 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         uint256,
         bytes calldata,
         bytes calldata
-    ) external {}
+    ) external {} // solhint-disable-line no-empty-blocks
 
     function committeePublicKey(uint256) external pure returns (bytes memory) {
         return hex"";

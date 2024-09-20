@@ -8,8 +8,22 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eth = { path = "../eth" }
+p2p = { path = "../p2p" }
+bfv = { path = "../bfv" }
+sortition = { path = "../sortition" }
+enclave-core = { path = "../core" }
 async-std = "1.12.0"
 fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+tokio = { version = "1.38", features = ["full"] }
+actix-rt = "2.10.0"
+alloy-primitives = { version = "0.6", default-features = false, features = ["rlp", "serde", "std"] }
+
+alloy = { version = "0.2.1", features = ["full"] }
+clap = { version = "4.5.17", features = ["derive"] }
+rand_chacha = "0.3.1"
+rand = "0.8.5"
+bincode = "1.3.3"
+base91 = "0.1.0"
+base64 = "0.22.1"

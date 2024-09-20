@@ -10,6 +10,7 @@ interface IE3Program {
     /// @param seed Seed for the computation.
     /// @param e3ProgramParams ABI encoded computation parameters.
     /// @param computeProviderParams ABI encoded compute provider parameters.
+    /// @return encryptionSchemeId ID of the encryption scheme to be used for the computation.
     /// @return inputValidator The input validator to be used for the computation.
     /// @return decryptionVerifier The decryption verifier to be used for the computation.
     function validate(
@@ -20,17 +21,19 @@ interface IE3Program {
     )
         external
         returns (
+            bytes32 encryptionSchemeId,
             IInputValidator inputValidator,
             IDecryptionVerifier decryptionVerifier
         );
 
     /// @notice This function should be called by the Enclave contract to verify the decrypted output of an E3.
     /// @param e3Id ID of the E3.
-    /// @param outputData ABI encoded output data to be verified.
-    /// @return output The output data to be published.
+    /// @param ciphertextOutputHash The keccak256 hash of output data to be verified.
+    /// @param proof ABI encoded data to verify the ciphertextOutputHash.
     /// @return success Whether the output data is valid.
     function verify(
         uint256 e3Id,
-        bytes memory outputData
-    ) external returns (bytes memory output, bool success);
+        bytes32 ciphertextOutputHash,
+        bytes memory proof
+    ) external returns (bool success);
 }

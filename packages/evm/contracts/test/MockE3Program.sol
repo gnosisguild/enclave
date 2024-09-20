@@ -19,6 +19,7 @@ contract MockE3Program is IE3Program {
         external
         pure
         returns (
+            bytes32 encryptionSchemeId,
             IInputValidator inputValidator,
             IDecryptionVerifier decryptionVerifier
         )
@@ -32,13 +33,15 @@ contract MockE3Program is IE3Program {
             inputValidator := mload(add(e3ProgramParams, 32))
             decryptionVerifier := mload(add(computeProviderParams, 32))
         }
+        encryptionSchemeId = 0x0000000000000000000000000000000000000000000000000000000000000001;
     }
 
     function verify(
         uint256,
+        bytes32,
         bytes memory data
-    ) external pure returns (bytes memory output, bool success) {
-        output = data;
-        if (output.length > 0) success = true;
+    ) external pure returns (bool success) {
+        data;
+        if (data.length > 0) success = true;
     }
 }
