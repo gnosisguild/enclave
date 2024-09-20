@@ -2,7 +2,6 @@
 pragma solidity >=0.8.27;
 
 import { IInputValidator } from "./IInputValidator.sol";
-import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 
 interface IE3Program {
     /// @notice This function should be called by the Enclave contract to validate the computation parameters.
