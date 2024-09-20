@@ -1,5 +1,28 @@
 # Enclave EVM
 
+## Importing the contracts, interfaces or types
+
+To install, run
+
+```
+yarn add @gnosis-guild/enclave
+```
+
+If writing a new E3 program, you can import the necessary interfaces by writing
+something similar to:
+
+```
+import {
+    IE3Program,
+    IInputValidator,
+    IDecryptionVerifier
+} from "../interfaces/IE3Program.sol";
+
+contract MockE3Program is IE3Program {...}
+```
+
+[Check out the E3 mock for an example](./contracts/test/MockE3Program.sol)
+
 ## To deploy
 
 ```
@@ -19,8 +42,27 @@ To add a ciphernode to the registry, run
 yarn ciphernode:add --network [network] --ciphernode-address [address]
 ```
 
-To remove a ciphernode, run
+To request a new committee, run
 
 ```
-yarn ciphernode:remove --network [network] --ciphernode-address [address]
+yarn run hardhat committee:new --network [network] \
+```
+
+To publish the public key of a committee, run
+
+```
+yarn run hardhat --network [network] committee:publish --e3-id [e3-id] --nodes [node address],
+[node address] --public-key [publickey] \
+```
+
+To activate an E3, run
+
+```
+yarn run hardhat --network [network] e3:activate --e3-id [e3-id] \
+```
+
+To publish an input for an active E3, run
+
+```
+yarn run hardhat --network [network] e3:publishInput --e3-id [e3-id] --data [input data]
 ```
