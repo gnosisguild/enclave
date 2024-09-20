@@ -5,8 +5,9 @@ on:
     types: [created]
 
 env:
-  HARDHAT_VAR_MNEMONIC: "test test test test test test test test test test test junk"
-  HARDHAT_VAR_INFURA_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+  MNEMONIC: "test test test test test test test test test test test junk"
+  INFURA_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+  ETHERSCAN_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 
 jobs:
   publish-npm:
