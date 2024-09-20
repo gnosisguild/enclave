@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import {
-    IE3Program,
-    IInputValidator,
-    IDecryptionVerifier
-} from "../interfaces/IE3Program.sol";
+import { IE3Program, IInputValidator } from "../interfaces/IE3Program.sol";
 
 contract MockE3Program is IE3Program {
     error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
@@ -18,11 +14,7 @@ contract MockE3Program is IE3Program {
     )
         external
         pure
-        returns (
-            bytes32 encryptionSchemeId,
-            IInputValidator inputValidator,
-            IDecryptionVerifier decryptionVerifier
-        )
+        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator)
     {
         require(
             e3ProgramParams.length == 32 && computeProviderParams.length == 32,
@@ -31,7 +23,6 @@ contract MockE3Program is IE3Program {
         // solhint-disable no-inline-assembly
         assembly {
             inputValidator := mload(add(e3ProgramParams, 32))
-            decryptionVerifier := mload(add(computeProviderParams, 32))
         }
         encryptionSchemeId = 0x0000000000000000000000000000000000000000000000000000000000000001;
     }
