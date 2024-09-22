@@ -4,6 +4,7 @@ use std::{str};
 use p2p::{EnclaveRouter, P2PMessage};
 use bfv::EnclaveBFV;
 use sortition::DistanceSortition;
+use eth::{EventListener, ContractManager};
 use tokio::{
     self,
     io::{self, AsyncBufReadExt, BufReader},
@@ -11,8 +12,14 @@ use tokio::{
 };
 
 use alloy_primitives::{address};
+use alloy::sol;
 
 use log::Level;
+
+sol! {
+    #[derive(Debug)]
+    event TestingEvent(uint256 e3Id, bytes input);
+}
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
@@ -54,7 +61,7 @@ fn handle_p2p_msg(msg: Vec<u8>) {
 }
 
 fn handle_eth_event() {
-    
+
 }
 
 async fn start_p2p() -> Result<(), Box<dyn Error>> {
@@ -85,6 +92,15 @@ async fn start_p2p() -> Result<(), Box<dyn Error>> {
 
 async fn start_eth_listener() {
     log::info!("Listening on E3 Contract");
+    let manager = ContractManager::new("ws://127.0.0.1:8545").await;
+    // let listener = manager
+    //     .send(AddListener {
+    //         contract_address: address!("e7f1725E7734CE288F8367e1Bb143E90bb3F0512"),
+    //     })
+    //     .await
+    //     .unwrap();
+
+    // listener.send(AddEventHandler::<TestingEvent>::new()).await.unwrap();
 }
 
 async fn run() {

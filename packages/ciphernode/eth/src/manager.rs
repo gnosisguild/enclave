@@ -18,7 +18,7 @@ pub struct ContractManager {
 }
 
 impl ContractManager {
-    async fn new(rpc_url: &str, ) -> Result<(Self, Sender<Vec<u8>>, Receiver<Vec<u8>>), Box<dyn Error>> {
+    pub async fn new(rpc_url: &str, ) -> Result<(Self, Sender<Vec<u8>>, Receiver<Vec<u8>>), Box<dyn Error>> {
         let (evt_tx, evt_rx) = channel(100); // TODO : tune this param
         let (cmd_tx, cmd_rx) = channel(100); // TODO : tune this param
         let provider = ProviderBuilder::new().on_builtin(rpc_url).await?;
@@ -33,7 +33,7 @@ impl ContractManager {
         ))
     }
 
-    fn add_listener(&mut self, contract_address: Address) {
+    pub fn add_listener(&mut self, contract_address: Address) {
         let filter = Filter::new()
             .address(contract_address)
             .from_block(BlockNumberOrTag::Latest);
