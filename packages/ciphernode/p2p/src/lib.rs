@@ -10,9 +10,18 @@ use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
+use std::str;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::{io, select};
 use tracing_subscriber::EnvFilter;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct P2PMessage {
+    pub topic: String,
+    pub msg_type: String,
+    pub data: Vec<u8>,
+}
 
 #[derive(NetworkBehaviour)]
 pub struct MyBehaviour {
@@ -127,6 +136,7 @@ impl EnclaveRouter {
         loop {
             select! {
                 Some(line) = self.cmd_rx.recv() => {
+                    let (topic, data) = parse_msg(line.clone());
                     if let Err(e) = self.swarm.as_mut().unwrap()
                         .behaviour_mut().gossipsub
                         .publish(self.topic.as_mut().unwrap().clone(), line) {
@@ -165,6 +175,15 @@ impl EnclaveRouter {
             }
         }
     }
+}
+
+fn parse_msg(msg: Vec<u8>) -> (gossipsub::IdentTopic, Vec<u8>) {
+    //let stringify = serde_json::to_string(&msg).unwrap();
+    let stringify = String::from_utf8(msg).unwrap();
+    println!("{:?}", stringify);
+    let mut p2p_message: P2PMessage = serde_json::from_str(&stringify).expect("JSON was not well-formatted");
+    let topic = gossipsub::IdentTopic::new(p2p_message.topic);
+    (topic, p2p_message.data)
 }
 
 // #[tokio::main]
