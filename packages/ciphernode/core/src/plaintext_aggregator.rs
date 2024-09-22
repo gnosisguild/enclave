@@ -1,6 +1,6 @@
 use crate::{
-    ordered_set::OrderedSet, DecryptionshareCreated, E3id, EnclaveEvent, EventBus, Fhe,
-    GetAggregatePlaintext, GetHasNode, PlaintextAggregated, Sortition,
+    ordered_set::OrderedSet, ActorFactory, DecryptionshareCreated, E3id, EnclaveEvent, EventBus,
+    Fhe, GetAggregatePlaintext, GetHasNode, PlaintextAggregated, Sortition,
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
@@ -176,5 +176,34 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
                     Ok(())
                 }),
         )
+    }
+}
+
+pub struct PlaintextAggregatorFactory;
+impl PlaintextAggregatorFactory {
+    pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> ActorFactory {
+        Box::new(move |ctx, evt| {
+            // Save plaintext aggregator
+            let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
+                return;
+            };
+            let Some(ref fhe) = ctx.fhe else {
+                return;
+            };
+            let Some(ref meta) = ctx.meta else {
+                return;
+            };
+            ctx.plaintext = Some(
+                PlaintextAggregator::new(
+                    fhe.clone(),
+                    bus.clone(),
+                    sortition.clone(),
+                    data.e3_id,
+                    meta.nodecount,
+                    meta.seed,
+                )
+                .start(),
+            );
+        })
     }
 }

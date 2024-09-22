@@ -22,7 +22,8 @@
     "evm:typechain": "cd packages/evm && yarn typechain",
     "evm:test": "cd packages/evm && yarn test",
     "evm:coverage": "cd packages/evm && yarn coverage",
-    "preinstall": "yarn evm:install"
+    "preinstall": "yarn evm:install",
+    "evm:release": "cd packages/evm && yarn release"
   },
   "dependencies": {}
 }

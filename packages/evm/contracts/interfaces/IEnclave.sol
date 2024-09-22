@@ -66,6 +66,14 @@ interface IEnclave {
     /// @param ciphernodeRegistry The address of the CiphernodeRegistry contract.
     event CiphernodeRegistrySet(address ciphernodeRegistry);
 
+    /// @notice The event MUST be emitted any time an encryption scheme is enabled.
+    /// @param encryptionSchemeId The ID of the encryption scheme that was enabled.
+    event EncryptionSchemeEnabled(bytes32 encryptionSchemeId);
+
+    /// @notice This event MUST be emitted any time an encryption scheme is disabled.
+    /// @param encryptionSchemeId The ID of the encryption scheme that was disabled.
+    event EncryptionSchemeDisabled(bytes32 encryptionSchemeId);
+
     /// @notice This event MUST be emitted any time a E3 Program is enabled.
     /// @param e3Program The address of the E3 Program.
     event E3ProgramEnabled(IE3Program e3Program);
@@ -122,22 +130,25 @@ interface IEnclave {
     /// @notice This function should be called to publish output data for an Encrypted Execution Environment (E3).
     /// @dev This function MUST emit the CiphertextOutputPublished event.
     /// @param e3Id ID of the E3.
-    /// @param data ABI encoded output data to verify.
+    /// @param ciphertextOutput ABI encoded output data to verify.
+    /// @param proof ABI encoded data to verify the ciphertextOutput.
     /// @return success True if the output was successfully published.
     function publishCiphertextOutput(
         uint256 e3Id,
-        bytes memory data
+        bytes memory ciphertextOutput,
+        bytes memory proof
     ) external returns (bool success);
 
     /// @notice This function publishes the plaintext output of an Encrypted Execution Environment (E3).
     /// @dev This function MUST revert if the output has not been published.
     /// @dev This function MUST emit the PlaintextOutputPublished event.
     /// @param e3Id ID of the E3.
-    /// @param data ABI encoded output data to decrypt.
-    /// @return success True if the output was successfully decrypted.
+    /// @param plaintextOutput ABI encoded plaintext output.
+    /// @param proof ABI encoded data to verify the plaintextOutput.
     function publishPlaintextOutput(
         uint256 e3Id,
-        bytes memory data
+        bytes memory plaintextOutput,
+        bytes memory proof
     ) external returns (bool success);
 
     ////////////////////////////////////////////////////////////

@@ -34,11 +34,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     // Mapping of E3s.
     mapping(uint256 e3Id => E3 e3) public e3s;
 
-    // Mapping of input merkle trees
+    // Mapping of input merkle trees.
     mapping(uint256 e3Id => LeanIMTData imt) public inputs;
 
     // Mapping counting the number of inputs for each E3.
     mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
+
+    // Mapping of enabled encryption schemes.
+    mapping(bytes32 encryptionSchemeId => bool enabled)
+        public encryptionSchemes;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -55,6 +59,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error E3DoesNotExist(uint256 e3Id);
     error ModuleAlreadyEnabled(address module);
     error ModuleNotEnabled(address module);
+    error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputationRequest(
@@ -141,6 +146,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
         (
+            bytes32 encryptionSchemeId,
             IInputValidator inputValidator,
             IDecryptionVerifier decryptionVerifier
         ) = e3Program.validate(
@@ -149,6 +155,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
                 e3ProgramParams,
                 computeProviderParams
             );
+        require(
+            encryptionSchemes[encryptionSchemeId],
+            InvalidEncryptionScheme(encryptionSchemeId)
+        );
         require(
             address(inputValidator) != address(0) &&
                 address(decryptionVerifier) != address(0),
@@ -161,6 +171,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             startWindow: startWindow,
             duration: duration,
             expiration: 0,
+            encryptionSchemeId: encryptionSchemeId,
             e3Program: e3Program,
             e3ProgramParams: e3ProgramParams,
             inputValidator: inputValidator,
@@ -176,7 +187,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CommitteeSelectionFailed()
         );
 
-        emit E3Requested(e3Id, e3s[e3Id], filter, e3Program);
+        emit E3Requested(e3Id, e3, filter, e3Program);
     }
 
     function activate(uint256 e3Id) external returns (bool success) {
@@ -228,7 +239,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function publishCiphertextOutput(
         uint256 e3Id,
-        bytes memory data
+        bytes memory ciphertextOutput,
+        bytes memory proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         // Note: if we make 0 a no expiration, this has to be refactored
@@ -240,38 +252,43 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         // TODO: should the output verifier be able to change its mind?
         //i.e. should we be able to call this multiple times?
         require(
-            e3.ciphertextOutput.length == 0,
+            e3.ciphertextOutput == bytes32(0),
             CiphertextOutputAlreadyPublished(e3Id)
         );
-        bytes memory output;
-        (output, success) = e3.e3Program.verify(e3Id, data);
-        require(success, InvalidOutput(output));
-        e3s[e3Id].ciphertextOutput = output;
+        bytes32 ciphertextOutputHash = keccak256(ciphertextOutput);
+        (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
+        require(success, InvalidOutput(ciphertextOutput));
+        e3s[e3Id].ciphertextOutput = ciphertextOutputHash;
 
-        emit CiphertextOutputPublished(e3Id, output);
+        emit CiphertextOutputPublished(e3Id, ciphertextOutput);
     }
 
     function publishPlaintextOutput(
         uint256 e3Id,
-        bytes memory data
+        bytes memory plaintextOutput,
+        bytes memory proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
         require(
-            e3.ciphertextOutput.length > 0,
+            e3.ciphertextOutput != bytes32(0),
             CiphertextOutputNotPublished(e3Id)
         );
         require(
-            e3.plaintextOutput.length == 0,
+            e3.plaintextOutput == bytes32(0),
             PlaintextOutputAlreadyPublished(e3Id)
         );
-        bytes memory output;
-        (output, success) = e3.decryptionVerifier.verify(e3Id, data);
-        require(success, InvalidOutput(output));
-        e3s[e3Id].plaintextOutput = output;
+        bytes32 plaintextOutputHash = keccak256(plaintextOutput);
+        (success) = e3.decryptionVerifier.verify(
+            e3Id,
+            plaintextOutputHash,
+            proof
+        );
+        require(success, InvalidOutput(plaintextOutput));
+        e3s[e3Id].plaintextOutput = plaintextOutputHash;
 
-        emit PlaintextOutputPublished(e3Id, output);
+        emit PlaintextOutputPublished(e3Id, plaintextOutput);
     }
 
     ////////////////////////////////////////////////////////////
@@ -322,6 +339,30 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3ProgramDisabled(e3Program);
     }
 
+    function enableEncryptionScheme(
+        bytes32 encryptionSchemeId
+    ) public onlyOwner returns (bool success) {
+        require(
+            !encryptionSchemes[encryptionSchemeId],
+            InvalidEncryptionScheme(encryptionSchemeId)
+        );
+        encryptionSchemes[encryptionSchemeId] = true;
+        success = true;
+        emit EncryptionSchemeEnabled(encryptionSchemeId);
+    }
+
+    function disableEncryptionScheme(
+        bytes32 encryptionSchemeId
+    ) public onlyOwner returns (bool success) {
+        require(
+            encryptionSchemes[encryptionSchemeId],
+            InvalidEncryptionScheme(encryptionSchemeId)
+        );
+        encryptionSchemes[encryptionSchemeId] = false;
+        success = false;
+        emit EncryptionSchemeDisabled(encryptionSchemeId);
+    }
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Get Functions                        //
@@ -339,5 +380,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             E3DoesNotExist(e3Id)
         );
         return InternalLeanIMT._root(inputs[e3Id]);
+    }
+
+    function isEncryptionSchemeEnabled(
+        bytes32 encryptionSchemeId
+    ) public view returns (bool) {
+        return encryptionSchemes[encryptionSchemeId];
     }
 }

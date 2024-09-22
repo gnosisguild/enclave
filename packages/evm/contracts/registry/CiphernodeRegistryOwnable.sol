@@ -24,7 +24,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     uint256 public numCiphernodes;
     LeanIMTData public ciphernodes;
 
-    mapping(uint256 e3Id => IRegistryFilter filter) public requests;
+    mapping(uint256 e3Id => IRegistryFilter filter) public filters;
     mapping(uint256 e3Id => uint256 root) public roots;
     mapping(uint256 e3Id => bytes publicKey) public publicKeys;
 
@@ -36,7 +36,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     error CommitteeAlreadyRequested();
     error CommitteeAlreadyPublished();
-    error CommitteeDoesNotExist();
+    error OnlyFilter();
     error CommitteeNotPublished();
     error CiphernodeNotEnabled(address node);
     error OnlyEnclave();
@@ -65,7 +65,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function initialize(address _owner, address _enclave) public initializer {
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
-        transferOwnership(_owner);
+        if (_owner != owner()) transferOwnership(_owner);
     }
 
     ////////////////////////////////////////////////////////////
@@ -80,10 +80,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint32[2] calldata threshold
     ) external onlyEnclave returns (bool success) {
         require(
-            requests[e3Id] == IRegistryFilter(address(0)),
+            filters[e3Id] == IRegistryFilter(address(0)),
             CommitteeAlreadyRequested()
         );
-        requests[e3Id] = IRegistryFilter(filter);
+        filters[e3Id] = IRegistryFilter(filter);
         roots[e3Id] = root();
 
         IRegistryFilter(filter).requestCommittee(e3Id, threshold);
@@ -97,21 +97,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes calldata publicKey
     ) external {
         // only to be published by the filter
-        require(address(requests[e3Id]) == msg.sender, CommitteeDoesNotExist());
+        require(address(filters[e3Id]) == msg.sender, OnlyFilter());
 
         publicKeys[e3Id] = publicKey;
         emit CommitteePublished(e3Id, publicKey);
-    }
-
-    ////////////////////////////////////////////////////////////
-    //                                                        //
-    //                   Set Functions                        //
-    //                                                        //
-    ////////////////////////////////////////////////////////////
-
-    function setEnclave(address _enclave) public onlyOwner {
-        enclave = _enclave;
-        emit EnclaveSet(_enclave);
     }
 
     function addCiphernode(address node) external onlyOwner {
@@ -130,21 +119,22 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         address node,
         uint256[] calldata siblingNodes
     ) external onlyOwner {
-        uint256 ciphernode = uint256(bytes32(bytes20(node)));
-        ciphernodes._remove(ciphernode, siblingNodes);
+        uint160 ciphernode = uint160(node);
         uint256 index = ciphernodes._indexOf(ciphernode);
+        ciphernodes._remove(ciphernode, siblingNodes);
         numCiphernodes--;
-        emit CiphernodeAdded(
-            node,
-            ciphernodes._indexOf(ciphernode),
-            numCiphernodes,
-            ciphernodes.size
-        );
         emit CiphernodeRemoved(node, index, numCiphernodes, ciphernodes.size);
     }
 
-    function isCiphernodeEligible(address node) external view returns (bool) {
-        return isEnabled(node);
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Set Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function setEnclave(address _enclave) public onlyOwner {
+        enclave = _enclave;
+        emit EnclaveSet(_enclave);
     }
 
     ////////////////////////////////////////////////////////////
@@ -160,8 +150,12 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(publicKey.length > 0, CommitteeNotPublished());
     }
 
+    function isCiphernodeEligible(address node) external view returns (bool) {
+        return isEnabled(node);
+    }
+
     function isEnabled(address node) public view returns (bool) {
-        return ciphernodes._has(uint256(bytes32(bytes20(node))));
+        return ciphernodes._has(uint160(node));
     }
 
     function root() public view returns (uint256) {
@@ -170,5 +164,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function rootAt(uint256 e3Id) public view returns (uint256) {
         return roots[e3Id];
+    }
+
+    function getFilter(uint256 e3Id) public view returns (IRegistryFilter) {
+        return filters[e3Id];
+    }
+
+    function treeSize() public view returns (uint256) {
+        return ciphernodes.size;
     }
 }

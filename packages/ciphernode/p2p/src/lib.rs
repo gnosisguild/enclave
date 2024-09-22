@@ -146,13 +146,13 @@ impl EnclaveRouter {
                 event = self.swarm.as_mut().unwrap().select_next_some() => match event {
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
-                            println!("mDNS discovered a new peer: {peer_id}");
+                            // println!("mDNS discovered a new peer: {peer_id}");
                             self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                         for (peer_id, _multiaddr) in list {
-                            println!("mDNS discover peer has expired: {peer_id}");
+                            // println!("mDNS discover peer has expired: {peer_id}");
                             self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                         }
                     },
@@ -161,14 +161,14 @@ impl EnclaveRouter {
                         message_id: id,
                         message,
                     })) => {
-                        println!(
-                            "Got message with id: {id} from peer: {peer_id}",
-                        );
-                        println!("{:?}", message);
+                        // println!(
+                        //     "Got message with id: {id} from peer: {peer_id}",
+                        // );
+                        // println!("{:?}", message);
                         self.evt_tx.send(message.data).await?;
                     },
                     SwarmEvent::NewListenAddr { address, .. } => {
-                        println!("Local node is listening on {address}");
+                        // println!("Local node is listening on {address}");
                     }
                     _ => {}
                 }

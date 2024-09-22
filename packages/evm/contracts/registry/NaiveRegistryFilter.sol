@@ -60,7 +60,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     function initialize(address _owner, address _registry) public initializer {
         __Ownable_init(msg.sender);
         setRegistry(_registry);
-        transferOwnership(_owner);
+        if (_owner != owner()) transferOwnership(_owner);
     }
 
     ////////////////////////////////////////////////////////////
@@ -73,9 +73,8 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         uint256 e3Id,
         uint32[2] calldata threshold
     ) external onlyRegistry returns (bool success) {
-        Committee storage committee = committees[e3Id];
-        require(committee.threshold.length == 0, CommitteeAlreadyExists());
-        committee.threshold = threshold;
+        require(committees[e3Id].threshold[1] == 0, CommitteeAlreadyExists());
+        committees[e3Id].threshold = threshold;
         success = true;
     }
 
@@ -106,5 +105,17 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     function setRegistry(address _registry) public onlyOwner {
         registry = _registry;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Get Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function getCommittee(
+        uint256 e3Id
+    ) external view returns (Committee memory) {
+        return committees[e3Id];
     }
 }
