@@ -1,5 +1,6 @@
 use actix::Message;
-use alloy_primitives::Address;
+use alloy::primitives::U256;
+use alloy_primitives::{Address, Uint};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -32,6 +33,12 @@ impl E3id {
 
 impl From<u32> for E3id {
     fn from(value: u32) -> Self {
+        E3id::new(value.to_string())
+    }
+}
+
+impl From<Uint<256,4>> for E3id {
+    fn from(value: Uint<256,4>) -> Self {
         E3id::new(value.to_string())
     }
 }
@@ -268,7 +275,7 @@ pub struct PublicKeyAggregated {
 #[rtype(result = "()")]
 pub struct CommitteeRequested {
     pub e3_id: E3id,
-    pub nodecount: usize,
+    pub nodecount: u32,
     pub sortition_seed: u64, // Should actually be much larger eg [u8;32]
 
     // fhe params
@@ -307,7 +314,7 @@ pub struct PlaintextAggregated {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeAdded {
-    pub address: Address,
+    pub address: Vec<u8>,
     pub index: usize,
     pub num_nodes: usize,
 }
@@ -315,7 +322,7 @@ pub struct CiphernodeAdded {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeRemoved {
-    pub address: Address,
+    pub address: Vec<u8>,
     pub index: usize,
     pub num_nodes: usize,
 }
