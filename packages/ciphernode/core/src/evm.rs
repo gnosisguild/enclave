@@ -23,13 +23,6 @@ sol! {
     }
 
     #[derive(Debug)]
-    event CommitteeRequested(
-        uint256 indexed e3Id,
-        address filter,
-        uint32[2] threshold
-    );
-
-    #[derive(Debug)]
     event CiphernodeAdded(
         address indexed node,
         uint256 index,
@@ -79,7 +72,7 @@ impl Evm {
             .unwrap();
 
         evm_listener
-            .send(AddEventHandler::<CommitteeRequested>::new())
+            .send(AddEventHandler::<E3Requested>::new())
             .await
             .unwrap();
 
