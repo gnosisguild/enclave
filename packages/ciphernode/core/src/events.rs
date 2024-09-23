@@ -95,6 +95,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: CiphernodeRemoved,
     },
+    E3Requested {
+        id: EventId,
+        data: E3Requested
+    }
     // CommitteeSelected,
     // OutputDecrypted,
     // CiphernodeRegistered,
@@ -115,8 +119,8 @@ impl EnclaveEvent {
     }
 
     pub fn is_local_only(&self) -> bool {
-        // Add a list of local events
         match self {
+            // Add a list of local events
             EnclaveEvent::CiphernodeSelected { .. } => true,
             _ => false,
         }
@@ -135,6 +139,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeSelected { id, .. } => id,
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
+            EnclaveEvent::E3Requested { id, .. } => id,
         }
     }
 }
@@ -319,6 +324,19 @@ pub struct CiphernodeRemoved {
     pub num_nodes: usize,
 }
 
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct E3Requested {
+    pub e3_id: E3id,
+    pub seed: [u8;32],
+    pub threshold: [u32;2],
+    // fhe params
+    pub moduli: Vec<u64>,
+    pub degree: usize,
+    pub plaintext_modulus: u64,
+    pub crp: Vec<u8>,
+}
+
 fn extract_enclave_event_name(s: &str) -> &str {
     let bytes = s.as_bytes();
     for (i, &item) in bytes.iter().enumerate() {
@@ -366,14 +384,14 @@ mod tests {
 
     #[test]
     fn test_deserialization() -> Result<(), Box<dyn Error>> {
-        let moduli = &vec![0x3FFFFFFF000001];
+        let moduli = &[0x3FFFFFFF000001];
         let degree = 2048usize;
         let plaintext_modulus = 1032193u64;
         let mut rng = ChaCha20Rng::from_entropy();
         let params = BfvParametersBuilder::new()
             .set_degree(degree)
             .set_plaintext_modulus(plaintext_modulus)
-            .set_moduli(&moduli)
+            .set_moduli(moduli)
             .build_arc()?;
         let crp = CommonRandomPoly::new(&params, &mut rng)?;
         let sk_share = { SecretKey::random(&params, &mut rng) };
