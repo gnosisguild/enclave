@@ -62,7 +62,6 @@ mod tests {
         SharedRng, Sortition,
     };
     use actix::prelude::*;
-    use alloy_primitives::Address;
     use anyhow::*;
     use fhe::{
         bfv::{BfvParameters, Encoding, Plaintext, PublicKey, SecretKey},
@@ -81,7 +80,7 @@ mod tests {
         bus: Addr<EventBus>,
         rng: SharedRng,
         logging: bool,
-        addr: Address,
+        addr: [u8;20],
     ) {
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
@@ -130,8 +129,8 @@ mod tests {
 
         let rng = Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42)));
 
-        let eth_addrs: Vec<Address> = (0..3)
-            .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()))
+        let eth_addrs: Vec<[u8;20]> = (0..3)
+            .map(|_| rand::thread_rng().gen::<[u8; 20]>())
             .collect();
 
         setup_local_ciphernode(bus.clone(), rng.clone(), true, eth_addrs[0]).await;

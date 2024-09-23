@@ -10,7 +10,7 @@ use crate::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EthAddr, EventBus,
 #[rtype(result = "bool")]
 pub struct GetHasNode {
     pub seed: u64,
-    pub address: Address,
+    pub address: [u8; 20],
     pub size: usize,
 }
 
@@ -21,7 +21,7 @@ pub trait SortitionList<T> {
 }
 
 pub struct SortitionModule {
-    nodes: HashSet<Address>,
+    nodes: HashSet<[u8; 20]>,
 }
 
 impl SortitionModule {
@@ -38,11 +38,15 @@ impl Default for SortitionModule {
     }
 }
 
-impl SortitionList<Address> for SortitionModule {
-    fn contains(&self, seed: u64, size: usize, address: Address) -> bool {
+impl SortitionList<[u8; 20]> for SortitionModule {
+    fn contains(&self, seed: u64, size: usize, address: [u8; 20]) -> bool {
         DistanceSortition::new(
             seed,
-            self.nodes.clone().into_iter().collect(),
+            self.nodes
+                .clone()
+                .into_iter()
+                .map(|b| Address::from(b))
+                .collect(),
             size,
         )
         .get_committee()
@@ -50,11 +54,11 @@ impl SortitionList<Address> for SortitionModule {
         .any(|(_, addr)| *addr == address)
     }
 
-    fn add(&mut self, address: Address) {
+    fn add(&mut self, address: [u8; 20]) {
         self.nodes.insert(address);
     }
 
-    fn remove(&mut self, address: Address) {
+    fn remove(&mut self, address: [u8; 20]) {
         self.nodes.remove(&address);
     }
 }
