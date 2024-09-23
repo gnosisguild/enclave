@@ -4,7 +4,7 @@ use std::{str};
 use p2p::{EnclaveRouter, P2PMessage};
 use bfv::EnclaveBFV;
 use sortition::DistanceSortition;
-use eth::{EventListener, ContractManager};
+use eth::{EventListener, ContractManager, CommitteeRequestedEvent, ETHEvent, EventType};
 use tokio::{
     self,
     io::{self, AsyncBufReadExt, BufReader},
@@ -12,7 +12,10 @@ use tokio::{
 };
 
 use alloy_primitives::{address as paddress};
-use alloy::{primitives::address, sol};
+use alloy::{
+    primitives::{Address, address},
+    sol,
+};
 
 use log::Level;
 
@@ -55,13 +58,28 @@ async fn send_p2p_msg(
 fn handle_p2p_msg(msg: Vec<u8>) {
     let msg_out_str = str::from_utf8(&msg).unwrap();
     let msg_out_struct: P2PMessage = serde_json::from_str(&msg_out_str).unwrap();
-    println!("msg_topic: {}", msg_out_struct.topic);
-    println!("msg_type: {}", msg_out_struct.msg_type);
-    println!("msg: {}", String::from_utf8(msg_out_struct.data).unwrap());
+    log::info!("P2P Message Received: Topic {}, Type {}, Data {}", msg_out_struct.topic, msg_out_struct.msg_type, String::from_utf8(msg_out_struct.data).unwrap());
 }
 
-fn handle_eth_event(msg: Vec<u8>) {
+fn handle_eth_event(msg: Vec<u8>, mock_db: &mut Vec<Address>) {
     log::info!("Received Committee Requested Event");
+    let event_out_str = str::from_utf8(&msg).unwrap();
+    let event_out_struct: ETHEvent = serde_json::from_str(&event_out_str).unwrap();
+    match event_out_struct.event_type {
+        EventType::CommitteeRequested => {
+            let committee_event = event_out_struct.committee_requested.unwrap();
+            log::info!("Committee Request: e3Id {}", committee_event.e3Id);
+            let mut committee = DistanceSortition::new(122, mock_db.clone(), committee_event.threshold[0] as usize);
+            let selected = committee.get_committee();
+            log::info!("Committee Selected: Node {}", selected[0].1);
+            log::info!("Committee Selected: Node {}", selected[1].1);
+        },
+        EventType::CiphernodeAdded => {
+            let node_address = event_out_struct.ciphernode_added.unwrap().node;
+            log::info!("Ciphernode Added: Address {}", node_address.clone());
+            mock_db.push(node_address);
+        }
+    }
 }
 
 async fn start_p2p() -> Result<(), Box<dyn Error>> {
@@ -69,6 +87,7 @@ async fn start_p2p() -> Result<(), Box<dyn Error>> {
     let (mut p2p, p2p_tx, mut p2p_rx) = EnclaveRouter::new()?;
     p2p.connect_swarm("mdns".to_string())?;
     p2p.join_topic("enclave-testnet")?;
+    log::info!("Joined Topic Enclave-Testnet");
     let mut stdin = BufReader::new(io::stdin()).lines();
     tokio::spawn(async move { p2p.start().await });
     tokio::spawn(async move {
@@ -90,7 +109,7 @@ async fn start_p2p() -> Result<(), Box<dyn Error>> {
     }
 }
 
-async fn start_eth_listener() {
+async fn start_eth_listener(mock_db: &mut Vec<Address>) {
     log::info!("Listening on E3 Contract");
     let (mut manager, tx_sender, mut tx_receiver) = ContractManager::new("ws://127.0.0.1:8545").await.unwrap();
     let listener = manager.add_listener(address!("959922be3caee4b8cd9a407cc3ac1c251c2007b1"));
@@ -98,26 +117,19 @@ async fn start_eth_listener() {
         listener.listen().await;
     });
     while let Some(msg) = tx_receiver.recv().await {
-        handle_eth_event(msg);
+        handle_eth_event(msg, mock_db);
     };
 }
 
 async fn run() {
+    let mut mock_db: Vec<Address> = Vec::new();
     tokio::join!(
         start_p2p(),
-        start_eth_listener(),
+        start_eth_listener(&mut mock_db),
     );
 }
 
-
 fn main() -> Result<(), Box<dyn Error>> {
-    // boot up p2p network
-
-    // boot up ether client
-
-    // start main loop
-
-    //let ether = eth::EtherClient::new("test".to_string());
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
 
@@ -127,8 +139,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let future = run();
     main_rt.block_on(future);
 
-    let mut committee = DistanceSortition::new(12, vec![paddress!("d8da6bf26964af9d7eed9e03e53415d37aa96045")], 1);
-    committee.get_committee();
+    // let mut committee = DistanceSortition::new(12, vec![address!("d8da6bf26964af9d7eed9e03e53415d37aa96045")], 1);
+    // committee.get_committee();
 
     let mut new_bfv = EnclaveBFV::new(4096, 4096, vec![0xffffee001, 0xffffc4001, 0x1ffffe0001]);
     let pk_bytes = new_bfv.serialize_pk();
