@@ -7,7 +7,7 @@ use crate::{
     setup_crp_params, EnclaveEvent, EventBus, ParamsWithCrp,
 };
 use actix::{Actor, Addr, Context};
-use alloy::{primitives::Address, sol, sol_types::SolEvent};
+use alloy::{primitives::Address, sol};
 use anyhow::Result;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -72,7 +72,7 @@ impl From<E3Requested> for events::E3Requested {
             degree,
             plaintext_modulus,
             crp_bytes,
-            params,
+            ..
         } = setup_crp_params(
             &[0x3FFFFFFF000001],
             2048,
@@ -86,20 +86,73 @@ impl From<E3Requested> for events::E3Requested {
             threshold_m: value.e3.threshold[0],
             crp: crp_bytes,
             // HACK: Following should be [u8;32] and not converted to u64
-            seed: value.e3.seed.as_limbs()[1], // converting to u64
+            seed: value.e3.seed.as_limbs()[0], // converting to u64
             e3_id: value.e3Id.to_string().into(),
         }
     }
 }
-// impl From<CiphernodeAdded> for events::CiphernodeAdded {
-//     fn from(value: CiphernodeAdded) -> Self {
-//         events::CiphernodeAdded {
-//             address: value.node.to_string(),
-//             index: value.index.as_limbs()[1] as usize,
-//             num_nodes: value.numNodes.as_limbs()[1] as usize,
-//         }
-//     }
-// }
+
+impl From<CiphernodeAdded> for events::CiphernodeAdded {
+    fn from(value: CiphernodeAdded) -> Self {
+        events::CiphernodeAdded {
+            address: value.node.to_string(),
+            index: value.index.as_limbs()[0] as usize,
+            num_nodes: value.numNodes.as_limbs()[0] as usize,
+        }
+    }
+}
+
+impl From<CiphernodeRemoved> for events::CiphernodeRemoved {
+    fn from(value: CiphernodeRemoved) -> Self {
+        events::CiphernodeRemoved {
+            address: value.node.to_string(),
+            index: value.index.as_limbs()[0] as usize,
+            num_nodes: value.numNodes.as_limbs()[0] as usize,
+        }
+    }
+}
+
+impl From<CiphertextOutputPublished> for events::CiphertextOutputPublished {
+    fn from(value: CiphertextOutputPublished) -> Self {
+        events::CiphertextOutputPublished {
+            e3_id: value.e3Id.to_string().into(),
+            ciphertext_output: value.ciphertextOutput.to_vec(),
+        }
+    }
+}
+
+impl ContractEvent for CiphernodeAdded {
+    fn process(&self, bus: Addr<EventBus>) -> Result<()> {
+        let data: events::CiphernodeAdded = self.clone().into();
+        bus.do_send(EnclaveEvent::from(data));
+        Ok(())
+    }
+}
+
+impl ContractEvent for E3Requested {
+    fn process(&self, bus: Addr<EventBus>) -> Result<()> {
+        let data: events::E3Requested = self.clone().into();
+        bus.do_send(EnclaveEvent::from(data));
+        Ok(())
+    }
+}
+
+impl ContractEvent for CiphernodeRemoved { 
+    fn process(&self, bus: Addr<EventBus>) -> Result<()> {
+        let data: events::CiphernodeRemoved = self.clone().into(); 
+        bus.do_send(EnclaveEvent::from(data));
+        Ok(())
+    }
+}
+
+impl ContractEvent for CiphertextOutputPublished {
+    fn process(&self, bus: Addr<EventBus>) -> Result<()> {
+        let data: events::CiphertextOutputPublished = self.clone().into();
+        bus.do_send(EnclaveEvent::from(data));
+        Ok(())
+    }
+}
+
 struct Evm {
     // holding refs to evm contracts for management
     evm_manager: Addr<EvmContractManager>,

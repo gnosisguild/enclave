@@ -9,25 +9,13 @@ use alloy::{
 use anyhow::Result;
 use futures_util::stream::StreamExt;
 use std::collections::HashMap;
-use std::fmt::Debug;
-use std::sync::Arc;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
-use crate::{EnclaveEvent, EventBus};
+use crate::EventBus;
 
 pub trait ContractEvent: Send + Sync + 'static {
     fn process(&self, bus: Addr<EventBus>) -> Result<()>;
-}
-
-impl<T> ContractEvent for T
-where
-    T: SolEvent + Debug + Send + Sync + 'static,
-{
-    fn process(&self, bus: Addr<EventBus>) -> Result<()> {
-        println!("Processing event: {:?}", self);
-        // bus.do_send(EnclaveEvent::from(self));
-        Ok(())
-    }
 }
 
 pub struct EvmEventListener {
