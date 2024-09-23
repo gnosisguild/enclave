@@ -14,7 +14,7 @@ pub struct Ciphernode {
     fhe: Addr<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
-    address: Address,
+    address: [u8;20],
 }
 
 impl Actor for Ciphernode {
@@ -22,7 +22,7 @@ impl Actor for Ciphernode {
 }
 
 impl Ciphernode {
-    pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>, address: Address) -> Self {
+    pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>, address: [u8;20]) -> Self {
         Self {
             bus,
             fhe,
@@ -82,7 +82,7 @@ async fn on_ciphernode_selected(
     data: Addr<Data>,
     bus: Addr<EventBus>,
     event: CiphernodeSelected,
-    address: Address,
+    address: [u8;20],
 ) -> Result<()> {
     let CiphernodeSelected { e3_id, .. } = event;
 
@@ -117,7 +117,7 @@ async fn on_decryption_requested(
     data: Addr<Data>,
     bus: Addr<EventBus>,
     event: CiphertextOutputPublished,
-    address: Address,
+    address: [u8;20],
 ) -> Result<()> {
     let CiphertextOutputPublished {
         e3_id,
@@ -151,7 +151,7 @@ async fn on_decryption_requested(
 
 pub struct CiphernodeFactory;
 impl CiphernodeFactory {
-    pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: Address) -> ActorFactory {
+    pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: [u8;20]) -> ActorFactory {
         Box::new(move |ctx, evt| {
             // Save Ciphernode on CiphernodeSelected
             let EnclaveEvent::CiphernodeSelected { .. } = evt else {

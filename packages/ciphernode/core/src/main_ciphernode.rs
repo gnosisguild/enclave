@@ -56,7 +56,7 @@ impl MainCiphernode {
         let bus = EventBus::new(true).start();
         let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
         let sortition = Sortition::attach(bus.clone());
-        let selector = CiphernodeSelector::attach(bus.clone(), sortition.clone(), address);
+        let selector = CiphernodeSelector::attach(bus.clone(), sortition.clone(), address.into_array());
 
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
@@ -64,7 +64,7 @@ impl MainCiphernode {
             .add_hook(CiphernodeFactory::create(
                 bus.clone(),
                 data.clone(),
-                address,
+                address.into_array(),
             ))
             .build();
 

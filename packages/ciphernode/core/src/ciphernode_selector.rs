@@ -8,7 +8,7 @@ use crate::{
 pub struct CiphernodeSelector {
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
-    address: Address, 
+    address: [u8;20], 
 }
 
 impl Actor for CiphernodeSelector {
@@ -16,7 +16,7 @@ impl Actor for CiphernodeSelector {
 }
 
 impl CiphernodeSelector {
-    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: Address) -> Self {
+    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: [u8;20]) -> Self {
         Self {
             bus,
             sortition,
@@ -24,7 +24,7 @@ impl CiphernodeSelector {
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: Address) -> Addr<Self> {
+    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: [u8;20]) -> Addr<Self> {
         let addr = CiphernodeSelector::new(bus.clone(), sortition, address).start();
 
         bus.do_send(Subscribe::new(

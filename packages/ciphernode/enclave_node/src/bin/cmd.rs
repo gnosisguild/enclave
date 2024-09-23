@@ -7,8 +7,6 @@ use enclave_core::{
     SimpleLogger,
 };
 use enclave_core::{CiphernodeAdded, CiphertextOutputPublished};
-use fhe::bfv::{Encoding, Plaintext, PublicKey};
-use fhe_traits::{DeserializeParametrized, FheEncoder};
 use rand::{thread_rng, RngCore, SeedableRng};
 use rand_chacha::rand_core::OsRng;
 use std::fs;
@@ -50,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["reg", "1"] => {
                     println!("Registering Ciphernode {}", ADDRS[0]);
                     bus.do_send(EnclaveEvent::from(CiphernodeAdded {
-                        address: ADDRS[0],
+                        address: ADDRS[0].into_array(),
                         index: 0,
                         num_nodes: 1,
                     }));
@@ -58,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["reg", "2"] => {
                     println!("Registering Ciphernode {}", ADDRS[1]);
                     bus.do_send(EnclaveEvent::from(CiphernodeAdded {
-                        address: ADDRS[1],
+                        address: ADDRS[1].into_array(),
                         index: 1,
                         num_nodes: 2,
                     }))
@@ -66,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["reg", "3"] => {
                     println!("Registering Ciphernode {}", ADDRS[2]);
                     bus.do_send(EnclaveEvent::from(CiphernodeAdded {
-                        address: ADDRS[2],
+                        address: ADDRS[2].into_array(),
                         index: 2,
                         num_nodes: 3,
                     }))
@@ -74,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["reg", "4"] => {
                     println!("Registering Ciphernode {}", ADDRS[3]);
                     bus.do_send(EnclaveEvent::from(CiphernodeAdded {
-                        address: ADDRS[3],
+                        address: ADDRS[3].into_array(),
                         index: 3,
                         num_nodes: 4,
                     }))

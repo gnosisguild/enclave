@@ -1,5 +1,6 @@
 use crate::{EnclaveEvent, EventBus, Subscribe};
 use actix::{Actor, Addr, Context, Handler};
+use alloy::primitives::Address;
 use base64::prelude::*;
 use std::fs;
 
@@ -46,7 +47,7 @@ impl Handler<EnclaveEvent> for SimpleLogger {
                 println!("[{}]: {}", self.name, msg);
             }
             EnclaveEvent::CiphernodeAdded { data, .. } => {
-                println!("[{}]: CiphernodeAdded({})", self.name, data.address);
+                println!("[{}]: CiphernodeAdded({})", self.name, Address::from(data.address));
             }
             _ => println!("[{}]: {}", self.name, msg),
         }
