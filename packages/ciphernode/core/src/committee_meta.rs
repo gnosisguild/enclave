@@ -16,7 +16,7 @@ impl CommitteeMetaFactory {
             };
             let E3Requested {
                 threshold_m,
-                seed: seed,
+                seed,
                 ..
             } = data;
 
