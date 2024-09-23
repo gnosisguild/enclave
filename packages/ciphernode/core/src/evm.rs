@@ -1,14 +1,27 @@
+use crate::{
+    events, evm_listener::{AddEventHandler, ContractEvent, EvmEventListener, StartListening}, evm_manager::{AddListener, EvmContractManager}, EnclaveEvent, EventBus
+};
 use actix::{Actor, Addr, Context};
 use alloy::{primitives::Address, sol, sol_types::SolEvent};
-use rand::{thread_rng, RngCore};
-
-use crate::{
-    evm_listener::{AddEventHandler, EvmEventListener, StartListening},
-    evm_manager::{AddListener, EvmContractManager},
-    E3id, EnclaveEvent, EventBus, SharedRng,
-};
+use anyhow::Result;
 
 sol! {
+    #[derive(Debug)]
+    struct E3 {
+        uint256 seed;
+        uint32[2] threshold;
+        uint256[2] startWindow;
+        uint256 duration;
+        uint256 expiration;
+        address e3Program;
+        bytes e3ProgramParams;
+        address inputValidator;
+        address decryptionVerifier;
+        bytes committeePublicKey;
+        bytes ciphertextOutput;
+        bytes plaintextOutput;
+    }
+
     #[derive(Debug)]
     event CommitteeRequested(
         uint256 indexed e3Id,
@@ -37,9 +50,18 @@ sol! {
         uint256 indexed e3Id,
         bytes ciphertextOutput
     );
+
+    #[derive(Debug)]
+    event E3Requested(
+        uint256 e3Id,
+        E3 e3,
+        address filter,
+        address indexed e3Program
+    );
 }
 
 struct Evm {
+    // holding refs to evm contracts for management
     evm_manager: Addr<EvmContractManager>,
     evm_listener: Addr<EvmEventListener>,
 }

@@ -16,17 +16,9 @@ pub struct E3RequestContext {
     pub publickey: Option<Addr<PublicKeyAggregator>>,
     pub meta: Option<CommitteeMeta>,
 }
-
+#[derive(Default)]
 struct EventBuffer {
     buffer: HashMap<String, Vec<EnclaveEvent>>,
-}
-
-impl Default for EventBuffer {
-    fn default() -> Self {
-        Self {
-            buffer: HashMap::new(),
-        }
-    }
 }
 
 impl EventBuffer {

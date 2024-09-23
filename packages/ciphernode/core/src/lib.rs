@@ -7,7 +7,6 @@ mod ciphernode_selector;
 mod committee_meta;
 mod data;
 mod e3_request;
-mod enclave_contract;
 mod eventbus;
 pub mod events;
 mod evm;
