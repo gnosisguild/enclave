@@ -1,4 +1,7 @@
-use alloy_primitives::{address, Address, keccak256};
+use alloy_primitives::{keccak256};
+use alloy::{
+    primitives::{Address, address},
+};
 use num::{BigInt, Num};
 
 pub struct DistanceSortition {

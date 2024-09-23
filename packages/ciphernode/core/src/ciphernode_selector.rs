@@ -1,5 +1,6 @@
 use actix::prelude::*;
-use alloy_primitives::Address;
+//use alloy_primitives::Address;
+use alloy::{primitives::{Address, address}};
 
 use crate::{
     CiphernodeSelected, EnclaveEvent, EventBus, GetHasNode, Sortition, Subscribe,

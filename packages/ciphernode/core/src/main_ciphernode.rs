@@ -6,7 +6,8 @@ use crate::{
     Sortition,
 };
 use actix::{Actor, Addr, Context};
-use alloy_primitives::Address;
+//use alloy_primitives::Address;
+use alloy::{primitives::{Address, address}};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use tokio::task::JoinHandle;

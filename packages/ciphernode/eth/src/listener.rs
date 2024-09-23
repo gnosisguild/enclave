@@ -23,10 +23,31 @@ sol!(
 );
 
 #[derive(Debug, Deserialize, Serialize)]
+pub enum EventType {
+    CommitteeRequested,
+    CiphernodeAdded,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ETHEvent {
+    pub event_type: EventType,
+    pub committee_requested: Option<CommitteeRequestedEvent>,
+    pub ciphernode_added: Option<CipherNodeAddedEvent>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CommitteeRequestedEvent {
-    e3Id: Uint<256, 4>,
-    filter: Address,
-    threshold: [u32; 2],
+    pub e3Id: Uint<256, 4>,
+    pub filter: Address,
+    pub threshold: [u32; 2],
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CipherNodeAddedEvent {
+    pub node: Address,
+    pub index: Uint<256, 4>,
+    pub numNodes: Uint<256, 4>,
+    pub size: Uint<256, 4>,
 }
 
 #[derive(Clone)]
@@ -63,23 +84,42 @@ impl EventListener {
         while let Some(log) = stream.next().await {
             // Match on topic 0, the hash of the signature of the event.
             match log.topic0() {
-                // Match the `Approval(address,address,uint256)` event.
+                // Match the `CommitteeRequested(address,address,uint256)` event.
                 Some(&ICiphernodeRegistry::CommitteeRequested::SIGNATURE_HASH) => {
                     let ICiphernodeRegistry::CommitteeRequested { e3Id, filter, threshold } = log.log_decode()?.inner.data;
-                    println!("CommitteeRequested with ID {e3Id} filter {filter} thresold {:?}", threshold);
+                    //println!("CommitteeRequested with ID {e3Id} filter {filter} thresold {:?}", threshold);
                     let cevent = CommitteeRequestedEvent {
                         e3Id,
                         filter,
                         threshold
                     };
-                    let msg_str = serde_json::to_string(&cevent).unwrap();
+                    let eevent = ETHEvent {
+                        event_type: EventType::CommitteeRequested,
+                        committee_requested: Some(cevent),
+                        ciphernode_added: None,
+                    };
+                    let msg_str = serde_json::to_string(&eevent).unwrap();
                     let msg_bytes = msg_str.into_bytes();
                     self.evt_tx.send(msg_bytes).await?;
                 }
-                // Match the `Transfer(address,address,uint256)` event.
+                // Match the `CiphernodeAdded(address,address,uint256)` event.
                 Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
                     let ICiphernodeRegistry::CiphernodeAdded { node, index, numNodes, size } = log.log_decode()?.inner.data;
-                    println!("CiphernodeAdded node {node} index {index} numNodes {numNodes} size {size}");
+                    //println!("CiphernodeAdded node {node} index {index} numNodes {numNodes} size {size}");
+                    let aevent = CipherNodeAddedEvent {
+                        node,
+                        index,
+                        numNodes,
+                        size,
+                    };
+                    let eevent = ETHEvent {
+                        event_type: EventType::CiphernodeAdded,
+                        committee_requested: None,
+                        ciphernode_added: Some(aevent),
+                    };
+                    let msg_str = serde_json::to_string(&eevent).unwrap();
+                    let msg_bytes = msg_str.into_bytes();
+                    self.evt_tx.send(msg_bytes).await?;
                 }
                 // WETH9's `Deposit(address,uint256)` and `Withdrawal(address,uint256)` events are not
                 // handled here.

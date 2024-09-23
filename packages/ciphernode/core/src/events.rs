@@ -1,5 +1,6 @@
 use actix::Message;
-use alloy_primitives::Address;
+//use alloy_primitives::Address;
+use alloy::{primitives::{Address, address}};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{

@@ -7,7 +7,8 @@ use crate::{
     DecryptionshareCreated, Get,
 };
 use actix::prelude::*;
-use alloy_primitives::Address;
+//use alloy_primitives::Address;
+use alloy::{primitives::{Address, address}};
 use anyhow::Result;
 
 pub struct Ciphernode {

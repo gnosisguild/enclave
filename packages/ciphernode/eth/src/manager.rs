@@ -1,6 +1,6 @@
 use crate::EventListener;
 use alloy::{
-    primitives::Address,
+    primitives::{Address, address},
     providers::{ProviderBuilder, RootProvider},
     rpc::types::{BlockNumberOrTag, Filter},
     transports::BoxTransport,

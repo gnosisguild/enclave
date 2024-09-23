@@ -161,10 +161,6 @@ impl EnclaveRouter {
                         message_id: id,
                         message,
                     })) => {
-                        // println!(
-                        //     "Got message with id: {id} from peer: {peer_id}",
-                        // );
-                        // println!("{:?}", message);
                         self.evt_tx.send(message.data).await?;
                     },
                     SwarmEvent::NewListenAddr { address, .. } => {
@@ -178,22 +174,8 @@ impl EnclaveRouter {
 }
 
 fn parse_msg(msg: Vec<u8>) -> (gossipsub::IdentTopic, Vec<u8>) {
-    //let stringify = serde_json::to_string(&msg).unwrap();
     let stringify = String::from_utf8(msg).unwrap();
-    println!("{:?}", stringify);
     let mut p2p_message: P2PMessage = serde_json::from_str(&stringify).expect("JSON was not well-formatted");
     let topic = gossipsub::IdentTopic::new(p2p_message.topic);
     (topic, p2p_message.data)
 }
-
-// #[tokio::main]
-// async fn main() -> Result<(), Box<dyn Error>> {
-
-//     let mut p2p = EnclaveRouter::new()?;
-//     p2p.connect_swarm("mdns".to_string())?;
-//     p2p.join_topic("enclave-keygen-01")?;
-//     p2p.start().await?;
-
-//     println!("Hello, cipher world!");
-//     Ok(())
-// }

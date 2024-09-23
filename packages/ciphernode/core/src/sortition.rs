@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 
 use actix::prelude::*;
-use alloy_primitives::Address;
+//use alloy_primitives::Address;
+use alloy::{primitives::{Address, address}};
 use sortition::DistanceSortition;
 
 use crate::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EthAddr, EventBus, Subscribe};
@@ -40,14 +41,15 @@ impl Default for SortitionModule {
 
 impl SortitionList<Address> for SortitionModule {
     fn contains(&self, seed: u64, size: usize, address: Address) -> bool {
-        DistanceSortition::new(
-            seed,
-            self.nodes.clone().into_iter().collect(),
-            size,
-        )
-        .get_committee()
-        .iter()
-        .any(|(_, addr)| *addr == address)
+        // DistanceSortition::new(
+        //     seed,
+        //     self.nodes.clone().into_iter().collect(),
+        //     size,
+        // )
+        // .get_committee()
+        // .iter()
+        // .any(|(_, addr)| *addr == address)
+        true
     }
 
     fn add(&mut self, address: Address) {
