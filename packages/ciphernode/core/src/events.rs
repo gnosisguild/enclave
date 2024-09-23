@@ -26,6 +26,12 @@ impl From<u32> for E3id {
     }
 }
 
+impl From<String> for E3id {
+    fn from(value: String) -> Self {
+        E3id::new(value)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EventId(pub [u8; 32]);
 
@@ -54,9 +60,9 @@ pub enum EnclaveEvent {
         id: EventId,
         data: KeyshareCreated,
     },
-    CommitteeRequested {
+    E3Requested {
         id: EventId,
-        data: CommitteeRequested,
+        data: E3Requested,
     },
     PublicKeyAggregated {
         id: EventId,
@@ -118,7 +124,7 @@ impl From<EnclaveEvent> for EventId {
     fn from(value: EnclaveEvent) -> Self {
         match value {
             EnclaveEvent::KeyshareCreated { id, .. } => id,
-            EnclaveEvent::CommitteeRequested { id, .. } => id,
+            EnclaveEvent::E3Requested { id, .. } => id,
             EnclaveEvent::PublicKeyAggregated { id, .. } => id,
             EnclaveEvent::CiphertextOutputPublished { id, .. } => id,
             EnclaveEvent::DecryptionshareCreated { id, .. } => id,
@@ -134,7 +140,7 @@ impl EnclaveEvent {
     pub fn get_e3_id(&self) -> Option<E3id> {
         match self.clone() {
             EnclaveEvent::KeyshareCreated { data, .. } => Some(data.e3_id),
-            EnclaveEvent::CommitteeRequested { data, .. } => Some(data.e3_id),
+            EnclaveEvent::E3Requested { data, .. } => Some(data.e3_id),
             EnclaveEvent::PublicKeyAggregated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CiphertextOutputPublished { data, .. } => Some(data.e3_id),
             EnclaveEvent::DecryptionshareCreated { data, .. } => Some(data.e3_id),
@@ -154,9 +160,9 @@ impl From<KeyshareCreated> for EnclaveEvent {
     }
 }
 
-impl From<CommitteeRequested> for EnclaveEvent {
-    fn from(data: CommitteeRequested) -> Self {
-        EnclaveEvent::CommitteeRequested {
+impl From<E3Requested> for EnclaveEvent {
+    fn from(data: E3Requested) -> Self {
+        EnclaveEvent::E3Requested {
             id: EventId::from(data.clone()),
             data: data.clone(),
         }
@@ -256,10 +262,10 @@ pub struct PublicKeyAggregated {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct CommitteeRequested {
+pub struct E3Requested {
     pub e3_id: E3id,
-    pub nodecount: usize,
-    pub sortition_seed: u64, // Should actually be much larger eg [u8;32]
+    pub threshold_m: u32,
+    pub seed: u64, // Should actually be much larger eg [u8;32]
 
     // fhe params
     pub moduli: Vec<u64>,
@@ -277,7 +283,7 @@ pub struct CommitteeRequested {
 #[rtype(result = "()")]
 pub struct CiphernodeSelected {
     pub e3_id: E3id,
-    pub nodecount: usize,
+    pub threshold_m: u32,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

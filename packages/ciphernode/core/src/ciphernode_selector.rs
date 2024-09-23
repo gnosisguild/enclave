@@ -27,7 +27,7 @@ impl CiphernodeSelector {
         let addr = CiphernodeSelector::new(bus.clone(), sortition, address).start();
 
         bus.do_send(Subscribe::new(
-            "CommitteeRequested",
+            "E3Requested",
             addr.clone().recipient(),
         ));
 
@@ -44,12 +44,12 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
         let bus = self.bus.clone();
 
         Box::pin(async move {
-            let EnclaveEvent::CommitteeRequested { data, .. } = event else {
+            let EnclaveEvent::E3Requested { data, .. } = event else {
                 return;
             };
 
-            let seed = data.sortition_seed;
-            let size = data.nodecount;
+            let seed = data.seed;
+            let size = data.threshold_m as usize;
 
             if let Ok(is_selected) = sortition
                 .send(GetHasNode {
@@ -65,7 +65,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
 
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
                     e3_id: data.e3_id,
-                    nodecount: data.nodecount,
+                    threshold_m: data.threshold_m,
                 }));
             }
         })

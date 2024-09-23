@@ -4,7 +4,7 @@ use crate::{
         CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
         PublicKeyShareSerializer, SecretKeySerializer,
     },
-    ActorFactory, CommitteeRequested, EnclaveEvent,
+    ActorFactory, E3Requested, EnclaveEvent,
 };
 use actix::{Actor, Context, Handler, Message};
 use anyhow::*;
@@ -190,10 +190,10 @@ impl FheFactory {
     pub fn create(rng: Arc<Mutex<ChaCha20Rng>>) -> ActorFactory {
         Box::new(move |ctx, evt| {
             // Saving the fhe on Committee Requested
-            let EnclaveEvent::CommitteeRequested { data, .. } = evt else {
+            let EnclaveEvent::E3Requested { data, .. } = evt else {
                 return;
             };
-            let CommitteeRequested {
+            let E3Requested {
                 degree,
                 moduli,
                 plaintext_modulus,

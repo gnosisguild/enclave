@@ -11,7 +11,7 @@ use anyhow::Result;
 #[derive(Debug, Clone)]
 pub enum PublicKeyAggregatorState {
     Collecting {
-        nodecount: usize,
+        threshold_m: u32,
         keyshares: OrderedSet<Vec<u8>>,
         seed: u64,
     },
@@ -50,7 +50,7 @@ impl PublicKeyAggregator {
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
         e3_id: E3id,
-        nodecount: usize,
+        threshold_m: u32,
         seed: u64,
     ) -> Self {
         PublicKeyAggregator {
@@ -59,7 +59,7 @@ impl PublicKeyAggregator {
             e3_id,
             sortition,
             state: PublicKeyAggregatorState::Collecting {
-                nodecount,
+                threshold_m,
                 keyshares: OrderedSet::new(),
                 seed,
             },
@@ -68,7 +68,7 @@ impl PublicKeyAggregator {
 
     pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<PublicKeyAggregatorState> {
         let PublicKeyAggregatorState::Collecting {
-            nodecount,
+            threshold_m,
             keyshares,
             ..
         } = &mut self.state
@@ -77,7 +77,7 @@ impl PublicKeyAggregator {
         };
 
         keyshares.insert(keyshare);
-        if keyshares.len() == *nodecount {
+        if keyshares.len() == *threshold_m as usize {
             return Ok(PublicKeyAggregatorState::Computing {
                 keyshares: keyshares.clone(),
             });
@@ -118,7 +118,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
     fn handle(&mut self, event: KeyshareCreated, _: &mut Self::Context) -> Self::Result {
         let PublicKeyAggregatorState::Collecting {
-            nodecount, seed, ..
+            threshold_m, seed, ..
         } = self.state.clone()
         else {
             println!("Aggregator has been closed for collecting keyshares."); // TODO: log properly
@@ -126,7 +126,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
             return Box::pin(fut::ready(Ok(())));
         };
 
-        let size = nodecount;
+        let size = threshold_m as usize;
         let address = event.node;
         let e3_id = event.e3_id.clone();
         let pubkey = event.pubkey.clone();
@@ -212,8 +212,8 @@ pub struct PublicKeyAggregatorFactory;
 impl PublicKeyAggregatorFactory {
     pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> ActorFactory {
         Box::new(move |ctx, evt| {
-            // Saving the publickey aggregator with deps on CommitteeRequested
-            let EnclaveEvent::CommitteeRequested { data, .. } = evt else {
+            // Saving the publickey aggregator with deps on E3Requested
+            let EnclaveEvent::E3Requested { data, .. } = evt else {
                 return;
             };
 
@@ -230,7 +230,7 @@ impl PublicKeyAggregatorFactory {
                     bus.clone(),
                     sortition.clone(),
                     data.e3_id,
-                    meta.nodecount,
+                    meta.threshold_m,
                     meta.seed,
                 )
                 .start(),

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use alloy_primitives::{address, Address};
 use base64::{engine::general_purpose, Engine as _};
 use enclave_core::{
-    setup_crp_params, Actor, CommitteeRequested, E3id, EnclaveEvent, EventBus, P2p, ParamsWithCrp,
+    setup_crp_params, Actor, E3Requested, E3id, EnclaveEvent, EventBus, P2p, ParamsWithCrp,
     SimpleLogger,
 };
 use enclave_core::{CiphernodeAdded, CiphertextOutputPublished};
@@ -81,10 +81,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["com"] => {
                     id += 1;
                     println!("Requesting comittee: {}", id);
-                    bus.do_send(EnclaveEvent::from(CommitteeRequested {
+                    bus.do_send(EnclaveEvent::from(E3Requested {
                         e3_id: E3id::from(id),
-                        nodecount: 3,
-                        sortition_seed: thread_rng().next_u64(),
+                        threshold_m: 3,
+                        seed: thread_rng().next_u64(),
                         moduli: moduli.clone(),
                         plaintext_modulus,
                         degree,

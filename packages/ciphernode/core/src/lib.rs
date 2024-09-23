@@ -51,7 +51,7 @@ mod tests {
         ciphernode_selector::CiphernodeSelector,
         data::Data,
         eventbus::{EventBus, GetHistory},
-        events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
+        events::{E3Requested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         p2p::P2p,
         serializers::{CiphertextSerializer, DecryptionShareSerializer, PublicKeyShareSerializer},
         utils::{setup_crp_params, ParamsWithCrp},
@@ -172,10 +172,10 @@ mod tests {
 
         bus.send(regevt_3.clone()).await?;
 
-        let event = EnclaveEvent::from(CommitteeRequested {
+        let event = EnclaveEvent::from(E3Requested {
             e3_id: e3_id.clone(),
-            nodecount: 3,
-            sortition_seed: 123,
+            threshold_m: 3,
+            seed: 123,
             moduli: moduli.clone(),
             degree,
             plaintext_modulus,
@@ -211,10 +211,10 @@ mod tests {
                 regevt_1,
                 regevt_2,
                 regevt_3,
-                EnclaveEvent::from(CommitteeRequested {
+                EnclaveEvent::from(E3Requested {
                     e3_id: e3_id.clone(),
-                    nodecount: 3,
-                    sortition_seed: 123,
+                    threshold_m: 3,
+                    seed: 123,
                     moduli,
                     degree,
                     plaintext_modulus,
@@ -222,7 +222,7 @@ mod tests {
                 }),
                 EnclaveEvent::from(CiphernodeSelected {
                     e3_id: e3_id.clone(),
-                    nodecount: 3,
+                    threshold_m: 3,
                 }),
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p1.clone(),
@@ -342,20 +342,20 @@ mod tests {
             }
         });
 
-        let evt_1 = EnclaveEvent::from(CommitteeRequested {
+        let evt_1 = EnclaveEvent::from(E3Requested {
             e3_id: E3id::new("1234"),
-            nodecount: 3,
-            sortition_seed: 123,
+            threshold_m: 3,
+            seed: 123,
             moduli: vec![0x3FFFFFFF000001],
             degree: 2048,
             plaintext_modulus: 1032193,
             crp: vec![1, 2, 3, 4],
         });
 
-        let evt_2 = EnclaveEvent::from(CommitteeRequested {
+        let evt_2 = EnclaveEvent::from(E3Requested {
             e3_id: E3id::new("1235"),
-            nodecount: 3,
-            sortition_seed: 123,
+            threshold_m: 3,
+            seed: 123,
             moduli: vec![0x3FFFFFFF000001],
             degree: 2048,
             plaintext_modulus: 1032193,
@@ -364,7 +364,7 @@ mod tests {
 
         let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
             e3_id: E3id::new("1235"),
-            nodecount: 3,
+            threshold_m: 3,
         });
 
         bus.do_send(evt_1.clone());
@@ -401,10 +401,10 @@ mod tests {
         P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
 
         // Capture messages from output on msgs vec
-        let event = EnclaveEvent::from(CommitteeRequested {
+        let event = EnclaveEvent::from(E3Requested {
             e3_id: E3id::new("1235"),
-            nodecount: 3,
-            sortition_seed: 123,
+            threshold_m: 3,
+            seed: 123,
             moduli: vec![0x3FFFFFFF000001],
             degree: 2048,
             plaintext_modulus: 1032193,

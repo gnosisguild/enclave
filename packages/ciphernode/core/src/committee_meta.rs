@@ -1,8 +1,8 @@
-use crate::{ActorFactory, CommitteeRequested, EnclaveEvent};
+use crate::{ActorFactory, E3Requested, EnclaveEvent};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitteeMeta {
-    pub nodecount: usize,
+    pub threshold_m: u32,
     pub seed: u64,
 }
 
@@ -11,16 +11,16 @@ pub struct CommitteeMetaFactory;
 impl CommitteeMetaFactory {
     pub fn create() -> ActorFactory {
         Box::new(move |ctx, evt| {
-            let EnclaveEvent::CommitteeRequested { data, .. }: crate::EnclaveEvent = evt else {
+            let EnclaveEvent::E3Requested { data, .. }: crate::EnclaveEvent = evt else {
                 return;
             };
-            let CommitteeRequested {
-                nodecount,
-                sortition_seed: seed,
+            let E3Requested {
+                threshold_m,
+                seed: seed,
                 ..
             } = data;
 
-            ctx.meta = Some(CommitteeMeta { nodecount, seed });
+            ctx.meta = Some(CommitteeMeta { threshold_m, seed });
         })
     }
 }
