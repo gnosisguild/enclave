@@ -2645,6 +2645,8 @@ dependencies = [
  "enclave-core",
  "eyre",
  "futures-util",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 

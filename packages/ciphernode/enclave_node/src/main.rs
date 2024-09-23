@@ -11,8 +11,8 @@ use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
 };
 
-use alloy_primitives::{address};
-use alloy::sol;
+use alloy_primitives::{address as paddress};
+use alloy::{primitives::address, sol};
 
 use log::Level;
 
@@ -60,8 +60,8 @@ fn handle_p2p_msg(msg: Vec<u8>) {
     println!("msg: {}", String::from_utf8(msg_out_struct.data).unwrap());
 }
 
-fn handle_eth_event() {
-
+fn handle_eth_event(msg: Vec<u8>) {
+    log::info!("Received Committee Requested Event");
 }
 
 async fn start_p2p() -> Result<(), Box<dyn Error>> {
@@ -92,15 +92,14 @@ async fn start_p2p() -> Result<(), Box<dyn Error>> {
 
 async fn start_eth_listener() {
     log::info!("Listening on E3 Contract");
-    let manager = ContractManager::new("ws://127.0.0.1:8545").await;
-    // let listener = manager
-    //     .send(AddListener {
-    //         contract_address: address!("e7f1725E7734CE288F8367e1Bb143E90bb3F0512"),
-    //     })
-    //     .await
-    //     .unwrap();
-
-    // listener.send(AddEventHandler::<TestingEvent>::new()).await.unwrap();
+    let (mut manager, tx_sender, mut tx_receiver) = ContractManager::new("ws://127.0.0.1:8545").await.unwrap();
+    let listener = manager.add_listener(address!("959922be3caee4b8cd9a407cc3ac1c251c2007b1"));
+    tokio::spawn(async move { 
+        listener.listen().await;
+    });
+    while let Some(msg) = tx_receiver.recv().await {
+        handle_eth_event(msg);
+    };
 }
 
 async fn run() {
@@ -128,7 +127,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let future = run();
     main_rt.block_on(future);
 
-    let mut committee = DistanceSortition::new(12, vec![address!("d8da6bf26964af9d7eed9e03e53415d37aa96045")], 1);
+    let mut committee = DistanceSortition::new(12, vec![paddress!("d8da6bf26964af9d7eed9e03e53415d37aa96045")], 1);
     committee.get_committee();
 
     let mut new_bfv = EnclaveBFV::new(4096, 4096, vec![0xffffee001, 0xffffc4001, 0x1ffffe0001]);

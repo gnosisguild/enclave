@@ -12,9 +12,9 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct ContractManager {
     provider: Arc<RootProvider<BoxTransport>>,
-    listeners: Vec<EventListener>,
-    evt_tx: Sender<Vec<u8>>,
-    cmd_rx: Receiver<Vec<u8>>
+    pub listeners: Vec<EventListener>,
+    pub evt_tx: Sender<Vec<u8>>,
+    pub cmd_rx: Receiver<Vec<u8>>
 }
 
 impl ContractManager {
@@ -33,11 +33,9 @@ impl ContractManager {
         ))
     }
 
-    pub fn add_listener(&mut self, contract_address: Address) {
-        let filter = Filter::new()
-            .address(contract_address)
-            .from_block(BlockNumberOrTag::Latest);
-        let listener = EventListener::new(self.provider.clone(), filter, self.evt_tx.clone());
-        self.listeners.push(listener);
+    pub fn add_listener(&mut self, contract_address: Address) -> EventListener {
+        let listener = EventListener::new(self.provider.clone(), contract_address, self.evt_tx.clone());
+        self.listeners.push(listener.clone());
+        listener
     }
 }
