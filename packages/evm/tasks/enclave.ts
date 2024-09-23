@@ -99,6 +99,7 @@ task(
 
     let computeParams = taskArguments.computeParams;
     if (!computeParams) {
+      // no compute params provided, use mock
       const MockDecryptionVerifier = await hre.deployments.get(
         "MockDecryptionVerifier",
       );
@@ -109,6 +110,21 @@ task(
         MockDecryptionVerifier.address,
         32,
       );
+
+      // since we are using mock, we need to set the decryption verifier to the mock encryption scheme id
+      try {
+        const setDecryptionVerifier =
+          await enclaveContract.setDecryptionVerifier(
+            "0x0000000000000000000000000000000000000000000000000000000000000001",
+            MockDecryptionVerifier.address,
+          );
+        await setDecryptionVerifier.wait();
+      } catch (e) {
+        console.log(
+          "Setting decryption verifier for encryption scheme id failed: ",
+          e,
+        );
+      }
     }
 
     try {
@@ -227,6 +243,7 @@ task("e3:publishInput", "Publish input for an E3 program")
 task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
   .addParam("e3Id", "Id of the E3 program")
   .addParam("data", "data to publish")
+  .addParam("proof", "proof to publish")
   .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
@@ -238,6 +255,7 @@ task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
     const tx = await enclaveContract.publishCiphertextOutput(
       taskArguments.e3Id,
       taskArguments.data,
+      taskArguments.proof,
     );
 
     console.log("Publishing ciphertext... ", tx.hash);
@@ -249,6 +267,7 @@ task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
 task("e3:publishPlaintext", "Publish plaintext output for an E3 program")
   .addParam("e3Id", "Id of the E3 program")
   .addParam("data", "data to publish")
+  .addParam("proof", "proof to publish")
   .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
@@ -260,6 +279,7 @@ task("e3:publishPlaintext", "Publish plaintext output for an E3 program")
     const tx = await enclaveContract.publishPlaintextOutput(
       taskArguments.e3Id,
       taskArguments.data,
+      taskArguments.proof,
     );
 
     console.log("Publishing ciphertext... ", tx.hash);
