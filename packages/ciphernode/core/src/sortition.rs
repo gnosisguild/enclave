@@ -1,16 +1,15 @@
 use std::collections::HashSet;
 
 use actix::prelude::*;
-use alloy_primitives::Address;
 use sortition::DistanceSortition;
 
-use crate::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EthAddr, EventBus, Subscribe};
+use crate::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EventBus, Subscribe};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
 pub struct GetHasNode {
     pub seed: u64,
-    pub address: [u8; 20],
+    pub address: String,
     pub size: usize,
 }
 
@@ -21,7 +20,7 @@ pub trait SortitionList<T> {
 }
 
 pub struct SortitionModule {
-    nodes: HashSet<[u8; 20]>,
+    nodes: HashSet<String>,
 }
 
 impl SortitionModule {
@@ -38,27 +37,27 @@ impl Default for SortitionModule {
     }
 }
 
-impl SortitionList<[u8; 20]> for SortitionModule {
-    fn contains(&self, seed: u64, size: usize, address: [u8; 20]) -> bool {
+impl SortitionList<String> for SortitionModule {
+    fn contains(&self, seed: u64, size: usize, address: String) -> bool {
         DistanceSortition::new(
             seed,
             self.nodes
                 .clone()
                 .into_iter()
-                .map(|b| Address::from(b))
+                .map(|b| b.parse().unwrap())
                 .collect(),
             size,
         )
         .get_committee()
         .iter()
-        .any(|(_, addr)| *addr == address)
+        .any(|(_, addr)| addr.to_string() == address)
     }
 
-    fn add(&mut self, address: [u8; 20]) {
+    fn add(&mut self, address: String) {
         self.nodes.insert(address);
     }
 
-    fn remove(&mut self, address: [u8; 20]) {
+    fn remove(&mut self, address: String) {
         self.nodes.remove(&address);
     }
 }

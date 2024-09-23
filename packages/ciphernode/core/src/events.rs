@@ -7,15 +7,6 @@ use std::{
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct EthAddr(pub Vec<u8>);
-
-impl From<[u8;20]> for EthAddr {
-    fn from(value: [u8;20]) -> Self {
-        Self(value.to_vec())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id(pub String);
 impl fmt::Display for E3id {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -245,7 +236,7 @@ impl fmt::Display for EnclaveEvent {
 pub struct KeyshareCreated {
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
-    pub node: [u8;20],
+    pub node: String,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -253,7 +244,7 @@ pub struct KeyshareCreated {
 pub struct DecryptionshareCreated {
     pub decryption_share: Vec<u8>,
     pub e3_id: E3id,
-    pub node: [u8;20],
+    pub node: String,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -306,7 +297,7 @@ pub struct PlaintextAggregated {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeAdded {
-    pub address: [u8;20],
+    pub address: String,
     pub index: usize,
     pub num_nodes: usize,
 }
@@ -314,7 +305,7 @@ pub struct CiphernodeAdded {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeRemoved {
-    pub address: [u8;20],
+    pub address: String,
     pub index: usize,
     pub num_nodes: usize,
 }
@@ -382,7 +373,7 @@ mod tests {
         let kse = EnclaveEvent::from(KeyshareCreated {
             e3_id: E3id::from(1001),
             pubkey,
-            node: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into_array(),
+            node: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").to_string(),
         });
         let kse_bytes = kse.to_bytes()?;
         let _ = EnclaveEvent::from_bytes(&kse_bytes.clone());

@@ -62,6 +62,7 @@ mod tests {
         SharedRng, Sortition,
     };
     use actix::prelude::*;
+    use alloy::primitives::Address;
     use anyhow::*;
     use fhe::{
         bfv::{BfvParameters, Encoding, Plaintext, PublicKey, SecretKey},
@@ -80,7 +81,7 @@ mod tests {
         bus: Addr<EventBus>,
         rng: SharedRng,
         logging: bool,
-        addr: [u8;20],
+        addr: &str,
     ) {
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
@@ -100,11 +101,7 @@ mod tests {
                 bus.clone(),
                 sortition.clone(),
             ))
-            .add_hook(CiphernodeFactory::create(
-                bus.clone(),
-                data.clone(),
-                addr,
-            ))
+            .add_hook(CiphernodeFactory::create(bus.clone(), data.clone(), addr))
             .build();
     }
 
@@ -129,13 +126,13 @@ mod tests {
 
         let rng = Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42)));
 
-        let eth_addrs: Vec<[u8;20]> = (0..3)
-            .map(|_| rand::thread_rng().gen::<[u8; 20]>())
+        let eth_addrs: Vec<String> = (0..3)
+            .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()).to_string())
             .collect();
 
-        setup_local_ciphernode(bus.clone(), rng.clone(), true, eth_addrs[0]).await;
-        setup_local_ciphernode(bus.clone(), rng.clone(), true, eth_addrs[1]).await;
-        setup_local_ciphernode(bus.clone(), rng.clone(), true, eth_addrs[2]).await;
+        setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[0]).await;
+        setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[1]).await;
+        setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[2]).await;
 
         let e3_id = E3id::new("1234");
 
@@ -153,7 +150,7 @@ mod tests {
         );
 
         let regevt_1 = EnclaveEvent::from(CiphernodeAdded {
-            address: eth_addrs[0],
+            address: eth_addrs[0].clone(),
             index: 0,
             num_nodes: 1,
         });
@@ -161,7 +158,7 @@ mod tests {
         bus.send(regevt_1.clone()).await?;
 
         let regevt_2 = EnclaveEvent::from(CiphernodeAdded {
-            address: eth_addrs[1],
+            address: eth_addrs[1].clone(),
             index: 1,
             num_nodes: 2,
         });
@@ -169,7 +166,7 @@ mod tests {
         bus.send(regevt_2.clone()).await?;
 
         let regevt_3 = EnclaveEvent::from(CiphernodeAdded {
-            address: eth_addrs[2],
+            address: eth_addrs[2].clone(),
             index: 2,
             num_nodes: 3,
         });
@@ -231,17 +228,17 @@ mod tests {
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p1.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[0]
+                    node: eth_addrs[0].clone()
                 }),
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p2.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[1]
+                    node: eth_addrs[1].clone()
                 }),
                 EnclaveEvent::from(KeyshareCreated {
                     pubkey: p3.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[2]
+                    node: eth_addrs[2].clone()
                 }),
                 EnclaveEvent::from(PublicKeyAggregated {
                     pubkey: pubkey.to_bytes(),
@@ -302,17 +299,17 @@ mod tests {
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds1.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[0]
+                    node: eth_addrs[0].clone()
                 }),
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds2.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[1]
+                    node: eth_addrs[1].clone()
                 }),
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds3.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[2]
+                    node: eth_addrs[2].clone()
                 }),
                 EnclaveEvent::from(PlaintextAggregated {
                     e3_id: e3_id.clone(),

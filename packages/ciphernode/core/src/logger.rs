@@ -47,7 +47,7 @@ impl Handler<EnclaveEvent> for SimpleLogger {
                 println!("[{}]: {}", self.name, msg);
             }
             EnclaveEvent::CiphernodeAdded { data, .. } => {
-                println!("[{}]: CiphernodeAdded({})", self.name, Address::from(data.address));
+                println!("[{}]: CiphernodeAdded({})", self.name, data.address);
             }
             _ => println!("[{}]: {}", self.name, msg),
         }

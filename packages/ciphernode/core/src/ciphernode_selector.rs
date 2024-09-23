@@ -1,5 +1,4 @@
 use actix::prelude::*;
-use alloy_primitives::Address;
 
 use crate::{
     CiphernodeSelected, EnclaveEvent, EventBus, GetHasNode, Sortition, Subscribe,
@@ -8,7 +7,7 @@ use crate::{
 pub struct CiphernodeSelector {
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
-    address: [u8;20], 
+    address: String, 
 }
 
 impl Actor for CiphernodeSelector {
@@ -16,15 +15,15 @@ impl Actor for CiphernodeSelector {
 }
 
 impl CiphernodeSelector {
-    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: [u8;20]) -> Self {
+    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: &str) -> Self {
         Self {
             bus,
             sortition,
-            address,
+            address:address.to_owned(),
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: [u8;20]) -> Addr<Self> {
+    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: &str) -> Addr<Self> {
         let addr = CiphernodeSelector::new(bus.clone(), sortition, address).start();
 
         bus.do_send(Subscribe::new(
@@ -40,7 +39,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
-        let address = self.address;
+        let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
 

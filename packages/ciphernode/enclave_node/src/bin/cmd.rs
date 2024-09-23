@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["reg", "1"] => {
                     println!("Registering Ciphernode {}", ADDRS[0]);
                     bus.do_send(EnclaveEvent::from(CiphernodeAdded {
-                        address: ADDRS[0].into_array(),
+                        address: ADDRS[0].to_string(),
                         index: 0,
                         num_nodes: 1,
                     }));
@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["reg", "2"] => {
                     println!("Registering Ciphernode {}", ADDRS[1]);
                     bus.do_send(EnclaveEvent::from(CiphernodeAdded {
-                        address: ADDRS[1].into_array(),
+                        address: ADDRS[1].to_string(),
                         index: 1,
                         num_nodes: 2,
                     }))
@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["reg", "3"] => {
                     println!("Registering Ciphernode {}", ADDRS[2]);
                     bus.do_send(EnclaveEvent::from(CiphernodeAdded {
-                        address: ADDRS[2].into_array(),
+                        address: ADDRS[2].to_string(),
                         index: 2,
                         num_nodes: 3,
                     }))
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ["reg", "4"] => {
                     println!("Registering Ciphernode {}", ADDRS[3]);
                     bus.do_send(EnclaveEvent::from(CiphernodeAdded {
-                        address: ADDRS[3].into_array(),
+                        address: ADDRS[3].to_string(),
                         index: 3,
                         num_nodes: 4,
                     }))

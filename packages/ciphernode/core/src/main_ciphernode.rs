@@ -1,9 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    CiphernodeFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus,
-    FheFactory, P2p, PlaintextAggregatorFactory, PublicKeyAggregatorFactory, SimpleLogger,
-    Sortition,
+    CiphernodeFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus, FheFactory, P2p, SimpleLogger, Sortition
 };
 use actix::{Actor, Addr, Context};
 use alloy_primitives::Address;
@@ -56,7 +54,8 @@ impl MainCiphernode {
         let bus = EventBus::new(true).start();
         let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
         let sortition = Sortition::attach(bus.clone());
-        let selector = CiphernodeSelector::attach(bus.clone(), sortition.clone(), address.into_array());
+        let selector =
+            CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
@@ -64,7 +63,7 @@ impl MainCiphernode {
             .add_hook(CiphernodeFactory::create(
                 bus.clone(),
                 data.clone(),
-                address.into_array(),
+                &address.to_string(),
             ))
             .build();
 

@@ -7,14 +7,13 @@ use crate::{
     DecryptionshareCreated, Get,
 };
 use actix::prelude::*;
-use alloy_primitives::Address;
 use anyhow::Result;
 
 pub struct Ciphernode {
     fhe: Addr<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
-    address: [u8;20],
+    address: String,
 }
 
 impl Actor for Ciphernode {
@@ -22,12 +21,12 @@ impl Actor for Ciphernode {
 }
 
 impl Ciphernode {
-    pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>, address: [u8;20]) -> Self {
+    pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>, address: &str) -> Self {
         Self {
             bus,
             fhe,
             data,
-            address,
+            address:address.to_string(),
         }
     }
 }
@@ -51,7 +50,7 @@ impl Handler<CiphernodeSelected> for Ciphernode {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
-        let address = self.address;
+        let address = self.address.clone();
         Box::pin(async move {
             on_ciphernode_selected(fhe, data, bus, event, address)
                 .await
@@ -68,7 +67,7 @@ impl Handler<CiphertextOutputPublished> for Ciphernode {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
-        let address = self.address;
+        let address = self.address.clone();
         Box::pin(async move {
             on_decryption_requested(fhe, data, bus, event, address)
                 .await
@@ -82,7 +81,7 @@ async fn on_ciphernode_selected(
     data: Addr<Data>,
     bus: Addr<EventBus>,
     event: CiphernodeSelected,
-    address: [u8;20],
+    address: String,
 ) -> Result<()> {
     let CiphernodeSelected { e3_id, .. } = event;
 
@@ -117,7 +116,7 @@ async fn on_decryption_requested(
     data: Addr<Data>,
     bus: Addr<EventBus>,
     event: CiphertextOutputPublished,
-    address: [u8;20],
+    address: String,
 ) -> Result<()> {
     let CiphertextOutputPublished {
         e3_id,
@@ -151,7 +150,8 @@ async fn on_decryption_requested(
 
 pub struct CiphernodeFactory;
 impl CiphernodeFactory {
-    pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: [u8;20]) -> ActorFactory {
+    pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: &str) -> ActorFactory {
+        let address = address.to_string();
         Box::new(move |ctx, evt| {
             // Save Ciphernode on CiphernodeSelected
             let EnclaveEvent::CiphernodeSelected { .. } = evt else {
@@ -163,7 +163,7 @@ impl CiphernodeFactory {
             };
 
             ctx.ciphernode =
-                Some(Ciphernode::new(bus.clone(), fhe.clone(), data.clone(), address).start())
+                Some(Ciphernode::new(bus.clone(), fhe.clone(), data.clone(), &address).start())
         })
     }
 }
