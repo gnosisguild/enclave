@@ -1,3 +1,4 @@
+import fs from "fs";
 import { task, types } from "hardhat/config";
 import type { TaskArguments } from "hardhat/types";
 
@@ -220,7 +221,8 @@ task("e3:activate", "Activate an E3 program")
 
 task("e3:publishInput", "Publish input for an E3 program")
   .addParam("e3Id", "Id of the E3 program")
-  .addParam("data", "data to publish")
+  .addOptionalParam("data", "data to publish")
+  .addOptionalParam("dataFile", "file containing data to publish")
   .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
@@ -229,10 +231,14 @@ task("e3:publishInput", "Publish input for an E3 program")
       enclave.address,
     );
 
-    const tx = await enclaveContract.publishInput(
-      taskArguments.e3Id,
-      taskArguments.data,
-    );
+    let data = taskArguments.data;
+
+    if (taskArguments.dataFile) {
+      const file = fs.readFileSync(taskArguments.dataFile);
+      data = file.toString();
+    }
+
+    const tx = await enclaveContract.publishInput(taskArguments.e3Id, data);
 
     console.log("Publishing input... ", tx.hash);
     await tx.wait();
@@ -242,7 +248,8 @@ task("e3:publishInput", "Publish input for an E3 program")
 
 task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
   .addParam("e3Id", "Id of the E3 program")
-  .addParam("data", "data to publish")
+  .addOptionalParam("data", "data to publish")
+  .addOptionalParam("dataFile", "file containing data to publish")
   .addParam("proof", "proof to publish")
   .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
@@ -252,9 +259,16 @@ task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
       enclave.address,
     );
 
+    let data = taskArguments.data;
+
+    if (taskArguments.dataFile) {
+      const file = fs.readFileSync(taskArguments.dataFile);
+      data = file.toString();
+    }
+
     const tx = await enclaveContract.publishCiphertextOutput(
       taskArguments.e3Id,
-      taskArguments.data,
+      data,
       taskArguments.proof,
     );
 
@@ -266,7 +280,8 @@ task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
 
 task("e3:publishPlaintext", "Publish plaintext output for an E3 program")
   .addParam("e3Id", "Id of the E3 program")
-  .addParam("data", "data to publish")
+  .addOptionalParam("data", "data to publish")
+  .addOptionalParam("dataFile", "file containing data to publish")
   .addParam("proof", "proof to publish")
   .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
@@ -276,9 +291,16 @@ task("e3:publishPlaintext", "Publish plaintext output for an E3 program")
       enclave.address,
     );
 
+    let data = taskArguments.data;
+
+    if (taskArguments.dataFile) {
+      const file = fs.readFileSync(taskArguments.dataFile);
+      data = file.toString();
+    }
+
     const tx = await enclaveContract.publishPlaintextOutput(
       taskArguments.e3Id,
-      taskArguments.data,
+      data,
       taskArguments.proof,
     );
 
