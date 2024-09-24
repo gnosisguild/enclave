@@ -47,7 +47,14 @@ sleep 2
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localhost
 sleep 2
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
+sleep 2
+yarn evm:committee:new --network localhost
+sleep 2
+
+cat ./tests/output/pubkey.b64
 
 # Wait for Ctrl+C
+echo ""
+echo ""
 echo "All processes are running. Press Ctrl+C to stop and clean up."
 wait

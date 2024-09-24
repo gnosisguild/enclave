@@ -27,6 +27,7 @@
     "evm:typechain": "cd packages/evm && yarn typechain",
     "evm:test": "cd packages/evm && yarn test",
     "evm:coverage": "cd packages/evm && yarn coverage",
+    "evm:committee:new": "cd packages/evm && yarn committee:new",
     "preinstall": "yarn evm:install",
     "evm:release": "cd packages/evm && yarn release"
   },
