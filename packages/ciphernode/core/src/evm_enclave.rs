@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use crate::{
     events,
-    evm_listener::{AddEventHandler, ContractEvent, EvmEventListener, StartListening},
+    evm_listener::{AddEventHandler, ContractEvent, StartListening},
     evm_manager::{AddListener, EvmContractManager},
     setup_crp_params, EnclaveEvent, EventBus, ParamsWithCrp,
 };
-use actix::{Actor, Addr, Context};
+use actix::Addr;
 use alloy::{primitives::Address, sol};
 use anyhow::Result;
 use rand::SeedableRng;
@@ -28,22 +28,6 @@ sol! {
         bytes ciphertextOutput;
         bytes plaintextOutput;
     }
-
-    #[derive(Debug)]
-    event CiphernodeAdded(
-        address indexed node,
-        uint256 index,
-        uint256 numNodes,
-        uint256 size
-    );
-
-    #[derive(Debug)]
-    event CiphernodeRemoved(
-        address indexed node,
-        uint256 index,
-        uint256 numNodes,
-        uint256 size
-    );
 
     #[derive(Debug)]
     event CiphertextOutputPublished(
@@ -92,26 +76,6 @@ impl From<E3Requested> for events::E3Requested {
     }
 }
 
-impl From<CiphernodeAdded> for events::CiphernodeAdded {
-    fn from(value: CiphernodeAdded) -> Self {
-        events::CiphernodeAdded {
-            address: value.node.to_string(),
-            index: value.index.as_limbs()[0] as usize,
-            num_nodes: value.numNodes.as_limbs()[0] as usize,
-        }
-    }
-}
-
-impl From<CiphernodeRemoved> for events::CiphernodeRemoved {
-    fn from(value: CiphernodeRemoved) -> Self {
-        events::CiphernodeRemoved {
-            address: value.node.to_string(),
-            index: value.index.as_limbs()[0] as usize,
-            num_nodes: value.numNodes.as_limbs()[0] as usize,
-        }
-    }
-}
-
 impl From<CiphertextOutputPublished> for events::CiphertextOutputPublished {
     fn from(value: CiphertextOutputPublished) -> Self {
         events::CiphertextOutputPublished {
@@ -121,25 +85,9 @@ impl From<CiphertextOutputPublished> for events::CiphertextOutputPublished {
     }
 }
 
-impl ContractEvent for CiphernodeAdded {
-    fn process(&self, bus: Addr<EventBus>) -> Result<()> {
-        let data: events::CiphernodeAdded = self.clone().into();
-        bus.do_send(EnclaveEvent::from(data));
-        Ok(())
-    }
-}
-
 impl ContractEvent for E3Requested {
     fn process(&self, bus: Addr<EventBus>) -> Result<()> {
         let data: events::E3Requested = self.clone().into();
-        bus.do_send(EnclaveEvent::from(data));
-        Ok(())
-    }
-}
-
-impl ContractEvent for CiphernodeRemoved { 
-    fn process(&self, bus: Addr<EventBus>) -> Result<()> {
-        let data: events::CiphernodeRemoved = self.clone().into(); 
         bus.do_send(EnclaveEvent::from(data));
         Ok(())
     }
@@ -153,53 +101,27 @@ impl ContractEvent for CiphertextOutputPublished {
     }
 }
 
-struct Evm {
-    // holding refs to evm contracts for management
-    evm_manager: Addr<EvmContractManager>,
-    evm_listener: Addr<EvmEventListener>,
-}
+pub async fn connect_evm_enclave(
+    bus: Addr<EventBus>,
+    rpc_url: &str,
+    contract_address: Address,
+) {
+    let evm_manager = EvmContractManager::attach(bus.clone(), rpc_url).await;
+    let evm_listener = evm_manager
+        .send(AddListener { contract_address })
+        .await
+        .unwrap();
 
-impl Evm {
-    pub async fn attach(
-        bus: Addr<EventBus>,
-        rpc_url: &str,
-        contract_address: Address,
-    ) -> Addr<Evm> {
-        let evm_manager = EvmContractManager::attach(bus.clone(), rpc_url).await;
-        let evm_listener = evm_manager
-            .send(AddListener { contract_address })
-            .await
-            .unwrap();
+    evm_listener
+        .send(AddEventHandler::<E3Requested>::new())
+        .await
+        .unwrap();
 
-        evm_listener
-            .send(AddEventHandler::<E3Requested>::new())
-            .await
-            .unwrap();
+    evm_listener
+        .send(AddEventHandler::<CiphertextOutputPublished>::new())
+        .await
+        .unwrap();
+    evm_listener.do_send(StartListening);
 
-        evm_listener
-            .send(AddEventHandler::<CiphernodeAdded>::new())
-            .await
-            .unwrap();
-
-        evm_listener
-            .send(AddEventHandler::<CiphernodeRemoved>::new())
-            .await
-            .unwrap();
-
-        evm_listener
-            .send(AddEventHandler::<CiphertextOutputPublished>::new())
-            .await
-            .unwrap();
-        evm_listener.do_send(StartListening);
-
-        Evm {
-            evm_listener,
-            evm_manager,
-        }
-        .start()
-    }
-}
-
-impl Actor for Evm {
-    type Context = Context<Self>;
+    println!("Evm is listening.......");
 }

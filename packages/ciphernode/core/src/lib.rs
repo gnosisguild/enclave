@@ -3,13 +3,13 @@
 // #![warn(missing_docs, unused_imports)]
 
 mod ciphernode;
-mod ciphernode_selector;
+mod cipernode_selector;
 mod committee_meta;
 mod data;
 mod e3_request;
 mod eventbus;
 pub mod events;
-mod evm;
+mod evm_ciphernode_registry;
 mod evm_listener;
 mod evm_manager;
 mod fhe;
@@ -23,11 +23,12 @@ mod publickey_aggregator;
 mod serializers;
 mod sortition;
 mod utils;
+mod evm_enclave;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use ciphernode::*;
-pub use ciphernode_selector::*;
+pub use cipernode_selector::*;
 pub use committee_meta::*;
 pub use data::*;
 pub use e3_request::*;
@@ -48,7 +49,7 @@ pub use utils::*;
 #[cfg(test)]
 mod tests {
     use crate::{
-        ciphernode_selector::CiphernodeSelector,
+        cipernode_selector::CiphernodeSelector,
         data::Data,
         eventbus::{EventBus, GetHistory},
         events::{E3Requested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},

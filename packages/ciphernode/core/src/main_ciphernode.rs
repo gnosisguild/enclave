@@ -1,10 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    CiphernodeFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus, FheFactory, P2p, SimpleLogger, Sortition
+    evm_ciphernode_registry::connect_evm_ciphernode_registry, evm_enclave::connect_evm_enclave, CiphernodeFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus, FheFactory, P2p, SimpleLogger, Sortition
 };
 use actix::{Actor, Addr, Context};
-use alloy_primitives::Address;
+use alloy::primitives::Address;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use tokio::task::JoinHandle;
@@ -45,8 +45,9 @@ impl MainCiphernode {
 
     pub async fn attach(
         address: Address,
-        // rpc_url: String,
-        // contract_address: Address,
+        rpc_url: &str,
+        enclave_contract: Address,
+        registry_contract: Address
     ) -> (Addr<Self>, JoinHandle<()>) {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -56,6 +57,9 @@ impl MainCiphernode {
         let sortition = Sortition::attach(bus.clone());
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
+
+        connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
+        connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
 
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())

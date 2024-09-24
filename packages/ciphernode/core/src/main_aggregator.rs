@@ -1,10 +1,12 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    committee_meta::CommitteeMetaFactory, E3RequestManager, EventBus, FheFactory, P2p,
-    PlaintextAggregatorFactory, PublicKeyAggregatorFactory, SimpleLogger, Sortition,
+    committee_meta::CommitteeMetaFactory, evm_ciphernode_registry::connect_evm_ciphernode_registry,
+    E3RequestManager, EventBus, FheFactory, P2p, PlaintextAggregatorFactory,
+    PublicKeyAggregatorFactory, SimpleLogger, Sortition,
 };
 use actix::{Actor, Addr, Context};
+use alloy::primitives::Address;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use tokio::task::JoinHandle;
@@ -34,12 +36,14 @@ impl MainAggregator {
         }
     }
 
-    pub async fn attach() -> (Addr<Self>, JoinHandle<()>) {
+    pub async fn attach(rpc_url: &str, contract_address: Address) -> (Addr<Self>, JoinHandle<()>) {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
         let bus = EventBus::new(true).start();
         let sortition = Sortition::attach(bus.clone());
+
+        connect_evm_ciphernode_registry(bus.clone(), rpc_url, contract_address).await;
 
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())

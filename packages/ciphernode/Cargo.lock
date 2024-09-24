@@ -2571,7 +2571,7 @@ name = "enclave_node"
 version = "0.1.0"
 dependencies = [
  "actix-rt",
- "alloy 0.2.1",
+ "alloy 0.3.3",
  "alloy-primitives 0.6.4",
  "async-std",
  "base64 0.22.1",

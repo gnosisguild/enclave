@@ -59,6 +59,7 @@ impl EvmEventListener {
             .await?
             .into_stream();
         while let Some(log) = stream.next().await {
+            println!("received log!");
             if let Some(topic0) = log.topic0() {
                 if let Some(decoder) = self.handlers.get(topic0) {
                     if let Ok(event) = decoder(log.clone()) {

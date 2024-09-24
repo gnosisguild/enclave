@@ -20,7 +20,7 @@ tokio = { version = "1.38", features = ["full"] }
 actix-rt = "2.10.0"
 alloy-primitives = { version = "0.6", default-features = false, features = ["rlp", "serde", "std"] }
 
-alloy = { version = "0.2.1", features = ["full"] }
+alloy = { version = "0.3.3", features = ["full"] }
 clap = { version = "4.5.17", features = ["derive"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
