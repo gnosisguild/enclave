@@ -1,7 +1,8 @@
 use crate::{EnclaveEvent, EventBus, Subscribe};
 use actix::{Actor, Addr, Context, Handler};
 use base64::prelude::*;
-use std::{env, fs, path::PathBuf};
+use std::fs;
+use std::io::Write;
 
 pub struct PublicKeyWriter {
     path: String,
@@ -34,19 +35,27 @@ impl Handler<EnclaveEvent> for PublicKeyWriter {
             let pubkey_str = BASE64_STANDARD.encode(&data.pubkey);
 
             println!("Write pubkey to {}", &self.path);
-            if let Some(path) = append_relative_path(&self.path) {
-                let Some(path_str) = path.to_str() else {
-                    return;
-                };
-                println!("Write pubkey to {}", &path_str);
-                fs::write(path, &pubkey_str).unwrap();
-            }
+            write_file_with_dirs(&self.path, &pubkey_str).unwrap();
         }
     }
 }
 
-fn append_relative_path(relative_path: &str) -> Option<PathBuf> {
-    let mut path = env::current_dir().ok()?;
-    path.push(relative_path);
-    Some(path.canonicalize().ok()?)
+fn write_file_with_dirs(relative_path: &str, content: &str) -> std::io::Result<()> {
+    // Get the current working directory
+    let cwd = std::env::current_dir()?;
+
+    // Create an absolute path by joining the cwd and the relative path
+    let abs_path = cwd.join(relative_path);
+
+    // Ensure the directory structure exists
+    if let Some(parent) = abs_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    // Open the file (creates it if it doesn't exist) and write the content
+    let mut file = fs::File::create(&abs_path)?;
+    file.write_all(content.as_bytes())?;
+
+    println!("File written successfully: {:?}", abs_path);
+    Ok(())
 }
