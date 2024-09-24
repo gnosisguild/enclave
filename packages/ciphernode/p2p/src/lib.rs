@@ -139,7 +139,7 @@ impl EnclaveRouter {
                     let (topic, data) = parse_msg(line.clone());
                     if let Err(e) = self.swarm.as_mut().unwrap()
                         .behaviour_mut().gossipsub
-                        .publish(self.topic.as_mut().unwrap().clone(), line) {
+                        .publish(topic, line) {
                         println!("Publish error: {e:?}");
                     }
                 }

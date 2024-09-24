@@ -1,0 +1,11 @@
+[package]
+name = "database"
+version = "0.1.0"
+edition = "2021"
+description = ": coordinates the encryption and decryption of enclave computations"
+repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sled = "0.34"
