@@ -2,8 +2,8 @@
 
 # Environment variables
 export RPC_URL="ws://localhost:8545"
-export ENCLAVE_CONTRACT="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-export REGISTRY_CONTRACT="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+export ENCLAVE_CONTRACT="0x404Af1c0780A9269e4D3308a0812fB87BF5fC490"
+export REGISTRY_CONTRACT="0x04DaE625b71c7094Fc5216061E3b97077420c13e"
 export CIPHERNODE_ADDRESS_1="0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
 export CIPHERNODE_ADDRESS_2="0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
 export CIPHERNODE_ADDRESS_3="0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
@@ -19,7 +19,7 @@ cleanup() {
 # Set up trap to catch Ctrl+C
 trap cleanup SIGINT
 
-pushd packages/ciphernode; RUSTFLAGS="-A warnings" cargo build --frozen --bin encrypt --bin node --bin aggregator; popd
+cd packages/ciphernode; RUSTFLAGS="-A warnings" cargo build --frozen --bin encrypt --bin node --bin aggregator; cd ../..
 
 # Start the EVM node
 yarn evm:node &
@@ -50,19 +50,19 @@ cat ./tests/output/pubkey.b64
 
 yarn ciphernode:encrypt --input "../../tests/output/pubkey.b64" --output "../../tests/output/output.bin"
 
-cd packages/evm; yarn hardhat committee:publish --e3-id 0 --nodes $CIPHERNODE_ADDRESS_1,$CIPHERNODE_ADDRESS_2,$CIPHERNODE_ADDRESS_3,$CIPHERNODE_ADDRESS_4 --public-key 0x12345678 --network localhost; popd
+cd packages/evm; yarn hardhat committee:publish --e3-id 0 --nodes $CIPHERNODE_ADDRESS_1,$CIPHERNODE_ADDRESS_2,$CIPHERNODE_ADDRESS_3,$CIPHERNODE_ADDRESS_4 --public-key 0x12345678 --network localhost; cd ../..
 
 sleep 2
 
-cd packages/evm; yarn hardhat e3:activate --e3-id 0 --network localhost; popd
+cd packages/evm; yarn hardhat e3:activate --e3-id 0 --network localhost; cd ../..
 
 sleep 2
 
-cd packages/evm; hardhat --network localhost e3:publishInput --e3-id 0 --data 0x12345678; popd
+cd packages/evm; yarn hardhat --network localhost e3:publishInput --e3-id 0 --data 0x12345678; cd ../..
 
 sleep 4
 
-cd packages/evm; yarn hardhat e3:publishCiphertext --e3-id 0 --network localhost --data "0x$(xxd -p -c 0 ../../tests/output/output.bin)" --proof 0x12345678; popd
+cd packages/evm; yarn hardhat e3:publishCiphertext --e3-id 0 --network localhost --data "0x$(xxd -p -c 0 ../../tests/output/output.bin)" --proof 0x12345678; cd ../..
 
 # Wait for Ctrl+C
 echo ""

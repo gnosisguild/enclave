@@ -113,19 +113,19 @@ task(
       );
 
       // since we are using mock, we need to set the decryption verifier to the mock encryption scheme id
-      try {
-        const setDecryptionVerifier =
-          await enclaveContract.setDecryptionVerifier(
-            "0x0000000000000000000000000000000000000000000000000000000000000001",
-            MockDecryptionVerifier.address,
-          );
-        await setDecryptionVerifier.wait();
-      } catch (e) {
-        console.log(
-          "Setting decryption verifier for encryption scheme id failed: ",
-          e,
-        );
-      }
+      // try {
+      //   const setDecryptionVerifier =
+      //     await enclaveContract.setDecryptionVerifier(
+      //       "0x0000000000000000000000000000000000000000000000000000000000000001",
+      //       MockDecryptionVerifier.address,
+      //     );
+      //   await setDecryptionVerifier.wait();
+      // } catch (e) {
+      //   console.log(
+      //     "Setting decryption verifier for encryption scheme id failed: ",
+      //     e,
+      //   );
+      // }
     }
 
     try {
