@@ -50,7 +50,19 @@ cat ./tests/output/pubkey.b64
 
 yarn ciphernode:encrypt --input "../../tests/output/pubkey.b64" --output "../../tests/output/output.bin"
 
-cd packages/evm; yarn hardhat e3:publishCiphertext --e3-id 0 --network localhost --data "0x$(xxd -p -c 0 ../../tests/output/output.bin)"; popd
+cd packages/evm; yarn hardhat committee:publish --e3-id 0 --nodes $CIPHERNODE_ADDRESS_1,$CIPHERNODE_ADDRESS_2,$CIPHERNODE_ADDRESS_3,$CIPHERNODE_ADDRESS_4 --public-key 0x12345678 --network localhost; popd
+
+sleep 2
+
+cd packages/evm; yarn hardhat e3:activate --e3-id 0 --network localhost; popd
+
+sleep 2
+
+cd packages/evm; hardhat --network localhost e3:publishInput --e3-id 0 --data 0x12345678; popd
+
+sleep 2
+
+cd packages/evm; yarn hardhat e3:publishCiphertext --e3-id 0 --network localhost --data "0x$(xxd -p -c 0 ../../tests/output/output.bin)" --proof 0x12345678; popd
 
 # Wait for Ctrl+C
 echo ""
