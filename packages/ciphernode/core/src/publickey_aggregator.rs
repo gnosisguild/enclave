@@ -75,7 +75,7 @@ impl PublicKeyAggregator {
         else {
             return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
         };
-
+        println!("\nADD KEYSHARE!!!!\n");
         keyshares.insert(keyshare);
         if keyshares.len() == *threshold_m as usize {
             return Ok(PublicKeyAggregatorState::Computing {
@@ -218,9 +218,11 @@ impl PublicKeyAggregatorFactory {
             };
 
             let Some(ref fhe) = ctx.fhe else {
+                println!("fhe was not on ctx");
                 return;
             };
             let Some(ref meta) = ctx.meta else {
+                println!("meta was not on ctx");
                 return;
             };
 

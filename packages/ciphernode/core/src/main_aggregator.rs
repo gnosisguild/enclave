@@ -61,7 +61,7 @@ impl MainAggregator {
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
 
-        SimpleLogger::attach("AGGREGATOR", bus.clone());
+        SimpleLogger::attach("AGG", bus.clone());
 
         let main_addr = MainAggregator::new(bus, sortition, p2p_addr, e3_manager).start();
         (main_addr, join_handle)
