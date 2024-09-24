@@ -104,7 +104,6 @@ impl Handler<EnclaveEvent> for Sortition {
 impl Handler<CiphernodeAdded> for Sortition {
     type Result = ();
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
-        println!("$$$$$$\nCIPHERNODE ADDED\n$$$$$$\n\n{}", msg.address);
         self.list.add(msg.address);
     }
 }

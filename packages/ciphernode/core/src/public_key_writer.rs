@@ -1,6 +1,5 @@
 use crate::{EnclaveEvent, EventBus, Subscribe};
 use actix::{Actor, Addr, Context, Handler};
-use alloy::primitives::Address;
 use base64::prelude::*;
 use std::{env, fs, path::PathBuf};
 
@@ -18,6 +17,8 @@ impl PublicKeyWriter {
             listener: addr.clone().recipient(),
             event_type: "*".to_string(),
         });
+
+        println!("PublicKeyWriter attached to path {}", path);
         addr
     }
 }
@@ -32,7 +33,12 @@ impl Handler<EnclaveEvent> for PublicKeyWriter {
         if let EnclaveEvent::PublicKeyAggregated { data, .. } = msg.clone() {
             let pubkey_str = BASE64_STANDARD.encode(&data.pubkey);
 
+            println!("Write pubkey to {}", &self.path);
             if let Some(path) = append_relative_path(&self.path) {
+                let Some(path_str) = path.to_str() else {
+                    return;
+                };
+                println!("Write pubkey to {}", &path_str);
                 fs::write(path, &pubkey_str).unwrap();
             }
         }
