@@ -40,6 +40,11 @@ const OWO: &str = r#"
                                                                       
 "#;
 
+fn aggregate_key(pubkey_share: Vec<u8>, mock_db_pubkey: Vec<Vec<u8>>) {
+    println!("got pk data");
+    println!("{:?}", mock_db_pubkey[0]);
+}
+
 async fn send_p2p_msg(
     p2p_tx: Sender<Vec<u8>>,
     topic: String,
@@ -56,13 +61,16 @@ async fn send_p2p_msg(
     p2p_tx.send(msg_bytes.clone()).await.unwrap(); 
 }
 
-fn handle_p2p_msg(msg: Vec<u8>) {
+fn handle_p2p_msg(msg: Vec<u8>, mock_db_pubkey: Vec<Vec<u8>>) {
     let msg_out_str = str::from_utf8(&msg).unwrap();
     let msg_out_struct: P2PMessage = serde_json::from_str(&msg_out_str).unwrap();
+    if msg_out_struct.msg_type == "join and share key" {
+        aggregate_key(msg_out_struct.data.clone(), mock_db_pubkey.clone());
+    }
     log::info!("P2P Message Received: Topic {}, Type {}, Data {}", msg_out_struct.topic, msg_out_struct.msg_type, String::from_utf8(msg_out_struct.data).unwrap());
 }
 
-async fn handle_eth_event(msg: Vec<u8>, mock_db: &mut Vec<Address>, id: Address, p2p_tx: Sender<Vec<u8>>) {
+async fn handle_eth_event(msg: Vec<u8>, mock_db: &mut Vec<Address>, mock_db_pubkey: &mut Vec<Vec<u8>>, id: Address, p2p_tx: Sender<Vec<u8>>) {
     log::info!("Received Committee Requested Event");
     let event_out_str = str::from_utf8(&msg).unwrap();
     let event_out_struct: ETHEvent = serde_json::from_str(&event_out_str).unwrap();
@@ -76,11 +84,18 @@ async fn handle_eth_event(msg: Vec<u8>, mock_db: &mut Vec<Address>, id: Address,
                 log::info!("Selected for Committee, Join Gossip Channel");
                 // sub to new topic and join
                 // generate keyshare
-
+                let mut new_bfv = EnclaveBFV::new(4096, 4096, vec![0xffffee001, 0xffffc4001, 0x1ffffe0001]);
+                let pk_bytes = new_bfv.serialize_pk();
+                let param_bytes = new_bfv.serialize_params();
+                let crp_bytes = new_bfv.serialize_crp();
+                mock_db_pubkey.push(pk_bytes.clone());
+                mock_db_pubkey.push(crp_bytes);
+                //let deserialized_pk = new_bfv.deserialize_pk(pk_bytes, param_bytes, crp_bytes);
                 let msg_formatted = P2PMessage {
-                    topic: committee_event.e3Id.to_string(),
+                    //topic: committee_event.e3Id.to_string(),
+                    topic: "enclave-testnet".to_string(),
                     msg_type: "join and share key".to_string(),
-                    data: String::from("Hello, world!").as_bytes().to_vec(),
+                    data: pk_bytes,
                 };
                 let msg_str = serde_json::to_string(&msg_formatted).unwrap();
                 let msg_bytes = msg_str.into_bytes();
@@ -102,7 +117,7 @@ fn get_p2p_router() -> Result<(EnclaveRouter, Sender<Vec<u8>>, Receiver<Vec<u8>>
     Ok((p2p, p2p_tx, p2p_rx))
 }
 
-async fn start_p2p(mut p2p: EnclaveRouter, mut p2p_tx: Sender<Vec<u8>>, mut p2p_rx: Receiver<Vec<u8>>) -> Result<(), Box<dyn Error>> {
+async fn start_p2p(mock_db_pubkey: Vec<Vec<u8>>, mut p2p: EnclaveRouter, mut p2p_tx: Sender<Vec<u8>>, mut p2p_rx: Receiver<Vec<u8>>) -> Result<(), Box<dyn Error>> {
     log::info!("Connecting to swarm");
     p2p.connect_swarm("mdns".to_string())?;
     p2p.join_topic("enclave-testnet")?;
@@ -111,25 +126,13 @@ async fn start_p2p(mut p2p: EnclaveRouter, mut p2p_tx: Sender<Vec<u8>>, mut p2p_
     tokio::spawn(async move { p2p.start().await });
     tokio::spawn(async move {
         while let Some(msg) = p2p_rx.recv().await {
-            handle_p2p_msg(msg);
+            handle_p2p_msg(msg, mock_db_pubkey.clone());
         }
     });
-    // loop {
-    //     if let Ok(Some(line)) = stdin.next_line().await {
-    //         let msg_formatted = P2PMessage {
-    //             topic: "enclave-testnet".to_string(),
-    //             msg_type: "join_main_channel".to_string(),
-    //             data: line.into_bytes(),
-    //         };
-    //         let msg_str = serde_json::to_string(&msg_formatted).unwrap();
-    //         let msg_bytes = msg_str.into_bytes();
-    //         p2p_tx.send(msg_bytes.clone()).await.unwrap();
-    //     }
-    // }
     Ok(())
 }
 
-async fn start_eth_listener(mock_db: &mut Vec<Address>, id: Address, mut p2p_tx: Sender<Vec<u8>>) {
+async fn start_eth_listener(mock_db: &mut Vec<Address>, mock_db_pubkey: &mut Vec<Vec<u8>>, id: Address, mut p2p_tx: Sender<Vec<u8>>) {
     log::info!("Listening on E3 Contract");
     let (mut manager, tx_sender, mut tx_receiver) = ContractManager::new("ws://127.0.0.1:8545").await.unwrap();
     let listener = manager.add_listener(address!("959922be3caee4b8cd9a407cc3ac1c251c2007b1"));
@@ -137,17 +140,18 @@ async fn start_eth_listener(mock_db: &mut Vec<Address>, id: Address, mut p2p_tx:
         listener.listen().await;
     });
     while let Some(msg) = tx_receiver.recv().await {
-        handle_eth_event(msg, mock_db, id, p2p_tx.clone()).await;
+        handle_eth_event(msg, mock_db, mock_db_pubkey, id, p2p_tx.clone()).await;
     };
 }
 
 async fn run(id: Address) {
     let mut mock_db: Vec<Address> = Vec::new();
     let mut mock_db_ids: Vec<u32> = Vec::new();
+    let mut mock_db_pubkey: Vec<Vec<u8>> = Vec::new();
     let (p2p, p2p_tx, p2p_rx) = get_p2p_router().unwrap();
     tokio::join!(
-        start_p2p(p2p, p2p_tx.clone(), p2p_rx),
-        start_eth_listener(&mut mock_db, id, p2p_tx),
+        start_p2p(mock_db_pubkey.clone(), p2p, p2p_tx.clone(), p2p_rx),
+        start_eth_listener(&mut mock_db, &mut mock_db_pubkey, id, p2p_tx),
     );
 }
 
@@ -166,15 +170,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let main_rt = tokio::runtime::Runtime::new().unwrap();
     let future = run(n_address);
     main_rt.block_on(future);
-
-    // let mut committee = DistanceSortition::new(12, vec![address!("d8da6bf26964af9d7eed9e03e53415d37aa96045")], 1);
-    // committee.get_committee();
-
-    let mut new_bfv = EnclaveBFV::new(4096, 4096, vec![0xffffee001, 0xffffc4001, 0x1ffffe0001]);
-    let pk_bytes = new_bfv.serialize_pk();
-    let param_bytes = new_bfv.serialize_params();
-    let crp_bytes = new_bfv.serialize_crp();
-    let deserialized_pk = new_bfv.deserialize_pk(pk_bytes, param_bytes, crp_bytes);
 
     Ok(())
 }
