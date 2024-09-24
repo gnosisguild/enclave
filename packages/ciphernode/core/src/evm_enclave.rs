@@ -7,7 +7,7 @@ use crate::{
     setup_crp_params, EnclaveEvent, EventBus, ParamsWithCrp,
 };
 use actix::Addr;
-use alloy::{primitives::Address, sol};
+use alloy::{primitives::Address, sol, sol_types::SolEvent};
 use anyhow::Result;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -20,13 +20,14 @@ sol! {
         uint256[2] startWindow;
         uint256 duration;
         uint256 expiration;
+        bytes32 encryptionSchemeId;
         address e3Program;
         bytes e3ProgramParams;
         address inputValidator;
         address decryptionVerifier;
         bytes committeePublicKey;
-        bytes ciphertextOutput;
-        bytes plaintextOutput;
+        bytes32 ciphertextOutput;
+        bytes32 plaintextOutput;
     }
 
     #[derive(Debug)]
@@ -46,6 +47,11 @@ sol! {
 
 impl From<E3Requested> for events::E3Requested {
     fn from(value: E3Requested) -> Self {
+        println!(
+            "===========================\n\nE3Request\n\n===============\n{:?}",
+            value
+        );
+
         let _params_bytes = value.e3.e3ProgramParams;
         // TODO: decode params bytes
         // HACK: temp supply canned params:
@@ -101,11 +107,7 @@ impl ContractEvent for CiphertextOutputPublished {
     }
 }
 
-pub async fn connect_evm_enclave(
-    bus: Addr<EventBus>,
-    rpc_url: &str,
-    contract_address: Address,
-) {
+pub async fn connect_evm_enclave(bus: Addr<EventBus>, rpc_url: &str, contract_address: Address) {
     let evm_manager = EvmContractManager::attach(bus.clone(), rpc_url).await;
     let evm_listener = evm_manager
         .send(AddListener { contract_address })
@@ -123,5 +125,5 @@ pub async fn connect_evm_enclave(
         .unwrap();
     evm_listener.do_send(StartListening);
 
-    println!("Evm is listening.......");
+    println!("Evm is listening to {}", contract_address);
 }

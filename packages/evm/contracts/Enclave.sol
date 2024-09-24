@@ -13,7 +13,7 @@ import {
     LeanIMTData,
     PoseidonT3
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
-
+import "hardhat/console.sol";
 contract Enclave is IEnclave, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
 
@@ -178,7 +178,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             ciphernodeRegistry.requestCommittee(e3Id, filter, threshold),
             CommitteeSelectionFailed()
         );
-
+        console.log("Event signature:");
+        console.logBytes32(E3Requested.selector);
         emit E3Requested(e3Id, e3, filter, e3Program);
     }
 

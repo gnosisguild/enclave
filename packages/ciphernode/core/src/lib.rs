@@ -2,14 +2,15 @@
 #![crate_type = "lib"]
 // #![warn(missing_docs, unused_imports)]
 
-mod ciphernode;
 mod cipernode_selector;
+mod ciphernode;
 mod committee_meta;
 mod data;
 mod e3_request;
 mod eventbus;
 pub mod events;
 mod evm_ciphernode_registry;
+mod evm_enclave;
 mod evm_listener;
 mod evm_manager;
 mod fhe;
@@ -23,12 +24,12 @@ mod publickey_aggregator;
 mod serializers;
 mod sortition;
 mod utils;
-mod evm_enclave;
+mod public_key_writer;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
-pub use ciphernode::*;
 pub use cipernode_selector::*;
+pub use ciphernode::*;
 pub use committee_meta::*;
 pub use data::*;
 pub use e3_request::*;
@@ -41,6 +42,7 @@ pub use main_ciphernode::*;
 pub use p2p::*;
 pub use plaintext_aggregator::*;
 pub use publickey_aggregator::*;
+pub use public_key_writer::*;
 pub use serializers::*;
 pub use sortition::*;
 pub use utils::*;
@@ -336,31 +338,22 @@ mod tests {
         tokio::spawn(async move {
             while let Some(msg) = output.recv().await {
                 msgs_loop.lock().await.push(msg.clone());
-                let _ = input.send(msg).await; // loopback to simulate a rebroadcast message
-                                               // if this  manages to broadcast an event to the
-                                               // event bus we will expect to see an extra event on
-                                               // the bus
+                let _ = input.send(msg).await;
+                // loopback to simulate a rebroadcast message
+                // if this  manages to broadcast an event to the
+                // event bus we will expect to see an extra event on
+                // the bus
             }
         });
 
-        let evt_1 = EnclaveEvent::from(E3Requested {
-            e3_id: E3id::new("1234"),
-            threshold_m: 3,
-            seed: 123,
-            moduli: vec![0x3FFFFFFF000001],
-            degree: 2048,
-            plaintext_modulus: 1032193,
-            crp: vec![1, 2, 3, 4],
+        let evt_1 = EnclaveEvent::from(PlaintextAggregated {
+            e3_id: E3id::new("1235"),
+            decrypted_output: vec![1, 2, 3, 4],
         });
 
-        let evt_2 = EnclaveEvent::from(E3Requested {
-            e3_id: E3id::new("1235"),
-            threshold_m: 3,
-            seed: 123,
-            moduli: vec![0x3FFFFFFF000001],
-            degree: 2048,
-            plaintext_modulus: 1032193,
-            crp: vec![1, 2, 3, 4],
+        let evt_2 = EnclaveEvent::from(PlaintextAggregated {
+            e3_id: E3id::new("1236"),
+            decrypted_output: vec![1, 2, 3, 4],
         });
 
         let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {

@@ -86,5 +86,5 @@ pub async fn connect_evm_ciphernode_registry(
 
     evm_listener.do_send(StartListening);
 
-    println!("Evm is listening.......");
+    println!("Evm is listening to {}", contract_address);
 }

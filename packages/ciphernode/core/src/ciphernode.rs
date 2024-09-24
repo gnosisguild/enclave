@@ -85,8 +85,6 @@ async fn on_ciphernode_selected(
 ) -> Result<()> {
     let CiphernodeSelected { e3_id, .. } = event;
 
-    println!("\n\nGENERATING KEY!\n\n");
-
     // generate keyshare
     let (sk, pubkey) = fhe.send(GenerateKeyshare {}).await??;
 

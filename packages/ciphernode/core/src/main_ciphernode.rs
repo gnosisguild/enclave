@@ -1,7 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    evm_ciphernode_registry::connect_evm_ciphernode_registry, evm_enclave::connect_evm_enclave, CiphernodeFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus, FheFactory, P2p, SimpleLogger, Sortition
+    evm_ciphernode_registry::connect_evm_ciphernode_registry, evm_enclave::connect_evm_enclave,
+    CiphernodeFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus,
+    FheFactory, P2p, SimpleLogger, Sortition,
 };
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
@@ -47,7 +49,7 @@ impl MainCiphernode {
         address: Address,
         rpc_url: &str,
         enclave_contract: Address,
-        registry_contract: Address
+        registry_contract: Address,
     ) -> (Addr<Self>, JoinHandle<()>) {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -74,7 +76,8 @@ impl MainCiphernode {
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
 
-        SimpleLogger::attach("CIPHERNODE", bus.clone());
+        let nm = format!("CIPHER({})", &address.to_string()[0..5]);
+        SimpleLogger::attach(&nm, bus.clone());
         let main_addr = MainCiphernode::new(
             address, bus, data, sortition, selector, p2p_addr, e3_manager,
         )

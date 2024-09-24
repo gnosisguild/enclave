@@ -115,6 +115,9 @@ impl EnclaveEvent {
         // Add a list of local events
         match self {
             EnclaveEvent::CiphernodeSelected { .. } => true,
+            EnclaveEvent::E3Requested { .. } => true,
+            EnclaveEvent::CiphernodeAdded { .. } => true,
+            EnclaveEvent::CiphernodeRemoved { .. } => true,
             _ => false,
         }
     }
