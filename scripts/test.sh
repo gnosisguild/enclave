@@ -19,16 +19,11 @@ cleanup() {
 # Set up trap to catch Ctrl+C
 trap cleanup SIGINT
 
-# pushd packages/ciphernode && \
-#   cargo build --bin node && \
-#   cargo build --bin aggregator && \
-#   popd
+pushd packages/ciphernode; RUSTFLAGS="-A warnings" cargo build --frozen --bin encrypt --bin node --bin aggregator; popd
 
 # Start the EVM node
 yarn evm:node &
 sleep 2
-
-
 
 # Launch ciphernodes in parallel
 yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_1 --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT &
@@ -52,6 +47,10 @@ yarn evm:committee:new --network localhost
 sleep 2
 
 cat ./tests/output/pubkey.b64
+
+yarn ciphernode:encrypt --input "../../tests/output/pubkey.b64" --output "../../tests/output/output.bin"
+
+cd packages/evm; yarn hardhat e3:publishCiphertext --e3-id 0 --network localhost --data "0x$(xxd -p -c 0 ../../tests/output/output.bin)"; popd
 
 # Wait for Ctrl+C
 echo ""

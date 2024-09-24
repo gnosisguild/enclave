@@ -20,6 +20,7 @@
     "ciphernode:aggregator": "cd packages/ciphernode && ./scripts/aggregator.sh",
     "ciphernode:test": "cd packages/ciphernode && cargo test",
     "ciphernode:build": "cd packages/ciphernode && cargo build --release",
+    "ciphernode:encrypt": "cd packages/ciphernode && RUSTFLAGS=\"-A warnings\" cargo run --bin encrypt -- ",
     "evm:install": "cd packages/evm && yarn install",
     "evm:node": "cd packages/evm && yarn hardhat node",
     "evm:compile": "cd packages/evm && yarn compile",
