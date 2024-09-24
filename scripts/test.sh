@@ -43,7 +43,7 @@ yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localho
 sleep 2
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
 sleep 2
-yarn evm:committee:new --network localhost
+yarn evm:committee:new --network localhost --duration 6
 sleep 2
 
 cat ./tests/output/pubkey.b64
@@ -60,7 +60,7 @@ sleep 2
 
 cd packages/evm; hardhat --network localhost e3:publishInput --e3-id 0 --data 0x12345678; popd
 
-sleep 2
+sleep 4
 
 cd packages/evm; yarn hardhat e3:publishCiphertext --e3-id 0 --network localhost --data "0x$(xxd -p -c 0 ../../tests/output/output.bin)" --proof 0x12345678; popd
 
