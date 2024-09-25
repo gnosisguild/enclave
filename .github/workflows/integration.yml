@@ -34,10 +34,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install latest stable Rust
+      - name: Install Rust 1.81.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: 1.81.0
           override: true
       
       - name: Cache node modules

@@ -14,10 +14,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Install latest stable Rust
+    - name: Install Rust 1.81.0
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: stable
+        toolchain: 1.81.0
         override: true
     
     - name: Run tests
