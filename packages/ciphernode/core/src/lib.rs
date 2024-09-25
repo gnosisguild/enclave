@@ -25,6 +25,7 @@ mod serializers;
 mod sortition;
 mod utils;
 mod public_key_writer;
+mod plaintext_writer;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -43,6 +44,7 @@ pub use p2p::*;
 pub use plaintext_aggregator::*;
 pub use publickey_aggregator::*;
 pub use public_key_writer::*;
+pub use plaintext_writer::*;
 pub use serializers::*;
 pub use sortition::*;
 pub use utils::*;

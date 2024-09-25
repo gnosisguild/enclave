@@ -48,7 +48,6 @@ impl From<CiphernodeRemoved> for events::CiphernodeRemoved {
 
 impl ContractEvent for CiphernodeAdded {
     fn process(&self, bus: Addr<EventBus>) -> Result<()> {
-        println!("Ciphernode Added: {:?}", self);
         let data: events::CiphernodeAdded = self.clone().into();
         bus.do_send(EnclaveEvent::from(data));
         Ok(())

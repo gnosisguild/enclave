@@ -4,7 +4,7 @@ use fhe::{
     mbfv::CommonRandomPoly,
 };
 use fhe_traits::Serialize;
-use std::sync::Arc;
+use std::{fs, io::Write, path::Path, sync::Arc};
 
 pub struct ParamsWithCrp {
     pub moduli: Vec<u64>,
@@ -31,7 +31,11 @@ pub fn setup_crp_params(
     }
 }
 
-pub fn setup_bfv_params(moduli: &[u64], degree: usize, plaintext_modulus: u64) -> Arc<BfvParameters> {
+pub fn setup_bfv_params(
+    moduli: &[u64],
+    degree: usize,
+    plaintext_modulus: u64,
+) -> Arc<BfvParameters> {
     BfvParametersBuilder::new()
         .set_degree(degree)
         .set_plaintext_modulus(plaintext_modulus)
@@ -42,4 +46,25 @@ pub fn setup_bfv_params(moduli: &[u64], degree: usize, plaintext_modulus: u64) -
 
 pub fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
     CommonRandomPoly::new(&params, &mut *rng.lock().unwrap()).unwrap()
+}
+
+pub fn write_file_with_dirs(path: &str, content: &[u8]) -> std::io::Result<()> {
+    let abs_path = if Path::new(path).is_absolute() {
+        Path::new(path).to_path_buf()
+    } else {
+        let cwd = std::env::current_dir()?;
+        cwd.join(path)
+    };
+
+    // Ensure the directory structure exists
+    if let Some(parent) = abs_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    // Open the file (creates it if it doesn't exist) and write the content
+    let mut file = fs::File::create(&abs_path)?;
+    file.write_all(content)?;
+
+    println!("File written successfully: {:?}", abs_path);
+    Ok(())
 }

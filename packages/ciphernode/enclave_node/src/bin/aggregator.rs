@@ -13,6 +13,8 @@ struct Args {
     registry_contract: String,
     #[arg(short, long = "pubkey-write-path")]
     pubkey_write_path: Option<String>,
+    #[arg(short = 't', long = "plaintext-write-path")]
+    plaintext_write_path: Option<String>,
 }
 
 #[actix_rt::main]
@@ -28,6 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         enclave_contract,
         registry_contract,
         args.pubkey_write_path.as_deref(),
+        args.plaintext_write_path.as_deref()
     )
     .await;
     let _ = tokio::join!(handle);

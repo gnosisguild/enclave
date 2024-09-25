@@ -47,11 +47,6 @@ sol! {
 
 impl From<E3Requested> for events::E3Requested {
     fn from(value: E3Requested) -> Self {
-        println!(
-            "===========================\n\nE3Request\n\n===============\n{:?}",
-            value
-        );
-
         let _params_bytes = value.e3.e3ProgramParams;
         // TODO: decode params bytes
         // HACK: temp supply canned params:
