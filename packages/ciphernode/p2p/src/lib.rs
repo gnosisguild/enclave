@@ -54,6 +54,7 @@ impl EnclaveRouter {
             .heartbeat_interval(Duration::from_secs(10))
             .validation_mode(gossipsub::ValidationMode::Strict)
             .message_id_fn(message_id_fn)
+            .max_transmit_size(299539)
             .build()
             .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))?;
 

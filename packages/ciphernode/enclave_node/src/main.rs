@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::{str, env};
 use std::process;
+use std::mem::size_of_val;
 
 use p2p::{EnclaveRouter, P2PMessage};
 use bfv::EnclaveBFV;
@@ -85,20 +86,24 @@ async fn handle_eth_event(msg: Vec<u8>, mock_db: &mut Vec<Address>, mock_db_pubk
                 // sub to new topic and join
                 // generate keyshare
                 let mut new_bfv = EnclaveBFV::new(4096, 4096, vec![0xffffee001, 0xffffc4001, 0x1ffffe0001]);
-                let pk_bytes = new_bfv.serialize_pk();
+                let mut pk_bytes = new_bfv.serialize_pk();
                 let param_bytes = new_bfv.serialize_params();
                 let crp_bytes = new_bfv.serialize_crp();
                 mock_db_pubkey.push(pk_bytes.clone());
                 mock_db_pubkey.push(crp_bytes);
                 //let deserialized_pk = new_bfv.deserialize_pk(pk_bytes, param_bytes, crp_bytes);
+                println!("{:?}", size_of_val(&*pk_bytes));
+                //pk_bytes.drain(0..52725);
+                //println!("{:?}", size_of_val(&*pk_bytes));
                 let msg_formatted = P2PMessage {
                     //topic: committee_event.e3Id.to_string(),
                     topic: "enclave-testnet".to_string(),
                     msg_type: "join and share key".to_string(),
-                    data: pk_bytes,
+                    data: pk_bytes.clone(),
                 };
                 let msg_str = serde_json::to_string(&msg_formatted).unwrap();
                 let msg_bytes = msg_str.into_bytes();
+                println!("{:?}", size_of_val(&*msg_bytes));
                 p2p_tx.send(msg_bytes.clone()).await.unwrap();
             }
             // log::info!("Committee Selected: Node {}", selected[0].1);
