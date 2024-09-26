@@ -13,7 +13,7 @@
     "lint": "yarn evm:lint",
     "typechain": "yarn evm:typechain",
     "test": "yarn evm:test && yarn ciphernode:test",
-    "test:integration": "./tests/basic_integration/run.sh",
+    "test:integration": "./tests/basic_integration/test.sh",
     "coverage": "yarn evm:coverage",
     "ciphernode:launch": "cd packages/ciphernode && ./scripts/launch.sh",
     "ciphernode:add": "cd packages/evm && yarn ciphernode:add",
