@@ -47,19 +47,25 @@ waiton() {
 }
 
 waiton-files() {
-    while true; do
-        all_exist=true
-        for file in "$@"; do
-            if [ ! -f "$file" ]; then
-                all_exist=false
-                break
-            fi
-        done
-        if $all_exist; then
-            break
-        fi
-        sleep 1
+  local timeout=600  # 10 minutes timeout
+  local start_time=$(date +%s)
+  while true; do
+    all_exist=true
+    for file in "$@"; do
+      if [ ! -f "$file" ]; then
+        all_exist=false
+        break
+      fi
     done
+    if $all_exist; then
+      break
+    fi
+    if [ $(($(date +%s) - start_time)) -ge $timeout ]; then
+      echo "Timeout waiting for files: $@" >&2
+      return 1
+    fi
+    sleep 1
+  done
 }
 
 pkill -9 -f "target/debug/node" || true
