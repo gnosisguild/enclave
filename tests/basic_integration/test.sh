@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e  # Exit immediately if a command exits with a non-zero status
+set -eu  # Exit immediately if a command exits with a non-zero status
 #
 # Get the script's location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -149,6 +149,8 @@ if [[ "$ACTUAL" != "$PLAINTEXT" ]]; then
   echo "Invalid plaintext decrypted: actual='$ACTUAL' expected='$PLAINTEXT'"
   exit 1
 fi
+
+echo "Test PASSED"
 
 cleanup 0
 
