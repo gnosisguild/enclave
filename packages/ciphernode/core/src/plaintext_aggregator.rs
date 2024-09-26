@@ -179,7 +179,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
         // Update the local state
         self.state = self.set_decryption(decrypted_output.clone())?;
 
-        // Dispatch the PublicKeyAggregated event
+        // Dispatch the PlaintextAggregated event
         let event = EnclaveEvent::from(PlaintextAggregated {
             decrypted_output,
             e3_id: self.e3_id.clone(),

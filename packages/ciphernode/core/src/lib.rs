@@ -3,7 +3,6 @@
 // #![warn(missing_docs, unused_imports)]
 
 mod cipernode_selector;
-mod ciphernode;
 mod committee_meta;
 mod data;
 mod e3_request;
@@ -14,6 +13,7 @@ mod evm_enclave;
 mod evm_listener;
 mod evm_manager;
 mod fhe;
+mod keyshare;
 mod logger;
 mod main_aggregator;
 mod main_ciphernode;
@@ -29,13 +29,13 @@ mod utils;
 // TODO: this is too permissive
 pub use actix::prelude::*;
 pub use cipernode_selector::*;
-pub use ciphernode::*;
 pub use committee_meta::*;
 pub use data::*;
 pub use e3_request::*;
 pub use eventbus::*;
 pub use events::*;
 pub use fhe::*;
+pub use keyshare::*;
 pub use logger::*;
 pub use main_aggregator::*;
 pub use main_ciphernode::*;
@@ -66,9 +66,9 @@ mod tests {
     use anyhow::*;
     use fhe::{
         bfv::{BfvParameters, Encoding, Plaintext, PublicKey, SecretKey},
-        mbfv::{Aggregate, AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
+        mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
     };
-    use fhe_traits::{Deserialize, DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
+    use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
     use rand::Rng;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -244,7 +244,12 @@ mod tests {
 
         // Aggregate decryption
         bus.send(ResetHistory).await?;
-
+        fn pad_end(input: &[u64], pad: u64, total: usize) -> Vec<u64> {
+            let len = input.len();
+            let mut cop = input.to_vec();
+            cop.extend(std::iter::repeat(pad).take(total - len));
+            cop
+        }
         // TODO:
         // Making these values large (especially the yes value) requires changing
         // the params we use here - as we tune the FHE we need to take care
@@ -252,7 +257,8 @@ mod tests {
         let no = 873827u64;
 
         let raw_plaintext = vec![yes, no];
-        let expected_raw_plaintext = bincode::serialize(&raw_plaintext)?;
+        let padded = &pad_end(&raw_plaintext, 0, 2048);
+        let expected_raw_plaintext = bincode::serialize(&padded)?;
         let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
 
         let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
@@ -275,6 +281,7 @@ mod tests {
         let history = bus.send(GetHistory).await?;
 
         assert_eq!(history.len(), 5);
+
         assert_eq!(
             history,
             vec![

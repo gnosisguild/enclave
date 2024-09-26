@@ -108,7 +108,6 @@ impl Fhe {
             .aggregate()?;
 
         let decoded = Vec::<u64>::try_decode(&plaintext, Encoding::poly())?;
-        let decoded = &decoded[0..2]; // TODO: remove this and leave it up to the caller
         Ok(bincode::serialize(&decoded)?)
     }
 }

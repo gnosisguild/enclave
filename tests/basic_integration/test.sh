@@ -150,13 +150,17 @@ yarn e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR
 waiton "$SCRIPT_DIR/output/plaintext.txt"
 
 ACTUAL=$(cat $SCRIPT_DIR/output/plaintext.txt)
+ 
 
-if [[ "$ACTUAL" != "$PLAINTEXT" ]]; then
+# Assume plaintext is shorter
+
+if [[ "$ACTUAL" != "$PLAINTEXT"* ]]; then
   echo "Invalid plaintext decrypted: actual='$ACTUAL' expected='$PLAINTEXT'"
+  echo "Test FAILED"
   exit 1
 fi
 
-echo "Test PASSED"
+heading "Test PASSED !"
 
 cleanup 0
 
