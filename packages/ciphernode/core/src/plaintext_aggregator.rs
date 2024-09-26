@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 #[derive(Debug, Clone)]
 pub enum PlaintextAggregatorState {
     Collecting {
-        threshold_m: u32,
+        threshold_m: usize,
         shares: OrderedSet<Vec<u8>>,
         seed: u64,
     },
@@ -41,7 +41,7 @@ impl PlaintextAggregator {
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
         e3_id: E3id,
-        threshold_m: u32,
+        threshold_m: usize,
         seed: u64,
     ) -> Self {
         PlaintextAggregator {
@@ -68,7 +68,7 @@ impl PlaintextAggregator {
         };
 
         shares.insert(share);
-        if shares.len() == *threshold_m as usize {
+        if shares.len() == *threshold_m {
             return Ok(PlaintextAggregatorState::Computing {
                 shares: shares.clone(),
             });
@@ -113,7 +113,7 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
             return Box::pin(fut::ready(Ok(())));
         };
 
-        let size = threshold_m as usize;
+        let size = threshold_m;
         let address = event.node;
         let e3_id = event.e3_id.clone();
         let decryption_share = event.decryption_share.clone();

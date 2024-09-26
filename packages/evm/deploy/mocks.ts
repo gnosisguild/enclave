@@ -48,6 +48,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     console.log(`Successfully set MockDecryptionVerifier in Enclave contract`);
   } catch (error) {
     console.error("Error setting MockDecryptionVerifier:", error);
+    process.exit(1);
   }
 };
 export default func;

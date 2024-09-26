@@ -49,7 +49,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
             };
 
             let seed = data.seed;
-            let size = data.threshold_m as usize;
+            let size = data.threshold_m;
 
             if let Ok(is_selected) = sortition
                 .send(GetHasNode {

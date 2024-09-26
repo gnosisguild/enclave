@@ -30,8 +30,15 @@ impl From<CiphernodeAdded> for events::CiphernodeAdded {
     fn from(value: CiphernodeAdded) -> Self {
         events::CiphernodeAdded {
             address: value.node.to_string(),
-            index: value.index.as_limbs()[0] as usize,
-            num_nodes: value.numNodes.as_limbs()[0] as usize,
+            // TODO: limit index and numNodes to uint32 at the solidity level
+            index: value
+                .index
+                .try_into()
+                .expect("Index exceeds usize capacity"),
+            num_nodes: value
+                .numNodes
+                .try_into()
+                .expect("NumNodes exceeds usize capacity"),
         }
     }
 }
@@ -40,8 +47,14 @@ impl From<CiphernodeRemoved> for events::CiphernodeRemoved {
     fn from(value: CiphernodeRemoved) -> Self {
         events::CiphernodeRemoved {
             address: value.node.to_string(),
-            index: value.index.as_limbs()[0] as usize,
-            num_nodes: value.numNodes.as_limbs()[0] as usize,
+            index: value
+                .index
+                .try_into()
+                .expect("Index exceeds usize capacity"),
+            num_nodes: value
+                .numNodes
+                .try_into()
+                .expect("NumNodes exceeds usize capacity"),
         }
     }
 }
@@ -66,24 +79,22 @@ pub async fn connect_evm_ciphernode_registry(
     bus: Addr<EventBus>,
     rpc_url: &str,
     contract_address: Address,
-) {
+) -> Result<()> {
     let evm_manager = EvmContractManager::attach(bus.clone(), rpc_url).await;
     let evm_listener = evm_manager
         .send(AddListener { contract_address })
-        .await
-        .unwrap();
+        .await?;
 
     evm_listener
         .send(AddEventHandler::<CiphernodeAdded>::new())
-        .await
-        .unwrap();
+        .await?;
 
     evm_listener
         .send(AddEventHandler::<CiphernodeRemoved>::new())
-        .await
-        .unwrap();
+        .await?;
 
     evm_listener.do_send(StartListening);
 
     println!("Evm is listening to {}", contract_address);
+    Ok(())
 }

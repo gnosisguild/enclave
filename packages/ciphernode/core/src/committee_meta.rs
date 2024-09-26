@@ -2,7 +2,7 @@ use crate::{ActorFactory, E3Requested, EnclaveEvent};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitteeMeta {
-    pub threshold_m: u32,
+    pub threshold_m: usize,
     pub seed: u64,
 }
 

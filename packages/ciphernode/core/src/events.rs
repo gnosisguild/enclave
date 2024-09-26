@@ -32,6 +32,12 @@ impl From<String> for E3id {
     }
 }
 
+impl From<&str> for E3id {
+    fn from(value: &str) -> Self {
+        E3id::new(value)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EventId(pub [u8; 32]);
 
@@ -267,7 +273,7 @@ pub struct PublicKeyAggregated {
 #[rtype(result = "()")]
 pub struct E3Requested {
     pub e3_id: E3id,
-    pub threshold_m: u32,
+    pub threshold_m: usize,
     pub seed: u64, // Should actually be much larger eg [u8;32]
 
     // fhe params
@@ -286,7 +292,7 @@ pub struct E3Requested {
 #[rtype(result = "()")]
 pub struct CiphernodeSelected {
     pub e3_id: E3id,
-    pub threshold_m: u32,
+    pub threshold_m: usize,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

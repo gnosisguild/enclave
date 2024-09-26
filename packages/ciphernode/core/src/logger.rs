@@ -1,8 +1,6 @@
 use crate::{EnclaveEvent, EventBus, Subscribe};
 use actix::{Actor, Addr, Context, Handler};
-use alloy::primitives::Address;
 use base64::prelude::*;
-use std::fs;
 
 pub struct SimpleLogger {
     name: String,

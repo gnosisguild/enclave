@@ -7,7 +7,7 @@ use crate::{
     setup_crp_params, EnclaveEvent, EventBus, ParamsWithCrp,
 };
 use actix::Addr;
-use alloy::{primitives::Address, sol, sol_types::SolEvent};
+use alloy::{primitives::Address, sol};
 use anyhow::Result;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -62,16 +62,18 @@ impl From<E3Requested> for events::E3Requested {
             &[0x3FFFFFFF000001],
             2048,
             1032193,
+            // HACK: This is required to be fixed in order to have the same CRP bytes which will be
+            // resolved once we are decrypting params from the contract
             Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42))),
         );
         events::E3Requested {
             moduli,
             plaintext_modulus,
             degree,
-            threshold_m: value.e3.threshold[0],
+            threshold_m: value.e3.threshold[0] as usize,
             crp: crp_bytes,
             // HACK: Following should be [u8;32] and not converted to u64
-            seed: value.e3.seed.as_limbs()[0], // converting to u64
+            seed: value.e3.seed.try_into().unwrap_or_default(), // converting to u64
             e3_id: value.e3Id.to_string().into(),
         }
     }

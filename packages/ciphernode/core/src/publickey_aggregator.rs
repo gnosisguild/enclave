@@ -11,7 +11,7 @@ use anyhow::Result;
 #[derive(Debug, Clone)]
 pub enum PublicKeyAggregatorState {
     Collecting {
-        threshold_m: u32,
+        threshold_m: usize,
         keyshares: OrderedSet<Vec<u8>>,
         seed: u64,
     },
@@ -50,7 +50,7 @@ impl PublicKeyAggregator {
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
         e3_id: E3id,
-        threshold_m: u32,
+        threshold_m: usize,
         seed: u64,
     ) -> Self {
         PublicKeyAggregator {
@@ -76,7 +76,7 @@ impl PublicKeyAggregator {
             return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
         };
         keyshares.insert(keyshare);
-        if keyshares.len() == *threshold_m as usize {
+        if keyshares.len() == *threshold_m {
             return Ok(PublicKeyAggregatorState::Computing {
                 keyshares: keyshares.clone(),
             });
@@ -125,7 +125,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
             return Box::pin(fut::ready(Ok(())));
         };
 
-        let size = threshold_m as usize;
+        let size = threshold_m;
         let address = event.node;
         let e3_id = event.e3_id.clone();
         let pubkey = event.pubkey.clone();

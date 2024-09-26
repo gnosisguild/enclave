@@ -31,6 +31,9 @@ impl Handler<EnclaveEvent> for PlaintextWriter {
 
             println!("Write plaintext to {}", &self.path);
             let contents: Vec<String> = output.iter().map(|&num| num.to_string()).collect();
+
+            // NOTE: panicking is kind of what we want here for now as we don't really need to handle the
+            // error yet not knowing if this feature will be in production
             write_file_with_dirs(&self.path, format!("{}", contents.join(",")).as_bytes())
                 .unwrap();
         }
