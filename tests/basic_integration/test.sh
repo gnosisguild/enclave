@@ -122,7 +122,7 @@ sleep 2
 
 heading "Publish ciphertext to EVM"
 
-yarn e3:publishCiphertext --e3-id 0 --network localhost --data "0x$(xxd -p -c 0 $SCRIPT_DIR/output/output.bin)" --proof 0x12345678
+yarn e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR/output/output.bin" --proof 0x12345678
 
 sleep 10
 

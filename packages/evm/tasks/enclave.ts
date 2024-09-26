@@ -60,7 +60,7 @@ task(
     undefined,
     types.string,
   )
-  .setAction(async function (taskArguments: TaskArguments, hre) {
+  .setAction(async function(taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
     const enclaveContract = await hre.ethers.getContractAt(
@@ -111,21 +111,6 @@ task(
         MockDecryptionVerifier.address,
         32,
       );
-
-      // since we are using mock, we need to set the decryption verifier to the mock encryption scheme id
-      // try {
-      //   const setDecryptionVerifier =
-      //     await enclaveContract.setDecryptionVerifier(
-      //       "0x0000000000000000000000000000000000000000000000000000000000000001",
-      //       MockDecryptionVerifier.address,
-      //     );
-      //   await setDecryptionVerifier.wait();
-      // } catch (e) {
-      //   console.log(
-      //     "Setting decryption verifier for encryption scheme id failed: ",
-      //     e,
-      //   );
-      // }
     }
 
     try {
@@ -166,7 +151,7 @@ task("committee:publish", "Publish the publickey of the committee")
     types.string,
   )
   .addParam("publicKey", "public key of the committee", undefined, types.string)
-  .setAction(async function (taskArguments: TaskArguments, hre) {
+  .setAction(async function(taskArguments: TaskArguments, hre) {
     let filterAddress = taskArguments.filter;
     if (!taskArguments.filter) {
       filterAddress = (await hre.deployments.get("NaiveRegistryFilter"))
@@ -203,7 +188,7 @@ task("committee:publish", "Publish the publickey of the committee")
 
 task("e3:activate", "Activate an E3 program")
   .addParam("e3Id", "Id of the E3 program")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
+  .setAction(async function(taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
     const enclaveContract = await hre.ethers.getContractAt(
@@ -223,7 +208,7 @@ task("e3:publishInput", "Publish input for an E3 program")
   .addParam("e3Id", "Id of the E3 program")
   .addOptionalParam("data", "data to publish")
   .addOptionalParam("dataFile", "file containing data to publish")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
+  .setAction(async function(taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
     const enclaveContract = await hre.ethers.getContractAt(
@@ -251,7 +236,7 @@ task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
   .addOptionalParam("data", "data to publish")
   .addOptionalParam("dataFile", "file containing data to publish")
   .addParam("proof", "proof to publish")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
+  .setAction(async function(taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
     const enclaveContract = await hre.ethers.getContractAt(
@@ -263,7 +248,7 @@ task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
 
     if (taskArguments.dataFile) {
       const file = fs.readFileSync(taskArguments.dataFile);
-      data = file.toString();
+      data = "0x" + file.toString("hex");
     }
 
     const tx = await enclaveContract.publishCiphertextOutput(
@@ -283,7 +268,7 @@ task("e3:publishPlaintext", "Publish plaintext output for an E3 program")
   .addOptionalParam("data", "data to publish")
   .addOptionalParam("dataFile", "file containing data to publish")
   .addParam("proof", "proof to publish")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
+  .setAction(async function(taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
     const enclaveContract = await hre.ethers.getContractAt(
