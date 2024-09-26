@@ -1,5 +1,4 @@
 use actix::prelude::*;
-use alloy_primitives::Address;
 
 use crate::{
     CiphernodeSelected, EnclaveEvent, EventBus, GetHasNode, Sortition, Subscribe,
@@ -8,7 +7,7 @@ use crate::{
 pub struct CiphernodeSelector {
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
-    address: Address, 
+    address: String, 
 }
 
 impl Actor for CiphernodeSelector {
@@ -16,19 +15,19 @@ impl Actor for CiphernodeSelector {
 }
 
 impl CiphernodeSelector {
-    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: Address) -> Self {
+    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: &str) -> Self {
         Self {
             bus,
             sortition,
-            address,
+            address:address.to_owned(),
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: Address) -> Addr<Self> {
+    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: &str) -> Addr<Self> {
         let addr = CiphernodeSelector::new(bus.clone(), sortition, address).start();
 
         bus.do_send(Subscribe::new(
-            "CommitteeRequested",
+            "E3Requested",
             addr.clone().recipient(),
         ));
 
@@ -40,17 +39,17 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
-        let address = self.address;
+        let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
 
         Box::pin(async move {
-            let EnclaveEvent::CommitteeRequested { data, .. } = event else {
+            let EnclaveEvent::E3Requested { data, .. } = event else {
                 return;
             };
 
-            let seed = data.sortition_seed;
-            let size = data.nodecount;
+            let seed = data.seed;
+            let size = data.threshold_m;
 
             if let Ok(is_selected) = sortition
                 .send(GetHasNode {
@@ -66,7 +65,7 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
 
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
                     e3_id: data.e3_id,
-                    nodecount: data.nodecount,
+                    threshold_m: data.threshold_m,
                 }));
             }
         })

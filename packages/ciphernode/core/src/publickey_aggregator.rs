@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     eventbus::EventBus,
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
@@ -11,7 +13,7 @@ use anyhow::Result;
 #[derive(Debug, Clone)]
 pub enum PublicKeyAggregatorState {
     Collecting {
-        nodecount: usize,
+        threshold_m: usize,
         keyshares: OrderedSet<Vec<u8>>,
         seed: u64,
     },
@@ -31,7 +33,7 @@ struct ComputeAggregate {
 }
 
 pub struct PublicKeyAggregator {
-    fhe: Addr<Fhe>,
+    fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
@@ -46,11 +48,11 @@ pub struct PublicKeyAggregator {
 /// for them.
 impl PublicKeyAggregator {
     pub fn new(
-        fhe: Addr<Fhe>,
+        fhe: Arc<Fhe>,
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
         e3_id: E3id,
-        nodecount: usize,
+        threshold_m: usize,
         seed: u64,
     ) -> Self {
         PublicKeyAggregator {
@@ -59,7 +61,7 @@ impl PublicKeyAggregator {
             e3_id,
             sortition,
             state: PublicKeyAggregatorState::Collecting {
-                nodecount,
+                threshold_m,
                 keyshares: OrderedSet::new(),
                 seed,
             },
@@ -68,16 +70,15 @@ impl PublicKeyAggregator {
 
     pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<PublicKeyAggregatorState> {
         let PublicKeyAggregatorState::Collecting {
-            nodecount,
+            threshold_m,
             keyshares,
             ..
         } = &mut self.state
         else {
             return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
         };
-
         keyshares.insert(keyshare);
-        if keyshares.len() == *nodecount {
+        if keyshares.len() == *threshold_m {
             return Ok(PublicKeyAggregatorState::Computing {
                 keyshares: keyshares.clone(),
             });
@@ -118,7 +119,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
     fn handle(&mut self, event: KeyshareCreated, _: &mut Self::Context) -> Self::Result {
         let PublicKeyAggregatorState::Collecting {
-            nodecount, seed, ..
+            threshold_m, seed, ..
         } = self.state.clone()
         else {
             println!("Aggregator has been closed for collecting keyshares."); // TODO: log properly
@@ -126,7 +127,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
             return Box::pin(fut::ready(Ok(())));
         };
 
-        let size = nodecount;
+        let size = threshold_m;
         let address = event.node;
         let e3_id = event.e3_id.clone();
         let pubkey = event.pubkey.clone();
@@ -170,57 +171,44 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 }
 
 impl Handler<ComputeAggregate> for PublicKeyAggregator {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = Result<()>;
 
     fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
-        // Futures are awkward in Actix from what I can tell we should try and structure events so
-        // that futures that don't require access to self like the following...
-        Box::pin(
-            // Run the async future.
-            self.fhe
-                .send(GetAggregatePublicKey {
-                    keyshares: msg.keyshares.clone(),
-                })
-                // allow access to the actor
-                .into_actor(self)
-                // map into some sync stuff
-                .map(|res, act, _| {
-                    // We have to double unwrap here. Suggestions?
-                    // 1st - Mailbox error.
-                    // 2nd - GetAggregatePublicKey Response.
-                    let pubkey = res??;
+        let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
+            keyshares: msg.keyshares.clone(),
+        })?;
 
-                    // Update the local state
-                    act.state = act.set_pubkey(pubkey.clone())?;
+        // Update the local state
+        self.state = self.set_pubkey(pubkey.clone())?;
 
-                    // Dispatch the PublicKeyAggregated event
-                    let event = EnclaveEvent::from(PublicKeyAggregated {
-                        pubkey,
-                        e3_id: act.e3_id.clone(),
-                    });
+        // Dispatch the PublicKeyAggregated event
+        let event = EnclaveEvent::from(PublicKeyAggregated {
+            pubkey,
+            e3_id: self.e3_id.clone(),
+        });
 
-                    act.bus.do_send(event);
+        self.bus.do_send(event);
 
-                    // Return
-                    Ok(())
-                }),
-        )
+        // Return
+        Ok(())
     }
-}
+} 
 
 pub struct PublicKeyAggregatorFactory;
 impl PublicKeyAggregatorFactory {
     pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> ActorFactory {
         Box::new(move |ctx, evt| {
-            // Saving the publickey aggregator with deps on CommitteeRequested
-            let EnclaveEvent::CommitteeRequested { data, .. } = evt else {
+            // Saving the publickey aggregator with deps on E3Requested
+            let EnclaveEvent::E3Requested { data, .. } = evt else {
                 return;
             };
 
             let Some(ref fhe) = ctx.fhe else {
+                println!("fhe was not on ctx");
                 return;
             };
             let Some(ref meta) = ctx.meta else {
+                println!("meta was not on ctx");
                 return;
             };
 
@@ -230,7 +218,7 @@ impl PublicKeyAggregatorFactory {
                     bus.clone(),
                     sortition.clone(),
                     data.e3_id,
-                    meta.nodecount,
+                    meta.threshold_m,
                     meta.seed,
                 )
                 .start(),

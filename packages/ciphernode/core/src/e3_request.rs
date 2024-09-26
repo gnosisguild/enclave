@@ -1,32 +1,24 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use actix::{Actor, Addr, Context, Handler, Recipient};
 
 use crate::{
-    Ciphernode, CommitteeMeta, E3id, EnclaveEvent, EventBus, Fhe, PlaintextAggregator,
+    Keyshare, CommitteeMeta, E3id, EnclaveEvent, EventBus, Fhe, PlaintextAggregator,
     PublicKeyAggregator, Subscribe,
 };
 
 #[derive(Default)]
 // TODO: Set this up with a Typestate pattern
 pub struct E3RequestContext {
-    pub ciphernode: Option<Addr<Ciphernode>>,
-    pub fhe: Option<Addr<Fhe>>,
+    pub keyshare: Option<Addr<Keyshare>>,
+    pub fhe: Option<Arc<Fhe>>,
     pub plaintext: Option<Addr<PlaintextAggregator>>,
     pub publickey: Option<Addr<PublicKeyAggregator>>,
     pub meta: Option<CommitteeMeta>,
 }
-
+#[derive(Default)]
 struct EventBuffer {
     buffer: HashMap<String, Vec<EnclaveEvent>>,
-}
-
-impl Default for EventBuffer {
-    fn default() -> Self {
-        Self {
-            buffer: HashMap::new(),
-        }
-    }
 }
 
 impl EventBuffer {
@@ -46,8 +38,8 @@ impl E3RequestContext {
     fn recipients(&self) -> Vec<(String, Option<Recipient<EnclaveEvent>>)> {
         vec![
             (
-                "ciphernode".to_owned(),
-                self.ciphernode.clone().map(|addr| addr.into()),
+                "keyshare".to_owned(),
+                self.keyshare.clone().map(|addr| addr.into()),
             ),
             (
                 "plaintext".to_owned(),
@@ -72,12 +64,6 @@ impl E3RequestContext {
             }
         });
     }
-}
-
-struct E3RequestBuffers {
-    ciphernode: Vec<EnclaveEvent>,
-    publickey: Vec<EnclaveEvent>,
-    plaintext: Vec<EnclaveEvent>,
 }
 
 pub type ActorFactory = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;

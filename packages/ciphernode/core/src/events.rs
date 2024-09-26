@@ -1,20 +1,10 @@
 use actix::Message;
-use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fmt,
     hash::{DefaultHasher, Hash, Hasher},
 };
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct EthAddr(pub Vec<u8>);
-
-impl From<Address> for EthAddr {
-    fn from(value: Address) -> Self {
-        Self(value.to_vec())
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id(pub String);
@@ -33,6 +23,18 @@ impl E3id {
 impl From<u32> for E3id {
     fn from(value: u32) -> Self {
         E3id::new(value.to_string())
+    }
+}
+
+impl From<String> for E3id {
+    fn from(value: String) -> Self {
+        E3id::new(value)
+    }
+}
+
+impl From<&str> for E3id {
+    fn from(value: &str) -> Self {
+        E3id::new(value)
     }
 }
 
@@ -64,9 +66,9 @@ pub enum EnclaveEvent {
         id: EventId,
         data: KeyshareCreated,
     },
-    CommitteeRequested {
+    E3Requested {
         id: EventId,
-        data: CommitteeRequested,
+        data: E3Requested,
     },
     PublicKeyAggregated {
         id: EventId,
@@ -119,6 +121,9 @@ impl EnclaveEvent {
         // Add a list of local events
         match self {
             EnclaveEvent::CiphernodeSelected { .. } => true,
+            EnclaveEvent::E3Requested { .. } => true,
+            EnclaveEvent::CiphernodeAdded { .. } => true,
+            EnclaveEvent::CiphernodeRemoved { .. } => true,
             _ => false,
         }
     }
@@ -128,7 +133,7 @@ impl From<EnclaveEvent> for EventId {
     fn from(value: EnclaveEvent) -> Self {
         match value {
             EnclaveEvent::KeyshareCreated { id, .. } => id,
-            EnclaveEvent::CommitteeRequested { id, .. } => id,
+            EnclaveEvent::E3Requested { id, .. } => id,
             EnclaveEvent::PublicKeyAggregated { id, .. } => id,
             EnclaveEvent::CiphertextOutputPublished { id, .. } => id,
             EnclaveEvent::DecryptionshareCreated { id, .. } => id,
@@ -144,7 +149,7 @@ impl EnclaveEvent {
     pub fn get_e3_id(&self) -> Option<E3id> {
         match self.clone() {
             EnclaveEvent::KeyshareCreated { data, .. } => Some(data.e3_id),
-            EnclaveEvent::CommitteeRequested { data, .. } => Some(data.e3_id),
+            EnclaveEvent::E3Requested { data, .. } => Some(data.e3_id),
             EnclaveEvent::PublicKeyAggregated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CiphertextOutputPublished { data, .. } => Some(data.e3_id),
             EnclaveEvent::DecryptionshareCreated { data, .. } => Some(data.e3_id),
@@ -164,9 +169,9 @@ impl From<KeyshareCreated> for EnclaveEvent {
     }
 }
 
-impl From<CommitteeRequested> for EnclaveEvent {
-    fn from(data: CommitteeRequested) -> Self {
-        EnclaveEvent::CommitteeRequested {
+impl From<E3Requested> for EnclaveEvent {
+    fn from(data: E3Requested) -> Self {
+        EnclaveEvent::E3Requested {
             id: EventId::from(data.clone()),
             data: data.clone(),
         }
@@ -246,7 +251,7 @@ impl fmt::Display for EnclaveEvent {
 pub struct KeyshareCreated {
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
-    pub node: Address,
+    pub node: String,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -254,7 +259,7 @@ pub struct KeyshareCreated {
 pub struct DecryptionshareCreated {
     pub decryption_share: Vec<u8>,
     pub e3_id: E3id,
-    pub node: Address,
+    pub node: String,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -266,10 +271,10 @@ pub struct PublicKeyAggregated {
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct CommitteeRequested {
+pub struct E3Requested {
     pub e3_id: E3id,
-    pub nodecount: usize,
-    pub sortition_seed: u64, // Should actually be much larger eg [u8;32]
+    pub threshold_m: usize,
+    pub seed: u64, // Should actually be much larger eg [u8;32]
 
     // fhe params
     pub moduli: Vec<u64>,
@@ -287,7 +292,7 @@ pub struct CommitteeRequested {
 #[rtype(result = "()")]
 pub struct CiphernodeSelected {
     pub e3_id: E3id,
-    pub nodecount: usize,
+    pub threshold_m: usize,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -307,7 +312,7 @@ pub struct PlaintextAggregated {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeAdded {
-    pub address: Address,
+    pub address: String,
     pub index: usize,
     pub num_nodes: usize,
 }
@@ -315,7 +320,7 @@ pub struct CiphernodeAdded {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeRemoved {
-    pub address: Address,
+    pub address: String,
     pub index: usize,
     pub num_nodes: usize,
 }
@@ -340,15 +345,13 @@ impl EnclaveEvent {
 #[cfg(test)]
 mod tests {
     use super::EnclaveEvent;
-    use crate::{
-        events::extract_enclave_event_name, serializers::PublicKeyShareSerializer, E3id,
-        KeyshareCreated,
-    };
+    use crate::{events::extract_enclave_event_name, E3id, KeyshareCreated};
     use alloy_primitives::address;
     use fhe::{
         bfv::{BfvParametersBuilder, SecretKey},
         mbfv::{CommonRandomPoly, PublicKeyShare},
     };
+    use fhe_traits::Serialize;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use std::error::Error;
@@ -379,11 +382,11 @@ mod tests {
         let crp = CommonRandomPoly::new(&params, &mut rng)?;
         let sk_share = { SecretKey::random(&params, &mut rng) };
         let pk_share = { PublicKeyShare::new(&sk_share, crp.clone(), &mut rng)? };
-        let pubkey = PublicKeyShareSerializer::to_bytes(pk_share, params.clone(), crp.clone())?;
+        let pubkey = pk_share.to_bytes();
         let kse = EnclaveEvent::from(KeyshareCreated {
             e3_id: E3id::from(1001),
             pubkey,
-            node: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"),
+            node: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").to_string(),
         });
         let kse_bytes = kse.to_bytes()?;
         let _ = EnclaveEvent::from_bytes(&kse_bytes.clone());

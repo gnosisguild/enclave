@@ -2,46 +2,48 @@
 #![crate_type = "lib"]
 // #![warn(missing_docs, unused_imports)]
 
-mod ciphernode;
-mod ciphernode_selector;
+mod cipernode_selector;
 mod committee_meta;
 mod data;
 mod e3_request;
-mod enclave_contract;
 mod eventbus;
 pub mod events;
-mod evm;
+mod evm_ciphernode_registry;
+mod evm_enclave;
 mod evm_listener;
 mod evm_manager;
 mod fhe;
+mod keyshare;
 mod logger;
 mod main_aggregator;
 mod main_ciphernode;
 mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
+mod plaintext_writer;
+mod public_key_writer;
 mod publickey_aggregator;
-mod serializers;
 mod sortition;
 mod utils;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
-pub use ciphernode::*;
-pub use ciphernode_selector::*;
+pub use cipernode_selector::*;
 pub use committee_meta::*;
 pub use data::*;
 pub use e3_request::*;
 pub use eventbus::*;
 pub use events::*;
 pub use fhe::*;
+pub use keyshare::*;
 pub use logger::*;
 pub use main_aggregator::*;
 pub use main_ciphernode::*;
 pub use p2p::*;
 pub use plaintext_aggregator::*;
+pub use plaintext_writer::*;
+pub use public_key_writer::*;
 pub use publickey_aggregator::*;
-pub use serializers::*;
 pub use sortition::*;
 pub use utils::*;
 
@@ -49,20 +51,18 @@ pub use utils::*;
 #[cfg(test)]
 mod tests {
     use crate::{
-        ciphernode_selector::CiphernodeSelector,
+        cipernode_selector::CiphernodeSelector,
         data::Data,
         eventbus::{EventBus, GetHistory},
-        events::{CommitteeRequested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
+        events::{E3Requested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
         p2p::P2p,
-        serializers::{CiphertextSerializer, DecryptionShareSerializer, PublicKeyShareSerializer},
         utils::{setup_crp_params, ParamsWithCrp},
-        CiphernodeAdded, CiphernodeFactory, CiphernodeSelected, CiphertextOutputPublished,
-        CommitteeMetaFactory, DecryptionshareCreated, E3RequestManager, FheFactory,
-        PlaintextAggregated, PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory,
-        SharedRng, Sortition,
+        CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, CommitteeMetaFactory,
+        DecryptionshareCreated, E3RequestManager, FheFactory, KeyshareFactory, PlaintextAggregated,
+        PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory, SharedRng, Sortition,
     };
     use actix::prelude::*;
-    use alloy_primitives::Address;
+    use alloy::primitives::Address;
     use anyhow::*;
     use fhe::{
         bfv::{BfvParameters, Encoding, Plaintext, PublicKey, SecretKey},
@@ -81,7 +81,7 @@ mod tests {
         bus: Addr<EventBus>,
         rng: SharedRng,
         logging: bool,
-        addr: Address,
+        addr: &str,
     ) {
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
@@ -101,11 +101,7 @@ mod tests {
                 bus.clone(),
                 sortition.clone(),
             ))
-            .add_hook(CiphernodeFactory::create(
-                bus.clone(),
-                data.clone(),
-                addr,
-            ))
+            .add_hook(KeyshareFactory::create(bus.clone(), data.clone(), addr))
             .build();
     }
 
@@ -113,13 +109,9 @@ mod tests {
         params: Arc<BfvParameters>,
         crp: CommonRandomPoly,
         rng: SharedRng,
-    ) -> Result<(Vec<u8>, SecretKey)> {
+    ) -> Result<(PublicKeyShare, SecretKey)> {
         let sk = SecretKey::random(&params, &mut *rng.lock().unwrap());
-        let pk = PublicKeyShareSerializer::to_bytes(
-            PublicKeyShare::new(&sk, crp.clone(), &mut *rng.lock().unwrap())?,
-            params.clone(),
-            crp,
-        )?;
+        let pk = PublicKeyShare::new(&sk, crp.clone(), &mut *rng.lock().unwrap())?;
         Ok((pk, sk))
     }
 
@@ -130,13 +122,13 @@ mod tests {
 
         let rng = Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42)));
 
-        let eth_addrs: Vec<Address> = (0..3)
-            .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()))
+        let eth_addrs: Vec<String> = (0..3)
+            .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()).to_string())
             .collect();
 
-        setup_local_ciphernode(bus.clone(), rng.clone(), true, eth_addrs[0]).await;
-        setup_local_ciphernode(bus.clone(), rng.clone(), true, eth_addrs[1]).await;
-        setup_local_ciphernode(bus.clone(), rng.clone(), true, eth_addrs[2]).await;
+        setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[0]).await;
+        setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[1]).await;
+        setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[2]).await;
 
         let e3_id = E3id::new("1234");
 
@@ -154,7 +146,7 @@ mod tests {
         );
 
         let regevt_1 = EnclaveEvent::from(CiphernodeAdded {
-            address: eth_addrs[0],
+            address: eth_addrs[0].clone(),
             index: 0,
             num_nodes: 1,
         });
@@ -162,7 +154,7 @@ mod tests {
         bus.send(regevt_1.clone()).await?;
 
         let regevt_2 = EnclaveEvent::from(CiphernodeAdded {
-            address: eth_addrs[1],
+            address: eth_addrs[1].clone(),
             index: 1,
             num_nodes: 2,
         });
@@ -170,17 +162,17 @@ mod tests {
         bus.send(regevt_2.clone()).await?;
 
         let regevt_3 = EnclaveEvent::from(CiphernodeAdded {
-            address: eth_addrs[2],
+            address: eth_addrs[2].clone(),
             index: 2,
             num_nodes: 3,
         });
 
         bus.send(regevt_3.clone()).await?;
 
-        let event = EnclaveEvent::from(CommitteeRequested {
+        let event = EnclaveEvent::from(E3Requested {
             e3_id: e3_id.clone(),
-            nodecount: 3,
-            sortition_seed: 123,
+            threshold_m: 3,
+            seed: 123,
             moduli: moduli.clone(),
             degree,
             plaintext_modulus,
@@ -204,9 +196,8 @@ mod tests {
         let (p2, sk2) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
         let (p3, sk3) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
 
-        let pubkey: PublicKey = [p1.clone(), p2.clone(), p3.clone()]
-            .iter()
-            .map(|k| PublicKeyShareSerializer::from_bytes(k).unwrap())
+        let pubkey: PublicKey = vec![p1.clone(), p2.clone(), p3.clone()]
+            .into_iter()
             .aggregate()?;
 
         assert_eq!(history.len(), 9);
@@ -216,10 +207,10 @@ mod tests {
                 regevt_1,
                 regevt_2,
                 regevt_3,
-                EnclaveEvent::from(CommitteeRequested {
+                EnclaveEvent::from(E3Requested {
                     e3_id: e3_id.clone(),
-                    nodecount: 3,
-                    sortition_seed: 123,
+                    threshold_m: 3,
+                    seed: 123,
                     moduli,
                     degree,
                     plaintext_modulus,
@@ -227,22 +218,22 @@ mod tests {
                 }),
                 EnclaveEvent::from(CiphernodeSelected {
                     e3_id: e3_id.clone(),
-                    nodecount: 3,
+                    threshold_m: 3,
                 }),
                 EnclaveEvent::from(KeyshareCreated {
-                    pubkey: p1.clone(),
+                    pubkey: p1.to_bytes(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[0]
+                    node: eth_addrs[0].clone()
                 }),
                 EnclaveEvent::from(KeyshareCreated {
-                    pubkey: p2.clone(),
+                    pubkey: p2.to_bytes(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[1]
+                    node: eth_addrs[1].clone()
                 }),
                 EnclaveEvent::from(KeyshareCreated {
-                    pubkey: p3.clone(),
+                    pubkey: p3.to_bytes(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[2]
+                    node: eth_addrs[2].clone()
                 }),
                 EnclaveEvent::from(PublicKeyAggregated {
                     pubkey: pubkey.to_bytes(),
@@ -253,7 +244,12 @@ mod tests {
 
         // Aggregate decryption
         bus.send(ResetHistory).await?;
-
+        fn pad_end(input: &[u64], pad: u64, total: usize) -> Vec<u64> {
+            let len = input.len();
+            let mut cop = input.to_vec();
+            cop.extend(std::iter::repeat(pad).take(total - len));
+            cop
+        }
         // TODO:
         // Making these values large (especially the yes value) requires changing
         // the params we use here - as we tune the FHE we need to take care
@@ -261,33 +257,22 @@ mod tests {
         let no = 873827u64;
 
         let raw_plaintext = vec![yes, no];
-        let expected_raw_plaintext = bincode::serialize(&raw_plaintext)?;
+        let padded = &pad_end(&raw_plaintext, 0, 2048);
+        let expected_raw_plaintext = bincode::serialize(&padded)?;
         let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
 
         let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
 
         let event = EnclaveEvent::from(CiphertextOutputPublished {
-            ciphertext_output: CiphertextSerializer::to_bytes(ciphertext.clone(), params.clone())?,
+            ciphertext_output: ciphertext.to_bytes(),
             e3_id: e3_id.clone(),
         });
 
         let arc_ct = Arc::new(ciphertext);
 
-        let ds1 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk1, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
-            params.clone(),
-            arc_ct.clone(),
-        )?;
-        let ds2 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk2, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
-            params.clone(),
-            arc_ct.clone(),
-        )?;
-        let ds3 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk3, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
-            params.clone(),
-            arc_ct.clone(),
-        )?;
+        let ds1 = DecryptionShare::new(&sk1, &arc_ct, &mut *rng_test.lock().unwrap())?.to_bytes();
+        let ds2 = DecryptionShare::new(&sk2, &arc_ct, &mut *rng_test.lock().unwrap())?.to_bytes();
+        let ds3 = DecryptionShare::new(&sk3, &arc_ct, &mut *rng_test.lock().unwrap())?.to_bytes();
 
         // let ds1 = sk1
         bus.send(event.clone()).await?;
@@ -296,6 +281,7 @@ mod tests {
         let history = bus.send(GetHistory).await?;
 
         assert_eq!(history.len(), 5);
+
         assert_eq!(
             history,
             vec![
@@ -303,17 +289,17 @@ mod tests {
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds1.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[0]
+                    node: eth_addrs[0].clone()
                 }),
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds2.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[1]
+                    node: eth_addrs[1].clone()
                 }),
                 EnclaveEvent::from(DecryptionshareCreated {
                     decryption_share: ds3.clone(),
                     e3_id: e3_id.clone(),
-                    node: eth_addrs[2]
+                    node: eth_addrs[2].clone()
                 }),
                 EnclaveEvent::from(PlaintextAggregated {
                     e3_id: e3_id.clone(),
@@ -340,36 +326,27 @@ mod tests {
         tokio::spawn(async move {
             while let Some(msg) = output.recv().await {
                 msgs_loop.lock().await.push(msg.clone());
-                let _ = input.send(msg).await; // loopback to simulate a rebroadcast message
-                                               // if this  manages to broadcast an event to the
-                                               // event bus we will expect to see an extra event on
-                                               // the bus
+                let _ = input.send(msg).await;
+                // loopback to simulate a rebroadcast message
+                // if this  manages to broadcast an event to the
+                // event bus we will expect to see an extra event on
+                // the bus
             }
         });
 
-        let evt_1 = EnclaveEvent::from(CommitteeRequested {
-            e3_id: E3id::new("1234"),
-            nodecount: 3,
-            sortition_seed: 123,
-            moduli: vec![0x3FFFFFFF000001],
-            degree: 2048,
-            plaintext_modulus: 1032193,
-            crp: vec![1, 2, 3, 4],
+        let evt_1 = EnclaveEvent::from(PlaintextAggregated {
+            e3_id: E3id::new("1235"),
+            decrypted_output: vec![1, 2, 3, 4],
         });
 
-        let evt_2 = EnclaveEvent::from(CommitteeRequested {
-            e3_id: E3id::new("1235"),
-            nodecount: 3,
-            sortition_seed: 123,
-            moduli: vec![0x3FFFFFFF000001],
-            degree: 2048,
-            plaintext_modulus: 1032193,
-            crp: vec![1, 2, 3, 4],
+        let evt_2 = EnclaveEvent::from(PlaintextAggregated {
+            e3_id: E3id::new("1236"),
+            decrypted_output: vec![1, 2, 3, 4],
         });
 
         let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
             e3_id: E3id::new("1235"),
-            nodecount: 3,
+            threshold_m: 3,
         });
 
         bus.do_send(evt_1.clone());
@@ -406,10 +383,10 @@ mod tests {
         P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
 
         // Capture messages from output on msgs vec
-        let event = EnclaveEvent::from(CommitteeRequested {
+        let event = EnclaveEvent::from(E3Requested {
             e3_id: E3id::new("1235"),
-            nodecount: 3,
-            sortition_seed: 123,
+            threshold_m: 3,
+            seed: 123,
             moduli: vec![0x3FFFFFFF000001],
             degree: 2048,
             plaintext_modulus: 1032193,

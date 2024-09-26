@@ -17,7 +17,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  await deploy("MockDecryptionVerifier", {
+  const mockDecryptionVerifier = await deploy("MockDecryptionVerifier", {
     from: deployer,
     args: [],
     log: true,
@@ -28,6 +28,28 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [],
     log: true,
   });
+
+  // Set up MockDecryptionVerifier in Enclave contract
+  const enclaveDeployment = await hre.deployments.get("Enclave");
+  const enclaveContract = await hre.ethers.getContractAt(
+    "Enclave",
+    enclaveDeployment.address,
+  );
+
+  const encryptionSchemeId =
+    "0x0000000000000000000000000000000000000000000000000000000000000001";
+
+  try {
+    const tx = await enclaveContract.setDecryptionVerifier(
+      encryptionSchemeId,
+      mockDecryptionVerifier.address,
+    );
+    await tx.wait();
+    console.log(`Successfully set MockDecryptionVerifier in Enclave contract`);
+  } catch (error) {
+    console.error("Error setting MockDecryptionVerifier:", error);
+    process.exit(1);
+  }
 };
 export default func;
 func.tags = ["mocks"];

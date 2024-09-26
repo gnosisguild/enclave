@@ -111,21 +111,6 @@ task(
         MockDecryptionVerifier.address,
         32,
       );
-
-      // since we are using mock, we need to set the decryption verifier to the mock encryption scheme id
-      try {
-        const setDecryptionVerifier =
-          await enclaveContract.setDecryptionVerifier(
-            "0x0000000000000000000000000000000000000000000000000000000000000001",
-            MockDecryptionVerifier.address,
-          );
-        await setDecryptionVerifier.wait();
-      } catch (e) {
-        console.log(
-          "Setting decryption verifier for encryption scheme id failed: ",
-          e,
-        );
-      }
     }
 
     try {
@@ -264,7 +249,7 @@ task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
 
     if (taskArguments.dataFile) {
       const file = fs.readFileSync(taskArguments.dataFile);
-      data = file.toString();
+      data = "0x" + file.toString("hex");
     }
 
     let proof = taskArguments.proof;

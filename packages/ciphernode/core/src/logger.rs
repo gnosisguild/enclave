@@ -1,7 +1,6 @@
 use crate::{EnclaveEvent, EventBus, Subscribe};
 use actix::{Actor, Addr, Context, Handler};
 use base64::prelude::*;
-use std::fs;
 
 pub struct SimpleLogger {
     name: String,
@@ -33,20 +32,18 @@ impl Handler<EnclaveEvent> for SimpleLogger {
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
                 let pubkey_str = BASE64_STANDARD.encode(&data.pubkey);
                 println!(
-                    "\n\nPUBKEY:\n{}...{}\n\nSaved to scripts/pubkey.b64\n\n",
+                    "\n[{}]: PUBKEY: {}...{}\n",
+                    self.name,
                     &pubkey_str[..20],
                     &pubkey_str[pubkey_str.len() - 20..]
                 );
-                fs::write("scripts/pubkey.b64", &pubkey_str).unwrap();
-                println!("[{}]: {}", self.name, msg);
-            }
-            EnclaveEvent::PlaintextAggregated { data, .. } => {
-                let output: Vec<u64> = bincode::deserialize(&data.decrypted_output).unwrap();
-                println!("\n\nDECRYPTED:\n{:?}\n\n", output);
                 println!("[{}]: {}", self.name, msg);
             }
             EnclaveEvent::CiphernodeAdded { data, .. } => {
                 println!("[{}]: CiphernodeAdded({})", self.name, data.address);
+            },
+            EnclaveEvent::E3Requested { data,.. } => {
+                println!("[{}]: E3Requested(e3_id: {}, threshold_m: {} , seed: {})", self.name, data.e3_id, data.threshold_m, data.seed)
             }
             _ => println!("[{}]: {}", self.name, msg),
         }
