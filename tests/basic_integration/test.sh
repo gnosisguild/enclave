@@ -40,6 +40,29 @@ heading() {
     echo ""
 }
 
+waiton() {
+    local file_path="$1"
+    until [ -f "$file_path" ]; do
+        sleep 1
+    done
+}
+
+waiton-files() {
+    while true; do
+        all_exist=true
+        for file in "$@"; do
+            if [ ! -f "$file" ]; then
+                all_exist=false
+                break
+            fi
+        done
+        if $all_exist; then
+            break
+        fi
+        sleep 1
+    done
+}
+
 pkill -9 -f "target/debug/node" || true
 pkill -9 -f "hardhat node" || true
 pkill -9 -f "target/debug/aggregator" || true
@@ -56,7 +79,9 @@ heading "Start the EVM node"
 
 yarn evm:node &
 
-sleep 2
+until curl -f -s "http://localhost:8545" > /dev/null; do
+  sleep 1
+done
 
 heading "Launch ciphernode $CIPHERNODE_ADDRESS_1"
 yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_1 --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT &
@@ -72,33 +97,27 @@ yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_4 --rpc "$RPC_URL" --enclav
 
 yarn ciphernode:aggregator --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
 
-sleep 2
+sleep 1
+
+waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/node" "$ROOT_DIR/packages/ciphernode/target/debug/aggregator" "$ROOT_DIR/packages/ciphernode/target/debug/test_encryptor"
 
 heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
 
-sleep 2
-
 heading "Add ciphernode $CIPHERNODE_ADDRESS_2"
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_2 --network localhost
-
-sleep 2
 
 heading "Add ciphernode $CIPHERNODE_ADDRESS_3"
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localhost
 
-sleep 2
-
 heading "Add ciphernode $CIPHERNODE_ADDRESS_4"
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
 
-sleep 2
-
 heading "Request Committee"
 
-yarn committee:new --network localhost --duration 6
+yarn committee:new --network localhost --duration 4
 
-sleep 2
+waiton "$SCRIPT_DIR/output/pubkey.bin"
 
 heading "Mock encrypted plaintext"
 
@@ -108,24 +127,22 @@ heading "Mock publish committee key"
 
 cd packages/evm; yarn hardhat committee:publish --e3-id 0 --nodes $CIPHERNODE_ADDRESS_1,$CIPHERNODE_ADDRESS_2,$CIPHERNODE_ADDRESS_3,$CIPHERNODE_ADDRESS_4 --public-key 0x12345678 --network localhost; cd ../..
 
-sleep 2
-
 heading "Mock activate e3-id"
 
 yarn e3:activate --e3-id 0 --network localhost
 
-sleep 2
-
 heading "Mock publish input e3-id"
 yarn e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
 
-sleep 2
+sleep 4 # wait for input deadline to pass
+
+waiton "$SCRIPT_DIR/output/output.bin"
 
 heading "Publish ciphertext to EVM"
 
 yarn e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR/output/output.bin" --proof 0x12345678
 
-sleep 10
+waiton "$SCRIPT_DIR/output/plaintext.txt"
 
 ACTUAL=$(cat $SCRIPT_DIR/output/plaintext.txt)
 
