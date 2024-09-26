@@ -53,17 +53,7 @@ pub use utils::*;
 #[cfg(test)]
 mod tests {
     use crate::{
-        cipernode_selector::CiphernodeSelector,
-        data::Data,
-        eventbus::{EventBus, GetHistory},
-        events::{E3Requested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
-        p2p::P2p,
-        serializers::{CiphertextSerializer, DecryptionShareSerializer, PublicKeyShareSerializer},
-        utils::{setup_crp_params, ParamsWithCrp},
-        CiphernodeAdded, CiphernodeFactory, CiphernodeSelected, CiphertextOutputPublished,
-        CommitteeMetaFactory, DecryptionshareCreated, E3RequestManager, FheFactory,
-        PlaintextAggregated, PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory,
-        SharedRng, Sortition,
+        cipernode_selector::CiphernodeSelector, data::Data, eventbus::{EventBus, GetHistory}, events::{E3Requested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated}, p2p::P2p, serializers::{CiphertextSerializer, DecryptionShareSerializer, PublicKeyShareSerializer}, utils::{setup_crp_params, ParamsWithCrp}, CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, CommitteeMetaFactory, DecryptionshareCreated, E3RequestManager, FheFactory, KeyshareFactory, PlaintextAggregated, PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory, SharedRng, Sortition
     };
     use actix::prelude::*;
     use alloy::primitives::Address;
@@ -105,7 +95,7 @@ mod tests {
                 bus.clone(),
                 sortition.clone(),
             ))
-            .add_hook(CiphernodeFactory::create(bus.clone(), data.clone(), addr))
+            .add_hook(KeyshareFactory::create(bus.clone(), data.clone(), addr))
             .build();
     }
 

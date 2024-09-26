@@ -11,18 +11,18 @@ use crate::{
 use actix::prelude::*;
 use anyhow::Result;
 
-pub struct Ciphernode {
+pub struct Keyshare {
     fhe: Arc<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
     address: String,
 }
 
-impl Actor for Ciphernode {
+impl Actor for Keyshare {
     type Context = Context<Self>;
 }
 
-impl Ciphernode {
+impl Keyshare {
     pub fn new(bus: Addr<EventBus>, data: Addr<Data>, fhe: Arc<Fhe>, address: &str) -> Self {
         Self {
             bus,
@@ -33,7 +33,7 @@ impl Ciphernode {
     }
 }
 
-impl Handler<EnclaveEvent> for Ciphernode {
+impl Handler<EnclaveEvent> for Keyshare {
     type Result = ();
 
     fn handle(&mut self, event: EnclaveEvent, ctx: &mut Context<Self>) -> Self::Result {
@@ -45,7 +45,7 @@ impl Handler<EnclaveEvent> for Ciphernode {
     }
 }
 
-impl Handler<CiphernodeSelected> for Ciphernode {
+impl Handler<CiphernodeSelected> for Keyshare {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, event: CiphernodeSelected, _: &mut Context<Self>) -> Self::Result {
@@ -61,7 +61,7 @@ impl Handler<CiphernodeSelected> for Ciphernode {
     }
 }
 
-impl Handler<CiphertextOutputPublished> for Ciphernode {
+impl Handler<CiphertextOutputPublished> for Keyshare {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, event: CiphertextOutputPublished, _: &mut Context<Self>) -> Self::Result {
@@ -146,8 +146,8 @@ async fn on_decryption_requested(
     Ok(())
 }
 
-pub struct CiphernodeFactory;
-impl CiphernodeFactory {
+pub struct KeyshareFactory;
+impl KeyshareFactory {
     pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: &str) -> ActorFactory {
         let address = address.to_string();
         Box::new(move |ctx, evt| {
@@ -160,8 +160,8 @@ impl CiphernodeFactory {
                 return;
             };
 
-            ctx.ciphernode =
-                Some(Ciphernode::new(bus.clone(), data.clone(), fhe.clone(), &address).start())
+            ctx.keyshare =
+                Some(Keyshare::new(bus.clone(), data.clone(), fhe.clone(), &address).start())
         })
     }
 }

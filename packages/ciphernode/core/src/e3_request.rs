@@ -3,14 +3,14 @@ use std::{collections::HashMap, sync::Arc};
 use actix::{Actor, Addr, Context, Handler, Recipient};
 
 use crate::{
-    Ciphernode, CommitteeMeta, E3id, EnclaveEvent, EventBus, Fhe, PlaintextAggregator,
+    Keyshare, CommitteeMeta, E3id, EnclaveEvent, EventBus, Fhe, PlaintextAggregator,
     PublicKeyAggregator, Subscribe,
 };
 
 #[derive(Default)]
 // TODO: Set this up with a Typestate pattern
 pub struct E3RequestContext {
-    pub ciphernode: Option<Addr<Ciphernode>>,
+    pub keyshare: Option<Addr<Keyshare>>,
     pub fhe: Option<Arc<Fhe>>,
     pub plaintext: Option<Addr<PlaintextAggregator>>,
     pub publickey: Option<Addr<PublicKeyAggregator>>,
@@ -38,8 +38,8 @@ impl E3RequestContext {
     fn recipients(&self) -> Vec<(String, Option<Recipient<EnclaveEvent>>)> {
         vec![
             (
-                "ciphernode".to_owned(),
-                self.ciphernode.clone().map(|addr| addr.into()),
+                "keyshare".to_owned(),
+                self.keyshare.clone().map(|addr| addr.into()),
             ),
             (
                 "plaintext".to_owned(),
