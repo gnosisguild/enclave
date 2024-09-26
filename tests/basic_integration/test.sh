@@ -25,9 +25,8 @@ export CIPHERNODE_ADDRESS_4="0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
 
 # Function to clean up background processes
 cleanup() {
-    echo "Cleaning up processes..." >&2
+    echo "Cleaning up processes..."
     kill $(jobs -p) 2>/dev/null
-    sleep 4
     exit ${1:-1}
 }
 
