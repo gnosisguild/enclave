@@ -345,15 +345,13 @@ impl EnclaveEvent {
 #[cfg(test)]
 mod tests {
     use super::EnclaveEvent;
-    use crate::{
-        events::extract_enclave_event_name, serializers::PublicKeyShareSerializer, E3id,
-        KeyshareCreated,
-    };
+    use crate::{events::extract_enclave_event_name, E3id, KeyshareCreated};
     use alloy_primitives::address;
     use fhe::{
         bfv::{BfvParametersBuilder, SecretKey},
         mbfv::{CommonRandomPoly, PublicKeyShare},
     };
+    use fhe_traits::Serialize;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
     use std::error::Error;
@@ -384,7 +382,7 @@ mod tests {
         let crp = CommonRandomPoly::new(&params, &mut rng)?;
         let sk_share = { SecretKey::random(&params, &mut rng) };
         let pk_share = { PublicKeyShare::new(&sk_share, crp.clone(), &mut rng)? };
-        let pubkey = PublicKeyShareSerializer::to_bytes(pk_share, params.clone(), crp.clone())?;
+        let pubkey = pk_share.to_bytes();
         let kse = EnclaveEvent::from(KeyshareCreated {
             e3_id: E3id::from(1001),
             pubkey,

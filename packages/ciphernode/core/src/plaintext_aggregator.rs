@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use crate::{
     ordered_set::OrderedSet, ActorFactory, DecryptionshareCreated, E3id, EnclaveEvent, EventBus,
     Fhe, GetAggregatePlaintext, GetHasNode, PlaintextAggregated, Sortition,
 };
 use actix::prelude::*;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 #[derive(Debug, Clone)]
 pub enum PlaintextAggregatorState {
@@ -11,9 +13,11 @@ pub enum PlaintextAggregatorState {
         threshold_m: usize,
         shares: OrderedSet<Vec<u8>>,
         seed: u64,
+        ciphertext_output: Vec<u8>,
     },
     Computing {
         shares: OrderedSet<Vec<u8>>,
+        ciphertext_output: Vec<u8>,
     },
     Complete {
         decrypted: Vec<u8>,
@@ -25,10 +29,11 @@ pub enum PlaintextAggregatorState {
 #[rtype(result = "anyhow::Result<()>")]
 struct ComputeAggregate {
     pub shares: OrderedSet<Vec<u8>>,
+    pub ciphertext_output: Vec<u8>,
 }
 
 pub struct PlaintextAggregator {
-    fhe: Addr<Fhe>,
+    fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
@@ -37,12 +42,13 @@ pub struct PlaintextAggregator {
 
 impl PlaintextAggregator {
     pub fn new(
-        fhe: Addr<Fhe>,
+        fhe: Arc<Fhe>,
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
         e3_id: E3id,
         threshold_m: usize,
         seed: u64,
+        ciphertext_output: Vec<u8>,
     ) -> Self {
         PlaintextAggregator {
             fhe,
@@ -53,6 +59,7 @@ impl PlaintextAggregator {
                 threshold_m,
                 shares: OrderedSet::new(),
                 seed,
+                ciphertext_output,
             },
         }
     }
@@ -61,6 +68,7 @@ impl PlaintextAggregator {
         let PlaintextAggregatorState::Collecting {
             threshold_m,
             shares,
+            ciphertext_output,
             ..
         } = &mut self.state
         else {
@@ -71,6 +79,7 @@ impl PlaintextAggregator {
         if shares.len() == *threshold_m {
             return Ok(PlaintextAggregatorState::Computing {
                 shares: shares.clone(),
+                ciphertext_output: ciphertext_output.to_vec(),
             });
         }
 
@@ -78,7 +87,7 @@ impl PlaintextAggregator {
     }
 
     pub fn set_decryption(&mut self, decrypted: Vec<u8>) -> Result<PlaintextAggregatorState> {
-        let PlaintextAggregatorState::Computing { shares } = &mut self.state else {
+        let PlaintextAggregatorState::Computing { shares, .. } = &mut self.state else {
             return Ok(self.state.clone());
         };
 
@@ -142,9 +151,14 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                     act.state = act.add_share(decryption_share)?;
 
                     // Check the state and if it has changed to the computing
-                    if let PlaintextAggregatorState::Computing { shares } = &act.state {
+                    if let PlaintextAggregatorState::Computing {
+                        shares,
+                        ciphertext_output,
+                    } = &act.state
+                    {
                         ctx.notify(ComputeAggregate {
                             shares: shares.clone(),
+                            ciphertext_output: ciphertext_output.to_vec(),
                         })
                     }
 
@@ -155,29 +169,25 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
 }
 
 impl Handler<ComputeAggregate> for PlaintextAggregator {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = Result<()>;
     fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
-        Box::pin(
-            self.fhe
-                .send(GetAggregatePlaintext {
-                    decryptions: msg.shares.clone(),
-                })
-                .into_actor(self)
-                .map(|res, act, _| {
-                    let decrypted_output = res??;
-                    // Update the local state
-                    act.state = act.set_decryption(decrypted_output.clone())?;
+        let decrypted_output = self.fhe.get_aggregate_plaintext(GetAggregatePlaintext {
+            decryptions: msg.shares.clone(),
+            ciphertext_output: msg.ciphertext_output
+        })?;
 
-                    // Dispatch the PublicKeyAggregated event
-                    let event = EnclaveEvent::from(PlaintextAggregated {
-                        decrypted_output,
-                        e3_id: act.e3_id.clone(),
-                    });
-                    act.bus.do_send(event);
+        // Update the local state
+        self.state = self.set_decryption(decrypted_output.clone())?;
 
-                    Ok(())
-                }),
-        )
+        // Dispatch the PlaintextAggregated event
+        let event = EnclaveEvent::from(PlaintextAggregated {
+            decrypted_output,
+            e3_id: self.e3_id.clone(),
+        });
+
+        self.bus.do_send(event);
+
+        Ok(())
     }
 }
 
@@ -195,6 +205,7 @@ impl PlaintextAggregatorFactory {
             let Some(ref meta) = ctx.meta else {
                 return;
             };
+
             ctx.plaintext = Some(
                 PlaintextAggregator::new(
                     fhe.clone(),
@@ -203,6 +214,7 @@ impl PlaintextAggregatorFactory {
                     data.e3_id,
                     meta.threshold_m,
                     meta.seed,
+                    data.ciphertext_output,
                 )
                 .start(),
             );

@@ -39,11 +39,6 @@ impl Handler<EnclaveEvent> for SimpleLogger {
                 );
                 println!("[{}]: {}", self.name, msg);
             }
-            EnclaveEvent::PlaintextAggregated { data, .. } => {
-                let output: Vec<u64> = bincode::deserialize(&data.decrypted_output).unwrap();
-                println!("[{}]: DECRYPTED: \n{:?}\n\n", self.name,output);
-                println!("[{}]: {}", self.name, msg);
-            }
             EnclaveEvent::CiphernodeAdded { data, .. } => {
                 println!("[{}]: CiphernodeAdded({})", self.name, data.address);
             },

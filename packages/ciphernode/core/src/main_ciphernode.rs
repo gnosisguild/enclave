@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     evm_ciphernode_registry::connect_evm_ciphernode_registry, evm_enclave::connect_evm_enclave,
-    CiphernodeFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus,
+    KeyshareFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus,
     FheFactory, P2p, SimpleLogger, Sortition,
 };
 use actix::{Actor, Addr, Context};
@@ -66,7 +66,7 @@ impl MainCiphernode {
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
             .add_hook(FheFactory::create(rng.clone()))
-            .add_hook(CiphernodeFactory::create(
+            .add_hook(KeyshareFactory::create(
                 bus.clone(),
                 data.clone(),
                 &address.to_string(),

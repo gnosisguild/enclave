@@ -1,15 +1,14 @@
-use std::{
-    env,
-    sync::{Arc, Mutex},
-};
-
 use crate::{
-    committee_meta::CommitteeMetaFactory, evm_ciphernode_registry::connect_evm_ciphernode_registry, evm_enclave::connect_evm_enclave, public_key_writer::PublicKeyWriter, E3RequestManager, EventBus, FheFactory, P2p, PlaintextAggregatorFactory, PlaintextWriter, PublicKeyAggregatorFactory, SimpleLogger, Sortition
+    committee_meta::CommitteeMetaFactory, evm_ciphernode_registry::connect_evm_ciphernode_registry,
+    evm_enclave::connect_evm_enclave, public_key_writer::PublicKeyWriter, E3RequestManager,
+    EventBus, FheFactory, P2p, PlaintextAggregatorFactory, PlaintextWriter,
+    PublicKeyAggregatorFactory, SimpleLogger, Sortition,
 };
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
+use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
 /// Main Ciphernode Actor
@@ -42,7 +41,7 @@ impl MainAggregator {
         enclave_contract: Address,
         registry_contract: Address,
         pubkey_write_path: Option<&str>,
-        plaintext_write_path: Option<&str>
+        plaintext_write_path: Option<&str>,
     ) -> (Addr<Self>, JoinHandle<()>) {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),

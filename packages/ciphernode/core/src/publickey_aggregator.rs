@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     eventbus::EventBus,
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
@@ -31,7 +33,7 @@ struct ComputeAggregate {
 }
 
 pub struct PublicKeyAggregator {
-    fhe: Addr<Fhe>,
+    fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
@@ -46,7 +48,7 @@ pub struct PublicKeyAggregator {
 /// for them.
 impl PublicKeyAggregator {
     pub fn new(
-        fhe: Addr<Fhe>,
+        fhe: Arc<Fhe>,
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
         e3_id: E3id,
@@ -169,43 +171,28 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 }
 
 impl Handler<ComputeAggregate> for PublicKeyAggregator {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = Result<()>;
 
     fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
-        // Futures are awkward in Actix from what I can tell we should try and structure events so
-        // that futures that don't require access to self like the following...
-        Box::pin(
-            // Run the async future.
-            self.fhe
-                .send(GetAggregatePublicKey {
-                    keyshares: msg.keyshares.clone(),
-                })
-                // allow access to the actor
-                .into_actor(self)
-                // map into some sync stuff
-                .map(|res, act, _| {
-                    // We have to double unwrap here. Suggestions?
-                    // 1st - Mailbox error.
-                    // 2nd - GetAggregatePublicKey Response.
-                    let pubkey = res??;
+        let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
+            keyshares: msg.keyshares.clone(),
+        })?;
 
-                    // Update the local state
-                    act.state = act.set_pubkey(pubkey.clone())?;
+        // Update the local state
+        self.state = self.set_pubkey(pubkey.clone())?;
 
-                    // Dispatch the PublicKeyAggregated event
-                    let event = EnclaveEvent::from(PublicKeyAggregated {
-                        pubkey,
-                        e3_id: act.e3_id.clone(),
-                    });
+        // Dispatch the PublicKeyAggregated event
+        let event = EnclaveEvent::from(PublicKeyAggregated {
+            pubkey,
+            e3_id: self.e3_id.clone(),
+        });
 
-                    act.bus.do_send(event);
+        self.bus.do_send(event);
 
-                    // Return
-                    Ok(())
-                }),
-        )
+        // Return
+        Ok(())
     }
-}
+} 
 
 pub struct PublicKeyAggregatorFactory;
 impl PublicKeyAggregatorFactory {
