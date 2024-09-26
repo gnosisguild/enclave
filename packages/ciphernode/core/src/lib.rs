@@ -20,12 +20,11 @@ mod main_ciphernode;
 mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
+mod plaintext_writer;
+mod public_key_writer;
 mod publickey_aggregator;
-mod serializers;
 mod sortition;
 mod utils;
-mod public_key_writer;
-mod plaintext_writer;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -42,10 +41,9 @@ pub use main_aggregator::*;
 pub use main_ciphernode::*;
 pub use p2p::*;
 pub use plaintext_aggregator::*;
-pub use publickey_aggregator::*;
-pub use public_key_writer::*;
 pub use plaintext_writer::*;
-pub use serializers::*;
+pub use public_key_writer::*;
+pub use publickey_aggregator::*;
 pub use sortition::*;
 pub use utils::*;
 
@@ -53,16 +51,24 @@ pub use utils::*;
 #[cfg(test)]
 mod tests {
     use crate::{
-        cipernode_selector::CiphernodeSelector, data::Data, eventbus::{EventBus, GetHistory}, events::{E3Requested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated}, p2p::P2p, serializers::{CiphertextSerializer, DecryptionShareSerializer, PublicKeyShareSerializer}, utils::{setup_crp_params, ParamsWithCrp}, CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, CommitteeMetaFactory, DecryptionshareCreated, E3RequestManager, FheFactory, KeyshareFactory, PlaintextAggregated, PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory, SharedRng, Sortition
+        cipernode_selector::CiphernodeSelector,
+        data::Data,
+        eventbus::{EventBus, GetHistory},
+        events::{E3Requested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
+        p2p::P2p,
+        utils::{setup_crp_params, ParamsWithCrp},
+        CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, CommitteeMetaFactory,
+        DecryptionshareCreated, E3RequestManager, FheFactory, KeyshareFactory, PlaintextAggregated,
+        PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory, SharedRng, Sortition,
     };
     use actix::prelude::*;
     use alloy::primitives::Address;
     use anyhow::*;
     use fhe::{
         bfv::{BfvParameters, Encoding, Plaintext, PublicKey, SecretKey},
-        mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
+        mbfv::{Aggregate, AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
     };
-    use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
+    use fhe_traits::{Deserialize, DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
     use rand::Rng;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
@@ -103,13 +109,9 @@ mod tests {
         params: Arc<BfvParameters>,
         crp: CommonRandomPoly,
         rng: SharedRng,
-    ) -> Result<(Vec<u8>, SecretKey)> {
+    ) -> Result<(PublicKeyShare, SecretKey)> {
         let sk = SecretKey::random(&params, &mut *rng.lock().unwrap());
-        let pk = PublicKeyShareSerializer::to_bytes(
-            PublicKeyShare::new(&sk, crp.clone(), &mut *rng.lock().unwrap())?,
-            params.clone(),
-            crp,
-        )?;
+        let pk = PublicKeyShare::new(&sk, crp.clone(), &mut *rng.lock().unwrap())?;
         Ok((pk, sk))
     }
 
@@ -194,9 +196,8 @@ mod tests {
         let (p2, sk2) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
         let (p3, sk3) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
 
-        let pubkey: PublicKey = [p1.clone(), p2.clone(), p3.clone()]
-            .iter()
-            .map(|k| PublicKeyShareSerializer::from_bytes(k).unwrap())
+        let pubkey: PublicKey = vec![p1.clone(), p2.clone(), p3.clone()]
+            .into_iter()
             .aggregate()?;
 
         assert_eq!(history.len(), 9);
@@ -220,17 +221,17 @@ mod tests {
                     threshold_m: 3,
                 }),
                 EnclaveEvent::from(KeyshareCreated {
-                    pubkey: p1.clone(),
+                    pubkey: p1.to_bytes(),
                     e3_id: e3_id.clone(),
                     node: eth_addrs[0].clone()
                 }),
                 EnclaveEvent::from(KeyshareCreated {
-                    pubkey: p2.clone(),
+                    pubkey: p2.to_bytes(),
                     e3_id: e3_id.clone(),
                     node: eth_addrs[1].clone()
                 }),
                 EnclaveEvent::from(KeyshareCreated {
-                    pubkey: p3.clone(),
+                    pubkey: p3.to_bytes(),
                     e3_id: e3_id.clone(),
                     node: eth_addrs[2].clone()
                 }),
@@ -257,27 +258,15 @@ mod tests {
         let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
 
         let event = EnclaveEvent::from(CiphertextOutputPublished {
-            ciphertext_output: CiphertextSerializer::to_bytes(ciphertext.clone(), params.clone())?,
+            ciphertext_output: ciphertext.to_bytes(),
             e3_id: e3_id.clone(),
         });
 
         let arc_ct = Arc::new(ciphertext);
 
-        let ds1 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk1, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
-            params.clone(),
-            arc_ct.clone(),
-        )?;
-        let ds2 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk2, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
-            params.clone(),
-            arc_ct.clone(),
-        )?;
-        let ds3 = DecryptionShareSerializer::to_bytes(
-            DecryptionShare::new(&sk3, &arc_ct, &mut *rng_test.lock().unwrap()).unwrap(),
-            params.clone(),
-            arc_ct.clone(),
-        )?;
+        let ds1 = DecryptionShare::new(&sk1, &arc_ct, &mut *rng_test.lock().unwrap())?.to_bytes();
+        let ds2 = DecryptionShare::new(&sk2, &arc_ct, &mut *rng_test.lock().unwrap())?.to_bytes();
+        let ds3 = DecryptionShare::new(&sk3, &arc_ct, &mut *rng_test.lock().unwrap())?.to_bytes();
 
         // let ds1 = sk1
         bus.send(event.clone()).await?;

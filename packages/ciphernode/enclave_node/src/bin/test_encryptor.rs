@@ -1,8 +1,8 @@
 // This is a test script designed to encrypt some fixed data to a fhe public key
 use clap::Parser;
-use enclave_core::{setup_bfv_params, CiphertextSerializer};
+use enclave_core::setup_bfv_params;
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
-use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter};
+use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::fs;
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
     let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
-    let ciphertext_bytes = CiphertextSerializer::to_bytes(ciphertext.clone(), params.clone())?;
+    let ciphertext_bytes = ciphertext.clone().to_bytes();
 
     fs::write(&args.output, &ciphertext_bytes)?;
     println!("Created {}", args.output);

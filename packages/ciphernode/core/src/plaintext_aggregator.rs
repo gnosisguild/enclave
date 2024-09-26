@@ -13,9 +13,11 @@ pub enum PlaintextAggregatorState {
         threshold_m: usize,
         shares: OrderedSet<Vec<u8>>,
         seed: u64,
+        ciphertext_output: Vec<u8>,
     },
     Computing {
         shares: OrderedSet<Vec<u8>>,
+        ciphertext_output: Vec<u8>,
     },
     Complete {
         decrypted: Vec<u8>,
@@ -27,6 +29,7 @@ pub enum PlaintextAggregatorState {
 #[rtype(result = "anyhow::Result<()>")]
 struct ComputeAggregate {
     pub shares: OrderedSet<Vec<u8>>,
+    pub ciphertext_output: Vec<u8>,
 }
 
 pub struct PlaintextAggregator {
@@ -45,6 +48,7 @@ impl PlaintextAggregator {
         e3_id: E3id,
         threshold_m: usize,
         seed: u64,
+        ciphertext_output: Vec<u8>,
     ) -> Self {
         PlaintextAggregator {
             fhe,
@@ -55,6 +59,7 @@ impl PlaintextAggregator {
                 threshold_m,
                 shares: OrderedSet::new(),
                 seed,
+                ciphertext_output,
             },
         }
     }
@@ -63,6 +68,7 @@ impl PlaintextAggregator {
         let PlaintextAggregatorState::Collecting {
             threshold_m,
             shares,
+            ciphertext_output,
             ..
         } = &mut self.state
         else {
@@ -73,6 +79,7 @@ impl PlaintextAggregator {
         if shares.len() == *threshold_m {
             return Ok(PlaintextAggregatorState::Computing {
                 shares: shares.clone(),
+                ciphertext_output: ciphertext_output.to_vec(),
             });
         }
 
@@ -80,7 +87,7 @@ impl PlaintextAggregator {
     }
 
     pub fn set_decryption(&mut self, decrypted: Vec<u8>) -> Result<PlaintextAggregatorState> {
-        let PlaintextAggregatorState::Computing { shares } = &mut self.state else {
+        let PlaintextAggregatorState::Computing { shares, .. } = &mut self.state else {
             return Ok(self.state.clone());
         };
 
@@ -144,9 +151,14 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                     act.state = act.add_share(decryption_share)?;
 
                     // Check the state and if it has changed to the computing
-                    if let PlaintextAggregatorState::Computing { shares } = &act.state {
+                    if let PlaintextAggregatorState::Computing {
+                        shares,
+                        ciphertext_output,
+                    } = &act.state
+                    {
                         ctx.notify(ComputeAggregate {
                             shares: shares.clone(),
+                            ciphertext_output: ciphertext_output.to_vec(),
                         })
                     }
 
@@ -161,6 +173,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
     fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
         let decrypted_output = self.fhe.get_aggregate_plaintext(GetAggregatePlaintext {
             decryptions: msg.shares.clone(),
+            ciphertext_output: msg.ciphertext_output
         })?;
 
         // Update the local state
@@ -192,6 +205,7 @@ impl PlaintextAggregatorFactory {
             let Some(ref meta) = ctx.meta else {
                 return;
             };
+
             ctx.plaintext = Some(
                 PlaintextAggregator::new(
                     fhe.clone(),
@@ -200,6 +214,7 @@ impl PlaintextAggregatorFactory {
                     data.e3_id,
                     meta.threshold_m,
                     meta.seed,
+                    data.ciphertext_output,
                 )
                 .start(),
             );

@@ -10,6 +10,7 @@ use crate::{
 };
 use actix::prelude::*;
 use anyhow::Result;
+use anyhow::Context;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
@@ -19,7 +20,7 @@ pub struct Keyshare {
 }
 
 impl Actor for Keyshare {
-    type Context = Context<Self>;
+    type Context = actix::Context<Self>;
 }
 
 impl Keyshare {
@@ -36,7 +37,7 @@ impl Keyshare {
 impl Handler<EnclaveEvent> for Keyshare {
     type Result = ();
 
-    fn handle(&mut self, event: EnclaveEvent, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, event: EnclaveEvent, ctx: &mut actix::Context<Self>) -> Self::Result {
         match event {
             EnclaveEvent::CiphernodeSelected { data, .. } => ctx.address().do_send(data),
             EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.address().do_send(data),
@@ -48,7 +49,7 @@ impl Handler<EnclaveEvent> for Keyshare {
 impl Handler<CiphernodeSelected> for Keyshare {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, event: CiphernodeSelected, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, event: CiphernodeSelected, _: &mut actix::Context<Self>) -> Self::Result {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
@@ -64,7 +65,7 @@ impl Handler<CiphernodeSelected> for Keyshare {
 impl Handler<CiphertextOutputPublished> for Keyshare {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, event: CiphertextOutputPublished, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, event: CiphertextOutputPublished, _: &mut actix::Context<Self>) -> Self::Result {
         println!("Ciphernode::CiphertextOutputPublished");
         let fhe = self.fhe.clone();
         let data = self.data.clone();
@@ -133,7 +134,7 @@ async fn on_decryption_requested(
     let decryption_share = fhe.decrypt_ciphertext(DecryptCiphertext {
         ciphertext: ciphertext_output,
         unsafe_secret,
-    })?;
+    }).context("error decrypting ciphertext")?;
 
     let event = EnclaveEvent::from(DecryptionshareCreated {
         e3_id,
