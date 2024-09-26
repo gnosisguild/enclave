@@ -9,6 +9,7 @@ PLAINTEXT="1234,567890"
 
 if [[ "$ROOT_DIR" != "$(pwd)" ]]; then 
   echo "This script must be run from the root"
+  exit 1
 fi
 
 # Environment variables
