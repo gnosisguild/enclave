@@ -1,12 +1,11 @@
 use crate::{
     ordered_set::OrderedSet,
     serializers::{
-        CiphertextSerializer, DecryptionShareSerializer, PublicKeySerializer,
-        PublicKeyShareSerializer, SecretKeySerializer,
+        CiphertextSerializer, DecryptionShareSerializer, PublicKeyShareSerializer,
+        SecretKeySerializer,
     },
     ActorFactory, E3Requested, EnclaveEvent,
 };
-use actix::{Actor, Context, Handler, Message};
 use anyhow::*;
 use fhe::{
     bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey},
@@ -14,32 +13,17 @@ use fhe::{
 };
 use fhe_traits::{FheDecoder, Serialize};
 use rand::SeedableRng;
-use rand_chacha::{ChaCha20Rng, ChaCha8Rng};
-use std::{
-    hash::Hash,
-    sync::{Arc, Mutex},
-};
+use rand_chacha::ChaCha20Rng;
+use std::sync::{Arc, Mutex};
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
-#[rtype(result = "Result<(Vec<u8>, Vec<u8>)>")]
-pub struct GenerateKeyshare {
-    // responder_pk: Vec<u8>, // TODO: use this to encrypt the secret data
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "Result<(Vec<u8>)>")]
 pub struct GetAggregatePublicKey {
     pub keyshares: OrderedSet<Vec<u8>>,
 }
 
-#[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "Result<(Vec<u8>)>")]
 pub struct GetAggregatePlaintext {
     pub decryptions: OrderedSet<Vec<u8>>,
 }
 
-#[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "Result<(Vec<u8>)>")]
 pub struct DecryptCiphertext {
     pub unsafe_secret: Vec<u8>,
     pub ciphertext: Vec<u8>,
@@ -47,15 +31,12 @@ pub struct DecryptCiphertext {
 
 pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 
-/// Fhe library adaptor. All FHE computations should happen through this actor.
+/// Fhe library adaptor.
+#[derive(Clone)]
 pub struct Fhe {
     params: Arc<BfvParameters>,
     crp: CommonRandomPoly,
     rng: SharedRng,
-}
-
-impl Actor for Fhe {
-    type Context = Context<Self>;
 }
 
 impl Fhe {
@@ -109,11 +90,8 @@ impl Fhe {
             rng,
         ))
     }
-}
 
-impl Handler<GenerateKeyshare> for Fhe {
-    type Result = Result<(Vec<u8>, Vec<u8>)>;
-    fn handle(&mut self, _event: GenerateKeyshare, _: &mut Self::Context) -> Self::Result {
+    pub fn generate_keyshare(&self) -> Result<(Vec<u8>, Vec<u8>)> {
         let sk_share = { SecretKey::random(&self.params, &mut *self.rng.lock().unwrap()) };
         let pk_share =
             { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut *self.rng.lock().unwrap())? };
@@ -122,11 +100,8 @@ impl Handler<GenerateKeyshare> for Fhe {
             PublicKeyShareSerializer::to_bytes(pk_share, self.params.clone(), self.crp.clone())?,
         ))
     }
-}
 
-impl Handler<DecryptCiphertext> for Fhe {
-    type Result = Result<Vec<u8>>;
-    fn handle(&mut self, msg: DecryptCiphertext, _: &mut Self::Context) -> Self::Result {
+    pub fn decrypt_ciphertext(&self, msg: DecryptCiphertext) -> Result<Vec<u8>> {
         let DecryptCiphertext {
             unsafe_secret, // TODO: fix security issues with sending secrets between actors
             ciphertext,
@@ -142,12 +117,8 @@ impl Handler<DecryptCiphertext> for Fhe {
             ct.clone(),
         )?)
     }
-}
 
-impl Handler<GetAggregatePublicKey> for Fhe {
-    type Result = Result<Vec<u8>>;
-
-    fn handle(&mut self, msg: GetAggregatePublicKey, _: &mut Self::Context) -> Self::Result {
+    pub fn get_aggregate_public_key(&self, msg: GetAggregatePublicKey) -> Result<Vec<u8>> {
         let public_key: PublicKey = msg
             .keyshares
             .iter()
@@ -158,11 +129,8 @@ impl Handler<GetAggregatePublicKey> for Fhe {
 
         Ok(public_key.to_bytes())
     }
-}
 
-impl Handler<GetAggregatePlaintext> for Fhe {
-    type Result = Result<Vec<u8>>;
-    fn handle(&mut self, msg: GetAggregatePlaintext, _: &mut Self::Context) -> Self::Result {
+    pub fn get_aggregate_plaintext(&self, msg: GetAggregatePlaintext) -> Result<Vec<u8>> {
         let plaintext: Plaintext = msg
             .decryptions
             .iter()
@@ -170,16 +138,9 @@ impl Handler<GetAggregatePlaintext> for Fhe {
             .collect::<Result<Vec<_>>>()?
             .into_iter()
             .aggregate()?;
-
-        // XXX: how do we know what the expected output of the plaintext is in order to decrypt
-        // here for serialization?
-        // This would be dependent on the computation that is running.
-        // For now assuming testcase of Vec<u64> and currently represents a "HARDCODED" program
-        // output format of Vec<u64>
-        // This could be determined based on the "program" config events
-
+    
         let decoded = Vec::<u64>::try_decode(&plaintext, Encoding::poly())?;
-        let decoded = &decoded[0..2]; // TODO: this will be computation dependent
+        let decoded = &decoded[0..2]; // TODO: remove this and leave it up to the caller
         Ok(bincode::serialize(&decoded)?)
     }
 }
@@ -201,11 +162,10 @@ impl FheFactory {
                 ..
             } = data;
 
-            ctx.fhe = Some(
+            ctx.fhe = Some(Arc::new(
                 Fhe::from_raw_params(&moduli, degree, plaintext_modulus, &crp, rng.clone())
-                    .unwrap()
-                    .start(),
-            );
+                    .unwrap(),
+            ));
         })
     }
 }

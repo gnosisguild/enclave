@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use crate::{
     ordered_set::OrderedSet, ActorFactory, DecryptionshareCreated, E3id, EnclaveEvent, EventBus,
     Fhe, GetAggregatePlaintext, GetHasNode, PlaintextAggregated, Sortition,
 };
 use actix::prelude::*;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 #[derive(Debug, Clone)]
 pub enum PlaintextAggregatorState {
@@ -28,7 +30,7 @@ struct ComputeAggregate {
 }
 
 pub struct PlaintextAggregator {
-    fhe: Addr<Fhe>,
+    fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
@@ -37,7 +39,7 @@ pub struct PlaintextAggregator {
 
 impl PlaintextAggregator {
     pub fn new(
-        fhe: Addr<Fhe>,
+        fhe: Arc<Fhe>,
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
         e3_id: E3id,
@@ -155,29 +157,24 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
 }
 
 impl Handler<ComputeAggregate> for PlaintextAggregator {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = Result<()>;
     fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
-        Box::pin(
-            self.fhe
-                .send(GetAggregatePlaintext {
-                    decryptions: msg.shares.clone(),
-                })
-                .into_actor(self)
-                .map(|res, act, _| {
-                    let decrypted_output = res??;
-                    // Update the local state
-                    act.state = act.set_decryption(decrypted_output.clone())?;
+        let decrypted_output = self.fhe.get_aggregate_plaintext(GetAggregatePlaintext {
+            decryptions: msg.shares.clone(),
+        })?;
 
-                    // Dispatch the PublicKeyAggregated event
-                    let event = EnclaveEvent::from(PlaintextAggregated {
-                        decrypted_output,
-                        e3_id: act.e3_id.clone(),
-                    });
-                    act.bus.do_send(event);
+        // Update the local state
+        self.state = self.set_decryption(decrypted_output.clone())?;
 
-                    Ok(())
-                }),
-        )
+        // Dispatch the PublicKeyAggregated event
+        let event = EnclaveEvent::from(PlaintextAggregated {
+            decrypted_output,
+            e3_id: self.e3_id.clone(),
+        });
+
+        self.bus.do_send(event);
+
+        Ok(())
     }
 }
 

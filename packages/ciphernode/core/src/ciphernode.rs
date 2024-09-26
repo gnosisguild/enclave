@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use crate::{
     data::{Data, Insert},
     eventbus::EventBus,
     events::{EnclaveEvent, KeyshareCreated},
-    fhe::{Fhe, GenerateKeyshare},
+    fhe::Fhe,
     ActorFactory, CiphernodeSelected, CiphertextOutputPublished, DecryptCiphertext,
     DecryptionshareCreated, Get,
 };
@@ -10,7 +12,7 @@ use actix::prelude::*;
 use anyhow::Result;
 
 pub struct Ciphernode {
-    fhe: Addr<Fhe>,
+    fhe: Arc<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
     address: String,
@@ -21,12 +23,12 @@ impl Actor for Ciphernode {
 }
 
 impl Ciphernode {
-    pub fn new(bus: Addr<EventBus>, fhe: Addr<Fhe>, data: Addr<Data>, address: &str) -> Self {
+    pub fn new(bus: Addr<EventBus>, data: Addr<Data>, fhe: Arc<Fhe>, address: &str) -> Self {
         Self {
             bus,
             fhe,
             data,
-            address:address.to_string(),
+            address: address.to_string(),
         }
     }
 }
@@ -77,7 +79,7 @@ impl Handler<CiphertextOutputPublished> for Ciphernode {
 }
 
 async fn on_ciphernode_selected(
-    fhe: Addr<Fhe>,
+    fhe: Arc<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
     event: CiphernodeSelected,
@@ -86,7 +88,7 @@ async fn on_ciphernode_selected(
     let CiphernodeSelected { e3_id, .. } = event;
 
     // generate keyshare
-    let (sk, pubkey) = fhe.send(GenerateKeyshare {}).await??;
+    let (sk, pubkey) = fhe.generate_keyshare()?;
 
     // TODO: decrypt from FHE actor
     // save encrypted key against e3_id/sk
@@ -110,7 +112,7 @@ async fn on_ciphernode_selected(
 }
 
 async fn on_decryption_requested(
-    fhe: Addr<Fhe>,
+    fhe: Arc<Fhe>,
     data: Addr<Data>,
     bus: Addr<EventBus>,
     event: CiphertextOutputPublished,
@@ -128,12 +130,10 @@ async fn on_decryption_requested(
 
     println!("\n\nDECRYPTING!\n\n");
 
-    let decryption_share = fhe
-        .send(DecryptCiphertext {
-            ciphertext: ciphertext_output,
-            unsafe_secret,
-        })
-        .await??;
+    let decryption_share = fhe.decrypt_ciphertext(DecryptCiphertext {
+        ciphertext: ciphertext_output,
+        unsafe_secret,
+    })?;
 
     let event = EnclaveEvent::from(DecryptionshareCreated {
         e3_id,
@@ -161,7 +161,7 @@ impl CiphernodeFactory {
             };
 
             ctx.ciphernode =
-                Some(Ciphernode::new(bus.clone(), fhe.clone(), data.clone(), &address).start())
+                Some(Ciphernode::new(bus.clone(), data.clone(), fhe.clone(), &address).start())
         })
     }
 }

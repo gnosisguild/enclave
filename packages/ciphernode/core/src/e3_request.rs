@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use actix::{Actor, Addr, Context, Handler, Recipient};
 
@@ -11,7 +11,7 @@ use crate::{
 // TODO: Set this up with a Typestate pattern
 pub struct E3RequestContext {
     pub ciphernode: Option<Addr<Ciphernode>>,
-    pub fhe: Option<Addr<Fhe>>,
+    pub fhe: Option<Arc<Fhe>>,
     pub plaintext: Option<Addr<PlaintextAggregator>>,
     pub publickey: Option<Addr<PublicKeyAggregator>>,
     pub meta: Option<CommitteeMeta>,
@@ -64,12 +64,6 @@ impl E3RequestContext {
             }
         });
     }
-}
-
-struct E3RequestBuffers {
-    ciphernode: Vec<EnclaveEvent>,
-    publickey: Vec<EnclaveEvent>,
-    plaintext: Vec<EnclaveEvent>,
 }
 
 pub type ActorFactory = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
