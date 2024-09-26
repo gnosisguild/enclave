@@ -60,7 +60,7 @@ task(
     undefined,
     types.string,
   )
-  .setAction(async function(taskArguments: TaskArguments, hre) {
+  .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
     const enclaveContract = await hre.ethers.getContractAt(
@@ -151,7 +151,7 @@ task("committee:publish", "Publish the publickey of the committee")
     types.string,
   )
   .addParam("publicKey", "public key of the committee", undefined, types.string)
-  .setAction(async function(taskArguments: TaskArguments, hre) {
+  .setAction(async function (taskArguments: TaskArguments, hre) {
     let filterAddress = taskArguments.filter;
     if (!taskArguments.filter) {
       filterAddress = (await hre.deployments.get("NaiveRegistryFilter"))
@@ -188,7 +188,7 @@ task("committee:publish", "Publish the publickey of the committee")
 
 task("e3:activate", "Activate an E3 program")
   .addParam("e3Id", "Id of the E3 program")
-  .setAction(async function(taskArguments: TaskArguments, hre) {
+  .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
     const enclaveContract = await hre.ethers.getContractAt(
@@ -208,7 +208,7 @@ task("e3:publishInput", "Publish input for an E3 program")
   .addParam("e3Id", "Id of the E3 program")
   .addOptionalParam("data", "data to publish")
   .addOptionalParam("dataFile", "file containing data to publish")
-  .setAction(async function(taskArguments: TaskArguments, hre) {
+  .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
     const enclaveContract = await hre.ethers.getContractAt(
