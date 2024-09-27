@@ -1,7 +1,7 @@
-use std::{error::Error, num::ParseIntError, process};
 use alloy::sol;
 use clap::{command, Parser};
-use enclave_core::{abi_encode_params, abi_encode_params_crpgen};
+use enclave_core::{abi_encode_params, abi_encode_params_crpgen, encode_bfv_params};
+use std::{error::Error, num::ParseIntError, process};
 
 fn parse_hex(arg: &str) -> Result<u64, ParseIntError> {
     let without_prefix = arg.trim_start_matches("0x");
@@ -24,20 +24,6 @@ struct Args {
     no_crp: bool,
 }
 
-sol! {
-    struct EncodedBfvParams {
-        uint64[] moduli;
-        uint64 degree;
-        uint64 plaintext_modulus;
-    }
-    struct EncodedBfvParamsWithCrp {
-        uint64[] moduli;
-        uint64 degree;
-        uint64 plaintext_modulus;
-        bytes crp;
-    }
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
@@ -46,11 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    let encoded = if args.no_crp {
-        abi_encode_params(args.moduli, args.degree, args.plaintext_modulus)
-    } else {
-        abi_encode_params_crpgen(args.moduli, args.degree, args.plaintext_modulus)
-    };
+    let encoded = encode_bfv_params(args.moduli, args.degree, args.plaintext_modulus);
 
     for byte in encoded {
         print!("{:02x}", byte);

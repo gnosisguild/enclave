@@ -1,9 +1,12 @@
 use crate::{
-    decode_params, events, evm_listener::{AddEventHandler, ContractEvent, StartListening}, evm_manager::{AddListener, EvmContractManager}, DecodedParams, EnclaveEvent, EncodedBfvParamsWithCrp, EventBus
+    events,
+    evm_listener::{AddEventHandler, ContractEvent, StartListening},
+    evm_manager::{AddListener, EvmContractManager},
+    EnclaveEvent, EventBus,
 };
 use actix::Addr;
 use alloy::{primitives::Address, sol};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 
 sol! {
     #[derive(Debug)]
@@ -41,23 +44,12 @@ sol! {
 impl TryFrom<&E3Requested> for events::E3Requested {
     type Error = anyhow::Error;
     fn try_from(value: &E3Requested) -> Result<Self, Self::Error> {
-        let encoded_params = value.e3.e3ProgramParams.clone();
-        let EncodedBfvParamsWithCrp {
-            moduli,
-            degree,
-            plaintext_modulus,
-            crp,
-        } = match decode_params(&encoded_params)? {
-            DecodedParams::WithCrp(data) => Ok(data),
-            DecodedParams::WithoutCrp(_) => Err(anyhow!("Params did not include a CRP")),
-        }?;
+        let params = value.e3.e3ProgramParams.to_vec();
+        // let params = decode_params(&encoded_params)?;
 
         Ok(events::E3Requested {
-            moduli,
-            plaintext_modulus,
-            degree: degree.try_into().unwrap(),
+            params,
             threshold_m: value.e3.threshold[0] as usize,
-            crp: crp.into(),
             // HACK: Following should be [u8;32] and not converted to u64
             seed: value.e3.seed.try_into().unwrap_or_default(), // converting to u64
             e3_id: value.e3Id.to_string().into(),

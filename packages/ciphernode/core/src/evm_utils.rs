@@ -43,16 +43,5 @@ pub fn abi_encode_params_crpgen(moduli: Vec<u64>, degree: u64, plaintext_modulus
         crp: crp_bytes.into(),
     })
 }
-pub enum DecodedParams {
-    WithoutCrp(EncodedBfvParams),
-    WithCrp(EncodedBfvParamsWithCrp),
-}
 
-pub fn decode_params(data: &[u8]) -> Result<DecodedParams> {
-    if let Ok(decoded) = EncodedBfvParamsWithCrp::abi_decode(data, false) {
-        Ok(DecodedParams::WithCrp(decoded))
-    } else {
-        let decoded = EncodedBfvParams::abi_decode(data, false)?;
-        Ok(DecodedParams::WithoutCrp(decoded))
-    }
-}
+

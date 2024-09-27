@@ -304,13 +304,8 @@ pub struct E3Requested {
     pub e3_id: E3id,
     pub threshold_m: usize,
     pub seed: u64, // Should actually be much larger eg [u8;32]
-
-    // fhe params
-    pub moduli: Vec<u64>,
-    pub degree: usize,
-    pub plaintext_modulus: u64,
-    pub crp: Vec<u8>,
-    // threshold: usize, // TODO:
+    pub params: Vec<u8>,
+     // threshold: usize, // TODO:
     // computation_type: ??, // TODO:
     // execution_model_type: ??, // TODO:
     // input_deadline: ??, // TODO:
