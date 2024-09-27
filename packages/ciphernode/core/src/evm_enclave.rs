@@ -1,16 +1,9 @@
-use std::sync::Arc;
-
 use crate::{
-    events,
-    evm_listener::{AddEventHandler, ContractEvent, StartListening},
-    evm_manager::{AddListener, EvmContractManager},
-    setup_crp_params, EnclaveEvent, EventBus, ParamsWithCrp,
+    decode_params, events, evm_listener::{AddEventHandler, ContractEvent, StartListening}, evm_manager::{AddListener, EvmContractManager}, DecodedParams, EnclaveEvent, EncodedBfvParamsWithCrp, EventBus
 };
 use actix::Addr;
 use alloy::{primitives::Address, sol};
-use anyhow::Result;
-use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
+use anyhow::{anyhow, Context, Result};
 
 sol! {
     #[derive(Debug)]
@@ -45,37 +38,30 @@ sol! {
     );
 }
 
-impl From<E3Requested> for events::E3Requested {
-    fn from(value: E3Requested) -> Self {
-        let _params_bytes = value.e3.e3ProgramParams;
-        // TODO: decode params bytes
-        // HACK: temp supply canned params:
-        // this is temporary parse this from params_bytes above
-        // We will parse the ABI encoded bytes and extract params
-        let ParamsWithCrp {
+impl TryFrom<&E3Requested> for events::E3Requested {
+    type Error = anyhow::Error;
+    fn try_from(value: &E3Requested) -> Result<Self, Self::Error> {
+        let encoded_params = value.e3.e3ProgramParams.clone();
+        let EncodedBfvParamsWithCrp {
             moduli,
             degree,
             plaintext_modulus,
-            crp_bytes,
-            ..
-        } = setup_crp_params(
-            &[0x3FFFFFFF000001],
-            2048,
-            1032193,
-            // HACK: This is required to be fixed in order to have the same CRP bytes which will be
-            // resolved once we are decrypting params from the contract
-            Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42))),
-        );
-        events::E3Requested {
+            crp,
+        } = match decode_params(&encoded_params)? {
+            DecodedParams::WithCrp(data) => Ok(data),
+            DecodedParams::WithoutCrp(_) => Err(anyhow!("Params did not include a CRP")),
+        }?;
+
+        Ok(events::E3Requested {
             moduli,
             plaintext_modulus,
-            degree,
+            degree: degree.try_into().unwrap(),
             threshold_m: value.e3.threshold[0] as usize,
-            crp: crp_bytes,
+            crp: crp.into(),
             // HACK: Following should be [u8;32] and not converted to u64
             seed: value.e3.seed.try_into().unwrap_or_default(), // converting to u64
             e3_id: value.e3Id.to_string().into(),
-        }
+        })
     }
 }
 
@@ -90,7 +76,10 @@ impl From<CiphertextOutputPublished> for events::CiphertextOutputPublished {
 
 impl ContractEvent for E3Requested {
     fn process(&self, bus: Addr<EventBus>) -> Result<()> {
-        let data: events::E3Requested = self.clone().into();
+        let data: events::E3Requested = self
+            .try_into()
+            .context("Could not parse E3Requested event")?;
+
         bus.do_send(EnclaveEvent::from(data));
         Ok(())
     }

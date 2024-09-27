@@ -98,6 +98,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: CiphernodeRemoved,
     },
+    EnclaveError {
+        id: EventId,
+        data: EnclaveError,
+    },
     // CommitteeSelected,
     // OutputDecrypted,
     // CiphernodeRegistered,
@@ -141,6 +145,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeSelected { id, .. } => id,
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
+            EnclaveEvent::EnclaveError { id, .. } => id,
         }
     }
 }
@@ -158,6 +163,13 @@ impl EnclaveEvent {
             _ => None,
         }
     }
+}
+
+pub trait FromError<E>
+where
+    E: ToString,
+{
+    fn from_error(err_type: EnclaveErrorType, error: E) -> Self;
 }
 
 impl From<KeyshareCreated> for EnclaveEvent {
@@ -240,6 +252,23 @@ impl From<CiphernodeRemoved> for EnclaveEvent {
         }
     }
 }
+
+impl From<EnclaveError> for EnclaveEvent {
+    fn from(data: EnclaveError) -> Self {
+        EnclaveEvent::EnclaveError {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
+
+impl FromError<anyhow::Error> for EnclaveEvent {
+    fn from_error(err_type: EnclaveErrorType, error: anyhow::Error) -> Self {
+        let error_event = EnclaveError::from_error(err_type, &error);
+        EnclaveEvent::from(error_event)
+    }
+}
+
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{}({})", self.event_type(), self.get_id()))
@@ -323,6 +352,43 @@ pub struct CiphernodeRemoved {
     pub address: String,
     pub index: usize,
     pub num_nodes: usize,
+}
+
+
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct EnclaveError {
+    pub err_type: EnclaveErrorType,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EnclaveErrorType {
+    Evm,
+    KeyGeneration,
+    PublickeyAggregation,
+    IO,
+    PlaintextAggregation,
+    Decryption
+}
+
+impl EnclaveError {
+    pub fn new(err_type: EnclaveErrorType, message: &str) -> Self {
+        Self {
+            err_type,
+            message: message.to_string(),
+        }
+    }
+}
+
+impl<E: ToString> FromError<E> for EnclaveError {
+    fn from_error(err_type: EnclaveErrorType, error: E) -> Self {
+        Self {
+            err_type,
+            message: error.to_string(),
+        }
+    }
 }
 
 fn extract_enclave_event_name(s: &str) -> &str {

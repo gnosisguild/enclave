@@ -25,6 +25,7 @@ mod public_key_writer;
 mod publickey_aggregator;
 mod sortition;
 mod utils;
+mod evm_utils;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -34,6 +35,7 @@ pub use data::*;
 pub use e3_request::*;
 pub use eventbus::*;
 pub use events::*;
+pub use evm_utils::*;
 pub use fhe::*;
 pub use keyshare::*;
 pub use logger::*;

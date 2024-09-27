@@ -120,7 +120,9 @@ yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localho
 
 heading "Request Committee"
 
-yarn committee:new --network localhost --duration 4
+PARAMS=0x$($SCRIPT_DIR/lib/bfvgen.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
+
+yarn committee:new --network localhost --duration 4 --e3-params "$PARAMS"
 
 waiton "$SCRIPT_DIR/output/pubkey.bin"
 
