@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::{EnclaveError, EnclaveErrorType, EnclaveEvent, EventBus, FromError};
+use crate::{EnclaveErrorType, EnclaveEvent, EventBus, FromError};
 
 pub trait ContractEvent: Send + Sync + 'static {
     fn process(&self, bus: Addr<EventBus>) -> Result<()>;

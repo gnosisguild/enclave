@@ -2,8 +2,7 @@ use actix::Message;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fmt::{self, Display},
-    hash::{DefaultHasher, Hash, Hasher},
+    error::Error, fmt::{self, Display}, hash::{DefaultHasher, Hash, Hasher}
 };
 use alloy::primitives::Uint;
 
@@ -166,11 +165,10 @@ impl EnclaveEvent {
     }
 }
 
-pub trait FromError<E>
-where
-    E: ToString,
+pub trait FromError
 {
-    fn from_error(err_type: EnclaveErrorType, error: E) -> Self;
+    type Error;
+    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self;
 }
 
 impl From<KeyshareCreated> for EnclaveEvent {
@@ -263,9 +261,10 @@ impl From<EnclaveError> for EnclaveEvent {
     }
 }
 
-impl FromError<anyhow::Error> for EnclaveEvent {
-    fn from_error(err_type: EnclaveErrorType, error: anyhow::Error) -> Self {
-        let error_event = EnclaveError::from_error(err_type, &error);
+impl FromError for EnclaveEvent {
+    type Error = anyhow::Error;
+    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
+        let error_event = EnclaveError::from_error(err_type, error);
         EnclaveEvent::from(error_event)
     }
 }
@@ -398,8 +397,9 @@ impl EnclaveError {
     }
 }
 
-impl<E: ToString> FromError<E> for EnclaveError {
-    fn from_error(err_type: EnclaveErrorType, error: E) -> Self {
+impl FromError for EnclaveError {
+    type Error = anyhow::Error;
+    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
         Self {
             err_type,
             message: error.to_string(),

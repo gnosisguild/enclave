@@ -1,16 +1,10 @@
 use std::sync::Arc;
 
 use crate::{
-    data::{Data, Insert},
-    eventbus::EventBus,
-    events::{EnclaveEvent, KeyshareCreated},
-    fhe::Fhe,
-    ActorFactory, CiphernodeSelected, CiphertextOutputPublished, DecryptCiphertext,
-    DecryptionshareCreated, Get,
+    data::{Data, Insert}, eventbus::EventBus, events::{EnclaveEvent, KeyshareCreated}, fhe::Fhe, ActorFactory, CiphernodeSelected, CiphertextOutputPublished, DecryptCiphertext, DecryptionshareCreated, EnclaveErrorType, FromError, Get
 };
 use actix::prelude::*;
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
@@ -53,8 +47,13 @@ impl Handler<CiphernodeSelected> for Keyshare {
         let CiphernodeSelected { e3_id, .. } = event;
 
         // generate keyshare
-        // TODO: instead of unwrap we should broadcast an error on the event bus
-        let (sk, pubkey) = self.fhe.generate_keyshare().unwrap();
+        let Ok((sk, pubkey)) = self.fhe.generate_keyshare() else {
+            self.bus.do_send(EnclaveEvent::from_error(
+                EnclaveErrorType::KeyGeneration,
+                anyhow!("Error creating Keyshare"),
+            ));
+            return;
+        };
 
         // TODO: decrypt from FHE actor
         // save encrypted key against e3_id/sk
