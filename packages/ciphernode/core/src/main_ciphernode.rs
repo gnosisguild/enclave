@@ -2,8 +2,8 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     evm_ciphernode_registry::connect_evm_ciphernode_registry, evm_enclave::connect_evm_enclave,
-    KeyshareFactory, CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus,
-    FheFactory, P2p, SimpleLogger, Sortition,
+    CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus, FheFactory,
+    KeyshareFactory, P2p, SimpleLogger, Sortition,
 };
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
@@ -61,11 +61,11 @@ impl MainCiphernode {
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
         connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
-        connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
+        let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
 
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
-            .add_hook(FheFactory::create(rng.clone()))
+            .add_hook(FheFactory::create(rng))
             .add_hook(KeyshareFactory::create(
                 bus.clone(),
                 data.clone(),

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    ordered_set::OrderedSet, ActorFactory, DecryptionshareCreated, E3id, EnclaveEvent, EventBus,
-    Fhe, GetAggregatePlaintext, GetHasNode, PlaintextAggregated, Sortition,
+    ordered_set::OrderedSet, ActorFactory, DecryptionshareCreated, E3id, EnclaveEvent, EventBus, Fhe, GetAggregatePlaintext, GetHasNode, PlaintextAggregated, Seed, Sortition
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -12,7 +11,7 @@ pub enum PlaintextAggregatorState {
     Collecting {
         threshold_m: usize,
         shares: OrderedSet<Vec<u8>>,
-        seed: u64,
+        seed: Seed,
         ciphertext_output: Vec<u8>,
     },
     Computing {
@@ -47,7 +46,7 @@ impl PlaintextAggregator {
         sortition: Addr<Sortition>,
         e3_id: E3id,
         threshold_m: usize,
-        seed: u64,
+        seed: Seed,
         ciphertext_output: Vec<u8>,
     ) -> Self {
         PlaintextAggregator {

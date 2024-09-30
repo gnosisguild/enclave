@@ -2,9 +2,10 @@ use actix::Message;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fmt,
+    fmt::{self, Display},
     hash::{DefaultHasher, Hash, Hasher},
 };
+use alloy::primitives::Uint;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id(pub String);
@@ -303,7 +304,7 @@ pub struct PublicKeyAggregated {
 pub struct E3Requested {
     pub e3_id: E3id,
     pub threshold_m: usize,
-    pub seed: u64, // Should actually be much larger eg [u8;32]
+    pub seed: Seed, // Should actually be much larger eg [u8;32]
     pub params: Vec<u8>,
      // threshold: usize, // TODO:
     // computation_type: ??, // TODO:
@@ -356,6 +357,26 @@ pub struct CiphernodeRemoved {
 pub struct EnclaveError {
     pub err_type: EnclaveErrorType,
     pub message: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Seed(pub [u8;32]);
+impl From<Seed> for u64 {
+    fn from(value: Seed) -> Self {
+        u64::from_le_bytes(value.0[..8].try_into().unwrap())
+    }
+}
+
+impl From<Seed> for [u8;32] {
+    fn from(value: Seed) -> Self {
+        value.0
+    }
+}
+
+impl From<Uint<256,4>> for Seed {
+    fn from(value: Uint<256,4>) -> Self {
+        Seed(value.to_le_bytes())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

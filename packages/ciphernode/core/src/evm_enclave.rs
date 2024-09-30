@@ -2,7 +2,7 @@ use crate::{
     events,
     evm_listener::{AddEventHandler, ContractEvent, StartListening},
     evm_manager::{AddListener, EvmContractManager},
-    EnclaveEvent, EventBus,
+    EnclaveEvent, EventBus, Seed,
 };
 use actix::Addr;
 use alloy::{primitives::Address, sol};
@@ -45,13 +45,11 @@ impl TryFrom<&E3Requested> for events::E3Requested {
     type Error = anyhow::Error;
     fn try_from(value: &E3Requested) -> Result<Self, Self::Error> {
         let params = value.e3.e3ProgramParams.to_vec();
-        // let params = decode_params(&encoded_params)?;
 
         Ok(events::E3Requested {
             params,
             threshold_m: value.e3.threshold[0] as usize,
-            // HACK: Following should be [u8;32] and not converted to u64
-            seed: value.e3.seed.try_into().unwrap_or_default(), // converting to u64
+            seed: value.e3.seed.into(),
             e3_id: value.e3Id.to_string().into(),
         })
     }

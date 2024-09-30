@@ -9,8 +9,8 @@ use crate::{
     DecryptionshareCreated, Get,
 };
 use actix::prelude::*;
-use anyhow::Result;
 use anyhow::Context;
+use anyhow::Result;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
@@ -47,26 +47,45 @@ impl Handler<EnclaveEvent> for Keyshare {
 }
 
 impl Handler<CiphernodeSelected> for Keyshare {
-    type Result = ResponseFuture<()>;
+    type Result = ();
 
     fn handle(&mut self, event: CiphernodeSelected, _: &mut actix::Context<Self>) -> Self::Result {
-        let fhe = self.fhe.clone();
-        let data = self.data.clone();
-        let bus = self.bus.clone();
-        let address = self.address.clone();
-        Box::pin(async move {
-            on_ciphernode_selected(fhe, data, bus, event, address)
-                .await
-                .unwrap()
-        })
+        let CiphernodeSelected { e3_id, .. } = event;
+
+        // generate keyshare
+        // TODO: instead of unwrap we should broadcast an error on the event bus
+        let (sk, pubkey) = self.fhe.generate_keyshare().unwrap();
+
+        // TODO: decrypt from FHE actor
+        // save encrypted key against e3_id/sk
+        // reencrypt secretkey locally with env var - this is so we don't have to serialize a secret
+        // best practice would be as you boot up a node you enter in a configured password from
+        // which we derive a kdf which gets used to generate this key
+        self.data
+            .do_send(Insert(format!("{}/sk", e3_id).into(), sk));
+
+        // save public key against e3_id/pk
+        self.data
+            .do_send(Insert(format!("{}/pk", e3_id).into(), pubkey.clone()));
+
+        // broadcast the KeyshareCreated message
+        let event = EnclaveEvent::from(KeyshareCreated {
+            pubkey,
+            e3_id,
+            node: self.address.clone(),
+        });
+        self.bus.do_send(event);
     }
 }
 
 impl Handler<CiphertextOutputPublished> for Keyshare {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, event: CiphertextOutputPublished, _: &mut actix::Context<Self>) -> Self::Result {
-        println!("Ciphernode::CiphertextOutputPublished");
+    fn handle(
+        &mut self,
+        event: CiphertextOutputPublished,
+        _: &mut actix::Context<Self>,
+    ) -> Self::Result {
         let fhe = self.fhe.clone();
         let data = self.data.clone();
         let bus = self.bus.clone();
@@ -77,39 +96,6 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
                 .unwrap()
         })
     }
-}
-
-async fn on_ciphernode_selected(
-    fhe: Arc<Fhe>,
-    data: Addr<Data>,
-    bus: Addr<EventBus>,
-    event: CiphernodeSelected,
-    address: String,
-) -> Result<()> {
-    let CiphernodeSelected { e3_id, .. } = event;
-
-    // generate keyshare
-    let (sk, pubkey) = fhe.generate_keyshare()?;
-
-    // TODO: decrypt from FHE actor
-    // save encrypted key against e3_id/sk
-    // reencrypt secretkey locally with env var - this is so we don't have to serialize a secret
-    // best practice would be as you boot up a node you enter in a configured password from
-    // which we derive a kdf which gets used to generate this key
-    data.do_send(Insert(format!("{}/sk", e3_id).into(), sk));
-
-    // save public key against e3_id/pk
-    data.do_send(Insert(format!("{}/pk", e3_id).into(), pubkey.clone()));
-
-    // broadcast the KeyshareCreated message
-    let event = EnclaveEvent::from(KeyshareCreated {
-        pubkey,
-        e3_id,
-        node: address,
-    });
-    bus.do_send(event);
-
-    Ok(())
 }
 
 async fn on_decryption_requested(
@@ -131,10 +117,12 @@ async fn on_decryption_requested(
 
     println!("\n\nDECRYPTING!\n\n");
 
-    let decryption_share = fhe.decrypt_ciphertext(DecryptCiphertext {
-        ciphertext: ciphertext_output,
-        unsafe_secret,
-    }).context("error decrypting ciphertext")?;
+    let decryption_share = fhe
+        .decrypt_ciphertext(DecryptCiphertext {
+            ciphertext: ciphertext_output,
+            unsafe_secret,
+        })
+        .context("error decrypting ciphertext")?;
 
     let event = EnclaveEvent::from(DecryptionshareCreated {
         e3_id,

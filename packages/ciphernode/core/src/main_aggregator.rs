@@ -43,18 +43,19 @@ impl MainAggregator {
         pubkey_write_path: Option<&str>,
         plaintext_write_path: Option<&str>,
     ) -> (Addr<Self>, JoinHandle<()>) {
+        let bus = EventBus::new(true).start();
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
-        let bus = EventBus::new(true).start();
+
         let sortition = Sortition::attach(bus.clone());
 
         connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
-        connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
+        let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
 
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
-            .add_hook(FheFactory::create(rng.clone()))
+            .add_hook(FheFactory::create(rng))
             .add_hook(PublicKeyAggregatorFactory::create(
                 bus.clone(),
                 sortition.clone(),

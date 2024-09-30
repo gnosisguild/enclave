@@ -12,6 +12,7 @@ mod evm_ciphernode_registry;
 mod evm_enclave;
 mod evm_listener;
 mod evm_manager;
+mod evm_utils;
 mod fhe;
 mod keyshare;
 mod logger;
@@ -25,7 +26,6 @@ mod public_key_writer;
 mod publickey_aggregator;
 mod sortition;
 mod utils;
-mod evm_utils;
 
 // TODO: this is too permissive
 pub use actix::prelude::*;
@@ -61,7 +61,8 @@ mod tests {
         utils::{setup_crp_params, ParamsWithCrp},
         CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, CommitteeMetaFactory,
         DecryptionshareCreated, E3RequestManager, FheFactory, KeyshareFactory, PlaintextAggregated,
-        PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory, SharedRng, Sortition,
+        PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory, Seed, SharedRng,
+        SimpleLogger, Sortition,
     };
     use actix::prelude::*;
     use alloy::primitives::Address;
@@ -79,12 +80,7 @@ mod tests {
     use tokio::{sync::mpsc::channel, time::sleep};
 
     // Simulating a local node
-    async fn setup_local_ciphernode(
-        bus: Addr<EventBus>,
-        rng: SharedRng,
-        logging: bool,
-        addr: &str,
-    ) {
+    async fn setup_local_ciphernode(bus: Addr<EventBus>, rng:SharedRng, logging: bool, addr: &str) {
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
 
@@ -94,7 +90,7 @@ mod tests {
 
         E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
-            .add_hook(FheFactory::create(rng.clone()))
+            .add_hook(FheFactory::create(rng))
             .add_hook(PublicKeyAggregatorFactory::create(
                 bus.clone(),
                 sortition.clone(),
@@ -105,6 +101,8 @@ mod tests {
             ))
             .add_hook(KeyshareFactory::create(bus.clone(), data.clone(), addr))
             .build();
+
+        SimpleLogger::attach(addr, bus.clone());
     }
 
     fn generate_pk_share(
@@ -121,8 +119,8 @@ mod tests {
     async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         // Setup EventBus
         let bus = EventBus::new(true).start();
-
         let rng = Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42)));
+        let seed = Seed(ChaCha20Rng::seed_from_u64(123).get_seed());
 
         let eth_addrs: Vec<String> = (0..3)
             .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()).to_string())
@@ -135,16 +133,12 @@ mod tests {
         let e3_id = E3id::new("1234");
 
         let ParamsWithCrp {
-            moduli,
-            degree,
-            plaintext_modulus,
-            crp_bytes,
-            params,
+            crp_bytes, params, ..
         } = setup_crp_params(
             &[0x3FFFFFFF000001],
             2048,
             1032193,
-            Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(42))),
+            Arc::new(std::sync::Mutex::new(ChaCha20Rng::from_seed(seed.clone().into()))),
         );
 
         let regevt_1 = EnclaveEvent::from(CiphernodeAdded {
@@ -174,13 +168,9 @@ mod tests {
         let event = EnclaveEvent::from(E3Requested {
             e3_id: e3_id.clone(),
             threshold_m: 3,
-            seed: 123,
-            moduli: moduli.clone(),
-            degree,
-            plaintext_modulus,
-            crp: crp_bytes.clone(),
+            seed: seed.clone(),
+            params: params.to_bytes(),
         });
-
         // Send the computation requested event
         bus.send(event.clone()).await?;
 
@@ -193,7 +183,6 @@ mod tests {
 
         let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
 
-        // Passing rng through function chain to ensure it matches usage in system above
         let (p1, sk1) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
         let (p2, sk2) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
         let (p3, sk3) = generate_pk_share(params.clone(), crpoly.clone(), rng_test.clone())?;
@@ -212,11 +201,8 @@ mod tests {
                 EnclaveEvent::from(E3Requested {
                     e3_id: e3_id.clone(),
                     threshold_m: 3,
-                    seed: 123,
-                    moduli,
-                    degree,
-                    plaintext_modulus,
-                    crp: crp_bytes,
+                    seed: seed.clone(),
+                    params: params.to_bytes()
                 }),
                 EnclaveEvent::from(CiphernodeSelected {
                     e3_id: e3_id.clone(),
@@ -378,6 +364,8 @@ mod tests {
 
     #[actix::test]
     async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
+        let seed = Seed(ChaCha20Rng::seed_from_u64(123).get_seed());
+
         // Setup elements in test
         let (tx, _) = channel(100); // Transmit byte events to the network
         let (input, rx) = channel(100); // Receive byte events from the network
@@ -388,11 +376,8 @@ mod tests {
         let event = EnclaveEvent::from(E3Requested {
             e3_id: E3id::new("1235"),
             threshold_m: 3,
-            seed: 123,
-            moduli: vec![0x3FFFFFFF000001],
-            degree: 2048,
-            plaintext_modulus: 1032193,
-            crp: vec![1, 2, 3, 4],
+            seed: seed.clone(),
+            params: vec![1, 2, 3, 4],
         });
 
         // lets send an event from the network

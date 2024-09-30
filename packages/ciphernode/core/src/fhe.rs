@@ -1,4 +1,4 @@
-use crate::{ordered_set::OrderedSet, set_up_crp, ActorFactory, E3Requested, EnclaveEvent};
+use crate::{ordered_set::OrderedSet, set_up_crp, ActorFactory, E3Requested, EnclaveEvent, Seed};
 use anyhow::*;
 use fhe::{
     bfv::{
@@ -40,10 +40,12 @@ impl Fhe {
         Self { params, crp, rng }
     }
 
-    pub fn from_encoded(bytes: &[u8], seed: u64) -> Result<Self> {
+    pub fn from_encoded(bytes: &[u8], seed: Seed, rng: SharedRng) -> Result<Self> {
         let params = Arc::new(BfvParameters::try_deserialize(bytes)?);
-        let rng = Arc::new(Mutex::new(ChaCha20Rng::seed_from_u64(seed)));
-        let crp = set_up_crp(params.clone(), rng.clone());
+        let crp = set_up_crp(
+            params.clone(),
+            Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
+        );
         Ok(Fhe::new(params.clone(), crp, rng.clone()))
     }
 
@@ -123,23 +125,17 @@ impl Fhe {
 pub struct FheFactory;
 
 impl FheFactory {
-    pub fn create(rng: Arc<Mutex<ChaCha20Rng>>) -> ActorFactory {
+    pub fn create(rng: SharedRng) -> ActorFactory {
         Box::new(move |ctx, evt| {
             // Saving the fhe on Committee Requested
             let EnclaveEvent::E3Requested { data, .. } = evt else {
                 return;
             };
-            let E3Requested {
-                // degree,
-                // moduli,
-                // plaintext_modulus,
-                // crp,
-                params,
-                seed,
-                ..
-            } = data;
+            let E3Requested { params, seed, .. } = data;
 
-            ctx.fhe = Some(Arc::new(Fhe::from_encoded(&params, seed).unwrap()));
+            ctx.fhe = Some(Arc::new(
+                Fhe::from_encoded(&params, seed, rng.clone()).unwrap(),
+            ));
         })
     }
 }
