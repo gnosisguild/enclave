@@ -80,8 +80,8 @@ describe("Enclave", function () {
         duration: time.duration.days(30),
         e3Program: await e3Program.getAddress(),
         e3ProgramParams: abiCoder.encode(
-          ["address"],
-          [await inputValidator.getAddress()],
+          ["address", "bytes"],
+          [await inputValidator.getAddress(), "0x12345678"],
         ),
         computeProviderParams: abiCoder.encode(
           ["address"],
@@ -209,7 +209,7 @@ describe("Enclave", function () {
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
       expect(e3.inputValidator).to.equal(
-        abiCoder.decode(["address"], request.e3ProgramParams)[0],
+        abiCoder.decode(["address", "bytes"], request.e3ProgramParams)[0],
       );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
@@ -533,7 +533,7 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          ZeroHash,
+          abiCoder.encode(['address','bytes'],[ethers.ZeroAddress, ZeroHash]),
           request.computeProviderParams,
           { value: 10 },
         ),
@@ -551,7 +551,7 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          ZeroHash,
+          abiCoder.encode(['address','bytes'],[ethers.ZeroAddress, ZeroHash]),
           request.computeProviderParams,
           { value: 10 },
         ),
