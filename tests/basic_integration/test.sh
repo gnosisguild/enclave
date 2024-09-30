@@ -106,7 +106,7 @@ yarn ciphernode:aggregator --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT
 
 sleep 1
 
-waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/node" "$ROOT_DIR/packages/ciphernode/target/debug/aggregator" "$ROOT_DIR/packages/ciphernode/target/debug/test_encryptor"
+waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/node" "$ROOT_DIR/packages/ciphernode/target/debug/aggregator" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 
 heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
