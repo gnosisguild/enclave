@@ -5,7 +5,7 @@ use crate::{
     events::{E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
     fhe::{Fhe, GetAggregatePublicKey},
     ordered_set::OrderedSet,
-    ActorFactory, GetHasNode, Sortition,
+    ActorFactory, GetHasNode, Seed, Sortition,
 };
 use actix::prelude::*;
 use anyhow::Result;
@@ -15,7 +15,7 @@ pub enum PublicKeyAggregatorState {
     Collecting {
         threshold_m: usize,
         keyshares: OrderedSet<Vec<u8>>,
-        seed: u64,
+        seed: Seed,
     },
     Computing {
         keyshares: OrderedSet<Vec<u8>>,
@@ -53,7 +53,7 @@ impl PublicKeyAggregator {
         sortition: Addr<Sortition>,
         e3_id: E3id,
         threshold_m: usize,
-        seed: u64,
+        seed: Seed,
     ) -> Self {
         PublicKeyAggregator {
             fhe,
@@ -192,7 +192,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
         // Return
         Ok(())
     }
-} 
+}
 
 pub struct PublicKeyAggregatorFactory;
 impl PublicKeyAggregatorFactory {

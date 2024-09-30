@@ -1,4 +1,4 @@
-use crate::{ordered_set::OrderedSet, ActorFactory, E3Requested, EnclaveEvent};
+use crate::{ordered_set::OrderedSet, set_up_crp, ActorFactory, E3Requested, EnclaveEvent, Seed};
 use anyhow::*;
 use fhe::{
     bfv::{
@@ -6,7 +6,8 @@ use fhe::{
     },
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
-use fhe_traits::{DeserializeParametrized, FheDecoder, Serialize};
+use fhe_traits::{Deserialize, DeserializeParametrized, FheDecoder, Serialize};
+use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
 
@@ -37,6 +38,15 @@ pub struct Fhe {
 impl Fhe {
     pub fn new(params: Arc<BfvParameters>, crp: CommonRandomPoly, rng: SharedRng) -> Self {
         Self { params, crp, rng }
+    }
+
+    pub fn from_encoded(bytes: &[u8], seed: Seed, rng: SharedRng) -> Result<Self> {
+        let params = Arc::new(BfvParameters::try_deserialize(bytes)?);
+        let crp = set_up_crp(
+            params.clone(),
+            Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
+        );
+        Ok(Fhe::new(params.clone(), crp, rng.clone()))
     }
 
     pub fn from_raw_params(
@@ -115,23 +125,16 @@ impl Fhe {
 pub struct FheFactory;
 
 impl FheFactory {
-    pub fn create(rng: Arc<Mutex<ChaCha20Rng>>) -> ActorFactory {
+    pub fn create(rng: SharedRng) -> ActorFactory {
         Box::new(move |ctx, evt| {
             // Saving the fhe on Committee Requested
             let EnclaveEvent::E3Requested { data, .. } = evt else {
                 return;
             };
-            let E3Requested {
-                degree,
-                moduli,
-                plaintext_modulus,
-                crp,
-                ..
-            } = data;
+            let E3Requested { params, seed, .. } = data;
 
             ctx.fhe = Some(Arc::new(
-                Fhe::from_raw_params(&moduli, degree, plaintext_modulus, &crp, rng.clone())
-                    .unwrap(),
+                Fhe::from_encoded(&params, seed, rng.clone()).unwrap(),
             ));
         })
     }

@@ -3,18 +3,18 @@ use std::collections::HashSet;
 use actix::prelude::*;
 use sortition::DistanceSortition;
 
-use crate::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EventBus, Subscribe};
+use crate::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EventBus, Seed, Subscribe};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
 pub struct GetHasNode {
-    pub seed: u64,
+    pub seed: Seed,
     pub address: String,
     pub size: usize,
 }
 
 pub trait SortitionList<T> {
-    fn contains(&self, seed: u64, size: usize, address: T) -> bool;
+    fn contains(&self, seed: Seed, size: usize, address: T) -> bool;
     fn add(&mut self, address: T);
     fn remove(&mut self, address: T);
 }
@@ -38,9 +38,9 @@ impl Default for SortitionModule {
 }
 
 impl SortitionList<String> for SortitionModule {
-    fn contains(&self, seed: u64, size: usize, address: String) -> bool {
+    fn contains(&self, seed: Seed, size: usize, address: String) -> bool {
         DistanceSortition::new(
-            seed,
+            seed.into(),
             self.nodes
                 .clone()
                 .into_iter()

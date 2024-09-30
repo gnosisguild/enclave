@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::EventBus;
+use crate::{EnclaveErrorType, EnclaveEvent, EventBus, FromError};
 
 pub trait ContractEvent: Send + Sync + 'static {
     fn process(&self, bus: Addr<EventBus>) -> Result<()>;
@@ -61,7 +61,15 @@ impl EvmEventListener {
             if let Some(topic0) = log.topic0() {
                 if let Some(decoder) = self.handlers.get(topic0) {
                     if let Ok(event) = decoder(log.clone()) {
-                        event.process(self.bus.clone())?;
+                        if let Err(err) = event.process(self.bus.clone()) {
+                            // Send enclave error to bus
+                            self.bus
+                                .clone()
+                                .do_send(EnclaveEvent::from_error(
+                                    EnclaveErrorType::Evm,
+                                    err,
+                                ));
+                        }
                     }
                 }
             }

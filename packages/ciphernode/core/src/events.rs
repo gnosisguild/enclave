@@ -1,8 +1,10 @@
 use actix::Message;
+use alloy::{hex, primitives::Uint};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    fmt,
+    error::Error,
+    fmt::{self, Display},
     hash::{DefaultHasher, Hash, Hasher},
 };
 
@@ -98,6 +100,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: CiphernodeRemoved,
     },
+    EnclaveError {
+        id: EventId,
+        data: EnclaveError,
+    },
     // CommitteeSelected,
     // OutputDecrypted,
     // CiphernodeRegistered,
@@ -141,6 +147,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeSelected { id, .. } => id,
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
+            EnclaveEvent::EnclaveError { id, .. } => id,
         }
     }
 }
@@ -158,6 +165,11 @@ impl EnclaveEvent {
             _ => None,
         }
     }
+}
+
+pub trait FromError {
+    type Error;
+    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self;
 }
 
 impl From<KeyshareCreated> for EnclaveEvent {
@@ -240,6 +252,24 @@ impl From<CiphernodeRemoved> for EnclaveEvent {
         }
     }
 }
+
+impl From<EnclaveError> for EnclaveEvent {
+    fn from(data: EnclaveError) -> Self {
+        EnclaveEvent::EnclaveError {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
+
+impl FromError for EnclaveEvent {
+    type Error = anyhow::Error;
+    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
+        let error_event = EnclaveError::from_error(err_type, error);
+        EnclaveEvent::from(error_event)
+    }
+}
+
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{}({})", self.event_type(), self.get_id()))
@@ -274,13 +304,8 @@ pub struct PublicKeyAggregated {
 pub struct E3Requested {
     pub e3_id: E3id,
     pub threshold_m: usize,
-    pub seed: u64, // Should actually be much larger eg [u8;32]
-
-    // fhe params
-    pub moduli: Vec<u64>,
-    pub degree: usize,
-    pub plaintext_modulus: u64,
-    pub crp: Vec<u8>,
+    pub seed: Seed,
+    pub params: Vec<u8>,
     // threshold: usize, // TODO:
     // computation_type: ??, // TODO:
     // execution_model_type: ??, // TODO:
@@ -323,6 +348,68 @@ pub struct CiphernodeRemoved {
     pub address: String,
     pub index: usize,
     pub num_nodes: usize,
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct EnclaveError {
+    pub err_type: EnclaveErrorType,
+    pub message: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Seed(pub [u8; 32]);
+impl From<Seed> for u64 {
+    fn from(value: Seed) -> Self {
+        u64::from_le_bytes(value.0[..8].try_into().unwrap())
+    }
+}
+
+impl From<Seed> for [u8; 32] {
+    fn from(value: Seed) -> Self {
+        value.0
+    }
+}
+
+impl From<Uint<256, 4>> for Seed {
+    fn from(value: Uint<256, 4>) -> Self {
+        Seed(value.to_le_bytes())
+    }
+}
+
+impl Display for Seed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Seed(0x{})", hex::encode(self.0))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EnclaveErrorType {
+    Evm,
+    KeyGeneration,
+    PublickeyAggregation,
+    IO,
+    PlaintextAggregation,
+    Decryption,
+}
+
+impl EnclaveError {
+    pub fn new(err_type: EnclaveErrorType, message: &str) -> Self {
+        Self {
+            err_type,
+            message: message.to_string(),
+        }
+    }
+}
+
+impl FromError for EnclaveError {
+    type Error = anyhow::Error;
+    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
+        Self {
+            err_type,
+            message: error.to_string(),
+        }
+    }
 }
 
 fn extract_enclave_event_name(s: &str) -> &str {

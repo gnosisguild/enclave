@@ -1,9 +1,10 @@
 use crate::SharedRng;
+use anyhow::{Context, Result};
 use fhe::{
     bfv::{BfvParameters, BfvParametersBuilder},
     mbfv::CommonRandomPoly,
 };
-use fhe_traits::Serialize;
+use fhe_traits::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path, sync::Arc};
 
 pub struct ParamsWithCrp {
@@ -42,6 +43,16 @@ pub fn setup_bfv_params(
         .set_moduli(moduli)
         .build_arc()
         .unwrap()
+}
+
+pub fn encode_bfv_params(moduli: Vec<u64>, degree: u64, plaintext_modulus: u64) -> Vec<u8> {
+    setup_bfv_params(&moduli, degree as usize, plaintext_modulus).to_bytes()
+}
+
+pub fn decode_params(bytes: &[u8]) -> Result<Arc<BfvParameters>> {
+    Ok(Arc::new(
+        BfvParameters::try_deserialize(bytes).context("Could not decode Bfv Params")?,
+    ))
 }
 
 pub fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {

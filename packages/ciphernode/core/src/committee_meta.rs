@@ -1,9 +1,9 @@
-use crate::{ActorFactory, E3Requested, EnclaveEvent};
+use crate::{ActorFactory, E3Requested, EnclaveEvent, Seed};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitteeMeta {
     pub threshold_m: usize,
-    pub seed: u64,
+    pub seed: Seed,
 }
 
 pub struct CommitteeMetaFactory;

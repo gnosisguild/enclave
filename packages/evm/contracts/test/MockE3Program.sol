@@ -17,13 +17,13 @@ contract MockE3Program is IE3Program {
         returns (bytes32 encryptionSchemeId, IInputValidator inputValidator)
     {
         require(
-            e3ProgramParams.length == 32 && computeProviderParams.length == 32,
+            computeProviderParams.length == 32,
             invalidParams(e3ProgramParams, computeProviderParams)
         );
-        // solhint-disable no-inline-assembly
-        assembly {
-            inputValidator := mload(add(e3ProgramParams, 32))
-        }
+        (, inputValidator) = abi.decode(
+            e3ProgramParams,
+            (bytes, IInputValidator)
+        );
         encryptionSchemeId = 0x0000000000000000000000000000000000000000000000000000000000000001;
     }
 
