@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { AbiCoder } from "ethers";
+import { AbiCoder, solidityPacked } from "ethers";
 import { Command } from "commander";
 
 const program = new Command();
@@ -13,11 +13,16 @@ program
   .requiredOption("--bfv-params <params>", "BFV scheme parameters")
   .action((options) => {
     const abiCoder = new AbiCoder();
+
     const out = abiCoder.encode(
       ["bytes", "address"],
-      [options.bfvParams, options.inputValidator],
+      [
+        options.bfvParams,
+        options.inputValidator,
+      ],
     );
+
     console.log(out);
   });
 
-program.parse(process.argv)
+program.parse(process.argv);

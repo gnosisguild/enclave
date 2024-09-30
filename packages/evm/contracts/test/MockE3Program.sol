@@ -20,11 +20,12 @@ contract MockE3Program is IE3Program {
             computeProviderParams.length == 32,
             invalidParams(e3ProgramParams, computeProviderParams)
         );
-        (,inputValidator) = abi.decode(
+        (, IInputValidator _inputValidator) = abi.decode(
             e3ProgramParams,
             (bytes, IInputValidator)
         );
 
+        inputValidator = _inputValidator;
         encryptionSchemeId = 0x0000000000000000000000000000000000000000000000000000000000000001;
     }
 

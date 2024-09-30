@@ -34,6 +34,7 @@ pub use data::*;
 pub use e3_request::*;
 pub use eventbus::*;
 pub use events::*;
+pub use evm_enclave::{decode_e3_params, encode_e3_params};
 pub use fhe::*;
 pub use keyshare::*;
 pub use logger::*;
@@ -78,7 +79,12 @@ mod tests {
     use tokio::{sync::mpsc::channel, time::sleep};
 
     // Simulating a local node
-    async fn setup_local_ciphernode(bus: Addr<EventBus>, rng:SharedRng, logging: bool, addr: &str) {
+    async fn setup_local_ciphernode(
+        bus: Addr<EventBus>,
+        rng: SharedRng,
+        logging: bool,
+        addr: &str,
+    ) {
         // create data actor for saving data
         let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
 
@@ -136,7 +142,9 @@ mod tests {
             &[0x3FFFFFFF000001],
             2048,
             1032193,
-            Arc::new(std::sync::Mutex::new(ChaCha20Rng::from_seed(seed.clone().into()))),
+            Arc::new(std::sync::Mutex::new(ChaCha20Rng::from_seed(
+                seed.clone().into(),
+            ))),
         );
 
         let regevt_1 = EnclaveEvent::from(CiphernodeAdded {
