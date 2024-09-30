@@ -1,10 +1,12 @@
 use actix::Message;
+use alloy::{hex, primitives::Uint};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    error::Error, fmt::{self, Display}, hash::{DefaultHasher, Hash, Hasher}
+    error::Error,
+    fmt::{self, Display},
+    hash::{DefaultHasher, Hash, Hasher},
 };
-use alloy::primitives::Uint;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id(pub String);
@@ -165,8 +167,7 @@ impl EnclaveEvent {
     }
 }
 
-pub trait FromError
-{
+pub trait FromError {
     type Error;
     fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self;
 }
@@ -349,8 +350,6 @@ pub struct CiphernodeRemoved {
     pub num_nodes: usize,
 }
 
-
-
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct EnclaveError {
@@ -359,22 +358,28 @@ pub struct EnclaveError {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Seed(pub [u8;32]);
+pub struct Seed(pub [u8; 32]);
 impl From<Seed> for u64 {
     fn from(value: Seed) -> Self {
         u64::from_le_bytes(value.0[..8].try_into().unwrap())
     }
 }
 
-impl From<Seed> for [u8;32] {
+impl From<Seed> for [u8; 32] {
     fn from(value: Seed) -> Self {
         value.0
     }
 }
 
-impl From<Uint<256,4>> for Seed {
-    fn from(value: Uint<256,4>) -> Self {
+impl From<Uint<256, 4>> for Seed {
+    fn from(value: Uint<256, 4>) -> Self {
         Seed(value.to_le_bytes())
+    }
+}
+
+impl Display for Seed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Seed(0x{})", hex::encode(self.0))
     }
 }
 
@@ -385,7 +390,7 @@ pub enum EnclaveErrorType {
     PublickeyAggregation,
     IO,
     PlaintextAggregation,
-    Decryption
+    Decryption,
 }
 
 impl EnclaveError {
