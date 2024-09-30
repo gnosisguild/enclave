@@ -1,6 +1,5 @@
-use alloy::sol;
 use clap::{command, Parser};
-use enclave_core::{abi_encode_params, abi_encode_params_crpgen, encode_bfv_params};
+use enclave_core::encode_bfv_params;
 use std::{error::Error, num::ParseIntError, process};
 
 fn parse_hex(arg: &str) -> Result<u64, ParseIntError> {

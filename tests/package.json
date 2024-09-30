@@ -1,0 +1,10 @@
+{
+  "name": "tests",
+  "version": "0.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "ethers": "6.1.0"
+  }
+}

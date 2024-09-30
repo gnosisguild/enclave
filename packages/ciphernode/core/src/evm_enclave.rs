@@ -2,13 +2,18 @@ use crate::{
     events,
     evm_listener::{AddEventHandler, ContractEvent, StartListening},
     evm_manager::{AddListener, EvmContractManager},
-    EnclaveEvent, EventBus, Seed,
+    EnclaveEvent, EventBus,
 };
 use actix::Addr;
-use alloy::{primitives::Address, sol};
+use alloy::{primitives::Address, sol, sol_types::SolValue};
 use anyhow::{Context, Result};
 
 sol! {
+    struct EncodedE3ProgramParams {
+        bytes params;
+        address input_validator;
+    }
+
     #[derive(Debug)]
     struct E3 {
         uint256 seed;
@@ -44,10 +49,10 @@ sol! {
 impl TryFrom<&E3Requested> for events::E3Requested {
     type Error = anyhow::Error;
     fn try_from(value: &E3Requested) -> Result<Self, Self::Error> {
-        let params = value.e3.e3ProgramParams.to_vec();
-
+        let program_params = value.e3.e3ProgramParams.to_vec();
+        let decoded = EncodedE3ProgramParams::abi_decode(&program_params, true)?;
         Ok(events::E3Requested {
-            params,
+            params: decoded.params.into(),
             threshold_m: value.e3.threshold[0] as usize,
             seed: value.e3.seed.into(),
             e3_id: value.e3Id.to_string().into(),
