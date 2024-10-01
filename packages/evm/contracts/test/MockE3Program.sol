@@ -8,6 +8,16 @@ contract MockE3Program is IE3Program {
 
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
+    IInputValidator private storageInputValidator;
+
+    constructor(IInputValidator _inputValidator) {
+        storageInputValidator = _inputValidator;
+    }
+
+    function setInputValidator(IInputValidator _inputValidator) external {
+        storageInputValidator = _inputValidator;
+    }
+
     function validate(
         uint256,
         uint256,
@@ -15,17 +25,15 @@ contract MockE3Program is IE3Program {
         bytes memory computeProviderParams
     )
         external
-        pure
+        view
         returns (bytes32 encryptionSchemeId, IInputValidator inputValidator)
     {
         require(
             computeProviderParams.length == 32,
             invalidParams(e3ProgramParams, computeProviderParams)
         );
-        (, inputValidator) = abi.decode(
-            e3ProgramParams,
-            (bytes, IInputValidator)
-        );
+        
+        inputValidator = storageInputValidator;
         encryptionSchemeId = ENCRYPTION_SCHEME_ID;
     }
 
