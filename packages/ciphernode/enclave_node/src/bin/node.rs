@@ -5,13 +5,13 @@ use enclave_core::MainCiphernode;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long)]
+    #[arg(short = 'a', long)]
     address: String,
-    #[arg(short='n', long)]
+    #[arg(short='r', long)]
     rpc: String,
-    #[arg(short, long="enclave-contract")]
+    #[arg(short = 'e', long = "enclave-contract")]
     enclave_contract: String,
-    #[arg(short, long="registry-contract")]
+    #[arg(short = 'c', long = "registry-contract")]
     registry_contract: String
 }
 

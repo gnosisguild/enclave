@@ -18,6 +18,7 @@ export RPC_URL="ws://localhost:8545"
 # We _may_ wish to get these off the hardhat environment somehow?
 export ENCLAVE_CONTRACT="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 export REGISTRY_CONTRACT="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+export REGISTRY_FILTER_CONTRACT="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 export INPUT_VALIDATOR_CONTRACT="0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
 # These are random addresses for now
 export CIPHERNODE_ADDRESS_1="0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
@@ -105,7 +106,7 @@ heading "Launch ciphernode $CIPHERNODE_ADDRESS_4"
 yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_4 --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT &
 
 # NOTE: This node is configured to be an aggregator
-yarn ciphernode:aggregator --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
+yarn ciphernode:aggregator --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT  --registry-filter-contract $REGISTRY_FILTER_CONTRACT --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
 
 sleep 1
 
@@ -130,18 +131,13 @@ ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 -
 yarn committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
 
 waiton "$SCRIPT_DIR/output/pubkey.bin"
+PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
 
 heading "Mock encrypted plaintext"
-
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT
 
-heading "Mock publish committee key"
-
-yarn committee:publish --e3-id 0 --nodes $CIPHERNODE_ADDRESS_1,$CIPHERNODE_ADDRESS_2,$CIPHERNODE_ADDRESS_3,$CIPHERNODE_ADDRESS_4 --public-key 0x12345678 --network localhost
-
 heading "Mock activate e3-id"
-
-yarn e3:activate --e3-id 0 --public-key 0x12345678 --network localhost
+yarn e3:activate --e3-id 0 --public-key "0x$PUBLIC_KEY" --network localhost
 
 heading "Mock publish input e3-id"
 yarn e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
@@ -151,7 +147,6 @@ sleep 4 # wait for input deadline to pass
 waiton "$SCRIPT_DIR/output/output.bin"
 
 heading "Publish ciphertext to EVM"
-
 yarn e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR/output/output.bin" --proof 0x12345678
 
 waiton "$SCRIPT_DIR/output/plaintext.txt"

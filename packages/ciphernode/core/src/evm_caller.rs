@@ -88,29 +88,32 @@ impl Handler<EnclaveEvent> for EvmCaller {
                                 .filter_map(|node| node.parse().ok())
                                 .collect();
 
-                            if let Err(e) = contract
+                            match contract
                                 .publish_committee(
                                     U256::from_str_radix(&data.e3_id.0, 10).unwrap(),
                                     nodes,
                                     Bytes::from(data.pubkey),
                                 )
-                                .await
+                                .await 
                             {
-                                eprintln!("Failed to publish committee public key: {:?}", e);
+                                Ok(tx) => println!("Published committee public key {:?}", tx.transaction_hash),
+                                Err(e) => eprintln!("Failed to publish committee public key: {:?}", e),
                             }
                         }
                     }
                     EnclaveEvent::PlaintextAggregated { data, .. } => {
                         if let Some(contract) = contracts.get("enclave") {
-                            if let Err(e) = contract
+                            println!("Publishing plaintext output {:?}", data.e3_id);
+                            match contract
                                 .publish_plaintext_output(
                                     U256::from_str_radix(&data.e3_id.0, 10).unwrap(),
                                     Bytes::from(data.decrypted_output),
-                                    Bytes::default(), // TODO: Implement proof generation
+                                    Bytes::from(vec![1]), // TODO: Implement proof generation
                                 )
                                 .await
                             {
-                                eprintln!("Failed to publish plaintext: {:?}", e);
+                                Ok(tx) => println!("Published plaintext output {:?}", tx.transaction_hash),
+                                Err(e) => eprintln!("Failed to publish plaintext: {:?}", e),
                             }
                         }
                     }
