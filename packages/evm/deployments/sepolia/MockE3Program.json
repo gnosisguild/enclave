@@ -1,0 +1,179 @@
+{
+  "address": "0xD56AA6F5224181c243F7FCe8b04fE84c4dff8356",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "contract IInputValidator",
+          "name": "_inputValidator",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "e3ProgramParams",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "computeProviderParams",
+          "type": "bytes"
+        }
+      ],
+      "name": "invalidParams",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ENCRYPTION_SCHEME_ID",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IInputValidator",
+          "name": "_inputValidator",
+          "type": "address"
+        }
+      ],
+      "name": "setInputValidator",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "e3ProgramParams",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "computeProviderParams",
+          "type": "bytes"
+        }
+      ],
+      "name": "validate",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "contract IInputValidator",
+          "name": "inputValidator",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "verify",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x5213f671f478ae29283b8c95e274dfa02dc686433394b963fcb9d82b3f1c90ea",
+  "receipt": {
+    "to": null,
+    "from": "0x485E60C486671E932fd9C53d4110cdEab1E7F0eb",
+    "contractAddress": "0xD56AA6F5224181c243F7FCe8b04fE84c4dff8356",
+    "transactionIndex": 30,
+    "gasUsed": "237696",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0x58088f75cc1f85e9c0cf62bae1adcebd3b4117bc97038363c1bd4ed8f7a9f57d",
+    "transactionHash": "0x5213f671f478ae29283b8c95e274dfa02dc686433394b963fcb9d82b3f1c90ea",
+    "logs": [],
+    "blockNumber": 6795929,
+    "cumulativeGasUsed": "10367369",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [
+    "0x5886DA898774c6036B0957db10d1FdA979Ae42da"
+  ],
+  "numDeployments": 1,
+  "solcInputHash": "21fe30cc06e4cb96958a78cd2e5aab1b",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.27+commit.40a35a09\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"contract IInputValidator\",\"name\":\"_inputValidator\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"e3ProgramParams\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"computeProviderParams\",\"type\":\"bytes\"}],\"name\":\"invalidParams\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ENCRYPTION_SCHEME_ID\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"contract IInputValidator\",\"name\":\"_inputValidator\",\"type\":\"address\"}],\"name\":\"setInputValidator\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"e3ProgramParams\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"computeProviderParams\",\"type\":\"bytes\"}],\"name\":\"validate\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"encryptionSchemeId\",\"type\":\"bytes32\"},{\"internalType\":\"contract IInputValidator\",\"name\":\"inputValidator\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"verify\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/test/MockE3Program.sol\":\"MockE3Program\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"none\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":800},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/interfaces/IE3Program.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\nimport { IInputValidator } from \\\"./IInputValidator.sol\\\";\\n\\ninterface IE3Program {\\n    /// @notice This function should be called by the Enclave contract to validate the computation parameters.\\n    /// @param e3Id ID of the E3.\\n    /// @param seed Seed for the computation.\\n    /// @param e3ProgramParams ABI encoded computation parameters.\\n    /// @param computeProviderParams ABI encoded compute provider parameters.\\n    /// @return encryptionSchemeId ID of the encryption scheme to be used for the computation.\\n    /// @return inputValidator The input validator to be used for the computation.\\n    function validate(\\n        uint256 e3Id,\\n        uint256 seed,\\n        bytes calldata e3ProgramParams,\\n        bytes calldata computeProviderParams\\n    )\\n        external\\n        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator);\\n\\n    /// @notice This function should be called by the Enclave contract to verify the decrypted output of an E3.\\n    /// @param e3Id ID of the E3.\\n    /// @param ciphertextOutputHash The keccak256 hash of output data to be verified.\\n    /// @param proof ABI encoded data to verify the ciphertextOutputHash.\\n    /// @return success Whether the output data is valid.\\n    function verify(\\n        uint256 e3Id,\\n        bytes32 ciphertextOutputHash,\\n        bytes memory proof\\n    ) external returns (bool success);\\n}\\n\",\"keccak256\":\"0xd60e92b5b6498daf0b7f1238d354156c67d25c03caaaabbc601368e9e4a295b2\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/IInputValidator.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\ninterface IInputValidator {\\n    /// @notice This function should be called by the Enclave contract to validate the input parameters.\\n    /// @param params ABI encoded input parameters.\\n    /// @return input The input data to be published.\\n    /// @return success Whether the input parameters are valid.\\n    function validate(\\n        address sender,\\n        bytes memory params\\n    ) external returns (bytes memory input, bool success);\\n}\\n\",\"keccak256\":\"0xb36d367543af680b61d0ce6b2a28045f3e8fae5753e8f6ba245752609ff2bb4a\",\"license\":\"LGPL-3.0-only\"},\"contracts/test/MockE3Program.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\nimport { IE3Program, IInputValidator } from \\\"../interfaces/IE3Program.sol\\\";\\n\\ncontract MockE3Program is IE3Program {\\n    error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);\\n\\n    bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256(\\\"fhe.rs:BFV\\\");\\n\\n    IInputValidator private storageInputValidator;\\n\\n    constructor(IInputValidator _inputValidator) {\\n        storageInputValidator = _inputValidator;\\n    }\\n\\n    function setInputValidator(IInputValidator _inputValidator) external {\\n        storageInputValidator = _inputValidator;\\n    }\\n\\n    function validate(\\n        uint256,\\n        uint256,\\n        bytes memory e3ProgramParams,\\n        bytes memory computeProviderParams\\n    )\\n        external\\n        view\\n        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator)\\n    {\\n        require(\\n            computeProviderParams.length == 32,\\n            invalidParams(e3ProgramParams, computeProviderParams)\\n        );\\n\\n        inputValidator = storageInputValidator;\\n        encryptionSchemeId = ENCRYPTION_SCHEME_ID;\\n    }\\n\\n    function verify(\\n        uint256,\\n        bytes32,\\n        bytes memory data\\n    ) external pure returns (bool success) {\\n        data;\\n        if (data.length > 0) success = true;\\n    }\\n}\\n\",\"keccak256\":\"0x5cf3b29857af2663e7a5944b4d60f2386d2fb54a20b97e2b7dd9239c3f702d3d\",\"license\":\"LGPL-3.0-only\"}},\"version\":1}",
+  "bytecode": "0x608034607057601f61037138819003918201601f19168301916001600160401b03831184841017607557808492602094604052833981010312607057516001600160a01b03811690819003607057600080546001600160a01b0319169190911790556040516102e5908161008c8239f35b600080fd5b634e487b7160e01b600052604160045260246000fdfe6080604052600436101561001257600080fd5b60003560e01c80632f0e1bbf146101c95780635d42800d1461016957806378d891871461012e5763a61d7e3e1461004857600080fd5b346101295760803660031901126101295760443567ffffffffffffffff811161012957610079903690600401610218565b60643567ffffffffffffffff811161012957610099903690600401610218565b9060208251036100eb57604073ffffffffffffffffffffffffffffffffffffffff600054168151907f2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c682526020820152f35b610125610113926040519384936312bed5ff60e31b8552604060048601526044850190610297565b83810360031901602485015290610297565b0390fd5b600080fd5b346101295760003660031901126101295760206040517f2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c68152f35b346101295760203660031901126101295760043573ffffffffffffffffffffffffffffffffffffffff8116809103610129577fffffffffffffffffffffffff00000000000000000000000000000000000000006000541617600055600080f35b346101295760603660031901126101295760443567ffffffffffffffff8111610129576101fa903690600401610218565b60009051610210575b6020906040519015158152f35b506001610203565b81601f820112156101295780359067ffffffffffffffff82116102815760405192601f8301601f19908116603f0116840167ffffffffffffffff811185821017610281576040528284526020838301011161012957816000926020809301838601378301015290565b634e487b7160e01b600052604160045260246000fd5b919082519283825260005b8481106102c3575050826000602080949584010152601f8019910116010190565b806020809284010151828286010152016102a256fea164736f6c634300081b000a",
+  "deployedBytecode": "0x6080604052600436101561001257600080fd5b60003560e01c80632f0e1bbf146101c95780635d42800d1461016957806378d891871461012e5763a61d7e3e1461004857600080fd5b346101295760803660031901126101295760443567ffffffffffffffff811161012957610079903690600401610218565b60643567ffffffffffffffff811161012957610099903690600401610218565b9060208251036100eb57604073ffffffffffffffffffffffffffffffffffffffff600054168151907f2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c682526020820152f35b610125610113926040519384936312bed5ff60e31b8552604060048601526044850190610297565b83810360031901602485015290610297565b0390fd5b600080fd5b346101295760003660031901126101295760206040517f2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c68152f35b346101295760203660031901126101295760043573ffffffffffffffffffffffffffffffffffffffff8116809103610129577fffffffffffffffffffffffff00000000000000000000000000000000000000006000541617600055600080f35b346101295760603660031901126101295760443567ffffffffffffffff8111610129576101fa903690600401610218565b60009051610210575b6020906040519015158152f35b506001610203565b81601f820112156101295780359067ffffffffffffffff82116102815760405192601f8301601f19908116603f0116840167ffffffffffffffff811185821017610281576040528284526020838301011161012957816000926020809301838601378301015290565b634e487b7160e01b600052604160045260246000fd5b919082519283825260005b8481106102c3575050826000602080949584010152601f8019910116010190565b806020809284010151828286010152016102a256fea164736f6c634300081b000a",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 3725,
+        "contract": "contracts/test/MockE3Program.sol:MockE3Program",
+        "label": "storageInputValidator",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_contract(IInputValidator)2846"
+      }
+    ],
+    "types": {
+      "t_contract(IInputValidator)2846": {
+        "encoding": "inplace",
+        "label": "contract IInputValidator",
+        "numberOfBytes": "20"
+      }
+    }
+  }
+}
