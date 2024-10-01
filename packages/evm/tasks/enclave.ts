@@ -188,6 +188,7 @@ task("committee:publish", "Publish the publickey of the committee")
 
 task("e3:activate", "Activate an E3 program")
   .addParam("e3Id", "Id of the E3 program")
+  .addParam("publicKey", "public key of the committee")
   .setAction(async function (taskArguments: TaskArguments, hre) {
     const enclave = await hre.deployments.get("Enclave");
 
@@ -196,7 +197,10 @@ task("e3:activate", "Activate an E3 program")
       enclave.address,
     );
 
-    const tx = await enclaveContract.activate(taskArguments.e3Id);
+    const tx = await enclaveContract.activate(
+      taskArguments.e3Id,
+      taskArguments.publicKey,
+    );
 
     console.log("Activating E3 program... ", tx.hash);
     await tx.wait();

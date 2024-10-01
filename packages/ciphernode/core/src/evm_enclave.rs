@@ -25,9 +25,9 @@ sol! {
         bytes e3ProgramParams;
         address inputValidator;
         address decryptionVerifier;
-        bytes committeePublicKey;
+        bytes32 committeePublicKey;
         bytes32 ciphertextOutput;
-        bytes32 plaintextOutput;
+        bytes plaintextOutput;
     }
 
     #[derive(Debug)]

@@ -36,8 +36,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     enclaveDeployment.address,
   );
 
-  const encryptionSchemeId =
-    "0x0000000000000000000000000000000000000000000000000000000000000001";
+  const encryptionSchemeId = hre.ethers.keccak256(
+    hre.ethers.toUtf8Bytes("fhe.rs:BFV"),
+  );
 
   try {
     const tx = await enclaveContract.setDecryptionVerifier(
