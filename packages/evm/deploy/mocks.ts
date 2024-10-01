@@ -5,12 +5,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  await deploy("MockE3Program", {
-    from: deployer,
-    args: [],
-    log: true,
-  });
-
   await deploy("MockComputeProvider", {
     from: deployer,
     args: [],
@@ -23,9 +17,15 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  await deploy("MockInputValidator", {
+  const mockInputValidator = await deploy("MockInputValidator", {
     from: deployer,
     args: [],
+    log: true,
+  });
+
+  await deploy("MockE3Program", {
+    from: deployer,
+    args: [mockInputValidator.address],
     log: true,
   });
 

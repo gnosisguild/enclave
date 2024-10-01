@@ -90,6 +90,8 @@ until curl -f -s "http://localhost:8545" > /dev/null; do
   sleep 1
 done
 
+# Launch 4 ciphernodes
+
 heading "Launch ciphernode $CIPHERNODE_ADDRESS_1"
 yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_1 --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT &
 
@@ -102,6 +104,7 @@ yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_3 --rpc "$RPC_URL" --enclav
 heading "Launch ciphernode $CIPHERNODE_ADDRESS_4"
 yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_4 --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT &
 
+# NOTE: This node is configured to be an aggregator
 yarn ciphernode:aggregator --rpc "$RPC_URL" --enclave-contract $ENCLAVE_CONTRACT --registry-contract $REGISTRY_CONTRACT --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
 
 sleep 1
@@ -122,7 +125,7 @@ yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localho
 
 heading "Request Committee"
 
-ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193 --input-validator "$INPUT_VALIDATOR_CONTRACT")
+ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
 
 yarn committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
 
