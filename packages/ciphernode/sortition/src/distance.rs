@@ -6,16 +6,16 @@ use num::{BigInt, Num};
 
 pub struct DistanceSortition {
     pub random_seed: u64,
-    pub registered_nodes: Vec<Address>,
+    pub registered_nodes: Vec<String>,
     pub size: usize,
 }
 
 impl DistanceSortition {
-    pub fn new(random_seed: u64, registered_nodes: Vec<Address>, size: usize) -> Self {
+    pub fn new(random_seed: u64, registered_nodes: Vec<String>, size: usize) -> Self {
         Self { random_seed, registered_nodes, size }
     }
 
-    pub fn get_committee(&mut self) -> Vec<(BigInt, Address)> {
+    pub fn get_committee(&mut self) -> Vec<(String, String)> {
         let mut scores = self.registered_nodes.iter()
             .map(|address|
                 {
@@ -24,9 +24,9 @@ impl DistanceSortition {
                     let without_prefix = hash.trim_start_matches("0x");
                     let z = BigInt::from_str_radix(without_prefix, 16).unwrap();
                     let score = z - BigInt::from(self.random_seed);
-                    (score, *address)
+                    (score.to_string(), address.to_string())
                 })
-            .collect::<Vec<(BigInt, Address)>>();
+            .collect::<Vec<(String, String)>>();
             
         scores.sort_by(|a, b| a.0.cmp(&b.0));
         let result = scores[0..self.size].to_vec();

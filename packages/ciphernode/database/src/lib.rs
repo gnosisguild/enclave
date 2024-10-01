@@ -7,6 +7,23 @@ use std::fs::File;
 use std::io::Read;
 use sled::Db;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct State {
+    pub id: String,
+    pub nodes: Vec<String>,
+    pub e3Ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Computation {
+    pub computation_id: String,
+    pub committee: Vec<(String, String)>,
+    pub pk_share: Vec<u8>,
+    pub pk_shares: Vec<Vec<u8>>,
+    pub rng_seed: u64,
+}
 
 #[derive(Clone)]
 pub struct EnclaveDB {
@@ -46,10 +63,48 @@ impl EnclaveDB {
         result
     }
 
+    pub fn get_state(&mut self, key: &str) -> State {
+        let mut pathdbst = self.db_path.clone();
+        pathdbst.push_str("/");
+        pathdbst.push_str(key);
+        let state_out = self.db.get(pathdbst.clone()).unwrap().unwrap();
+        let state_out_str = str::from_utf8(&state_out).unwrap();
+        let state_out_struct: State = serde_json::from_str(&state_out_str).unwrap();
+        state_out_struct
+    }
+
+    pub fn get_computation_state(&mut self, key: &str) -> Computation {
+        let mut pathdbst = self.db_path.clone();
+        pathdbst.push_str("/");
+        pathdbst.push_str(key);
+        let state_out = self.db.get(pathdbst.clone()).unwrap().unwrap();
+        let state_out_str = str::from_utf8(&state_out).unwrap();
+        let state_out_struct: Computation = serde_json::from_str(&state_out_str).unwrap();
+        state_out_struct
+    }
+
     pub fn insert(&mut self, key: &str, data: Vec<u8>) {
         let mut pathdbst = self.db_path.clone();
         pathdbst.push_str("/");
         pathdbst.push_str(key);
         self.db.insert(pathdbst.clone(), data).unwrap();
+    }
+
+    pub fn insert_state(&mut self, key: &str, state: State) {
+        let mut pathdbst = self.db_path.clone();
+        pathdbst.push_str("/");
+        pathdbst.push_str(key);
+        let state_str = serde_json::to_string(&state).unwrap();
+        let state_bytes = state_str.into_bytes();
+        self.db.insert(pathdbst.clone(), state_bytes).unwrap();
+    }
+
+    pub fn insert_computation_state(&mut self, key: &str, state: Computation) {
+        let mut pathdbst = self.db_path.clone();
+        pathdbst.push_str("/");
+        pathdbst.push_str(key);
+        let state_str = serde_json::to_string(&state).unwrap();
+        let state_bytes = state_str.into_bytes();
+        self.db.insert(pathdbst.clone(), state_bytes).unwrap();
     }
 }

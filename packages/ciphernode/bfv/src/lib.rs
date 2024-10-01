@@ -6,11 +6,12 @@ mod util;
 
 use std::{sync::Arc};
 use fhe::{
-    bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, SecretKey},
+    bfv::{BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, SecretKey, PublicKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
 use fhe_traits::{FheDecoder, Serialize as FheSerialize, Deserialize, DeserializeParametrized};
-use rand::{Rng, rngs::OsRng, thread_rng};
+use rand::{Rng, rngs::OsRng, thread_rng, SeedableRng};
+use rand::rngs::StdRng;
 use util::timeit::{timeit};
 
 pub struct EnclaveBFV {
@@ -21,7 +22,7 @@ pub struct EnclaveBFV {
 }
 
 impl EnclaveBFV {
-    pub fn new(degree: usize, plaintext_modulus: u64, moduli: Vec<u64>) -> Self {
+    pub fn new(degree: usize, plaintext_modulus: u64, moduli: Vec<u64>, seed: u64) -> Self {
 	    // let degree = 4096;
 	    // let plaintext_modulus: u64 = 4096;
 	    // let moduli = vec![0xffffee001, 0xffffc4001, 0x1ffffe0001];
@@ -35,8 +36,8 @@ impl EnclaveBFV {
 	            .set_moduli(&moduli)
 	            .build_arc().unwrap()
 	    );
-
-	    let crp = CommonRandomPoly::new(&params, &mut thread_rng()).unwrap();
+        let mut r = StdRng::seed_from_u64(seed);
+	    let crp = CommonRandomPoly::new(&params, &mut r).unwrap();
 	    //TODO: save encrypted sk_share to disk?
         let sk_share = SecretKey::random(&params, &mut OsRng);
         let pk_share = PublicKeyShare::new(&sk_share, crp.clone(), &mut thread_rng()).unwrap();
@@ -69,5 +70,24 @@ impl EnclaveBFV {
 
     pub fn deserialize_params(&mut self, par_bytes: Vec<u8>) -> Arc<BfvParameters> {
     	Arc::new(BfvParameters::try_deserialize(&par_bytes).unwrap())
+    }
+
+    pub fn aggregate_pk(pk_shares: Vec<Vec<u8>>, params: Arc<BfvParameters>, crp: CommonRandomPoly) -> Vec<u8> {
+        let mut parties :Vec<PublicKeyShare> = Vec::new();
+        for i in 1..pk_shares.len() {
+            println!("Aggregating PKShare... id {}", i);
+            let data_des = PublicKeyShare::deserialize(&pk_shares[i as usize], &params, crp.clone()).unwrap();
+            parties.push(data_des);
+        }
+
+        // Aggregation: this could be one of the parties or a separate entity. Or the
+        // parties can aggregate cooperatively, in a tree-like fashion.
+        let pk = timeit!("Public key aggregation", {
+            let pk: PublicKey = parties.iter().map(|p| p.clone()).aggregate().unwrap();
+            pk
+        });
+        //println!("{:?}", pk);
+        println!("Multiparty Public Key Generated");
+        pk.to_bytes()
     }
 }
