@@ -10,6 +10,7 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 [dependencies]
 p2p = { path = "../p2p" }
 bfv = { path = "../bfv" }
+database = { path = "../database" }
 sortition = { path = "../sortition" }
 enclave-core = { path = "../core" }
 eth = { path = "../eth" }

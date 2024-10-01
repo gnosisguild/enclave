@@ -9,3 +9,4 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
 [dependencies]
 sled = "0.34"
+rand = "0.8.5"

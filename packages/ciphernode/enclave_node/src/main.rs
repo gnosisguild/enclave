@@ -5,6 +5,7 @@ use std::mem::size_of_val;
 
 use p2p::{EnclaveRouter, P2PMessage};
 use bfv::EnclaveBFV;
+use database::EnclaveDB;
 use sortition::DistanceSortition;
 use eth::{EventListener, ContractManager, CommitteeRequestedEvent, ETHEvent, EventType};
 use tokio::{
@@ -41,8 +42,8 @@ const OWO: &str = r#"
                                                                       
 "#;
 
-fn aggregate_key(pubkey_share: Vec<u8>, mock_db_pubkey: Vec<Vec<u8>>) {
-    println!("got pk data");
+fn aggregate_key(id: String, pubkey_share: Vec<u8>, mock_db_pubkey: Vec<Vec<u8>>) {
+    println!("got pk data from {:?}", id);
     println!("{:?}", mock_db_pubkey[0]);
 }
 
@@ -50,11 +51,13 @@ async fn send_p2p_msg(
     p2p_tx: Sender<Vec<u8>>,
     topic: String,
     msg_type: String,
+    id: String,
     data: Vec<u8>
 ) {
     let msg_formatted = P2PMessage {
         topic: topic,
         msg_type: msg_type,
+        msg_sender: id,
         data: data,
     };
     let msg_str = serde_json::to_string(&msg_formatted).unwrap();
@@ -62,16 +65,19 @@ async fn send_p2p_msg(
     p2p_tx.send(msg_bytes.clone()).await.unwrap(); 
 }
 
-fn handle_p2p_msg(msg: Vec<u8>, mock_db_pubkey: Vec<Vec<u8>>) {
+fn handle_p2p_msg(mut db: EnclaveDB, msg: Vec<u8>, mock_db_pubkey: Vec<Vec<u8>>) {
     let msg_out_str = str::from_utf8(&msg).unwrap();
     let msg_out_struct: P2PMessage = serde_json::from_str(&msg_out_str).unwrap();
     if msg_out_struct.msg_type == "join and share key" {
-        aggregate_key(msg_out_struct.data.clone(), mock_db_pubkey.clone());
+        log::info!("New key share received, aggregating...");
+        db.insert("pk_other", msg_out_struct.data.clone());
+        // TODO: If all keys shards gathered
+        aggregate_key(msg_out_struct.msg_sender, msg_out_struct.data.clone(), mock_db_pubkey.clone());
     }
     log::info!("P2P Message Received: Topic {}, Type {}, Data {}", msg_out_struct.topic, msg_out_struct.msg_type, String::from_utf8(msg_out_struct.data).unwrap());
 }
 
-async fn handle_eth_event(msg: Vec<u8>, mock_db: &mut Vec<Address>, mock_db_pubkey: &mut Vec<Vec<u8>>, id: Address, p2p_tx: Sender<Vec<u8>>) {
+async fn handle_eth_event(mut db: EnclaveDB, msg: Vec<u8>, mock_db: &mut Vec<Address>, mock_db_pubkey: &mut Vec<Vec<u8>>, id: Address, p2p_tx: Sender<Vec<u8>>) {
     log::info!("Received Committee Requested Event");
     let event_out_str = str::from_utf8(&msg).unwrap();
     let event_out_struct: ETHEvent = serde_json::from_str(&event_out_str).unwrap();
@@ -91,6 +97,9 @@ async fn handle_eth_event(msg: Vec<u8>, mock_db: &mut Vec<Address>, mock_db_pubk
                 let crp_bytes = new_bfv.serialize_crp();
                 mock_db_pubkey.push(pk_bytes.clone());
                 mock_db_pubkey.push(crp_bytes);
+
+                db.insert("pk-self", pk_bytes.clone());
+
                 //let deserialized_pk = new_bfv.deserialize_pk(pk_bytes, param_bytes, crp_bytes);
                 println!("{:?}", size_of_val(&*pk_bytes));
                 //pk_bytes.drain(0..52725);
@@ -99,6 +108,7 @@ async fn handle_eth_event(msg: Vec<u8>, mock_db: &mut Vec<Address>, mock_db_pubk
                     //topic: committee_event.e3Id.to_string(),
                     topic: "enclave-testnet".to_string(),
                     msg_type: "join and share key".to_string(),
+                    msg_sender: id.to_string(),
                     data: pk_bytes.clone(),
                 };
                 let msg_str = serde_json::to_string(&msg_formatted).unwrap();
@@ -122,7 +132,7 @@ fn get_p2p_router() -> Result<(EnclaveRouter, Sender<Vec<u8>>, Receiver<Vec<u8>>
     Ok((p2p, p2p_tx, p2p_rx))
 }
 
-async fn start_p2p(mock_db_pubkey: Vec<Vec<u8>>, mut p2p: EnclaveRouter, mut p2p_tx: Sender<Vec<u8>>, mut p2p_rx: Receiver<Vec<u8>>) -> Result<(), Box<dyn Error>> {
+async fn start_p2p(mut db: EnclaveDB, mock_db_pubkey: Vec<Vec<u8>>, mut p2p: EnclaveRouter, mut p2p_tx: Sender<Vec<u8>>, mut p2p_rx: Receiver<Vec<u8>>) -> Result<(), Box<dyn Error>> {
     log::info!("Connecting to swarm");
     p2p.connect_swarm("mdns".to_string())?;
     p2p.join_topic("enclave-testnet")?;
@@ -131,13 +141,13 @@ async fn start_p2p(mock_db_pubkey: Vec<Vec<u8>>, mut p2p: EnclaveRouter, mut p2p
     tokio::spawn(async move { p2p.start().await });
     tokio::spawn(async move {
         while let Some(msg) = p2p_rx.recv().await {
-            handle_p2p_msg(msg, mock_db_pubkey.clone());
+            handle_p2p_msg(db.clone(), msg, mock_db_pubkey.clone());
         }
     });
     Ok(())
 }
 
-async fn start_eth_listener(mock_db: &mut Vec<Address>, mock_db_pubkey: &mut Vec<Vec<u8>>, id: Address, mut p2p_tx: Sender<Vec<u8>>) {
+async fn start_eth_listener(mut db: EnclaveDB, mock_db: &mut Vec<Address>, mock_db_pubkey: &mut Vec<Vec<u8>>, id: Address, mut p2p_tx: Sender<Vec<u8>>) {
     log::info!("Listening on E3 Contract");
     let (mut manager, tx_sender, mut tx_receiver) = ContractManager::new("ws://127.0.0.1:8545").await.unwrap();
     let listener = manager.add_listener(address!("959922be3caee4b8cd9a407cc3ac1c251c2007b1"));
@@ -145,7 +155,7 @@ async fn start_eth_listener(mock_db: &mut Vec<Address>, mock_db_pubkey: &mut Vec
         listener.listen().await;
     });
     while let Some(msg) = tx_receiver.recv().await {
-        handle_eth_event(msg, mock_db, mock_db_pubkey, id, p2p_tx.clone()).await;
+        handle_eth_event(db.clone(), msg, mock_db, mock_db_pubkey, id, p2p_tx.clone()).await;
     };
 }
 
@@ -153,10 +163,19 @@ async fn run(id: Address) {
     let mut mock_db: Vec<Address> = Vec::new();
     let mut mock_db_ids: Vec<u32> = Vec::new();
     let mut mock_db_pubkey: Vec<Vec<u8>> = Vec::new();
+    let mut db = EnclaveDB::new();
+
+    let node_address = db.get(&"address".to_string());
+    if node_address.is_empty() {
+        println!("no address in db");
+        let address_bytes = id.to_string().into_bytes();
+        db.insert(&"address".to_string(), address_bytes);
+    }
+
     let (p2p, p2p_tx, p2p_rx) = get_p2p_router().unwrap();
     tokio::join!(
-        start_p2p(mock_db_pubkey.clone(), p2p, p2p_tx.clone(), p2p_rx),
-        start_eth_listener(&mut mock_db, &mut mock_db_pubkey, id, p2p_tx),
+        start_p2p(db.clone(), mock_db_pubkey.clone(), p2p, p2p_tx.clone(), p2p_rx),
+        start_eth_listener(db.clone(), &mut mock_db, &mut mock_db_pubkey, id, p2p_tx),
     );
 }
 

@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 pub struct P2PMessage {
     pub topic: String,
     pub msg_type: String,
+    pub msg_sender: String,
     pub data: Vec<u8>,
 }
 
