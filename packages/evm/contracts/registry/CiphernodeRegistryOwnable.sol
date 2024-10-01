@@ -26,7 +26,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     mapping(uint256 e3Id => IRegistryFilter filter) public filters;
     mapping(uint256 e3Id => uint256 root) public roots;
-    mapping(uint256 e3Id => bytes publicKey) public publicKeys;
+    mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -99,7 +99,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         // only to be published by the filter
         require(address(filters[e3Id]) == msg.sender, OnlyFilter());
 
-        publicKeys[e3Id] = publicKey;
+        publicKeyHashes[e3Id] = keccak256(publicKey);
         emit CommitteePublished(e3Id, publicKey);
     }
 
@@ -145,9 +145,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function committeePublicKey(
         uint256 e3Id
-    ) external view returns (bytes memory publicKey) {
-        publicKey = publicKeys[e3Id];
-        require(publicKey.length > 0, CommitteeNotPublished());
+    ) external view returns (bytes32 publicKeyHash) {
+        publicKeyHash = publicKeyHashes[e3Id];
+        require(publicKeyHash != bytes32(0), CommitteeNotPublished());
     }
 
     function isCiphernodeEligible(address node) external view returns (bool) {

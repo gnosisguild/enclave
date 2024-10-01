@@ -163,7 +163,7 @@ describe("NaiveRegistryFilter", function () {
         AddressThree,
       );
       const committee = await filter.getCommittee(request.e3Id);
-      expect(committee.publicKey).to.equal(AddressThree);
+      expect(committee.publicKey).to.equal(ethers.keccak256(AddressThree));
     });
     it("should publish the correct node addresses of the committee for the given e3Id", async function () {
       const { filter, registry, request } = await loadFixture(setup);
@@ -197,7 +197,7 @@ describe("NaiveRegistryFilter", function () {
         AddressThree,
       );
       const committee = await filter.getCommittee(request.e3Id);
-      expect(committee.publicKey).to.equal(AddressThree);
+      expect(committee.publicKey).to.equal(ethers.keccak256(AddressThree));
     });
   });
 
@@ -235,7 +235,7 @@ describe("NaiveRegistryFilter", function () {
       const committee = await filter.getCommittee(request.e3Id);
       expect(committee.threshold).to.deep.equal(request.threshold);
       expect(committee.nodes).to.deep.equal([AddressOne, AddressTwo]);
-      expect(committee.publicKey).to.equal(AddressThree);
+      expect(committee.publicKey).to.equal(ethers.keccak256(AddressThree));
     });
   });
 });

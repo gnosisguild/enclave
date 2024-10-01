@@ -11,7 +11,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     struct Committee {
         address[] nodes;
         uint32[2] threshold;
-        bytes publicKey;
+        bytes32 publicKey;
     }
 
     ////////////////////////////////////////////////////////////
@@ -84,12 +84,9 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         bytes memory publicKey
     ) external onlyOwner {
         Committee storage committee = committees[e3Id];
-        require(
-            keccak256(committee.publicKey) == keccak256(hex""),
-            CommitteeAlreadyPublished()
-        );
+        require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
         committee.nodes = nodes;
-        committee.publicKey = publicKey;
+        committee.publicKey = keccak256(publicKey);
         ICiphernodeRegistry(registry).publishCommittee(
             e3Id,
             abi.encode(nodes),

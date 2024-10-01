@@ -141,7 +141,7 @@ yarn committee:publish --e3-id 0 --nodes $CIPHERNODE_ADDRESS_1,$CIPHERNODE_ADDRE
 
 heading "Mock activate e3-id"
 
-yarn e3:activate --e3-id 0 --network localhost
+yarn e3:activate --e3-id 0 --public-key 0x12345678 --network localhost
 
 heading "Mock publish input e3-id"
 yarn e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
