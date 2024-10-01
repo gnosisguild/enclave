@@ -12,6 +12,8 @@ mod evm_ciphernode_registry;
 mod evm_enclave;
 mod evm_listener;
 mod evm_manager;
+mod evm_caller;
+mod evm_contracts;
 mod fhe;
 mod keyshare;
 mod logger;

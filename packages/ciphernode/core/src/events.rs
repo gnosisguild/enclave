@@ -3,7 +3,6 @@ use alloy::{hex, primitives::Uint};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    error::Error,
     fmt::{self, Display},
     hash::{DefaultHasher, Hash, Hasher},
 };

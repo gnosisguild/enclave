@@ -3,6 +3,7 @@ use crate::{
     evm_enclave::connect_evm_enclave, public_key_writer::PublicKeyWriter, E3RequestManager,
     EventBus, FheFactory, P2p, PlaintextAggregatorFactory, PlaintextWriter,
     PublicKeyAggregatorFactory, SimpleLogger, Sortition,
+    evm_caller::connect_evm_caller,
 };
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
@@ -40,6 +41,7 @@ impl MainAggregator {
         rpc_url: &str,
         enclave_contract: Address,
         registry_contract: Address,
+        registry_filter_contract: Address,
         pubkey_write_path: Option<&str>,
         plaintext_write_path: Option<&str>,
     ) -> (Addr<Self>, JoinHandle<()>) {
@@ -52,6 +54,7 @@ impl MainAggregator {
 
         connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
         let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
+        let _ = connect_evm_caller(bus.clone(), sortition.clone(), rpc_url, enclave_contract, registry_filter_contract).await;    
 
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())

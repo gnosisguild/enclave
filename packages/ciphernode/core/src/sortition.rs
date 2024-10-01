@@ -62,6 +62,11 @@ impl SortitionList<String> for SortitionModule {
     }
 }
 
+#[derive(Message)]
+#[rtype(result = "Vec<String>")]
+pub struct GetNodes;
+
+
 pub struct Sortition {
     list: SortitionModule,
 }
@@ -77,6 +82,10 @@ impl Sortition {
         let addr = Sortition::new().start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
         addr
+    }
+
+    pub fn get_nodes(&self) -> Vec<String> {
+        self.list.nodes.clone().into_iter().collect()
     }
 }
 
@@ -121,3 +130,12 @@ impl Handler<GetHasNode> for Sortition {
         self.list.contains(msg.seed, msg.size, msg.address)
     }
 }
+
+impl Handler<GetNodes> for Sortition {
+    type Result = Vec<String>;
+
+    fn handle(&mut self, _msg: GetNodes, _ctx: &mut Self::Context) -> Self::Result {
+        self.get_nodes()
+    }
+}
+

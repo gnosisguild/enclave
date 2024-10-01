@@ -3,6 +3,7 @@ name: "INTEGRATION"
 env:
   HARDHAT_VAR_MNEMONIC: "test test test test test test test test test test test junk"
   HARDHAT_VAR_INFURA_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+  PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
   # Uncomment the following lines to set your configuration variables using
   # GitHub secrets (https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions)
   #

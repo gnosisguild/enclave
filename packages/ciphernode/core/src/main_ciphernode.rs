@@ -1,9 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    evm_ciphernode_registry::connect_evm_ciphernode_registry, evm_enclave::connect_evm_enclave,
-    CiphernodeSelector, CommitteeMetaFactory, Data, E3RequestManager, EventBus, FheFactory,
-    KeyshareFactory, P2p, SimpleLogger, Sortition,
+    evm_ciphernode_registry::connect_evm_ciphernode_registry,
+    evm_enclave::connect_evm_enclave, CiphernodeSelector, CommitteeMetaFactory, Data,
+    E3RequestManager, EventBus, FheFactory, KeyshareFactory, P2p, SimpleLogger, Sortition,
 };
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
