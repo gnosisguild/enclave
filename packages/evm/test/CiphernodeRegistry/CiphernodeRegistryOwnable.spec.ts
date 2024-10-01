@@ -12,6 +12,9 @@ const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressThree = "0x0000000000000000000000000000000000000003";
 
+const data = "0xda7a";
+const dataHash = ethers.keccak256(data);
+
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
@@ -165,7 +168,7 @@ describe("CiphernodeRegistryOwnable", function () {
         request.threshold,
       );
       await expect(
-        registry.publishCommittee(request.e3Id, "0xc0de", "0xda7a"),
+        registry.publishCommittee(request.e3Id, "0xc0de", data),
       ).to.be.revertedWithCustomError(registry, "OnlyFilter");
     });
     it("stores the public key of the committee", async function () {
@@ -178,10 +181,10 @@ describe("CiphernodeRegistryOwnable", function () {
       await filter.publishCommittee(
         request.e3Id,
         [AddressOne, AddressTwo],
-        "0xda7a",
+        data,
       );
       expect(await registry.committeePublicKey(request.e3Id)).to.equal(
-        "0xda7a",
+        dataHash,
       );
     });
     it("emits a CommitteePublished event", async function () {
@@ -195,11 +198,11 @@ describe("CiphernodeRegistryOwnable", function () {
         await filter.publishCommittee(
           request.e3Id,
           [AddressOne, AddressTwo],
-          "0xda7a",
+          data,
         ),
       )
         .to.emit(registry, "CommitteePublished")
-        .withArgs(request.e3Id, "0xda7a");
+        .withArgs(request.e3Id, data);
     });
   });
 
@@ -308,10 +311,10 @@ describe("CiphernodeRegistryOwnable", function () {
       await filter.publishCommittee(
         request.e3Id,
         [AddressOne, AddressTwo],
-        "0xda7a",
+        data,
       );
       expect(await registry.committeePublicKey(request.e3Id)).to.equal(
-        "0xda7a",
+        dataHash,
       );
     });
     it("reverts if the committee has not been published", async function () {

@@ -29,7 +29,7 @@ struct E3 {
     bytes e3ProgramParams;
     IInputValidator inputValidator;
     IDecryptionVerifier decryptionVerifier;
-    bytes committeePublicKey;
+    bytes32 committeePublicKey;
     bytes32 ciphertextOutput;
-    bytes32 plaintextOutput;
+    bytes plaintextOutput;
 }

@@ -182,23 +182,27 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3Requested(e3Id, e3, filter, e3Program);
     }
 
-    function activate(uint256 e3Id) external returns (bool success) {
-        // Note: we could load this into a storage pointer, and do the sets there
-        // Requires a mew internal _getter that returns storage
+    function activate(
+        uint256 e3Id,
+        bytes memory publicKey
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+
         require(e3.expiration == 0, E3AlreadyActivated(e3Id));
         require(e3.startWindow[0] <= block.timestamp, E3NotReady());
         // TODO: handle what happens to the payment if the start window has passed.
         require(e3.startWindow[1] >= block.timestamp, E3Expired());
 
-        bytes memory publicKey = ciphernodeRegistry.committeePublicKey(e3Id);
-        // Note: This check feels weird
-        require(publicKey.length > 0, CommitteeSelectionFailed());
+        bytes32 publicKeyHash = ciphernodeRegistry.committeePublicKey(e3Id);
+        require(
+            keccak256(publicKey) == publicKeyHash,
+            CommitteeSelectionFailed()
+        );
 
         e3s[e3Id].expiration = block.timestamp + e3.duration;
-        e3s[e3Id].committeePublicKey = publicKey;
+        e3s[e3Id].committeePublicKey = keccak256(publicKey);
 
-        emit E3Activated(e3Id, e3.expiration, e3.committeePublicKey);
+        emit E3Activated(e3Id, e3.expiration, publicKey);
 
         return true;
     }
@@ -268,17 +272,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             CiphertextOutputNotPublished(e3Id)
         );
         require(
-            e3.plaintextOutput == bytes32(0),
+            e3.plaintextOutput.length == 0,
             PlaintextOutputAlreadyPublished(e3Id)
         );
-        bytes32 plaintextOutputHash = keccak256(plaintextOutput);
         (success) = e3.decryptionVerifier.verify(
             e3Id,
-            plaintextOutputHash,
+            keccak256(plaintextOutput),
             proof
         );
         require(success, InvalidOutput(plaintextOutput));
-        e3s[e3Id].plaintextOutput = plaintextOutputHash;
+        e3s[e3Id].plaintextOutput = plaintextOutput;
 
         emit PlaintextOutputPublished(e3Id, plaintextOutput);
     }

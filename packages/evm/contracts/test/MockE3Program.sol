@@ -6,6 +6,8 @@ import { IE3Program, IInputValidator } from "../interfaces/IE3Program.sol";
 contract MockE3Program is IE3Program {
     error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
 
+    bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
+
     function validate(
         uint256,
         uint256,
@@ -24,7 +26,7 @@ contract MockE3Program is IE3Program {
             e3ProgramParams,
             (bytes, IInputValidator)
         );
-        encryptionSchemeId = 0x0000000000000000000000000000000000000000000000000000000000000001;
+        encryptionSchemeId = ENCRYPTION_SCHEME_ID;
     }
 
     function verify(

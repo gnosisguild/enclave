@@ -23,13 +23,11 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         bytes calldata
     ) external {} // solhint-disable-line no-empty-blocks
 
-    function committeePublicKey(
-        uint256 e3Id
-    ) external pure returns (bytes memory) {
+    function committeePublicKey(uint256 e3Id) external pure returns (bytes32) {
         if (e3Id == type(uint256).max) {
-            return hex"";
+            return bytes32(0);
         } else {
-            return abi.encodePacked(keccak256(abi.encode(e3Id)));
+            return keccak256(abi.encode(e3Id));
         }
     }
 
@@ -58,8 +56,8 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         bytes calldata
     ) external {} // solhint-disable-line no-empty-blocks
 
-    function committeePublicKey(uint256) external pure returns (bytes memory) {
-        return hex"";
+    function committeePublicKey(uint256) external pure returns (bytes32) {
+        return bytes32(0);
     }
 
     function isCiphernodeEligible(address) external pure returns (bool) {

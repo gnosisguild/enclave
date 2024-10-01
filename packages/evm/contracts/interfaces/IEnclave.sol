@@ -114,7 +114,12 @@ interface IEnclave {
     /// @dev This function MUST revert if the given E3 has not yet been requested.
     /// @dev This function MUST revert if the selected node committee has not yet published a public key.
     /// @param e3Id ID of the E3.
-    function activate(uint256 e3Id) external returns (bool success);
+    /// @param publicKey Public key of the committee.
+    /// @return success True if the E3 was successfully activated.
+    function activate(
+        uint256 e3Id,
+        bytes memory publicKey
+    ) external returns (bool success);
 
     /// @notice This function should be called to publish input data for Encrypted Execution Environment (E3).
     /// @dev This function MUST revert if the E3 is not yet activated.
