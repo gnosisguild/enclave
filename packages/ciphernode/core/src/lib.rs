@@ -34,7 +34,6 @@ pub use data::*;
 pub use e3_request::*;
 pub use eventbus::*;
 pub use events::*;
-pub use evm_enclave::{decode_e3_params, encode_e3_params};
 pub use fhe::*;
 pub use keyshare::*;
 pub use logger::*;

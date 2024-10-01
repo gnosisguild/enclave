@@ -41,10 +41,12 @@ describe("Enclave", function () {
 
     const poseidon = await PoseidonT3Fixture();
     const registry = await deployCiphernodeRegistryFixture();
-    const e3Program = await deployE3ProgramFixture();
     const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
     const inputValidator = await deployInputValidatorFixture();
+    const e3Program = await deployE3ProgramFixture(
+      await inputValidator.getAddress(),
+    );
 
     const enclave = await deployEnclaveFixture(
       owner.address,
@@ -79,10 +81,7 @@ describe("Enclave", function () {
         ],
         duration: time.duration.days(30),
         e3Program: await e3Program.getAddress(),
-        e3ProgramParams: abiCoder.encode(
-          ["bytes", "address"],
-          ["0x12345678", await inputValidator.getAddress()],
-        ),
+        e3ProgramParams: "0x12345678",
         computeProviderParams: abiCoder.encode(
           ["address"],
           [await decryptionVerifier.getAddress()],
@@ -191,7 +190,7 @@ describe("Enclave", function () {
         .withArgs(1);
     });
     it("returns correct E3 details", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, mocks, request } = await loadFixture(setup);
       await enclave.request(
         request.filter,
         request.threshold,
@@ -209,7 +208,7 @@ describe("Enclave", function () {
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
       expect(e3.inputValidator).to.equal(
-        abiCoder.decode(["bytes", "address"], request.e3ProgramParams)[1],
+        await mocks.inputValidator.getAddress(),
       );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
@@ -542,8 +541,10 @@ describe("Enclave", function () {
         .withArgs(encryptionSchemeId);
     });
     it("reverts if given E3 Program does not return input validator address", async function () {
-      const { enclave, request } = await loadFixture(setup);
-
+      const { enclave, mocks, owner, request } = await loadFixture(setup);
+      await mocks.e3Program
+        .connect(owner)
+        .setInputValidator(ethers.ZeroAddress);
       await expect(
         enclave.request(
           request.filter,
@@ -551,7 +552,7 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          abiCoder.encode(["bytes", "address"], [ZeroHash, ethers.ZeroAddress]),
+          request.e3ProgramParams,
           request.computeProviderParams,
           { value: 10 },
         ),
@@ -573,7 +574,7 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
     });
     it("instantiates a new E3", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, mocks, request } = await loadFixture(setup);
       await enclave.request(
         request.filter,
         request.threshold,
@@ -590,7 +591,7 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.inputValidator).to.equal(
-        abiCoder.decode(["bytes", "address"], request.e3ProgramParams)[1],
+        await mocks.inputValidator.getAddress(),
       );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
