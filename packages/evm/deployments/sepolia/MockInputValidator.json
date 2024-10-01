@@ -1,0 +1,70 @@
+{
+  "address": "0x5886DA898774c6036B0957db10d1FdA979Ae42da",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes",
+          "name": "params",
+          "type": "bytes"
+        }
+      ],
+      "name": "validate",
+      "outputs": [
+        {
+          "internalType": "bytes",
+          "name": "input",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    }
+  ],
+  "transactionHash": "0x047b00b9d4caaf80dbfb021987ef0e1cf3181b34b67059e4c59b1effa7fce6d9",
+  "receipt": {
+    "to": null,
+    "from": "0x485E60C486671E932fd9C53d4110cdEab1E7F0eb",
+    "contractAddress": "0x5886DA898774c6036B0957db10d1FdA979Ae42da",
+    "transactionIndex": 13,
+    "gasUsed": "129617",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0x866873034423d6dfb2770ddb087c5aac8ae1009cbcd084f2d9acf8bbdc62f8b6",
+    "transactionHash": "0x047b00b9d4caaf80dbfb021987ef0e1cf3181b34b67059e4c59b1effa7fce6d9",
+    "logs": [],
+    "blockNumber": 6795928,
+    "cumulativeGasUsed": "904689",
+    "status": 1,
+    "byzantium": true
+  },
+  "args": [],
+  "numDeployments": 1,
+  "solcInputHash": "21fe30cc06e4cb96958a78cd2e5aab1b",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.27+commit.40a35a09\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"params\",\"type\":\"bytes\"}],\"name\":\"validate\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"input\",\"type\":\"bytes\"},{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/test/MockInputValidator.sol\":\"MockInputValidator\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"none\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":800},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/interfaces/IInputValidator.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\ninterface IInputValidator {\\n    /// @notice This function should be called by the Enclave contract to validate the input parameters.\\n    /// @param params ABI encoded input parameters.\\n    /// @return input The input data to be published.\\n    /// @return success Whether the input parameters are valid.\\n    function validate(\\n        address sender,\\n        bytes memory params\\n    ) external returns (bytes memory input, bool success);\\n}\\n\",\"keccak256\":\"0xb36d367543af680b61d0ce6b2a28045f3e8fae5753e8f6ba245752609ff2bb4a\",\"license\":\"LGPL-3.0-only\"},\"contracts/test/MockInputValidator.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\nimport { IInputValidator } from \\\"../interfaces/IInputValidator.sol\\\";\\n\\ncontract MockInputValidator is IInputValidator {\\n    function validate(\\n        address,\\n        bytes memory params\\n    ) external pure returns (bytes memory input, bool success) {\\n        input = params;\\n\\n        if (input.length == 3) {\\n            success = false;\\n        } else {\\n            success = true;\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0x5cc01d27a2ee82ed07350b0a801146d831f9d63af9771989fb66600745d4287d\",\"license\":\"LGPL-3.0-only\"}},\"version\":1}",
+  "bytecode": "0x60808060405234601557610161908161001b8239f35b600080fdfe6080600436101561000f57600080fd5b60003560e01c63caf927851461002457600080fd5b346101395760403660031901126101395760043573ffffffffffffffffffffffffffffffffffffffff8116036101395760243567ffffffffffffffff811161013957366023820112156101395780600401359067ffffffffffffffff821161013e57601f8201601f19908116603f0116830167ffffffffffffffff81118482101761013e576040528183523660248383010111610139578160009260246020930183860137830101528051600303610131576000905b60405180926040825282519283604084015260005b84811061011957505091606092600084838501015215156020830152601f80199101168101030190f35b602082820181015160608884010152869450016100ef565b6001906100da565b600080fd5b634e487b7160e01b600052604160045260246000fdfea164736f6c634300081b000a",
+  "deployedBytecode": "0x6080600436101561000f57600080fd5b60003560e01c63caf927851461002457600080fd5b346101395760403660031901126101395760043573ffffffffffffffffffffffffffffffffffffffff8116036101395760243567ffffffffffffffff811161013957366023820112156101395780600401359067ffffffffffffffff821161013e57601f8201601f19908116603f0116830167ffffffffffffffff81118482101761013e576040528183523660248383010111610139578160009260246020930183860137830101528051600303610131576000905b60405180926040825282519283604084015260005b84811061011957505091606092600084838501015215156020830152601f80199101168101030190f35b602082820181015160608884010152869450016100ef565b6001906100da565b600080fd5b634e487b7160e01b600052604160045260246000fdfea164736f6c634300081b000a",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  },
+  "storageLayout": {
+    "storage": [],
+    "types": null
+  }
+}
