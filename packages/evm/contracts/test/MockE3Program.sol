@@ -32,7 +32,7 @@ contract MockE3Program is IE3Program {
             computeProviderParams.length == 32,
             invalidParams(e3ProgramParams, computeProviderParams)
         );
-        
+
         inputValidator = storageInputValidator;
         encryptionSchemeId = ENCRYPTION_SCHEME_ID;
     }
