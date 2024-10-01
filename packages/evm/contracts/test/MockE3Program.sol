@@ -6,7 +6,7 @@ import { IE3Program, IInputValidator } from "../interfaces/IE3Program.sol";
 contract MockE3Program is IE3Program {
     error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
 
-    IInputValidator storageInputValidator;
+    IInputValidator private storageInputValidator;
 
     constructor(IInputValidator _inputValidator) {
         storageInputValidator = _inputValidator;
