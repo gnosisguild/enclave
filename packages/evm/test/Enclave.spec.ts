@@ -30,7 +30,7 @@ const FilterOkay = AddressSix;
 
 const data = "0xda7a";
 const dataHash = ethers.keccak256(data);
-const publicKeyHash = ethers.keccak256(abiCoder.encode(["uint256"], [0]));
+const _publicKeyHash = ethers.keccak256(abiCoder.encode(["uint256"], [0]));
 const proof = "0x1337";
 
 // Hash function used to compute the tree nodes.
@@ -1285,7 +1285,7 @@ describe("Enclave", function () {
       ).to.equal(true);
     });
     it("emits PlaintextOutputPublished event", async function () {
-      const { enclave, request, mocks } = await loadFixture(setup);
+      const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
       await enclave.request(
