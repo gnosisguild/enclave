@@ -2,67 +2,32 @@
 #![crate_type = "lib"]
 // #![warn(missing_docs, unused_imports)]
 
-mod cipernode_selector;
-mod committee_meta;
+mod ciphernode_selector;
 mod data;
-mod e3_request;
-mod eventbus;
-pub mod events;
-mod evm_ciphernode_registry;
-mod evm_enclave;
-mod evm_listener;
-mod evm_manager;
-mod evm_caller;
-mod evm_contracts;
+mod e3;
+mod enclave_core;
+mod enclave_node;
+mod evm;
 mod fhe;
 mod keyshare;
 mod logger;
-mod main_aggregator;
-mod main_ciphernode;
-mod ordered_set;
 mod p2p;
 mod plaintext_aggregator;
 mod plaintext_writer;
 mod public_key_writer;
 mod publickey_aggregator;
 mod sortition;
-mod utils;
 
-// TODO: this is too permissive
-pub use actix::prelude::*;
-pub use cipernode_selector::*;
-pub use committee_meta::*;
-pub use data::*;
-pub use e3_request::*;
-pub use eventbus::*;
-pub use events::*;
-pub use fhe::*;
-pub use keyshare::*;
-pub use logger::*;
-pub use main_aggregator::*;
-pub use main_ciphernode::*;
-pub use p2p::*;
-pub use plaintext_aggregator::*;
-pub use plaintext_writer::*;
-pub use public_key_writer::*;
-pub use publickey_aggregator::*;
-pub use sortition::*;
-pub use utils::*;
+pub use fhe::encode_bfv_params;
+pub use fhe::setup_bfv_params;
+pub use enclave_node::MainAggregator;
+pub use enclave_node::MainCiphernode;
 
 // TODO: move these out to a test folder
 #[cfg(test)]
 mod tests {
     use crate::{
-        cipernode_selector::CiphernodeSelector,
-        data::Data,
-        eventbus::{EventBus, GetHistory},
-        events::{E3Requested, E3id, EnclaveEvent, KeyshareCreated, PublicKeyAggregated},
-        p2p::P2p,
-        utils::{setup_crp_params, ParamsWithCrp},
-        CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, CommitteeMetaFactory,
-        DecryptionshareCreated, E3RequestManager, FheFactory, KeyshareFactory, PlaintextAggregated,
-        PlaintextAggregatorFactory, PublicKeyAggregatorFactory, ResetHistory, Seed, SharedRng,
-        SimpleLogger, Sortition,
+        ciphernode_selector::CiphernodeSelector, data::Data, e3::{CommitteeMetaFactory, E3RequestManager}, enclave_core::{CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed}, fhe::{setup_crp_params, FheFactory, ParamsWithCrp, SharedRng}, keyshare::KeyshareFactory, logger::SimpleLogger, p2p::P2p, plaintext_aggregator::PlaintextAggregatorFactory, publickey_aggregator::PublicKeyAggregatorFactory, sortition::Sortition
     };
     use actix::prelude::*;
     use alloy::primitives::Address;
