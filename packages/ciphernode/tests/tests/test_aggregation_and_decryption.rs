@@ -1,4 +1,3 @@
-
 use data::Data;
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
@@ -9,8 +8,8 @@ use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
 use p2p::P2p;
 use router::{
-    CiphernodeSelector, E3RequestRouter, LazyFhe, LazyKeyshare,
-    LazyPlaintextAggregator, LazyPublicKeyAggregator,
+    CiphernodeSelector, E3RequestRouter, LazyFhe, LazyKeyshare, LazyPlaintextAggregator,
+    LazyPublicKeyAggregator,
 };
 use sortition::Sortition;
 

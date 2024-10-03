@@ -1,4 +1,4 @@
-use std::{fs,io::Write, path::Path};
+use std::{fs, io::Write, path::Path};
 pub fn write_file_with_dirs(path: &str, content: &[u8]) -> std::io::Result<()> {
     let abs_path = if Path::new(path).is_absolute() {
         Path::new(path).to_path_buf()

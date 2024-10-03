@@ -8,7 +8,6 @@ use sortition::{GetNodes, Sortition};
 
 use super::EVMContract;
 
-
 pub struct EvmCaller {
     contracts: HashMap<String, Arc<EVMContract>>,
     bus: Addr<EventBus>,
@@ -20,10 +19,7 @@ impl Actor for EvmCaller {
 }
 
 impl EvmCaller {
-    pub fn new(
-        bus: Addr<EventBus>,
-        sortition: Addr<Sortition>,
-    ) -> Self {
+    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> Self {
         Self {
             contracts: HashMap::new(),
             bus,
@@ -35,10 +31,7 @@ impl EvmCaller {
         self.contracts.insert(name.to_string(), contract);
     }
 
-    pub fn attach(
-        bus: Addr<EventBus>,
-        sortition: Addr<Sortition>,
-    ) -> Addr<Self> {
+    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> Addr<Self> {
         let addr = Self::new(bus.clone(), sortition).start();
 
         bus.do_send(Subscribe::new(
@@ -94,10 +87,15 @@ impl Handler<EnclaveEvent> for EvmCaller {
                                     nodes,
                                     Bytes::from(data.pubkey),
                                 )
-                                .await 
+                                .await
                             {
-                                Ok(tx) => println!("Published committee public key {:?}", tx.transaction_hash),
-                                Err(e) => eprintln!("Failed to publish committee public key: {:?}", e),
+                                Ok(tx) => println!(
+                                    "Published committee public key {:?}",
+                                    tx.transaction_hash
+                                ),
+                                Err(e) => {
+                                    eprintln!("Failed to publish committee public key: {:?}", e)
+                                }
                             }
                         }
                     }
@@ -112,7 +110,9 @@ impl Handler<EnclaveEvent> for EvmCaller {
                                 )
                                 .await
                             {
-                                Ok(tx) => println!("Published plaintext output {:?}", tx.transaction_hash),
+                                Ok(tx) => {
+                                    println!("Published plaintext output {:?}", tx.transaction_hash)
+                                }
                                 Err(e) => eprintln!("Failed to publish plaintext: {:?}", e),
                             }
                         }
@@ -126,7 +126,6 @@ impl Handler<EnclaveEvent> for EvmCaller {
     }
 }
 
-
 pub async fn connect_evm_caller(
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
@@ -139,15 +138,19 @@ pub async fn connect_evm_caller(
     let enclave_instance = EVMContract::new(rpc_url, enclave_contract).await?;
     let registry_instance = EVMContract::new(rpc_url, registry_contract).await?;
 
-    evm_caller.send(AddContract {
-        name: "enclave".to_string(),
-        contract: Arc::new(enclave_instance),
-    }).await?;
+    evm_caller
+        .send(AddContract {
+            name: "enclave".to_string(),
+            contract: Arc::new(enclave_instance),
+        })
+        .await?;
 
-    evm_caller.send(AddContract {
-        name: "registry".to_string(),
-        contract: Arc::new(registry_instance),
-    }).await?;
+    evm_caller
+        .send(AddContract {
+            name: "registry".to_string(),
+            contract: Arc::new(registry_instance),
+        })
+        .await?;
 
     Ok(evm_caller)
 }

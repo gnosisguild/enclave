@@ -2041,7 +2041,6 @@ dependencies = [
  "alloy-primitives 0.6.4",
  "alloy-sol-types 0.6.4",
  "anyhow",
- "async-std",
  "bincode",
  "bs58",
  "futures-util",

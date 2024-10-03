@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
-use std::hash::{Hash, Hasher};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 #[derive(Clone)]
 pub struct OrderedSet<T: Ord>(BTreeSet<T>);

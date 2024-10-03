@@ -25,11 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("LAUNCHING AGGREGATOR");
     let registry_contract =
         Address::parse_checksummed(&args.registry_contract, None).expect("Invalid address");
-    let registry_filter_contract = Address::parse_checksummed(
-        &args.registry_filter_contract,
-        None,
-    )
-    .expect("Invalid address");
+    let registry_filter_contract =
+        Address::parse_checksummed(&args.registry_filter_contract, None).expect("Invalid address");
     let enclave_contract =
         Address::parse_checksummed(&args.enclave_contract, None).expect("Invalid address");
     let (_, handle) = MainAggregator::attach(
@@ -38,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         registry_contract,
         registry_filter_contract,
         args.pubkey_write_path.as_deref(),
-        args.plaintext_write_path.as_deref()
+        args.plaintext_write_path.as_deref(),
     )
     .await;
     let _ = tokio::join!(handle);

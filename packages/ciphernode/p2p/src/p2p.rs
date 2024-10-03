@@ -1,13 +1,12 @@
 use std::{collections::HashSet, error::Error};
 
+use crate::libp2p_router::EnclaveRouter;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
-use crate::libp2p_router::EnclaveRouter;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
-
 
 pub struct P2p {
     bus: Addr<EventBus>,

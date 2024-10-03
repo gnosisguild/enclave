@@ -7,9 +7,7 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{
-    CiphernodeSelector, CommitteeMetaFactory, E3RequestRouter, LazyFhe, LazyKeyshare,
-};
+use router::{CiphernodeSelector, CommitteeMetaFactory, E3RequestRouter, LazyFhe, LazyKeyshare};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;

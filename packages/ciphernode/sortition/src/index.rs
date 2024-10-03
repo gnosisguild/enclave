@@ -8,7 +8,11 @@ pub struct IndexSortition {
 
 impl IndexSortition {
     pub fn new(random_seed: u64, num_nodes: usize, size: usize) -> Self {
-        Self { random_seed, num_nodes, size }
+        Self {
+            random_seed,
+            num_nodes,
+            size,
+        }
     }
 
     fn get_committee(&mut self) -> Vec<usize> {

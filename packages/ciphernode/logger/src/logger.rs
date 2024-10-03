@@ -42,10 +42,13 @@ impl Handler<EnclaveEvent> for SimpleLogger {
             }
             EnclaveEvent::CiphernodeAdded { data, .. } => {
                 println!("[{}]: CiphernodeAdded({})", self.name, data.address);
-            },
-            EnclaveEvent::E3Requested { data,.. } => {
-                println!("[{}]: E3Requested(e3_id: {}, threshold_m: {} , seed: {})", self.name, data.e3_id, data.threshold_m, data.seed);
-            },
+            }
+            EnclaveEvent::E3Requested { data, .. } => {
+                println!(
+                    "[{}]: E3Requested(e3_id: {}, threshold_m: {} , seed: {})",
+                    self.name, data.e3_id, data.threshold_m, data.seed
+                );
+            }
             EnclaveEvent::EnclaveError { data, .. } => {
                 println!("[{}]: EnclaveError('{}')", self.name, data.message);
             }

@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use alloy::primitives::address;
 use bfv::EnclaveBFV;
 use p2p::EnclaveRouter;
 use sortition::DistanceSortition;
@@ -7,7 +8,6 @@ use tokio::{
     self,
     io::{self, AsyncBufReadExt, BufReader},
 };
-use alloy::primitives::address;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     

@@ -16,14 +16,13 @@ pub struct MyBehaviour {
     mdns: mdns::tokio::Behaviour,
 }
 
-
 pub struct EnclaveRouter {
     pub identity: Option<identity::Keypair>,
     pub gossipsub_config: gossipsub::Config,
     pub swarm: Option<libp2p::Swarm<MyBehaviour>>,
     pub topic: Option<gossipsub::IdentTopic>,
     evt_tx: Sender<Vec<u8>>,
-    cmd_rx: Receiver<Vec<u8>>
+    cmd_rx: Receiver<Vec<u8>>,
 }
 
 impl EnclaveRouter {
@@ -51,7 +50,7 @@ impl EnclaveRouter {
                 swarm: None,
                 topic: None,
                 evt_tx,
-                cmd_rx
+                cmd_rx,
             },
             cmd_tx,
             evt_rx,

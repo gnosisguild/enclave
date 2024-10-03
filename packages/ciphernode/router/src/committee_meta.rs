@@ -2,7 +2,6 @@ use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
 use super::EventHook;
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitteeMeta {
     pub threshold_m: usize,
@@ -18,9 +17,7 @@ impl CommitteeMetaFactory {
                 return;
             };
             let E3Requested {
-                threshold_m,
-                seed,
-                ..
+                threshold_m, seed, ..
             } = data;
 
             ctx.meta = Some(CommitteeMeta { threshold_m, seed });

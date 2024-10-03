@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use actix::{Actor, Context, Handler, Message};
+use std::collections::BTreeMap;
 
 // TODO: replace with sled version
 

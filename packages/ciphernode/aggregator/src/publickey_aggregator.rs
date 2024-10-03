@@ -190,4 +190,3 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
         Ok(())
     }
 }
-

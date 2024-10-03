@@ -427,4 +427,3 @@ impl EnclaveEvent {
         extract_enclave_event_name(&s).to_string()
     }
 }
-

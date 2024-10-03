@@ -1,5 +1,5 @@
-use actix::{Actor, Addr, Context, Handler};
 use super::write_file_with_dirs;
+use actix::{Actor, Addr, Context, Handler};
 use enclave_core::{EnclaveEvent, EventBus, Subscribe};
 
 pub struct PlaintextWriter {

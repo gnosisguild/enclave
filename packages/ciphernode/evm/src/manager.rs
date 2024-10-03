@@ -6,8 +6,8 @@ use alloy::{
     transports::BoxTransport,
 };
 use anyhow::Result;
-use std::sync::Arc;
 use enclave_core::EventBus;
+use std::sync::Arc;
 
 use super::{EvmEventListener, StartListening};
 
@@ -72,4 +72,3 @@ impl Handler<StartListening> for EvmContractManager {
         }
     }
 }
-

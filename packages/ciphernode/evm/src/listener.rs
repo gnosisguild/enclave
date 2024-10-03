@@ -7,11 +7,11 @@ use alloy::{
     transports::BoxTransport,
 };
 use anyhow::Result;
+use enclave_core::{EnclaveErrorType, EnclaveEvent, EventBus, FromError};
 use futures_util::stream::StreamExt;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use enclave_core::{EnclaveErrorType, EnclaveEvent, EventBus, FromError};
 
 pub trait ContractEvent: Send + Sync + 'static {
     fn process(&self, bus: Addr<EventBus>) -> Result<()>;
@@ -64,10 +64,7 @@ impl EvmEventListener {
                             // Send enclave error to bus
                             self.bus
                                 .clone()
-                                .do_send(EnclaveEvent::from_error(
-                                    EnclaveErrorType::Evm,
-                                    err,
-                                ));
+                                .do_send(EnclaveEvent::from_error(EnclaveErrorType::Evm, err));
                         }
                     }
                 }

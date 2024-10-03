@@ -90,7 +90,7 @@ pub struct E3RequestRouter {
 impl E3RequestRouter {
     pub fn builder(bus: Addr<EventBus>) -> E3RequestRouterBuilder {
         let builder = E3RequestRouterBuilder { bus, hooks: vec![] };
-        
+
         // Everything needs the committe meta factory so adding it here by default
         builder.add_hook(CommitteeMetaFactory::create())
     }

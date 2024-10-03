@@ -1,6 +1,6 @@
-use enclave_core::{EnclaveEvent, EventBus, Subscribe};
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
+use enclave_core::{EnclaveEvent, EventBus, Subscribe};
 
 pub struct PublicKeyWriter {
     path: String,

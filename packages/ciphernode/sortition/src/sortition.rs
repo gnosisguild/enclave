@@ -1,9 +1,8 @@
 use std::collections::HashSet;
 
-use actix::prelude::*;
 use crate::DistanceSortition;
+use actix::prelude::*;
 use enclave_core::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EventBus, Seed, Subscribe};
-
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
@@ -65,7 +64,6 @@ impl SortitionList<String> for SortitionModule {
 #[derive(Message)]
 #[rtype(result = "Vec<String>")]
 pub struct GetNodes;
-
 
 pub struct Sortition {
     list: SortitionModule,
@@ -138,4 +136,3 @@ impl Handler<GetNodes> for Sortition {
         self.get_nodes()
     }
 }
-

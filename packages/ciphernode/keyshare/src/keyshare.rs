@@ -1,11 +1,11 @@
+use actix::prelude::*;
+use anyhow::{anyhow, Context, Result};
 use data::{Data, Get, Insert};
 use enclave_core::{
     CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, EnclaveErrorType,
     EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
 use fhe::{DecryptCiphertext, Fhe};
-use actix::prelude::*;
-use anyhow::{anyhow, Context, Result};
 use std::sync::Arc;
 
 pub struct Keyshare {
@@ -135,4 +135,3 @@ async fn on_decryption_requested(
 
     Ok(())
 }
-

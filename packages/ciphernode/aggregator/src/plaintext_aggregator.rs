@@ -190,5 +190,3 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
         Ok(())
     }
 }
-
-
