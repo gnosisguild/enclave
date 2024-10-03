@@ -2,7 +2,6 @@
 #![crate_type = "lib"]
 // #![warn(missing_docs, unused_imports)]
 
-mod ciphernode_selector;
 mod data;
 mod e3;
 mod enclave_core;
@@ -27,7 +26,7 @@ pub use enclave_node::MainCiphernode;
 #[cfg(test)]
 mod tests {
     use crate::{
-        ciphernode_selector::CiphernodeSelector, data::Data, e3::{CommitteeMetaFactory, E3RequestManager}, enclave_core::{CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed}, fhe::{setup_crp_params, FheFactory, ParamsWithCrp, SharedRng}, keyshare::KeyshareFactory, logger::SimpleLogger, p2p::P2p, plaintext_aggregator::PlaintextAggregatorFactory, publickey_aggregator::PublicKeyAggregatorFactory, sortition::Sortition
+        data::Data, e3::{CommitteeMetaFactory, CiphernodeSelector, E3RequestManager}, enclave_core::{CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed}, fhe::{setup_crp_params, FheFactory, ParamsWithCrp, SharedRng}, keyshare::KeyshareFactory, logger::SimpleLogger, p2p::P2p, plaintext_aggregator::PlaintextAggregatorFactory, publickey_aggregator::PublicKeyAggregatorFactory, sortition::Sortition
     };
     use actix::prelude::*;
     use alloy::primitives::Address;

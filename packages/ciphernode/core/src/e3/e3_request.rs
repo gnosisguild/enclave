@@ -1,19 +1,11 @@
 use std::{collections::HashMap, sync::Arc};
+
 use actix::{Actor, Addr, Context, Handler, Recipient};
+
 use crate::{enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe}, fhe::Fhe, keyshare::Keyshare, plaintext_aggregator::PlaintextAggregator, publickey_aggregator::PublicKeyAggregator};
 
-use super::committee_meta::CommitteeMeta;
+use super::CommitteeMeta;
 
-
-#[derive(Default)]
-// TODO: Set this up with a Typestate pattern
-pub struct E3RequestContext {
-    pub keyshare: Option<Addr<Keyshare>>,
-    pub fhe: Option<Arc<Fhe>>,
-    pub plaintext: Option<Addr<PlaintextAggregator>>,
-    pub publickey: Option<Addr<PublicKeyAggregator>>,
-    pub meta: Option<CommitteeMeta>,
-}
 #[derive(Default)]
 struct EventBuffer {
     buffer: HashMap<String, Vec<EnclaveEvent>>,
@@ -31,6 +23,16 @@ impl EventBuffer {
             .unwrap_or_default()
     }
 }
+
+#[derive(Default)]
+pub struct E3RequestContext {
+    pub keyshare: Option<Addr<Keyshare>>,
+    pub fhe: Option<Arc<Fhe>>,
+    pub plaintext: Option<Addr<PlaintextAggregator>>,
+    pub publickey: Option<Addr<PublicKeyAggregator>>,
+    pub meta: Option<CommitteeMeta>,
+}
+
 
 impl E3RequestContext {
     fn recipients(&self) -> Vec<(String, Option<Recipient<EnclaveEvent>>)> {
