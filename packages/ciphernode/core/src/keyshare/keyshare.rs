@@ -1,9 +1,15 @@
-use std::sync::Arc;
-
+use crate::{
+    data::{Data, Get, Insert},
+    e3::EventHook,
+    enclave_core::{
+        CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, EnclaveErrorType,
+        EnclaveEvent, EventBus, FromError, KeyshareCreated,
+    },
+    fhe::{DecryptCiphertext, Fhe},
+};
 use actix::prelude::*;
 use anyhow::{anyhow, Context, Result};
-
-use crate::{data::{Data, Get, Insert}, e3::ActorFactory, enclave_core::{CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated}, fhe::{DecryptCiphertext, Fhe}};
+use std::sync::Arc;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
@@ -135,7 +141,7 @@ async fn on_decryption_requested(
 
 pub struct KeyshareFactory;
 impl KeyshareFactory {
-    pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: &str) -> ActorFactory {
+    pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: &str) -> EventHook {
         let address = address.to_string();
         Box::new(move |ctx, evt| {
             // Save Ciphernode on CiphernodeSelected

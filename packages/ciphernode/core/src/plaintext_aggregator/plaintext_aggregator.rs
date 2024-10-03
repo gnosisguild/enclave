@@ -1,5 +1,5 @@
 use crate::{
-    e3::ActorFactory,
+    e3::EventHook,
     enclave_core::{
         DecryptionshareCreated, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated, Seed,
     },
@@ -196,7 +196,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
 
 pub struct PlaintextAggregatorFactory;
 impl PlaintextAggregatorFactory {
-    pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> ActorFactory {
+    pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> EventHook {
         Box::new(move |ctx, evt| {
             // Save plaintext aggregator
             let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {

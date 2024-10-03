@@ -1,6 +1,6 @@
 use crate::enclave_core::{E3Requested, EnclaveEvent, Seed};
 
-use super::e3_request::ActorFactory;
+use super::e3_request::EventHook;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitteeMeta {
@@ -11,7 +11,7 @@ pub struct CommitteeMeta {
 pub struct CommitteeMetaFactory;
 
 impl CommitteeMetaFactory {
-    pub fn create() -> ActorFactory {
+    pub fn create() -> EventHook {
         Box::new(move |ctx, evt| {
             let EnclaveEvent::E3Requested { data, .. } = evt else {
                 return;

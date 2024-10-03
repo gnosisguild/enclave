@@ -66,13 +66,13 @@ impl E3RequestContext {
     }
 }
 
-pub type ActorFactory = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
+pub type EventHook = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
 
-// TODO: setup typestate pattern so that we have to place factories within correct order of
+// TODO: setup typestate pattern so that we have to place hooks within correct order of
 // dependencies
 pub struct E3RequestManager {
     contexts: HashMap<E3id, E3RequestContext>,
-    factories: Vec<ActorFactory>,
+    hooks: Vec<EventHook>,
     buffer: EventBuffer,
 }
 
@@ -80,25 +80,25 @@ impl E3RequestManager {
     pub fn builder(bus: Addr<EventBus>) -> E3RequestManagerBuilder {
         E3RequestManagerBuilder {
             bus,
-            factories: vec![],
+            hooks: vec![],
         }
     }
 }
 
 pub struct E3RequestManagerBuilder {
     pub bus: Addr<EventBus>,
-    pub factories: Vec<ActorFactory>,
+    pub hooks: Vec<EventHook>,
 }
 impl E3RequestManagerBuilder {
-    pub fn add_hook(mut self, listener: ActorFactory) -> Self {
-        self.factories.push(listener);
+    pub fn add_hook(mut self, listener: EventHook) -> Self {
+        self.hooks.push(listener);
         self
     }
 
     pub fn build(self) -> Addr<E3RequestManager> {
         let e3r = E3RequestManager {
             contexts: HashMap::new(),
-            factories: self.factories,
+            hooks: self.hooks,
             buffer: EventBuffer::default(),
         };
 
@@ -122,8 +122,8 @@ impl Handler<EnclaveEvent> for E3RequestManager {
 
         let context = self.contexts.entry(e3_id).or_default();
 
-        for factory in &mut self.factories {
-            factory(context, msg.clone());
+        for hook in &mut self.hooks {
+            hook(context, msg.clone());
         }
 
         context.forward_message(&msg, &mut self.buffer);

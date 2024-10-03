@@ -10,7 +10,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
 
-use crate::{e3::ActorFactory, enclave_core::{E3Requested, EnclaveEvent, OrderedSet, Seed}};
+use crate::{e3::EventHook, enclave_core::{E3Requested, EnclaveEvent, OrderedSet, Seed}};
 
 use super::set_up_crp;
 
@@ -128,7 +128,7 @@ impl Fhe {
 pub struct FheFactory;
 
 impl FheFactory {
-    pub fn create(rng: SharedRng) -> ActorFactory {
+    pub fn create(rng: SharedRng) -> EventHook {
         Box::new(move |ctx, evt| {
             // Saving the fhe on Committee Requested
             let EnclaveEvent::E3Requested { data, .. } = evt else {

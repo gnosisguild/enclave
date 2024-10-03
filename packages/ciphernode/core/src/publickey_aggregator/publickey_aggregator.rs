@@ -1,5 +1,5 @@
 use crate::{
-    e3::ActorFactory,
+    e3::EventHook,
     enclave_core::{
         E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
     },
@@ -196,7 +196,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
 
 pub struct PublicKeyAggregatorFactory;
 impl PublicKeyAggregatorFactory {
-    pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> ActorFactory {
+    pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> EventHook {
         Box::new(move |ctx, evt| {
             // Saving the publickey aggregator with deps on E3Requested
             let EnclaveEvent::E3Requested { data, .. } = evt else {
