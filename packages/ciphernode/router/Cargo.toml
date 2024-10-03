@@ -1,0 +1,13 @@
+[package]
+name = "router"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix = "0.13.5"
+enclave-core = { path = "../core" }
+sortition = { path = "../sortition" }
+fhe = { path = "../fhe" }
+data = { path = "../data" }
+keyshare = { path = "../keyshare" }
+aggregator = { path = "../aggregator" }

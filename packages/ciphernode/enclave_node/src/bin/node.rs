@@ -1,6 +1,6 @@
 use alloy::primitives::Address;
 use clap::Parser;
-use enclave_core::MainCiphernode;
+use enclave_node::MainCiphernode;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

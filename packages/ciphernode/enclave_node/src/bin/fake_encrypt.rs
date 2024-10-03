@@ -1,7 +1,7 @@
 // This is a test script designed to encrypt some fixed data to a fhe public key
 use clap::Parser;
-use enclave_core::setup_bfv_params;
-use fhe::bfv::{Encoding, Plaintext, PublicKey};
+use fhe::setup_bfv_params;
+use fhe_rs::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;

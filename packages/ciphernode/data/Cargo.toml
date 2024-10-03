@@ -1,0 +1,10 @@
+[package]
+name = "data"
+version = "0.1.0"
+edition = "2021"
+description = "Data persistence for enclave"
+repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
+
+[dependencies]
+actix = "0.13.5"
+

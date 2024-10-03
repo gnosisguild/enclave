@@ -110,6 +110,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aggregator"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "bincode",
+ "enclave-core",
+ "fhe 0.1.0",
+ "sortition",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1369,7 +1381,7 @@ name = "bfv"
 version = "0.1.0"
 dependencies = [
  "async-std",
- "fhe",
+ "fhe 0.1.0-beta.7",
  "fhe-traits",
  "fhe-util",
  "rand",
@@ -1779,6 +1791,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "data"
+version = "0.1.0"
+dependencies = [
+ "actix",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2007,7 +2026,7 @@ name = "enclave"
 version = "0.1.0"
 dependencies = [
  "async-std",
- "fhe",
+ "fhe 0.1.0-beta.7",
  "fhe-traits",
  "fhe-util",
 ]
@@ -2027,18 +2046,16 @@ dependencies = [
  "base91",
  "bincode",
  "bs58",
- "fhe",
+ "fhe 0.1.0-beta.7",
  "fhe-traits",
  "fhe-util",
  "futures-util",
  "libp2p",
- "p2p",
  "rand",
  "rand_chacha",
  "secp256k1",
  "serde",
  "sha2",
- "sortition",
  "tokio",
 ]
 
@@ -2046,23 +2063,33 @@ dependencies = [
 name = "enclave_node"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "actix-rt",
+ "aggregator",
  "alloy",
  "alloy-primitives 0.6.4",
+ "anyhow",
  "async-std",
  "base64 0.22.1",
  "base91",
  "bfv",
  "bincode",
  "clap",
+ "data",
  "enclave-core",
- "fhe",
+ "evm",
+ "fhe 0.1.0",
+ "fhe 0.1.0-beta.7",
  "fhe-traits",
  "fhe-util",
+ "keyshare",
+ "logger",
  "p2p",
  "rand",
  "rand_chacha",
+ "router",
  "sortition",
+ "test-helpers",
  "tokio",
 ]
 
@@ -2139,13 +2166,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "eyre"
-version = "0.6.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cd915d99f24784cdc19fd37ef22b97e3ff0ae756c7e492e9fbfe897d61e2aec"
+name = "evm"
+version = "0.1.0"
 dependencies = [
- "indenter",
- "once_cell",
+ "actix",
+ "alloy",
+ "alloy-primitives 0.6.4",
+ "anyhow",
+ "enclave-core",
+ "futures-util",
+ "sortition",
 ]
 
 [[package]]
@@ -2205,6 +2235,21 @@ dependencies = [
  "thiserror",
  "zeroize",
  "zeroize_derive",
+]
+
+[[package]]
+name = "fhe"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "enclave-core",
+ "fhe 0.1.0-beta.7",
+ "fhe-traits",
+ "fhe-util",
+ "rand",
+ "rand_chacha",
+ "serde",
 ]
 
 [[package]]
@@ -2923,12 +2968,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "indenter"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce23b50ad8242c51a442f3ff322d56b02f08852c77e4c0b4d3fd684abc89c683"
-
-[[package]]
 name = "indexmap"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3070,6 +3109,17 @@ checksum = "422fbc7ff2f2f5bdffeb07718e5a5324dca72b0c9293d50df4026652385e3314"
 dependencies = [
  "digest 0.10.7",
  "sha3-asm",
+]
+
+[[package]]
+name = "keyshare"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "data",
+ "enclave-core",
+ "fhe 0.1.0",
 ]
 
 [[package]]
@@ -3697,6 +3747,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "logger"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "base64 0.22.1",
+ "enclave-core",
+]
+
+[[package]]
 name = "lru"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4183,12 +4242,11 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 name = "p2p"
 version = "0.1.0"
 dependencies = [
+ "actix",
+ "anyhow",
  "async-std",
  "async-trait",
- "bfv",
- "fhe",
- "fhe-traits",
- "fhe-util",
+ "enclave-core",
  "futures",
  "libp2p",
  "tokio",
@@ -4936,6 +4994,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "router"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "aggregator",
+ "data",
+ "enclave-core",
+ "fhe 0.1.0",
+ "keyshare",
+ "sortition",
+]
+
+[[package]]
 name = "rtnetlink"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5416,11 +5487,9 @@ dependencies = [
 name = "sortition"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "alloy",
- "alloy-primitives 0.6.4",
- "alloy-sol-types 0.6.4",
- "eyre",
- "futures-util",
+ "enclave-core",
  "num",
  "rand",
 ]
@@ -5597,6 +5666,15 @@ dependencies = [
  "once_cell",
  "rustix 0.38.34",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "test-helpers"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "bincode",
+ "enclave-core",
 ]
 
 [[package]]

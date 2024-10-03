@@ -1,0 +1,11 @@
+[package]
+name = "keyshare"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+data = { path = "../data" }
+enclave-core = { path = "../core" }
+fhe = { path = "../fhe" }
+actix = "0.13.5"
+anyhow = "1.0.86"

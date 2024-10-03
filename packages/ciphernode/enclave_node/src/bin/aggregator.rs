@@ -1,6 +1,6 @@
 use alloy::primitives::Address;
 use clap::Parser;
-use enclave_core::MainAggregator;
+use enclave_node::MainAggregator;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

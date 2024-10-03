@@ -1,0 +1,16 @@
+[package]
+name = "fhe"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+enclave-core = { path = "../core" }
+anyhow = "1.0.86"
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+bincode = "1.3.3"
+serde = { version = "1.0.208", features = ["derive"] }
+
