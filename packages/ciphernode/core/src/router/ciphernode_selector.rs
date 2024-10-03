@@ -1,4 +1,5 @@
-/// CiphernodeSelector is an actor that determines if a ciphernode
+/// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
+/// forwards a CiphernodeSelected event to the event bus
 use actix::prelude::*;
 use crate::{enclave_core::{CiphernodeSelected, EnclaveEvent, EventBus, Subscribe}, sortition::{GetHasNode, Sortition}};
 

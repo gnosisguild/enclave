@@ -1,9 +1,11 @@
 use crate::{
     data::{Data, Get, Insert},
     enclave_core::{
-        CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, EnclaveErrorType, EnclaveEvent, EventBus, EventHook, FromError, KeyshareCreated
+        CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, EnclaveErrorType,
+        EnclaveEvent, EventBus, FromError, KeyshareCreated,
     },
     fhe::{DecryptCiphertext, Fhe},
+    router::EventHook,
 };
 use actix::prelude::*;
 use anyhow::{anyhow, Context, Result};

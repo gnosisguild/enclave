@@ -4,6 +4,8 @@ use actix::{Actor, Addr, Context, Handler, Recipient};
 use crate::{enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe}, fhe::Fhe, keyshare::Keyshare, plaintext_aggregator::PlaintextAggregator, publickey_aggregator::PublicKeyAggregator};
 use super::CommitteeMeta;
 
+
+/// Helper class to buffer events for downstream instances incase events arrive in the wrong order
 #[derive(Default)]
 struct EventBuffer {
     buffer: HashMap<String, Vec<EnclaveEvent>>,
@@ -22,6 +24,8 @@ impl EventBuffer {
     }
 }
 
+/// Context that is set to each event hook. Hooks can use this context to gather dependencies if
+/// they need to instantiate struct instances or actors.
 #[derive(Default)]
 pub struct E3RequestContext {
     pub keyshare: Option<Addr<Keyshare>>,
@@ -109,7 +113,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
     }
 }
 
-
+/// Builder for E3RequestRouter
 pub struct E3RequestRouterBuilder {
     pub bus: Addr<EventBus>,
     pub hooks: Vec<EventHook>,

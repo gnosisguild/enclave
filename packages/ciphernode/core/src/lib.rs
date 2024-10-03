@@ -12,6 +12,7 @@ mod logger;
 mod p2p;
 mod plaintext_aggregator;
 mod publickey_aggregator;
+mod router;
 mod sortition;
 mod utils;
 
@@ -26,10 +27,9 @@ mod tests {
     use crate::{
         data::Data,
         enclave_core::{
-            CiphernodeAdded, CiphernodeSelected, CiphernodeSelector, CiphertextOutputPublished,
-            CommitteeMetaFactory, DecryptionshareCreated, E3RequestRouter, E3Requested, E3id,
-            EnclaveEvent, EventBus, GetHistory, KeyshareCreated, PlaintextAggregated,
-            PublicKeyAggregated, ResetHistory, Seed,
+            CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
+            E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated,
+            PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
         },
         fhe::{setup_crp_params, FheFactory, ParamsWithCrp, SharedRng},
         keyshare::KeyshareFactory,
@@ -37,6 +37,7 @@ mod tests {
         p2p::P2p,
         plaintext_aggregator::PlaintextAggregatorFactory,
         publickey_aggregator::PublicKeyAggregatorFactory,
+        router::{CiphernodeSelector, CommitteeMetaFactory, E3RequestRouter},
         sortition::Sortition,
     };
     use actix::prelude::*;

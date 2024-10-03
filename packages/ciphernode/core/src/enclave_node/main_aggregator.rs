@@ -1,14 +1,14 @@
 use crate::{
-    enclave_core::{EventBus,CommitteeMetaFactory, E3RequestRouter},
+    enclave_core::EventBus,
     evm::{connect_evm_caller, connect_evm_ciphernode_registry, connect_evm_enclave},
     fhe::FheFactory,
     logger::SimpleLogger,
     p2p::P2p,
     plaintext_aggregator::PlaintextAggregatorFactory,
     publickey_aggregator::PublicKeyAggregatorFactory,
+    router::{CommitteeMetaFactory, E3RequestRouter},
     sortition::Sortition,
-    utils::PlaintextWriter,
-    utils::PublicKeyWriter,
+    utils::{PlaintextWriter, PublicKeyWriter},
 };
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;

@@ -1,9 +1,9 @@
 use crate::{
     enclave_core::{
-        E3id, EnclaveEvent, EventBus, EventHook, KeyshareCreated, OrderedSet, PublicKeyAggregated,
-        Seed,
+        E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
     },
     fhe::{Fhe, GetAggregatePublicKey},
+    router::EventHook,
     sortition::{GetHasNode, Sortition},
 };
 use actix::prelude::*;

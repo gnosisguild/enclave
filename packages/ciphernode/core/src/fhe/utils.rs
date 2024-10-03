@@ -4,7 +4,7 @@ use fhe::{
     mbfv::CommonRandomPoly,
 };
 use fhe_traits::{Deserialize, Serialize};
-use std::{fs, io::Write, path::Path, sync::Arc};
+use std::sync::Arc;
 
 use super::SharedRng;
 
@@ -59,5 +59,3 @@ pub fn decode_params(bytes: &[u8]) -> Result<Arc<BfvParameters>> {
 pub fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
     CommonRandomPoly::new(&params, &mut *rng.lock().unwrap()).unwrap()
 }
-
-

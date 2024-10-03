@@ -1,5 +1,5 @@
 use super::set_up_crp;
-use crate::enclave_core::{E3Requested, EnclaveEvent, EventHook, OrderedSet, Seed};
+use crate::{enclave_core::{E3Requested, EnclaveEvent,OrderedSet, Seed}, router::EventHook};
 use anyhow::*;
 use fhe::{
     bfv::{
