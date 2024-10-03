@@ -5,7 +5,7 @@ sequenceDiagram
     autonumber
     participant EVM as EVM
     participant CS as CiphernodeSelector
-    participant E3 as E3Factory
+    participant E3 as E3RequestManager
     participant KS as Keyshare
     participant PKA as PublicKeyAggregator
     participant S as Sortition
@@ -31,7 +31,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant EVM as EVM
-    participant E3 as E3Factory
+    participant E3 as E3RequestManager
     participant KS as Keyshare
     participant PTA as PlaintextAggregator
     participant S as Sortition
