@@ -12,8 +12,6 @@ mod keyshare;
 mod logger;
 mod p2p;
 mod plaintext_aggregator;
-mod plaintext_writer;
-mod public_key_writer;
 mod publickey_aggregator;
 mod sortition;
 mod utils;
