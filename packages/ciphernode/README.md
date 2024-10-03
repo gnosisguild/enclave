@@ -44,8 +44,8 @@ sequenceDiagram
         S--)-PTA: yes
     end
     PTA--)EVM: PlaintextAggregated
-    PTA--)KS: PlaintextAggregated
+    PTA--)+KS: PlaintextAggregated
     PTA--)PTA: Stop
-    KS--)KS: Stop
+    KS--)-KS: Stop
 ```
 
