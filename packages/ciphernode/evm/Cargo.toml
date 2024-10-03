@@ -4,14 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-actix = "0.13.5"
-alloy = { version = "0.3.3", features = ["full"] }
-alloy-primitives = { version = "0.6", default-features = false, features = [
-  "rlp",
-  "serde",
-  "std",
-] }
-anyhow = "1.0.86"
+actix = { workspace = true }
+alloy = { workspace = true }
+alloy-primitives = { workspace = true }
+anyhow = { workspace = true }
 enclave-core = { path = "../core" }
-futures-util = "0.3"
+futures-util = { workspace = true }
 sortition = { path = "../sortition" }
