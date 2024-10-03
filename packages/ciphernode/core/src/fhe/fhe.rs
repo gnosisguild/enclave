@@ -1,3 +1,5 @@
+use super::set_up_crp;
+use crate::enclave_core::{E3Requested, EnclaveEvent, EventHook, OrderedSet, Seed};
 use anyhow::*;
 use fhe::{
     bfv::{
@@ -9,10 +11,6 @@ use fhe_traits::{Deserialize, DeserializeParametrized, FheDecoder, Serialize};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
-
-use crate::{e3::EventHook, enclave_core::{E3Requested, EnclaveEvent, OrderedSet, Seed}};
-
-use super::set_up_crp;
 
 pub struct GetAggregatePublicKey {
     pub keyshares: OrderedSet<Vec<u8>>,

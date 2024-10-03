@@ -1,6 +1,5 @@
 use crate::{
-    e3::{CommitteeMetaFactory, E3RequestManager},
-    enclave_core::EventBus,
+    enclave_core::{EventBus,CommitteeMetaFactory, E3RequestRouter},
     evm::{connect_evm_caller, connect_evm_ciphernode_registry, connect_evm_enclave},
     fhe::FheFactory,
     logger::SimpleLogger,
@@ -22,7 +21,7 @@ use tokio::task::JoinHandle;
 /// Suprvises all children
 // TODO: add supervision logic
 pub struct MainAggregator {
-    e3_manager: Addr<E3RequestManager>,
+    e3_manager: Addr<E3RequestRouter>,
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
     p2p: Addr<P2p>,
@@ -33,7 +32,7 @@ impl MainAggregator {
         bus: Addr<EventBus>,
         sortition: Addr<Sortition>,
         p2p: Addr<P2p>,
-        e3_manager: Addr<E3RequestManager>,
+        e3_manager: Addr<E3RequestRouter>,
     ) -> Self {
         Self {
             e3_manager,
@@ -69,7 +68,7 @@ impl MainAggregator {
         )
         .await;
 
-        let e3_manager = E3RequestManager::builder(bus.clone())
+        let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
             .add_hook(FheFactory::create(rng))
             .add_hook(PublicKeyAggregatorFactory::create(

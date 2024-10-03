@@ -1,3 +1,4 @@
+/// CiphernodeSelector is an actor that determines if a ciphernode
 use actix::prelude::*;
 use crate::{enclave_core::{CiphernodeSelected, EnclaveEvent, EventBus, Subscribe}, sortition::{GetHasNode, Sortition}};
 

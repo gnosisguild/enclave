@@ -1,7 +1,7 @@
 use crate::{
-    e3::EventHook,
     enclave_core::{
-        DecryptionshareCreated, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated, Seed,
+        DecryptionshareCreated, E3id, EnclaveEvent, EventBus, EventHook, OrderedSet,
+        PlaintextAggregated, Seed,
     },
     fhe::{Fhe, GetAggregatePlaintext},
     sortition::{GetHasNode, Sortition},

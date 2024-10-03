@@ -3,7 +3,6 @@
 // #![warn(missing_docs, unused_imports)]
 
 mod data;
-mod e3;
 mod enclave_core;
 mod enclave_node;
 mod evm;
@@ -16,16 +15,29 @@ mod publickey_aggregator;
 mod sortition;
 mod utils;
 
-pub use fhe::encode_bfv_params;
-pub use fhe::setup_bfv_params;
 pub use enclave_node::MainAggregator;
 pub use enclave_node::MainCiphernode;
+pub use fhe::encode_bfv_params;
+pub use fhe::setup_bfv_params;
 
 // TODO: move these out to a test folder
 #[cfg(test)]
 mod tests {
     use crate::{
-        data::Data, e3::{CommitteeMetaFactory, CiphernodeSelector, E3RequestManager}, enclave_core::{CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed}, fhe::{setup_crp_params, FheFactory, ParamsWithCrp, SharedRng}, keyshare::KeyshareFactory, logger::SimpleLogger, p2p::P2p, plaintext_aggregator::PlaintextAggregatorFactory, publickey_aggregator::PublicKeyAggregatorFactory, sortition::Sortition
+        data::Data,
+        enclave_core::{
+            CiphernodeAdded, CiphernodeSelected, CiphernodeSelector, CiphertextOutputPublished,
+            CommitteeMetaFactory, DecryptionshareCreated, E3RequestRouter, E3Requested, E3id,
+            EnclaveEvent, EventBus, GetHistory, KeyshareCreated, PlaintextAggregated,
+            PublicKeyAggregated, ResetHistory, Seed,
+        },
+        fhe::{setup_crp_params, FheFactory, ParamsWithCrp, SharedRng},
+        keyshare::KeyshareFactory,
+        logger::SimpleLogger,
+        p2p::P2p,
+        plaintext_aggregator::PlaintextAggregatorFactory,
+        publickey_aggregator::PublicKeyAggregatorFactory,
+        sortition::Sortition,
     };
     use actix::prelude::*;
     use alloy::primitives::Address;
@@ -56,7 +68,7 @@ mod tests {
         let sortition = Sortition::attach(bus.clone());
         CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
 
-        E3RequestManager::builder(bus.clone())
+        E3RequestRouter::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
             .add_hook(FheFactory::create(rng))
             .add_hook(PublicKeyAggregatorFactory::create(

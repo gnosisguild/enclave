@@ -1,9 +1,7 @@
 use crate::{
     data::{Data, Get, Insert},
-    e3::EventHook,
     enclave_core::{
-        CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, EnclaveErrorType,
-        EnclaveEvent, EventBus, FromError, KeyshareCreated,
+        CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, EnclaveErrorType, EnclaveEvent, EventBus, EventHook, FromError, KeyshareCreated
     },
     fhe::{DecryptCiphertext, Fhe},
 };

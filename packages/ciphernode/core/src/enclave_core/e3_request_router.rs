@@ -1,9 +1,7 @@
+
 use std::{collections::HashMap, sync::Arc};
-
 use actix::{Actor, Addr, Context, Handler, Recipient};
-
 use crate::{enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe}, fhe::Fhe, keyshare::Keyshare, plaintext_aggregator::PlaintextAggregator, publickey_aggregator::PublicKeyAggregator};
-
 use super::CommitteeMeta;
 
 #[derive(Default)]
@@ -66,54 +64,35 @@ impl E3RequestContext {
     }
 }
 
+/// Format of the hook that needs to be passed to E3RequestRouter
 pub type EventHook = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
 
+/// E3RequestRouter will register hooks that receive an E3_id specific context. After hooks
+/// have run e3_id specific messages are forwarded to all instances on the context. This enables
+/// hooks to lazily register instances that have the correct dependencies available per e3_id
+/// request
 // TODO: setup typestate pattern so that we have to place hooks within correct order of
 // dependencies
-pub struct E3RequestManager {
+pub struct E3RequestRouter {
     contexts: HashMap<E3id, E3RequestContext>,
     hooks: Vec<EventHook>,
     buffer: EventBuffer,
 }
 
-impl E3RequestManager {
-    pub fn builder(bus: Addr<EventBus>) -> E3RequestManagerBuilder {
-        E3RequestManagerBuilder {
+impl E3RequestRouter {
+    pub fn builder(bus: Addr<EventBus>) -> E3RequestRouterBuilder {
+        E3RequestRouterBuilder {
             bus,
             hooks: vec![],
         }
     }
 }
 
-pub struct E3RequestManagerBuilder {
-    pub bus: Addr<EventBus>,
-    pub hooks: Vec<EventHook>,
-}
-impl E3RequestManagerBuilder {
-    pub fn add_hook(mut self, listener: EventHook) -> Self {
-        self.hooks.push(listener);
-        self
-    }
-
-    pub fn build(self) -> Addr<E3RequestManager> {
-        let e3r = E3RequestManager {
-            contexts: HashMap::new(),
-            hooks: self.hooks,
-            buffer: EventBuffer::default(),
-        };
-
-        let addr = e3r.start();
-        self.bus
-            .do_send(Subscribe::new("*", addr.clone().recipient()));
-        addr
-    }
-}
-
-impl Actor for E3RequestManager {
+impl Actor for E3RequestRouter {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for E3RequestManager {
+impl Handler<EnclaveEvent> for E3RequestRouter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let Some(e3_id) = msg.get_e3_id() else {
@@ -127,5 +106,30 @@ impl Handler<EnclaveEvent> for E3RequestManager {
         }
 
         context.forward_message(&msg, &mut self.buffer);
+    }
+}
+
+
+pub struct E3RequestRouterBuilder {
+    pub bus: Addr<EventBus>,
+    pub hooks: Vec<EventHook>,
+}
+impl E3RequestRouterBuilder {
+    pub fn add_hook(mut self, listener: EventHook) -> Self {
+        self.hooks.push(listener);
+        self
+    }
+
+    pub fn build(self) -> Addr<E3RequestRouter> {
+        let e3r = E3RequestRouter {
+            contexts: HashMap::new(),
+            hooks: self.hooks,
+            buffer: EventBuffer::default(),
+        };
+
+        let addr = e3r.start();
+        self.bus
+            .do_send(Subscribe::new("*", addr.clone().recipient()));
+        addr
     }
 }

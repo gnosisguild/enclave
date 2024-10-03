@@ -1,6 +1,7 @@
 use crate::enclave_core::{E3Requested, EnclaveEvent, Seed};
 
-use super::e3_request::EventHook;
+use super::EventHook;
+
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitteeMeta {

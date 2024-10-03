@@ -1,7 +1,6 @@
 use crate::{
     data::Data,
-    e3::{CiphernodeSelector, CommitteeMetaFactory, E3RequestManager},
-    enclave_core::EventBus,
+    enclave_core::{CiphernodeSelector, CommitteeMetaFactory, E3RequestRouter, EventBus},
     evm::{connect_evm_ciphernode_registry, connect_evm_enclave},
     fhe::FheFactory,
     keyshare::KeyshareFactory,
@@ -25,7 +24,7 @@ pub struct MainCiphernode {
     data: Addr<Data>,
     sortition: Addr<Sortition>,
     selector: Addr<CiphernodeSelector>,
-    e3_manager: Addr<E3RequestManager>,
+    e3_manager: Addr<E3RequestRouter>,
     p2p: Addr<P2p>,
 }
 
@@ -37,7 +36,7 @@ impl MainCiphernode {
         sortition: Addr<Sortition>,
         selector: Addr<CiphernodeSelector>,
         p2p: Addr<P2p>,
-        e3_manager: Addr<E3RequestManager>,
+        e3_manager: Addr<E3RequestRouter>,
     ) -> Self {
         Self {
             addr,
@@ -68,7 +67,7 @@ impl MainCiphernode {
         connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
         let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
 
-        let e3_manager = E3RequestManager::builder(bus.clone())
+        let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())
             .add_hook(FheFactory::create(rng))
             .add_hook(KeyshareFactory::create(
