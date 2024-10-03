@@ -14,8 +14,17 @@ fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-bet
 async-std = { version = "1.12", features = ["attributes"] }
 async-trait = "0.1"
 futures = "0.3.30"
-libp2p = { version = "0.53.2", features = [ "async-std", "identify", "macros", "noise", "ping", "rendezvous", "tcp", "tokio", "yamux"] }
+libp2p = { version = "0.53.2", features = [
+  "async-std",
+  "identify",
+  "macros",
+  "noise",
+  "ping",
+  "rendezvous",
+  "tcp",
+  "tokio",
+  "yamux",
+] }
 tokio = { version = "1.38", features = ["rt-multi-thread", "macros", "time"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-

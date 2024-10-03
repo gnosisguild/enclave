@@ -22,7 +22,11 @@ fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-bet
 async-std = "1.12.0"
 tokio = { version = "1.38", features = ["full"] }
 actix-rt = "2.10.0"
-alloy-primitives = { version = "0.6", default-features = false, features = ["rlp", "serde", "std"] }
+alloy-primitives = { version = "0.6", default-features = false, features = [
+  "rlp",
+  "serde",
+  "std",
+] }
 alloy = { version = "0.3.3", features = ["full"] }
 clap = { version = "4.5.17", features = ["derive"] }
 rand_chacha = "0.3.1"
@@ -32,4 +36,3 @@ base91 = "0.1.0"
 base64 = "0.22.1"
 actix = "0.13.5"
 anyhow = "1.0.86"
-

@@ -7,4 +7,3 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
 [dependencies]
 actix = "0.13.5"
-

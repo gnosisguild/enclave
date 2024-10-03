@@ -1,5 +1,20 @@
 [workspace]
-members = ["core", "enclave", "enclave_node", "p2p", "bfv", "data", "evm", "fhe", "router", "keyshare", "aggregator", "test_helpers", "logger", "tests"]
+members = [
+  "core",
+  "enclave",
+  "enclave_node",
+  "p2p",
+  "bfv",
+  "data",
+  "evm",
+  "fhe",
+  "router",
+  "keyshare",
+  "aggregator",
+  "test_helpers",
+  "logger",
+  "tests",
+]
 
 [workspace.dependencies]
 actix = "0.13.5"
