@@ -8,7 +8,7 @@ use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use router::{
-    CiphernodeSelector, CommitteeMetaFactory, E3RequestRouter, FheFactory, KeyshareFactory,
+    CiphernodeSelector, CommitteeMetaFactory, E3RequestRouter, LazyFhe, LazyKeyshare,
 };
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
@@ -67,9 +67,8 @@ impl MainCiphernode {
         let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
 
         let e3_manager = E3RequestRouter::builder(bus.clone())
-            .add_hook(CommitteeMetaFactory::create())
-            .add_hook(FheFactory::create(rng))
-            .add_hook(KeyshareFactory::create(
+            .add_hook(LazyFhe::create(rng))
+            .add_hook(LazyKeyshare::create(
                 bus.clone(),
                 data.clone(),
                 &address.to_string(),

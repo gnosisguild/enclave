@@ -7,8 +7,8 @@ use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use router::{
-    CommitteeMetaFactory, E3RequestRouter, FheFactory, PlaintextAggregatorFactory,
-    PublicKeyAggregatorFactory,
+    CommitteeMetaFactory, E3RequestRouter, LazyFhe, LazyPlaintextAggregator,
+    LazyPublicKeyAggregator,
 };
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
@@ -67,13 +67,12 @@ impl MainAggregator {
         .await;
 
         let e3_manager = E3RequestRouter::builder(bus.clone())
-            .add_hook(CommitteeMetaFactory::create())
-            .add_hook(FheFactory::create(rng))
-            .add_hook(PublicKeyAggregatorFactory::create(
+            .add_hook(LazyFhe::create(rng))
+            .add_hook(LazyPublicKeyAggregator::create(
                 bus.clone(),
                 sortition.clone(),
             ))
-            .add_hook(PlaintextAggregatorFactory::create(
+            .add_hook(LazyPlaintextAggregator::create(
                 bus.clone(),
                 sortition.clone(),
             ))

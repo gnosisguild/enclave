@@ -1,9 +1,11 @@
+use crate::CommitteeMetaFactory;
+
 use super::CommitteeMeta;
+use aggregator::PlaintextAggregator;
+use aggregator::PublicKeyAggregator;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use fhe::Fhe;
 use keyshare::Keyshare;
-use aggregator::PlaintextAggregator;
-use aggregator::PublicKeyAggregator;
 
 use actix::{Actor, Addr, Context, Handler, Recipient};
 use std::{collections::HashMap, sync::Arc};
@@ -87,7 +89,10 @@ pub struct E3RequestRouter {
 
 impl E3RequestRouter {
     pub fn builder(bus: Addr<EventBus>) -> E3RequestRouterBuilder {
-        E3RequestRouterBuilder { bus, hooks: vec![] }
+        let builder = E3RequestRouterBuilder { bus, hooks: vec![] };
+        
+        // Everything needs the committe meta factory so adding it here by default
+        builder.add_hook(CommitteeMetaFactory::create())
     }
 }
 

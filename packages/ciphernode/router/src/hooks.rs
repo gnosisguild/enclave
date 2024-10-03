@@ -8,9 +8,9 @@ use keyshare::Keyshare;
 use sortition::Sortition;
 use std::sync::Arc;
 
-pub struct FheFactory;
+pub struct LazyFhe;
 
-impl FheFactory {
+impl LazyFhe {
     pub fn create(rng: SharedRng) -> EventHook {
         Box::new(move |ctx, evt| {
             // Saving the fhe on Committee Requested
@@ -26,8 +26,8 @@ impl FheFactory {
     }
 }
 
-pub struct KeyshareFactory;
-impl KeyshareFactory {
+pub struct LazyKeyshare;
+impl LazyKeyshare {
     pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: &str) -> EventHook {
         let address = address.to_string();
         Box::new(move |ctx, evt| {
@@ -46,8 +46,8 @@ impl KeyshareFactory {
     }
 }
 
-pub struct PlaintextAggregatorFactory;
-impl PlaintextAggregatorFactory {
+pub struct LazyPlaintextAggregator;
+impl LazyPlaintextAggregator {
     pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> EventHook {
         Box::new(move |ctx, evt| {
             // Save plaintext aggregator
@@ -77,8 +77,8 @@ impl PlaintextAggregatorFactory {
     }
 }
 
-pub struct PublicKeyAggregatorFactory;
-impl PublicKeyAggregatorFactory {
+pub struct LazyPublicKeyAggregator;
+impl LazyPublicKeyAggregator {
     pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> EventHook {
         Box::new(move |ctx, evt| {
             // Saving the publickey aggregator with deps on E3Requested
