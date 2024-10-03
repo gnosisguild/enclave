@@ -114,7 +114,7 @@ PRIVATE_KEY=$PRIVATE_KEY yarn ciphernode:aggregator --rpc "$RPC_URL" --enclave-c
 
 sleep 1
 
-waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/node" "$ROOT_DIR/packages/ciphernode/target/debug/aggregator" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
+waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/aggregator" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 
 heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
