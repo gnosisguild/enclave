@@ -2025,10 +2025,11 @@ dependencies = [
 name = "enclave"
 version = "0.1.0"
 dependencies = [
- "async-std",
- "fhe 0.1.0-beta.7",
- "fhe-traits",
- "fhe-util",
+ "actix-rt",
+ "alloy",
+ "clap",
+ "enclave_node",
+ "tokio",
 ]
 
 [[package]]
@@ -5645,7 +5646,13 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "bincode",
+ "clap",
  "enclave-core",
+ "fhe 0.1.0",
+ "fhe 0.1.0-beta.7",
+ "fhe-traits",
+ "rand",
+ "rand_chacha",
 ]
 
 [[package]]
