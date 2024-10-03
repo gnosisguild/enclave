@@ -1,12 +1,20 @@
-use std::sync::{Arc, Mutex};
-
+use crate::{
+    data::Data,
+    e3::{CiphernodeSelector, CommitteeMetaFactory, E3RequestManager},
+    enclave_core::EventBus,
+    evm::{connect_evm_ciphernode_registry, connect_evm_enclave},
+    fhe::FheFactory,
+    keyshare::KeyshareFactory,
+    logger::SimpleLogger,
+    p2p::P2p,
+    sortition::Sortition,
+};
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
+use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
-
-use crate::{data::Data, e3::{CiphernodeSelector, CommitteeMetaFactory, E3RequestManager}, enclave_core::EventBus, evm::{connect_evm_ciphernode_registry, connect_evm_enclave}, fhe::FheFactory, keyshare::KeyshareFactory, logger::SimpleLogger, p2p::P2p, sortition::Sortition};
 
 /// Main Ciphernode Actor
 /// Suprvises all children

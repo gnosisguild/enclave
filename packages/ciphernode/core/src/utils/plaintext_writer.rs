@@ -1,6 +1,6 @@
 use actix::{Actor, Addr, Context, Handler};
-
-use crate::{enclave_core::{EnclaveEvent, EventBus, Subscribe}, fhe::write_file_with_dirs};
+use super::write_file_with_dirs;
+use crate::enclave_core::{EnclaveEvent, EventBus, Subscribe};
 
 pub struct PlaintextWriter {
     path: String,
@@ -35,8 +35,7 @@ impl Handler<EnclaveEvent> for PlaintextWriter {
 
             // NOTE: panicking is kind of what we want here for now as we don't really need to handle the
             // error yet not knowing if this feature will be in production
-            write_file_with_dirs(&self.path, format!("{}", contents.join(",")).as_bytes())
-                .unwrap();
+            write_file_with_dirs(&self.path, format!("{}", contents.join(",")).as_bytes()).unwrap();
         }
     }
 }

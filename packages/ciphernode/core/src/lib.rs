@@ -16,6 +16,7 @@ mod plaintext_writer;
 mod public_key_writer;
 mod publickey_aggregator;
 mod sortition;
+mod utils;
 
 pub use fhe::encode_bfv_params;
 pub use fhe::setup_bfv_params;

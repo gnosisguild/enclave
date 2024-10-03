@@ -1,11 +1,22 @@
+use crate::{
+    e3::{CommitteeMetaFactory, E3RequestManager},
+    enclave_core::EventBus,
+    evm::{connect_evm_caller, connect_evm_ciphernode_registry, connect_evm_enclave},
+    fhe::FheFactory,
+    logger::SimpleLogger,
+    p2p::P2p,
+    plaintext_aggregator::PlaintextAggregatorFactory,
+    publickey_aggregator::PublicKeyAggregatorFactory,
+    sortition::Sortition,
+    utils::PlaintextWriter,
+    utils::PublicKeyWriter,
+};
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
-
-use crate::{e3::{CommitteeMetaFactory, E3RequestManager}, enclave_core::EventBus, evm::{connect_evm_caller, connect_evm_ciphernode_registry, connect_evm_enclave}, fhe::FheFactory, logger::SimpleLogger, p2p::P2p, plaintext_aggregator::PlaintextAggregatorFactory, plaintext_writer::PlaintextWriter, public_key_writer::PublicKeyWriter, publickey_aggregator::PublicKeyAggregatorFactory, sortition::Sortition};
 
 /// Main Ciphernode Actor
 /// Suprvises all children
@@ -49,7 +60,14 @@ impl MainAggregator {
 
         connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
         let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
-        let _ = connect_evm_caller(bus.clone(), sortition.clone(), rpc_url, enclave_contract, registry_filter_contract).await;    
+        let _ = connect_evm_caller(
+            bus.clone(),
+            sortition.clone(),
+            rpc_url,
+            enclave_contract,
+            registry_filter_contract,
+        )
+        .await;
 
         let e3_manager = E3RequestManager::builder(bus.clone())
             .add_hook(CommitteeMetaFactory::create())

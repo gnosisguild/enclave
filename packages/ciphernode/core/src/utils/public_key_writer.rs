@@ -1,7 +1,5 @@
-use crate::{
-    enclave_core::{EnclaveEvent, EventBus, Subscribe},
-    fhe::write_file_with_dirs,
-};
+use crate::enclave_core::{EnclaveEvent, EventBus, Subscribe};
+use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
 
 pub struct PublicKeyWriter {
