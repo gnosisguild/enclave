@@ -19,7 +19,10 @@ jobs:
       with:
         toolchain: 1.81.0
         override: true
-    
+
+    - name: Checking code format
+      run: cd ./packages/ciphernode && cargo fmt -- --check
+
     - name: Run tests
       run: |
         cd ./packages/ciphernode/
