@@ -22,9 +22,7 @@ sequenceDiagram
         S--)-PKA: yes
     end
     PKA--)EVM: PublicKeyAggregated
-    PKA--)+KS: PublicKeyAggregated
     PKA--)PKA: Stop
-    KS--)-KS: Stop
 ```
 
 # Ciphertext output published
