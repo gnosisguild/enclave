@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 enclave-core = { path = "../core" }
-actix = "0.13.5"
-base64 = "0.22.1"
+actix = { workspace = true }
+base64 = { workspace = true }

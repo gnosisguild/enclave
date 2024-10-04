@@ -1371,12 +1371,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
-name = "base91"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4eb5fbae7b5ee422f239444a3dca9bdf5ecb3abf3af1bf87c8097db3f7bc025"
-
-[[package]]
 name = "bfv"
 version = "0.1.0"
 dependencies = [
@@ -5660,7 +5654,6 @@ dependencies = [
  "anyhow",
  "async-std",
  "base64 0.22.1",
- "base91",
  "bfv",
  "bincode",
  "clap",

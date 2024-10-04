@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-actix = "0.13.5"
+actix = { workspace = true }
 enclave-core = { path = "../core" }
 sortition = { path = "../sortition" }
 fhe = { path = "../fhe" }
