@@ -1,7 +1,9 @@
 use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-use super::events::{EnclaveEvent, EventId};
+use crate::EnclaveErrorType;
+
+use super::events::{EnclaveEvent, EventId, FromError};
 
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
@@ -111,5 +113,26 @@ impl Handler<EnclaveEvent> for EventBus {
         if self.capture {
             self.add_to_history(event);
         }
+    }
+}
+
+pub trait BusError {
+    fn forward_err<T>(&self, err_type: EnclaveErrorType, result: anyhow::Result<T>) -> Option<T>;
+}
+
+impl BusError for Addr<EventBus> {
+    fn forward_err<T>(&self, err_type: EnclaveErrorType, result: anyhow::Result<T>) -> Option<T> {
+        self.clone().recipient().forward_err(err_type, result)
+    }
+}
+impl BusError for Recipient<EnclaveEvent> {
+    fn forward_err<T>(&self, err_type: EnclaveErrorType, result: anyhow::Result<T>) -> Option<T> {
+        result.map_or_else(
+            |err| {
+                self.do_send(EnclaveEvent::from_error(err_type, err));
+                None
+            },
+            |val| Some(val),
+        )
     }
 }

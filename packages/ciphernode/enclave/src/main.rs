@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let enclave_contract =
         Address::parse_checksummed(&args.enclave_contract, None).expect("Invalid address");
     let (_, handle) =
-        MainCiphernode::attach(address, &args.rpc, enclave_contract, registry_contract).await;
+        MainCiphernode::attach(address, &args.rpc, enclave_contract, registry_contract).await?;
     let _ = tokio::join!(handle);
     Ok(())
 }

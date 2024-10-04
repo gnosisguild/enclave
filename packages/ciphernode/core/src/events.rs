@@ -1,11 +1,17 @@
 use actix::Message;
-use alloy::{hex, primitives::Uint};
+use alloy::{
+    hex,
+    primitives::{Uint, U256},
+};
+use alloy_primitives::ruint::ParseError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fmt::{self, Display},
     hash::{DefaultHasher, Hash, Hasher},
 };
+
+use crate::OrderedSet;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct E3id(pub String);
@@ -36,6 +42,13 @@ impl From<String> for E3id {
 impl From<&str> for E3id {
     fn from(value: &str) -> Self {
         E3id::new(value)
+    }
+}
+
+impl TryFrom<E3id> for U256 {
+    type Error = ParseError;
+    fn try_from(value: E3id) -> Result<Self, Self::Error> {
+        U256::from_str_radix(&value.0, 10)
     }
 }
 
@@ -296,6 +309,7 @@ pub struct DecryptionshareCreated {
 pub struct PublicKeyAggregated {
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
+    pub nodes: OrderedSet<String>
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

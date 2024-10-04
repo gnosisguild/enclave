@@ -1,8 +1,9 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
+use anyhow::Result;
 use data::Data;
 use enclave_core::EventBus;
-use evm::{connect_evm_ciphernode_registry, connect_evm_enclave};
+use evm::{CiphernodeRegistrySolReader, EnclaveSolReader};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
@@ -51,7 +52,7 @@ impl MainCiphernode {
         rpc_url: &str,
         enclave_contract: Address,
         registry_contract: Address,
-    ) -> (Addr<Self>, JoinHandle<()>) {
+    ) -> Result<(Addr<Self>, JoinHandle<()>)> {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
@@ -61,8 +62,8 @@ impl MainCiphernode {
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
-        connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
-        let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
+        EnclaveSolReader::attach(bus.clone(), rpc_url, enclave_contract).await?;
+        CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, registry_contract).await?;
 
         let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(LazyFhe::create(rng))
@@ -82,7 +83,7 @@ impl MainCiphernode {
             address, bus, data, sortition, selector, p2p_addr, e3_manager,
         )
         .start();
-        (main_addr, join_handle)
+        Ok((main_addr, join_handle))
     }
 }
 

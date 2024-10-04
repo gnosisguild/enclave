@@ -1,8 +1,6 @@
 use data::Data;
 use enclave_core::{
-    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated, PlaintextAggregated,
-    PublicKeyAggregated, ResetHistory, Seed,
+    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
@@ -141,6 +139,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .into_iter()
         .aggregate()?;
 
+    println!("&&&& {}", history[8].event_type());
     assert_eq!(history.len(), 9);
     assert_eq!(
         history,
@@ -175,7 +174,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
             }),
             EnclaveEvent::from(PublicKeyAggregated {
                 pubkey: pubkey.to_bytes(),
-                e3_id: e3_id.clone()
+                e3_id: e3_id.clone(),
+                nodes: OrderedSet::from(eth_addrs.clone())
             })
         ]
     );

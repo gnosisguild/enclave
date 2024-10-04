@@ -2153,6 +2153,7 @@ dependencies = [
  "enclave-core",
  "futures-util",
  "sortition",
+ "tokio",
 ]
 
 [[package]]

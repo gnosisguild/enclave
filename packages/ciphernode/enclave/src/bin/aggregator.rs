@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.pubkey_write_path.as_deref(),
         args.plaintext_write_path.as_deref(),
     )
-    .await;
+    .await?;
     let _ = tokio::join!(handle);
     Ok(())
 }

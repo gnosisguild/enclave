@@ -1,7 +1,8 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
+use anyhow::Result;
 use enclave_core::EventBus;
-use evm::{connect_evm_caller, connect_evm_ciphernode_registry, connect_evm_enclave};
+use evm::{CiphernodeRegistrySolReader, EnclaveSolReader, EnclaveSolWriter, RegistryFilterSolWriter};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
@@ -47,7 +48,7 @@ impl MainAggregator {
         registry_filter_contract: Address,
         pubkey_write_path: Option<&str>,
         plaintext_write_path: Option<&str>,
-    ) -> (Addr<Self>, JoinHandle<()>) {
+    ) -> Result<(Addr<Self>, JoinHandle<()>)> {
         let bus = EventBus::new(true).start();
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -55,17 +56,11 @@ impl MainAggregator {
 
         let sortition = Sortition::attach(bus.clone());
 
-        connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
-        let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
-        let _ = connect_evm_caller(
-            bus.clone(),
-            sortition.clone(),
-            rpc_url,
-            enclave_contract,
-            registry_filter_contract,
-        )
-        .await;
-
+        EnclaveSolReader::attach(bus.clone(), rpc_url, enclave_contract).await?;
+        EnclaveSolWriter::attach(bus.clone(), rpc_url, enclave_contract).await?;
+        RegistryFilterSolWriter::attach(bus.clone(), rpc_url, registry_filter_contract).await?;
+        CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, registry_contract).await?;
+        
         let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(LazyFhe::create(rng))
             .add_hook(LazyPublicKeyAggregator::create(
@@ -92,7 +87,7 @@ impl MainAggregator {
         SimpleLogger::attach("AGG", bus.clone());
 
         let main_addr = MainAggregator::new(bus, sortition, p2p_addr, e3_manager).start();
-        (main_addr, join_handle)
+        Ok((main_addr, join_handle))
     }
 }
 

@@ -4,7 +4,7 @@ use enclave_core::{
     E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
 use fhe::{Fhe, GetAggregatePublicKey};
-use sortition::{GetHasNode, Sortition};
+use sortition::{GetHasNode, GetNodes, Sortition};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -27,6 +27,14 @@ pub enum PublicKeyAggregatorState {
 #[rtype(result = "anyhow::Result<()>")]
 struct ComputeAggregate {
     pub keyshares: OrderedSet<Vec<u8>>,
+    pub e3_id: E3id,
+}
+
+#[derive(Message)]
+#[rtype(result = "anyhow::Result<()>")]
+struct NotifyNetwork {
+    pub pubkey: Vec<u8>,
+    pub e3_id: E3id,
 }
 
 pub struct PublicKeyAggregator {
@@ -158,6 +166,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
                     if let PublicKeyAggregatorState::Computing { keyshares } = &act.state {
                         ctx.notify(ComputeAggregate {
                             keyshares: keyshares.clone(),
+                            e3_id
                         })
                     }
 
@@ -170,23 +179,40 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 impl Handler<ComputeAggregate> for PublicKeyAggregator {
     type Result = Result<()>;
 
-    fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ComputeAggregate, ctx: &mut Self::Context) -> Self::Result {
         let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
             keyshares: msg.keyshares.clone(),
         })?;
 
         // Update the local state
         self.state = self.set_pubkey(pubkey.clone())?;
-
-        // Dispatch the PublicKeyAggregated event
-        let event = EnclaveEvent::from(PublicKeyAggregated {
+        ctx.notify(NotifyNetwork {
             pubkey,
-            e3_id: self.e3_id.clone(),
+            e3_id: msg.e3_id,
         });
-
-        self.bus.do_send(event);
-
-        // Return
         Ok(())
     }
 }
+
+impl Handler<NotifyNetwork> for PublicKeyAggregator {
+    type Result = ResponseActFuture<Self, Result<()>>;
+    fn handle(&mut self, msg: NotifyNetwork, _: &mut Self::Context) -> Self::Result {
+        Box::pin(
+            self.sortition
+                .send(GetNodes)
+                .into_actor(self)
+                .map(move |res, act, _| {
+                    let nodes = res?;
+
+                    let event = EnclaveEvent::from(PublicKeyAggregated {
+                        pubkey: msg.pubkey.clone(),
+                        e3_id: msg.e3_id.clone(),
+                        nodes: OrderedSet::from(nodes)
+                    });
+                    act.bus.do_send(event);
+                    Ok(())
+                }),
+        )
+    }
+}
+
