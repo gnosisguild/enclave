@@ -35,12 +35,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
     let args = Args::parse();
-    let address = Address::parse_checksummed(&args.address, None).expect("Invalid address");
+    let address = Address::parse_checksummed(&args.address, None)
+        .map_err(|e| format!("Invalid node address: {}", e))?;
     println!("LAUNCHING CIPHERNODE: ({})", address);
     let registry_contract =
-        Address::parse_checksummed(&args.registry_contract, None).expect("Invalid address");
+        Address::parse_checksummed(&args.registry_contract, None)
+        .map_err(|e| format!("Invalid registry contract address: {}", e))?;
     let enclave_contract =
-        Address::parse_checksummed(&args.enclave_contract, None).expect("Invalid address");
+        Address::parse_checksummed(&args.enclave_contract, None)
+        .map_err(|e| format!("Invalid enclave contract address: {}", e))?;
     let (_, handle) =
         MainCiphernode::attach(address, &args.rpc, enclave_contract, registry_contract).await;
     let _ = tokio::join!(handle);
