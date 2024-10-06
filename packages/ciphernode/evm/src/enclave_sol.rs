@@ -23,6 +23,7 @@ use alloy::{
 use anyhow::Result;
 use enclave_core::{EnclaveErrorType, FromError, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};
+use std::env;
 use std::sync::Arc;
 
 use crate::helpers;

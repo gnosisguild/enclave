@@ -97,7 +97,7 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
     type Result = ResponseFuture<()>;
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
         let e3_id: U256 = msg.e3_id.try_into().unwrap();
-        let proof = Bytes::from(vec![1]);
+        let pubkey = Bytes::from(msg.pubkey);
         let contract_address = self.contract_address.clone();
         let provider = self.provider.clone();
         let bus = self.bus.clone();
@@ -108,7 +108,7 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
             .collect();
 
         Box::pin(async move {
-            match publish_committee(provider, contract_address, e3_id, nodes, proof).await {
+            match publish_committee(provider, contract_address, e3_id, nodes, pubkey).await {
                 Ok(_) => {
                     // log val
                 }
