@@ -1,22 +1,16 @@
+use crate::helpers::{create_signer, Signer};
 use actix::prelude::*;
 use alloy::{
-    network::{Ethereum, EthereumWallet},
     primitives::{Address, Bytes, U256},
-    providers::{
-        fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
-        Identity, ProviderBuilder, RootProvider,
-    },
     rpc::types::TransactionReceipt,
-    signers::local::PrivateKeySigner,
     sol,
-    transports::BoxTransport,
 };
 use anyhow::Result;
 use enclave_core::{
-    EnclaveErrorType, EnclaveEvent, EventBus, FromError, PublicKeyAggregated, Subscribe,
+    BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
+    Subscribe,
 };
 use std::env;
-use std::sync::Arc;
 
 sol! {
     #[derive(Debug)]
@@ -26,18 +20,8 @@ sol! {
     }
 }
 
-type ContractProvider = FillProvider<
-    JoinFill<
-        JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>,
-        WalletFiller<EthereumWallet>,
-    >,
-    RootProvider<BoxTransport>,
-    BoxTransport,
-    Ethereum,
->;
-
 pub struct RegistryFilterSolWriter {
-    provider: Arc<ContractProvider>,
+    provider: Signer,
     contract_address: Address,
     bus: Addr<EventBus>,
 }
@@ -48,16 +32,8 @@ impl RegistryFilterSolWriter {
         rpc_url: &str,
         contract_address: Address,
     ) -> Result<Self> {
-        let signer: PrivateKeySigner = env::var("PRIVATE_KEY")?.parse()?;
-        let wallet = EthereumWallet::from(signer.clone());
-        let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
-            .wallet(wallet)
-            .on_builtin(rpc_url)
-            .await?;
-
         Ok(Self {
-            provider: Arc::new(provider),
+            provider: create_signer(rpc_url, env::var("PRIVATE_KEY")?).await?,
             contract_address,
             bus,
         })
@@ -96,37 +72,51 @@ impl Handler<EnclaveEvent> for RegistryFilterSolWriter {
 impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
     type Result = ResponseFuture<()>;
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
-        let e3_id: U256 = msg.e3_id.try_into().unwrap();
-        let pubkey = Bytes::from(msg.pubkey);
-        let contract_address = self.contract_address.clone();
-        let provider = self.provider.clone();
-        let bus = self.bus.clone();
-        let nodes: Vec<Address> = msg
-            .nodes
-            .into_iter()
-            .filter_map(|node| node.parse().ok())
-            .collect();
+        Box::pin({
+            let e3_id = msg.e3_id.clone();
+            let pubkey = msg.pubkey.clone();
+            let contract_address = self.contract_address.clone();
+            let provider = self.provider.clone();
+            let bus = self.bus.clone();
+            let nodes = msg.nodes.clone();
 
-        Box::pin(async move {
-            match publish_committee(provider, contract_address, e3_id, nodes, pubkey).await {
-                Ok(_) => {
-                    // log val
+            async move {
+                let result =
+                    publish_committee(provider, contract_address, e3_id, nodes, pubkey).await;
+                match result {
+                    Ok(receipt) => {
+                        println!("tx:{}", receipt.transaction_hash);
+                    }
+                    Err(err) => bus.err(EnclaveErrorType::Evm, err),
                 }
-                Err(err) => bus.do_send(EnclaveEvent::from_error(EnclaveErrorType::Evm, err)),
             }
         })
     }
 }
 
 pub async fn publish_committee(
-    provider: Arc<ContractProvider>,
+    provider: Signer,
     contract_address: Address,
-    e3_id: U256,
-    nodes: Vec<Address>,
-    public_key: Bytes,
+    e3_id: E3id,
+    nodes: OrderedSet<String>,
+    public_key: Vec<u8>,
 ) -> Result<TransactionReceipt> {
+    let e3_id: U256 = e3_id.try_into()?;
+    let public_key = Bytes::from(public_key);
+    let nodes: Vec<Address> = nodes
+        .into_iter()
+        .filter_map(|node| node.parse().ok())
+        .collect();
     let contract = RegistryFilter::new(contract_address, &provider);
     let builder = contract.publishCommittee(e3_id, nodes, public_key);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
+}
+
+pub struct RegistryFilterSol;
+impl RegistryFilterSol {
+    pub async fn attach(bus: Addr<EventBus>, rpc_url: &str, contract_address: Address) -> Result<()> {
+        RegistryFilterSolWriter::attach(bus.clone(), rpc_url, contract_address).await?;
+        Ok(())
+    }
 }

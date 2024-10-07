@@ -2,15 +2,12 @@ use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use anyhow::Result;
 use enclave_core::EventBus;
-use evm::{CiphernodeRegistrySolReader, EnclaveSolReader, EnclaveSolWriter, RegistryFilterSolWriter};
+use evm::{CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{
-    CommitteeMetaFactory, E3RequestRouter, LazyFhe, LazyPlaintextAggregator,
-    LazyPublicKeyAggregator,
-};
+use router::{E3RequestRouter, LazyFhe, LazyPlaintextAggregator, LazyPublicKeyAggregator};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
@@ -55,12 +52,10 @@ impl MainAggregator {
         ));
 
         let sortition = Sortition::attach(bus.clone());
+        EnclaveSol::attach(bus.clone(), rpc_url, enclave_contract).await?;
+        RegistryFilterSol::attach(bus.clone(), rpc_url, registry_filter_contract).await?;
+        CiphernodeRegistrySol::attach(bus.clone(), rpc_url, registry_contract).await?;
 
-        EnclaveSolReader::attach(bus.clone(), rpc_url, enclave_contract).await?;
-        EnclaveSolWriter::attach(bus.clone(), rpc_url, enclave_contract).await?;
-        RegistryFilterSolWriter::attach(bus.clone(), rpc_url, registry_filter_contract).await?;
-        CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, registry_contract).await?;
-        
         let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(LazyFhe::create(rng))
             .add_hook(LazyPublicKeyAggregator::create(

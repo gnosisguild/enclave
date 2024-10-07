@@ -116,23 +116,18 @@ impl Handler<EnclaveEvent> for EventBus {
     }
 }
 
+/// Trait to send errors directly to the bus
 pub trait BusError {
-    fn forward_err<T>(&self, err_type: EnclaveErrorType, result: anyhow::Result<T>) -> Option<T>;
+    fn err(&self, err_type: EnclaveErrorType, err: anyhow::Error);
 }
 
 impl BusError for Addr<EventBus> {
-    fn forward_err<T>(&self, err_type: EnclaveErrorType, result: anyhow::Result<T>) -> Option<T> {
-        self.clone().recipient().forward_err(err_type, result)
+    fn err(&self, err_type: EnclaveErrorType, err: anyhow::Error) {
+        self.do_send(EnclaveEvent::from_error(err_type, err))
     }
 }
 impl BusError for Recipient<EnclaveEvent> {
-    fn forward_err<T>(&self, err_type: EnclaveErrorType, result: anyhow::Result<T>) -> Option<T> {
-        result.map_or_else(
-            |err| {
-                self.do_send(EnclaveEvent::from_error(err_type, err));
-                None
-            },
-            |val| Some(val),
-        )
+    fn err(&self, err_type: EnclaveErrorType, err: anyhow::Error) {
+        self.do_send(EnclaveEvent::from_error(err_type, err))
     }
 }

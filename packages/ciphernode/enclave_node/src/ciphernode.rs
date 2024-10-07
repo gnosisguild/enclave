@@ -3,7 +3,7 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use data::Data;
 use enclave_core::EventBus;
-use evm::{CiphernodeRegistrySolReader, EnclaveSolReader};
+use evm::{CiphernodeRegistrySol, CiphernodeRegistrySolReader, EnclaveSolReader};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
@@ -63,7 +63,7 @@ impl MainCiphernode {
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
         EnclaveSolReader::attach(bus.clone(), rpc_url, enclave_contract).await?;
-        CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, registry_contract).await?;
+        CiphernodeRegistrySol::attach(bus.clone(), rpc_url, registry_contract).await?;
 
         let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(LazyFhe::create(rng))

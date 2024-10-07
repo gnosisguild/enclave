@@ -1,42 +1,18 @@
+use crate::helpers::{self, create_readonly_provider, create_signer, ReadonlyProvider, Signer};
 use actix::prelude::*;
 use actix::{Addr, Recipient};
 use alloy::primitives::{LogData, B256};
 use alloy::{
-    eips::BlockNumberOrTag,
-    primitives::Address,
-    providers::{ProviderBuilder, RootProvider},
-    rpc::types::Filter,
-    sol,
-    sol_types::SolEvent,
-    transports::BoxTransport,
+    eips::BlockNumberOrTag, primitives::Address, rpc::types::Filter, sol, sol_types::SolEvent,
 };
 use alloy::{
-    network::{Ethereum, EthereumWallet},
     primitives::{Bytes, U256},
-    providers::{
-        fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
-        Identity,
-    },
     rpc::types::TransactionReceipt,
-    signers::local::PrivateKeySigner,
 };
 use anyhow::Result;
-use enclave_core::{EnclaveErrorType, FromError, PlaintextAggregated, Subscribe};
+use enclave_core::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};
 use std::env;
-use std::sync::Arc;
-
-use crate::helpers;
-
-type WriterContractProvider = FillProvider<
-    JoinFill<
-        JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>,
-        WalletFiller<EthereumWallet>,
-    >,
-    RootProvider<BoxTransport>,
-    BoxTransport,
-    Ethereum,
->;
 
 sol! {
     #[derive(Debug)]
@@ -111,12 +87,6 @@ impl From<CiphertextOutputPublished> for EnclaveEvent {
     }
 }
 
-pub struct EnclaveSolReader {
-    provider: Arc<RootProvider<BoxTransport>>,
-    filter: Filter,
-    bus: Recipient<EnclaveEvent>,
-}
-
 fn extractor(data: &LogData, topic: Option<&B256>) -> Option<EnclaveEvent> {
     match topic {
         Some(&E3Requested::SIGNATURE_HASH) => {
@@ -141,17 +111,10 @@ fn extractor(data: &LogData, topic: Option<&B256>) -> Option<EnclaveEvent> {
     }
 }
 
-impl Actor for EnclaveSolReader {
-    type Context = actix::Context<Self>;
-    fn started(&mut self, ctx: &mut Self::Context) {
-        let bus = self.bus.clone();
-        let provider = self.provider.clone();
-        let filter = self.filter.clone();
-        ctx.spawn(
-            async move { helpers::stream_from_evm(provider, filter, bus, extractor).await }
-                .into_actor(self),
-        );
-    }
+pub struct EnclaveSolReader {
+    provider: ReadonlyProvider,
+    contract_address: Address,
+    bus: Recipient<EnclaveEvent>,
 }
 
 impl EnclaveSolReader {
@@ -160,15 +123,10 @@ impl EnclaveSolReader {
         contract_address: Address,
         rpc_url: &str,
     ) -> Result<Self> {
-        let filter = Filter::new()
-            .address(contract_address)
-            .from_block(BlockNumberOrTag::Latest);
-
-        let provider: Arc<RootProvider<BoxTransport>> =
-            Arc::new(ProviderBuilder::new().on_builtin(rpc_url).await?.into());
+        let provider = create_readonly_provider(rpc_url).await?;
 
         Ok(Self {
-            filter,
+            contract_address,
             provider,
             bus: bus.into(),
         })
@@ -188,8 +146,24 @@ impl EnclaveSolReader {
     }
 }
 
+impl Actor for EnclaveSolReader {
+    type Context = actix::Context<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        let bus = self.bus.clone();
+        let provider = self.provider.clone();
+        let filter = Filter::new()
+            .address(self.contract_address)
+            .from_block(BlockNumberOrTag::Latest);
+
+        ctx.spawn(
+            async move { helpers::stream_from_evm(provider, filter, bus, extractor).await }
+                .into_actor(self),
+        );
+    }
+}
+
 pub struct EnclaveSolWriter {
-    provider: Arc<WriterContractProvider>,
+    provider: Signer,
     contract_address: Address,
     bus: Addr<EventBus>,
 }
@@ -200,16 +174,8 @@ impl EnclaveSolWriter {
         rpc_url: &str,
         contract_address: Address,
     ) -> Result<Self> {
-        let signer: PrivateKeySigner = env::var("PRIVATE_KEY")?.parse()?;
-        let wallet = EthereumWallet::from(signer.clone());
-        let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
-            .wallet(wallet)
-            .on_builtin(rpc_url)
-            .await?;
-
         Ok(Self {
-            provider: Arc::new(provider),
+            provider: create_signer(rpc_url, env::var("PRIVATE_KEY")?).await?,
             contract_address,
             bus,
         })
@@ -248,40 +214,48 @@ impl Handler<EnclaveEvent> for EnclaveSolWriter {
 impl Handler<PlaintextAggregated> for EnclaveSolWriter {
     type Result = ResponseFuture<()>;
     fn handle(&mut self, msg: PlaintextAggregated, _: &mut Self::Context) -> Self::Result {
-        let e3_id: U256 = msg.e3_id.try_into().unwrap();
-        let decrypted_output = Bytes::from(msg.decrypted_output);
-        let proof = Bytes::from(vec![1]);
-        let contract_address = self.contract_address.clone();
-        let provider = self.provider.clone();
-        let bus = self.bus.clone();
-        Box::pin(async move {
-            match publish_plaintext_output(
-                provider,
-                contract_address,
-                e3_id,
-                decrypted_output,
-                proof,
-            )
-            .await
-            {
-                Ok(_) => {
-                    // log val
+        Box::pin({
+            let e3_id = msg.e3_id.clone();
+            let decrypted_output = msg.decrypted_output.clone();
+            let contract_address = self.contract_address.clone();
+            let provider = self.provider.clone();
+            let bus = self.bus.clone();
+
+            async move {
+                let result =
+                    publish_plaintext_output(provider, contract_address, e3_id, decrypted_output)
+                        .await;
+                match result {
+                    Ok(receipt) => {
+                        println!("tx:{}", receipt.transaction_hash)
+                    }
+                    Err(err) => bus.err(EnclaveErrorType::Evm, err),
                 }
-                Err(err) => bus.do_send(EnclaveEvent::from_error(EnclaveErrorType::Evm, err)),
             }
         })
     }
 }
 
 async fn publish_plaintext_output(
-    provider: Arc<WriterContractProvider>,
+    provider: Signer,
     contract_address: Address,
-    e3_id: U256,
-    decrypted_output: Bytes,
-    proof: Bytes,
+    e3_id: E3id,
+    decrypted_output: Vec<u8>,
 ) -> Result<TransactionReceipt> {
+    let e3_id: U256 = e3_id.try_into()?;
+    let decrypted_output = Bytes::from(decrypted_output);
+    let proof = Bytes::from(vec![1]);
     let contract = Enclave::new(contract_address, &provider);
     let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
+}
+
+pub struct EnclaveSol;
+impl EnclaveSol {
+    pub async fn attach(bus: Addr<EventBus>, rpc_url: &str, contract_address: Address) -> Result<()> {
+        EnclaveSolReader::attach(bus.clone(), rpc_url, contract_address).await?;
+        EnclaveSolWriter::attach(bus, rpc_url, contract_address).await?;
+        Ok(())
+    }
 }

@@ -1,10 +1,3 @@
-// mod caller;
-// mod ciphernode_registry;
-// mod contracts;
-// mod enclave;
-// mod listener;
-// mod manager;
-
 mod enclave_sol;
 mod ciphernode_registry_sol;
 mod registry_filter_sol;
