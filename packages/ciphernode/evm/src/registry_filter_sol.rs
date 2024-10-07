@@ -47,9 +47,10 @@ impl RegistryFilterSolWriter {
         contract_address: &str,
         signer: Arc<PrivateKeySigner>,
     ) -> Result<Addr<RegistryFilterSolWriter>> {
-        let addr = RegistryFilterSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
-            .await?
-            .start();
+        let addr =
+            RegistryFilterSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
+                .await?
+                .start();
         let _ = bus
             .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
             .await;
@@ -122,7 +123,7 @@ impl RegistryFilterSol {
         bus: Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-        signer: Arc<PrivateKeySigner>
+        signer: Arc<PrivateKeySigner>,
     ) -> Result<()> {
         RegistryFilterSolWriter::attach(bus.clone(), rpc_url, contract_address, signer).await?;
         Ok(())

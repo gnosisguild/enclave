@@ -10,7 +10,7 @@ struct Args {
 
     // These are for testing and may be removed later
     // or put under a compile flag
-    #[arg(short='k', long = "pubkey-write-path")]
+    #[arg(short = 'k', long = "pubkey-write-path")]
     pub pubkey_write_path: Option<String>,
     #[arg(short, long = "plaintext-write-path")]
     pub plaintext_write_path: Option<String>,

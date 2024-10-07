@@ -1,6 +1,6 @@
 mod aggregator;
-mod ciphernode;
 mod app_config;
+mod ciphernode;
 
 pub use aggregator::*;
 pub use ciphernode::*;

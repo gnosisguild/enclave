@@ -73,8 +73,12 @@ impl MainAggregator {
                 signer.clone(),
             )
             .await?;
-            CiphernodeRegistrySol::attach(bus.clone(), rpc_url, &chain.contracts.ciphernode_registry)
-                .await?;
+            CiphernodeRegistrySol::attach(
+                bus.clone(),
+                rpc_url,
+                &chain.contracts.ciphernode_registry,
+            )
+            .await?;
         }
 
         let e3_manager = E3RequestRouter::builder(bus.clone())

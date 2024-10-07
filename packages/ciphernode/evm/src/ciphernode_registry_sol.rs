@@ -127,9 +127,10 @@ impl CiphernodeRegistrySolReader {
         rpc_url: &str,
         contract_address: &str,
     ) -> Result<Addr<Self>> {
-        let addr = CiphernodeRegistrySolReader::new(bus.clone(), contract_address.parse()?, rpc_url)
-            .await?
-            .start();
+        let addr =
+            CiphernodeRegistrySolReader::new(bus.clone(), contract_address.parse()?, rpc_url)
+                .await?
+                .start();
 
         println!("CiphernodeRegistrySol is listening to {}", contract_address);
         Ok(addr)
@@ -154,11 +155,7 @@ impl Actor for CiphernodeRegistrySolReader {
 
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
-    pub async fn attach(
-        bus: Addr<EventBus>,
-        rpc_url: &str,
-        contract_address: &str,
-    ) -> Result<()> {
+    pub async fn attach(bus: Addr<EventBus>, rpc_url: &str, contract_address: &str) -> Result<()> {
         CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, contract_address).await?;
         Ok(())
     }

@@ -65,7 +65,10 @@ pub type Signer = Arc<
         Ethereum,
     >,
 >;
-pub async fn create_provider_with_signer(rpc_url: &str, signer: Arc<PrivateKeySigner>) -> Result<Signer> {
+pub async fn create_provider_with_signer(
+    rpc_url: &str,
+    signer: Arc<PrivateKeySigner>,
+) -> Result<Signer> {
     let wallet = EthereumWallet::from(signer.clone());
     let provider = Arc::new(
         ProviderBuilder::new()
@@ -77,7 +80,7 @@ pub async fn create_provider_with_signer(rpc_url: &str, signer: Arc<PrivateKeySi
     Ok(provider)
 }
 
-pub async fn pull_eth_signer_from_env(var:&str) -> Result<Arc<PrivateKeySigner>> {
+pub async fn pull_eth_signer_from_env(var: &str) -> Result<Arc<PrivateKeySigner>> {
     let private_key = env::var(var)?;
     let signer = private_key.parse()?;
     env::remove_var(var);

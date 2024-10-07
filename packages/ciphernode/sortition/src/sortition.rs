@@ -137,8 +137,7 @@ impl Handler<CiphernodeRemoved> for Sortition {
 impl Handler<GetHasNode> for Sortition {
     type Result = bool;
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
-        self.list
-            .contains(msg.seed, msg.size, msg.address)
+        self.list.contains(msg.seed, msg.size, msg.address)
     }
 }
 
