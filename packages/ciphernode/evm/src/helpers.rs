@@ -16,13 +16,14 @@ use anyhow::{Context, Result};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
 
-pub async fn stream_from_evm<P:Provider>(
+pub async fn stream_from_evm<P: Provider>(
     provider: WithChainId<P>,
     filter: Filter,
     bus: Recipient<EnclaveEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
 ) {
-    match provider.get_provider()
+    match provider
+        .get_provider()
         .subscribe_logs(&filter)
         .await
         .context("Could not subscribe to stream")
@@ -30,7 +31,8 @@ pub async fn stream_from_evm<P:Provider>(
         Ok(subscription) => {
             let mut stream = subscription.into_stream();
             while let Some(log) = stream.next().await {
-                let Some(event) = extractor(log.data(), log.topic0(),provider.get_chain_id()) else {
+                let Some(event) = extractor(log.data(), log.topic0(), provider.get_chain_id())
+                else {
                     continue;
                 };
                 bus.do_send(event);

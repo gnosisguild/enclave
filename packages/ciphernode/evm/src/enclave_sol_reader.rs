@@ -50,7 +50,7 @@ impl From<E3RequestedWithChainId> for enclave_core::E3Requested {
             threshold_m: value.0.e3.threshold[0] as usize,
             seed: value.0.e3.seed.into(),
             e3_id: value.0.e3Id.to_string().into(),
-            src_chain_id: value.1
+            src_chain_id: value.1,
         }
     }
 }

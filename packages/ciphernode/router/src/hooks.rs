@@ -104,7 +104,7 @@ impl LazyPublicKeyAggregator {
                     data.e3_id,
                     meta.threshold_m,
                     meta.seed,
-                    meta.src_chain_id
+                    meta.src_chain_id,
                 )
                 .start(),
             );

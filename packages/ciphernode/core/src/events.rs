@@ -310,7 +310,7 @@ pub struct PublicKeyAggregated {
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,
-    pub src_chain_id: u64
+    pub src_chain_id: u64,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -320,12 +320,11 @@ pub struct E3Requested {
     pub threshold_m: usize,
     pub seed: Seed,
     pub params: Vec<u8>,
-    pub src_chain_id: u64
-    // threshold: usize, // TODO:
-    // computation_type: ??, // TODO:
-    // execution_model_type: ??, // TODO:
-    // input_deadline: ??, // TODO:
-    // availability_duration: ??, // TODO:
+    pub src_chain_id: u64, // threshold: usize, // TODO:
+                           // computation_type: ??, // TODO:
+                           // execution_model_type: ??, // TODO:
+                           // input_deadline: ??, // TODO:
+                           // availability_duration: ??, // TODO:
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -347,7 +346,7 @@ pub struct CiphertextOutputPublished {
 pub struct PlaintextAggregated {
     pub e3_id: E3id,
     pub decrypted_output: Vec<u8>,
-    pub src_chain_id: u64 
+    pub src_chain_id: u64,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
