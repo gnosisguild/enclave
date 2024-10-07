@@ -113,7 +113,6 @@ impl CiphernodeRegistrySolReader {
         contract_address: Address,
         rpc_url: &str,
     ) -> Result<Self> {
-  
         let provider = create_readonly_provider(rpc_url).await?;
 
         Ok(Self {
@@ -155,7 +154,11 @@ impl Actor for CiphernodeRegistrySolReader {
 
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
-    pub async fn attach(bus: Addr<EventBus>, rpc_url: &str, contract_address: Address) -> Result<()> {
+    pub async fn attach(
+        bus: Addr<EventBus>,
+        rpc_url: &str,
+        contract_address: Address,
+    ) -> Result<()> {
         CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, contract_address).await?;
         Ok(())
     }

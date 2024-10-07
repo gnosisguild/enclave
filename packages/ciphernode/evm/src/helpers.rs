@@ -13,7 +13,7 @@ use alloy::{
     transports::BoxTransport,
 };
 use anyhow::{Context, Result};
-use enclave_core::{EnclaveErrorType, EnclaveEvent, BusError};
+use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
 
 pub async fn stream_from_evm(

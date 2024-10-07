@@ -115,7 +115,11 @@ pub async fn publish_committee(
 
 pub struct RegistryFilterSol;
 impl RegistryFilterSol {
-    pub async fn attach(bus: Addr<EventBus>, rpc_url: &str, contract_address: Address) -> Result<()> {
+    pub async fn attach(
+        bus: Addr<EventBus>,
+        rpc_url: &str,
+        contract_address: Address,
+    ) -> Result<()> {
         RegistryFilterSolWriter::attach(bus.clone(), rpc_url, contract_address).await?;
         Ok(())
     }

@@ -309,7 +309,7 @@ pub struct DecryptionshareCreated {
 pub struct PublicKeyAggregated {
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
-    pub nodes: OrderedSet<String>
+    pub nodes: OrderedSet<String>,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

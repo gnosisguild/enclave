@@ -166,7 +166,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
                     if let PublicKeyAggregatorState::Computing { keyshares } = &act.state {
                         ctx.notify(ComputeAggregate {
                             keyshares: keyshares.clone(),
-                            e3_id
+                            e3_id,
                         })
                     }
 
@@ -207,7 +207,7 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                     let event = EnclaveEvent::from(PublicKeyAggregated {
                         pubkey: msg.pubkey.clone(),
                         e3_id: msg.e3_id.clone(),
-                        nodes: OrderedSet::from(nodes)
+                        nodes: OrderedSet::from(nodes),
                     });
                     act.bus.do_send(event);
                     Ok(())
@@ -215,4 +215,3 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
         )
     }
 }
-
