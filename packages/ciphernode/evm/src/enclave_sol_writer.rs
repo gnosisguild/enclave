@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::helpers::create_provider_with_signer;
-use crate::helpers::Signer;
+use crate::helpers::SignerProvider;
 use actix::prelude::*;
 use actix::Addr;
 use alloy::signers::local::PrivateKeySigner;
@@ -24,7 +24,7 @@ sol! {
 
 /// Consumes events from the event bus and calls EVM methods on the Enclave.sol contract
 pub struct EnclaveSolWriter {
-    provider: Signer,
+    provider: SignerProvider,
     contract_address: Address,
     bus: Addr<EventBus>,
 }
@@ -100,7 +100,7 @@ impl Handler<PlaintextAggregated> for EnclaveSolWriter {
 }
 
 async fn publish_plaintext_output(
-    provider: Signer,
+    provider: SignerProvider,
     contract_address: Address,
     e3_id: E3id,
     decrypted_output: Vec<u8>,
@@ -108,7 +108,7 @@ async fn publish_plaintext_output(
     let e3_id: U256 = e3_id.try_into()?;
     let decrypted_output = Bytes::from(decrypted_output);
     let proof = Bytes::from(vec![1]);
-    let contract = Enclave::new(contract_address, &provider);
+    let contract = Enclave::new(contract_address, provider.get_provider());
     let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)

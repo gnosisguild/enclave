@@ -38,6 +38,7 @@ pub struct PlaintextAggregator {
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: PlaintextAggregatorState,
+    src_chain_id: u64,
 }
 
 impl PlaintextAggregator {
@@ -49,12 +50,14 @@ impl PlaintextAggregator {
         threshold_m: usize,
         seed: Seed,
         ciphertext_output: Vec<u8>,
+        src_chain_id: u64,
     ) -> Self {
         PlaintextAggregator {
             fhe,
             bus,
             sortition,
             e3_id,
+            src_chain_id,
             state: PlaintextAggregatorState::Collecting {
                 threshold_m,
                 shares: OrderedSet::new(),
@@ -183,6 +186,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
         let event = EnclaveEvent::from(PlaintextAggregated {
             decrypted_output,
             e3_id: self.e3_id.clone(),
+            src_chain_id: self.src_chain_id,
         });
 
         self.bus.do_send(event);

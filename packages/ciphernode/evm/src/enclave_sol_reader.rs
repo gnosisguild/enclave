@@ -41,19 +41,22 @@ sol! {
     );
 }
 
-impl From<E3Requested> for enclave_core::E3Requested {
-    fn from(value: E3Requested) -> Self {
+struct E3RequestedWithChainId(pub E3Requested, pub u64);
+
+impl From<E3RequestedWithChainId> for enclave_core::E3Requested {
+    fn from(value: E3RequestedWithChainId) -> Self {
         enclave_core::E3Requested {
-            params: value.e3.e3ProgramParams.to_vec(),
-            threshold_m: value.e3.threshold[0] as usize,
-            seed: value.e3.seed.into(),
-            e3_id: value.e3Id.to_string().into(),
+            params: value.0.e3.e3ProgramParams.to_vec(),
+            threshold_m: value.0.e3.threshold[0] as usize,
+            seed: value.0.e3.seed.into(),
+            e3_id: value.0.e3Id.to_string().into(),
+            src_chain_id: value.1
         }
     }
 }
 
-impl From<E3Requested> for EnclaveEvent {
-    fn from(value: E3Requested) -> Self {
+impl From<E3RequestedWithChainId> for EnclaveEvent {
+    fn from(value: E3RequestedWithChainId) -> Self {
         let payload: enclave_core::E3Requested = value.into();
         EnclaveEvent::from(payload)
     }
@@ -75,14 +78,14 @@ impl From<CiphertextOutputPublished> for EnclaveEvent {
     }
 }
 
-fn extractor(data: &LogData, topic: Option<&B256>) -> Option<EnclaveEvent> {
+fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&E3Requested::SIGNATURE_HASH) => {
             let Ok(event) = E3Requested::decode_log_data(data, true) else {
                 println!("Error parsing event E3Requested"); // TODO: provide more info
                 return None;
             };
-            Some(EnclaveEvent::from(event))
+            Some(EnclaveEvent::from(E3RequestedWithChainId(event, chain_id)))
         }
         Some(&CiphertextOutputPublished::SIGNATURE_HASH) => {
             let Ok(event) = CiphertextOutputPublished::decode_log_data(data, true) else {
@@ -113,7 +116,6 @@ impl EnclaveSolReader {
         rpc_url: &str,
     ) -> Result<Self> {
         let provider = create_readonly_provider(rpc_url).await?;
-
         Ok(Self {
             contract_address,
             provider,

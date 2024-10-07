@@ -1,4 +1,4 @@
-use crate::helpers::{create_provider_with_signer, Signer};
+use crate::helpers::{create_provider_with_signer, SignerProvider};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
@@ -11,7 +11,7 @@ use enclave_core::{
     BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
     Subscribe,
 };
-use std::{env, sync::Arc};
+use std::sync::Arc;
 
 sol! {
     #[derive(Debug)]
@@ -22,7 +22,7 @@ sol! {
 }
 
 pub struct RegistryFilterSolWriter {
-    provider: Signer,
+    provider: SignerProvider,
     contract_address: Address,
     bus: Addr<EventBus>,
 }
@@ -99,7 +99,7 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
 }
 
 pub async fn publish_committee(
-    provider: Signer,
+    provider: SignerProvider,
     contract_address: Address,
     e3_id: E3id,
     nodes: OrderedSet<String>,
@@ -111,7 +111,7 @@ pub async fn publish_committee(
         .into_iter()
         .filter_map(|node| node.parse().ok())
         .collect();
-    let contract = RegistryFilter::new(contract_address, &provider);
+    let contract = RegistryFilter::new(contract_address, provider.get_provider());
     let builder = contract.publishCommittee(e3_id, nodes, public_key);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)

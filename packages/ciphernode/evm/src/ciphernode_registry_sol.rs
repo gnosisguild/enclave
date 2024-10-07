@@ -76,7 +76,7 @@ impl From<CiphernodeRemoved> for EnclaveEvent {
     }
 }
 
-fn extractor(data: &LogData, topic: Option<&B256>) -> Option<EnclaveEvent> {
+fn extractor(data: &LogData, topic: Option<&B256>, _:u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&CiphernodeAdded::SIGNATURE_HASH) => {
             let Ok(event) = CiphernodeAdded::decode_log_data(data, true) else {

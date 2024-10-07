@@ -70,6 +70,7 @@ impl LazyPlaintextAggregator {
                     meta.threshold_m,
                     meta.seed,
                     data.ciphertext_output,
+                    meta.src_chain_id,
                 )
                 .start(),
             );
@@ -103,6 +104,7 @@ impl LazyPublicKeyAggregator {
                     data.e3_id,
                     meta.threshold_m,
                     meta.seed,
+                    meta.src_chain_id
                 )
                 .start(),
             );

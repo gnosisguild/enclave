@@ -43,6 +43,7 @@ pub struct PublicKeyAggregator {
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: PublicKeyAggregatorState,
+    src_chain_id: u64
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
@@ -59,12 +60,14 @@ impl PublicKeyAggregator {
         e3_id: E3id,
         threshold_m: usize,
         seed: Seed,
+        src_chain_id: u64
     ) -> Self {
         PublicKeyAggregator {
             fhe,
             bus,
             e3_id,
             sortition,
+            src_chain_id,
             state: PublicKeyAggregatorState::Collecting {
                 threshold_m,
                 keyshares: OrderedSet::new(),
@@ -208,6 +211,7 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                         pubkey: msg.pubkey.clone(),
                         e3_id: msg.e3_id.clone(),
                         nodes: OrderedSet::from(nodes),
+                        src_chain_id: act.src_chain_id
                     });
                     act.bus.do_send(event);
                     Ok(())
