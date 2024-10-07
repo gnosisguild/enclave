@@ -120,6 +120,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         threshold_m: 3,
         seed: seed.clone(),
         params: params.to_bytes(),
+        src_chain_id: 1,
     });
     // Send the computation requested event
     bus.send(event.clone()).await?;
@@ -153,7 +154,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
                 e3_id: e3_id.clone(),
                 threshold_m: 3,
                 seed: seed.clone(),
-                params: params.to_bytes()
+                params: params.to_bytes(),
+                src_chain_id: 1
             }),
             EnclaveEvent::from(CiphernodeSelected {
                 e3_id: e3_id.clone(),
@@ -177,7 +179,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
             EnclaveEvent::from(PublicKeyAggregated {
                 pubkey: pubkey.to_bytes(),
                 e3_id: e3_id.clone(),
-                nodes: OrderedSet::from(eth_addrs.clone())
+                nodes: OrderedSet::from(eth_addrs.clone()),
+                src_chain_id: 1
             })
         ]
     );
@@ -243,7 +246,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
             }),
             EnclaveEvent::from(PlaintextAggregated {
                 e3_id: e3_id.clone(),
-                decrypted_output: expected_raw_plaintext.clone()
+                decrypted_output: expected_raw_plaintext.clone(),
+                src_chain_id: 1
             })
         ]
     );
@@ -277,11 +281,13 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let evt_1 = EnclaveEvent::from(PlaintextAggregated {
         e3_id: E3id::new("1235"),
         decrypted_output: vec![1, 2, 3, 4],
+        src_chain_id: 1,
     });
 
     let evt_2 = EnclaveEvent::from(PlaintextAggregated {
         e3_id: E3id::new("1236"),
         decrypted_output: vec![1, 2, 3, 4],
+        src_chain_id: 1,
     });
 
     let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
@@ -330,6 +336,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
         threshold_m: 3,
         seed: seed.clone(),
         params: vec![1, 2, 3, 4],
+        src_chain_id: 1,
     });
 
     // lets send an event from the network

@@ -67,7 +67,12 @@ impl Handler<EnclaveEvent> for RegistryFilterSolWriter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
-            EnclaveEvent::PublicKeyAggregated { data, .. } => ctx.notify(data),
+            EnclaveEvent::PublicKeyAggregated { data, .. } => {
+                // Only publish if the src and destination chains match
+                if self.provider.get_chain_id() == data.src_chain_id {
+                    ctx.notify(data);
+                }
+            }
             _ => (),
         }
     }

@@ -68,7 +68,12 @@ impl Handler<EnclaveEvent> for EnclaveSolWriter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
-            EnclaveEvent::PlaintextAggregated { data, .. } => ctx.notify(data),
+            EnclaveEvent::PlaintextAggregated { data, .. } => {
+                // Only publish if the src and destination chains match
+                if self.provider.get_chain_id() == data.src_chain_id {
+                    ctx.notify(data);
+                }
+            }
             _ => (),
         }
     }
