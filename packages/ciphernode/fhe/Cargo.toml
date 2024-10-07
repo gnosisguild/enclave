@@ -1,0 +1,15 @@
+[package]
+name = "fhe"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+enclave-core = { path = "../core" }
+anyhow = { workspace = true }
+fhe_rs = { workspace = true }
+fhe-traits = { workspace = true }
+fhe-util = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+bincode = { workspace = true }
+serde = { workspace = true }

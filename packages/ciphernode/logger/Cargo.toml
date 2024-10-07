@@ -1,0 +1,9 @@
+[package]
+name = "logger"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+enclave-core = { path = "../core" }
+actix = { workspace = true }
+base64 = { workspace = true }

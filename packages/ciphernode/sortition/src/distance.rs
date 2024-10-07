@@ -35,4 +35,3 @@ impl DistanceSortition {
         result
     }
 }
-

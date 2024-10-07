@@ -9,12 +9,8 @@ path = "src/lib.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-num = "0.4.3"
-rand = "0.8.5"
-
-# Ethereum
-futures-util = "0.3"
-eyre = "0.6"
-alloy = { version = "0.3.3", features = ["full"] }
-alloy-primitives = { version = "0.6", default-features = false, features = ["rlp", "serde", "std"] }
-alloy-sol-types = { version = "0.6" }
+num = { workspace = true }
+rand = { workspace = true }
+alloy = { workspace = true, features = ["full"] }
+actix = { workspace = true }
+enclave-core = { path = "../core" }

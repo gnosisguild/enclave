@@ -1,6 +1,7 @@
-use crate::events::{EnclaveEvent, EventId};
 use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
+
+use super::events::{EnclaveEvent, EventId};
 
 #[derive(Message, Debug)]
 #[rtype(result = "()")]

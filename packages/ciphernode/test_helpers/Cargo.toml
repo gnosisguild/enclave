@@ -1,0 +1,15 @@
+[package]
+name = "test-helpers"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix = { workspace = true }
+enclave-core = { path = "../core" }
+fhe = { path = "../fhe" }
+bincode = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+fhe_rs = { workspace = true }
+fhe-traits = { workspace = true }
+rand_chacha = { workspace = true }
+rand = { workspace = true }

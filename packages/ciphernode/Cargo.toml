@@ -1,2 +1,63 @@
 [workspace]
-members = ["core", "enclave", "enclave_node", "p2p", "bfv"]
+members = [
+  "core",
+  "enclave",
+  "enclave_node",
+  "p2p",
+  "bfv",
+  "data",
+  "evm",
+  "fhe",
+  "router",
+  "keyshare",
+  "aggregator",
+  "test_helpers",
+  "logger",
+  "tests",
+]
+
+[workspace.dependencies]
+actix = "0.13.5"
+actix-rt = "2.10.0"
+alloy = { version = "0.3.3", features = ["full"] }
+alloy-primitives = { version = "0.6", default-features = false, features = [
+  "rlp",
+  "serde",
+  "std",
+] }
+alloy-sol-types = { version = "0.6" }
+anyhow = "1.0.86"
+async-std = { version = "1.12", features = ["attributes"] }
+async-trait = "0.1"
+bincode = "1.3.3"
+bs58 = "0.5.1"
+base64 = "0.22.1"
+clap = { version = "4.5.17", features = ["derive"] }
+enclave_node = { path = "../enclave_node" }
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+futures = "0.3.30"
+futures-util = "0.3"
+num = "0.4.3"
+rand_chacha = "0.3.1"
+rand = "0.8.5"
+serde = { version = "1.0.208", features = ["derive"] }
+sha2 = "0.10.8"
+tokio = { version = "1.38", features = ["full"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+libp2p = { version = "0.53.2", features = [
+  "async-std",
+  "identify",
+  "macros",
+  "noise",
+  "ping",
+  "rendezvous",
+  "tcp",
+  "tokio",
+  "yamux",
+  "mdns",
+  "gossipsub",
+  "quic",
+] }

@@ -8,16 +8,26 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bfv = { path = "../bfv" }
-fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-async-std = { version = "1.12", features = ["attributes"] }
-async-trait = "0.1"
-futures = "0.3.30"
-libp2p = { version = "0.53.2", features = [ "async-std", "identify", "macros", "noise", "ping", "rendezvous", "tcp", "tokio", "yamux", "mdns", "gossipsub", "quic"] }
-tokio = { version = "1.38", features = ["full"] }
-tracing = "0.1.37"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-
+async-std = { workspace = true, features = ["attributes"] }
+async-trait = { workspace = true }
+futures = { workspace = true }
+libp2p = { workspace = true, features = [
+  "async-std",
+  "identify",
+  "macros",
+  "noise",
+  "ping",
+  "rendezvous",
+  "tcp",
+  "tokio",
+  "yamux",
+  "mdns",
+  "gossipsub",
+  "quic",
+] }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+enclave-core = { path = "../core" }
+anyhow = { workspace = true }
+actix = { workspace = true }

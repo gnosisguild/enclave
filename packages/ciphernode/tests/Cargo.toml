@@ -1,0 +1,33 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+p2p = { path = "../p2p" }
+bfv = { path = "../bfv" }
+sortition = { path = "../sortition" }
+enclave-core = { path = "../core" }
+evm = { path = "../evm" }
+logger = { path = "../logger" }
+fhe = { path = "../fhe" }
+data = { path = "../data" }
+keyshare = { path = "../keyshare" }
+aggregator = { path = "../aggregator" }
+router = { path = "../router" }
+test-helpers = { path = "../test_helpers" }
+fhe_rs = { workspace = true }
+fhe-traits = { workspace = true }
+fhe-util = { workspace = true }
+async-std = { workspace = true }
+tokio = { workspace = true }
+actix-rt = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy = { workspace = true }
+clap = { workspace = true }
+rand_chacha = { workspace = true }
+rand = { workspace = true }
+bincode = { workspace = true }
+base64 = { workspace = true }
+actix = { workspace = true }
+anyhow = { workspace = true }
