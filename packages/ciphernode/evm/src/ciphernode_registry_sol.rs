@@ -1,4 +1,3 @@
-/// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
 use actix::{Actor, Addr, AsyncContext, Recipient, WrapFuture};
 use alloy::{
     eips::BlockNumberOrTag,
@@ -101,6 +100,7 @@ fn extractor(data: &LogData, topic: Option<&B256>) -> Option<EnclaveEvent> {
     }
 }
 
+/// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
 pub struct CiphernodeRegistrySolReader {
     provider: ReadonlyProvider,
     contract_address: Address,
