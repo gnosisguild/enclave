@@ -1,8 +1,9 @@
-use crate::helpers::{create_signer, Signer};
+use crate::helpers::{create_provider_with_signer, Signer};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
     rpc::types::TransactionReceipt,
+    signers::local::PrivateKeySigner,
     sol,
 };
 use anyhow::Result;
@@ -10,7 +11,7 @@ use enclave_core::{
     BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
     Subscribe,
 };
-use std::env;
+use std::{env, sync::Arc};
 
 sol! {
     #[derive(Debug)]
@@ -31,9 +32,10 @@ impl RegistryFilterSolWriter {
         bus: Addr<EventBus>,
         rpc_url: &str,
         contract_address: Address,
+        signer: Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
-            provider: create_signer(rpc_url, env::var("PRIVATE_KEY")?).await?,
+            provider: create_provider_with_signer(rpc_url, signer).await?,
             contract_address,
             bus,
         })
@@ -42,9 +44,10 @@ impl RegistryFilterSolWriter {
     pub async fn attach(
         bus: Addr<EventBus>,
         rpc_url: &str,
-        contract_address: Address,
+        contract_address: &str,
+        signer: Arc<PrivateKeySigner>,
     ) -> Result<Addr<RegistryFilterSolWriter>> {
-        let addr = RegistryFilterSolWriter::new(bus.clone(), rpc_url, contract_address)
+        let addr = RegistryFilterSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
             .await?
             .start();
         let _ = bus
@@ -118,9 +121,10 @@ impl RegistryFilterSol {
     pub async fn attach(
         bus: Addr<EventBus>,
         rpc_url: &str,
-        contract_address: Address,
+        contract_address: &str,
+        signer: Arc<PrivateKeySigner>
     ) -> Result<()> {
-        RegistryFilterSolWriter::attach(bus.clone(), rpc_url, contract_address).await?;
+        RegistryFilterSolWriter::attach(bus.clone(), rpc_url, contract_address, signer).await?;
         Ok(())
     }
 }

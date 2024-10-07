@@ -13,6 +13,8 @@ use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
+use crate::app_config::AppConfig;
+
 /// Main Ciphernode Actor
 /// Suprvises all children
 // TODO: add supervision logic
@@ -48,10 +50,8 @@ impl MainCiphernode {
     }
 
     pub async fn attach(
+        config: AppConfig,
         address: Address,
-        rpc_url: &str,
-        enclave_contract: Address,
-        registry_contract: Address,
     ) -> Result<(Addr<Self>, JoinHandle<()>)> {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -62,8 +62,21 @@ impl MainCiphernode {
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
-        EnclaveSolReader::attach(bus.clone(), rpc_url, enclave_contract).await?;
-        CiphernodeRegistrySol::attach(bus.clone(), rpc_url, registry_contract).await?;
+        for chain in config
+            .chains
+            .iter()
+            .filter(|chain| chain.enabled.unwrap_or(true))
+        {
+            let rpc_url = &chain.rpc_url;
+
+            EnclaveSolReader::attach(bus.clone(), rpc_url, &chain.contracts.enclave).await?;
+            CiphernodeRegistrySol::attach(
+                bus.clone(),
+                rpc_url,
+                &chain.contracts.ciphernode_registry,
+            )
+            .await?;
+        }
 
         let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(LazyFhe::create(rng))

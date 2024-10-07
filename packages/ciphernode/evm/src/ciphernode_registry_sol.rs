@@ -125,13 +125,13 @@ impl CiphernodeRegistrySolReader {
     pub async fn attach(
         bus: Addr<EventBus>,
         rpc_url: &str,
-        contract_address: Address,
+        contract_address: &str,
     ) -> Result<Addr<Self>> {
-        let addr = CiphernodeRegistrySolReader::new(bus.clone(), contract_address, rpc_url)
+        let addr = CiphernodeRegistrySolReader::new(bus.clone(), contract_address.parse()?, rpc_url)
             .await?
             .start();
 
-        println!("Evm is listening to {}", contract_address);
+        println!("CiphernodeRegistrySol is listening to {}", contract_address);
         Ok(addr)
     }
 }
@@ -157,7 +157,7 @@ impl CiphernodeRegistrySol {
     pub async fn attach(
         bus: Addr<EventBus>,
         rpc_url: &str,
-        contract_address: Address,
+        contract_address: &str,
     ) -> Result<()> {
         CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, contract_address).await?;
         Ok(())

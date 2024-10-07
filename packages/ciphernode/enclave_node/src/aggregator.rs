@@ -1,8 +1,9 @@
 use actix::{Actor, Addr, Context};
-use alloy::primitives::Address;
 use anyhow::Result;
 use enclave_core::EventBus;
-use evm::{CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol};
+use evm::{
+    helpers::pull_eth_signer_from_env, CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
+};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
@@ -12,6 +13,8 @@ use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
+
+use crate::app_config::AppConfig;
 
 /// Main Ciphernode Actor
 /// Suprvises all children
@@ -39,10 +42,7 @@ impl MainAggregator {
     }
 
     pub async fn attach(
-        rpc_url: &str,
-        enclave_contract: Address,
-        registry_contract: Address,
-        registry_filter_contract: Address,
+        config: AppConfig,
         pubkey_write_path: Option<&str>,
         plaintext_write_path: Option<&str>,
     ) -> Result<(Addr<Self>, JoinHandle<()>)> {
@@ -52,9 +52,30 @@ impl MainAggregator {
         ));
 
         let sortition = Sortition::attach(bus.clone());
-        EnclaveSol::attach(bus.clone(), rpc_url, enclave_contract).await?;
-        RegistryFilterSol::attach(bus.clone(), rpc_url, registry_filter_contract).await?;
-        CiphernodeRegistrySol::attach(bus.clone(), rpc_url, registry_contract).await?;
+        let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;
+        for chain in config
+            .chains
+            .iter()
+            .filter(|chain| chain.enabled.unwrap_or(true))
+        {
+            let rpc_url = &chain.rpc_url;
+            EnclaveSol::attach(
+                bus.clone(),
+                rpc_url,
+                &chain.contracts.enclave,
+                signer.clone(),
+            )
+            .await?;
+            RegistryFilterSol::attach(
+                bus.clone(),
+                rpc_url,
+                &chain.contracts.filter_registry,
+                signer.clone(),
+            )
+            .await?;
+            CiphernodeRegistrySol::attach(bus.clone(), rpc_url, &chain.contracts.ciphernode_registry)
+                .await?;
+        }
 
         let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(LazyFhe::create(rng))

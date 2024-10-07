@@ -124,9 +124,9 @@ impl EnclaveSolReader {
     pub async fn attach(
         bus: Addr<EventBus>,
         rpc_url: &str,
-        contract_address: Address,
+        contract_address: &str,
     ) -> Result<Addr<Self>> {
-        let addr = EnclaveSolReader::new(bus.clone(), contract_address, rpc_url)
+        let addr = EnclaveSolReader::new(bus.clone(), contract_address.parse()?, rpc_url)
             .await?
             .start();
 

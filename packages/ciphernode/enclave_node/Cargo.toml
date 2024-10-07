@@ -27,6 +27,7 @@ p2p = { path = "../p2p" }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 router = { path = "../router" }
+serde = { workspace = true }
 sortition = { path = "../sortition" }
 test-helpers = { path = "../test_helpers" }
 tokio = { workspace = true }

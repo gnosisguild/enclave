@@ -1,6 +1,10 @@
-use crate::helpers::{create_signer, Signer};
+use std::sync::Arc;
+
+use crate::helpers::create_provider_with_signer;
+use crate::helpers::Signer;
 use actix::prelude::*;
 use actix::Addr;
+use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, sol};
 use alloy::{
     primitives::{Bytes, U256},
@@ -9,7 +13,6 @@ use alloy::{
 use anyhow::Result;
 use enclave_core::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};
-use std::env;
 
 sol! {
     #[derive(Debug)]
@@ -31,9 +34,10 @@ impl EnclaveSolWriter {
         bus: Addr<EventBus>,
         rpc_url: &str,
         contract_address: Address,
+        signer: Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
-            provider: create_signer(rpc_url, env::var("PRIVATE_KEY")?).await?,
+            provider: create_provider_with_signer(rpc_url, signer).await?,
             contract_address,
             bus,
         })
@@ -42,9 +46,10 @@ impl EnclaveSolWriter {
     pub async fn attach(
         bus: Addr<EventBus>,
         rpc_url: &str,
-        contract_address: Address,
+        contract_address: &str,
+        signer: Arc<PrivateKeySigner>,
     ) -> Result<Addr<EnclaveSolWriter>> {
-        let addr = EnclaveSolWriter::new(bus.clone(), rpc_url, contract_address)
+        let addr = EnclaveSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
             .await?
             .start();
         let _ = bus
