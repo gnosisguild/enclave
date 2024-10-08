@@ -13,3 +13,4 @@ alloy = { workspace = true }
 clap = { workspace = true }
 actix-rt = { workspace = true }
 tokio = { workspace = true }
+config = "0.14.0"

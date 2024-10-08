@@ -14,3 +14,4 @@ rand = { workspace = true }
 alloy = { workspace = true, features = ["full"] }
 actix = { workspace = true }
 enclave-core = { path = "../core" }
+anyhow = { workspace = true }

@@ -1,4 +1,5 @@
 use alloy::primitives::{keccak256, Address};
+use anyhow::Result;
 use num::{BigInt, Num};
 
 pub struct DistanceSortition {
@@ -16,7 +17,7 @@ impl DistanceSortition {
         }
     }
 
-    pub fn get_committee(&mut self) -> Vec<(BigInt, Address)> {
+    pub fn get_committee(&mut self) -> Result<Vec<(BigInt, Address)>> {
         let mut scores = self
             .registered_nodes
             .iter()
@@ -24,14 +25,15 @@ impl DistanceSortition {
                 let concat = address.to_string() + &self.random_seed.to_string();
                 let hash = keccak256(concat).to_string();
                 let without_prefix = hash.trim_start_matches("0x");
-                let z = BigInt::from_str_radix(without_prefix, 16).unwrap();
+                let z = BigInt::from_str_radix(without_prefix, 16)?;
                 let score = z - BigInt::from(self.random_seed);
-                (score, *address)
+                Ok((score, *address))
             })
-            .collect::<Vec<(BigInt, Address)>>();
+            .collect::<Result<Vec<_>>>()?;
 
         scores.sort_by(|a, b| a.0.cmp(&b.0));
-        let result = scores[0..self.size].to_vec();
-        result
+        let size = std::cmp::min(self.size, scores.len());
+        let result = scores[0..size].to_vec();
+        Ok(result)
     }
 }

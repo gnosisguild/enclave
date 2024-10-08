@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use crate::DistanceSortition;
 use actix::prelude::*;
+use alloy::primitives::Address;
 use enclave_core::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EventBus, Seed, Subscribe};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
@@ -38,18 +39,29 @@ impl Default for SortitionModule {
 
 impl SortitionList<String> for SortitionModule {
     fn contains(&self, seed: Seed, size: usize, address: String) -> bool {
-        DistanceSortition::new(
-            seed.into(),
-            self.nodes
-                .clone()
-                .into_iter()
-                .map(|b| b.parse().unwrap())
-                .collect(),
-            size,
-        )
-        .get_committee()
-        .iter()
-        .any(|(_, addr)| addr.to_string() == address)
+        if self.nodes.len() == 0 {
+            eprintln!("ERROR: No nodes registered!");
+            return false;
+        }
+
+        let registered_nodes: Vec<Address> = self
+            .nodes
+            .clone()
+            .into_iter()
+            // TODO: error handling
+            .map(|b| b.parse().unwrap())
+            .collect();
+
+        let Ok(committee) =
+            DistanceSortition::new(seed.into(), registered_nodes, size).get_committee()
+        else {
+            eprintln!("Error: Could not get committee!");
+            return false;
+        };
+
+        committee
+            .iter()
+            .any(|(_, addr)| addr.to_string() == address)
     }
 
     fn add(&mut self, address: String) {
@@ -94,7 +106,7 @@ impl Default for Sortition {
 }
 
 impl Actor for Sortition {
-    type Context = Context<Self>;
+    type Context = actix::Context<Self>;
 }
 
 impl Handler<EnclaveEvent> for Sortition {

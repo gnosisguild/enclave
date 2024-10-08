@@ -19,7 +19,25 @@ jobs:
       with:
         toolchain: 1.81.0
         override: true
+      
+      # We need to setup node in order to compile the hardhat contracts to get the artifacts 
+    - name: "Setup node"
+      uses: actions/setup-node@v2
+      with:
+        node-version: 20
 
+    - name: Cache node modules
+      uses: actions/cache@v2
+      with:
+        path: "**/node_modules"
+        key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+    - name: "Install the dependencies"
+      run: "yarn install"
+
+    - name: "Compile the contracts and generate the TypeChain bindings"
+      run: "yarn typechain"
+
+      # Now we can check rust formatting and run tests
     - name: Checking code format
       run: cd ./packages/ciphernode && cargo fmt -- --check
 

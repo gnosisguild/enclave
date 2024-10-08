@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct OrderedSet<T: Ord>(BTreeSet<T>);
 
 impl<T: Ord> OrderedSet<T> {
@@ -28,6 +29,16 @@ impl<T: Ord> OrderedSet<T> {
 
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.0.iter()
+    }
+
+    pub fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut set = Self::new();
+        set.extend(iter);
+        set
+    }
+
+    pub fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        self.0.extend(iter);
     }
 }
 
@@ -69,6 +80,12 @@ impl<'a, T: Ord> IntoIterator for &'a OrderedSet<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
+    }
+}
+
+impl<T: Ord> From<Vec<T>> for OrderedSet<T> {
+    fn from(vec: Vec<T>) -> Self {
+        Self::from_iter(vec)
     }
 }
 
@@ -190,5 +207,41 @@ mod tests {
         set.insert(2);
         let vec: Vec<&i32> = (&set).into_iter().collect();
         assert_eq!(vec, vec![&1, &2, &3]);
+    }
+
+    #[test]
+    fn test_from_vec() {
+        let vec = vec![
+            "apple".to_string(),
+            "banana".to_string(),
+            "cherry".to_string(),
+            "apple".to_string(),
+        ];
+        let set: OrderedSet<String> = OrderedSet::from(vec);
+
+        assert_eq!(set.len(), 3);
+        assert!(set.contains(&"apple".to_string()));
+        assert!(set.contains(&"banana".to_string()));
+        assert!(set.contains(&"cherry".to_string()));
+
+        let vec_from_set: Vec<&String> = set.iter().collect();
+        assert_eq!(vec_from_set, vec!["apple", "banana", "cherry"]);
+    }
+
+    #[test]
+    fn test_extend() {
+        let mut set = OrderedSet::new();
+        set.insert("apple".to_string());
+
+        set.extend(vec![
+            "banana".to_string(),
+            "cherry".to_string(),
+            "apple".to_string(),
+        ]);
+
+        assert_eq!(set.len(), 3);
+        assert!(set.contains(&"apple".to_string()));
+        assert!(set.contains(&"banana".to_string()));
+        assert!(set.contains(&"cherry".to_string()));
     }
 }

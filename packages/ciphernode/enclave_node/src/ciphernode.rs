@@ -1,16 +1,19 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
+use anyhow::Result;
 use data::Data;
 use enclave_core::EventBus;
-use evm::{connect_evm_ciphernode_registry, connect_evm_enclave};
+use evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{CiphernodeSelector, CommitteeMetaFactory, E3RequestRouter, LazyFhe, LazyKeyshare};
+use router::{CiphernodeSelector, E3RequestRouter, LazyFhe, LazyKeyshare};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
+
+use crate::app_config::AppConfig;
 
 /// Main Ciphernode Actor
 /// Suprvises all children
@@ -47,11 +50,9 @@ impl MainCiphernode {
     }
 
     pub async fn attach(
+        config: AppConfig,
         address: Address,
-        rpc_url: &str,
-        enclave_contract: Address,
-        registry_contract: Address,
-    ) -> (Addr<Self>, JoinHandle<()>) {
+    ) -> Result<(Addr<Self>, JoinHandle<()>)> {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
@@ -61,8 +62,21 @@ impl MainCiphernode {
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
-        connect_evm_enclave(bus.clone(), rpc_url, enclave_contract).await;
-        let _ = connect_evm_ciphernode_registry(bus.clone(), rpc_url, registry_contract).await;
+        for chain in config
+            .chains
+            .iter()
+            .filter(|chain| chain.enabled.unwrap_or(true))
+        {
+            let rpc_url = &chain.rpc_url;
+
+            EnclaveSolReader::attach(bus.clone(), rpc_url, &chain.contracts.enclave).await?;
+            CiphernodeRegistrySol::attach(
+                bus.clone(),
+                rpc_url,
+                &chain.contracts.ciphernode_registry,
+            )
+            .await?;
+        }
 
         let e3_manager = E3RequestRouter::builder(bus.clone())
             .add_hook(LazyFhe::create(rng))
@@ -82,7 +96,7 @@ impl MainCiphernode {
             address, bus, data, sortition, selector, p2p_addr, e3_manager,
         )
         .start();
-        (main_addr, join_handle)
+        Ok((main_addr, join_handle))
     }
 }
 
