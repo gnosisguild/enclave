@@ -32,7 +32,8 @@ impl DistanceSortition {
             .collect::<Result<Vec<_>>>()?;
 
         scores.sort_by(|a, b| a.0.cmp(&b.0));
-        let result = scores[0..self.size].to_vec();
+        let size = std::cmp::min(self.size, scores.len());
+        let result = scores[0..size].to_vec();
         Ok(result)
     }
 }
