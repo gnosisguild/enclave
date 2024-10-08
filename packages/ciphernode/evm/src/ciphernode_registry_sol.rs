@@ -11,26 +11,14 @@ use enclave_core::{EnclaveEvent, EventBus};
 
 use crate::helpers::{self, create_readonly_provider, ReadonlyProvider};
 
-sol! {
-    #[derive(Debug)]
-    event CiphernodeAdded(
-        address indexed node,
-        uint256 index,
-        uint256 numNodes,
-        uint256 size
-    );
+sol!(
+    #[sol(rpc)]
+    ICiphernodeRegistry,
+    "../../evm/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json"
+);
 
-    #[derive(Debug)]
-    event CiphernodeRemoved(
-        address indexed node,
-        uint256 index,
-        uint256 numNodes,
-        uint256 size
-    );
-}
-
-impl From<CiphernodeAdded> for enclave_core::CiphernodeAdded {
-    fn from(value: CiphernodeAdded) -> Self {
+impl From<ICiphernodeRegistry::CiphernodeAdded> for enclave_core::CiphernodeAdded {
+    fn from(value: ICiphernodeRegistry::CiphernodeAdded) -> Self {
         enclave_core::CiphernodeAdded {
             address: value.node.to_string(),
             // TODO: limit index and numNodes to uint32 at the solidity level
@@ -46,15 +34,15 @@ impl From<CiphernodeAdded> for enclave_core::CiphernodeAdded {
     }
 }
 
-impl From<CiphernodeAdded> for EnclaveEvent {
-    fn from(value: CiphernodeAdded) -> Self {
+impl From<ICiphernodeRegistry::CiphernodeAdded> for EnclaveEvent {
+    fn from(value: ICiphernodeRegistry::CiphernodeAdded) -> Self {
         let payload: enclave_core::CiphernodeAdded = value.into();
         EnclaveEvent::from(payload)
     }
 }
 
-impl From<CiphernodeRemoved> for enclave_core::CiphernodeRemoved {
-    fn from(value: CiphernodeRemoved) -> Self {
+impl From<ICiphernodeRegistry::CiphernodeRemoved> for enclave_core::CiphernodeRemoved {
+    fn from(value: ICiphernodeRegistry::CiphernodeRemoved) -> Self {
         enclave_core::CiphernodeRemoved {
             address: value.node.to_string(),
             index: value
@@ -69,8 +57,8 @@ impl From<CiphernodeRemoved> for enclave_core::CiphernodeRemoved {
     }
 }
 
-impl From<CiphernodeRemoved> for EnclaveEvent {
-    fn from(value: CiphernodeRemoved) -> Self {
+impl From<ICiphernodeRegistry::CiphernodeRemoved> for EnclaveEvent {
+    fn from(value: ICiphernodeRegistry::CiphernodeRemoved) -> Self {
         let payload: enclave_core::CiphernodeRemoved = value.into();
         EnclaveEvent::from(payload)
     }
@@ -78,15 +66,15 @@ impl From<CiphernodeRemoved> for EnclaveEvent {
 
 fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEvent> {
     match topic {
-        Some(&CiphernodeAdded::SIGNATURE_HASH) => {
-            let Ok(event) = CiphernodeAdded::decode_log_data(data, true) else {
+        Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
+            let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data, true) else {
                 println!("Error parsing event CiphernodeAdded"); // TODO: provide more info
                 return None;
             };
             Some(EnclaveEvent::from(event))
         }
-        Some(&CiphernodeRemoved::SIGNATURE_HASH) => {
-            let Ok(event) = CiphernodeRemoved::decode_log_data(data, true) else {
+        Some(&ICiphernodeRegistry::CiphernodeRemoved::SIGNATURE_HASH) => {
+            let Ok(event) = ICiphernodeRegistry::CiphernodeRemoved::decode_log_data(data, true) else {
                 println!("Error parsing event CiphernodeRemoved"); // TODO: provide more info
                 return None;
             };

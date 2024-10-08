@@ -8,40 +8,13 @@ use alloy::{
 use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus};
 
-sol! {
-    #[derive(Debug)]
-    struct E3 {
-        uint256 seed;
-        uint32[2] threshold;
-        uint256[2] startWindow;
-        uint256 duration;
-        uint256 expiration;
-        bytes32 encryptionSchemeId;
-        address e3Program;
-        bytes e3ProgramParams;
-        address inputValidator;
-        address decryptionVerifier;
-        bytes32 committeePublicKey;
-        bytes32 ciphertextOutput;
-        bytes plaintextOutput;
-    }
+sol!(
+    #[sol(rpc)]
+    IEnclave,
+    "../../evm/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
+);
 
-    #[derive(Debug)]
-    event CiphertextOutputPublished(
-        uint256 indexed e3Id,
-        bytes ciphertextOutput
-    );
-
-    #[derive(Debug)]
-    event E3Requested(
-        uint256 e3Id,
-        E3 e3,
-        address filter,
-        address indexed e3Program
-    );
-}
-
-struct E3RequestedWithChainId(pub E3Requested, pub u64);
+struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 
 impl From<E3RequestedWithChainId> for enclave_core::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
@@ -62,8 +35,8 @@ impl From<E3RequestedWithChainId> for EnclaveEvent {
     }
 }
 
-impl From<CiphertextOutputPublished> for enclave_core::CiphertextOutputPublished {
-    fn from(value: CiphertextOutputPublished) -> Self {
+impl From<IEnclave::CiphertextOutputPublished> for enclave_core::CiphertextOutputPublished {
+    fn from(value: IEnclave::CiphertextOutputPublished) -> Self {
         enclave_core::CiphertextOutputPublished {
             e3_id: value.e3Id.to_string().into(),
             ciphertext_output: value.ciphertextOutput.to_vec(),
@@ -71,8 +44,8 @@ impl From<CiphertextOutputPublished> for enclave_core::CiphertextOutputPublished
     }
 }
 
-impl From<CiphertextOutputPublished> for EnclaveEvent {
-    fn from(value: CiphertextOutputPublished) -> Self {
+impl From<IEnclave::CiphertextOutputPublished> for EnclaveEvent {
+    fn from(value: IEnclave::CiphertextOutputPublished) -> Self {
         let payload: enclave_core::CiphertextOutputPublished = value.into();
         EnclaveEvent::from(payload)
     }
@@ -80,15 +53,15 @@ impl From<CiphertextOutputPublished> for EnclaveEvent {
 
 fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
-        Some(&E3Requested::SIGNATURE_HASH) => {
-            let Ok(event) = E3Requested::decode_log_data(data, true) else {
+        Some(&IEnclave::E3Requested::SIGNATURE_HASH) => {
+            let Ok(event) = IEnclave::E3Requested::decode_log_data(data, true) else {
                 println!("Error parsing event E3Requested"); // TODO: provide more info
                 return None;
             };
             Some(EnclaveEvent::from(E3RequestedWithChainId(event, chain_id)))
         }
-        Some(&CiphertextOutputPublished::SIGNATURE_HASH) => {
-            let Ok(event) = CiphertextOutputPublished::decode_log_data(data, true) else {
+        Some(&IEnclave::CiphertextOutputPublished::SIGNATURE_HASH) => {
+            let Ok(event) = IEnclave::CiphertextOutputPublished::decode_log_data(data, true) else {
                 println!("Error parsing event CiphertextOutputPublished"); // TODO: provide more info
                 return None;
             };

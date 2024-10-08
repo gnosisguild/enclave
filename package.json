@@ -21,6 +21,7 @@
     "ciphernode:aggregator": "cd packages/ciphernode && ./scripts/aggregator.sh",
     "ciphernode:test": "cd packages/ciphernode && cargo test",
     "ciphernode:build": "cd packages/ciphernode && cargo build --release",
+    "preciphernode:build": "yarn evm:compile",
     "committee:new": "cd packages/evm && yarn committee:new",
     "committee:publish": "cd packages/evm && yarn hardhat committee:publish",
     "e3:activate": "cd packages/evm && yarn hardhat e3:activate",

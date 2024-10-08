@@ -13,13 +13,11 @@ use enclave_core::{
 };
 use std::sync::Arc;
 
-sol! {
-    #[derive(Debug)]
+sol!(
     #[sol(rpc)]
-    contract RegistryFilter {
-        function publishCommittee(uint256 e3Id, address[] memory nodes, bytes memory publicKey) external onlyOwner;
-    }
-}
+    NaiveRegistryFilter,
+    "../../evm/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json"
+);
 
 pub struct RegistryFilterSolWriter {
     provider: SignerProvider,
@@ -116,7 +114,7 @@ pub async fn publish_committee(
         .into_iter()
         .filter_map(|node| node.parse().ok())
         .collect();
-    let contract = RegistryFilter::new(contract_address, provider.get_provider());
+    let contract = NaiveRegistryFilter::new(contract_address, provider.get_provider());
     let builder = contract.publishCommittee(e3_id, nodes, public_key);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)

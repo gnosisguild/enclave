@@ -14,13 +14,11 @@ use anyhow::Result;
 use enclave_core::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};
 
-sol! {
-    #[derive(Debug)]
+sol!(
     #[sol(rpc)]
-    contract Enclave {
-        function publishPlaintextOutput(uint256 e3Id, bytes memory plaintextOutput, bytes memory proof) external returns (bool success);
-    }
-}
+    IEnclave,
+    "../../evm/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
+);
 
 /// Consumes events from the event bus and calls EVM methods on the Enclave.sol contract
 pub struct EnclaveSolWriter {
@@ -113,7 +111,7 @@ async fn publish_plaintext_output(
     let e3_id: U256 = e3_id.try_into()?;
     let decrypted_output = Bytes::from(decrypted_output);
     let proof = Bytes::from(vec![1]);
-    let contract = Enclave::new(contract_address, provider.get_provider());
+    let contract = IEnclave::new(contract_address, provider.get_provider());
     let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
