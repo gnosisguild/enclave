@@ -67,14 +67,16 @@ impl From<ICiphernodeRegistry::CiphernodeRemoved> for EnclaveEvent {
 fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
-            let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data, true) else {
+            let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data, true)
+            else {
                 println!("Error parsing event CiphernodeAdded"); // TODO: provide more info
                 return None;
             };
             Some(EnclaveEvent::from(event))
         }
         Some(&ICiphernodeRegistry::CiphernodeRemoved::SIGNATURE_HASH) => {
-            let Ok(event) = ICiphernodeRegistry::CiphernodeRemoved::decode_log_data(data, true) else {
+            let Ok(event) = ICiphernodeRegistry::CiphernodeRemoved::decode_log_data(data, true)
+            else {
                 println!("Error parsing event CiphernodeRemoved"); // TODO: provide more info
                 return None;
             };
