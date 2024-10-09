@@ -123,7 +123,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
 
         context.forward_message(&msg, &mut self.buffer);
 
-        match msg.clone() {
+        match &msg {
             EnclaveEvent::PlaintextAggregated { .. } => {
                 // Here we are detemining that by receiving the PlaintextAggregated event our request is
                 // complete and we can notify everyone. This might change as we consider other factors
