@@ -128,14 +128,12 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
                 // Here we are detemining that by receiving the PlaintextAggregated event our request is
                 // complete and we can notify everyone. This might change as we consider other factors
                 // when determining if the request is complete
-                let bus = self.bus.clone();
-
                 let event = EnclaveEvent::from(E3RequestComplete {
                     e3_id: e3_id.clone(),
                 });
 
                 // Send to bus so all other actors can react to a request being complete.
-                bus.do_send(event);
+                self.bus.do_send(event);
             }
             EnclaveEvent::E3RequestComplete { .. } => {
                 // Note this will be sent above to the children who can kill themselves based on
