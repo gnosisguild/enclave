@@ -143,6 +143,8 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
 
             // Send to bus so all other actors can react to a request being complete.
             self.bus.do_send(event);
+
+            // clean up context
             context.cleanup();
             self.contexts.remove(&e3_id);
         }
