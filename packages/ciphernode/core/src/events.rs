@@ -364,7 +364,6 @@ pub struct PlaintextAggregated {
     pub src_chain_id: u64,
 }
 
-
 /// E3RequestComplete event is a local only event
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
