@@ -2,7 +2,8 @@ use actix::prelude::*;
 use anyhow::{anyhow, Context, Result};
 use data::{Data, Get, Insert};
 use enclave_core::{
-    CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated
+    CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die, EnclaveErrorType,
+    EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
 use fhe::{DecryptCiphertext, Fhe};
 use std::sync::Arc;
@@ -34,8 +35,9 @@ impl Handler<EnclaveEvent> for Keyshare {
 
     fn handle(&mut self, event: EnclaveEvent, ctx: &mut actix::Context<Self>) -> Self::Result {
         match event {
-            EnclaveEvent::CiphernodeSelected { data, .. } => ctx.address().do_send(data),
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.address().do_send(data),
+            EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
+            EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
+            EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
             _ => (),
         }
     }
@@ -101,7 +103,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
 impl Handler<Die> for Keyshare {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
-       ctx.stop()
+        ctx.stop()
     }
 }
 
