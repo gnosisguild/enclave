@@ -1,8 +1,8 @@
 use data::Data;
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated, OrderedSet,
-    PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
+    E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated,
+    OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
@@ -181,7 +181,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
                 e3_id: e3_id.clone(),
                 nodes: OrderedSet::from(eth_addrs.clone()),
                 src_chain_id: 1
-            })
+            }),
         ]
     );
 
@@ -223,7 +223,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     sleep(Duration::from_millis(1)).await; // need to push to next tick
     let history = bus.send(GetHistory).await?;
 
-    assert_eq!(history.len(), 5);
+    assert_eq!(history.len(), 6);
 
     assert_eq!(
         history,
@@ -248,6 +248,9 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
                 e3_id: e3_id.clone(),
                 decrypted_output: expected_raw_plaintext.clone(),
                 src_chain_id: 1
+            }),
+            EnclaveEvent::from(E3RequestComplete {
+                e3_id: e3_id.clone()
             })
         ]
     );

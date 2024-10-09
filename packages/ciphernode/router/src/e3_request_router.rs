@@ -1,13 +1,14 @@
 use crate::CommitteeMetaFactory;
 
 use super::CommitteeMeta;
+use actix::{Actor, Addr, Context, Handler, Recipient};
 use aggregator::PlaintextAggregator;
 use aggregator::PublicKeyAggregator;
+use enclave_core::E3RequestComplete;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use fhe::Fhe;
 use keyshare::Keyshare;
-
-use actix::{Actor, Addr, Context, Handler, Recipient};
+use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
 
 /// Helper class to buffer events for downstream instances incase events arrive in the wrong order
@@ -83,8 +84,10 @@ pub type EventHook = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
 // dependencies
 pub struct E3RequestRouter {
     contexts: HashMap<E3id, E3RequestContext>,
+    completed: HashSet<E3id>,
     hooks: Vec<EventHook>,
     buffer: EventBuffer,
+    bus: Addr<EventBus>,
 }
 
 impl E3RequestRouter {
@@ -107,13 +110,39 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             return;
         };
 
-        let context = self.contexts.entry(e3_id).or_default();
+        if self.completed.contains(&e3_id) {
+            // TODO: Log warning that e3 event was received for completed e3_id
+            return;
+        }
+
+        let context = self.contexts.entry(e3_id.clone()).or_default();
 
         for hook in &mut self.hooks {
             hook(context, msg.clone());
         }
 
         context.forward_message(&msg, &mut self.buffer);
+
+        match &msg {
+            EnclaveEvent::PlaintextAggregated { .. } => {
+                // Here we are detemining that by receiving the PlaintextAggregated event our request is
+                // complete and we can notify everyone. This might change as we consider other factors
+                // when determining if the request is complete
+                let event = EnclaveEvent::from(E3RequestComplete {
+                    e3_id: e3_id.clone(),
+                });
+
+                // Send to bus so all other actors can react to a request being complete.
+                self.bus.do_send(event);
+            }
+            EnclaveEvent::E3RequestComplete { .. } => {
+                // Note this will be sent above to the children who can kill themselves based on
+                // the event
+                self.contexts.remove(&e3_id);
+                self.completed.insert(e3_id);
+            }
+            _ => (),
+        }
     }
 }
 
@@ -131,8 +160,10 @@ impl E3RequestRouterBuilder {
     pub fn build(self) -> Addr<E3RequestRouter> {
         let e3r = E3RequestRouter {
             contexts: HashMap::new(),
+            completed: HashSet::new(),
             hooks: self.hooks,
             buffer: EventBuffer::default(),
+            bus: self.bus.clone(),
         };
 
         let addr = e3r.start();
