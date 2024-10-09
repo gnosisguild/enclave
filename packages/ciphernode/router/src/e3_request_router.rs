@@ -3,6 +3,7 @@ use crate::CommitteeMetaFactory;
 use super::CommitteeMeta;
 use aggregator::PlaintextAggregator;
 use aggregator::PublicKeyAggregator;
+use enclave_core::E3RequestComplete;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use fhe::Fhe;
 use keyshare::Keyshare;
@@ -85,6 +86,7 @@ pub struct E3RequestRouter {
     contexts: HashMap<E3id, E3RequestContext>,
     hooks: Vec<EventHook>,
     buffer: EventBuffer,
+    bus: Addr<EventBus>,
 }
 
 impl E3RequestRouter {
@@ -107,13 +109,26 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             return;
         };
 
-        let context = self.contexts.entry(e3_id).or_default();
+        let context = self.contexts.entry(e3_id.clone()).or_default();
 
         for hook in &mut self.hooks {
             hook(context, msg.clone());
         }
 
         context.forward_message(&msg, &mut self.buffer);
+
+        // Here we are detemining that by receiving the PlaintextAggregated event our request is
+        // complete and we can notify everyone. This might change as we consider other factors
+        // when determining if the request is complete
+        if let EnclaveEvent::PlaintextAggregated { .. } = msg {
+            // Local event to clean up context
+            let event = EnclaveEvent::from(E3RequestComplete {
+                e3_id: e3_id.clone(),
+            });
+
+            // Send to bus so all other actors can react to a request being complete.
+            self.bus.do_send(event);
+        }
     }
 }
 
@@ -133,6 +148,7 @@ impl E3RequestRouterBuilder {
             contexts: HashMap::new(),
             hooks: self.hooks,
             buffer: EventBuffer::default(),
+            bus: self.bus.clone()
         };
 
         let addr = e3r.start();

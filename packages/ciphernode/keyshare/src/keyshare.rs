@@ -2,8 +2,7 @@ use actix::prelude::*;
 use anyhow::{anyhow, Context, Result};
 use data::{Data, Get, Insert};
 use enclave_core::{
-    CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, EnclaveErrorType,
-    EnclaveEvent, EventBus, FromError, KeyshareCreated,
+    CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated
 };
 use fhe::{DecryptCiphertext, Fhe};
 use std::sync::Arc;
@@ -96,6 +95,13 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
                 .await
                 .unwrap()
         })
+    }
+}
+
+impl Handler<Die> for Keyshare {
+    type Result = ();
+    fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+       ctx.stop()
     }
 }
 

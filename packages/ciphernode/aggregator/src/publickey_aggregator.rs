@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use anyhow::Result;
 use enclave_core::{
-    E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
+    Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed
 };
 use fhe::{Fhe, GetAggregatePublicKey};
 use sortition::{GetHasNode, GetNodes, Sortition};
@@ -217,5 +217,12 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                     Ok(())
                 }),
         )
+    }
+}
+
+impl Handler<Die> for PublicKeyAggregator {
+    type Result = ();
+    fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+       ctx.stop()
     }
 }

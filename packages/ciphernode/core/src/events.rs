@@ -1,4 +1,4 @@
-use actix::Message;
+use actix::{Actor, Addr, Message};
 use alloy::{
     hex,
     primitives::{Uint, U256},
@@ -116,6 +116,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: EnclaveError,
     },
+    E3RequestComplete {
+        id: EventId,
+        data: E3RequestComplete,
+    },
     // CommitteeSelected,
     // OutputDecrypted,
     // CiphernodeRegistered,
@@ -142,6 +146,7 @@ impl EnclaveEvent {
             EnclaveEvent::E3Requested { .. } => true,
             EnclaveEvent::CiphernodeAdded { .. } => true,
             EnclaveEvent::CiphernodeRemoved { .. } => true,
+            EnclaveEvent::E3RequestComplete { .. } => true,
             _ => false,
         }
     }
@@ -160,6 +165,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
             EnclaveEvent::EnclaveError { id, .. } => id,
+            EnclaveEvent::E3RequestComplete { id, .. } => id,
         }
     }
 }
@@ -232,6 +238,15 @@ impl From<DecryptionshareCreated> for EnclaveEvent {
 impl From<PlaintextAggregated> for EnclaveEvent {
     fn from(data: PlaintextAggregated) -> Self {
         EnclaveEvent::PlaintextAggregated {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
+
+impl From<E3RequestComplete> for EnclaveEvent {
+    fn from(data: E3RequestComplete) -> Self {
+        EnclaveEvent::E3RequestComplete {
             id: EventId::from(data.clone()),
             data: data.clone(),
         }
@@ -349,6 +364,14 @@ pub struct PlaintextAggregated {
     pub src_chain_id: u64,
 }
 
+
+/// E3RequestComplete event is a local only event
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct E3RequestComplete {
+    pub e3_id: E3id,
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeAdded {
@@ -371,6 +394,10 @@ pub struct EnclaveError {
     pub err_type: EnclaveErrorType,
     pub message: String,
 }
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct Die;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Seed(pub [u8; 32]);

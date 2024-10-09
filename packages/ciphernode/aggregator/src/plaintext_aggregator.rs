@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use anyhow::Result;
 use enclave_core::{
-    DecryptionshareCreated, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated, Seed,
+    DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated, E3RequestComplete, Seed
 };
 use fhe::{Fhe, GetAggregatePlaintext};
 use sortition::{GetHasNode, Sortition};
@@ -191,6 +191,14 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
 
         self.bus.do_send(event);
 
+
         Ok(())
+    }
+}
+
+impl Handler<Die> for PlaintextAggregator {
+    type Result = ();
+    fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+       ctx.stop()
     }
 }
