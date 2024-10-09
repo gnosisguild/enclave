@@ -2,7 +2,7 @@ use crate::EventHook;
 use actix::{Actor, Addr};
 use aggregator::{PlaintextAggregator, PublicKeyAggregator};
 use data::Data;
-use enclave_core::{Die, E3Requested, EnclaveEvent, EventBus};
+use enclave_core::{E3Requested, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::Keyshare;
 use sortition::Sortition;
@@ -30,23 +30,18 @@ pub struct LazyKeyshare;
 impl LazyKeyshare {
     pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: &str) -> EventHook {
         let address = address.to_string();
-        Box::new(move |ctx, evt| match evt {
-            EnclaveEvent::CiphernodeSelected { .. } => {
-                let Some(ref fhe) = ctx.fhe else {
-                    return;
-                };
+        Box::new(move |ctx, evt| {
+            // Save Ciphernode on CiphernodeSelected
+            let EnclaveEvent::CiphernodeSelected { .. } = evt else {
+                return;
+            };
 
-                ctx.keyshare =
-                    Some(Keyshare::new(bus.clone(), data.clone(), fhe.clone(), &address).start())
-            }
-            EnclaveEvent::E3RequestComplete { .. } => {
-                let Some(actor) = ctx.keyshare.take() else {
-                    return;
-                };
+            let Some(ref fhe) = ctx.fhe else {
+                return;
+            };
 
-                actor.do_send(Die);
-            }
-            _ => (),
+            ctx.keyshare =
+                Some(Keyshare::new(bus.clone(), data.clone(), fhe.clone(), &address).start())
         })
     }
 }
@@ -54,38 +49,31 @@ impl LazyKeyshare {
 pub struct LazyPlaintextAggregator;
 impl LazyPlaintextAggregator {
     pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> EventHook {
-        Box::new(move |ctx, evt| match evt {
-            EnclaveEvent::CiphertextOutputPublished { data, .. } => {
-                let Some(ref fhe) = ctx.fhe else {
-                    return;
-                };
-                let Some(ref meta) = ctx.meta else {
-                    return;
-                };
+        Box::new(move |ctx, evt| {
+            // Save plaintext aggregator
+            let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
+                return;
+            };
+            let Some(ref fhe) = ctx.fhe else {
+                return;
+            };
+            let Some(ref meta) = ctx.meta else {
+                return;
+            };
 
-                // Save plaintext aggregator
-                ctx.plaintext = Some(
-                    PlaintextAggregator::new(
-                        fhe.clone(),
-                        bus.clone(),
-                        sortition.clone(),
-                        data.e3_id,
-                        meta.threshold_m,
-                        meta.seed,
-                        data.ciphertext_output,
-                        meta.src_chain_id,
-                    )
-                    .start(),
-                );
-            }
-            EnclaveEvent::E3RequestComplete { .. } => {
-                let Some(actor) = ctx.plaintext.take() else {
-                    return;
-                };
-
-                actor.do_send(Die);
-            }
-            _ => (),
+            ctx.plaintext = Some(
+                PlaintextAggregator::new(
+                    fhe.clone(),
+                    bus.clone(),
+                    sortition.clone(),
+                    data.e3_id,
+                    meta.threshold_m,
+                    meta.seed,
+                    data.ciphertext_output,
+                    meta.src_chain_id,
+                )
+                .start(),
+            );
         })
     }
 }
@@ -93,40 +81,33 @@ impl LazyPlaintextAggregator {
 pub struct LazyPublicKeyAggregator;
 impl LazyPublicKeyAggregator {
     pub fn create(bus: Addr<EventBus>, sortition: Addr<Sortition>) -> EventHook {
-        Box::new(move |ctx, evt| match evt {
+        Box::new(move |ctx, evt| {
             // Saving the publickey aggregator with deps on E3Requested
-            EnclaveEvent::E3Requested { data, .. } => {
-                let Some(ref fhe) = ctx.fhe else {
-                    println!("fhe was not on ctx");
-                    return;
-                };
-                let Some(ref meta) = ctx.meta else {
-                    println!("meta was not on ctx");
-                    return;
-                };
+            let EnclaveEvent::E3Requested { data, .. } = evt else {
+                return;
+            };
 
-                ctx.publickey = Some(
-                    PublicKeyAggregator::new(
-                        fhe.clone(),
-                        bus.clone(),
-                        sortition.clone(),
-                        data.e3_id,
-                        meta.threshold_m,
-                        meta.seed,
-                        meta.src_chain_id,
-                    )
-                    .start(),
-                );
-            }
-            EnclaveEvent::E3RequestComplete { .. } => {
-                let Some(actor) = ctx.publickey.take() else {
-                    return;
-                };
+            let Some(ref fhe) = ctx.fhe else {
+                println!("fhe was not on ctx");
+                return;
+            };
+            let Some(ref meta) = ctx.meta else {
+                println!("meta was not on ctx");
+                return;
+            };
 
-                actor.do_send(Die);
-            }
-
-            _ => (),
+            ctx.publickey = Some(
+                PublicKeyAggregator::new(
+                    fhe.clone(),
+                    bus.clone(),
+                    sortition.clone(),
+                    data.e3_id,
+                    meta.threshold_m,
+                    meta.seed,
+                    meta.src_chain_id,
+                )
+                .start(),
+            );
         })
     }
 }

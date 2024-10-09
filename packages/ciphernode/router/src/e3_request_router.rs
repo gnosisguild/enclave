@@ -3,6 +3,7 @@ use crate::CommitteeMetaFactory;
 use super::CommitteeMeta;
 use aggregator::PlaintextAggregator;
 use aggregator::PublicKeyAggregator;
+use enclave_core::Die;
 use enclave_core::E3RequestComplete;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use fhe::Fhe;
@@ -71,6 +72,20 @@ impl E3RequestContext {
             }
         });
     }
+
+    pub fn cleanup(&mut self) {
+        if let Some(keyshare) = self.keyshare.take() {
+            keyshare.do_send(Die);
+        }
+        if let Some(plaintext) = self.plaintext.take() {
+            plaintext.do_send(Die);
+        }
+        if let Some(publickey) = self.publickey.take() {
+            publickey.do_send(Die);
+        }
+        self.fhe = None;
+        self.meta = None;
+    }
 }
 
 /// Format of the hook that needs to be passed to E3RequestRouter
@@ -128,6 +143,8 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
 
             // Send to bus so all other actors can react to a request being complete.
             self.bus.do_send(event);
+            context.cleanup();
+            self.contexts.remove(&e3_id);
         }
     }
 }
@@ -148,7 +165,7 @@ impl E3RequestRouterBuilder {
             contexts: HashMap::new(),
             hooks: self.hooks,
             buffer: EventBuffer::default(),
-            bus: self.bus.clone()
+            bus: self.bus.clone(),
         };
 
         let addr = e3r.start();
