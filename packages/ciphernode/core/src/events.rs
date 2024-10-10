@@ -539,6 +539,7 @@ pub enum EnclaveErrorType {
     IO,
     PlaintextAggregation,
     Decryption,
+    Sortition
 }
 
 impl EnclaveError {

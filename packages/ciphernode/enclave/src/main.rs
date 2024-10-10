@@ -2,6 +2,7 @@ use alloy::primitives::Address;
 use clap::Parser;
 use enclave::load_config;
 use enclave_node::MainCiphernode;
+use tracing::info;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
@@ -34,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n\n\n\n");
     let args = Args::parse();
     let address = Address::parse_checksummed(&args.address, None).expect("Invalid address");
-    println!("LAUNCHING CIPHERNODE: ({})", address);
+    info!("LAUNCHING CIPHERNODE: ({})", address);
     let config = load_config(&args.config)?;
     let (_, handle) = MainCiphernode::attach(config, address).await?;
     let _ = tokio::join!(handle);

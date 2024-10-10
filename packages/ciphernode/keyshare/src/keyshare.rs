@@ -124,8 +124,6 @@ async fn on_decryption_requested(
         return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
     };
 
-    println!("\n\nDECRYPTING!\n\n");
-
     let decryption_share = fhe
         .decrypt_ciphertext(DecryptCiphertext {
             ciphertext: ciphertext_output,

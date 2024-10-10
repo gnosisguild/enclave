@@ -11,6 +11,7 @@ use enclave_core::{
     BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
     Subscribe,
 };
+use tracing::info;
 use std::sync::Arc;
 
 sol!(
@@ -92,7 +93,7 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
                     publish_committee(provider, contract_address, e3_id, nodes, pubkey).await;
                 match result {
                     Ok(receipt) => {
-                        println!("tx:{}", receipt.transaction_hash);
+                        info!(tx=%receipt.transaction_hash,"tx");
                     }
                     Err(err) => bus.err(EnclaveErrorType::Evm, err),
                 }

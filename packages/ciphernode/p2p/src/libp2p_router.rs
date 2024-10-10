@@ -2,6 +2,7 @@ use futures::stream::StreamExt;
 use libp2p::{
     gossipsub, identity, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux,
 };
+use tracing::{error, info, trace};
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
@@ -93,7 +94,7 @@ impl EnclaveRouter {
                     .build();
                 self.swarm = Some(swarm);
             }
-            _ => println!("Defaulting to MDNS discovery"),
+            _ => info!("Defaulting to MDNS discovery"),
         }
         Ok(self)
     }
@@ -110,6 +111,7 @@ impl EnclaveRouter {
         Ok(self)
     }
 
+    /// Listen on the default multiaddr
     pub async fn start(&mut self) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         self.swarm
             .as_mut()
@@ -125,19 +127,19 @@ impl EnclaveRouter {
                     if let Err(e) = self.swarm.as_mut().unwrap()
                         .behaviour_mut().gossipsub
                         .publish(self.topic.as_mut().unwrap().clone(), line) {
-                        println!("Publish error: {e:?}");
+                        error!(error=?e, "Error publishing line to swarm");
                     }
                 }
                 event = self.swarm.as_mut().unwrap().select_next_some() => match event {
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
-                            // println!("mDNS discovered a new peer: {peer_id}");
+                            trace!("mDNS discovered a new peer: {peer_id}");
                             self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                         for (peer_id, _multiaddr) in list {
-                            // println!("mDNS discover peer has expired: {peer_id}");
+                            trace!("mDNS discover peer has expired: {peer_id}");
                             self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                         }
                     },
@@ -146,14 +148,14 @@ impl EnclaveRouter {
                         message_id: id,
                         message,
                     })) => {
-                        // println!(
-                        //     "Got message with id: {id} from peer: {peer_id}",
-                        // );
-                        // println!("{:?}", message);
+                        trace!(
+                            "Got message with id: {id} from peer: {peer_id}",
+                        );
+                        trace!("{:?}", message);
                         self.evt_tx.send(message.data).await?;
                     },
                     SwarmEvent::NewListenAddr { address, .. } => {
-                        // println!("Local node is listening on {address}");
+                        trace!("Local node is listening on {address}");
                     }
                     _ => {}
                 }
@@ -162,14 +164,4 @@ impl EnclaveRouter {
     }
 }
 
-// #[tokio::main]
-// async fn main() -> Result<(), Box<dyn Error>> {
 
-//     let mut p2p = EnclaveRouter::new()?;
-//     p2p.connect_swarm("mdns".to_string())?;
-//     p2p.join_topic("enclave-keygen-01")?;
-//     p2p.start().await?;
-
-//     println!("Hello, cipher world!");
-//     Ok(())
-// }
