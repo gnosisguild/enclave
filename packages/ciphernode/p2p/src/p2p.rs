@@ -114,7 +114,9 @@ impl Handler<EnclaveEvent> for P2p {
 
             match evt.to_bytes() {
                 Ok(bytes) => {
-                    let _ = tx.send(bytes).await;
+                    if let Err(e) = tx.send(bytes).await {
+                        error!(error=?e, "Error sending bytes to libp2p");
+                    };
                 }
                 Err(error) => {
                     error!(error=?error, "Could not convert event to bytes for serialization!")
