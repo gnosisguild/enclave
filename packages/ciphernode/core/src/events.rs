@@ -1,4 +1,4 @@
-use actix::{Actor, Addr, Message};
+use actix::Message;
 use alloy::{
     hex,
     primitives::{Uint, U256},
@@ -69,7 +69,7 @@ impl EventId {
 impl fmt::Display for EventId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let base58_string = bs58::encode(&self.0).into_string();
-        write!(f, "eid_{}", base58_string)
+        write!(f, "evt:{}", &base58_string[0..8])
     }
 }
 
@@ -181,6 +181,22 @@ impl EnclaveEvent {
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
             _ => None,
+        }
+    }
+    pub fn get_data(&self) -> String {
+        match self.clone() {
+            EnclaveEvent::KeyshareCreated { data, .. } => format!("{}", data),
+            EnclaveEvent::E3Requested { data, .. } => format!("{}", data),
+            EnclaveEvent::PublicKeyAggregated { data, .. } => format!("{}", data),
+            EnclaveEvent::CiphertextOutputPublished { data, .. } => format!("{}", data),
+            EnclaveEvent::DecryptionshareCreated { data, .. } => format!("{}", data),
+            EnclaveEvent::PlaintextAggregated { data, .. } => format!("{}", data),
+            EnclaveEvent::CiphernodeSelected { data, .. } => format!("{}", data),
+            EnclaveEvent::CiphernodeAdded { data, .. } => format!("{}", data),
+            EnclaveEvent::CiphernodeRemoved { data, .. } => format!("{}", data),
+            EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
+            EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
+            // _ => "<omitted>".to_string(),
         }
     }
 }
@@ -299,7 +315,7 @@ impl FromError for EnclaveEvent {
 
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&format!("{}({})", self.event_type(), self.get_id()))
+        f.write_str(&format!("{}({})", self.event_type(), self.get_data()))
     }
 }
 
@@ -311,12 +327,24 @@ pub struct KeyshareCreated {
     pub node: String,
 }
 
+impl Display for KeyshareCreated {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "e3_id: {}, node: {}", self.e3_id, self.node,)
+    }
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct DecryptionshareCreated {
     pub decryption_share: Vec<u8>,
     pub e3_id: E3id,
     pub node: String,
+}
+
+impl Display for DecryptionshareCreated {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "e3_id: {}, node: {}", self.e3_id, self.node,)
+    }
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -328,6 +356,16 @@ pub struct PublicKeyAggregated {
     pub src_chain_id: u64,
 }
 
+impl Display for PublicKeyAggregated {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "e3_id: {}, src_chain_id: {}, nodes: <omitted>, pubkey: <omitted>",
+            self.e3_id, self.src_chain_id,
+        )
+    }
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct E3Requested {
@@ -335,11 +373,17 @@ pub struct E3Requested {
     pub threshold_m: usize,
     pub seed: Seed,
     pub params: Vec<u8>,
-    pub src_chain_id: u64, // threshold: usize, // TODO:
-                           // computation_type: ??, // TODO:
-                           // execution_model_type: ??, // TODO:
-                           // input_deadline: ??, // TODO:
-                           // availability_duration: ??, // TODO:
+    pub src_chain_id: u64,
+}
+
+impl Display for E3Requested {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "e3_id: {}, threshold_m: {}, src_chain_id: {}, seed: {}, params: <omitted>",
+            self.e3_id, self.threshold_m, self.src_chain_id, self.seed
+        )
+    }
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -349,11 +393,27 @@ pub struct CiphernodeSelected {
     pub threshold_m: usize,
 }
 
+impl Display for CiphernodeSelected {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "e3_id: {}, threshold_m: {}",
+            self.e3_id, self.threshold_m,
+        )
+    }
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphertextOutputPublished {
     pub e3_id: E3id,
     pub ciphertext_output: Vec<u8>,
+}
+
+impl Display for CiphertextOutputPublished {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "e3_id: {}", self.e3_id,)
+    }
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -364,11 +424,27 @@ pub struct PlaintextAggregated {
     pub src_chain_id: u64,
 }
 
+impl Display for PlaintextAggregated {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "e3_id: {}, src_chain_id: {}",
+            self.e3_id, self.src_chain_id
+        )
+    }
+}
+
 /// E3RequestComplete event is a local only event
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct E3RequestComplete {
     pub e3_id: E3id,
+}
+
+impl Display for E3RequestComplete {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "e3_id: {}", self.e3_id)
+    }
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -379,12 +455,32 @@ pub struct CiphernodeAdded {
     pub num_nodes: usize,
 }
 
+impl Display for CiphernodeAdded {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "address: {}, index: {}, num_nodes: {}",
+            self.address, self.index, self.num_nodes
+        )
+    }
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeRemoved {
     pub address: String,
     pub index: usize,
     pub num_nodes: usize,
+}
+
+impl Display for CiphernodeRemoved {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "address: {}, index: {}, num_nodes: {}",
+            self.address, self.index, self.num_nodes
+        )
+    }
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -394,9 +490,20 @@ pub struct EnclaveError {
     pub message: String,
 }
 
+impl Display for EnclaveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct Die;
+impl Display for Die {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Die",)
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Seed(pub [u8; 32]);

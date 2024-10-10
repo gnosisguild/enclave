@@ -2086,6 +2086,7 @@ dependencies = [
  "config",
  "enclave_node",
  "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3811,6 +3812,7 @@ dependencies = [
  "actix",
  "base64 0.22.1",
  "enclave-core",
+ "tracing",
 ]
 
 [[package]]

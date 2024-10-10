@@ -18,6 +18,7 @@ struct Args {
 
 #[actix_rt::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
     println!("LAUNCHING AGGREGATOR");
     let config = load_config(&args.config)?;

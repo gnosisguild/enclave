@@ -29,6 +29,7 @@ pub struct Args {
 
 #[actix_rt::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
     let args = Args::parse();
