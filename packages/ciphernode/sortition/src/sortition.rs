@@ -43,7 +43,7 @@ impl Default for SortitionModule {
 impl SortitionList<String> for SortitionModule {
     fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
         if self.nodes.len() == 0 {
-            return Err(anyhow!("ERROR: No nodes registered!"));
+            return Err(anyhow!("No nodes registered!"));
         }
 
         let registered_nodes: Vec<Address> = self
