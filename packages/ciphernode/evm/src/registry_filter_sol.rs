@@ -11,8 +11,8 @@ use enclave_core::{
     BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
     Subscribe,
 };
-use tracing::info;
 use std::sync::Arc;
+use tracing::info;
 
 sol!(
     #[sol(rpc)]

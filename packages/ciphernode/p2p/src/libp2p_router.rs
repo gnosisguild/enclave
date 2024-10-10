@@ -2,13 +2,13 @@ use futures::stream::StreamExt;
 use libp2p::{
     gossipsub, identity, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux,
 };
-use tracing::{error, info, trace};
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::{io, select};
+use tracing::{error, info, trace};
 use tracing_subscriber::EnvFilter;
 
 #[derive(NetworkBehaviour)]
@@ -163,5 +163,3 @@ impl EnclaveRouter {
         }
     }
 }
-
-
