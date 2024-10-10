@@ -15,6 +15,7 @@ use alloy::{
 use anyhow::{Context, Result};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
+use tracing::{info, trace};
 
 pub async fn stream_from_evm<P: Provider>(
     provider: WithChainId<P>,
@@ -31,10 +32,13 @@ pub async fn stream_from_evm<P: Provider>(
         Ok(subscription) => {
             let mut stream = subscription.into_stream();
             while let Some(log) = stream.next().await {
+                trace!("Received log from EVM");
                 let Some(event) = extractor(log.data(), log.topic0(), provider.get_chain_id())
                 else {
+                    trace!("Failed to extract log from EVM");
                     continue;
                 };
+                info!("Extracted log from evm sending now.");
                 bus.do_send(event);
             }
         }

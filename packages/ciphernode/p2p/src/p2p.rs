@@ -7,7 +7,9 @@ use actix::prelude::*;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
+use tracing::{error, trace};
 
+/// P2p Actor converts between EVentBus events and Libp2p events
 pub struct P2p {
     bus: Addr<EventBus>,
     tx: Sender<Vec<u8>>,
@@ -23,6 +25,7 @@ impl Actor for P2p {
 struct LibP2pEvent(pub Vec<u8>);
 
 impl P2p {
+    /// Create a new P2p actor
     pub fn new(bus: Addr<EventBus>, tx: Sender<Vec<u8>>) -> Self {
         Self {
             bus,
@@ -59,6 +62,7 @@ impl P2p {
         p2p
     }
 
+    /// Spawn a Libp2p instance. Calls spawn and listen
     pub fn spawn_libp2p(
         bus: Addr<EventBus>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<()>), Box<dyn Error>> {
@@ -81,7 +85,7 @@ impl Handler<LibP2pEvent> for P2p {
                 self.bus.do_send(event.clone());
                 self.sent_events.insert(event.into());
             }
-            Err(err) => println!("Error: {}", err),
+            Err(err) => error!(error=?err, "Could not create EnclaveEvent from Libp2p Bytes!"),
         }
         Ok(())
     }
@@ -98,19 +102,25 @@ impl Handler<EnclaveEvent> for P2p {
 
             // if we have seen this event before dont rebroadcast
             if sent_events.contains(&id) {
+                trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
                 return;
             }
 
             // Ignore events that should be considered local
             if evt.is_local_only() {
+                trace!(evt_id=%id,"Local events should not be rebroadcast so ignoring");
                 return;
             }
 
             match evt.to_bytes() {
                 Ok(bytes) => {
-                    let _ = tx.send(bytes).await;
+                    if let Err(e) = tx.send(bytes).await {
+                        error!(error=?e, "Error sending bytes to libp2p");
+                    };
                 }
-                Err(error) => println!("Error: {}", error),
+                Err(error) => {
+                    error!(error=?error, "Could not convert event to bytes for serialization!")
+                }
             }
         })
     }

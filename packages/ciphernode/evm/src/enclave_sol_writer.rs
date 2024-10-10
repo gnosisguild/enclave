@@ -13,6 +13,7 @@ use alloy::{
 use anyhow::Result;
 use enclave_core::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};
+use tracing::info;
 
 sol!(
     #[sol(rpc)]
@@ -93,7 +94,7 @@ impl Handler<PlaintextAggregated> for EnclaveSolWriter {
                         .await;
                 match result {
                     Ok(receipt) => {
-                        println!("tx:{}", receipt.transaction_hash)
+                        info!(tx=%receipt.transaction_hash, "tx")
                     }
                     Err(err) => bus.err(EnclaveErrorType::Evm, err),
                 }

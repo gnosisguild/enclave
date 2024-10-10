@@ -11,3 +11,5 @@ fhe = { path = "../fhe" }
 data = { path = "../data" }
 keyshare = { path = "../keyshare" }
 aggregator = { path = "../aggregator" }
+anyhow = { workspace = true }
+tracing = { workspace = true }

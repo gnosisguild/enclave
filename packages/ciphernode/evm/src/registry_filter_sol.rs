@@ -12,6 +12,7 @@ use enclave_core::{
     Subscribe,
 };
 use std::sync::Arc;
+use tracing::info;
 
 sol!(
     #[sol(rpc)]
@@ -92,7 +93,7 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
                     publish_committee(provider, contract_address, e3_id, nodes, pubkey).await;
                 match result {
                     Ok(receipt) => {
-                        println!("tx:{}", receipt.transaction_hash);
+                        info!(tx=%receipt.transaction_hash,"tx");
                     }
                     Err(err) => bus.err(EnclaveErrorType::Evm, err),
                 }

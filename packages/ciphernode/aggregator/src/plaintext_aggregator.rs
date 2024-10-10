@@ -7,6 +7,7 @@ use enclave_core::{
 use fhe::{Fhe, GetAggregatePlaintext};
 use sortition::{GetHasNode, Sortition};
 use std::sync::Arc;
+use tracing::error;
 
 #[derive(Debug, Clone)]
 pub enum PlaintextAggregatorState {
@@ -124,7 +125,7 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
             threshold_m, seed, ..
         } = self.state
         else {
-            println!("Aggregator has been closed for collecting.");
+            error!(state=?self.state, "Aggregator has been closed for collecting.");
             return Box::pin(fut::ready(Ok(())));
         };
 
@@ -144,12 +145,12 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                 .map(move |res, act, ctx| {
                     let has_node = res?;
                     if !has_node {
-                        println!("Node not found in committee"); // TODO: log properly
+                        error!("Node not found in committee");
                         return Ok(());
                     }
 
                     if e3_id != act.e3_id {
-                        println!("Wrong e3_id sent to aggregator. This should not happen.");
+                        error!("Wrong e3_id sent to aggregator. This should not happen.");
                         return Ok(());
                     }
 

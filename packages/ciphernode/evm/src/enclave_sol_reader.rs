@@ -7,6 +7,7 @@ use alloy::{
 };
 use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus};
+use tracing::{error, info, trace};
 
 sol!(
     #[sol(rpc)]
@@ -55,21 +56,24 @@ fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<Encl
     match topic {
         Some(&IEnclave::E3Requested::SIGNATURE_HASH) => {
             let Ok(event) = IEnclave::E3Requested::decode_log_data(data, true) else {
-                println!("Error parsing event E3Requested"); // TODO: provide more info
+                error!("Error parsing event E3Requested after topic matched!");
                 return None;
             };
             Some(EnclaveEvent::from(E3RequestedWithChainId(event, chain_id)))
         }
         Some(&IEnclave::CiphertextOutputPublished::SIGNATURE_HASH) => {
             let Ok(event) = IEnclave::CiphertextOutputPublished::decode_log_data(data, true) else {
-                println!("Error parsing event CiphertextOutputPublished"); // TODO: provide more info
+                error!("Error parsing event CiphertextOutputPublished after topic matched!"); // TODO: provide more info
                 return None;
             };
             Some(EnclaveEvent::from(event))
         }
 
-        _ => {
-            println!("Unknown event");
+        _topic => {
+            trace!(
+                topic=?_topic,
+                "Unknown event was received by Enclave.sol parser buut was ignored"
+            );
             return None;
         }
     }
@@ -105,7 +109,7 @@ impl EnclaveSolReader {
             .await?
             .start();
 
-        println!("Evm is listening to {}", contract_address);
+        info!(address=%contract_address, "Evm is listening to address");
         Ok(addr)
     }
 }

@@ -12,6 +12,7 @@ if [[ "$ROOT_DIR" != "$(pwd)" ]]; then
   exit 1
 fi
 
+export RUST_LOG=info
 
 # Environment variables
 RPC_URL="ws://localhost:8545"

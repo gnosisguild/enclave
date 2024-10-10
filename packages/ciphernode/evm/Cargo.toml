@@ -12,3 +12,4 @@ enclave-core = { path = "../core" }
 futures-util = { workspace = true }
 sortition = { path = "../sortition" }
 tokio = { workspace = true }
+tracing = { workspace = true }

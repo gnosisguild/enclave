@@ -1,6 +1,7 @@
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
 use enclave_core::{EnclaveEvent, EventBus, Subscribe};
+use tracing::info;
 
 pub struct PlaintextWriter {
     path: String,
@@ -30,7 +31,7 @@ impl Handler<EnclaveEvent> for PlaintextWriter {
         if let EnclaveEvent::PlaintextAggregated { data, .. } = msg.clone() {
             let output: Vec<u64> = bincode::deserialize(&data.decrypted_output).unwrap();
 
-            println!("Write plaintext to {}", &self.path);
+            info!(path = &self.path, "Writing Plaintext To Path");
             let contents: Vec<String> = output.iter().map(|&num| num.to_string()).collect();
 
             // NOTE: panicking is kind of what we want here for now as we don't really need to handle the

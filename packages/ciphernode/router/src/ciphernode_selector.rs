@@ -3,6 +3,7 @@
 use actix::prelude::*;
 use enclave_core::{CiphernodeSelected, EnclaveEvent, EventBus, Subscribe};
 use sortition::{GetHasNode, Sortition};
+use tracing::info;
 
 pub struct CiphernodeSelector {
     bus: Addr<EventBus>,
@@ -51,12 +52,13 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
             if let Ok(is_selected) = sortition
                 .send(GetHasNode {
                     seed,
-                    address,
+                    address: address.clone(),
                     size,
                 })
                 .await
             {
                 if !is_selected {
+                    info!(node = address, "Ciphernode was not selected");
                     return;
                 }
 
