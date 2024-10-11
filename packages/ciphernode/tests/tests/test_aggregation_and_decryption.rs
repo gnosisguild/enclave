@@ -1,4 +1,4 @@
-use data::Data;
+use data::{DataStore, InMemDataStore};
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated,
@@ -31,7 +31,8 @@ use tokio::{sync::mpsc::channel, time::sleep};
 // Simulating a local node
 async fn setup_local_ciphernode(bus: Addr<EventBus>, rng: SharedRng, logging: bool, addr: &str) {
     // create data actor for saving data
-    let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
+    let data_actor = InMemDataStore::new(logging).start(); // TODO: Use a sled backed Data Actor
+    let store = DataStore::from_in_mem(data_actor);
 
     // create ciphernode actor for managing ciphernode flow
     let sortition = Sortition::attach(bus.clone());
@@ -47,7 +48,7 @@ async fn setup_local_ciphernode(bus: Addr<EventBus>, rng: SharedRng, logging: bo
             bus.clone(),
             sortition.clone(),
         ))
-        .add_hook(LazyKeyshare::create(bus.clone(), data.clone(), addr))
+        .add_hook(LazyKeyshare::create(bus.clone(), store.clone(), addr))
         .build();
 
     SimpleLogger::attach(addr, bus.clone());

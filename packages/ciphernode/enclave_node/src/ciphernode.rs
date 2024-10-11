@@ -1,7 +1,7 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use anyhow::Result;
-use data::Data;
+use data::{DataStore, InMemDataStore};
 use enclave_core::EventBus;
 use evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use logger::SimpleLogger;
@@ -21,7 +21,7 @@ use crate::app_config::AppConfig;
 pub struct MainCiphernode {
     addr: Address,
     bus: Addr<EventBus>,
-    data: Addr<Data>,
+    data: DataStore,
     sortition: Addr<Sortition>,
     selector: Addr<CiphernodeSelector>,
     e3_manager: Addr<E3RequestRouter>,
@@ -32,7 +32,7 @@ impl MainCiphernode {
     pub fn new(
         addr: Address,
         bus: Addr<EventBus>,
-        data: Addr<Data>,
+        data: DataStore,
         sortition: Addr<Sortition>,
         selector: Addr<CiphernodeSelector>,
         p2p: Addr<P2p>,
@@ -57,7 +57,8 @@ impl MainCiphernode {
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
         let bus = EventBus::new(true).start();
-        let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
+        // TODO: switch to Sled actor
+        let data = DataStore::from_in_mem(InMemDataStore::new(true).start());
         let sortition = Sortition::attach(bus.clone());
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());

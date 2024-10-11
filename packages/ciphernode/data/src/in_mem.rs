@@ -1,29 +1,7 @@
 use actix::{Actor, Context, Handler, Message};
 use std::collections::BTreeMap;
 
-// TODO: replace with sled version
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
-#[rtype(result = "()")]
-pub struct Insert(pub Vec<u8>, pub Vec<u8>);
-impl Insert {
-    fn key(&self) -> Vec<u8> {
-        self.0.clone()
-    }
-
-    fn value(&self) -> Vec<u8> {
-        self.1.clone()
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
-#[rtype(result = "Option<Vec<u8>>")]
-pub struct Get(pub Vec<u8>);
-impl Get {
-    fn key(&self) -> Vec<u8> {
-        self.0.clone()
-    }
-}
+use crate::{Get, Insert};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Vec<DataOp>")]
@@ -34,17 +12,17 @@ pub enum DataOp {
     Insert(Insert),
 }
 
-pub struct Data {
+pub struct InMemDataStore {
     db: BTreeMap<Vec<u8>, Vec<u8>>,
     log: Vec<DataOp>,
     capture: bool,
 }
 
-impl Actor for Data {
+impl Actor for InMemDataStore {
     type Context = Context<Self>;
 }
 
-impl Data {
+impl InMemDataStore {
     pub fn new(capture: bool) -> Self {
         Self {
             db: BTreeMap::new(),
@@ -54,7 +32,7 @@ impl Data {
     }
 }
 
-impl Handler<Insert> for Data {
+impl Handler<Insert> for InMemDataStore {
     type Result = ();
     fn handle(&mut self, event: Insert, _: &mut Self::Context) {
         // insert data into sled
@@ -66,7 +44,7 @@ impl Handler<Insert> for Data {
     }
 }
 
-impl Handler<Get> for Data {
+impl Handler<Get> for InMemDataStore {
     type Result = Option<Vec<u8>>;
     fn handle(&mut self, event: Get, _: &mut Self::Context) -> Option<Vec<u8>> {
         let key = event.key();
@@ -74,7 +52,7 @@ impl Handler<Get> for Data {
     }
 }
 
-impl Handler<GetLog> for Data {
+impl Handler<GetLog> for InMemDataStore {
     type Result = Vec<DataOp>;
     fn handle(&mut self, _: GetLog, _: &mut Self::Context) -> Vec<DataOp> {
         self.log.clone()

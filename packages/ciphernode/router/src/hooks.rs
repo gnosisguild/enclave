@@ -1,7 +1,7 @@
 use crate::EventHook;
 use actix::{Actor, Addr};
 use aggregator::{PlaintextAggregator, PublicKeyAggregator};
-use data::Data;
+use data::DataStore;
 use enclave_core::{E3Requested, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::Keyshare;
@@ -28,7 +28,7 @@ impl LazyFhe {
 
 pub struct LazyKeyshare;
 impl LazyKeyshare {
-    pub fn create(bus: Addr<EventBus>, data: Addr<Data>, address: &str) -> EventHook {
+    pub fn create(bus: Addr<EventBus>, data: DataStore, address: &str) -> EventHook {
         let address = address.to_string();
         Box::new(move |ctx, evt| {
             // Save Ciphernode on CiphernodeSelected

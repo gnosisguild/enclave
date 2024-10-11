@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Context, Result};
-use data::{Data, Get, Insert};
+use data::{DataStore, Get, Insert};
 use enclave_core::{
     CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die, EnclaveErrorType,
     EnclaveEvent, EventBus, FromError, KeyshareCreated,
@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
-    data: Addr<Data>,
+    data: DataStore,
     bus: Addr<EventBus>,
     address: String,
 }
@@ -20,7 +20,7 @@ impl Actor for Keyshare {
 }
 
 impl Keyshare {
-    pub fn new(bus: Addr<EventBus>, data: Addr<Data>, fhe: Arc<Fhe>, address: &str) -> Self {
+    pub fn new(bus: Addr<EventBus>, data: DataStore, fhe: Arc<Fhe>, address: &str) -> Self {
         Self {
             bus,
             fhe,
@@ -64,11 +64,11 @@ impl Handler<CiphernodeSelected> for Keyshare {
         // best practice would be as you boot up a node you enter in a configured password from
         // which we derive a kdf which gets used to generate this key
         self.data
-            .do_send(Insert(format!("{}/sk", e3_id).into(), sk));
+            .write(Insert(format!("{}/sk", e3_id).into(), sk));
 
         // save public key against e3_id/pk
         self.data
-            .do_send(Insert(format!("{}/pk", e3_id).into(), pubkey.clone()));
+            .write(Insert(format!("{}/pk", e3_id).into(), pubkey.clone()));
 
         // broadcast the KeyshareCreated message
         let event = EnclaveEvent::from(KeyshareCreated {
@@ -109,7 +109,7 @@ impl Handler<Die> for Keyshare {
 
 async fn on_decryption_requested(
     fhe: Arc<Fhe>,
-    data: Addr<Data>,
+    data: DataStore,
     bus: Addr<EventBus>,
     event: CiphertextOutputPublished,
     address: String,
@@ -120,7 +120,7 @@ async fn on_decryption_requested(
     } = event;
 
     // get secret key by id from data
-    let Some(unsafe_secret) = data.send(Get(format!("{}/sk", e3_id).into())).await? else {
+    let Some(unsafe_secret) = data.read(Get(format!("{}/sk", e3_id).into())).await? else {
         return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
     };
 
