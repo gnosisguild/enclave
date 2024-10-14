@@ -63,8 +63,7 @@ impl Handler<CiphernodeSelected> for Keyshare {
         // reencrypt secretkey locally with env var - this is so we don't have to serialize a secret
         // best practice would be as you boot up a node you enter in a configured password from
         // which we derive a kdf which gets used to generate this key
-        self.data
-            .write(Insert(format!("{}/sk", e3_id).into(), sk));
+        self.data.write(Insert(format!("{}/sk", e3_id).into(), sk));
 
         // save public key against e3_id/pk
         self.data
