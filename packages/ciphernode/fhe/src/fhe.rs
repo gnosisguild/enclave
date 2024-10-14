@@ -1,6 +1,6 @@
 use super::set_up_crp;
 use anyhow::*;
-use enclave_core::{E3Requested, EnclaveEvent, OrderedSet, Seed};
+use enclave_core::{OrderedSet, Seed};
 use fhe_rs::{
     bfv::{
         BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
@@ -31,9 +31,9 @@ pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 /// Fhe library adaptor.
 #[derive(Clone)]
 pub struct Fhe {
-    params: Arc<BfvParameters>,
-    crp: CommonRandomPoly,
-    rng: SharedRng,
+    pub params: Arc<BfvParameters>,
+    pub crp: CommonRandomPoly,
+    pub rng: SharedRng,
 }
 
 impl Fhe {

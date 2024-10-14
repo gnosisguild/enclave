@@ -9,3 +9,12 @@ enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
 actix = { workspace = true }
 anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+
+[dev-dependencies]
+fhe_rs = { workspace = true }
+fhe-traits = { workspace = true }
+fhe-util = { workspace = true }

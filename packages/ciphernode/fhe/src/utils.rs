@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
+use enclave_core::Seed;
 use fhe_rs::{
     bfv::{BfvParameters, BfvParametersBuilder},
     mbfv::CommonRandomPoly,
 };
 use fhe_traits::{Deserialize, Serialize};
+use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
 
 use super::SharedRng;
@@ -58,4 +60,17 @@ pub fn decode_params(bytes: &[u8]) -> Result<Arc<BfvParameters>> {
 
 pub fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
     CommonRandomPoly::new(&params, &mut *rng.lock().unwrap()).unwrap()
+}
+
+pub fn setup_bfv_encoded(
+    moduli: &[u64],
+    degree: usize,
+    plaintext_modulus: u64,
+    rng: ChaCha20Rng,
+) -> (Vec<u8>, Seed, SharedRng) {
+    (
+        setup_bfv_params(moduli, degree, plaintext_modulus).to_bytes(),
+        Seed(rng.clone().get_seed()),
+        Arc::new(std::sync::Mutex::new(rng)),
+    )
 }

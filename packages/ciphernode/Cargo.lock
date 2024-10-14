@@ -3179,6 +3179,13 @@ dependencies = [
  "data",
  "enclave-core",
  "fhe 0.1.0",
+ "fhe 0.1.0-beta.7",
+ "fhe-traits",
+ "fhe-util",
+ "rand",
+ "rand_chacha",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5120,11 +5127,13 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "aggregator",
+ "anyhow",
  "data",
  "enclave-core",
  "fhe 0.1.0",
  "keyshare",
  "sortition",
+ "tracing",
 ]
 
 [[package]]

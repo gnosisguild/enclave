@@ -4,12 +4,16 @@ use super::CommitteeMeta;
 use actix::{Actor, Addr, Context, Handler, Recipient};
 use aggregator::PlaintextAggregator;
 use aggregator::PublicKeyAggregator;
+use anyhow::anyhow;
+use enclave_core::BusError;
 use enclave_core::E3RequestComplete;
+use enclave_core::EnclaveErrorType;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use fhe::Fhe;
 use keyshare::Keyshare;
 use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
+use tracing::error;
 
 /// Helper class to buffer events for downstream instances incase events arrive in the wrong order
 #[derive(Default)]
@@ -111,7 +115,11 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
         };
 
         if self.completed.contains(&e3_id) {
-            // TODO: Log warning that e3 event was received for completed e3_id
+            error!(
+                "event: {} received for e3_id: {} after E3Request was closed",
+                msg.get_id(),
+                e3_id
+            );
             return;
         }
 

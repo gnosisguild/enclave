@@ -1,7 +1,7 @@
 use crate::EventHook;
 use actix::{Actor, Addr};
 use aggregator::{PlaintextAggregator, PublicKeyAggregator};
-use data::DataStore;
+use data::{DataStore, WithPrefix};
 use enclave_core::{E3Requested, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::Keyshare;
@@ -32,7 +32,7 @@ impl LazyKeyshare {
         let address = address.to_string();
         Box::new(move |ctx, evt| {
             // Save Ciphernode on CiphernodeSelected
-            let EnclaveEvent::CiphernodeSelected { .. } = evt else {
+            let EnclaveEvent::CiphernodeSelected { data: evt_data, .. } = evt else {
                 return;
             };
 
@@ -40,8 +40,18 @@ impl LazyKeyshare {
                 return;
             };
 
-            ctx.keyshare =
-                Some(Keyshare::new(bus.clone(), data.clone(), fhe.clone(), &address).start())
+            let e3_id = evt_data.e3_id;
+
+            ctx.keyshare = Some(
+                Keyshare::new(
+                    bus.clone(),
+                    data.clone().with_namespace(&format!("{e3_id}/keyshare")),
+                    None,
+                    fhe.clone(),
+                    &address,
+                )
+                .start(),
+            )
         })
     }
 }
