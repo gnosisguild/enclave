@@ -51,7 +51,7 @@ task("ciphernode:siblings", "Get the sibling of a ciphernode in the registry")
     "ciphernodeAddresses",
     "comma separated addresses of ciphernodes in the order they were added to the registry",
   )
-  .setAction(async function (taskArguments: TaskArguments, hre) {
+  .setAction(async function (taskArguments: TaskArguments) {
     const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
     const tree = new LeanIMT(hash);
 
