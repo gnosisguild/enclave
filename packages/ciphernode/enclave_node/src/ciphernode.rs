@@ -79,11 +79,10 @@ impl MainCiphernode {
             .await?;
         }
 
-        let e3_manager = E3RequestRouter::builder(bus.clone())
+        let e3_manager = E3RequestRouter::builder(bus.clone(), data.clone())
             .add_hook(LazyFhe::create(rng))
             .add_hook(LazyKeyshare::create(
                 bus.clone(),
-                data.clone(),
                 &address.to_string(),
             ))
             .build();

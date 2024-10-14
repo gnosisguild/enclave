@@ -38,7 +38,7 @@ async fn setup_local_ciphernode(bus: Addr<EventBus>, rng: SharedRng, logging: bo
     let sortition = Sortition::attach(bus.clone());
     CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
 
-    E3RequestRouter::builder(bus.clone())
+    E3RequestRouter::builder(bus.clone(), store)
         .add_hook(LazyFhe::create(rng))
         .add_hook(LazyPublicKeyAggregator::create(
             bus.clone(),
@@ -48,7 +48,7 @@ async fn setup_local_ciphernode(bus: Addr<EventBus>, rng: SharedRng, logging: bo
             bus.clone(),
             sortition.clone(),
         ))
-        .add_hook(LazyKeyshare::create(bus.clone(), store.clone(), addr))
+        .add_hook(LazyKeyshare::create(bus.clone(), addr))
         .build();
 
     SimpleLogger::attach(addr, bus.clone());

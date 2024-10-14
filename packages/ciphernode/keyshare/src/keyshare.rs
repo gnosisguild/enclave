@@ -63,11 +63,11 @@ impl Handler<CiphernodeSelected> for Keyshare {
         // reencrypt secretkey locally with env var - this is so we don't have to serialize a secret
         // best practice would be as you boot up a node you enter in a configured password from
         // which we derive a kdf which gets used to generate this key
-        self.data.write(Insert(format!("{}/sk", e3_id).into(), sk));
+        self.data.write(format!("{e3_id}/sk"), sk);
 
         // save public key against e3_id/pk
         self.data
-            .write(Insert(format!("{}/pk", e3_id).into(), pubkey.clone()));
+            .write(format!("{e3_id}/pk"), pubkey.clone());
 
         // broadcast the KeyshareCreated message
         let event = EnclaveEvent::from(KeyshareCreated {
@@ -119,7 +119,7 @@ async fn on_decryption_requested(
     } = event;
 
     // get secret key by id from data
-    let Some(unsafe_secret) = data.read(Get(format!("{}/sk", e3_id).into())).await? else {
+    let Some(unsafe_secret) = data.read(&format!("{e3_id}/sk")).await? else {
         return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
     };
 

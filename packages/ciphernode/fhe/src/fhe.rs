@@ -1,6 +1,6 @@
 use super::set_up_crp;
 use anyhow::*;
-use enclave_core::{E3Requested, EnclaveEvent, OrderedSet, Seed};
+use enclave_core::{ OrderedSet, Seed};
 use fhe_rs::{
     bfv::{
         BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
@@ -31,8 +31,8 @@ pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 /// Fhe library adaptor.
 #[derive(Clone)]
 pub struct Fhe {
-    params: Arc<BfvParameters>,
-    crp: CommonRandomPoly,
+    pub params: Arc<BfvParameters>,
+    pub crp: CommonRandomPoly,
     rng: SharedRng,
 }
 
@@ -47,7 +47,21 @@ impl Fhe {
             params.clone(),
             Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
         );
-        Ok(Fhe::new(params.clone(), crp, rng.clone()))
+        Ok(Fhe::new(params, crp, rng))
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        Ok(bincode::serialize(&PackedParams {
+            crp: self.crp.to_bytes(),
+            params: self.params.to_bytes(),
+        })?)
+    }
+
+    pub fn from_bytes(packed: &[u8], rng:SharedRng) -> Result<Self> {
+        let unpacked: PackedParams = bincode::deserialize(packed)?;
+        let params = Arc::new(BfvParameters::try_deserialize(&unpacked.params)?);
+        let crp = CommonRandomPoly::deserialize(&unpacked.crp, &params)?;
+        Ok(Fhe::new(params, crp, rng))
     }
 
     pub fn from_raw_params(
@@ -122,6 +136,13 @@ impl Fhe {
         Ok(bincode::serialize(&decoded)?)
     }
 }
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PackedParams {
+    crp: Vec<u8>,
+    params: Vec<u8>,
+}
+
 struct SecretKeySerializer {
     pub inner: SecretKey,
 }

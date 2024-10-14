@@ -5120,10 +5120,13 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "aggregator",
+ "anyhow",
+ "bincode",
  "data",
  "enclave-core",
  "fhe 0.1.0",
  "keyshare",
+ "serde",
  "sortition",
 ]
 

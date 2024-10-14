@@ -2,7 +2,7 @@ use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
 use super::EventHook;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CommitteeMeta {
     pub threshold_m: usize,
     pub seed: Seed,
@@ -21,14 +21,18 @@ impl CommitteeMetaFactory {
                 threshold_m,
                 seed,
                 src_chain_id,
+                e3_id,
                 ..
             } = data;
 
-            ctx.meta = Some(CommitteeMeta {
-                threshold_m,
-                seed,
-                src_chain_id,
-            });
+            ctx.set_meta(
+                &format!("//meta/{e3_id}"),
+                CommitteeMeta {
+                    threshold_m,
+                    seed,
+                    src_chain_id,
+                },
+            );
         })
     }
 }

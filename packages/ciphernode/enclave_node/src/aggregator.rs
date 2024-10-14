@@ -1,5 +1,6 @@
 use actix::{Actor, Addr, Context};
 use anyhow::Result;
+use data::{DataStore, InMemDataStore};
 use enclave_core::EventBus;
 use evm::{
     helpers::pull_eth_signer_from_env, CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
@@ -51,6 +52,7 @@ impl MainAggregator {
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
 
+        let store = DataStore::from_in_mem(InMemDataStore::new(true).start());
         let sortition = Sortition::attach(bus.clone());
         let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;
         for chain in config
@@ -81,7 +83,7 @@ impl MainAggregator {
             .await?;
         }
 
-        let e3_manager = E3RequestRouter::builder(bus.clone())
+        let e3_manager = E3RequestRouter::builder(bus.clone(), store)
             .add_hook(LazyFhe::create(rng))
             .add_hook(LazyPublicKeyAggregator::create(
                 bus.clone(),

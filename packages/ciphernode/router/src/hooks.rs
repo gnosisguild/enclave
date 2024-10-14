@@ -1,7 +1,7 @@
 use crate::EventHook;
 use actix::{Actor, Addr};
 use aggregator::{PlaintextAggregator, PublicKeyAggregator};
-use data::DataStore;
+use data::{DataStore, WithPrefix};
 use enclave_core::{E3Requested, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::Keyshare;
@@ -17,31 +17,51 @@ impl LazyFhe {
             let EnclaveEvent::E3Requested { data, .. } = evt else {
                 return;
             };
-            let E3Requested { params, seed, .. } = data;
 
-            ctx.fhe = Some(Arc::new(
-                Fhe::from_encoded(&params, seed, rng.clone()).unwrap(),
-            ));
+            let E3Requested {
+                params,
+                seed,
+                e3_id,
+                ..
+            } = data;
+
+            // Set the FHE instance passing in the instance id
+            let _ = ctx.set_fhe(
+                &format!("//fhe/{e3_id}"),
+                Arc::new(Fhe::from_encoded(&params, seed, rng.clone()).unwrap()),
+            );
         })
     }
 }
 
 pub struct LazyKeyshare;
 impl LazyKeyshare {
-    pub fn create(bus: Addr<EventBus>, data: DataStore, address: &str) -> EventHook {
+    pub fn create(bus: Addr<EventBus>, address: &str) -> EventHook {
         let address = address.to_string();
         Box::new(move |ctx, evt| {
             // Save Ciphernode on CiphernodeSelected
-            let EnclaveEvent::CiphernodeSelected { .. } = evt else {
+            let EnclaveEvent::CiphernodeSelected { data, .. } = evt else {
                 return;
             };
 
-            let Some(ref fhe) = ctx.fhe else {
+            let Some(fhe) = ctx.get_fhe() else {
                 return;
             };
 
-            ctx.keyshare =
-                Some(Keyshare::new(bus.clone(), data.clone(), fhe.clone(), &address).start())
+            let e3_id = data.e3_id;
+
+            let ks_id = &format!("//keystore/{e3_id}");
+
+            let _ = ctx.set_keyshare(
+                ks_id,
+                Keyshare::new(
+                    bus.clone(),
+                    ctx.store.clone().base(ks_id),
+                    fhe.clone(),
+                    &address,
+                )
+                .start(),
+            );
         })
     }
 }
@@ -54,19 +74,24 @@ impl LazyPlaintextAggregator {
             let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
                 return;
             };
-            let Some(ref fhe) = ctx.fhe else {
+            let Some(fhe) = ctx.get_fhe() else {
                 return;
             };
-            let Some(ref meta) = ctx.meta else {
+            let Some(ref meta) = ctx.get_meta() else {
                 return;
             };
 
-            ctx.plaintext = Some(
+            let e3_id = data.e3_id;
+
+            let id = &format!("//plaintext/{e3_id}");
+
+            let _ = ctx.set_plaintext(
+                id,
                 PlaintextAggregator::new(
                     fhe.clone(),
                     bus.clone(),
                     sortition.clone(),
-                    data.e3_id,
+                    e3_id,
                     meta.threshold_m,
                     meta.seed,
                     data.ciphertext_output,
@@ -87,21 +112,25 @@ impl LazyPublicKeyAggregator {
                 return;
             };
 
-            let Some(ref fhe) = ctx.fhe else {
+            let Some(fhe) = ctx.get_fhe() else {
                 println!("fhe was not on ctx");
                 return;
             };
-            let Some(ref meta) = ctx.meta else {
+            let Some(ref meta) = ctx.get_meta() else {
                 println!("meta was not on ctx");
                 return;
             };
 
-            ctx.publickey = Some(
+            let e3_id = data.e3_id;
+            let id = &format!("//publickey/{e3_id}");
+
+            let _ = ctx.set_publickey(
+                id,
                 PublicKeyAggregator::new(
                     fhe.clone(),
                     bus.clone(),
                     sortition.clone(),
-                    data.e3_id,
+                    e3_id,
                     meta.threshold_m,
                     meta.seed,
                     meta.src_chain_id,

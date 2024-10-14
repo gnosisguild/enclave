@@ -1,5 +1,5 @@
 use actix::{Addr, Message, Recipient};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use crate::InMemDataStore;
 
@@ -22,6 +22,12 @@ impl<'a> IntoKey for Vec<&'a str> {
 impl IntoKey for String {
     fn into_key(self) -> Vec<u8> {
         self.into_bytes()
+    }
+}
+
+impl IntoKey for &String {
+    fn into_key(self) -> Vec<u8> {
+        self.as_bytes().to_vec()
     }
 }
 
@@ -107,11 +113,15 @@ pub struct DataStore {
 }
 
 impl DataStore {
-    pub async fn read(&self, msg: Get) -> Result<Option<Vec<u8>>> {
+    pub async fn read<K:IntoKey>(&self, key: K) -> Result<Option<Vec<u8>>> {
+        let msg = Get::new(key);
+        let msg = self.prefix.as_ref().map_or(msg.clone(), |p| msg.prefix(p));
         Ok(self.get.send(msg).await?)
     }
 
-    pub fn write(&self, msg: Insert) {
+    pub fn write<K:IntoKey>(&self, key: K, value: Vec<u8>) {
+        let msg = Insert::new(key, value);
+        let msg = self.prefix.as_ref().map_or(msg.clone(), |p| msg.prefix(p));
         self.insert.do_send(msg)
     }
 
@@ -122,6 +132,13 @@ impl DataStore {
             insert: addr.clone().recipient(),
             prefix: None,
         }
+    }
+
+    pub fn ensure_root_id(str: &str) -> Result<()> {
+        if !str.starts_with("/") {
+            return Err(anyhow!("string doesnt start with slash."));
+        }
+        Ok(())
     }
 
     // // use this for production

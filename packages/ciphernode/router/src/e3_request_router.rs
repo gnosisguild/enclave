@@ -1,9 +1,13 @@
-use crate::CommitteeMetaFactory;
-
 use super::CommitteeMeta;
+use crate::CommitteeMetaFactory;
 use actix::{Actor, Addr, Context, Handler, Recipient};
 use aggregator::PlaintextAggregator;
 use aggregator::PublicKeyAggregator;
+use anyhow::*;
+use data::DataStore;
+use data::Get;
+use data::Insert;
+use data::WithPrefix;
 use enclave_core::E3RequestComplete;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use fhe::Fhe;
@@ -32,16 +36,27 @@ impl EventBuffer {
 
 /// Context that is set to each event hook. Hooks can use this context to gather dependencies if
 /// they need to instantiate struct instances or actors.
-#[derive(Default)]
 pub struct E3RequestContext {
-    pub keyshare: Option<Addr<Keyshare>>,
-    pub fhe: Option<Arc<Fhe>>,
-    pub plaintext: Option<Addr<PlaintextAggregator>>,
-    pub publickey: Option<Addr<PublicKeyAggregator>>,
-    pub meta: Option<CommitteeMeta>,
+    keyshare: Option<Addr<Keyshare>>,
+    fhe: Option<Arc<Fhe>>,
+    plaintext: Option<Addr<PlaintextAggregator>>,
+    publickey: Option<Addr<PublicKeyAggregator>>,
+    meta: Option<CommitteeMeta>,
+    pub store: DataStore,
 }
 
 impl E3RequestContext {
+    fn from_store(store: DataStore) -> Self {
+        Self {
+            keyshare: None,
+            fhe: None,
+            plaintext: None,
+            publickey: None,
+            meta: None,
+            store,
+        }
+    }
+
     fn recipients(&self) -> Vec<(String, Option<Recipient<EnclaveEvent>>)> {
         vec![
             (
@@ -71,6 +86,71 @@ impl E3RequestContext {
             }
         });
     }
+
+    /// Accept a DataStore ID and a Keystore actor address
+    pub fn set_keyshare(&mut self, id: &str, value: Addr<Keyshare>) -> Result<()> {
+        DataStore::ensure_root_id(id)?;
+        self.keyshare = Some(value);
+        self.store.write("keyshare", id.into());
+        Ok(())
+    }
+
+    /// Accept a DataStore ID and a Keystore actor address
+    pub fn set_plaintext(&mut self, id: &str, value: Addr<PlaintextAggregator>) -> Result<()> {
+        DataStore::ensure_root_id(id)?;
+        self.plaintext = Some(value);
+        self.store.write("plaintext", id.into());
+        Ok(())
+    }
+
+    /// Accept a DataStore ID and a Keystore actor address
+    pub fn set_publickey(&mut self, id: &str, value: Addr<PublicKeyAggregator>) -> Result<()> {
+        DataStore::ensure_root_id(id)?;
+        self.publickey = Some(value);
+        self.store.write("publickey", id.into());
+        Ok(())
+    }
+
+    /// Accept a DataStore ID and an Arc instance of the Fhe wrapper
+    pub fn set_fhe(&mut self, id: &str, value: Arc<Fhe>) -> Result<()> {
+        DataStore::ensure_root_id(id)?;
+        self.fhe = Some(value.clone());
+        self.store.write("fhe", id.into());
+        // TODO: should non actors store themselves?
+        self.store.write(id, value.to_bytes()?);
+        Ok(())
+    }
+
+    /// Accept a Datastore ID and a metadata object
+    pub fn set_meta(&mut self, id: &str, value: CommitteeMeta) -> Result<()> {
+        DataStore::ensure_root_id(id)?;
+        self.meta = Some(value.clone());
+        self.store.write("meta", id.into());
+        // TODO: should non actors store themselves?
+        self.store
+            .write(id, bincode::serialize(&value)?);
+        Ok(())
+    }
+
+    pub fn get_keyshare(&self) -> Option<&Addr<Keyshare>> {
+        self.keyshare.as_ref()
+    }
+
+    pub fn get_plaintext(&self) -> Option<&Addr<PlaintextAggregator>> {
+        self.plaintext.as_ref()
+    }
+
+    pub fn get_publickey(&self) -> Option<&Addr<PublicKeyAggregator>> {
+        self.publickey.as_ref()
+    }
+
+    pub fn get_fhe(&self) -> Option<&Arc<Fhe>> {
+        self.fhe.as_ref()
+    }
+
+    pub fn get_meta(&self) -> Option<&CommitteeMeta> {
+        self.meta.as_ref()
+    }
 }
 
 /// Format of the hook that needs to be passed to E3RequestRouter
@@ -88,11 +168,16 @@ pub struct E3RequestRouter {
     hooks: Vec<EventHook>,
     buffer: EventBuffer,
     bus: Addr<EventBus>,
+    store: DataStore,
 }
 
 impl E3RequestRouter {
-    pub fn builder(bus: Addr<EventBus>) -> E3RequestRouterBuilder {
-        let builder = E3RequestRouterBuilder { bus, hooks: vec![] };
+    pub fn builder(bus: Addr<EventBus>, store: DataStore) -> E3RequestRouterBuilder {
+        let builder = E3RequestRouterBuilder {
+            bus,
+            hooks: vec![],
+            store,
+        };
 
         // Everything needs the committe meta factory so adding it here by default
         builder.add_hook(CommitteeMetaFactory::create())
@@ -115,7 +200,10 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             return;
         }
 
-        let context = self.contexts.entry(e3_id.clone()).or_default();
+        let context = self
+            .contexts
+            .entry(e3_id.clone())
+            .or_insert_with(|| E3RequestContext::from_store(self.store.clone()));
 
         for hook in &mut self.hooks {
             hook(context, msg.clone());
@@ -150,6 +238,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
 pub struct E3RequestRouterBuilder {
     pub bus: Addr<EventBus>,
     pub hooks: Vec<EventHook>,
+    pub store: DataStore,
 }
 impl E3RequestRouterBuilder {
     pub fn add_hook(mut self, listener: EventHook) -> Self {
@@ -164,6 +253,7 @@ impl E3RequestRouterBuilder {
             hooks: self.hooks,
             buffer: EventBuffer::default(),
             bus: self.bus.clone(),
+            store: self.store,
         };
 
         let addr = e3r.start();
@@ -171,4 +261,8 @@ impl E3RequestRouterBuilder {
             .do_send(Subscribe::new("*", addr.clone().recipient()));
         addr
     }
+
+    // pub async fn hydrate(self) -> Addr<E3RequestRouter> {
+    //     let store = self.store.base("//router");
+    // }
 }
