@@ -8,7 +8,7 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{CiphernodeSelector, E3RequestRouter, LazyFhe, LazyKeyshare};
+use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
@@ -80,8 +80,8 @@ impl MainCiphernode {
         }
 
         let e3_manager = E3RequestRouter::builder(bus.clone(), data.clone())
-            .add_hook(LazyFhe::create(rng))
-            .add_hook(LazyKeyshare::create(bus.clone(), &address.to_string()))
+            .add_feature(FheFeature::create(rng))
+            .add_feature(KeyshareFeature::create(bus.clone(), &address.to_string()))
             .build();
 
         let (p2p_addr, join_handle) =

@@ -9,7 +9,7 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{E3RequestRouter, LazyFhe, LazyPlaintextAggregator, LazyPublicKeyAggregator};
+use router::{E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
@@ -84,12 +84,12 @@ impl MainAggregator {
         }
 
         let e3_manager = E3RequestRouter::builder(bus.clone(), store)
-            .add_hook(LazyFhe::create(rng))
-            .add_hook(LazyPublicKeyAggregator::create(
+            .add_feature(FheFeature::create(rng))
+            .add_feature(PublicKeyAggregatorFeature::create(
                 bus.clone(),
                 sortition.clone(),
             ))
-            .add_hook(LazyPlaintextAggregator::create(
+            .add_feature(PlaintextAggregatorFeature::create(
                 bus.clone(),
                 sortition.clone(),
             ))

@@ -1,5 +1,6 @@
+use crate::CommitteMetaFeature;
+
 use super::CommitteeMeta;
-use crate::CommitteeMetaFactory;
 use actix::{Actor, Addr, Context, Handler, Recipient};
 use aggregator::PlaintextAggregator;
 use aggregator::PublicKeyAggregator;
@@ -41,28 +42,28 @@ impl EventBuffer {
 /// Context that is set to each event hook. Hooks can use this context to gather dependencies if
 /// they need to instantiate struct instances or actors.
 pub struct E3RequestContext {
-    e3_id: E3id,
-    keyshare: Option<Addr<Keyshare>>,
-    fhe: Option<Arc<Fhe>>,
-    plaintext: Option<Addr<PlaintextAggregator>>,
-    publickey: Option<Addr<PublicKeyAggregator>>,
-    meta: Option<CommitteeMeta>,
-    store: DataStore,
+    pub e3_id: E3id,
+    pub keyshare: Option<Addr<Keyshare>>,
+    pub fhe: Option<Arc<Fhe>>,
+    pub plaintext: Option<Addr<PlaintextAggregator>>,
+    pub publickey: Option<Addr<PublicKeyAggregator>>,
+    pub meta: Option<CommitteeMeta>,
+    pub store: DataStore,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct E3RequestContextSnapshot {
-    e3_id: E3id,
-    keyshare: Option<String>,
-    fhe: Option<String>,
-    plaintext: Option<String>,
-    publickey: Option<String>,
-    meta: Option<String>,
+    pub keyshare: Option<String>,
+    pub fhe: Option<String>,
+    pub plaintext: Option<String>,
+    pub publickey: Option<String>,
+    pub meta: Option<String>,
 }
 
 pub struct E3RequestContextParams {
     pub store: DataStore,
     pub e3_id: E3id,
+    // pub hooks: Option<Vec<E3Feature>>
 }
 
 impl E3RequestContext {
@@ -190,7 +191,6 @@ impl Snapshot for E3RequestContext {
             .map(|_| format!("//keyshare/{e3_id}"));
 
         Self::Snapshot {
-            e3_id,
             meta,
             fhe,
             publickey,
@@ -204,7 +204,7 @@ impl Snapshot for E3RequestContext {
 impl FromSnapshotWithParams for E3RequestContext {
     type Params = E3RequestContextParams;
     async fn from_snapshot(params: Self::Params, _: Self::Snapshot) -> Result<Self> {
-        Ok(Self {
+        let ctx = Self {
             e3_id: params.e3_id,
             store: params.store,
             fhe: None,
@@ -212,7 +212,8 @@ impl FromSnapshotWithParams for E3RequestContext {
             meta: None,
             plaintext: None,
             publickey: None,
-        })
+        };
+        Ok(ctx)
     }
 }
 
@@ -223,7 +224,15 @@ impl Checkpoint for E3RequestContext {
 }
 
 /// Format of the hook that needs to be passed to E3RequestRouter
-pub type EventHook = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
+// pub type EventHook = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
+// pub type Hydrator = Box<dyn FnMut(&mut E3RequestContext, &E3RequestContextSnapshot)>;
+// pub type E3Feature = (EventHook, Hydrator);
+
+#[async_trait]
+pub trait E3Feature {
+    fn event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
+    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &E3RequestContextSnapshot);
+}
 
 /// E3RequestRouter will register hooks that receive an E3_id specific context. After hooks
 /// have run e3_id specific messages are forwarded to all instances on the context. This enables
@@ -234,7 +243,7 @@ pub type EventHook = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
 pub struct E3RequestRouter {
     contexts: HashMap<E3id, E3RequestContext>,
     completed: HashSet<E3id>,
-    hooks: Vec<EventHook>,
+    hooks: Vec<Box<dyn E3Feature>>,
     buffer: EventBuffer,
     bus: Addr<EventBus>,
     store: DataStore,
@@ -249,7 +258,7 @@ impl E3RequestRouter {
         };
 
         // Everything needs the committe meta factory so adding it here by default
-        builder.add_hook(CommitteeMetaFactory::create())
+        builder.add_feature(CommitteMetaFeature::create())
     }
 }
 
@@ -276,8 +285,8 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             })
         });
 
-        for hook in &mut self.hooks {
-            hook(context, msg.clone());
+        for feature in &mut self.hooks {
+            feature.event(context, &msg);
         }
 
         context.forward_message(&msg, &mut self.buffer);
@@ -308,11 +317,11 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
 /// Builder for E3RequestRouter
 pub struct E3RequestRouterBuilder {
     pub bus: Addr<EventBus>,
-    pub hooks: Vec<EventHook>,
+    pub hooks: Vec<Box<dyn E3Feature>>,
     pub store: DataStore,
 }
 impl E3RequestRouterBuilder {
-    pub fn add_hook(mut self, listener: EventHook) -> Self {
+    pub fn add_feature(mut self, listener: Box<dyn E3Feature>) -> Self {
         self.hooks.push(listener);
         self
     }

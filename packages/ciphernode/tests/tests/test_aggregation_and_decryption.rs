@@ -8,8 +8,8 @@ use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
 use p2p::P2p;
 use router::{
-    CiphernodeSelector, E3RequestRouter, LazyFhe, LazyKeyshare, LazyPlaintextAggregator,
-    LazyPublicKeyAggregator,
+    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
+    PublicKeyAggregatorFeature,
 };
 use sortition::Sortition;
 
@@ -39,16 +39,16 @@ async fn setup_local_ciphernode(bus: Addr<EventBus>, rng: SharedRng, logging: bo
     CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
 
     E3RequestRouter::builder(bus.clone(), store)
-        .add_hook(LazyFhe::create(rng))
-        .add_hook(LazyPublicKeyAggregator::create(
+        .add_feature(FheFeature::create(rng))
+        .add_feature(PublicKeyAggregatorFeature::create(
             bus.clone(),
             sortition.clone(),
         ))
-        .add_hook(LazyPlaintextAggregator::create(
+        .add_feature(PlaintextAggregatorFeature::create(
             bus.clone(),
             sortition.clone(),
         ))
-        .add_hook(LazyKeyshare::create(bus.clone(), addr))
+        .add_feature(KeyshareFeature::create(bus.clone(), addr))
         .build();
 
     SimpleLogger::attach(addr, bus.clone());
