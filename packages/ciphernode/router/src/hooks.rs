@@ -13,6 +13,8 @@ use keyshare::{Keyshare, KeyshareParams};
 use sortition::Sortition;
 use std::sync::Arc;
 
+/// TODO: move these to each package with access on MyStruct::launcher()
+
 pub struct FheFeature {
     rng: SharedRng,
 }
@@ -25,7 +27,7 @@ impl FheFeature {
 
 #[async_trait]
 impl E3Feature for FheFeature {
-    fn event(&self, ctx: &mut crate::E3RequestContext, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut crate::E3RequestContext, evt: &EnclaveEvent) {
         // Saving the fhe on Committee Requested
         let EnclaveEvent::E3Requested { data, .. } = evt else {
             return;
@@ -56,7 +58,7 @@ impl E3Feature for FheFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.at("").read(&id).await? else {
+        let Some(snap) = ctx.store.read_at(&id).await? else {
             return Ok(());
         };
 
@@ -83,7 +85,7 @@ impl KeyshareFeature {
 
 #[async_trait]
 impl E3Feature for KeyshareFeature {
-    fn event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
         // Save Ciphernode on CiphernodeSelected
         let EnclaveEvent::CiphernodeSelected { data, .. } = evt else {
             return;
@@ -119,7 +121,7 @@ impl E3Feature for KeyshareFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.at("").read(&id).await? else {
+        let Some(snap) = ctx.store.read_at(&id).await? else {
             return Ok(());
         };
 
@@ -160,7 +162,7 @@ impl PlaintextAggregatorFeature {
 
 #[async_trait]
 impl E3Feature for PlaintextAggregatorFeature {
-    fn event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
         // Save plaintext aggregator
         let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
             return;
@@ -207,7 +209,7 @@ impl E3Feature for PlaintextAggregatorFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.at("").read(&id).await? else {
+        let Some(snap) = ctx.store.read_at(&id).await? else {
             return Ok(());
         };
 
@@ -254,7 +256,7 @@ impl PublicKeyAggregatorFeature {
 
 #[async_trait]
 impl E3Feature for PublicKeyAggregatorFeature {
-    fn event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
         // Saving the publickey aggregator with deps on E3Requested
         let EnclaveEvent::E3Requested { data, .. } = evt else {
             return;
@@ -299,7 +301,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.at("").read(&id).await? else {
+        let Some(snap) = ctx.store.read_at(&id).await? else {
             return Ok(());
         };
 

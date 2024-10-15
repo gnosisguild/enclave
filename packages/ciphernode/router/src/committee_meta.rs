@@ -21,7 +21,7 @@ impl CommitteMetaFeature {
 
 #[async_trait]
 impl E3Feature for CommitteMetaFeature {
-    fn event(&self, ctx: &mut crate::E3RequestContext, event: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut crate::E3RequestContext, event: &EnclaveEvent) {
         let EnclaveEvent::E3Requested { data, .. } = event else {
             return;
         };
@@ -46,9 +46,21 @@ impl E3Feature for CommitteMetaFeature {
 
     async fn hydrate(
         &self,
-        _ctx: &mut E3RequestContext,
-        _snapshot: &E3RequestContextSnapshot,
+        ctx: &mut E3RequestContext,
+        snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
+        // No ID on the snapshot -> bail
+        let Some(id) = snapshot.meta.clone() else {
+            return Ok(());
+        };
+
+        // No Snapshot returned from the store -> bail
+        let Some(value) = ctx.store.read_at(&id).await? else {
+            return Ok(());
+        };
+
+        ctx.set_meta(value);
+
         Ok(())
     }
 }

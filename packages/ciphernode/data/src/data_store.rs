@@ -66,7 +66,7 @@ pub trait Checkpoint: Snapshot {
 
 #[async_trait]
 pub trait FromSnapshotWithParams: Snapshot {
-    type Params:Send + 'static;
+    type Params: Send + 'static;
 
     /// Return an instance of the persistable object at the state given by the snapshot
     /// This method is async because there may be subobjects that require hydration from the store
@@ -179,6 +179,15 @@ impl DataStore {
     /// Writes to whatever the prefix is set to on the datastore
     pub fn write<V: Serialize>(&self, value: V) {
         self.set("", value)
+    }
+
+    /// Read the value of the key starting at the root
+    pub async fn read_at<K, T>(&self, key: K) -> Result<Option<T>>
+    where
+        K: IntoKey,
+        T: for<'de> Deserialize<'de>,
+    {
+        self.at("").read(key).await
     }
 
     // use this for testing

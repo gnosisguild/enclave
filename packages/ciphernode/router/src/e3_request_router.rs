@@ -231,7 +231,7 @@ impl Checkpoint for E3RequestContext {
 
 #[async_trait]
 pub trait E3Feature: Send + Sync + 'static {
-    fn event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
+    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
     async fn hydrate(
         &self,
         ctx: &mut E3RequestContext,
@@ -311,7 +311,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
         });
 
         for feature in self.features.clone().iter() {
-            feature.event(context, &msg);
+            feature.on_event(context, &msg);
         }
 
         context.forward_message(&msg, &mut self.buffer);
@@ -416,7 +416,7 @@ impl E3RequestRouterBuilder {
     }
 
     pub async fn build(self) -> Result<Addr<E3RequestRouter>> {
-        let snapshot: Option<E3RequestRouterSnapshot> = self.store.at("").read("//router").await?;
+        let snapshot: Option<E3RequestRouterSnapshot> = self.store.read_at("//router").await?;
         let params = E3RequestRouterParams {
             features: self.features.into(),
             bus: self.bus.clone(),
