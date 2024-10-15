@@ -1,6 +1,7 @@
 use clap::Parser;
 use enclave::load_config;
 use enclave_node::MainAggregator;
+use tracing::info;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -18,8 +19,9 @@ struct Args {
 
 #[actix_rt::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
-    println!("LAUNCHING AGGREGATOR");
+    info!("LAUNCHING AGGREGATOR");
     let config = load_config(&args.config)?;
     let (_, handle) = MainAggregator::attach(
         config,

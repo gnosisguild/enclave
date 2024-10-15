@@ -8,6 +8,7 @@ use alloy::{
 };
 use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus};
+use tracing::{error, info, trace};
 
 use crate::helpers::{self, create_readonly_provider, ReadonlyProvider};
 
@@ -69,7 +70,7 @@ fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEven
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
             let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data, true)
             else {
-                println!("Error parsing event CiphernodeAdded"); // TODO: provide more info
+                error!("Error parsing event CiphernodeAdded after topic was matched!");
                 return None;
             };
             Some(EnclaveEvent::from(event))
@@ -77,14 +78,17 @@ fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEven
         Some(&ICiphernodeRegistry::CiphernodeRemoved::SIGNATURE_HASH) => {
             let Ok(event) = ICiphernodeRegistry::CiphernodeRemoved::decode_log_data(data, true)
             else {
-                println!("Error parsing event CiphernodeRemoved"); // TODO: provide more info
+                error!("Error parsing event CiphernodeRemoved after topic was matched!");
                 return None;
             };
             Some(EnclaveEvent::from(event))
         }
 
-        _ => {
-            println!("Unknown event");
+        _topic => {
+            trace!(
+                topic=?_topic,
+                "Unknown event was received by Enclave.sol parser buut was ignored"
+            );
             return None;
         }
     }
@@ -122,7 +126,7 @@ impl CiphernodeRegistrySolReader {
                 .await?
                 .start();
 
-        println!("CiphernodeRegistrySol is listening to {}", contract_address);
+        info!(address=%contract_address, "CiphernodeRegistrySol is listening to address");
         Ok(addr)
     }
 }

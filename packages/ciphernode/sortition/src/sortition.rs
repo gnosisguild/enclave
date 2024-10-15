@@ -1,9 +1,12 @@
-use std::collections::HashSet;
-
 use crate::DistanceSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
-use enclave_core::{CiphernodeAdded, CiphernodeRemoved, EnclaveEvent, EventBus, Seed, Subscribe};
+use anyhow::{anyhow, Result};
+use enclave_core::{
+    BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
+    Subscribe,
+};
+use std::collections::HashSet;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
@@ -14,7 +17,7 @@ pub struct GetHasNode {
 }
 
 pub trait SortitionList<T> {
-    fn contains(&self, seed: Seed, size: usize, address: T) -> bool;
+    fn contains(&self, seed: Seed, size: usize, address: T) -> Result<bool>;
     fn add(&mut self, address: T);
     fn remove(&mut self, address: T);
 }
@@ -38,10 +41,9 @@ impl Default for SortitionModule {
 }
 
 impl SortitionList<String> for SortitionModule {
-    fn contains(&self, seed: Seed, size: usize, address: String) -> bool {
+    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
         if self.nodes.len() == 0 {
-            eprintln!("ERROR: No nodes registered!");
-            return false;
+            return Err(anyhow!("No nodes registered!"));
         }
 
         let registered_nodes: Vec<Address> = self
@@ -55,13 +57,12 @@ impl SortitionList<String> for SortitionModule {
         let Ok(committee) =
             DistanceSortition::new(seed.into(), registered_nodes, size).get_committee()
         else {
-            eprintln!("Error: Could not get committee!");
-            return false;
+            return Err(anyhow!("Could not get committee!"));
         };
 
-        committee
+        Ok(committee
             .iter()
-            .any(|(_, addr)| addr.to_string() == address)
+            .any(|(_, addr)| addr.to_string() == address))
     }
 
     fn add(&mut self, address: String) {
@@ -79,29 +80,25 @@ pub struct GetNodes;
 
 pub struct Sortition {
     list: SortitionModule,
+    bus: Addr<EventBus>,
 }
 
 impl Sortition {
-    pub fn new() -> Self {
+    pub fn new(bus: Addr<EventBus>) -> Self {
         Self {
             list: SortitionModule::new(),
+            bus,
         }
     }
 
     pub fn attach(bus: Addr<EventBus>) -> Addr<Sortition> {
-        let addr = Sortition::new().start();
+        let addr = Sortition::new(bus.clone()).start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
         addr
     }
 
     pub fn get_nodes(&self) -> Vec<String> {
         self.list.nodes.clone().into_iter().collect()
-    }
-}
-
-impl Default for Sortition {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -137,7 +134,13 @@ impl Handler<CiphernodeRemoved> for Sortition {
 impl Handler<GetHasNode> for Sortition {
     type Result = bool;
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
-        self.list.contains(msg.seed, msg.size, msg.address)
+        match self.list.contains(msg.seed, msg.size, msg.address) {
+            Ok(val) => val,
+            Err(err) => {
+                self.bus.err(EnclaveErrorType::Sortition, err);
+                false
+            }
+        }
     }
 }
 
