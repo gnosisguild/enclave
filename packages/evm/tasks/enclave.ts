@@ -138,6 +138,24 @@ task(
     console.log(`Committee requested`);
   });
 
+task("enclave:enableE3", "Enable an E3 program")
+  .addParam("e3Address", "address of the E3 program")
+  .setAction(async function (taskArguments: TaskArguments, hre) {
+    const enclave = await hre.deployments.get("Enclave");
+
+    const enclaveContract = await hre.ethers.getContractAt(
+      "Enclave",
+      enclave.address,
+    );
+
+    const tx = await enclaveContract.enableE3Program(taskArguments.e3Address);
+
+    console.log("Enabling E3 program... ", tx.hash);
+    await tx.wait();
+
+    console.log(`E3 program enabled`);
+  });
+
 task("committee:publish", "Publish the publickey of the committee")
   .addOptionalParam(
     "filter",
