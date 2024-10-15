@@ -4,8 +4,9 @@ use aggregator::{
     PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState, PublicKeyAggregator,
     PublicKeyAggregatorParams, PublicKeyAggregatorState,
 };
+use anyhow::Result;
 use async_trait::async_trait;
-use data::{Snapshot, WithPrefix};
+use data::{FromSnapshotWithParams, Snapshot, WithPrefix};
 use enclave_core::{E3Requested, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::{Keyshare, KeyshareParams};
@@ -41,10 +42,29 @@ impl E3Feature for FheFeature {
         let fhe_id = format!("//fhe/{e3_id}");
         let fhe = Arc::new(Fhe::from_encoded(&params, seed, self.rng.clone()).unwrap());
         ctx.get_store().at(&fhe_id).write(fhe.snapshot());
-
         let _ = ctx.set_fhe(fhe);
     }
-    async fn hydrate(&self, _ctx: &mut E3RequestContext, _snapshot: &E3RequestContextSnapshot) {}
+
+    async fn hydrate(
+        &self,
+        ctx: &mut E3RequestContext,
+        snapshot: &E3RequestContextSnapshot,
+    ) -> Result<()> {
+        // No ID on the snapshot -> bail
+        let Some(id) = snapshot.fhe.clone() else {
+            return Ok(());
+        };
+
+        // No Snapshot returned from the store -> bail
+        let Some(snap) = ctx.store.at("").read(&id).await? else {
+            return Ok(());
+        };
+
+        let value = Arc::new(Fhe::from_snapshot(self.rng.clone(), snap).await?);
+        ctx.set_fhe(value);
+
+        Ok(())
+    }
 }
 
 pub struct KeyshareFeature {
@@ -88,7 +108,44 @@ impl E3Feature for KeyshareFeature {
         );
     }
 
-    async fn hydrate(&self, _ctx: &mut E3RequestContext, _snapshot: &E3RequestContextSnapshot) {}
+    async fn hydrate(
+        &self,
+        ctx: &mut E3RequestContext,
+        snapshot: &E3RequestContextSnapshot,
+    ) -> Result<()> {
+        // No ID on the snapshot -> bail
+        let Some(id) = snapshot.keyshare.clone() else {
+            return Ok(());
+        };
+
+        // No Snapshot returned from the store -> bail
+        let Some(snap) = ctx.store.at("").read(&id).await? else {
+            return Ok(());
+        };
+
+        // Get deps
+        let Some(fhe) = ctx.fhe.clone() else {
+            return Ok(());
+        };
+
+        // Construct from snapshot
+        let value = Keyshare::from_snapshot(
+            KeyshareParams {
+                fhe,
+                bus: self.bus.clone(),
+                store: ctx.store.at(&id),
+                address: self.address.clone(),
+            },
+            snap,
+        )
+        .await?
+        .start();
+
+        // send to context
+        ctx.set_keyshare(value);
+
+        Ok(())
+    }
 }
 
 pub struct PlaintextAggregatorFeature {
@@ -138,7 +195,50 @@ impl E3Feature for PlaintextAggregatorFeature {
             .start(),
         );
     }
-    async fn hydrate(&self, _ctx: &mut E3RequestContext, _snapshot: &E3RequestContextSnapshot) {}
+
+    async fn hydrate(
+        &self,
+        ctx: &mut E3RequestContext,
+        snapshot: &E3RequestContextSnapshot,
+    ) -> Result<()> {
+        // No ID on the snapshot -> bail
+        let Some(id) = snapshot.plaintext.clone() else {
+            return Ok(());
+        };
+
+        // No Snapshot returned from the store -> bail
+        let Some(snap) = ctx.store.at("").read(&id).await? else {
+            return Ok(());
+        };
+
+        // Get deps
+        let Some(fhe) = ctx.fhe.clone() else {
+            return Ok(());
+        };
+
+        let Some(meta) = ctx.meta.clone() else {
+            return Ok(());
+        };
+
+        let value = PlaintextAggregator::from_snapshot(
+            PlaintextAggregatorParams {
+                fhe: fhe.clone(),
+                bus: self.bus.clone(),
+                store: ctx.get_store().at(&id),
+                sortition: self.sortition.clone(),
+                e3_id: ctx.e3_id.clone(),
+                src_chain_id: meta.src_chain_id,
+            },
+            snap,
+        )
+        .await?
+        .start();
+        
+        // send to context
+        ctx.set_plaintext(value);
+
+        Ok(())
+    }
 }
 
 pub struct PublicKeyAggregatorFeature {
@@ -188,5 +288,47 @@ impl E3Feature for PublicKeyAggregatorFeature {
         );
     }
 
-    async fn hydrate(&self, _ctx: &mut E3RequestContext, _snapshot: &E3RequestContextSnapshot) {}
+    async fn hydrate(
+        &self,
+        ctx: &mut E3RequestContext,
+        snapshot: &E3RequestContextSnapshot,
+    ) -> Result<()> {
+       // No ID on the snapshot -> bail
+        let Some(id) = snapshot.publickey.clone() else {
+            return Ok(());
+        };
+
+        // No Snapshot returned from the store -> bail
+        let Some(snap) = ctx.store.at("").read(&id).await? else {
+            return Ok(());
+        };
+
+        // Get deps
+        let Some(fhe) = ctx.fhe.clone() else {
+            return Ok(());
+        };
+
+        let Some(meta) = ctx.meta.clone() else {
+            return Ok(());
+        };
+
+        let value = PublicKeyAggregator::from_snapshot(
+            PublicKeyAggregatorParams {
+                fhe: fhe.clone(),
+                bus: self.bus.clone(),
+                store: ctx.get_store().at(&id),
+                sortition: self.sortition.clone(),
+                e3_id: ctx.e3_id.clone(),
+                src_chain_id: meta.src_chain_id,
+            },
+            snap,
+        )
+        .await?
+        .start();
+        
+        // send to context
+        ctx.set_publickey(value);
+
+        Ok(())
+    }
 }

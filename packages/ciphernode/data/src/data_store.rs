@@ -66,7 +66,7 @@ pub trait Checkpoint: Snapshot {
 
 #[async_trait]
 pub trait FromSnapshotWithParams: Snapshot {
-    type Params;
+    type Params:Send + 'static;
 
     /// Return an instance of the persistable object at the state given by the snapshot
     /// This method is async because there may be subobjects that require hydration from the store

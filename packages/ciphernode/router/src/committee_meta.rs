@@ -1,5 +1,5 @@
 use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
-
+use anyhow::*;
 use async_trait::async_trait;
 use data::WithPrefix;
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
@@ -44,5 +44,11 @@ impl E3Feature for CommitteMetaFeature {
         let _ = ctx.set_meta(meta);
     }
 
-    async fn hydrate(&self, _ctx: &mut E3RequestContext, _snapshot: &E3RequestContextSnapshot) {}
+    async fn hydrate(
+        &self,
+        _ctx: &mut E3RequestContext,
+        _snapshot: &E3RequestContextSnapshot,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
