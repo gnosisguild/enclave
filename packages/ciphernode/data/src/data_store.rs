@@ -1,7 +1,8 @@
+use crate::InMemDataStore;
 use actix::{Addr, Message, Recipient};
 use anyhow::{anyhow, Result};
-
-use crate::InMemDataStore;
+use async_trait::async_trait;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 pub trait IntoKey {
     fn into_key(self) -> Vec<u8>;
@@ -38,20 +39,57 @@ impl<'a> IntoKey for &'a str {
 }
 
 pub trait WithPrefix: Sized {
-    fn prefix(self, prefix: &str) -> Self;
-    fn base(self, key: &str) -> Self;
+    fn prefix(&self, prefix: &str) -> Self;
+    fn at(&self, key: &str) -> Self;
+}
+
+pub trait Snapshot
+where
+    Self: Sized,
+{
+    type Snapshot: Serialize + DeserializeOwned;
+
+    /// Return a tuple with the first element being the id string of the object and the second
+    /// being a representation of the object's state that is easily serialized by the data store
+    fn snapshot(&self) -> Self::Snapshot;
+}
+
+pub trait Checkpoint: Snapshot {
+    /// Declare the DataStore instance available on the object
+    fn get_store(&self) -> DataStore;
+
+    /// Write the current snapshot to the DataStore provided by `get_store()` at the object's id returned by `get_id()`
+    fn checkpoint(&self) {
+        self.get_store().write(self.snapshot());
+    }
+}
+
+#[async_trait]
+pub trait FromSnapshotWithParams: Snapshot {
+    type Params;
+
+    /// Return an instance of the persistable object at the state given by the snapshot
+    /// This method is async because there may be subobjects that require hydration from the store
+    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self>;
+}
+
+#[async_trait]
+pub trait FromSnapshot: Snapshot {
+    /// Return an instance of the persistable object at the state given by the snapshot
+    /// This method is async because there may be subobjects that require hydration from the store
+    async fn from_snapshot(snapshot: Self::Snapshot) -> Result<Self>;
 }
 
 impl WithPrefix for Vec<u8> {
-    fn prefix(self, prefix: &str) -> Self {
+    fn prefix(&self, prefix: &str) -> Self {
         let Ok(encoded) = String::from_utf8(self.clone()) else {
             // If this is not encoded as utf8 do nothing
-            return self;
+            return self.clone();
         };
         vec![prefix.to_string(), encoded].join("/").into_bytes()
     }
 
-    fn base(self, key: &str) -> Self {
+    fn at(&self, key: &str) -> Self {
         key.to_string().into_bytes()
     }
 }
@@ -74,12 +112,12 @@ impl Insert {
 }
 
 impl WithPrefix for Insert {
-    fn prefix(self, prefix: &str) -> Self {
-        Insert(self.0.prefix(prefix), self.1)
+    fn prefix(&self, prefix: &str) -> Self {
+        Insert(self.0.prefix(prefix), self.1.clone())
     }
 
-    fn base(self, key: &str) -> Self {
-        Insert(self.0.base(key), self.1)
+    fn at(&self, key: &str) -> Self {
+        Insert(self.0.at(key), self.1.clone())
     }
 }
 
@@ -97,11 +135,11 @@ impl Get {
 }
 
 impl WithPrefix for Get {
-    fn prefix(self, prefix: &str) -> Self {
+    fn prefix(&self, prefix: &str) -> Self {
         Get(self.0.prefix(prefix))
     }
-    fn base(self, key: &str) -> Self {
-        Get(self.0.base(key))
+    fn at(&self, key: &str) -> Self {
+        Get(self.0.at(key))
     }
 }
 
@@ -113,16 +151,34 @@ pub struct DataStore {
 }
 
 impl DataStore {
-    pub async fn read<K:IntoKey>(&self, key: K) -> Result<Option<Vec<u8>>> {
+    pub async fn read<K, T>(&self, key: K) -> Result<Option<T>>
+    where
+        K: IntoKey,
+        T: for<'de> Deserialize<'de>,
+    {
         let msg = Get::new(key);
         let msg = self.prefix.as_ref().map_or(msg.clone(), |p| msg.prefix(p));
-        Ok(self.get.send(msg).await?)
+        let maybe_bytes = self.get.send(msg).await?;
+        let Some(bytes) = maybe_bytes else {
+            return Ok(None);
+        };
+
+        Ok(Some(bincode::deserialize(&bytes)?))
     }
 
-    pub fn write<K:IntoKey>(&self, key: K, value: Vec<u8>) {
-        let msg = Insert::new(key, value);
+    /// Writes anything serializable to the KV actor as a stream of bytes
+    pub fn set<K: IntoKey, V: Serialize>(&self, key: K, value: V) {
+        let Ok(serialized) = bincode::serialize(&value) else {
+            return;
+        };
+        let msg = Insert::new(key, serialized);
         let msg = self.prefix.as_ref().map_or(msg.clone(), |p| msg.prefix(p));
         self.insert.do_send(msg)
+    }
+
+    /// Writes to whatever the prefix is set to on the datastore
+    pub fn write<V: Serialize>(&self, value: V) {
+        self.set("", value)
     }
 
     // use this for testing
@@ -149,21 +205,21 @@ impl DataStore {
 }
 
 impl WithPrefix for DataStore {
-    fn prefix(self, prefix: &str) -> Self {
+    fn prefix(&self, prefix: &str) -> Self {
         Self {
-            get: self.get,
-            insert: self.insert,
-            prefix: self.prefix.map_or_else(
+            get: self.get.clone(),
+            insert: self.insert.clone(),
+            prefix: self.prefix.clone().map_or_else(
                 || Some(prefix.to_string()),
                 |p| Some(vec![prefix.to_string(), p].join("/")),
             ),
         }
     }
 
-    fn base(self, key: &str) -> Self {
+    fn at(&self, key: &str) -> Self {
         Self {
-            get: self.get,
-            insert: self.insert,
+            get: self.get.clone(),
+            insert: self.insert.clone(),
             prefix: Some(key.to_string()),
         }
     }

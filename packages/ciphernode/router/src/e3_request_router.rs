@@ -4,14 +4,18 @@ use actix::{Actor, Addr, Context, Handler, Recipient};
 use aggregator::PlaintextAggregator;
 use aggregator::PublicKeyAggregator;
 use anyhow::*;
+use async_trait::async_trait;
+use data::Checkpoint;
 use data::DataStore;
-use data::Get;
-use data::Insert;
+use data::FromSnapshotWithParams;
+use data::Snapshot;
 use data::WithPrefix;
 use enclave_core::E3RequestComplete;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use fhe::Fhe;
 use keyshare::Keyshare;
+use serde::Deserialize;
+use serde::Serialize;
 use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
 
@@ -37,23 +41,40 @@ impl EventBuffer {
 /// Context that is set to each event hook. Hooks can use this context to gather dependencies if
 /// they need to instantiate struct instances or actors.
 pub struct E3RequestContext {
+    e3_id: E3id,
     keyshare: Option<Addr<Keyshare>>,
     fhe: Option<Arc<Fhe>>,
     plaintext: Option<Addr<PlaintextAggregator>>,
     publickey: Option<Addr<PublicKeyAggregator>>,
     meta: Option<CommitteeMeta>,
+    store: DataStore,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct E3RequestContextSnapshot {
+    e3_id: E3id,
+    keyshare: Option<String>,
+    fhe: Option<String>,
+    plaintext: Option<String>,
+    publickey: Option<String>,
+    meta: Option<String>,
+}
+
+pub struct E3RequestContextParams {
     pub store: DataStore,
+    pub e3_id: E3id,
 }
 
 impl E3RequestContext {
-    fn from_store(store: DataStore) -> Self {
+    pub fn from_params(params: E3RequestContextParams) -> Self {
         Self {
-            keyshare: None,
+            e3_id: params.e3_id,
+            store: params.store,
             fhe: None,
+            keyshare: None,
+            meta: None,
             plaintext: None,
             publickey: None,
-            meta: None,
-            store,
         }
     }
 
@@ -88,47 +109,37 @@ impl E3RequestContext {
     }
 
     /// Accept a DataStore ID and a Keystore actor address
-    pub fn set_keyshare(&mut self, id: &str, value: Addr<Keyshare>) -> Result<()> {
-        DataStore::ensure_root_id(id)?;
+    pub fn set_keyshare(&mut self, value: Addr<Keyshare>) -> Result<()> {
         self.keyshare = Some(value);
-        self.store.write("keyshare", id.into());
+        self.checkpoint();
         Ok(())
     }
 
     /// Accept a DataStore ID and a Keystore actor address
-    pub fn set_plaintext(&mut self, id: &str, value: Addr<PlaintextAggregator>) -> Result<()> {
-        DataStore::ensure_root_id(id)?;
+    pub fn set_plaintext(&mut self, value: Addr<PlaintextAggregator>) -> Result<()> {
         self.plaintext = Some(value);
-        self.store.write("plaintext", id.into());
+        self.checkpoint();
         Ok(())
     }
 
     /// Accept a DataStore ID and a Keystore actor address
-    pub fn set_publickey(&mut self, id: &str, value: Addr<PublicKeyAggregator>) -> Result<()> {
-        DataStore::ensure_root_id(id)?;
+    pub fn set_publickey(&mut self, value: Addr<PublicKeyAggregator>) -> Result<()> {
         self.publickey = Some(value);
-        self.store.write("publickey", id.into());
+        self.checkpoint();
         Ok(())
     }
 
     /// Accept a DataStore ID and an Arc instance of the Fhe wrapper
-    pub fn set_fhe(&mut self, id: &str, value: Arc<Fhe>) -> Result<()> {
-        DataStore::ensure_root_id(id)?;
+    pub fn set_fhe(&mut self, value: Arc<Fhe>) -> Result<()> {
         self.fhe = Some(value.clone());
-        self.store.write("fhe", id.into());
-        // TODO: should non actors store themselves?
-        self.store.write(id, value.to_bytes()?);
+        self.checkpoint();
         Ok(())
     }
 
     /// Accept a Datastore ID and a metadata object
-    pub fn set_meta(&mut self, id: &str, value: CommitteeMeta) -> Result<()> {
-        DataStore::ensure_root_id(id)?;
+    pub fn set_meta(&mut self, value: CommitteeMeta) -> Result<()> {
         self.meta = Some(value.clone());
-        self.store.write("meta", id.into());
-        // TODO: should non actors store themselves?
-        self.store
-            .write(id, bincode::serialize(&value)?);
+        self.checkpoint();
         Ok(())
     }
 
@@ -150,6 +161,64 @@ impl E3RequestContext {
 
     pub fn get_meta(&self) -> Option<&CommitteeMeta> {
         self.meta.as_ref()
+    }
+
+    pub fn get_store(&self) -> DataStore {
+        self.store.clone()
+    }
+}
+
+#[async_trait]
+impl Snapshot for E3RequestContext {
+    type Snapshot = E3RequestContextSnapshot;
+
+    fn snapshot(&self) -> Self::Snapshot {
+        let e3_id = self.e3_id.clone();
+        let meta = self.meta.as_ref().map(|_| format!("//meta/{e3_id}"));
+        let fhe = self.fhe.as_ref().map(|_| format!("//fhe/{e3_id}"));
+        let publickey = self
+            .publickey
+            .as_ref()
+            .map(|_| format!("//publickey/{e3_id}"));
+        let plaintext = self
+            .plaintext
+            .as_ref()
+            .map(|_| format!("//plaintext/{e3_id}"));
+        let keyshare = self
+            .keyshare
+            .as_ref()
+            .map(|_| format!("//keyshare/{e3_id}"));
+
+        Self::Snapshot {
+            e3_id,
+            meta,
+            fhe,
+            publickey,
+            plaintext,
+            keyshare,
+        }
+    }
+}
+
+#[async_trait]
+impl FromSnapshotWithParams for E3RequestContext {
+    type Params = E3RequestContextParams;
+    async fn from_snapshot(params: Self::Params, _: Self::Snapshot) -> Result<Self> {
+        Ok(Self {
+            e3_id: params.e3_id,
+            store: params.store,
+            fhe: None,
+            keyshare: None,
+            meta: None,
+            plaintext: None,
+            publickey: None,
+        })
+    }
+}
+
+impl Checkpoint for E3RequestContext {
+    fn get_store(&self) -> DataStore {
+        self.store.clone()
     }
 }
 
@@ -200,10 +269,12 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             return;
         }
 
-        let context = self
-            .contexts
-            .entry(e3_id.clone())
-            .or_insert_with(|| E3RequestContext::from_store(self.store.clone()));
+        let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
+            E3RequestContext::from_params(E3RequestContextParams {
+                e3_id: e3_id.clone(),
+                store: self.store.at(&format!("//context/{e3_id}")),
+            })
+        });
 
         for hook in &mut self.hooks {
             hook(context, msg.clone());

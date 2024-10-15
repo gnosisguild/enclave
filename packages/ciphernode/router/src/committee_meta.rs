@@ -1,5 +1,5 @@
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
-
+use data::WithPrefix;
 use super::EventHook;
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -25,14 +25,15 @@ impl CommitteeMetaFactory {
                 ..
             } = data;
 
-            ctx.set_meta(
-                &format!("//meta/{e3_id}"),
-                CommitteeMeta {
-                    threshold_m,
-                    seed,
-                    src_chain_id,
-                },
-            );
+            // Meta doesn't implement Checkpoint so we are going to store it manually
+            let meta_id = format!("//meta/{e3_id}");
+            let meta = CommitteeMeta {
+                threshold_m,
+                seed,
+                src_chain_id,
+            };
+            ctx.get_store().at(&meta_id).write(meta.clone()); 
+            ctx.set_meta(meta);
         })
     }
 }

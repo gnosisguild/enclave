@@ -1,14 +1,16 @@
 use actix::prelude::*;
 use anyhow::Result;
+use async_trait::async_trait;
+use data::{Checkpoint, DataStore, FromSnapshotWithParams, Snapshot};
 use enclave_core::{
-    DecryptionshareCreated, Die, E3RequestComplete, E3id, EnclaveEvent, EventBus, OrderedSet,
-    PlaintextAggregated, Seed,
+    DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
+    Seed,
 };
 use fhe::{Fhe, GetAggregatePlaintext};
 use sortition::{GetHasNode, Sortition};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PlaintextAggregatorState {
     Collecting {
         threshold_m: usize,
@@ -26,6 +28,17 @@ pub enum PlaintextAggregatorState {
     },
 }
 
+impl PlaintextAggregatorState {
+    pub fn init(threshold_m: usize, seed: Seed, ciphertext_output: Vec<u8>) -> Self {
+        PlaintextAggregatorState::Collecting {
+            threshold_m,
+            shares: OrderedSet::new(),
+            seed,
+            ciphertext_output,
+        }
+    }
+}
+
 #[derive(Message)]
 #[rtype(result = "anyhow::Result<()>")]
 struct ComputeAggregate {
@@ -36,35 +49,32 @@ struct ComputeAggregate {
 pub struct PlaintextAggregator {
     fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
+    store: DataStore,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: PlaintextAggregatorState,
     src_chain_id: u64,
 }
 
+pub struct PlaintextAggregatorParams {
+    pub fhe: Arc<Fhe>,
+    pub bus: Addr<EventBus>,
+    pub store: DataStore,
+    pub sortition: Addr<Sortition>,
+    pub e3_id: E3id,
+    pub src_chain_id: u64,
+}
+
 impl PlaintextAggregator {
-    pub fn new(
-        fhe: Arc<Fhe>,
-        bus: Addr<EventBus>,
-        sortition: Addr<Sortition>,
-        e3_id: E3id,
-        threshold_m: usize,
-        seed: Seed,
-        ciphertext_output: Vec<u8>,
-        src_chain_id: u64,
-    ) -> Self {
+    pub fn new(params: PlaintextAggregatorParams, state: PlaintextAggregatorState) -> Self {
         PlaintextAggregator {
-            fhe,
-            bus,
-            sortition,
-            e3_id,
-            src_chain_id,
-            state: PlaintextAggregatorState::Collecting {
-                threshold_m,
-                shares: OrderedSet::new(),
-                seed,
-                ciphertext_output,
-            },
+            fhe: params.fhe,
+            bus: params.bus,
+            store: params.store,
+            sortition: params.sortition,
+            e3_id: params.e3_id,
+            src_chain_id: params.src_chain_id,
+            state,
         }
     }
 
@@ -155,6 +165,7 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
 
                     // add the keyshare and
                     act.state = act.add_share(decryption_share)?;
+                    act.checkpoint();
 
                     // Check the state and if it has changed to the computing
                     if let PlaintextAggregatorState::Computing {
@@ -184,6 +195,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
 
         // Update the local state
         self.state = self.set_decryption(decrypted_output.clone())?;
+        self.checkpoint();
 
         // Dispatch the PlaintextAggregated event
         let event = EnclaveEvent::from(PlaintextAggregated {
@@ -202,5 +214,28 @@ impl Handler<Die> for PlaintextAggregator {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop()
+    }
+}
+
+impl Snapshot for PlaintextAggregator {
+    type Snapshot = PlaintextAggregatorState;
+
+    fn snapshot(&self) -> Self::Snapshot {
+        self.state.clone()
+    }
+}
+
+#[async_trait]
+impl FromSnapshotWithParams for PlaintextAggregator {
+    type Params = PlaintextAggregatorParams;
+
+    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
+        Ok(PlaintextAggregator::new(params, snapshot))
+    }
+}
+
+impl Checkpoint for PlaintextAggregator {
+    fn get_store(&self) -> data::DataStore {
+        self.store.clone()
     }
 }

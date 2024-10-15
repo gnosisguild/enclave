@@ -1,10 +1,13 @@
 use crate::EventHook;
 use actix::{Actor, Addr};
-use aggregator::{PlaintextAggregator, PublicKeyAggregator};
-use data::{DataStore, WithPrefix};
+use aggregator::{
+    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState, PublicKeyAggregator,
+    PublicKeyAggregatorParams, PublicKeyAggregatorState,
+};
+use data::{Snapshot, WithPrefix};
 use enclave_core::{E3Requested, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
-use keyshare::Keyshare;
+use keyshare::{Keyshare, KeyshareParams};
 use sortition::Sortition;
 use std::sync::Arc;
 
@@ -25,11 +28,12 @@ impl LazyFhe {
                 ..
             } = data;
 
-            // Set the FHE instance passing in the instance id
-            let _ = ctx.set_fhe(
-                &format!("//fhe/{e3_id}"),
-                Arc::new(Fhe::from_encoded(&params, seed, rng.clone()).unwrap()),
-            );
+            // FHE doesn't implement Checkpoint so we are going to store it manually
+            let fhe_id = format!("//fhe/{e3_id}");
+            let fhe = Arc::new(Fhe::from_encoded(&params, seed, rng.clone()).unwrap());
+            ctx.get_store().at(&fhe_id).write(fhe.snapshot());
+
+            let _ = ctx.set_fhe(fhe);
         })
     }
 }
@@ -50,16 +54,15 @@ impl LazyKeyshare {
 
             let e3_id = data.e3_id;
 
-            let ks_id = &format!("//keystore/{e3_id}");
+            let ks_id = format!("//keystore/{e3_id}");
 
             let _ = ctx.set_keyshare(
-                ks_id,
-                Keyshare::new(
-                    bus.clone(),
-                    ctx.store.clone().base(ks_id),
-                    fhe.clone(),
-                    &address,
-                )
+                Keyshare::new(KeyshareParams {
+                    bus: bus.clone(),
+                    store: ctx.get_store().at(&ks_id),
+                    fhe: fhe.clone(),
+                    address: address.clone(),
+                })
                 .start(),
             );
         })
@@ -86,16 +89,20 @@ impl LazyPlaintextAggregator {
             let id = &format!("//plaintext/{e3_id}");
 
             let _ = ctx.set_plaintext(
-                id,
                 PlaintextAggregator::new(
-                    fhe.clone(),
-                    bus.clone(),
-                    sortition.clone(),
-                    e3_id,
-                    meta.threshold_m,
-                    meta.seed,
-                    data.ciphertext_output,
-                    meta.src_chain_id,
+                    PlaintextAggregatorParams {
+                        fhe: fhe.clone(),
+                        bus: bus.clone(),
+                        store: ctx.get_store().at(id),
+                        sortition: sortition.clone(),
+                        e3_id,
+                        src_chain_id: meta.src_chain_id,
+                    },
+                    PlaintextAggregatorState::init(
+                        meta.threshold_m,
+                        meta.seed,
+                        data.ciphertext_output,
+                    ),
                 )
                 .start(),
             );
@@ -125,15 +132,16 @@ impl LazyPublicKeyAggregator {
             let id = &format!("//publickey/{e3_id}");
 
             let _ = ctx.set_publickey(
-                id,
                 PublicKeyAggregator::new(
-                    fhe.clone(),
-                    bus.clone(),
-                    sortition.clone(),
-                    e3_id,
-                    meta.threshold_m,
-                    meta.seed,
-                    meta.src_chain_id,
+                    PublicKeyAggregatorParams {
+                        fhe: fhe.clone(),
+                        bus: bus.clone(),
+                        store: ctx.get_store().at(id),
+                        sortition: sortition.clone(),
+                        e3_id,
+                        src_chain_id: meta.src_chain_id,
+                    },
+                    PublicKeyAggregatorState::init(meta.threshold_m, meta.seed),
                 )
                 .start(),
             );
