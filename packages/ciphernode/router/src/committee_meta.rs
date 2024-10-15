@@ -1,6 +1,6 @@
-use enclave_core::{E3Requested, EnclaveEvent, Seed};
-use data::WithPrefix;
 use super::EventHook;
+use data::WithPrefix;
+use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CommitteeMeta {
@@ -32,7 +32,7 @@ impl CommitteeMetaFactory {
                 seed,
                 src_chain_id,
             };
-            ctx.get_store().at(&meta_id).write(meta.clone()); 
+            ctx.get_store().at(&meta_id).write(meta.clone());
             ctx.set_meta(meta);
         })
     }
