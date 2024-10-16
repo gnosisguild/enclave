@@ -4,7 +4,6 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-
 /// This trait allows our keys to be responsive to multiple inputs
 pub trait IntoKey {
     fn into_key(self) -> Vec<u8>;
@@ -52,7 +51,6 @@ pub trait WithPrefix: Sized {
     fn at(&self, key: &str) -> Self;
 }
 
-
 /// This trait enables the self type to report their state snapshot
 pub trait Snapshot
 where
@@ -66,7 +64,6 @@ where
     /// Return the Snapshot object for the implementor
     fn snapshot(&self) -> Self::Snapshot;
 }
-
 
 /// This trait enables the self type to checkpoint its state
 pub trait Checkpoint: Snapshot {
