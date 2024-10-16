@@ -58,12 +58,12 @@ pub trait Snapshot
 where
     Self: Sized,
 {
-    /// The state must be serializable so that it can be stored as a value
     /// The Snapshot should represent all the dynamic data managed within the Actor or Object
+    ///
+    /// The state must be serializable so that it can be stored as a value
     type Snapshot: Serialize + DeserializeOwned;
 
-    /// Return a tuple with the first element being the id string of the object and the second
-    /// being a representation of the object's state that is easily serialized by the data store
+    /// Return the Snapshot object for the implementor
     fn snapshot(&self) -> Self::Snapshot;
 }
 
