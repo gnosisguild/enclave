@@ -10,3 +10,4 @@ bincode = { workspace = true }
 enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
 sortition = { path = "../sortition" }
+tracing = { workspace = true }
