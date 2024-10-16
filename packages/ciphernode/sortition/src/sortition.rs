@@ -190,3 +190,6 @@ impl Handler<GetNodes> for Sortition {
         self.get_nodes()
     }
 }
+
+
+

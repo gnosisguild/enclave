@@ -4,49 +4,62 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+
+/// This trait allows our keys to be responsive to multiple inputs
 pub trait IntoKey {
     fn into_key(self) -> Vec<u8>;
 }
 
+/// Keys can be vectors of String
 impl IntoKey for Vec<String> {
     fn into_key(self) -> Vec<u8> {
         self.join("/").into_bytes()
     }
 }
 
+/// Keys can be vectors of &str
 impl<'a> IntoKey for Vec<&'a str> {
     fn into_key(self) -> Vec<u8> {
         self.join("/").into_bytes()
     }
 }
 
+/// Keys can be String
 impl IntoKey for String {
     fn into_key(self) -> Vec<u8> {
         self.into_bytes()
     }
 }
 
+/// Keys can be &String
 impl IntoKey for &String {
     fn into_key(self) -> Vec<u8> {
         self.as_bytes().to_vec()
     }
 }
 
+/// Keys can be &str
 impl<'a> IntoKey for &'a str {
     fn into_key(self) -> Vec<u8> {
         self.as_bytes().to_vec()
     }
 }
 
+/// Trait to add a prefix to a data storage object. This is used as a recursive trait for setting
+/// scope on data objects which include the Get ad Insert commands for the data store
 pub trait WithPrefix: Sized {
     fn prefix(&self, prefix: &str) -> Self;
     fn at(&self, key: &str) -> Self;
 }
 
+
+/// This trait enables the self type to report their state snapshot
 pub trait Snapshot
 where
     Self: Sized,
 {
+    /// The state must be serializable so that it can be stored as a value
+    /// The Snapshot should represent all the dynamic data managed within the Actor or Object
     type Snapshot: Serialize + DeserializeOwned;
 
     /// Return a tuple with the first element being the id string of the object and the second
@@ -54,6 +67,8 @@ where
     fn snapshot(&self) -> Self::Snapshot;
 }
 
+
+/// This trait enables the self type to checkpoint its state
 pub trait Checkpoint: Snapshot {
     /// Declare the DataStore instance available on the object
     fn get_store(&self) -> DataStore;
@@ -64,6 +79,7 @@ pub trait Checkpoint: Snapshot {
     }
 }
 
+/// Enable the self type to be reconstituted from the parameters coupled with the Snapshot
 #[async_trait]
 pub trait FromSnapshotWithParams: Snapshot {
     type Params: Send + 'static;
