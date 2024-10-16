@@ -11,16 +11,16 @@ pub struct CommitteeMeta {
     pub src_chain_id: u64,
 }
 
-pub struct CommitteMetaFeature;
+pub struct CommitteeMetaFeature;
 
-impl CommitteMetaFeature {
+impl CommitteeMetaFeature {
     pub fn create() -> Box<Self> {
         Box::new(Self {})
     }
 }
 
 #[async_trait]
-impl E3Feature for CommitteMetaFeature {
+impl E3Feature for CommitteeMetaFeature {
     fn on_event(&self, ctx: &mut crate::E3RequestContext, event: &EnclaveEvent) {
         let EnclaveEvent::E3Requested { data, .. } = event else {
             return;
