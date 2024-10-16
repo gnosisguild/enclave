@@ -13,3 +13,4 @@ enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
 sortition = { path = "../sortition" }
 data = { path = "../data" }
+tracing = { workspace = true }

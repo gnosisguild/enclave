@@ -150,7 +150,6 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .into_iter()
         .aggregate()?;
 
-    println!("&&&& {}", history[8].event_type());
     assert_eq!(history.len(), 9);
     assert_eq!(
         history,

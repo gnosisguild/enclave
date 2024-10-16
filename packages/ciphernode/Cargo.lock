@@ -122,6 +122,7 @@ dependencies = [
  "fhe 0.1.0",
  "serde",
  "sortition",
+ "tracing",
 ]
 
 [[package]]
@@ -2093,6 +2094,8 @@ dependencies = [
  "config",
  "enclave_node",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2224,6 +2227,7 @@ dependencies = [
  "futures-util",
  "sortition",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3822,6 +3826,7 @@ dependencies = [
  "actix",
  "base64 0.22.1",
  "enclave-core",
+ "tracing",
 ]
 
 [[package]]
@@ -5139,6 +5144,7 @@ dependencies = [
  "keyshare",
  "serde",
  "sortition",
+ "tracing",
 ]
 
 [[package]]
@@ -5629,6 +5635,7 @@ dependencies = [
  "enclave-core",
  "num",
  "rand",
+ "tracing",
 ]
 
 [[package]]
@@ -5818,6 +5825,7 @@ dependencies = [
  "fhe-traits",
  "rand",
  "rand_chacha",
+ "tracing",
 ]
 
 [[package]]

@@ -82,7 +82,8 @@ impl MainCiphernode {
         let e3_manager = E3RequestRouter::builder(bus.clone(), data.clone())
             .add_feature(FheFeature::create(rng))
             .add_feature(KeyshareFeature::create(bus.clone(), &address.to_string()))
-            .build().await?;
+            .build()
+            .await?;
 
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");

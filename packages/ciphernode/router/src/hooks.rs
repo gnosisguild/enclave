@@ -4,17 +4,16 @@ use aggregator::{
     PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState, PublicKeyAggregator,
     PublicKeyAggregatorParams, PublicKeyAggregatorState,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{FromSnapshotWithParams, Snapshot, WithPrefix};
-use enclave_core::{E3Requested, EnclaveEvent, EventBus};
+use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::{Keyshare, KeyshareParams};
 use sortition::Sortition;
 use std::sync::Arc;
 
 /// TODO: move these to each package with access on MyStruct::launcher()
-
 pub struct FheFeature {
     rng: SharedRng,
 }
@@ -92,6 +91,7 @@ impl E3Feature for KeyshareFeature {
         };
 
         let Some(fhe) = ctx.get_fhe() else {
+            self.bus.err(EnclaveErrorType::KeyGeneration, anyhow!("Could not create Keyshare because the fhe instance it depends on was not set on the context."));
             return;
         };
 
@@ -168,9 +168,13 @@ impl E3Feature for PlaintextAggregatorFeature {
             return;
         };
         let Some(fhe) = ctx.get_fhe() else {
+            self.   bus.err(EnclaveErrorType::PlaintextAggregation, anyhow!("Could not create PlaintextAggregator because the fhe instance it depends on was not set on the context."));
+
             return;
         };
         let Some(ref meta) = ctx.get_meta() else {
+            self. bus.err(EnclaveErrorType::PlaintextAggregation, anyhow!("Could not create PlaintextAggregator because the meta instance it depends on was not set on the context."));
+
             return;
         };
 
@@ -235,7 +239,7 @@ impl E3Feature for PlaintextAggregatorFeature {
         )
         .await?
         .start();
-        
+
         // send to context
         ctx.set_plaintext(value);
 
@@ -263,11 +267,11 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         let Some(fhe) = ctx.get_fhe() else {
-            println!("fhe was not on ctx");
+            self.bus.err(EnclaveErrorType::PublickeyAggregation, anyhow!("Could not create PublicKeyAggregator because the fhe instance it depends on was not set on the context."));
             return;
         };
         let Some(ref meta) = ctx.get_meta() else {
-            println!("meta was not on ctx");
+            self.bus.err(EnclaveErrorType::PublickeyAggregation, anyhow!("Could not create PublicKeyAggregator because the meta instance it depends on was not set on the context."));
             return;
         };
 
@@ -295,7 +299,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         ctx: &mut E3RequestContext,
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
-       // No ID on the snapshot -> bail
+        // No ID on the snapshot -> bail
         let Some(id) = snapshot.publickey.clone() else {
             return Ok(());
         };
@@ -327,7 +331,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         )
         .await?
         .start();
-        
+
         // send to context
         ctx.set_publickey(value);
 

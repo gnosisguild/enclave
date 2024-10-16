@@ -93,7 +93,8 @@ impl MainAggregator {
                 bus.clone(),
                 sortition.clone(),
             ))
-            .build().await?;
+            .build()
+            .await?;
 
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
