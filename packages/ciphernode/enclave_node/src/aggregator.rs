@@ -53,7 +53,7 @@ impl MainAggregator {
         ));
 
         let store = DataStore::from_in_mem(InMemDataStore::new(true).start());
-        let sortition = Sortition::attach(bus.clone());
+        let sortition = Sortition::attach(bus.clone(), store.clone());
         let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;
         for chain in config
             .chains

@@ -5632,9 +5632,12 @@ dependencies = [
  "actix",
  "alloy",
  "anyhow",
+ "async-trait",
+ "data",
  "enclave-core",
  "num",
  "rand",
+ "serde",
  "tracing",
 ]
 

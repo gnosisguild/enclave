@@ -59,7 +59,7 @@ impl MainCiphernode {
         let bus = EventBus::new(true).start();
         // TODO: switch to Sled actor
         let data = DataStore::from_in_mem(InMemDataStore::new(true).start());
-        let sortition = Sortition::attach(bus.clone());
+        let sortition = Sortition::attach(bus.clone(), data.clone());
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
