@@ -11,11 +11,17 @@ import "./tasks/enclave";
 
 dotenv.config();
 
-const { INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY } = process.env;
+const { INFURA_KEY, MNEMONIC, PRIVATE_KEY, ETHERSCAN_API_KEY } = process.env;
 
-if (!INFURA_KEY || !MNEMONIC || !ETHERSCAN_API_KEY) {
-  console.error(
-    "Please set the INFURA_KEY, MNEMONIC, and ETHERSCAN_API_KEY environment variables",
+if (!INFURA_KEY || !ETHERSCAN_API_KEY) {
+  console.warn(
+    "Please set the INFURA_KEY, and ETHERSCAN_API_KEY environment variables to deploy and verify contracts",
+  );
+}
+
+if (!MNEMONIC && !PRIVATE_KEY) {
+  console.warn(
+    "Please set a mnemonic or private key to deploy contracts. If you set neither, hardhat will use a default mnemonic",
   );
 }
 
@@ -49,12 +55,16 @@ function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
     default:
       jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
   }
+
+  let accounts;
+  if (PRIVATE_KEY) {
+    accounts = [PRIVATE_KEY];
+  } else {
+    accounts = { mnemonic };
+  }
+
   return {
-    accounts: {
-      count: 10,
-      mnemonic,
-      path: "m/44'/60'/0'/0",
-    },
+    accounts,
     chainId: chainIds[chain],
     url: jsonRpcUrl,
   };
