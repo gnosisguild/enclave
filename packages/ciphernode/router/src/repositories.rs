@@ -15,6 +15,13 @@ impl From<DataStore> for Repositories {
         Repositories { store: value }
     }
 }
+impl From<&DataStore> for Repositories {
+    fn from(value: &DataStore) -> Self {
+        Repositories {
+            store: value.clone(),
+        }
+    }
+}
 
 impl Repositories {
     pub fn new(store: DataStore) -> Self {
@@ -60,5 +67,22 @@ impl Repositories {
 
     pub fn sortition(&self) -> Repository<SortitionModule> {
         Repository::new(self.store.scope(format!("//sortition")))
+    }
+}
+
+pub trait RepositoriesFactory {
+    fn repositories(&self) -> Repositories;
+}
+
+impl RepositoriesFactory for DataStore {
+    fn repositories(&self) -> Repositories {
+        self.into()
+    }
+}
+
+impl<T> RepositoriesFactory for Repository<T> {
+    fn repositories(&self) -> Repositories {
+        let store:DataStore = self.clone().into();
+        store.repositories()
     }
 }

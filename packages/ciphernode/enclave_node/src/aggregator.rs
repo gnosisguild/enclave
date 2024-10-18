@@ -11,7 +11,7 @@ use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use router::{
     E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature,
-    Repositories,
+    RepositoriesFactory,
 };
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
@@ -56,7 +56,7 @@ impl MainAggregator {
         ));
 
         let store = DataStore::from_in_mem(InMemStore::new(true).start());
-        let repositories: Repositories = store.clone().into();
+        let repositories = store.repositories();
         let sortition = Sortition::attach(bus.clone(), repositories.sortition());
         let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;
         for chain in config

@@ -2,7 +2,7 @@ use crate::CommitteeMetaFeature;
 use crate::E3RequestContext;
 use crate::E3RequestContextParams;
 use crate::E3RequestContextSnapshot;
-use crate::Repositories;
+use crate::RepositoriesFactory;
 use actix::{Actor, Addr, Context, Handler};
 use anyhow::*;
 use async_trait::async_trait;
@@ -74,7 +74,7 @@ pub struct E3RequestRouterParams {
 
 impl E3RequestRouter {
     pub fn builder(bus: Addr<EventBus>, store: DataStore) -> E3RequestRouterBuilder {
-        let repositories: Repositories = store.into();
+        let repositories = store.repositories();
         let builder = E3RequestRouterBuilder {
             bus,
             features: vec![],
@@ -115,7 +115,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             return;
         }
 
-        let repositories: Repositories = self.repository().into();
+        let repositories = self.repository().repositories();
         let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
             E3RequestContext::from_params(E3RequestContextParams {
                 e3_id: e3_id.clone(),
@@ -187,7 +187,7 @@ impl FromSnapshotWithParams for E3RequestRouter {
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         let mut contexts = HashMap::new();
 
-        let repositories: Repositories = params.store.into();
+        let repositories = params.store.repositories();
         for e3_id in snapshot.contexts {
             let Some(ctx_snapshot) = repositories.context(&e3_id).read().await? else {
                 continue;
@@ -232,7 +232,7 @@ impl E3RequestRouterBuilder {
     }
 
     pub async fn build(self) -> Result<Addr<E3RequestRouter>> {
-        let repositories: Repositories = self.store.into();
+        let repositories = self.store.repositories();
         let router_repo = repositories.router();
         let snapshot: Option<E3RequestRouterSnapshot> = router_repo.read().await?;
         let params = E3RequestRouterParams {

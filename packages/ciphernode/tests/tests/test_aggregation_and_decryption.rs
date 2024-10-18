@@ -9,7 +9,7 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use router::{
     CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
-    PublicKeyAggregatorFeature, Repositories,
+    PublicKeyAggregatorFeature, Repositories, RepositoriesFactory,
 };
 use sortition::Sortition;
 
@@ -38,7 +38,7 @@ async fn setup_local_ciphernode(
     // create data actor for saving data
     let data_actor = InMemStore::new(logging).start(); // TODO: Use a sled backed Data Actor
     let store = DataStore::from_in_mem(data_actor);
-    let repositories: Repositories = store.clone().into();
+    let repositories = store.repositories();
 
     // create ciphernode actor for managing ciphernode flow
     let sortition = Sortition::attach(bus.clone(), repositories.sortition());

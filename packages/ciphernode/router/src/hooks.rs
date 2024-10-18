@@ -1,4 +1,4 @@
-use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
+use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot, RepositoriesFactory};
 use actix::{Actor, Addr};
 use aggregator::{
     PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState, PublicKeyAggregator,

@@ -8,7 +8,7 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, Repositories};
+use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, Repositories, RepositoriesFactory};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
@@ -59,7 +59,7 @@ impl MainCiphernode {
         let bus = EventBus::new(true).start();
         // TODO: switch to Sled actor
         let store = DataStore::from_in_mem(InMemStore::new(true).start());
-        let repositories: Repositories = store.clone().into();
+        let repositories = store.repositories();
 
         let sortition = Sortition::attach(bus.clone(), repositories.sortition());
         let selector =

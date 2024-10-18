@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{CommitteeMeta, E3Feature, EventBuffer, Repositories};
+use crate::{CommitteeMeta, E3Feature, EventBuffer, Repositories, RepositoriesFactory};
 use actix::{Addr, Recipient};
 use aggregator::{PlaintextAggregator, PublicKeyAggregator};
 use anyhow::Result;
@@ -82,10 +82,6 @@ impl E3RequestContext {
         });
     }
 
-    pub fn repositories(&self) -> Repositories {
-        self.repository().into()
-    }
-
     /// Accept a DataStore ID and a Keystore actor address
     pub fn set_keyshare(&mut self, value: Addr<Keyshare>) {
         self.keyshare = Some(value);
@@ -134,6 +130,12 @@ impl E3RequestContext {
 
     pub fn get_meta(&self) -> Option<&CommitteeMeta> {
         self.meta.as_ref()
+    }
+}
+
+impl RepositoriesFactory for E3RequestContext {
+    fn repositories(&self) -> Repositories {
+        self.repository().into()
     }
 }
 
