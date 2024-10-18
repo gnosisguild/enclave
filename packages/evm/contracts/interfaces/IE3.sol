@@ -8,6 +8,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 /// @title E3 struct
 /// @notice This struct represents an E3 computation.
 /// @param threshold M/N threshold for the committee.
+/// @param requestBlock Block number when the E3 was requested.
 /// @param startWindow Start window for the computation: index zero is minimum, index 1 is the maxium.
 /// @param duration Duration of the E3.
 /// @param expiration Timestamp when committee duties expire.
@@ -21,6 +22,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 struct E3 {
     uint256 seed;
     uint32[2] threshold;
+    uint256 requestBlock;
     uint256[2] startWindow;
     uint256 duration;
     uint256 expiration;

@@ -251,12 +251,17 @@ describe("CiphernodeRegistryOwnable", function () {
         .withArgs(notTheOwner.address);
     });
     it("removes the ciphernode from the registry", async function () {
-      const { registry, tree } = await loadFixture(setup);
+      const { registry } = await loadFixture(setup);
+      const tree = new LeanIMT(hash);
+      tree.insert(BigInt(AddressOne));
+      tree.insert(BigInt(AddressTwo));
       const index = tree.indexOf(BigInt(AddressOne));
       const proof = tree.generateProof(index);
+      tree.update(index, BigInt(0));
       expect(await registry.isEnabled(AddressOne)).to.be.true;
       expect(await registry.removeCiphernode(AddressOne, proof.siblings));
       expect(await registry.isEnabled(AddressOne)).to.be.false;
+      expect(await registry.root()).to.equal(tree.root);
     });
     it("decrements numCiphernodes", async function () {
       const { registry, tree } = await loadFixture(setup);
