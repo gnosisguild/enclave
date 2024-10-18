@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use anyhow::Result;
 use async_trait::async_trait;
-use data::{Checkpoint, DataStore, FromSnapshotWithParams, Snapshot};
+use data::{Checkpoint, FromSnapshotWithParams, Snapshot};
 use enclave_core::{
     DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
     Seed,
@@ -10,6 +10,8 @@ use fhe::{Fhe, GetAggregatePlaintext};
 use sortition::{GetHasNode, Sortition};
 use std::sync::Arc;
 use tracing::error;
+
+use crate::plaintext_repository::PlaintextAggregatorRepository;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PlaintextAggregatorState {
@@ -50,7 +52,7 @@ struct ComputeAggregate {
 pub struct PlaintextAggregator {
     fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
-    store: DataStore,
+    store: PlaintextAggregatorRepository,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: PlaintextAggregatorState,
@@ -60,7 +62,7 @@ pub struct PlaintextAggregator {
 pub struct PlaintextAggregatorParams {
     pub fhe: Arc<Fhe>,
     pub bus: Addr<EventBus>,
-    pub store: DataStore,
+    pub store: PlaintextAggregatorRepository,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub src_chain_id: u64,
@@ -236,7 +238,8 @@ impl FromSnapshotWithParams for PlaintextAggregator {
 }
 
 impl Checkpoint for PlaintextAggregator {
-    fn get_store(&self) -> data::DataStore {
+    type Repository = PlaintextAggregatorRepository;
+    fn get_store(&self) -> PlaintextAggregatorRepository {
         self.store.clone()
     }
 }

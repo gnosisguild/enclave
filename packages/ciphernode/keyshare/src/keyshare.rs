@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use data::{Checkpoint, DataStore, FromSnapshotWithParams, Snapshot};
+use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
     EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
@@ -10,9 +10,11 @@ use fhe::{DecryptCiphertext, Fhe};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::KeyshareRepository;
+
 pub struct Keyshare {
     fhe: Arc<Fhe>,
-    store: DataStore,
+    store: KeyshareRepository,
     bus: Addr<EventBus>,
     secret: Option<Vec<u8>>,
     address: String,
@@ -24,7 +26,7 @@ impl Actor for Keyshare {
 
 pub struct KeyshareParams {
     pub bus: Addr<EventBus>,
-    pub store: DataStore,
+    pub store: KeyshareRepository,
     pub fhe: Arc<Fhe>,
     pub address: String,
 }
@@ -57,7 +59,8 @@ impl Snapshot for Keyshare {
 }
 
 impl Checkpoint for Keyshare {
-    fn get_store(&self) -> DataStore {
+    type Repository = KeyshareRepository;
+    fn get_store(&self) -> KeyshareRepository {
         self.store.clone()
     }
 }

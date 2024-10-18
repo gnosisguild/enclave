@@ -1,15 +1,16 @@
 use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use actix::{Actor, Addr};
 use aggregator::{
-    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState, PublicKeyAggregator,
-    PublicKeyAggregatorParams, PublicKeyAggregatorState,
+    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorRepositoryFactory,
+    PlaintextAggregatorState, PublicKeyAggregator, PublicKeyAggregatorParams,
+    PublicKeyAggregatorRepositoryFactory, PublicKeyAggregatorState,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use data::{FromSnapshotWithParams, Snapshot};
+use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
-use fhe::{Fhe, SharedRng};
-use keyshare::{Keyshare, KeyshareParams};
+use fhe::{Fhe, FheRepositoryFactory, SharedRng};
+use keyshare::{Keyshare, KeyshareParams, KeyshareRepositoryFactory};
 use sortition::Sortition;
 use std::sync::Arc;
 
@@ -40,9 +41,8 @@ impl E3Feature for FheFeature {
         } = data.clone();
 
         // FHE doesn't implement Checkpoint so we are going to store it manually
-        let fhe_id = format!("//fhe/{e3_id}");
         let fhe = Arc::new(Fhe::from_encoded(&params, seed, self.rng.clone()).unwrap());
-        ctx.get_store().scope(&fhe_id).write(fhe.snapshot());
+        ctx.get_store().store().fhe(&e3_id).write(&fhe.snapshot());
         let _ = ctx.set_fhe(fhe);
     }
 
@@ -52,12 +52,12 @@ impl E3Feature for FheFeature {
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
         // No ID on the snapshot -> bail
-        let Some(id) = snapshot.fhe.clone() else {
+        if !snapshot.fhe {
             return Ok(());
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.scope(&id).read().await? else {
+        let Some(snap) = ctx.get_store().store().fhe(&ctx.e3_id).read().await? else {
             return Ok(());
         };
 
@@ -97,12 +97,10 @@ impl E3Feature for KeyshareFeature {
 
         let e3_id = data.clone().e3_id;
 
-        let ks_id = format!("//keystore/{e3_id}");
-
         let _ = ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
                 bus: self.bus.clone(),
-                store: ctx.get_store().scope(&ks_id),
+                store: ctx.get_store().store().keyshare(&e3_id),
                 fhe: fhe.clone(),
                 address: self.address.clone(),
             })
@@ -116,12 +114,14 @@ impl E3Feature for KeyshareFeature {
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
         // No ID on the snapshot -> bail
-        let Some(id) = snapshot.keyshare.clone() else {
+        if !snapshot.keyshare {
             return Ok(());
         };
 
+        let store = ctx.get_store().store().keyshare(&snapshot.e3_id);
+
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.scope(&id).read().await? else {
+        let Some(snap) = store.read().await? else {
             return Ok(());
         };
 
@@ -135,7 +135,7 @@ impl E3Feature for KeyshareFeature {
             KeyshareParams {
                 fhe,
                 bus: self.bus.clone(),
-                store: ctx.store.scope(&id),
+                store,
                 address: self.address.clone(),
             },
             snap,
@@ -180,14 +180,12 @@ impl E3Feature for PlaintextAggregatorFeature {
 
         let e3_id = data.e3_id.clone();
 
-        let id = &format!("//plaintext/{e3_id}");
-
         let _ = ctx.set_plaintext(
             PlaintextAggregator::new(
                 PlaintextAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.get_store().scope(id),
+                    store: ctx.get_store().store().plaintext(&e3_id),
                     sortition: self.sortition.clone(),
                     e3_id,
                     src_chain_id: meta.src_chain_id,
@@ -208,12 +206,14 @@ impl E3Feature for PlaintextAggregatorFeature {
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
         // No ID on the snapshot -> bail
-        let Some(id) = snapshot.plaintext.clone() else {
+        if !snapshot.plaintext {
             return Ok(());
-        };
+        }
+
+        let store = ctx.get_store().store().plaintext(&snapshot.e3_id);
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.scope(&id).read().await? else {
+        let Some(snap) = store.read().await? else {
             return Ok(());
         };
 
@@ -230,7 +230,7 @@ impl E3Feature for PlaintextAggregatorFeature {
             PlaintextAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
-                store: ctx.get_store().scope(&id),
+                store,
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 src_chain_id: meta.src_chain_id,
@@ -276,14 +276,13 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         let e3_id = data.e3_id.clone();
-        let id = &format!("//publickey/{e3_id}");
 
         let _ = ctx.set_publickey(
             PublicKeyAggregator::new(
                 PublicKeyAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.get_store().scope(id),
+                    store: ctx.get_store().store().publickey(&e3_id),
                     sortition: self.sortition.clone(),
                     e3_id,
                     src_chain_id: meta.src_chain_id,
@@ -300,12 +299,14 @@ impl E3Feature for PublicKeyAggregatorFeature {
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
         // No ID on the snapshot -> bail
-        let Some(id) = snapshot.publickey.clone() else {
+        if !snapshot.publickey {
             return Ok(());
         };
 
+        let repository = ctx.get_store().store().publickey(&ctx.e3_id);
+
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.scope(&id).read().await? else {
+        let Some(snap) = repository.read().await? else {
             return Ok(());
         };
 
@@ -322,7 +323,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
             PublicKeyAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
-                store: ctx.get_store().scope(&id),
+                store: repository,
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 src_chain_id: meta.src_chain_id,

@@ -1,6 +1,8 @@
+use crate::CommitteeMetaRepositoryFactory;
 use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use anyhow::*;
 use async_trait::async_trait;
+use data::{Checkpoint, Repository};
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -33,13 +35,12 @@ impl E3Feature for CommitteeMetaFeature {
         } = data.clone();
 
         // Meta doesn't implement Checkpoint so we are going to store it manually
-        let meta_id = format!("//meta/{e3_id}");
         let meta = CommitteeMeta {
             threshold_m,
             seed,
             src_chain_id,
         };
-        ctx.get_store().scope(&meta_id).write(meta.clone());
+        ctx.get_store().store().meta(&e3_id).write(&meta);
         let _ = ctx.set_meta(meta);
     }
 
@@ -49,12 +50,14 @@ impl E3Feature for CommitteeMetaFeature {
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
         // No ID on the snapshot -> bail
-        let Some(id) = snapshot.meta.clone() else {
+        if !snapshot.meta {
             return Ok(());
         };
 
+        let repository = ctx.get_store().store().meta(&ctx.e3_id);
+
         // No Snapshot returned from the store -> bail
-        let Some(value) = ctx.store.scope(&id).read().await? else {
+        let Some(value) = repository.read().await? else {
             return Ok(());
         };
 

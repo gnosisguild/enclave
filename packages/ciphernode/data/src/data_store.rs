@@ -33,6 +33,7 @@ impl Get {
     }
 }
 
+/// Generate proxy for the DB
 #[derive(Clone)]
 pub struct DataStore {
     scope: Vec<u8>,

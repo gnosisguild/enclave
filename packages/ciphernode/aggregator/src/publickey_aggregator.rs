@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use anyhow::Result;
 use async_trait::async_trait;
-use data::{Checkpoint, DataStore, FromSnapshotWithParams, Snapshot};
+use data::{Checkpoint, FromSnapshotWithParams, Snapshot};
 use enclave_core::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
@@ -9,6 +9,8 @@ use fhe::{Fhe, GetAggregatePublicKey};
 use sortition::{GetHasNode, GetNodes, Sortition};
 use std::sync::Arc;
 use tracing::error;
+
+use crate::PublicKeyAggregatorRepository;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
@@ -53,7 +55,7 @@ struct NotifyNetwork {
 pub struct PublicKeyAggregator {
     fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
-    store: DataStore,
+    store: PublicKeyAggregatorRepository,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: PublicKeyAggregatorState,
@@ -63,7 +65,7 @@ pub struct PublicKeyAggregator {
 pub struct PublicKeyAggregatorParams {
     pub fhe: Arc<Fhe>,
     pub bus: Addr<EventBus>,
-    pub store: DataStore,
+    pub store: PublicKeyAggregatorRepository,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub src_chain_id: u64,
@@ -261,7 +263,8 @@ impl FromSnapshotWithParams for PublicKeyAggregator {
 }
 
 impl Checkpoint for PublicKeyAggregator {
-    fn get_store(&self) -> data::DataStore {
+    type Repository = PublicKeyAggregatorRepository;
+    fn get_store(&self) -> PublicKeyAggregatorRepository {
         self.store.clone()
     }
 }

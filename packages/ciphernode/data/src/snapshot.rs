@@ -1,4 +1,4 @@
-use crate::DataStore;
+use crate::{DataStore, Repository};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
@@ -19,12 +19,13 @@ where
 
 /// This trait enables the self type to checkpoint its state
 pub trait Checkpoint: Snapshot {
+    type Repository: Repository<State = Self::Snapshot>;
     /// Declare the DataStore instance available on the object
-    fn get_store(&self) -> DataStore;
+    fn get_store(&self) -> Self::Repository;
 
     /// Write the current snapshot to the DataStore provided by `get_store()` at the object's id returned by `get_id()`
     fn checkpoint(&self) {
-        self.get_store().write(self.snapshot());
+        self.get_store().write(&self.snapshot());
     }
 }
 
