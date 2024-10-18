@@ -1,7 +1,7 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use anyhow::Result;
-use data::{DataStore, InMemDataStore};
+use data::{DataStore, InMemStore};
 use enclave_core::EventBus;
 use evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use logger::SimpleLogger;
@@ -58,7 +58,7 @@ impl MainCiphernode {
         ));
         let bus = EventBus::new(true).start();
         // TODO: switch to Sled actor
-        let data = DataStore::from_in_mem(InMemDataStore::new(true).start());
+        let data = DataStore::from_in_mem(InMemStore::new(true).start());
         let sortition = Sortition::attach(bus.clone(), data.clone());
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());

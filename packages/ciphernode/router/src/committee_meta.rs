@@ -1,7 +1,6 @@
 use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use anyhow::*;
 use async_trait::async_trait;
-use data::WithPrefix;
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -40,7 +39,7 @@ impl E3Feature for CommitteeMetaFeature {
             seed,
             src_chain_id,
         };
-        ctx.get_store().at(&meta_id).write(meta.clone());
+        ctx.get_store().scope(&meta_id).write(meta.clone());
         let _ = ctx.set_meta(meta);
     }
 
@@ -55,7 +54,7 @@ impl E3Feature for CommitteeMetaFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(value) = ctx.store.read_at(&id).await? else {
+        let Some(value) = ctx.store.scope(&id).read().await? else {
             return Ok(());
         };
 

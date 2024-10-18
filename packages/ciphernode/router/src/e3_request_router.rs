@@ -1,4 +1,4 @@
-use crate::CommitteMetaFeature;
+use crate::CommitteeMetaFeature;
 
 use super::CommitteeMeta;
 use actix::{Actor, Addr, Context, Handler, Recipient};
@@ -10,7 +10,6 @@ use data::Checkpoint;
 use data::DataStore;
 use data::FromSnapshotWithParams;
 use data::Snapshot;
-use data::WithPrefix;
 use enclave_core::E3RequestComplete;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use fhe::Fhe;
@@ -18,7 +17,6 @@ use keyshare::Keyshare;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
-use std::pin::Pin;
 use std::{collections::HashMap, sync::Arc};
 
 /// Helper class to buffer events for downstream instances incase events arrive in the wrong order
@@ -269,7 +267,7 @@ impl E3RequestRouter {
         };
 
         // Everything needs the committe meta factory so adding it here by default
-        builder.add_feature(CommitteMetaFeature::create())
+        builder.add_feature(CommitteeMetaFeature::create())
     }
 
     pub fn from_params(params: E3RequestRouterParams) -> Self {
@@ -305,7 +303,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
         let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
             E3RequestContext::from_params(E3RequestContextParams {
                 e3_id: e3_id.clone(),
-                store: self.store.at(&format!("//context/{e3_id}")),
+                store: self.store.scope(&format!("//context/{e3_id}")),
                 features: self.features.clone(),
             })
         });
@@ -373,7 +371,12 @@ impl FromSnapshotWithParams for E3RequestRouter {
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         let mut contexts = HashMap::new();
         for e3_id in snapshot.contexts {
-            let Some(ctx_snapshot) = params.store.read(format!("//context/{e3_id}")).await? else {
+            let Some(ctx_snapshot) = params
+                .store
+                .base(format!("//context/{e3_id}"))
+                .read()
+                .await?
+            else {
                 continue;
             };
 
@@ -416,7 +419,7 @@ impl E3RequestRouterBuilder {
     }
 
     pub async fn build(self) -> Result<Addr<E3RequestRouter>> {
-        let snapshot: Option<E3RequestRouterSnapshot> = self.store.read_at("//router").await?;
+        let snapshot: Option<E3RequestRouterSnapshot> = self.store.base("//router").read().await?;
         let params = E3RequestRouterParams {
             features: self.features.into(),
             bus: self.bus.clone(),

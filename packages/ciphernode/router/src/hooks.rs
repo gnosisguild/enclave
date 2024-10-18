@@ -6,7 +6,7 @@ use aggregator::{
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use data::{FromSnapshotWithParams, Snapshot, WithPrefix};
+use data::{FromSnapshotWithParams, Snapshot};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::{Keyshare, KeyshareParams};
@@ -42,7 +42,7 @@ impl E3Feature for FheFeature {
         // FHE doesn't implement Checkpoint so we are going to store it manually
         let fhe_id = format!("//fhe/{e3_id}");
         let fhe = Arc::new(Fhe::from_encoded(&params, seed, self.rng.clone()).unwrap());
-        ctx.get_store().at(&fhe_id).write(fhe.snapshot());
+        ctx.get_store().scope(&fhe_id).write(fhe.snapshot());
         let _ = ctx.set_fhe(fhe);
     }
 
@@ -57,7 +57,7 @@ impl E3Feature for FheFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.read_at(&id).await? else {
+        let Some(snap) = ctx.store.scope(&id).read().await? else {
             return Ok(());
         };
 
@@ -102,7 +102,7 @@ impl E3Feature for KeyshareFeature {
         let _ = ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
                 bus: self.bus.clone(),
-                store: ctx.get_store().at(&ks_id),
+                store: ctx.get_store().scope(&ks_id),
                 fhe: fhe.clone(),
                 address: self.address.clone(),
             })
@@ -121,7 +121,7 @@ impl E3Feature for KeyshareFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.read_at(&id).await? else {
+        let Some(snap) = ctx.store.scope(&id).read().await? else {
             return Ok(());
         };
 
@@ -135,7 +135,7 @@ impl E3Feature for KeyshareFeature {
             KeyshareParams {
                 fhe,
                 bus: self.bus.clone(),
-                store: ctx.store.at(&id),
+                store: ctx.store.scope(&id),
                 address: self.address.clone(),
             },
             snap,
@@ -187,7 +187,7 @@ impl E3Feature for PlaintextAggregatorFeature {
                 PlaintextAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.get_store().at(id),
+                    store: ctx.get_store().scope(id),
                     sortition: self.sortition.clone(),
                     e3_id,
                     src_chain_id: meta.src_chain_id,
@@ -213,7 +213,7 @@ impl E3Feature for PlaintextAggregatorFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.read_at(&id).await? else {
+        let Some(snap) = ctx.store.scope(&id).read().await? else {
             return Ok(());
         };
 
@@ -230,7 +230,7 @@ impl E3Feature for PlaintextAggregatorFeature {
             PlaintextAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
-                store: ctx.get_store().at(&id),
+                store: ctx.get_store().scope(&id),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 src_chain_id: meta.src_chain_id,
@@ -283,7 +283,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
                 PublicKeyAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.get_store().at(id),
+                    store: ctx.get_store().scope(id),
                     sortition: self.sortition.clone(),
                     e3_id,
                     src_chain_id: meta.src_chain_id,
@@ -305,7 +305,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.store.read_at(&id).await? else {
+        let Some(snap) = ctx.store.scope(&id).read().await? else {
             return Ok(());
         };
 
@@ -322,7 +322,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
             PublicKeyAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
-                store: ctx.get_store().at(&id),
+                store: ctx.get_store().scope(&id),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 src_chain_id: meta.src_chain_id,

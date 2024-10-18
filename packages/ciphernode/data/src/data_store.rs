@@ -1,111 +1,7 @@
-use crate::InMemDataStore;
+use crate::{InMemStore, IntoKey};
 use actix::{Addr, Message, Recipient};
-use anyhow::{anyhow, Result};
-use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-/// This trait allows our keys to be responsive to multiple inputs
-pub trait IntoKey {
-    fn into_key(self) -> Vec<u8>;
-}
-
-/// Keys can be vectors of String
-impl IntoKey for Vec<String> {
-    fn into_key(self) -> Vec<u8> {
-        self.join("/").into_bytes()
-    }
-}
-
-/// Keys can be vectors of &str
-impl<'a> IntoKey for Vec<&'a str> {
-    fn into_key(self) -> Vec<u8> {
-        self.join("/").into_bytes()
-    }
-}
-
-/// Keys can be String
-impl IntoKey for String {
-    fn into_key(self) -> Vec<u8> {
-        self.into_bytes()
-    }
-}
-
-/// Keys can be &String
-impl IntoKey for &String {
-    fn into_key(self) -> Vec<u8> {
-        self.as_bytes().to_vec()
-    }
-}
-
-/// Keys can be &str
-impl<'a> IntoKey for &'a str {
-    fn into_key(self) -> Vec<u8> {
-        self.as_bytes().to_vec()
-    }
-}
-
-/// Trait to add a prefix to a data storage object. This is used as a recursive trait for setting
-/// scope on data objects which include the Get ad Insert commands for the data store
-pub trait WithPrefix: Sized {
-    fn prefix(&self, prefix: &str) -> Self;
-    fn at(&self, key: &str) -> Self;
-}
-
-/// This trait enables the self type to report their state snapshot
-pub trait Snapshot
-where
-    Self: Sized,
-{
-    /// The Snapshot should represent all the dynamic data managed within the Actor or Object
-    ///
-    /// The state must be serializable so that it can be stored as a value
-    type Snapshot: Serialize + DeserializeOwned;
-
-    /// Return the Snapshot object for the implementor
-    fn snapshot(&self) -> Self::Snapshot;
-}
-
-/// This trait enables the self type to checkpoint its state
-pub trait Checkpoint: Snapshot {
-    /// Declare the DataStore instance available on the object
-    fn get_store(&self) -> DataStore;
-
-    /// Write the current snapshot to the DataStore provided by `get_store()` at the object's id returned by `get_id()`
-    fn checkpoint(&self) {
-        self.get_store().write(self.snapshot());
-    }
-}
-
-/// Enable the self type to be reconstituted from the parameters coupled with the Snapshot
-#[async_trait]
-pub trait FromSnapshotWithParams: Snapshot {
-    type Params: Send + 'static;
-
-    /// Return an instance of the persistable object at the state given by the snapshot
-    /// This method is async because there may be subobjects that require hydration from the store
-    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self>;
-}
-
-#[async_trait]
-pub trait FromSnapshot: Snapshot {
-    /// Return an instance of the persistable object at the state given by the snapshot
-    /// This method is async because there may be subobjects that require hydration from the store
-    async fn from_snapshot(snapshot: Self::Snapshot) -> Result<Self>;
-}
-
-impl WithPrefix for Vec<u8> {
-    fn prefix(&self, prefix: &str) -> Self {
-        let Ok(encoded) = String::from_utf8(self.clone()) else {
-            // If this is not encoded as utf8 do nothing
-            return self.clone();
-        };
-        vec![prefix.to_string(), encoded].join("/").into_bytes()
-    }
-
-    fn at(&self, key: &str) -> Self {
-        key.to_string().into_bytes()
-    }
-}
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "()")]
@@ -124,16 +20,6 @@ impl Insert {
     }
 }
 
-impl WithPrefix for Insert {
-    fn prefix(&self, prefix: &str) -> Self {
-        Insert(self.0.prefix(prefix), self.1.clone())
-    }
-
-    fn at(&self, key: &str) -> Self {
-        Insert(self.0.at(key), self.1.clone())
-    }
-}
-
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Option<Vec<u8>>")]
 pub struct Get(pub Vec<u8>);
@@ -147,102 +33,87 @@ impl Get {
     }
 }
 
-impl WithPrefix for Get {
-    fn prefix(&self, prefix: &str) -> Self {
-        Get(self.0.prefix(prefix))
-    }
-    fn at(&self, key: &str) -> Self {
-        Get(self.0.at(key))
-    }
-}
-
 #[derive(Clone)]
 pub struct DataStore {
-    prefix: Option<String>,
+    scope: Vec<u8>,
     get: Recipient<Get>,
     insert: Recipient<Insert>,
 }
 
 impl DataStore {
-    pub async fn read<K, T>(&self, key: K) -> Result<Option<T>>
+    /// Read data at the scope location
+    pub async fn read<T>(&self) -> Result<Option<T>>
     where
-        K: IntoKey,
         T: for<'de> Deserialize<'de>,
     {
-        let msg = Get::new(key);
-        let msg = self.prefix.as_ref().map_or(msg.clone(), |p| msg.prefix(p));
-        let maybe_bytes = self.get.send(msg).await?;
-        let Some(bytes) = maybe_bytes else {
+        let Some(bytes) = self.get.send(Get::new(&self.scope)).await? else {
             return Ok(None);
         };
 
         Ok(Some(bincode::deserialize(&bytes)?))
     }
 
-    /// Writes anything serializable to the KV actor as a stream of bytes
-    pub fn set<K: IntoKey, V: Serialize>(&self, key: K, value: V) {
+    /// Writes data to the scope location
+    pub fn write<T: Serialize>(&self, value: T) {
         let Ok(serialized) = bincode::serialize(&value) else {
             return;
         };
-        let msg = Insert::new(key, serialized);
-        let msg = self.prefix.as_ref().map_or(msg.clone(), |p| msg.prefix(p));
+        let msg = Insert::new(&self.scope, serialized);
         self.insert.do_send(msg)
     }
 
-    /// Writes to whatever the prefix is set to on the datastore
-    pub fn write<V: Serialize>(&self, value: V) {
-        self.set("", value)
-    }
-
-    /// Read the value of the key starting at the root
-    pub async fn read_at<K, T>(&self, key: K) -> Result<Option<T>>
-    where
-        K: IntoKey,
-        T: for<'de> Deserialize<'de>,
-    {
-        self.at("").read(key).await
-    }
-
-    // use this for testing
-    pub fn from_in_mem(addr: Addr<InMemDataStore>) -> Self {
+    /// Construct a data store from an InMemStore actor
+    pub fn from_in_mem(addr: Addr<InMemStore>) -> Self {
         Self {
             get: addr.clone().recipient(),
             insert: addr.clone().recipient(),
-            prefix: None,
+            scope: vec![],
         }
     }
 
-    pub fn ensure_root_id(str: &str) -> Result<()> {
-        if !str.starts_with("/") {
-            return Err(anyhow!("string doesnt start with slash."));
-        }
-        Ok(())
+    /// Get the scope as a string
+    pub fn get_scope(&self) -> Result<String> {
+        Ok(String::from_utf8(self.scope.clone())?)
     }
 
-    // // use this for production
-    // pub fn from_sled(&data_addr: Addr<SledDb>) -> Self {
-    //   let d = data_addr.clone();
-    //   Self(d.recipient(),d.recipient())
-    // }
-}
-
-impl WithPrefix for DataStore {
-    fn prefix(&self, prefix: &str) -> Self {
+    /// Changes the scope for the data store.
+    /// Note that if the scope does not start with a slash one is appended.
+    /// ```
+    /// use data::DataStore;
+    /// use data::InMemStore;
+    /// use actix::Actor;
+    /// use anyhow::Result;
+    ///
+    /// #[actix_rt::main]
+    /// async fn main() -> Result<()>{  
+    ///   let addr = InMemStore::new(false).start();
+    ///   let store = DataStore::from_in_mem(addr);
+    ///   assert_eq!(store.base("//foo")
+    ///     .scope("bar")
+    ///     .scope("/baz")
+    ///     .get_scope()?, "//foo/bar/baz");
+    ///   Ok(())
+    /// }
+    /// ```
+    pub fn scope<K: IntoKey>(&self, key: K) -> Self {
+        let mut scope = self.scope.clone();
+        let encoded_key = key.into_key();
+        if !encoded_key.starts_with(&[b'/']) {
+            scope.extend("/".into_key());
+        }
+        scope.extend(encoded_key);
         Self {
             get: self.get.clone(),
             insert: self.insert.clone(),
-            prefix: self.prefix.clone().map_or_else(
-                || Some(prefix.to_string()),
-                |p| Some(vec![prefix.to_string(), p].join("/")),
-            ),
+            scope,
         }
     }
 
-    fn at(&self, key: &str) -> Self {
+    pub fn base<K: IntoKey>(&self, key: K) -> Self {
         Self {
             get: self.get.clone(),
             insert: self.insert.clone(),
-            prefix: Some(key.to_string()),
+            scope: key.into_key(),
         }
     }
 }

@@ -1,4 +1,4 @@
-use data::{DataStore, InMemDataStore};
+use data::{DataStore, InMemStore};
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated,
@@ -36,7 +36,7 @@ async fn setup_local_ciphernode(
     addr: &str,
 ) -> Result<()> {
     // create data actor for saving data
-    let data_actor = InMemDataStore::new(logging).start(); // TODO: Use a sled backed Data Actor
+    let data_actor = InMemStore::new(logging).start(); // TODO: Use a sled backed Data Actor
     let store = DataStore::from_in_mem(data_actor);
 
     // create ciphernode actor for managing ciphernode flow

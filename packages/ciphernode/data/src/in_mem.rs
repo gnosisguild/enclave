@@ -12,17 +12,17 @@ pub enum DataOp {
     Insert(Insert),
 }
 
-pub struct InMemDataStore {
+pub struct InMemStore {
     db: BTreeMap<Vec<u8>, Vec<u8>>,
     log: Vec<DataOp>,
     capture: bool,
 }
 
-impl Actor for InMemDataStore {
+impl Actor for InMemStore {
     type Context = Context<Self>;
 }
 
-impl InMemDataStore {
+impl InMemStore {
     pub fn new(capture: bool) -> Self {
         Self {
             db: BTreeMap::new(),
@@ -32,7 +32,7 @@ impl InMemDataStore {
     }
 }
 
-impl Handler<Insert> for InMemDataStore {
+impl Handler<Insert> for InMemStore {
     type Result = ();
     fn handle(&mut self, event: Insert, _: &mut Self::Context) {
         // insert data into sled
@@ -44,7 +44,7 @@ impl Handler<Insert> for InMemDataStore {
     }
 }
 
-impl Handler<Get> for InMemDataStore {
+impl Handler<Get> for InMemStore {
     type Result = Option<Vec<u8>>;
     fn handle(&mut self, event: Get, _: &mut Self::Context) -> Option<Vec<u8>> {
         let key = event.key();
@@ -52,7 +52,7 @@ impl Handler<Get> for InMemDataStore {
     }
 }
 
-impl Handler<GetLog> for InMemDataStore {
+impl Handler<GetLog> for InMemStore {
     type Result = Vec<DataOp>;
     fn handle(&mut self, _: GetLog, _: &mut Self::Context) -> Vec<DataOp> {
         self.log.clone()
