@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use crate::{CommitteeMeta, E3ContextRepository, E3Feature, EventBuffer};
+use crate::{CommitteeMeta, E3Feature, EventBuffer, Repositories};
 use actix::{Addr, Recipient};
 use aggregator::{PlaintextAggregator, PublicKeyAggregator};
 use anyhow::Result;
 use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Snapshot};
+use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{E3id, EnclaveEvent};
 use fhe::Fhe;
 use keyshare::Keyshare;
@@ -20,7 +20,7 @@ pub struct E3RequestContext {
     pub plaintext: Option<Addr<PlaintextAggregator>>,
     pub publickey: Option<Addr<PublicKeyAggregator>>,
     pub meta: Option<CommitteeMeta>,
-    pub store: E3ContextRepository,
+    pub store: Repository<E3RequestContextSnapshot>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -34,7 +34,7 @@ pub struct E3RequestContextSnapshot {
 }
 
 pub struct E3RequestContextParams {
-    pub store: E3ContextRepository,
+    pub store: Repository<E3RequestContextSnapshot>,
     pub e3_id: E3id,
     pub features: Arc<Vec<Box<dyn E3Feature>>>,
 }
@@ -80,6 +80,10 @@ impl E3RequestContext {
                 buffer.add(&key, msg.clone());
             }
         });
+    }
+
+    pub fn repositories(&self) -> Repositories {
+        self.repository().into()
     }
 
     /// Accept a DataStore ID and a Keystore actor address
@@ -172,8 +176,7 @@ impl FromSnapshotWithParams for E3RequestContext {
 }
 
 impl Checkpoint for E3RequestContext {
-    type Repository = E3ContextRepository;
-    fn get_store(&self) -> E3ContextRepository {
+    fn repository(&self) -> Repository<E3RequestContextSnapshot> {
         self.store.clone()
     }
 }

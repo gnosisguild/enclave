@@ -9,8 +9,11 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
-use sortition::{Sortition, SortitionRepositoryFactory};
+use router::{
+    E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature,
+    Repositories,
+};
+use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
@@ -53,7 +56,8 @@ impl MainAggregator {
         ));
 
         let store = DataStore::from_in_mem(InMemStore::new(true).start());
-        let sortition = Sortition::attach(bus.clone(), store.sortition());
+        let repositories: Repositories = store.clone().into();
+        let sortition = Sortition::attach(bus.clone(), repositories.sortition());
         let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;
         for chain in config
             .chains

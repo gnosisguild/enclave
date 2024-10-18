@@ -10,11 +10,9 @@ use fhe::{DecryptCiphertext, Fhe};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::KeyshareRepository;
-
 pub struct Keyshare {
     fhe: Arc<Fhe>,
-    store: KeyshareRepository,
+    store: Repository<KeyshareState>,
     bus: Addr<EventBus>,
     secret: Option<Vec<u8>>,
     address: String,
@@ -26,7 +24,7 @@ impl Actor for Keyshare {
 
 pub struct KeyshareParams {
     pub bus: Addr<EventBus>,
-    pub store: KeyshareRepository,
+    pub store: Repository<KeyshareState>,
     pub fhe: Arc<Fhe>,
     pub address: String,
 }
@@ -59,8 +57,7 @@ impl Snapshot for Keyshare {
 }
 
 impl Checkpoint for Keyshare {
-    type Repository = KeyshareRepository;
-    fn get_store(&self) -> KeyshareRepository {
+    fn repository(&self) -> Repository<KeyshareState>{
         self.store.clone()
     }
 }

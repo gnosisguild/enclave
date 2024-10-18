@@ -1,10 +1,8 @@
 use crate::CommitteeMetaFeature;
-use crate::E3ContextRepositoryFactory;
 use crate::E3RequestContext;
 use crate::E3RequestContextParams;
 use crate::E3RequestContextSnapshot;
-use crate::E3RouterRepository;
-use crate::E3RouterRepositoryFactory;
+use crate::Repositories;
 use actix::{Actor, Addr, Context, Handler};
 use anyhow::*;
 use async_trait::async_trait;
@@ -65,21 +63,22 @@ pub struct E3RequestRouter {
     features: Arc<Vec<Box<dyn E3Feature>>>,
     buffer: EventBuffer,
     bus: Addr<EventBus>,
-    store: E3RouterRepository,
+    store: Repository<E3RequestRouterSnapshot>,
 }
 
 pub struct E3RequestRouterParams {
     features: Arc<Vec<Box<dyn E3Feature>>>,
     bus: Addr<EventBus>,
-    store: E3RouterRepository,
+    store: Repository<E3RequestRouterSnapshot>,
 }
 
 impl E3RequestRouter {
     pub fn builder(bus: Addr<EventBus>, store: DataStore) -> E3RequestRouterBuilder {
+        let repositories: Repositories = store.into();
         let builder = E3RequestRouterBuilder {
             bus,
             features: vec![],
-            store: store.router(),
+            store: repositories.router(),
         };
 
         // Everything needs the committe meta factory so adding it here by default
@@ -115,11 +114,12 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             // TODO: Log warning that e3 event was received for completed e3_id
             return;
         }
-        let store = self.get_store().store();
+
+        let repositories: Repositories = self.repository().into();
         let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
             E3RequestContext::from_params(E3RequestContextParams {
                 e3_id: e3_id.clone(),
-                store: store.context(&e3_id),
+                store: repositories.context(&e3_id),
                 features: self.features.clone(),
             })
         });
@@ -175,8 +175,7 @@ impl Snapshot for E3RequestRouter {
 }
 
 impl Checkpoint for E3RequestRouter {
-    type Repository = E3RouterRepository;
-    fn get_store(&self) -> E3RouterRepository {
+    fn repository(&self) -> Repository<E3RequestRouterSnapshot> {
         self.store.clone()
     }
 }
@@ -187,9 +186,10 @@ impl FromSnapshotWithParams for E3RequestRouter {
 
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         let mut contexts = HashMap::new();
-        let store = params.store.store();
+
+        let repositories: Repositories = params.store.into();
         for e3_id in snapshot.contexts {
-            let Some(ctx_snapshot) = store.context(&e3_id).read().await? else {
+            let Some(ctx_snapshot) = repositories.context(&e3_id).read().await? else {
                 continue;
             };
 
@@ -197,7 +197,7 @@ impl FromSnapshotWithParams for E3RequestRouter {
                 e3_id.clone(),
                 E3RequestContext::from_snapshot(
                     E3RequestContextParams {
-                        store: store.context(&e3_id),
+                        store: repositories.context(&e3_id),
                         e3_id: e3_id.clone(),
                         features: params.features.clone(),
                     },
@@ -213,7 +213,7 @@ impl FromSnapshotWithParams for E3RequestRouter {
             features: params.features.into(),
             buffer: EventBuffer::default(),
             bus: params.bus,
-            store: params.store,
+            store: repositories.router(),
         })
     }
 }
@@ -222,7 +222,7 @@ impl FromSnapshotWithParams for E3RequestRouter {
 pub struct E3RequestRouterBuilder {
     pub bus: Addr<EventBus>,
     pub features: Vec<Box<dyn E3Feature>>,
-    pub store: E3RouterRepository,
+    pub store: Repository<E3RequestRouterSnapshot>,
 }
 
 impl E3RequestRouterBuilder {
@@ -232,12 +232,14 @@ impl E3RequestRouterBuilder {
     }
 
     pub async fn build(self) -> Result<Addr<E3RequestRouter>> {
-        let snapshot: Option<E3RequestRouterSnapshot> = self.store.store().router().read().await?;
+        let repositories: Repositories = self.store.into();
+        let router_repo = repositories.router();
+        let snapshot: Option<E3RequestRouterSnapshot> = router_repo.read().await?;
         let params = E3RequestRouterParams {
             features: self.features.into(),
             bus: self.bus.clone(),
 
-            store: self.store,
+            store: router_repo,
         };
 
         let e3r = match snapshot {

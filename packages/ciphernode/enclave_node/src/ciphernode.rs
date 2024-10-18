@@ -8,8 +8,8 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature};
-use sortition::{Sortition, SortitionRepositoryFactory};
+use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, Repositories};
+use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
@@ -58,8 +58,10 @@ impl MainCiphernode {
         ));
         let bus = EventBus::new(true).start();
         // TODO: switch to Sled actor
-        let data = DataStore::from_in_mem(InMemStore::new(true).start());
-        let sortition = Sortition::attach(bus.clone(), data.sortition());
+        let store = DataStore::from_in_mem(InMemStore::new(true).start());
+        let repositories: Repositories = store.clone().into();
+
+        let sortition = Sortition::attach(bus.clone(), repositories.sortition());
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
@@ -79,7 +81,7 @@ impl MainCiphernode {
             .await?;
         }
 
-        let e3_manager = E3RequestRouter::builder(bus.clone(), data.clone())
+        let e3_manager = E3RequestRouter::builder(bus.clone(), store.clone())
             .add_feature(FheFeature::create(rng))
             .add_feature(KeyshareFeature::create(bus.clone(), &address.to_string()))
             .build()
@@ -91,7 +93,7 @@ impl MainCiphernode {
         let nm = format!("CIPHER({})", &address.to_string()[0..5]);
         SimpleLogger::attach(&nm, bus.clone());
         let main_addr = MainCiphernode::new(
-            address, bus, data, sortition, selector, p2p_addr, e3_manager,
+            address, bus, store, sortition, selector, p2p_addr, e3_manager,
         )
         .start();
         Ok((main_addr, join_handle))

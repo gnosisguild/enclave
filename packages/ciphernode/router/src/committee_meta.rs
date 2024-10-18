@@ -1,8 +1,6 @@
-use crate::CommitteeMetaRepositoryFactory;
 use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use anyhow::*;
 use async_trait::async_trait;
-use data::{Checkpoint, Repository};
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -40,7 +38,7 @@ impl E3Feature for CommitteeMetaFeature {
             seed,
             src_chain_id,
         };
-        ctx.get_store().store().meta(&e3_id).write(&meta);
+        ctx.repositories().meta(&e3_id).write(&meta);
         let _ = ctx.set_meta(meta);
     }
 
@@ -54,7 +52,7 @@ impl E3Feature for CommitteeMetaFeature {
             return Ok(());
         };
 
-        let repository = ctx.get_store().store().meta(&ctx.e3_id);
+        let repository = ctx.repositories().meta(&ctx.e3_id);
 
         // No Snapshot returned from the store -> bail
         let Some(value) = repository.read().await? else {

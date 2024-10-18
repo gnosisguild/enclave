@@ -19,13 +19,12 @@ where
 
 /// This trait enables the self type to checkpoint its state
 pub trait Checkpoint: Snapshot {
-    type Repository: Repository<State = Self::Snapshot>;
     /// Declare the DataStore instance available on the object
-    fn get_store(&self) -> Self::Repository;
+    fn repository(&self) -> Repository<Self::Snapshot>;
 
     /// Write the current snapshot to the DataStore provided by `get_store()` at the object's id returned by `get_id()`
     fn checkpoint(&self) {
-        self.get_store().write(&self.snapshot());
+        self.repository().write(&self.snapshot());
     }
 }
 

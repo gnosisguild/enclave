@@ -1,16 +1,16 @@
 use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use actix::{Actor, Addr};
 use aggregator::{
-    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorRepositoryFactory,
+    PlaintextAggregator, PlaintextAggregatorParams,
     PlaintextAggregatorState, PublicKeyAggregator, PublicKeyAggregatorParams,
-    PublicKeyAggregatorRepositoryFactory, PublicKeyAggregatorState,
+     PublicKeyAggregatorState,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
+use data::{ FromSnapshotWithParams, Snapshot};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
-use fhe::{Fhe, FheRepositoryFactory, SharedRng};
-use keyshare::{Keyshare, KeyshareParams, KeyshareRepositoryFactory};
+use fhe::{Fhe, SharedRng};
+use keyshare::{Keyshare, KeyshareParams};
 use sortition::Sortition;
 use std::sync::Arc;
 
@@ -42,7 +42,7 @@ impl E3Feature for FheFeature {
 
         // FHE doesn't implement Checkpoint so we are going to store it manually
         let fhe = Arc::new(Fhe::from_encoded(&params, seed, self.rng.clone()).unwrap());
-        ctx.get_store().store().fhe(&e3_id).write(&fhe.snapshot());
+        ctx.repositories().fhe(&e3_id).write(&fhe.snapshot());
         let _ = ctx.set_fhe(fhe);
     }
 
@@ -57,7 +57,7 @@ impl E3Feature for FheFeature {
         };
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = ctx.get_store().store().fhe(&ctx.e3_id).read().await? else {
+        let Some(snap) = ctx.repositories().fhe(&ctx.e3_id).read().await? else {
             return Ok(());
         };
 
@@ -100,7 +100,7 @@ impl E3Feature for KeyshareFeature {
         let _ = ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
                 bus: self.bus.clone(),
-                store: ctx.get_store().store().keyshare(&e3_id),
+                store: ctx.repositories().keyshare(&e3_id),
                 fhe: fhe.clone(),
                 address: self.address.clone(),
             })
@@ -118,7 +118,7 @@ impl E3Feature for KeyshareFeature {
             return Ok(());
         };
 
-        let store = ctx.get_store().store().keyshare(&snapshot.e3_id);
+        let store = ctx.repositories().keyshare(&snapshot.e3_id);
 
         // No Snapshot returned from the store -> bail
         let Some(snap) = store.read().await? else {
@@ -185,7 +185,7 @@ impl E3Feature for PlaintextAggregatorFeature {
                 PlaintextAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.get_store().store().plaintext(&e3_id),
+                    store: ctx.repositories().plaintext(&e3_id),
                     sortition: self.sortition.clone(),
                     e3_id,
                     src_chain_id: meta.src_chain_id,
@@ -210,7 +210,7 @@ impl E3Feature for PlaintextAggregatorFeature {
             return Ok(());
         }
 
-        let store = ctx.get_store().store().plaintext(&snapshot.e3_id);
+        let store = ctx.repositories().plaintext(&snapshot.e3_id);
 
         // No Snapshot returned from the store -> bail
         let Some(snap) = store.read().await? else {
@@ -282,7 +282,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
                 PublicKeyAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.get_store().store().publickey(&e3_id),
+                    store: ctx.repositories().publickey(&e3_id),
                     sortition: self.sortition.clone(),
                     e3_id,
                     src_chain_id: meta.src_chain_id,
@@ -303,7 +303,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
             return Ok(());
         };
 
-        let repository = ctx.get_store().store().publickey(&ctx.e3_id);
+        let repository = ctx.repositories().publickey(&ctx.e3_id);
 
         // No Snapshot returned from the store -> bail
         let Some(snap) = repository.read().await? else {

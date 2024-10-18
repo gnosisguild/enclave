@@ -1,9 +1,9 @@
-use crate::{DistanceSortition, SortitionRepository};
+use crate::DistanceSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Snapshot};
+use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
     Subscribe,
@@ -84,12 +84,12 @@ pub struct GetNodes;
 pub struct Sortition {
     list: SortitionModule,
     bus: Addr<EventBus>,
-    store: SortitionRepository,
+    store: Repository<SortitionModule>,
 }
 
 pub struct SortitionParams {
     pub bus: Addr<EventBus>,
-    pub store: SortitionRepository,
+    pub store: Repository<SortitionModule>,
 }
 
 impl Sortition {
@@ -101,7 +101,7 @@ impl Sortition {
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>, store: SortitionRepository) -> Addr<Sortition> {
+    pub fn attach(bus: Addr<EventBus>, store: Repository<SortitionModule>) -> Addr<Sortition> {
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             store,
@@ -140,8 +140,7 @@ impl FromSnapshotWithParams for Sortition {
 }
 
 impl Checkpoint for Sortition {
-    type Repository = SortitionRepository;
-    fn get_store(&self) -> SortitionRepository {
+    fn repository(&self) -> Repository<SortitionModule> {
         self.store.clone()
     }
 }
