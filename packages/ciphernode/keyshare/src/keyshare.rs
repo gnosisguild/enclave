@@ -57,7 +57,7 @@ impl Snapshot for Keyshare {
 }
 
 impl Checkpoint for Keyshare {
-    fn repository(&self) -> Repository<KeyshareState>{
+    fn repository(&self) -> Repository<KeyshareState> {
         self.store.clone()
     }
 }

@@ -18,7 +18,7 @@ impl<S> Repository<S> {
     }
 }
 
-impl<S> Deref for Repository<S>{
+impl<S> Deref for Repository<S> {
     type Target = DataStore;
     fn deref(&self) -> &Self::Target {
         &self.store

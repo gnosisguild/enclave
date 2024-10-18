@@ -17,14 +17,14 @@ impl From<DataStore> for Repositories {
 }
 
 impl Repositories {
-    fn new(store: DataStore) -> Self {
+    pub fn new(store: DataStore) -> Self {
         Repositories { store }
     }
 }
 
 impl<T> From<Repository<T>> for Repositories {
     fn from(value: Repository<T>) -> Self {
-        let store:DataStore = value.into();
+        let store: DataStore = value.into();
         store.into()
     }
 }

@@ -10,7 +10,6 @@ use sortition::{GetHasNode, GetNodes, Sortition};
 use std::sync::Arc;
 use tracing::error;
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
     Collecting {

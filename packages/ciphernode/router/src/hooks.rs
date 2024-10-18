@@ -1,13 +1,12 @@
 use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use actix::{Actor, Addr};
 use aggregator::{
-    PlaintextAggregator, PlaintextAggregatorParams,
-    PlaintextAggregatorState, PublicKeyAggregator, PublicKeyAggregatorParams,
-     PublicKeyAggregatorState,
+    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState, PublicKeyAggregator,
+    PublicKeyAggregatorParams, PublicKeyAggregatorState,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use data::{ FromSnapshotWithParams, Snapshot};
+use data::{FromSnapshotWithParams, Snapshot};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::{Keyshare, KeyshareParams};
