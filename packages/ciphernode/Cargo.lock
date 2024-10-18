@@ -115,9 +115,12 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "anyhow",
+ "async-trait",
  "bincode",
+ "data",
  "enclave-core",
  "fhe 0.1.0",
+ "serde",
  "sortition",
  "tracing",
 ]
@@ -1842,6 +1845,11 @@ name = "data"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "actix-rt",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "serde",
 ]
 
 [[package]]
@@ -2287,7 +2295,9 @@ name = "fhe"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "bincode",
+ "data",
  "enclave-core",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
@@ -3179,9 +3189,11 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "anyhow",
+ "async-trait",
  "data",
  "enclave-core",
  "fhe 0.1.0",
+ "serde",
 ]
 
 [[package]]
@@ -5125,10 +5137,13 @@ dependencies = [
  "actix",
  "aggregator",
  "anyhow",
+ "async-trait",
+ "bincode",
  "data",
  "enclave-core",
  "fhe 0.1.0",
  "keyshare",
+ "serde",
  "sortition",
  "tracing",
 ]
@@ -5618,9 +5633,12 @@ dependencies = [
  "actix",
  "alloy",
  "anyhow",
+ "async-trait",
+ "data",
  "enclave-core",
  "num",
  "rand",
+ "serde",
  "tracing",
 ]
 

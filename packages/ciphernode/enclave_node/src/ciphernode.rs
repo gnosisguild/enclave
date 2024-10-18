@@ -1,14 +1,14 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use anyhow::Result;
-use data::Data;
+use data::{DataStore, InMemStore};
 use enclave_core::EventBus;
 use evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{CiphernodeSelector, E3RequestRouter, LazyFhe, LazyKeyshare};
+use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
@@ -21,7 +21,7 @@ use crate::app_config::AppConfig;
 pub struct MainCiphernode {
     addr: Address,
     bus: Addr<EventBus>,
-    data: Addr<Data>,
+    data: DataStore,
     sortition: Addr<Sortition>,
     selector: Addr<CiphernodeSelector>,
     e3_manager: Addr<E3RequestRouter>,
@@ -32,7 +32,7 @@ impl MainCiphernode {
     pub fn new(
         addr: Address,
         bus: Addr<EventBus>,
-        data: Addr<Data>,
+        data: DataStore,
         sortition: Addr<Sortition>,
         selector: Addr<CiphernodeSelector>,
         p2p: Addr<P2p>,
@@ -57,8 +57,9 @@ impl MainCiphernode {
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
         let bus = EventBus::new(true).start();
-        let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
-        let sortition = Sortition::attach(bus.clone());
+        // TODO: switch to Sled actor
+        let data = DataStore::from_in_mem(InMemStore::new(true).start());
+        let sortition = Sortition::attach(bus.clone(), data.clone());
         let selector =
             CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
 
@@ -78,14 +79,11 @@ impl MainCiphernode {
             .await?;
         }
 
-        let e3_manager = E3RequestRouter::builder(bus.clone())
-            .add_hook(LazyFhe::create(rng))
-            .add_hook(LazyKeyshare::create(
-                bus.clone(),
-                data.clone(),
-                &address.to_string(),
-            ))
-            .build();
+        let e3_manager = E3RequestRouter::builder(bus.clone(), data.clone())
+            .add_feature(FheFeature::create(rng))
+            .add_feature(KeyshareFeature::create(bus.clone(), &address.to_string()))
+            .build()
+            .await?;
 
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");

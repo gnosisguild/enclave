@@ -2,6 +2,8 @@ use crate::DistanceSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use data::{Checkpoint, DataStore, FromSnapshotWithParams, Snapshot};
 use enclave_core::{
     BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
     Subscribe,
@@ -22,6 +24,7 @@ pub trait SortitionList<T> {
     fn remove(&mut self, address: T);
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct SortitionModule {
     nodes: HashSet<String>,
 }
@@ -81,18 +84,29 @@ pub struct GetNodes;
 pub struct Sortition {
     list: SortitionModule,
     bus: Addr<EventBus>,
+    store: DataStore,
+}
+
+pub struct SortitionParams {
+    pub bus: Addr<EventBus>,
+    pub store: DataStore,
 }
 
 impl Sortition {
-    pub fn new(bus: Addr<EventBus>) -> Self {
+    pub fn new(params: SortitionParams) -> Self {
         Self {
             list: SortitionModule::new(),
-            bus,
+            bus: params.bus,
+            store: params.store,
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>) -> Addr<Sortition> {
-        let addr = Sortition::new(bus.clone()).start();
+    pub fn attach(bus: Addr<EventBus>, store: DataStore) -> Addr<Sortition> {
+        let addr = Sortition::new(SortitionParams {
+            bus: bus.clone(),
+            store,
+        })
+        .start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
         addr
     }
@@ -104,6 +118,31 @@ impl Sortition {
 
 impl Actor for Sortition {
     type Context = actix::Context<Self>;
+}
+
+impl Snapshot for Sortition {
+    type Snapshot = SortitionModule;
+    fn snapshot(&self) -> Self::Snapshot {
+        self.list.clone()
+    }
+}
+
+#[async_trait]
+impl FromSnapshotWithParams for Sortition {
+    type Params = SortitionParams;
+    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
+        Ok(Sortition {
+            bus: params.bus,
+            store: params.store,
+            list: snapshot,
+        })
+    }
+}
+
+impl Checkpoint for Sortition {
+    fn get_store(&self) -> DataStore {
+        self.store.clone()
+    }
 }
 
 impl Handler<EnclaveEvent> for Sortition {

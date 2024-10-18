@@ -1,4 +1,4 @@
-use data::Data;
+use data::{DataStore, InMemStore};
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated,
@@ -8,8 +8,8 @@ use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
 use p2p::P2p;
 use router::{
-    CiphernodeSelector, E3RequestRouter, LazyFhe, LazyKeyshare, LazyPlaintextAggregator,
-    LazyPublicKeyAggregator,
+    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
+    PublicKeyAggregatorFeature,
 };
 use sortition::Sortition;
 
@@ -29,28 +29,36 @@ use tokio::sync::Mutex;
 use tokio::{sync::mpsc::channel, time::sleep};
 
 // Simulating a local node
-async fn setup_local_ciphernode(bus: Addr<EventBus>, rng: SharedRng, logging: bool, addr: &str) {
+async fn setup_local_ciphernode(
+    bus: Addr<EventBus>,
+    rng: SharedRng,
+    logging: bool,
+    addr: &str,
+) -> Result<()> {
     // create data actor for saving data
-    let data = Data::new(logging).start(); // TODO: Use a sled backed Data Actor
+    let data_actor = InMemStore::new(logging).start(); // TODO: Use a sled backed Data Actor
+    let store = DataStore::from_in_mem(data_actor);
 
     // create ciphernode actor for managing ciphernode flow
-    let sortition = Sortition::attach(bus.clone());
+    let sortition = Sortition::attach(bus.clone(), store.clone());
     CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
 
-    E3RequestRouter::builder(bus.clone())
-        .add_hook(LazyFhe::create(rng))
-        .add_hook(LazyPublicKeyAggregator::create(
+    E3RequestRouter::builder(bus.clone(), store)
+        .add_feature(FheFeature::create(rng))
+        .add_feature(PublicKeyAggregatorFeature::create(
             bus.clone(),
             sortition.clone(),
         ))
-        .add_hook(LazyPlaintextAggregator::create(
+        .add_feature(PlaintextAggregatorFeature::create(
             bus.clone(),
             sortition.clone(),
         ))
-        .add_hook(LazyKeyshare::create(bus.clone(), data.clone(), addr))
-        .build();
+        .add_feature(KeyshareFeature::create(bus.clone(), addr))
+        .build()
+        .await?;
 
     SimpleLogger::attach(addr, bus.clone());
+    Ok(())
 }
 
 fn generate_pk_share(
@@ -74,9 +82,9 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()).to_string())
         .collect();
 
-    setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[0]).await;
-    setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[1]).await;
-    setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[2]).await;
+    setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[0]).await?;
+    setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[1]).await?;
+    setup_local_ciphernode(bus.clone(), rng.clone(), true, &eth_addrs[2]).await?;
 
     let e3_id = E3id::new("1234");
 
