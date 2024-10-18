@@ -587,10 +587,12 @@ describe("Enclave", function () {
         { value: 10 },
       );
       const e3 = await enclave.getE3(0);
+      const block = await ethers.provider.getBlock("latest").catch((e) => e);
 
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
+      expect(e3.requestBlock).to.equal(block.number);
       expect(e3.inputValidator).to.equal(
         await mocks.inputValidator.getAddress(),
       );
