@@ -8,7 +8,10 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, Repositories, RepositoriesFactory};
+use router::{
+    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, Repositories,
+    RepositoriesFactory,
+};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;

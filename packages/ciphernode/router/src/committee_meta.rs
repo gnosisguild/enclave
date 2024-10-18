@@ -1,4 +1,4 @@
-use crate::{E3Feature, E3RequestContext, RepositoriesFactory, E3RequestContextSnapshot};
+use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot, RepositoriesFactory};
 use anyhow::*;
 use async_trait::async_trait;
 use enclave_core::{E3Requested, EnclaveEvent, Seed};

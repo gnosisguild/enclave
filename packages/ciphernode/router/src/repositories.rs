@@ -82,7 +82,7 @@ impl RepositoriesFactory for DataStore {
 
 impl<T> RepositoriesFactory for Repository<T> {
     fn repositories(&self) -> Repositories {
-        let store:DataStore = self.clone().into();
+        let store: DataStore = self.clone().into();
         store.repositories()
     }
 }
