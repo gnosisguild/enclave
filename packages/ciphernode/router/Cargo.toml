@@ -12,4 +12,7 @@ data = { path = "../data" }
 keyshare = { path = "../keyshare" }
 aggregator = { path = "../aggregator" }
 anyhow = { workspace = true }
+serde = { workspace = true }
+bincode = { workspace = true }
+async-trait = { workspace = true }
 tracing = { workspace = true }

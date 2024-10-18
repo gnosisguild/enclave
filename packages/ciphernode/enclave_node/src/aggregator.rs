@@ -1,5 +1,6 @@
 use actix::{Actor, Addr, Context};
 use anyhow::Result;
+use data::{DataStore, InMemStore};
 use enclave_core::EventBus;
 use evm::{
     helpers::pull_eth_signer_from_env, CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
@@ -8,7 +9,10 @@ use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{E3RequestRouter, LazyFhe, LazyPlaintextAggregator, LazyPublicKeyAggregator};
+use router::{
+    E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature,
+    RepositoriesFactory,
+};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
@@ -51,7 +55,9 @@ impl MainAggregator {
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
 
-        let sortition = Sortition::attach(bus.clone());
+        let store = DataStore::from_in_mem(InMemStore::new(true).start());
+        let repositories = store.repositories();
+        let sortition = Sortition::attach(bus.clone(), repositories.sortition());
         let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;
         for chain in config
             .chains
@@ -81,17 +87,18 @@ impl MainAggregator {
             .await?;
         }
 
-        let e3_manager = E3RequestRouter::builder(bus.clone())
-            .add_hook(LazyFhe::create(rng))
-            .add_hook(LazyPublicKeyAggregator::create(
+        let e3_manager = E3RequestRouter::builder(bus.clone(), store)
+            .add_feature(FheFeature::create(rng))
+            .add_feature(PublicKeyAggregatorFeature::create(
                 bus.clone(),
                 sortition.clone(),
             ))
-            .add_hook(LazyPlaintextAggregator::create(
+            .add_feature(PlaintextAggregatorFeature::create(
                 bus.clone(),
                 sortition.clone(),
             ))
-            .build();
+            .build()
+            .await?;
 
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
