@@ -160,6 +160,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3 = E3({
             seed: seed,
             threshold: threshold,
+            requestBlock: block.number,
             startWindow: startWindow,
             duration: duration,
             expiration: 0,
