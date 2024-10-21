@@ -390,19 +390,18 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let cn2 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[1], None).await?;
     add_ciphernodes(&bus, &eth_addrs).await?;
 
-    sleep(Duration::from_millis(1)).await;
-
     // Send e3request
-    let e3_request_event = EnclaveEvent::from(E3Requested {
-        e3_id: e3_id.clone(),
-        threshold_m: 2,
-        seed: seed.clone(),
-        params: params.to_bytes(),
-        src_chain_id: 1,
-    });
-    bus.send(e3_request_event.clone()).await?;
-
-    sleep(Duration::from_millis(1)).await;
+    bus.send(
+        EnclaveEvent::from(E3Requested {
+            e3_id: e3_id.clone(),
+            threshold_m: 2,
+            seed: seed.clone(),
+            params: params.to_bytes(),
+            src_chain_id: 1,
+        })
+        .clone(),
+    )
+    .await?;
 
     let history = bus.send(GetHistory).await?;
 
@@ -411,7 +410,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     // Reset history
     bus.send(ResetHistory).await?;
-    sleep(Duration::from_millis(1)).await;
 
     // Check event count is correct
     assert_eq!(history.len(), 7);
@@ -436,9 +434,9 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         })
         .aggregate()?;
 
+    // Publish the ciphertext
     let raw_plaintext = vec![1234u64, 873827u64];
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
-
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
             ciphertext_output: ciphertext.to_bytes(),
@@ -447,8 +445,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         .clone(),
     )
     .await?;
-
-    sleep(Duration::from_millis(1)).await;
 
     let history = bus.send(GetHistory).await?;
 
