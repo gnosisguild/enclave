@@ -79,7 +79,18 @@ waiton-files() {
 launch_ciphernode() {
     local address="$1"
     heading "Launch ciphernode $address"
-    yarn ciphernode:launch --address "$address" --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" --data-location "$SCRIPT_DIR/output/$address.db" &
+    yarn ciphernode:launch \
+      --address "$address" \
+      --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" \
+      --data-location "$SCRIPT_DIR/output/$address.db" &
+}
+
+launch_aggregator() {
+    local private_key="$1"
+    PRIVATE_KEY=$private_key yarn ciphernode:aggregator \
+      --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" \
+      --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
+      --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
 }
 
 pkill -9 -f "target/debug/enclave" || true
@@ -108,9 +119,7 @@ launch_ciphernode "$CIPHERNODE_ADDRESS_1"
 launch_ciphernode "$CIPHERNODE_ADDRESS_2"
 launch_ciphernode "$CIPHERNODE_ADDRESS_3"
 launch_ciphernode "$CIPHERNODE_ADDRESS_4"
-
-# NOTE: This node is configured to be an aggregator
-PRIVATE_KEY=$PRIVATE_KEY yarn ciphernode:aggregator --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
+launch_aggregator "$PRIVATE_KEY"
 
 sleep 1
 

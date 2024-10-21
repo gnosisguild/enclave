@@ -566,7 +566,7 @@ pub enum EnclaveErrorType {
     PlaintextAggregation,
     Decryption,
     Sortition,
-    Data
+    Data,
 }
 
 impl EnclaveError {

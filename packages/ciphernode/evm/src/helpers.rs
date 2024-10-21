@@ -15,6 +15,7 @@ use alloy::{
 use anyhow::{Context, Result};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
+use tokio::{select, sync::oneshot};
 use tracing::{info, trace};
 
 pub async fn stream_from_evm<P: Provider>(
@@ -22,6 +23,7 @@ pub async fn stream_from_evm<P: Provider>(
     filter: Filter,
     bus: Recipient<EnclaveEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
+    mut shutdown: oneshot::Receiver<()>,
 ) {
     match provider
         .get_provider()
@@ -31,15 +33,28 @@ pub async fn stream_from_evm<P: Provider>(
     {
         Ok(subscription) => {
             let mut stream = subscription.into_stream();
-            while let Some(log) = stream.next().await {
-                trace!("Received log from EVM");
-                let Some(event) = extractor(log.data(), log.topic0(), provider.get_chain_id())
-                else {
-                    trace!("Failed to extract log from EVM");
-                    continue;
-                };
-                info!("Extracted log from evm sending now.");
-                bus.do_send(event);
+            loop {
+                select! {
+                    maybe_log = stream.next() => {
+                        match maybe_log {
+                            Some(log) => {
+                                trace!("Received log from EVM");
+                                let Some(event) = extractor(log.data(), log.topic0(), provider.get_chain_id())
+                                else {
+                                    trace!("Failed to extract log from EVM");
+                                    continue;
+                                };
+                                info!("Extracted log from evm sending now.");
+                                bus.do_send(event);
+                            }
+                            None => break, // Stream ended
+                        }
+                    }
+                    _ = &mut shutdown => {
+                        info!("Received shutdown signal, stopping EVM stream");
+                        break;
+                    }
+                }
             }
         }
         Err(e) => {

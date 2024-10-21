@@ -1,13 +1,10 @@
-use crate::helpers::{self, create_readonly_provider, ReadonlyProvider};
-use actix::prelude::*;
-use actix::{Addr, Recipient};
+use crate::EvmEventReader;
+use actix::Addr;
 use alloy::primitives::{LogData, B256};
-use alloy::{
-    eips::BlockNumberOrTag, primitives::Address, rpc::types::Filter, sol, sol_types::SolEvent,
-};
+use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus};
-use tracing::{error, info, trace};
+use tracing::{error, trace};
 
 sol!(
     #[sol(rpc)]
@@ -52,7 +49,7 @@ impl From<IEnclave::CiphertextOutputPublished> for EnclaveEvent {
     }
 }
 
-fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
+pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&IEnclave::E3Requested::SIGNATURE_HASH) => {
             let Ok(event) = IEnclave::E3Requested::decode_log_data(data, true) else {
@@ -80,52 +77,15 @@ fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<Encl
 }
 
 /// Connects to Enclave.sol converting EVM events to EnclaveEvents
-pub struct EnclaveSolReader {
-    provider: ReadonlyProvider,
-    contract_address: Address,
-    bus: Recipient<EnclaveEvent>,
-}
+pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
-    pub async fn new(
-        bus: Addr<EventBus>,
-        contract_address: Address,
-        rpc_url: &str,
-    ) -> Result<Self> {
-        let provider = create_readonly_provider(rpc_url).await?;
-        Ok(Self {
-            contract_address,
-            provider,
-            bus: bus.into(),
-        })
-    }
-
     pub async fn attach(
         bus: Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-    ) -> Result<Addr<Self>> {
-        let addr = EnclaveSolReader::new(bus.clone(), contract_address.parse()?, rpc_url)
-            .await?
-            .start();
-
-        info!(address=%contract_address, "Evm is listening to address");
+    ) -> Result<Addr<EvmEventReader>> {
+        let addr = EvmEventReader::attach(bus, rpc_url, extractor, contract_address).await?;
         Ok(addr)
-    }
-}
-
-impl Actor for EnclaveSolReader {
-    type Context = actix::Context<Self>;
-    fn started(&mut self, ctx: &mut Self::Context) {
-        let bus = self.bus.clone();
-        let provider = self.provider.clone();
-        let filter = Filter::new()
-            .address(self.contract_address)
-            .from_block(BlockNumberOrTag::Latest);
-
-        ctx.spawn(
-            async move { helpers::stream_from_evm(provider, filter, bus, extractor).await }
-                .into_actor(self),
-        );
     }
 }
