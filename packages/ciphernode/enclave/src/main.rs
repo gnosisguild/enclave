@@ -26,6 +26,8 @@ pub struct Args {
     pub address: String,
     #[arg(short, long)]
     pub config: String,
+    #[arg(short, long = "data-location")]
+    pub data_location: Option<String>,
 }
 
 #[actix_rt::main]
@@ -37,7 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let address = Address::parse_checksummed(&args.address, None).expect("Invalid address");
     info!("LAUNCHING CIPHERNODE: ({})", address);
     let config = load_config(&args.config)?;
-    let (_, handle) = MainCiphernode::attach(config, address).await?;
+    let (_, handle) =
+        MainCiphernode::attach(config, address, args.data_location.as_deref()).await?;
     let _ = tokio::join!(handle);
     Ok(())
 }

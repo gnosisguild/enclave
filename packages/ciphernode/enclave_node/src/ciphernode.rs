@@ -1,7 +1,7 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use anyhow::Result;
-use data::{DataStore, InMemStore};
+use data::{DataStore, InMemStore, SledStore};
 use enclave_core::EventBus;
 use evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use logger::SimpleLogger;
@@ -9,8 +9,7 @@ use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use router::{
-    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, Repositories,
-    RepositoriesFactory,
+    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, RepositoriesFactory,
 };
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
@@ -55,13 +54,18 @@ impl MainCiphernode {
     pub async fn attach(
         config: AppConfig,
         address: Address,
+        data_location: Option<&str>,
     ) -> Result<(Addr<Self>, JoinHandle<()>)> {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
         let bus = EventBus::new(true).start();
-        // TODO: switch to Sled actor
-        let store = DataStore::from_in_mem(&InMemStore::new(true).start());
+
+        let store: DataStore = match data_location {
+            Some(loc) => (&SledStore::new(&bus, loc)?.start()).into(),
+            None => (&InMemStore::new(true).start()).into(),
+        };
+
         let repositories = store.repositories();
 
         let sortition = Sortition::attach(bus.clone(), repositories.sortition());

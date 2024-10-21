@@ -1,6 +1,6 @@
 use actix::{Actor, Addr, Context};
 use anyhow::Result;
-use data::{DataStore, InMemStore};
+use data::{DataStore, InMemStore, SledStore};
 use enclave_core::EventBus;
 use evm::{
     helpers::pull_eth_signer_from_env, CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
@@ -49,13 +49,18 @@ impl MainAggregator {
         config: AppConfig,
         pubkey_write_path: Option<&str>,
         plaintext_write_path: Option<&str>,
+        data_location: Option<&str>,
     ) -> Result<(Addr<Self>, JoinHandle<()>)> {
         let bus = EventBus::new(true).start();
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
 
-        let store = DataStore::from_in_mem(&InMemStore::new(true).start());
+        let store: DataStore = match data_location {
+            Some(loc) => (&SledStore::new(&bus, loc)?.start()).into(),
+            None => (&InMemStore::new(true).start()).into(),
+        };
+
         let repositories = store.repositories();
         let sortition = Sortition::attach(bus.clone(), repositories.sortition());
         let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;

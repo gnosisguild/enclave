@@ -1,4 +1,4 @@
-use crate::{InMemStore, IntoKey};
+use crate::{InMemStore, IntoKey, SledStore};
 use actix::{Addr, Message, Recipient};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -63,15 +63,6 @@ impl DataStore {
         self.insert.do_send(msg)
     }
 
-    /// Construct a data store from an InMemStore actor
-    pub fn from_in_mem(addr: &Addr<InMemStore>) -> Self {
-        Self {
-            get: addr.clone().recipient(),
-            insert: addr.clone().recipient(),
-            scope: vec![],
-        }
-    }
-
     /// Get the scope as a string
     pub fn get_scope(&self) -> Result<String> {
         Ok(String::from_utf8(self.scope.clone())?)
@@ -115,6 +106,26 @@ impl DataStore {
             get: self.get.clone(),
             insert: self.insert.clone(),
             scope: key.into_key(),
+        }
+    }
+}
+
+impl From<&Addr<SledStore>> for DataStore {
+    fn from(addr: &Addr<SledStore>) -> Self {
+        Self {
+            get: addr.clone().recipient(),
+            insert: addr.clone().recipient(),
+            scope: vec![],
+        }
+    }
+}
+
+impl From<&Addr<InMemStore>> for DataStore {
+    fn from(addr: &Addr<InMemStore>) -> Self {
+        Self {
+            get: addr.clone().recipient(),
+            insert: addr.clone().recipient(),
+            scope: vec![],
         }
     }
 }

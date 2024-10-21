@@ -15,6 +15,8 @@ struct Args {
     pub pubkey_write_path: Option<String>,
     #[arg(short, long = "plaintext-write-path")]
     pub plaintext_write_path: Option<String>,
+    #[arg(short, long = "data-location")]
+    pub data_location: Option<String>,
 }
 
 #[actix_rt::main]
@@ -27,6 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config,
         args.pubkey_write_path.as_deref(),
         args.plaintext_write_path.as_deref(),
+        args.data_location.as_deref(),
     )
     .await?;
     let _ = tokio::join!(handle);
