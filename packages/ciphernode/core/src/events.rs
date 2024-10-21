@@ -212,7 +212,6 @@ pub trait FromError {
     fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self;
 }
 
-
 // TODO: These From traits should be handled by a macro
 impl From<KeyshareCreated> for EnclaveEvent {
     fn from(data: KeyshareCreated) -> Self {
@@ -521,7 +520,6 @@ impl Display for Die {
         write!(f, "Die",)
     }
 }
-
 
 /// Represents a shutdown event triggered by SIG TERM
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
