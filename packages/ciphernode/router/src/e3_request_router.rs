@@ -3,6 +3,7 @@ use crate::E3RequestContext;
 use crate::E3RequestContextParams;
 use crate::E3RequestContextSnapshot;
 use crate::RepositoriesFactory;
+use actix::AsyncContext;
 use actix::{Actor, Addr, Context, Handler};
 use anyhow::*;
 use async_trait::async_trait;
@@ -12,6 +13,7 @@ use data::FromSnapshotWithParams;
 use data::Repository;
 use data::Snapshot;
 use enclave_core::E3RequestComplete;
+use enclave_core::Shutdown;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
 use serde::Deserialize;
 use serde::Serialize;
@@ -105,7 +107,13 @@ impl Actor for E3RequestRouter {
 
 impl Handler<EnclaveEvent> for E3RequestRouter {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        // If we are shuttomg down then bail on anything else
+        if let EnclaveEvent::Shutdown { data, .. } = msg {
+            ctx.notify(data);
+            return;
+        }
+
         let Some(e3_id) = msg.get_e3_id() else {
             return;
         };
@@ -152,6 +160,16 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
         }
 
         self.checkpoint();
+    }
+}
+
+impl Handler<Shutdown> for E3RequestRouter {
+    type Result = ();
+    fn handle(&mut self, msg: Shutdown, _ctx: &mut Self::Context) -> Self::Result {
+        let shutdown_evt = EnclaveEvent::from(msg);
+        for (_, ctx) in self.contexts.iter() {
+            ctx.forward_message_now(&shutdown_evt)
+        }
     }
 }
 

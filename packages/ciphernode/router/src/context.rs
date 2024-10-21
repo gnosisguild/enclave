@@ -82,6 +82,14 @@ impl E3RequestContext {
         });
     }
 
+    pub fn forward_message_now(&self, msg: &EnclaveEvent) {
+        self.recipients().into_iter().for_each(|(_, recipient)| {
+            if let Some(act) = recipient {
+                act.do_send(msg.clone());
+            }
+        });
+    }
+
     /// Accept a DataStore ID and a Keystore actor address
     pub fn set_keyshare(&mut self, value: Addr<Keyshare>) {
         self.keyshare = Some(value);

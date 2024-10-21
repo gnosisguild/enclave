@@ -64,7 +64,7 @@ impl DataStore {
     }
 
     /// Construct a data store from an InMemStore actor
-    pub fn from_in_mem(addr: Addr<InMemStore>) -> Self {
+    pub fn from_in_mem(addr: &Addr<InMemStore>) -> Self {
         Self {
             get: addr.clone().recipient(),
             insert: addr.clone().recipient(),
@@ -88,7 +88,7 @@ impl DataStore {
     /// #[actix_rt::main]
     /// async fn main() -> Result<()>{  
     ///   let addr = InMemStore::new(false).start();
-    ///   let store = DataStore::from_in_mem(addr);
+    ///   let store = DataStore::from_in_mem(&addr);
     ///   assert_eq!(store.base("//foo")
     ///     .scope("bar")
     ///     .scope("/baz")

@@ -55,7 +55,7 @@ impl MainAggregator {
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
 
-        let store = DataStore::from_in_mem(InMemStore::new(true).start());
+        let store = DataStore::from_in_mem(&InMemStore::new(true).start());
         let repositories = store.repositories();
         let sortition = Sortition::attach(bus.clone(), repositories.sortition());
         let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;

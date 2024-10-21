@@ -3194,6 +3194,7 @@ dependencies = [
  "enclave-core",
  "fhe 0.1.0",
  "serde",
+ "tracing",
 ]
 
 [[package]]

@@ -9,6 +9,7 @@ use enclave_core::{
 use fhe::{DecryptCiphertext, Fhe};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::warn;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
@@ -84,6 +85,7 @@ impl Handler<EnclaveEvent> for Keyshare {
             EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
             EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
             EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
+            EnclaveEvent::Shutdown { .. } => ctx.notify(Die),
             _ => (),
         }
     }
@@ -162,6 +164,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
 impl Handler<Die> for Keyshare {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+        warn!("Keyshare is shutting down");
         ctx.stop()
     }
 }
