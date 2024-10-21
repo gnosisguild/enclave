@@ -1,6 +1,6 @@
 use clap::Parser;
 use enclave::load_config;
-use enclave_node::MainAggregator;
+use enclave_node::{listen_for_shutdown, MainAggregator};
 use tracing::info;
 
 #[derive(Parser, Debug)]
@@ -32,6 +32,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.data_location.as_deref(),
     )
     .await?;
-    let _ = tokio::join!(handle);
+
+    tokio::spawn(listen_for_shutdown(handle));
+
+    std::future::pending::<()>().await;
+
     Ok(())
 }

@@ -2109,6 +2109,7 @@ dependencies = [
 name = "enclave"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "actix-rt",
  "alloy",
  "clap",

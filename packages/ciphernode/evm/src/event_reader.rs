@@ -6,7 +6,7 @@ use alloy::{
     eips::BlockNumberOrTag, primitives::Address, rpc::types::Filter, sol, sol_types::SolEvent,
 };
 use anyhow::{anyhow, Result};
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
+use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Shutdown, Subscribe};
 use tokio::sync::oneshot;
 use tracing::info;
 
@@ -19,7 +19,7 @@ pub struct EvmEventReader {
     bus: Recipient<EnclaveEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     shutdown_rx: Option<oneshot::Receiver<()>>,
-    shutdown_tx: oneshot::Sender<()>,
+    shutdown_tx: Option<oneshot::Sender<()>>,
 }
 
 impl EvmEventReader {
@@ -37,7 +37,7 @@ impl EvmEventReader {
             extractor,
             bus: bus.into(),
             shutdown_rx: Some(shutdown_rx),
-            shutdown_tx,
+            shutdown_tx: Some(shutdown_tx),
         })
     }
 
@@ -50,6 +50,9 @@ impl EvmEventReader {
         let addr = EvmEventReader::new(bus.clone(), rpc_url, extractor, contract_address.parse()?)
             .await?
             .start();
+
+        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
+            .await?;
 
         info!(address=%contract_address, "Evm is listening to address");
         Ok(addr)
@@ -74,5 +77,24 @@ impl Actor for EvmEventReader {
             async move { helpers::stream_from_evm(provider, filter, bus, extractor, shutdown).await }
                 .into_actor(self),
         );
+    }
+
+    fn stopping(&mut self, _: &mut Self::Context) -> Running {
+        if let Some(shutdown) = self.shutdown_tx.take() {
+            let _ = shutdown.send(());
+        }
+
+        Running::Stop
+    }
+}
+
+impl Handler<EnclaveEvent> for EvmEventReader {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+        if let EnclaveEvent::Shutdown { .. } = msg {
+            if let Some(shutdown) = self.shutdown_tx.take() {
+                let _ = shutdown.send(());
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
 use alloy::primitives::Address;
 use clap::Parser;
 use enclave::load_config;
-use enclave_node::MainCiphernode;
+use enclave_node::{listen_for_shutdown, MainCiphernode};
 use tracing::info;
 
 const OWO: &str = r#"
@@ -41,6 +41,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = load_config(&args.config)?;
     let (_, handle) =
         MainCiphernode::attach(config, address, args.data_location.as_deref()).await?;
-    let _ = tokio::join!(handle);
+
+    tokio::spawn(listen_for_shutdown(handle));
+
+    std::future::pending::<()>().await;
+
     Ok(())
 }
