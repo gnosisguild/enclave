@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::helpers::create_provider_with_signer;
+use crate::helpers::ensure_http_rpc;
 use crate::helpers::SignerProvider;
 use actix::prelude::*;
 use actix::Addr;
@@ -11,6 +12,7 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
+use enclave_core::Shutdown;
 use enclave_core::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};
 use tracing::info;
@@ -30,30 +32,32 @@ pub struct EnclaveSolWriter {
 
 impl EnclaveSolWriter {
     pub async fn new(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: Address,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
-            provider: create_provider_with_signer(rpc_url, signer).await?,
+            provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
             contract_address,
-            bus,
+            bus: bus.clone(),
         })
     }
 
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Addr<EnclaveSolWriter>> {
-        let addr = EnclaveSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
+        let addr = EnclaveSolWriter::new(bus, rpc_url, contract_address.parse()?, signer)
             .await?
             .start();
-        let _ = bus
-            .send(Subscribe::new("PlaintextAggregated", addr.clone().into()))
-            .await;
+        bus.send(Subscribe::new("PlaintextAggregated", addr.clone().into()))
+            .await?;
+
+        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
+            .await?;
 
         Ok(addr)
     }
@@ -73,6 +77,7 @@ impl Handler<EnclaveEvent> for EnclaveSolWriter {
                     ctx.notify(data);
                 }
             }
+            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
             _ => (),
         }
     }
@@ -100,6 +105,13 @@ impl Handler<PlaintextAggregated> for EnclaveSolWriter {
                 }
             }
         })
+    }
+}
+
+impl Handler<Shutdown> for EnclaveSolWriter {
+    type Result = ();
+    fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
     }
 }
 

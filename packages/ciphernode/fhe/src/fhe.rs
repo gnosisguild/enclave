@@ -1,6 +1,8 @@
 use super::set_up_crp;
 use anyhow::*;
-use enclave_core::{E3Requested, EnclaveEvent, OrderedSet, Seed};
+use async_trait::async_trait;
+use data::{FromSnapshotWithParams, Snapshot};
+use enclave_core::{OrderedSet, Seed};
 use fhe_rs::{
     bfv::{
         BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
@@ -31,8 +33,8 @@ pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 /// Fhe library adaptor.
 #[derive(Clone)]
 pub struct Fhe {
-    params: Arc<BfvParameters>,
-    crp: CommonRandomPoly,
+    pub params: Arc<BfvParameters>,
+    pub crp: CommonRandomPoly,
     rng: SharedRng,
 }
 
@@ -47,7 +49,7 @@ impl Fhe {
             params.clone(),
             Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
         );
-        Ok(Fhe::new(params.clone(), crp, rng.clone()))
+        Ok(Fhe::new(params, crp, rng))
     }
 
     pub fn from_raw_params(
@@ -122,6 +124,33 @@ impl Fhe {
         Ok(bincode::serialize(&decoded)?)
     }
 }
+
+impl Snapshot for Fhe {
+    type Snapshot = FheSnapshot;
+    fn snapshot(&self) -> Self::Snapshot {
+        FheSnapshot {
+            crp: self.crp.to_bytes(),
+            params: self.params.to_bytes(),
+        }
+    }
+}
+
+#[async_trait]
+impl FromSnapshotWithParams for Fhe {
+    type Params = SharedRng;
+    async fn from_snapshot(rng: SharedRng, snapshot: FheSnapshot) -> Result<Self> {
+        let params = Arc::new(BfvParameters::try_deserialize(&snapshot.params)?);
+        let crp = CommonRandomPoly::deserialize(&snapshot.crp, &params)?;
+        Ok(Fhe::new(params, crp, rng))
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct FheSnapshot {
+    crp: Vec<u8>,
+    params: Vec<u8>,
+}
+
 struct SecretKeySerializer {
     pub inner: SecretKey,
 }

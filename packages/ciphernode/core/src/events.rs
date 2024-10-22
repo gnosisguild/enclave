@@ -120,10 +120,13 @@ pub enum EnclaveEvent {
         id: EventId,
         data: E3RequestComplete,
     },
-    // CommitteeSelected,
-    // OutputDecrypted,
-    // CiphernodeRegistered,
-    // CiphernodeDeregistered,
+    Shutdown {
+        id: EventId,
+        data: Shutdown,
+    }, // CommitteeSelected,
+       // OutputDecrypted,
+       // CiphernodeRegistered,
+       // CiphernodeDeregistered,
 }
 
 impl EnclaveEvent {
@@ -147,6 +150,7 @@ impl EnclaveEvent {
             EnclaveEvent::CiphernodeAdded { .. } => true,
             EnclaveEvent::CiphernodeRemoved { .. } => true,
             EnclaveEvent::E3RequestComplete { .. } => true,
+            EnclaveEvent::Shutdown { .. } => true,
             _ => false,
         }
     }
@@ -166,6 +170,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
             EnclaveEvent::EnclaveError { id, .. } => id,
             EnclaveEvent::E3RequestComplete { id, .. } => id,
+            EnclaveEvent::Shutdown { id, .. } => id,
         }
     }
 }
@@ -196,6 +201,7 @@ impl EnclaveEvent {
             EnclaveEvent::CiphernodeRemoved { data, .. } => format!("{}", data),
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
+            EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
     }
@@ -206,6 +212,7 @@ pub trait FromError {
     fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self;
 }
 
+// TODO: These From traits should be handled by a macro
 impl From<KeyshareCreated> for EnclaveEvent {
     fn from(data: KeyshareCreated) -> Self {
         EnclaveEvent::KeyshareCreated {
@@ -299,6 +306,15 @@ impl From<CiphernodeRemoved> for EnclaveEvent {
 impl From<EnclaveError> for EnclaveEvent {
     fn from(data: EnclaveError) -> Self {
         EnclaveEvent::EnclaveError {
+            id: EventId::from(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
+
+impl From<Shutdown> for EnclaveEvent {
+    fn from(data: Shutdown) -> Self {
+        EnclaveEvent::Shutdown {
             id: EventId::from(data.clone()),
             data: data.clone(),
         }
@@ -505,6 +521,16 @@ impl Display for Die {
     }
 }
 
+/// Represents a shutdown event triggered by SIG TERM
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct Shutdown;
+impl Display for Shutdown {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Shutdown",)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Seed(pub [u8; 32]);
 impl From<Seed> for u64 {
@@ -540,6 +566,7 @@ pub enum EnclaveErrorType {
     PlaintextAggregation,
     Decryption,
     Sortition,
+    Data,
 }
 
 impl EnclaveError {

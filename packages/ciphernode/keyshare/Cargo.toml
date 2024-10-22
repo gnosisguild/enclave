@@ -9,3 +9,6 @@ enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
 actix = { workspace = true }
 anyhow = { workspace = true }
+serde = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }

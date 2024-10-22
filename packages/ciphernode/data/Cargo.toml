@@ -7,3 +7,13 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
 [dependencies]
 actix = { workspace = true }
+enclave-core = { path = "../core" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+sled = { workspace = true }
+bincode = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+actix-rt = { workspace = true }

@@ -1,16 +1,13 @@
-use actix::{Actor, Addr, AsyncContext, Recipient, WrapFuture};
+use crate::EvmEventReader;
+use actix::Addr;
 use alloy::{
-    eips::BlockNumberOrTag,
-    primitives::{Address, LogData, B256},
-    rpc::types::Filter,
+    primitives::{LogData, B256},
     sol,
     sol_types::SolEvent,
 };
 use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus};
-use tracing::{error, info, trace};
-
-use crate::helpers::{self, create_readonly_provider, ReadonlyProvider};
+use tracing::{error, trace};
 
 sol!(
     #[sol(rpc)]
@@ -65,7 +62,7 @@ impl From<ICiphernodeRegistry::CiphernodeRemoved> for EnclaveEvent {
     }
 }
 
-fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEvent> {
+pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
             let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data, true)
@@ -95,62 +92,23 @@ fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEven
 }
 
 /// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
-pub struct CiphernodeRegistrySolReader {
-    provider: ReadonlyProvider,
-    contract_address: Address,
-    bus: Recipient<EnclaveEvent>,
-}
+pub struct CiphernodeRegistrySolReader;
 
 impl CiphernodeRegistrySolReader {
-    pub async fn new(
-        bus: Addr<EventBus>,
-        contract_address: Address,
-        rpc_url: &str,
-    ) -> Result<Self> {
-        let provider = create_readonly_provider(rpc_url).await?;
-
-        Ok(Self {
-            contract_address,
-            provider,
-            bus: bus.into(),
-        })
-    }
-
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-    ) -> Result<Addr<Self>> {
-        let addr =
-            CiphernodeRegistrySolReader::new(bus.clone(), contract_address.parse()?, rpc_url)
-                .await?
-                .start();
-
-        info!(address=%contract_address, "CiphernodeRegistrySol is listening to address");
+    ) -> Result<Addr<EvmEventReader>> {
+        let addr = EvmEventReader::attach(bus, rpc_url, extractor, contract_address).await?;
         Ok(addr)
-    }
-}
-
-impl Actor for CiphernodeRegistrySolReader {
-    type Context = actix::Context<Self>;
-    fn started(&mut self, ctx: &mut Self::Context) {
-        let bus = self.bus.clone();
-        let provider = self.provider.clone();
-        let filter = Filter::new()
-            .address(self.contract_address)
-            .from_block(BlockNumberOrTag::Latest);
-
-        ctx.spawn(
-            async move { helpers::stream_from_evm(provider, filter, bus, extractor).await }
-                .into_actor(self),
-        );
     }
 }
 
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
-    pub async fn attach(bus: Addr<EventBus>, rpc_url: &str, contract_address: &str) -> Result<()> {
-        CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, contract_address).await?;
+    pub async fn attach(bus: &Addr<EventBus>, rpc_url: &str, contract_address: &str) -> Result<()> {
+        CiphernodeRegistrySolReader::attach(bus, rpc_url, contract_address).await?;
         Ok(())
     }
 }

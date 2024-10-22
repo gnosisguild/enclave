@@ -1,6 +1,6 @@
 use clap::Parser;
 use enclave::load_config;
-use enclave_node::MainAggregator;
+use enclave_node::{listen_for_shutdown, MainAggregator};
 use tracing::info;
 
 #[derive(Parser, Debug)]
@@ -15,6 +15,8 @@ struct Args {
     pub pubkey_write_path: Option<String>,
     #[arg(short, long = "plaintext-write-path")]
     pub plaintext_write_path: Option<String>,
+    #[arg(short, long = "data-location")]
+    pub data_location: Option<String>,
 }
 
 #[actix_rt::main]
@@ -23,12 +25,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     info!("LAUNCHING AGGREGATOR");
     let config = load_config(&args.config)?;
-    let (_, handle) = MainAggregator::attach(
+    let (bus, handle) = MainAggregator::attach(
         config,
         args.pubkey_write_path.as_deref(),
         args.plaintext_write_path.as_deref(),
+        args.data_location.as_deref(),
     )
     .await?;
-    let _ = tokio::join!(handle);
+
+    tokio::spawn(listen_for_shutdown(bus.into(), handle));
+
+    std::future::pending::<()>().await;
+
     Ok(())
 }

@@ -11,6 +11,7 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 enclave_node = { path = "../enclave_node" }
 alloy = { workspace = true }
 clap = { workspace = true }
+actix = { workspace = true }
 actix-rt = { workspace = true }
 tokio = { workspace = true }
 config = "0.14.0"
