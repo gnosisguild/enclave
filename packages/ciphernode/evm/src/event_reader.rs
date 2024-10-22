@@ -2,11 +2,9 @@ use crate::helpers::{self, create_readonly_provider, ensure_ws_rpc, ReadonlyProv
 use actix::prelude::*;
 use actix::{Addr, Recipient};
 use alloy::primitives::{LogData, B256};
-use alloy::{
-    eips::BlockNumberOrTag, primitives::Address, rpc::types::Filter, sol, sol_types::SolEvent,
-};
+use alloy::{eips::BlockNumberOrTag, primitives::Address, rpc::types::Filter};
 use anyhow::{anyhow, Result};
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Shutdown, Subscribe};
+use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
 use tokio::sync::oneshot;
 use tracing::info;
 
@@ -17,7 +15,7 @@ pub struct EvmEventReader {
     provider: Option<ReadonlyProvider>,
     contract_address: Address,
     bus: Recipient<EnclaveEvent>,
-    extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
+    extractor: ExtractorFn,
     shutdown_rx: Option<oneshot::Receiver<()>>,
     shutdown_tx: Option<oneshot::Sender<()>>,
 }
