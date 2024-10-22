@@ -166,13 +166,15 @@ impl E3Feature for PlaintextAggregatorFeature {
         let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
             return;
         };
+
         let Some(fhe) = ctx.get_fhe() else {
-            self.   bus.err(EnclaveErrorType::PlaintextAggregation, anyhow!("Could not create PlaintextAggregator because the fhe instance it depends on was not set on the context."));
+            self.bus.err(EnclaveErrorType::PlaintextAggregation, anyhow!("Could not create PlaintextAggregator because the fhe instance it depends on was not set on the context."));
 
             return;
         };
+
         let Some(ref meta) = ctx.get_meta() else {
-            self. bus.err(EnclaveErrorType::PlaintextAggregation, anyhow!("Could not create PlaintextAggregator because the meta instance it depends on was not set on the context."));
+            self.bus.err(EnclaveErrorType::PlaintextAggregation, anyhow!("Could not create PlaintextAggregator because the meta instance it depends on was not set on the context."));
 
             return;
         };
