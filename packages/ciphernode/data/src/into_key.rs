@@ -10,7 +10,7 @@ impl IntoKey for Vec<u8> {
     }
 }
 
-/// Keys can be vectors of String
++/// Keys can be references to vectors of bytes (&Vec<u8>)
 impl IntoKey for &Vec<u8> {
     fn into_key(self) -> Vec<u8> {
         self.clone()
