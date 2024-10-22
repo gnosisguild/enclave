@@ -38,6 +38,8 @@ pub trait FromSnapshotWithParams: Snapshot {
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self>;
 }
 
+
+/// Enable the self type to be reconstituted from the Snapshot only
 #[async_trait]
 pub trait FromSnapshot: Snapshot {
     /// Return an instance of the persistable object at the state given by the snapshot
