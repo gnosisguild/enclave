@@ -12,6 +12,7 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
+use enclave_core::Shutdown;
 use enclave_core::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};
 use tracing::info;
@@ -52,9 +53,11 @@ impl EnclaveSolWriter {
         let addr = EnclaveSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
             .await?
             .start();
-        let _ = bus
-            .send(Subscribe::new("PlaintextAggregated", addr.clone().into()))
-            .await;
+        bus.send(Subscribe::new("PlaintextAggregated", addr.clone().into()))
+            .await?;
+
+        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
+            .await?;
 
         Ok(addr)
     }
@@ -73,7 +76,8 @@ impl Handler<EnclaveEvent> for EnclaveSolWriter {
                 if self.provider.get_chain_id() == data.src_chain_id {
                     ctx.notify(data);
                 }
-            }
+            },
+            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
             _ => (),
         }
     }
@@ -101,6 +105,13 @@ impl Handler<PlaintextAggregated> for EnclaveSolWriter {
                 }
             }
         })
+    }
+}
+
+impl Handler<Shutdown> for EnclaveSolWriter {
+    type Result = ();
+    fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
     }
 }
 

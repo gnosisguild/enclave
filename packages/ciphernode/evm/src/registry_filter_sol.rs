@@ -8,8 +8,7 @@ use alloy::{
 };
 use anyhow::Result;
 use enclave_core::{
-    BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
-    Subscribe,
+    BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated, Shutdown, Subscribe
 };
 use std::sync::Arc;
 use tracing::info;
@@ -71,7 +70,8 @@ impl Handler<EnclaveEvent> for RegistryFilterSolWriter {
                 if self.provider.get_chain_id() == data.src_chain_id {
                     ctx.notify(data);
                 }
-            }
+            },
+            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
             _ => (),
         }
     }
@@ -99,6 +99,13 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
                 }
             }
         })
+    }
+}
+
+impl Handler<Shutdown> for RegistryFilterSolWriter {
+    type Result = ();
+    fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
     }
 }
 
