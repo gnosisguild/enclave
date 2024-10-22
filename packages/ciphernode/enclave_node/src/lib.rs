@@ -4,6 +4,6 @@ mod ciphernode;
 mod shutdown;
 
 pub use aggregator::*;
-pub use ciphernode::*;
 pub use app_config::*;
+pub use ciphernode::*;
 pub use shutdown::*;

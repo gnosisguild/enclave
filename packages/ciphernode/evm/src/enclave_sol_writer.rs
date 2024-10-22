@@ -76,7 +76,7 @@ impl Handler<EnclaveEvent> for EnclaveSolWriter {
                 if self.provider.get_chain_id() == data.src_chain_id {
                     ctx.notify(data);
                 }
-            },
+            }
             EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
             _ => (),
         }

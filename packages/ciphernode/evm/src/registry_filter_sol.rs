@@ -8,7 +8,8 @@ use alloy::{
 };
 use anyhow::Result;
 use enclave_core::{
-    BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated, Shutdown, Subscribe
+    BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
+    Shutdown, Subscribe,
 };
 use std::sync::Arc;
 use tracing::info;
@@ -70,7 +71,7 @@ impl Handler<EnclaveEvent> for RegistryFilterSolWriter {
                 if self.provider.get_chain_id() == data.src_chain_id {
                     ctx.notify(data);
                 }
-            },
+            }
             EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
             _ => (),
         }

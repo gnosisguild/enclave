@@ -100,7 +100,13 @@ impl MainCiphernode {
         let nm = format!("CIPHER({})", &address.to_string()[0..5]);
         SimpleLogger::attach(&nm, bus.clone());
         MainCiphernode::new(
-            address, bus.clone(), store, sortition, selector, p2p_addr, e3_manager,
+            address,
+            bus.clone(),
+            store,
+            sortition,
+            selector,
+            p2p_addr,
+            e3_manager,
         )
         .start();
         Ok((bus, join_handle))
