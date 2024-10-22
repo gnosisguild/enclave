@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{InMemStore, IntoKey, SledStore};
 use actix::{Addr, Message, Recipient};
 use anyhow::Result;
@@ -58,7 +60,7 @@ impl DataStore {
     /// Writes data to the scope location
     pub fn write<T: Serialize>(&self, value: T) {
         let Ok(serialized) = bincode::serialize(&value) else {
-            let str_key = self.get_scope().unwrap_or("<bad key>".to_string());
+            let str_key = self.get_scope().unwrap_or(Cow::Borrowed("<bad key>"));
             let str_error = format!("Could not serialize value passed to {}", str_key);
             error!(str_error);
             return;
@@ -68,8 +70,8 @@ impl DataStore {
     }
 
     /// Get the scope as a string
-    pub fn get_scope(&self) -> Result<String> {
-        Ok(String::from_utf8(self.scope.clone())?)
+    pub fn get_scope(&self) -> Result<Cow<str>> {
+        Ok(String::from_utf8_lossy(&self.scope))
     }
 
     /// Changes the scope for the data store.
