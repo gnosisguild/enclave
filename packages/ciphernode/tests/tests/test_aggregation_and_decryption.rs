@@ -50,20 +50,14 @@ async fn setup_local_ciphernode(
     let repositories = store.repositories();
 
     // create ciphernode actor for managing ciphernode flow
-    let sortition = Sortition::attach(bus.clone(), repositories.sortition());
-    CiphernodeSelector::attach(bus.clone(), sortition.clone(), addr);
+    let sortition = Sortition::attach(&bus, repositories.sortition());
+    CiphernodeSelector::attach(&bus, &sortition, addr);
 
-    let router = E3RequestRouter::builder(bus.clone(), store)
-        .add_feature(FheFeature::create(rng.clone()))
-        .add_feature(PublicKeyAggregatorFeature::create(
-            bus.clone(),
-            sortition.clone(),
-        ))
-        .add_feature(PlaintextAggregatorFeature::create(
-            bus.clone(),
-            sortition.clone(),
-        ))
-        .add_feature(KeyshareFeature::create(bus.clone(), addr))
+    let router = E3RequestRouter::builder(&bus, store)
+        .add_feature(FheFeature::create(&bus, &rng))
+        .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
+        .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))
+        .add_feature(KeyshareFeature::create(&bus, addr))
         .build()
         .await?;
 

@@ -75,10 +75,10 @@ pub struct E3RequestRouterParams {
 }
 
 impl E3RequestRouter {
-    pub fn builder(bus: Addr<EventBus>, store: DataStore) -> E3RequestRouterBuilder {
+    pub fn builder(bus: &Addr<EventBus>, store: DataStore) -> E3RequestRouterBuilder {
         let repositories = store.repositories();
         let builder = E3RequestRouterBuilder {
-            bus,
+            bus: bus.clone(),
             features: vec![],
             store: repositories.router(),
         };

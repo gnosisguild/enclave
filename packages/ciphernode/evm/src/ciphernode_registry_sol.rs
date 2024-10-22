@@ -96,7 +96,7 @@ pub struct CiphernodeRegistrySolReader;
 
 impl CiphernodeRegistrySolReader {
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
     ) -> Result<Addr<EvmEventReader>> {
@@ -107,8 +107,8 @@ impl CiphernodeRegistrySolReader {
 
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
-    pub async fn attach(bus: Addr<EventBus>, rpc_url: &str, contract_address: &str) -> Result<()> {
-        CiphernodeRegistrySolReader::attach(bus.clone(), rpc_url, contract_address).await?;
+    pub async fn attach(bus: &Addr<EventBus>, rpc_url: &str, contract_address: &str) -> Result<()> {
+        CiphernodeRegistrySolReader::attach(bus, rpc_url, contract_address).await?;
         Ok(())
     }
 }

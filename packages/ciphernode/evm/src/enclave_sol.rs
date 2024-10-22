@@ -9,12 +9,12 @@ use enclave_core::EventBus;
 pub struct EnclaveSol;
 impl EnclaveSol {
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<()> {
-        EnclaveSolReader::attach(bus.clone(), rpc_url, contract_address).await?;
+        EnclaveSolReader::attach(bus, rpc_url, contract_address).await?;
         EnclaveSolWriter::attach(bus, rpc_url, contract_address, signer).await?;
         Ok(())
     }

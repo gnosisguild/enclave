@@ -24,7 +24,7 @@ pub struct EvmEventReader {
 
 impl EvmEventReader {
     pub async fn new(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         extractor: ExtractorFn,
         contract_address: Address,
@@ -35,19 +35,19 @@ impl EvmEventReader {
             contract_address,
             provider: Some(provider),
             extractor,
-            bus: bus.into(),
+            bus: bus.clone().into(),
             shutdown_rx: Some(shutdown_rx),
             shutdown_tx: Some(shutdown_tx),
         })
     }
 
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         extractor: ExtractorFn,
         contract_address: &str,
     ) -> Result<Addr<Self>> {
-        let addr = EvmEventReader::new(bus.clone(), rpc_url, extractor, contract_address.parse()?)
+        let addr = EvmEventReader::new(bus, rpc_url, extractor, contract_address.parse()?)
             .await?
             .start();
 

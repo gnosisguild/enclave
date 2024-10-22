@@ -68,9 +68,8 @@ impl MainCiphernode {
 
         let repositories = store.repositories();
 
-        let sortition = Sortition::attach(bus.clone(), repositories.sortition());
-        let selector =
-            CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
+        let sortition = Sortition::attach(&bus, repositories.sortition());
+        let selector = CiphernodeSelector::attach(&bus, &sortition, &address.to_string());
 
         for chain in config
             .chains
@@ -79,18 +78,14 @@ impl MainCiphernode {
         {
             let rpc_url = &chain.rpc_url;
 
-            EnclaveSolReader::attach(bus.clone(), rpc_url, &chain.contracts.enclave).await?;
-            CiphernodeRegistrySol::attach(
-                bus.clone(),
-                rpc_url,
-                &chain.contracts.ciphernode_registry,
-            )
-            .await?;
+            EnclaveSolReader::attach(&bus, rpc_url, &chain.contracts.enclave).await?;
+            CiphernodeRegistrySol::attach(&bus, rpc_url, &chain.contracts.ciphernode_registry)
+                .await?;
         }
 
-        let e3_manager = E3RequestRouter::builder(bus.clone(), store.clone())
-            .add_feature(FheFeature::create(rng))
-            .add_feature(KeyshareFeature::create(bus.clone(), &address.to_string()))
+        let e3_manager = E3RequestRouter::builder(&bus, store.clone())
+            .add_feature(FheFeature::create(&bus, &rng))
+            .add_feature(KeyshareFeature::create(&bus, &address.to_string()))
             .build()
             .await?;
 

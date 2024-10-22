@@ -16,16 +16,16 @@ impl Actor for CiphernodeSelector {
 }
 
 impl CiphernodeSelector {
-    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: &str) -> Self {
+    pub fn new(bus: &Addr<EventBus>, sortition: &Addr<Sortition>, address: &str) -> Self {
         Self {
-            bus,
-            sortition,
+            bus: bus.clone(),
+            sortition: sortition.clone(),
             address: address.to_owned(),
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: &str) -> Addr<Self> {
-        let addr = CiphernodeSelector::new(bus.clone(), sortition, address).start();
+    pub fn attach(bus: &Addr<EventBus>, sortition: &Addr<Sortition>, address: &str) -> Addr<Self> {
+        let addr = CiphernodeSelector::new(bus, sortition, address).start();
 
         bus.do_send(Subscribe::new("E3Requested", addr.clone().recipient()));
         bus.do_send(Subscribe::new("Shutdown", addr.clone().recipient()));

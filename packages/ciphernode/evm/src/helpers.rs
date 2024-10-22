@@ -119,7 +119,7 @@ pub type SignerProvider = WithChainId<
 
 pub async fn create_provider_with_signer(
     rpc_url: &str,
-    signer: Arc<PrivateKeySigner>,
+    signer: &Arc<PrivateKeySigner>,
 ) -> Result<SignerProvider> {
     let wallet = EthereumWallet::from(signer.clone());
     let provider = ProviderBuilder::new()

@@ -81,7 +81,7 @@ pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
     ) -> Result<Addr<EvmEventReader>> {

@@ -28,28 +28,27 @@ pub struct RegistryFilterSolWriter {
 
 impl RegistryFilterSolWriter {
     pub async fn new(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: Address,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
             provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
             contract_address,
-            bus,
+            bus: bus.clone(),
         })
     }
 
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Addr<RegistryFilterSolWriter>> {
-        let addr =
-            RegistryFilterSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
-                .await?
-                .start();
+        let addr = RegistryFilterSolWriter::new(bus, rpc_url, contract_address.parse()?, signer)
+            .await?
+            .start();
         let _ = bus
             .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
             .await;
@@ -132,12 +131,12 @@ pub async fn publish_committee(
 pub struct RegistryFilterSol;
 impl RegistryFilterSol {
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<()> {
-        RegistryFilterSolWriter::attach(bus.clone(), rpc_url, contract_address, signer).await?;
+        RegistryFilterSolWriter::attach(bus, rpc_url, contract_address, signer).await?;
         Ok(())
     }
 }

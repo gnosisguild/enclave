@@ -32,25 +32,25 @@ pub struct EnclaveSolWriter {
 
 impl EnclaveSolWriter {
     pub async fn new(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: Address,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
             provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
             contract_address,
-            bus,
+            bus: bus.clone(),
         })
     }
 
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Addr<EnclaveSolWriter>> {
-        let addr = EnclaveSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
+        let addr = EnclaveSolWriter::new(bus, rpc_url, contract_address.parse()?, signer)
             .await?
             .start();
         bus.send(Subscribe::new("PlaintextAggregated", addr.clone().into()))

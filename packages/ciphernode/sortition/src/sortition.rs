@@ -101,7 +101,7 @@ impl Sortition {
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>, store: Repository<SortitionModule>) -> Addr<Sortition> {
+    pub fn attach(bus: &Addr<EventBus>, store: Repository<SortitionModule>) -> Addr<Sortition> {
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             store,

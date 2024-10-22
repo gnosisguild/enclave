@@ -62,7 +62,7 @@ impl MainAggregator {
         };
 
         let repositories = store.repositories();
-        let sortition = Sortition::attach(bus.clone(), repositories.sortition());
+        let sortition = Sortition::attach(&bus, repositories.sortition());
         let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;
         for chain in config
             .chains
@@ -70,38 +70,17 @@ impl MainAggregator {
             .filter(|chain| chain.enabled.unwrap_or(true))
         {
             let rpc_url = &chain.rpc_url;
-            EnclaveSol::attach(
-                bus.clone(),
-                rpc_url,
-                &chain.contracts.enclave,
-                signer.clone(),
-            )
-            .await?;
-            RegistryFilterSol::attach(
-                bus.clone(),
-                rpc_url,
-                &chain.contracts.filter_registry,
-                signer.clone(),
-            )
-            .await?;
-            CiphernodeRegistrySol::attach(
-                bus.clone(),
-                rpc_url,
-                &chain.contracts.ciphernode_registry,
-            )
-            .await?;
+            EnclaveSol::attach(&bus, rpc_url, &chain.contracts.enclave, &signer).await?;
+            RegistryFilterSol::attach(&bus, rpc_url, &chain.contracts.filter_registry, &signer)
+                .await?;
+            CiphernodeRegistrySol::attach(&bus, rpc_url, &chain.contracts.ciphernode_registry)
+                .await?;
         }
 
-        let e3_manager = E3RequestRouter::builder(bus.clone(), store)
-            .add_feature(FheFeature::create(rng))
-            .add_feature(PublicKeyAggregatorFeature::create(
-                bus.clone(),
-                sortition.clone(),
-            ))
-            .add_feature(PlaintextAggregatorFeature::create(
-                bus.clone(),
-                sortition.clone(),
-            ))
+        let e3_manager = E3RequestRouter::builder(&bus, store)
+            .add_feature(FheFeature::create(&bus, &rng))
+            .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
+            .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))
             .build()
             .await?;
 
