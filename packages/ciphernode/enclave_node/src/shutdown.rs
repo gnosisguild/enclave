@@ -20,6 +20,7 @@ pub async fn listen_for_shutdown(bus: Recipient<EnclaveEvent>, handle: JoinHandl
     // Abort the spawned task
     handle.abort();
 
+    // Wait for all actor processes to disconnect
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Wait for the task to finish
