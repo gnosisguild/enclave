@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::helpers::create_provider_with_signer;
+use crate::helpers::ensure_http_rpc;
 use crate::helpers::SignerProvider;
 use actix::prelude::*;
 use actix::Addr;
@@ -36,7 +37,7 @@ impl EnclaveSolWriter {
         signer: Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
-            provider: create_provider_with_signer(rpc_url, signer).await?,
+            provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
             contract_address,
             bus,
         })

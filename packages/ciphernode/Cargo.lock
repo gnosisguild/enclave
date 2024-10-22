@@ -2163,6 +2163,7 @@ dependencies = [
  "sortition",
  "test-helpers",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

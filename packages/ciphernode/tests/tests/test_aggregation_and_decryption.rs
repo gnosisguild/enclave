@@ -46,7 +46,7 @@ async fn setup_local_ciphernode(
 ) -> Result<LocalCiphernodeTuple> {
     // create data actor for saving data
     let data_actor = data.unwrap_or_else(|| InMemStore::new(logging).start());
-    let store = DataStore::from_in_mem(&data_actor);
+    let store = DataStore::from(&data_actor);
     let repositories = store.repositories();
 
     // create ciphernode actor for managing ciphernode flow

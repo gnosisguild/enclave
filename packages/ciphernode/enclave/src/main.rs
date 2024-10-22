@@ -39,10 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let address = Address::parse_checksummed(&args.address, None).expect("Invalid address");
     info!("LAUNCHING CIPHERNODE: ({})", address);
     let config = load_config(&args.config)?;
-    let (_, handle) =
+    let (bus, handle) =
         MainCiphernode::attach(config, address, args.data_location.as_deref()).await?;
 
-    tokio::spawn(listen_for_shutdown(handle));
+    tokio::spawn(listen_for_shutdown(bus.into(), handle));
 
     std::future::pending::<()>().await;
 

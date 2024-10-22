@@ -55,7 +55,7 @@ impl MainCiphernode {
         config: AppConfig,
         address: Address,
         data_location: Option<&str>,
-    ) -> Result<(Addr<Self>, JoinHandle<()>)> {
+    ) -> Result<(Addr<EventBus>, JoinHandle<()>)> {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
@@ -99,11 +99,11 @@ impl MainCiphernode {
 
         let nm = format!("CIPHER({})", &address.to_string()[0..5]);
         SimpleLogger::attach(&nm, bus.clone());
-        let main_addr = MainCiphernode::new(
-            address, bus, store, sortition, selector, p2p_addr, e3_manager,
+        MainCiphernode::new(
+            address, bus.clone(), store, sortition, selector, p2p_addr, e3_manager,
         )
         .start();
-        Ok((main_addr, join_handle))
+        Ok((bus, join_handle))
     }
 }
 

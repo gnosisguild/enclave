@@ -177,5 +177,10 @@ fi
 
 heading "Test PASSED !"
 
+pkill -15 -f "target/debug/enclave" || true
+pkill -15 -f "target/debug/aggregator" || true
+
+sleep 4
+
 cleanup 0
 

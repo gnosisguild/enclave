@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     info!("LAUNCHING AGGREGATOR");
     let config = load_config(&args.config)?;
-    let (_, handle) = MainAggregator::attach(
+    let (bus, handle) = MainAggregator::attach(
         config,
         args.pubkey_write_path.as_deref(),
         args.plaintext_write_path.as_deref(),
@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    tokio::spawn(listen_for_shutdown(handle));
+    tokio::spawn(listen_for_shutdown(bus.into(), handle));
 
     std::future::pending::<()>().await;
 

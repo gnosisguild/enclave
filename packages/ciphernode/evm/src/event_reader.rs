@@ -1,4 +1,4 @@
-use crate::helpers::{self, create_readonly_provider, ReadonlyProvider};
+use crate::helpers::{self, create_readonly_provider, ensure_ws_rpc, ReadonlyProvider};
 use actix::prelude::*;
 use actix::{Addr, Recipient};
 use alloy::primitives::{LogData, B256};
@@ -14,7 +14,7 @@ pub type ExtractorFn = fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>;
 
 /// Connects to Enclave.sol converting EVM events to EnclaveEvents
 pub struct EvmEventReader {
-    provider: ReadonlyProvider,
+    provider: Option<ReadonlyProvider>,
     contract_address: Address,
     bus: Recipient<EnclaveEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
@@ -30,10 +30,10 @@ impl EvmEventReader {
         contract_address: Address,
     ) -> Result<Self> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let provider = create_readonly_provider(rpc_url).await?;
+        let provider = create_readonly_provider(&ensure_ws_rpc(rpc_url)).await?;
         Ok(Self {
             contract_address,
-            provider,
+            provider: Some(provider),
             extractor,
             bus: bus.into(),
             shutdown_rx: Some(shutdown_rx),
@@ -63,7 +63,10 @@ impl Actor for EvmEventReader {
     type Context = actix::Context<Self>;
     fn started(&mut self, ctx: &mut Self::Context) {
         let bus = self.bus.clone();
-        let provider = self.provider.clone();
+        let Some(provider) = self.provider.take() else {
+            tracing::error!("Could not start event reader as provider has already been used.");
+            return;
+        };
         let filter = Filter::new()
             .address(self.contract_address)
             .from_block(BlockNumberOrTag::Latest);
@@ -77,14 +80,6 @@ impl Actor for EvmEventReader {
             async move { helpers::stream_from_evm(provider, filter, bus, extractor, shutdown).await }
                 .into_actor(self),
         );
-    }
-
-    fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        if let Some(shutdown) = self.shutdown_tx.take() {
-            let _ = shutdown.send(());
-        }
-
-        Running::Stop
     }
 }
 

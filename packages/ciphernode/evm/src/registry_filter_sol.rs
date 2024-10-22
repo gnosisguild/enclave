@@ -1,4 +1,4 @@
-use crate::helpers::{create_provider_with_signer, SignerProvider};
+use crate::helpers::{create_provider_with_signer, ensure_http_rpc, SignerProvider};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
@@ -34,7 +34,7 @@ impl RegistryFilterSolWriter {
         signer: Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
-            provider: create_provider_with_signer(rpc_url, signer).await?,
+            provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
             contract_address,
             bus,
         })

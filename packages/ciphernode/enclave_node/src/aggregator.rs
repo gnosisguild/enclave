@@ -32,14 +32,14 @@ pub struct MainAggregator {
 
 impl MainAggregator {
     pub fn new(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         sortition: Addr<Sortition>,
         p2p: Addr<P2p>,
         e3_manager: Addr<E3RequestRouter>,
     ) -> Self {
         Self {
             e3_manager,
-            bus,
+            bus: bus.clone(),
             sortition,
             p2p,
         }
@@ -50,7 +50,7 @@ impl MainAggregator {
         pubkey_write_path: Option<&str>,
         plaintext_write_path: Option<&str>,
         data_location: Option<&str>,
-    ) -> Result<(Addr<Self>, JoinHandle<()>)> {
+    ) -> Result<(Addr<EventBus>, JoinHandle<()>)> {
         let bus = EventBus::new(true).start();
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -118,8 +118,8 @@ impl MainAggregator {
 
         SimpleLogger::attach("AGG", bus.clone());
 
-        let main_addr = MainAggregator::new(bus, sortition, p2p_addr, e3_manager).start();
-        Ok((main_addr, join_handle))
+        MainAggregator::new(&bus, sortition, p2p_addr, e3_manager).start();
+        Ok((bus, join_handle))
     }
 }
 

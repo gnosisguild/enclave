@@ -60,7 +60,8 @@ pub async fn stream_from_evm<P: Provider>(
         Err(e) => {
             bus.err(EnclaveErrorType::Evm, e);
         }
-    }
+    };
+    info!("Exiting stream loop");
 }
 
 #[derive(Clone)]
@@ -126,6 +127,7 @@ pub async fn create_provider_with_signer(
         .wallet(wallet)
         .on_builtin(rpc_url)
         .await?;
+
     Ok(SignerProvider::new(provider).await?)
 }
 
@@ -134,4 +136,42 @@ pub async fn pull_eth_signer_from_env(var: &str) -> Result<Arc<PrivateKeySigner>
     let signer = private_key.parse()?;
     env::remove_var(var);
     Ok(Arc::new(signer))
+}
+
+pub fn ensure_http_rpc(rpc_url: &str) -> String {
+    if rpc_url.starts_with("ws://") {
+        return rpc_url.replacen("ws://", "http://", 1);
+    } else if rpc_url.starts_with("wss://") {
+        return rpc_url.replacen("wss://", "https://", 1);
+    }
+    rpc_url.to_string()
+}
+
+pub fn ensure_ws_rpc(rpc_url: &str) -> String {
+    if rpc_url.starts_with("http://") {
+        return rpc_url.replacen("http://", "ws://", 1);
+    } else if rpc_url.starts_with("https://") {
+        return rpc_url.replacen("https://", "wss://", 1);
+    }
+    rpc_url.to_string()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_ensure_http_rpc() {
+        assert_eq!(ensure_http_rpc("http://foo.com"), "http://foo.com");
+        assert_eq!(ensure_http_rpc("https://foo.com"), "https://foo.com");
+        assert_eq!(ensure_http_rpc("ws://foo.com"), "http://foo.com");
+        assert_eq!(ensure_http_rpc("wss://foo.com"), "https://foo.com");
+    }
+    #[test]
+    fn test_ensure_ws_rpc() {
+        assert_eq!(ensure_ws_rpc("http://foo.com"), "ws://foo.com");
+        assert_eq!(ensure_ws_rpc("https://foo.com"), "wss://foo.com");
+        assert_eq!(ensure_ws_rpc("wss://foo.com"), "wss://foo.com");
+        assert_eq!(ensure_ws_rpc("ws://foo.com"), "ws://foo.com");
+    }
 }
