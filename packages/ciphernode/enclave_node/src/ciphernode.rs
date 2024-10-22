@@ -1,14 +1,16 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use anyhow::Result;
-use data::Data;
+use data::{DataStore, InMemStore, SledStore};
 use enclave_core::EventBus;
 use evm::{CiphernodeRegistrySol, EnclaveSolReader};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{CiphernodeSelector, E3RequestRouter, LazyFhe, LazyKeyshare};
+use router::{
+    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, RepositoriesFactory,
+};
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
@@ -21,7 +23,7 @@ use crate::app_config::AppConfig;
 pub struct MainCiphernode {
     addr: Address,
     bus: Addr<EventBus>,
-    data: Addr<Data>,
+    data: DataStore,
     sortition: Addr<Sortition>,
     selector: Addr<CiphernodeSelector>,
     e3_manager: Addr<E3RequestRouter>,
@@ -32,7 +34,7 @@ impl MainCiphernode {
     pub fn new(
         addr: Address,
         bus: Addr<EventBus>,
-        data: Addr<Data>,
+        data: DataStore,
         sortition: Addr<Sortition>,
         selector: Addr<CiphernodeSelector>,
         p2p: Addr<P2p>,
@@ -52,15 +54,22 @@ impl MainCiphernode {
     pub async fn attach(
         config: AppConfig,
         address: Address,
-    ) -> Result<(Addr<Self>, JoinHandle<()>)> {
+        data_location: Option<&str>,
+    ) -> Result<(Addr<EventBus>, JoinHandle<()>)> {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
         let bus = EventBus::new(true).start();
-        let data = Data::new(true).start(); // TODO: Use a sled backed Data Actor
-        let sortition = Sortition::attach(bus.clone());
-        let selector =
-            CiphernodeSelector::attach(bus.clone(), sortition.clone(), &address.to_string());
+
+        let store: DataStore = match data_location {
+            Some(loc) => (&SledStore::new(&bus, loc)?.start()).into(),
+            None => (&InMemStore::new(true).start()).into(),
+        };
+
+        let repositories = store.repositories();
+
+        let sortition = Sortition::attach(&bus, repositories.sortition());
+        let selector = CiphernodeSelector::attach(&bus, &sortition, &address.to_string());
 
         for chain in config
             .chains
@@ -69,34 +78,33 @@ impl MainCiphernode {
         {
             let rpc_url = &chain.rpc_url;
 
-            EnclaveSolReader::attach(bus.clone(), rpc_url, &chain.contracts.enclave).await?;
-            CiphernodeRegistrySol::attach(
-                bus.clone(),
-                rpc_url,
-                &chain.contracts.ciphernode_registry,
-            )
-            .await?;
+            EnclaveSolReader::attach(&bus, rpc_url, &chain.contracts.enclave).await?;
+            CiphernodeRegistrySol::attach(&bus, rpc_url, &chain.contracts.ciphernode_registry)
+                .await?;
         }
 
-        let e3_manager = E3RequestRouter::builder(bus.clone())
-            .add_hook(LazyFhe::create(rng))
-            .add_hook(LazyKeyshare::create(
-                bus.clone(),
-                data.clone(),
-                &address.to_string(),
-            ))
-            .build();
+        let e3_manager = E3RequestRouter::builder(&bus, store.clone())
+            .add_feature(FheFeature::create(&bus, &rng))
+            .add_feature(KeyshareFeature::create(&bus, &address.to_string()))
+            .build()
+            .await?;
 
         let (p2p_addr, join_handle) =
             P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
 
         let nm = format!("CIPHER({})", &address.to_string()[0..5]);
         SimpleLogger::attach(&nm, bus.clone());
-        let main_addr = MainCiphernode::new(
-            address, bus, data, sortition, selector, p2p_addr, e3_manager,
+        MainCiphernode::new(
+            address,
+            bus.clone(),
+            store,
+            sortition,
+            selector,
+            p2p_addr,
+            e3_manager,
         )
         .start();
-        Ok((main_addr, join_handle))
+        Ok((bus, join_handle))
     }
 }
 

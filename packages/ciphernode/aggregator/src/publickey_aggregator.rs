@@ -1,5 +1,7 @@
 use actix::prelude::*;
 use anyhow::Result;
+use async_trait::async_trait;
+use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
@@ -8,7 +10,7 @@ use sortition::{GetHasNode, GetNodes, Sortition};
 use std::sync::Arc;
 use tracing::error;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
     Collecting {
         threshold_m: usize,
@@ -22,6 +24,16 @@ pub enum PublicKeyAggregatorState {
         public_key: Vec<u8>,
         keyshares: OrderedSet<Vec<u8>>,
     },
+}
+
+impl PublicKeyAggregatorState {
+    pub fn init(threshold_m: usize, seed: Seed) -> Self {
+        PublicKeyAggregatorState::Collecting {
+            threshold_m,
+            keyshares: OrderedSet::new(),
+            seed,
+        }
+    }
 }
 
 #[derive(Message)]
@@ -41,10 +53,20 @@ struct NotifyNetwork {
 pub struct PublicKeyAggregator {
     fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
+    store: Repository<PublicKeyAggregatorState>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: PublicKeyAggregatorState,
     src_chain_id: u64,
+}
+
+pub struct PublicKeyAggregatorParams {
+    pub fhe: Arc<Fhe>,
+    pub bus: Addr<EventBus>,
+    pub store: Repository<PublicKeyAggregatorState>,
+    pub sortition: Addr<Sortition>,
+    pub e3_id: E3id,
+    pub src_chain_id: u64,
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
@@ -54,26 +76,15 @@ pub struct PublicKeyAggregator {
 /// It is expected to change this mechanism as we work through adversarial scenarios and write tests
 /// for them.
 impl PublicKeyAggregator {
-    pub fn new(
-        fhe: Arc<Fhe>,
-        bus: Addr<EventBus>,
-        sortition: Addr<Sortition>,
-        e3_id: E3id,
-        threshold_m: usize,
-        seed: Seed,
-        src_chain_id: u64,
-    ) -> Self {
+    pub fn new(params: PublicKeyAggregatorParams, state: PublicKeyAggregatorState) -> Self {
         PublicKeyAggregator {
-            fhe,
-            bus,
-            e3_id,
-            sortition,
-            src_chain_id,
-            state: PublicKeyAggregatorState::Collecting {
-                threshold_m,
-                keyshares: OrderedSet::new(),
-                seed,
-            },
+            fhe: params.fhe,
+            bus: params.bus,
+            store: params.store,
+            sortition: params.sortition,
+            e3_id: params.e3_id,
+            src_chain_id: params.src_chain_id,
+            state,
         }
     }
 
@@ -166,6 +177,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
                     // add the keyshare and
                     act.state = act.add_keyshare(pubkey)?;
+                    act.checkpoint();
 
                     // Check the state and if it has changed to the computing
                     if let PublicKeyAggregatorState::Computing { keyshares } = &act.state {
@@ -191,6 +203,8 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
 
         // Update the local state
         self.state = self.set_pubkey(pubkey.clone())?;
+        self.checkpoint();
+
         ctx.notify(NotifyNetwork {
             pubkey,
             e3_id: msg.e3_id,
@@ -226,5 +240,28 @@ impl Handler<Die> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop()
+    }
+}
+
+impl Snapshot for PublicKeyAggregator {
+    type Snapshot = PublicKeyAggregatorState;
+
+    fn snapshot(&self) -> Self::Snapshot {
+        self.state.clone()
+    }
+}
+
+#[async_trait]
+impl FromSnapshotWithParams for PublicKeyAggregator {
+    type Params = PublicKeyAggregatorParams;
+
+    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
+        Ok(PublicKeyAggregator::new(params, snapshot))
+    }
+}
+
+impl Checkpoint for PublicKeyAggregator {
+    fn repository(&self) -> Repository<PublicKeyAggregatorState> {
+        self.store.clone()
     }
 }

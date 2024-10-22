@@ -1,17 +1,21 @@
 use actix::prelude::*;
-use anyhow::{anyhow, Context, Result};
-use data::{Data, Get, Insert};
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
-    CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die, EnclaveErrorType,
-    EnclaveEvent, EventBus, FromError, KeyshareCreated,
+    BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
+    EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
 use fhe::{DecryptCiphertext, Fhe};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::warn;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
-    data: Addr<Data>,
+    store: Repository<KeyshareState>,
     bus: Addr<EventBus>,
+    secret: Option<Vec<u8>>,
     address: String,
 }
 
@@ -19,14 +23,57 @@ impl Actor for Keyshare {
     type Context = actix::Context<Self>;
 }
 
+pub struct KeyshareParams {
+    pub bus: Addr<EventBus>,
+    pub store: Repository<KeyshareState>,
+    pub fhe: Arc<Fhe>,
+    pub address: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct KeyshareState {
+    secret: Option<Vec<u8>>,
+}
+
 impl Keyshare {
-    pub fn new(bus: Addr<EventBus>, data: Addr<Data>, fhe: Arc<Fhe>, address: &str) -> Self {
+    pub fn new(params: KeyshareParams) -> Self {
         Self {
-            bus,
-            fhe,
-            data,
-            address: address.to_string(),
+            bus: params.bus,
+            fhe: params.fhe,
+            store: params.store,
+            secret: None,
+            address: params.address,
         }
+    }
+}
+
+impl Snapshot for Keyshare {
+    type Snapshot = KeyshareState;
+
+    fn snapshot(&self) -> Self::Snapshot {
+        KeyshareState {
+            secret: self.secret.clone(),
+        }
+    }
+}
+
+impl Checkpoint for Keyshare {
+    fn repository(&self) -> Repository<KeyshareState> {
+        self.store.clone()
+    }
+}
+
+#[async_trait]
+impl FromSnapshotWithParams for Keyshare {
+    type Params = KeyshareParams;
+    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
+        Ok(Self {
+            bus: params.bus,
+            fhe: params.fhe,
+            store: params.store,
+            secret: snapshot.secret,
+            address: params.address,
+        })
     }
 }
 
@@ -38,6 +85,7 @@ impl Handler<EnclaveEvent> for Keyshare {
             EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
             EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
             EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
+            EnclaveEvent::Shutdown { .. } => ctx.notify(Die),
             _ => (),
         }
     }
@@ -50,94 +98,73 @@ impl Handler<CiphernodeSelected> for Keyshare {
         let CiphernodeSelected { e3_id, .. } = event;
 
         // generate keyshare
-        let Ok((sk, pubkey)) = self.fhe.generate_keyshare() else {
+        let Ok((secret, pubkey)) = self.fhe.generate_keyshare() else {
             self.bus.do_send(EnclaveEvent::from_error(
                 EnclaveErrorType::KeyGeneration,
-                anyhow!("Error creating Keyshare"),
+                anyhow!("Error creating Keyshare for {e3_id}"),
             ));
             return;
         };
 
-        // TODO: decrypt from FHE actor
-        // save encrypted key against e3_id/sk
-        // reencrypt secretkey locally with env var - this is so we don't have to serialize a secret
-        // best practice would be as you boot up a node you enter in a configured password from
-        // which we derive a kdf which gets used to generate this key
-        self.data
-            .do_send(Insert(format!("{}/sk", e3_id).into(), sk));
+        // Save secret on state
+        self.secret = Some(secret);
 
-        // save public key against e3_id/pk
-        self.data
-            .do_send(Insert(format!("{}/pk", e3_id).into(), pubkey.clone()));
-
-        // broadcast the KeyshareCreated message
-        let event = EnclaveEvent::from(KeyshareCreated {
+        // Broadcast the KeyshareCreated message
+        self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
             pubkey,
             e3_id,
             node: self.address.clone(),
-        });
-        self.bus.do_send(event);
+        }));
+
+        // Write the snapshot to the store
+        self.checkpoint()
     }
 }
 
 impl Handler<CiphertextOutputPublished> for Keyshare {
-    type Result = ResponseFuture<()>;
+    type Result = ();
 
     fn handle(
         &mut self,
         event: CiphertextOutputPublished,
         _: &mut actix::Context<Self>,
     ) -> Self::Result {
-        let fhe = self.fhe.clone();
-        let data = self.data.clone();
-        let bus = self.bus.clone();
-        let address = self.address.clone();
-        Box::pin(async move {
-            on_decryption_requested(fhe, data, bus, event, address)
-                .await
-                .unwrap()
-        })
+        let CiphertextOutputPublished {
+            e3_id,
+            ciphertext_output,
+        } = event;
+
+        let Some(secret) = &self.secret else {
+            self.bus.err(
+                EnclaveErrorType::Decryption,
+                anyhow!("secret not found on Keyshare for e3_id {e3_id}"),
+            );
+            return;
+        };
+
+        let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
+            ciphertext: ciphertext_output.clone(),
+            unsafe_secret: secret.to_vec(),
+        }) else {
+            self.bus.err(
+                EnclaveErrorType::Decryption,
+                anyhow!("error decrypting ciphertext: {:?}", ciphertext_output),
+            );
+            return;
+        };
+
+        self.bus.do_send(EnclaveEvent::from(DecryptionshareCreated {
+            e3_id,
+            decryption_share,
+            node: self.address.clone(),
+        }));
     }
 }
 
 impl Handler<Die> for Keyshare {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+        warn!("Keyshare is shutting down");
         ctx.stop()
     }
-}
-
-async fn on_decryption_requested(
-    fhe: Arc<Fhe>,
-    data: Addr<Data>,
-    bus: Addr<EventBus>,
-    event: CiphertextOutputPublished,
-    address: String,
-) -> Result<()> {
-    let CiphertextOutputPublished {
-        e3_id,
-        ciphertext_output,
-    } = event;
-
-    // get secret key by id from data
-    let Some(unsafe_secret) = data.send(Get(format!("{}/sk", e3_id).into())).await? else {
-        return Err(anyhow::anyhow!("Secret key not stored for {}", e3_id));
-    };
-
-    let decryption_share = fhe
-        .decrypt_ciphertext(DecryptCiphertext {
-            ciphertext: ciphertext_output,
-            unsafe_secret,
-        })
-        .context("error decrypting ciphertext")?;
-
-    let event = EnclaveEvent::from(DecryptionshareCreated {
-        e3_id,
-        decryption_share,
-        node: address,
-    });
-
-    bus.do_send(event);
-
-    Ok(())
 }

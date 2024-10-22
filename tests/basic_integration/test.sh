@@ -76,6 +76,23 @@ waiton-files() {
   done
 }
 
+launch_ciphernode() {
+    local address="$1"
+    heading "Launch ciphernode $address"
+    yarn ciphernode:launch \
+      --address "$address" \
+      --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" \
+      --data-location "$SCRIPT_DIR/output/$address.db" &
+}
+
+launch_aggregator() {
+    local private_key="$1"
+    PRIVATE_KEY=$private_key yarn ciphernode:aggregator \
+      --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" \
+      --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
+      --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
+}
+
 pkill -9 -f "target/debug/enclave" || true
 pkill -9 -f "hardhat node" || true
 pkill -9 -f "target/debug/aggregator" || true
@@ -98,20 +115,11 @@ done
 
 # Launch 4 ciphernodes
 
-heading "Launch ciphernode $CIPHERNODE_ADDRESS_1"
-yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_1 --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" &
-
-heading "Launch ciphernode $CIPHERNODE_ADDRESS_2"
-yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_2 --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" &
-
-heading "Launch ciphernode $CIPHERNODE_ADDRESS_3"
-yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_3 --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" &
-
-heading "Launch ciphernode $CIPHERNODE_ADDRESS_4"
-yarn ciphernode:launch --address $CIPHERNODE_ADDRESS_4 --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" &
-
-# NOTE: This node is configured to be an aggregator
-PRIVATE_KEY=$PRIVATE_KEY yarn ciphernode:aggregator --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
+launch_ciphernode "$CIPHERNODE_ADDRESS_1"
+launch_ciphernode "$CIPHERNODE_ADDRESS_2"
+launch_ciphernode "$CIPHERNODE_ADDRESS_3"
+launch_ciphernode "$CIPHERNODE_ADDRESS_4"
+launch_aggregator "$PRIVATE_KEY"
 
 sleep 1
 
@@ -168,6 +176,11 @@ if [[ "$ACTUAL" != "$PLAINTEXT"* ]]; then
 fi
 
 heading "Test PASSED !"
+
+pkill -15 -f "target/debug/enclave" || true
+pkill -15 -f "target/debug/aggregator" || true
+
+sleep 4
 
 cleanup 0
 

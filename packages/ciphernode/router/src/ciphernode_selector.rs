@@ -1,7 +1,7 @@
 /// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
 /// forwards a CiphernodeSelected event to the event bus
 use actix::prelude::*;
-use enclave_core::{CiphernodeSelected, EnclaveEvent, EventBus, Subscribe};
+use enclave_core::{CiphernodeSelected, E3Requested, EnclaveEvent, EventBus, Shutdown, Subscribe};
 use sortition::{GetHasNode, Sortition};
 use tracing::info;
 
@@ -16,36 +16,44 @@ impl Actor for CiphernodeSelector {
 }
 
 impl CiphernodeSelector {
-    pub fn new(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: &str) -> Self {
+    pub fn new(bus: &Addr<EventBus>, sortition: &Addr<Sortition>, address: &str) -> Self {
         Self {
-            bus,
-            sortition,
+            bus: bus.clone(),
+            sortition: sortition.clone(),
             address: address.to_owned(),
         }
     }
 
-    pub fn attach(bus: Addr<EventBus>, sortition: Addr<Sortition>, address: &str) -> Addr<Self> {
-        let addr = CiphernodeSelector::new(bus.clone(), sortition, address).start();
+    pub fn attach(bus: &Addr<EventBus>, sortition: &Addr<Sortition>, address: &str) -> Addr<Self> {
+        let addr = CiphernodeSelector::new(bus, sortition, address).start();
 
         bus.do_send(Subscribe::new("E3Requested", addr.clone().recipient()));
+        bus.do_send(Subscribe::new("Shutdown", addr.clone().recipient()));
 
         addr
     }
 }
 
 impl Handler<EnclaveEvent> for CiphernodeSelector {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            EnclaveEvent::E3Requested { data, .. } => ctx.notify(data),
+            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+            _ => (),
+        }
+    }
+}
+
+impl Handler<E3Requested> for CiphernodeSelector {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, event: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, data: E3Requested, _ctx: &mut Self::Context) -> Self::Result {
         let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
 
         Box::pin(async move {
-            let EnclaveEvent::E3Requested { data, .. } = event else {
-                return;
-            };
-
             let seed = data.seed;
             let size = data.threshold_m;
 
@@ -68,5 +76,13 @@ impl Handler<EnclaveEvent> for CiphernodeSelector {
                 }));
             }
         })
+    }
+}
+
+impl Handler<Shutdown> for CiphernodeSelector {
+    type Result = ();
+    fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) -> Self::Result {
+        tracing::info!("Killing CiphernodeSelector");
+        ctx.stop();
     }
 }

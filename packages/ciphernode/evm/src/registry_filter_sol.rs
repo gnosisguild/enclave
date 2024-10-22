@@ -1,4 +1,4 @@
-use crate::helpers::{create_provider_with_signer, SignerProvider};
+use crate::helpers::{create_provider_with_signer, ensure_http_rpc, SignerProvider};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
@@ -9,7 +9,7 @@ use alloy::{
 use anyhow::Result;
 use enclave_core::{
     BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
-    Subscribe,
+    Shutdown, Subscribe,
 };
 use std::sync::Arc;
 use tracing::info;
@@ -28,28 +28,27 @@ pub struct RegistryFilterSolWriter {
 
 impl RegistryFilterSolWriter {
     pub async fn new(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: Address,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
-            provider: create_provider_with_signer(rpc_url, signer).await?,
+            provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
             contract_address,
-            bus,
+            bus: bus.clone(),
         })
     }
 
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Addr<RegistryFilterSolWriter>> {
-        let addr =
-            RegistryFilterSolWriter::new(bus.clone(), rpc_url, contract_address.parse()?, signer)
-                .await?
-                .start();
+        let addr = RegistryFilterSolWriter::new(bus, rpc_url, contract_address.parse()?, signer)
+            .await?
+            .start();
         let _ = bus
             .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
             .await;
@@ -72,6 +71,7 @@ impl Handler<EnclaveEvent> for RegistryFilterSolWriter {
                     ctx.notify(data);
                 }
             }
+            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
             _ => (),
         }
     }
@@ -102,6 +102,13 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
     }
 }
 
+impl Handler<Shutdown> for RegistryFilterSolWriter {
+    type Result = ();
+    fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
+    }
+}
+
 pub async fn publish_committee(
     provider: SignerProvider,
     contract_address: Address,
@@ -124,12 +131,12 @@ pub async fn publish_committee(
 pub struct RegistryFilterSol;
 impl RegistryFilterSol {
     pub async fn attach(
-        bus: Addr<EventBus>,
+        bus: &Addr<EventBus>,
         rpc_url: &str,
         contract_address: &str,
-        signer: Arc<PrivateKeySigner>,
+        signer: &Arc<PrivateKeySigner>,
     ) -> Result<()> {
-        RegistryFilterSolWriter::attach(bus.clone(), rpc_url, contract_address, signer).await?;
+        RegistryFilterSolWriter::attach(bus, rpc_url, contract_address, signer).await?;
         Ok(())
     }
 }

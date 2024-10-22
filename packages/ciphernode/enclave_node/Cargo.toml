@@ -31,3 +31,4 @@ serde = { workspace = true }
 sortition = { path = "../sortition" }
 test-helpers = { path = "../test_helpers" }
 tokio = { workspace = true }
+tracing = { workspace = true }

@@ -1,19 +1,28 @@
-use crate::CommitteeMetaFactory;
-
-use super::CommitteeMeta;
-use actix::{Actor, Addr, Context, Handler, Recipient};
-use aggregator::PlaintextAggregator;
-use aggregator::PublicKeyAggregator;
+use crate::CommitteeMetaFeature;
+use crate::E3RequestContext;
+use crate::E3RequestContextParams;
+use crate::E3RequestContextSnapshot;
+use crate::RepositoriesFactory;
+use actix::AsyncContext;
+use actix::{Actor, Addr, Context, Handler};
+use anyhow::*;
+use async_trait::async_trait;
+use data::Checkpoint;
+use data::DataStore;
+use data::FromSnapshotWithParams;
+use data::Repository;
+use data::Snapshot;
 use enclave_core::E3RequestComplete;
+use enclave_core::Shutdown;
 use enclave_core::{E3id, EnclaveEvent, EventBus, Subscribe};
-use fhe::Fhe;
-use keyshare::Keyshare;
+use serde::Deserialize;
+use serde::Serialize;
 use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
 
 /// Helper class to buffer events for downstream instances incase events arrive in the wrong order
 #[derive(Default)]
-struct EventBuffer {
+pub struct EventBuffer {
     buffer: HashMap<String, Vec<EnclaveEvent>>,
 }
 
@@ -30,72 +39,62 @@ impl EventBuffer {
     }
 }
 
-/// Context that is set to each event hook. Hooks can use this context to gather dependencies if
-/// they need to instantiate struct instances or actors.
-#[derive(Default)]
-pub struct E3RequestContext {
-    pub keyshare: Option<Addr<Keyshare>>,
-    pub fhe: Option<Arc<Fhe>>,
-    pub plaintext: Option<Addr<PlaintextAggregator>>,
-    pub publickey: Option<Addr<PublicKeyAggregator>>,
-    pub meta: Option<CommitteeMeta>,
-}
-
-impl E3RequestContext {
-    fn recipients(&self) -> Vec<(String, Option<Recipient<EnclaveEvent>>)> {
-        vec![
-            (
-                "keyshare".to_owned(),
-                self.keyshare.clone().map(|addr| addr.into()),
-            ),
-            (
-                "plaintext".to_owned(),
-                self.plaintext.clone().map(|addr| addr.into()),
-            ),
-            (
-                "publickey".to_owned(),
-                self.publickey.clone().map(|addr| addr.into()),
-            ),
-        ]
-    }
-
-    fn forward_message(&self, msg: &EnclaveEvent, buffer: &mut EventBuffer) {
-        self.recipients().into_iter().for_each(|(key, recipient)| {
-            if let Some(act) = recipient {
-                act.do_send(msg.clone());
-                for m in buffer.take(&key) {
-                    act.do_send(m);
-                }
-            } else {
-                buffer.add(&key, msg.clone());
-            }
-        });
-    }
-}
-
 /// Format of the hook that needs to be passed to E3RequestRouter
-pub type EventHook = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
+#[async_trait]
+pub trait E3Feature: Send + Sync + 'static {
+    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
+    async fn hydrate(
+        &self,
+        ctx: &mut E3RequestContext,
+        snapshot: &E3RequestContextSnapshot,
+    ) -> Result<()>;
+}
 
-/// E3RequestRouter will register hooks that receive an E3_id specific context. After hooks
+/// E3RequestRouter will register features that receive an E3_id specific context. After features
 /// have run e3_id specific messages are forwarded to all instances on the context. This enables
-/// hooks to lazily register instances that have the correct dependencies available per e3_id
+/// features to lazily register instances that have the correct dependencies available per e3_id
 /// request
-// TODO: setup typestate pattern so that we have to place hooks within correct order of
+// TODO: setup typestate pattern so that we have to place features within correct order of
 // dependencies
 pub struct E3RequestRouter {
     contexts: HashMap<E3id, E3RequestContext>,
     completed: HashSet<E3id>,
-    hooks: Vec<EventHook>,
+    features: Arc<Vec<Box<dyn E3Feature>>>,
     buffer: EventBuffer,
     bus: Addr<EventBus>,
+    store: Repository<E3RequestRouterSnapshot>,
+}
+
+pub struct E3RequestRouterParams {
+    features: Arc<Vec<Box<dyn E3Feature>>>,
+    bus: Addr<EventBus>,
+    store: Repository<E3RequestRouterSnapshot>,
 }
 
 impl E3RequestRouter {
-    pub fn builder(bus: Addr<EventBus>) -> E3RequestRouterBuilder {
-        let builder = E3RequestRouterBuilder { bus, hooks: vec![] };
+    pub fn builder(bus: &Addr<EventBus>, store: DataStore) -> E3RequestRouterBuilder {
+        let repositories = store.repositories();
+        let builder = E3RequestRouterBuilder {
+            bus: bus.clone(),
+            features: vec![],
+            store: repositories.router(),
+        };
 
         // Everything needs the committe meta factory so adding it here by default
-        builder.add_hook(CommitteeMetaFactory::create())
+        builder.add_feature(CommitteeMetaFeature::create())
+    }
+
+    pub fn from_params(params: E3RequestRouterParams) -> Self {
+        Self {
+            features: params.features,
+            bus: params.bus.clone(),
+            store: params.store.clone(),
+            completed: HashSet::new(),
+            contexts: HashMap::new(),
+            buffer: EventBuffer {
+                buffer: HashMap::new(),
+            },
+        }
     }
 }
 
@@ -105,7 +104,13 @@ impl Actor for E3RequestRouter {
 
 impl Handler<EnclaveEvent> for E3RequestRouter {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        // If we are shuttomg down then bail on anything else
+        if let EnclaveEvent::Shutdown { data, .. } = msg {
+            ctx.notify(data);
+            return;
+        }
+
         let Some(e3_id) = msg.get_e3_id() else {
             return;
         };
@@ -115,10 +120,17 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             return;
         }
 
-        let context = self.contexts.entry(e3_id.clone()).or_default();
+        let repositories = self.repository().repositories();
+        let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
+            E3RequestContext::from_params(E3RequestContextParams {
+                e3_id: e3_id.clone(),
+                store: repositories.context(&e3_id),
+                features: self.features.clone(),
+            })
+        });
 
-        for hook in &mut self.hooks {
-            hook(context, msg.clone());
+        for feature in self.features.iter() {
+            feature.on_event(context, &msg);
         }
 
         context.forward_message(&msg, &mut self.buffer);
@@ -143,32 +155,116 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             }
             _ => (),
         }
+
+        self.checkpoint();
+    }
+}
+
+impl Handler<Shutdown> for E3RequestRouter {
+    type Result = ();
+    fn handle(&mut self, msg: Shutdown, _ctx: &mut Self::Context) -> Self::Result {
+        let shutdown_evt = EnclaveEvent::from(msg);
+        for (_, ctx) in self.contexts.iter() {
+            ctx.forward_message_now(&shutdown_evt)
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct E3RequestRouterSnapshot {
+    contexts: Vec<E3id>,
+    completed: HashSet<E3id>,
+}
+
+impl Snapshot for E3RequestRouter {
+    type Snapshot = E3RequestRouterSnapshot;
+    fn snapshot(&self) -> Self::Snapshot {
+        let contexts = self.contexts.keys().cloned().collect();
+        let completed = self.completed.clone();
+
+        Self::Snapshot {
+            completed,
+            contexts,
+        }
+    }
+}
+
+impl Checkpoint for E3RequestRouter {
+    fn repository(&self) -> Repository<E3RequestRouterSnapshot> {
+        self.store.clone()
+    }
+}
+
+#[async_trait]
+impl FromSnapshotWithParams for E3RequestRouter {
+    type Params = E3RequestRouterParams;
+
+    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
+        let mut contexts = HashMap::new();
+
+        let repositories = params.store.repositories();
+        for e3_id in snapshot.contexts {
+            let Some(ctx_snapshot) = repositories.context(&e3_id).read().await? else {
+                continue;
+            };
+
+            contexts.insert(
+                e3_id.clone(),
+                E3RequestContext::from_snapshot(
+                    E3RequestContextParams {
+                        store: repositories.context(&e3_id),
+                        e3_id: e3_id.clone(),
+                        features: params.features.clone(),
+                    },
+                    ctx_snapshot,
+                )
+                .await?,
+            );
+        }
+
+        Ok(E3RequestRouter {
+            contexts,
+            completed: snapshot.completed,
+            features: params.features.into(),
+            buffer: EventBuffer::default(),
+            bus: params.bus,
+            store: repositories.router(),
+        })
     }
 }
 
 /// Builder for E3RequestRouter
 pub struct E3RequestRouterBuilder {
     pub bus: Addr<EventBus>,
-    pub hooks: Vec<EventHook>,
+    pub features: Vec<Box<dyn E3Feature>>,
+    pub store: Repository<E3RequestRouterSnapshot>,
 }
+
 impl E3RequestRouterBuilder {
-    pub fn add_hook(mut self, listener: EventHook) -> Self {
-        self.hooks.push(listener);
+    pub fn add_feature(mut self, listener: Box<dyn E3Feature>) -> Self {
+        self.features.push(listener);
         self
     }
 
-    pub fn build(self) -> Addr<E3RequestRouter> {
-        let e3r = E3RequestRouter {
-            contexts: HashMap::new(),
-            completed: HashSet::new(),
-            hooks: self.hooks,
-            buffer: EventBuffer::default(),
+    pub async fn build(self) -> Result<Addr<E3RequestRouter>> {
+        let repositories = self.store.repositories();
+        let router_repo = repositories.router();
+        let snapshot: Option<E3RequestRouterSnapshot> = router_repo.read().await?;
+        let params = E3RequestRouterParams {
+            features: self.features.into(),
             bus: self.bus.clone(),
+
+            store: router_repo,
+        };
+
+        let e3r = match snapshot {
+            Some(snapshot) => E3RequestRouter::from_snapshot(params, snapshot).await?,
+            None => E3RequestRouter::from_params(params),
         };
 
         let addr = e3r.start();
         self.bus
             .do_send(Subscribe::new("*", addr.clone().recipient()));
-        addr
+        Ok(addr)
     }
 }
