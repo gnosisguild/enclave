@@ -2,6 +2,7 @@ use crate::{InMemStore, IntoKey, SledStore};
 use actix::{Addr, Message, Recipient};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "()")]
@@ -57,6 +58,9 @@ impl DataStore {
     /// Writes data to the scope location
     pub fn write<T: Serialize>(&self, value: T) {
         let Ok(serialized) = bincode::serialize(&value) else {
+            let str_key = self.get_scope().unwrap_or("<bad key>".to_string());
+            let str_error = format!("Could not serialize value passed to {}", str_key);
+            error!(str_error);
             return;
         };
         let msg = Insert::new(&self.scope, serialized);

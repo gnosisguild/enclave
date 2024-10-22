@@ -1870,6 +1870,7 @@ dependencies = [
  "enclave-core",
  "serde",
  "sled",
+ "tracing",
 ]
 
 [[package]]
