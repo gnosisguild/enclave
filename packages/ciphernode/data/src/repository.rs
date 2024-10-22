@@ -31,6 +31,12 @@ impl<S> From<Repository<S>> for DataStore {
     }
 }
 
+impl<T> From<&Repository<T>> for DataStore {
+    fn from(value: &Repository<T>) -> Self {
+       value.store.clone() 
+    }
+}
+
 /// Clone without phantom data
 impl<S> Clone for Repository<S> {
     fn clone(&self) -> Self {
