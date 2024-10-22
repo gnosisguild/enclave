@@ -132,7 +132,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
             })
         });
 
-        for feature in self.features.clone().iter() {
+        for feature in self.features.iter() {
             feature.on_event(context, &msg);
         }
 

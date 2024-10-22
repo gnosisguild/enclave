@@ -22,7 +22,7 @@ pub trait Checkpoint: Snapshot {
     /// Declare the DataStore instance available on the object
     fn repository(&self) -> Repository<Self::Snapshot>;
 
-    /// Write the current snapshot to the DataStore provided by `get_store()` at the object's id returned by `get_id()`
+    /// Write the current snapshot to the `Repository` provided by `repository()`
     fn checkpoint(&self) {
         self.repository().write(&self.snapshot());
     }
