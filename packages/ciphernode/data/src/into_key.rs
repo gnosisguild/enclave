@@ -6,7 +6,7 @@ pub trait IntoKey {
 /// Keys can be vectors of String
 impl IntoKey for Vec<u8> {
     fn into_key(self) -> Vec<u8> {
-        self.clone()
+        self
     }
 }
 
