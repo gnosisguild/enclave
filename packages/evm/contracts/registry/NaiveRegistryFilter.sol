@@ -34,6 +34,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     error CommitteeAlreadyPublished();
     error CommitteeDoesNotExist();
     error CommitteeNotPublished();
+    error CiphernodeNotEnabled(address ciphernode);
     error OnlyRegistry();
 
     ////////////////////////////////////////////////////////////
@@ -44,6 +45,15 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     modifier onlyRegistry() {
         require(msg.sender == registry, OnlyRegistry());
+        _;
+    }
+
+    modifier onlyOwnerOrCiphernode() {
+        require(
+            msg.sender == owner() ||
+                ICiphernodeRegistry(registry).isCiphernodeEligible(msg.sender),
+            CiphernodeNotEnabled(msg.sender)
+        );
         _;
     }
 
