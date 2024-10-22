@@ -523,9 +523,6 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     Ok(())
 }
 
-// #[actix::test]
-// async fn test_actors_resume_from_shutdown() -> Result<()> {}
-
 #[actix::test]
 async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     let seed = Seed(ChaCha20Rng::seed_from_u64(123).get_seed());
