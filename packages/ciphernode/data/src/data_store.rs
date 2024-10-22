@@ -12,12 +12,12 @@ impl Insert {
         Self(key.into_key(), value)
     }
 
-    pub fn key(&self) -> Vec<u8> {
-        self.0.clone()
+    pub fn key(&self) -> &Vec<u8> {
+        &self.0
     }
 
-    pub fn value(&self) -> Vec<u8> {
-        self.1.clone()
+    pub fn value(&self) -> &Vec<u8> {
+        &self.1
     }
 }
 
@@ -29,8 +29,8 @@ impl Get {
         Self(key.into_key())
     }
 
-    pub fn key(&self) -> Vec<u8> {
-        self.0.clone()
+    pub fn key(&self) -> &Vec<u8> {
+        &self.0
     }
 }
 

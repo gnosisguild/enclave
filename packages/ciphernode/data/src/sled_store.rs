@@ -29,7 +29,7 @@ impl Handler<Insert> for SledStore {
     fn handle(&mut self, event: Insert, _: &mut Self::Context) -> Self::Result {
         match self
             .db
-            .insert(event.key(), event.value())
+            .insert(event.key(), event.value().to_vec())
             .context("Could not insert data into db")
         {
             Err(err) => self.bus.err(EnclaveErrorType::Data, err),

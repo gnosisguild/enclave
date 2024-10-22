@@ -36,7 +36,7 @@ impl Handler<Insert> for InMemStore {
     type Result = ();
     fn handle(&mut self, event: Insert, _: &mut Self::Context) {
         // insert data into sled
-        self.db.insert(event.key(), event.value());
+        self.db.insert(event.key().to_vec(), event.value().to_vec());
 
         if self.capture {
             self.log.push(DataOp::Insert(event));
@@ -48,7 +48,7 @@ impl Handler<Get> for InMemStore {
     type Result = Option<Vec<u8>>;
     fn handle(&mut self, event: Get, _: &mut Self::Context) -> Option<Vec<u8>> {
         let key = event.key();
-        self.db.get(&key).map(|r| r.clone())
+        self.db.get(key).cloned()
     }
 }
 
