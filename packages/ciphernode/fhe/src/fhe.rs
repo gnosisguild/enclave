@@ -139,7 +139,7 @@ impl Snapshot for Fhe {
 impl FromSnapshotWithParams for Fhe {
     type Params = SharedRng;
     async fn from_snapshot(rng: SharedRng, snapshot: FheSnapshot) -> Result<Self> {
-        let params = Arc::new(BfvParameters::try_deserialize(&snapshot.params).unwrap());
+        let params = Arc::new(BfvParameters::try_deserialize(&snapshot.params)?);
         let crp = CommonRandomPoly::deserialize(&snapshot.crp, &params)?;
         Ok(Fhe::new(params, crp, rng))
     }
