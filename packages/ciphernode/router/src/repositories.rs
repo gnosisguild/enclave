@@ -86,5 +86,3 @@ impl<T> RepositoriesFactory for Repository<T> {
         store.repositories()
     }
 }
-
-

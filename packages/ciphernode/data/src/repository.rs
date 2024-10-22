@@ -33,7 +33,7 @@ impl<S> From<Repository<S>> for DataStore {
 
 impl<T> From<&Repository<T>> for DataStore {
     fn from(value: &Repository<T>) -> Self {
-       value.store.clone() 
+        value.store.clone()
     }
 }
 
