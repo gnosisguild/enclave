@@ -38,11 +38,8 @@ impl EventBuffer {
             .unwrap_or_default()
     }
 }
-/// Format of the hook that needs to be passed to E3RequestRouter
-// pub type EventHook = Box<dyn FnMut(&mut E3RequestContext, EnclaveEvent)>;
-// pub type Hydrator = Box<dyn FnMut(&mut E3RequestContext, &E3RequestContextSnapshot)>;
-// pub type E3Feature = (EventHook, Hydrator);
 
+/// Format of the hook that needs to be passed to E3RequestRouter
 #[async_trait]
 pub trait E3Feature: Send + Sync + 'static {
     fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
