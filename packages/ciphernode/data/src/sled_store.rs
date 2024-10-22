@@ -15,7 +15,8 @@ impl Actor for SledStore {
 
 impl SledStore {
     pub fn new(bus: &Addr<EventBus>, path: &str) -> Result<Self> {
-        let db = sled::open(path).context("could not open db")?;
+        let db = sled::open(path)
+            .with_context(|| format!("Could not open database at path '{}'", path))?;
         Ok(Self {
             db,
             bus: bus.clone(),
