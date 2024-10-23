@@ -158,7 +158,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             ciphertext_output,
         } = event;
 
-        let Ok(secret) = &self.get_secret() else {
+        let Ok(secret) = self.get_secret() else {
             self.bus.err(
                 EnclaveErrorType::Decryption,
                 anyhow!("Secret not available for Keyshare for e3_id {e3_id}"),
@@ -168,7 +168,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
 
         let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
             ciphertext: ciphertext_output.clone(),
-            unsafe_secret: secret.to_vec(),
+            unsafe_secret: secret,
         }) else {
             self.bus.err(
                 EnclaveErrorType::Decryption,
