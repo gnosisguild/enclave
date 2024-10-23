@@ -3250,7 +3250,6 @@ dependencies = [
  "data",
  "enclave-core",
  "fhe 0.1.0",
- "proptest",
  "rand",
  "serde",
  "tracing",

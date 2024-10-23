@@ -2,7 +2,7 @@ use std::env;
 
 use alloy::primitives::Address;
 use clap::Parser;
-use enclave::{ensure_req_env, load_config};
+use enclave::load_config;
 use enclave_node::{listen_for_shutdown, MainCiphernode};
 use tracing::info;
 
