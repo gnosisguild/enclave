@@ -1,4 +1,4 @@
-use crate::{decrypt_data, encrypt_data};
+use crate::Encryptor;
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -50,8 +50,10 @@ impl Keyshare {
     }
 
     fn set_secret(&mut self, mut data: Vec<u8>) -> Result<()> {
-        let encrypted = encrypt_data(&mut data)?;
+        let encrypted = Encryptor::from_env("CIPHERNODE_SECRET")?.encrypt_data(&mut data)?;
+
         self.secret = Some(encrypted);
+
         Ok(())
     }
 
@@ -60,7 +62,9 @@ impl Keyshare {
             .secret
             .clone()
             .ok_or(anyhow!("No secret share available on Keyshare"))?;
-        let decrypted = decrypt_data(&encrypted)?;
+
+        let decrypted = Encryptor::from_env("CIPHERNODE_SECRET")?.decrypt_data(&encrypted)?;
+
         Ok(decrypted)
     }
 }
