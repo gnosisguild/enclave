@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn test_large_data() {
         let encryptor = Encryptor::new("test_password".to_owned());
-        let data = vec![0u8; 1024 * 1024]; // 1MB of data
+        let data = vec![1u8; 1024 * 1024]; // 1MB of data
 
         let start = Instant::now();
         let encrypted = encryptor.encrypt_data(&mut data.clone()).unwrap();
