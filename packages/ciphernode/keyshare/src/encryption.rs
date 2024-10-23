@@ -111,7 +111,7 @@ impl Encryptor {
         Self { key }
     }
 
-    pub fn from_env(key:&str) -> Result<Self> {
+    pub fn from_env(key: &str) -> Result<Self> {
         Ok(Self::new(env::var(key)?))
     }
 
