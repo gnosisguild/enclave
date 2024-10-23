@@ -4,11 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+actix = { workspace = true }
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+argon2  = { workspace = true }
+async-trait = { workspace = true }
 data = { path = "../data" }
 enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
-actix = { workspace = true }
-anyhow = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
-async-trait = { workspace = true }
 tracing = { workspace = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true } 

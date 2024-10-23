@@ -1,6 +1,8 @@
+use std::env;
+
 use alloy::primitives::Address;
 use clap::Parser;
-use enclave::load_config;
+use enclave::{ensure_req_env, load_config};
 use enclave_node::{listen_for_shutdown, MainCiphernode};
 use tracing::info;
 
@@ -39,6 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let address = Address::parse_checksummed(&args.address, None).expect("Invalid address");
     info!("LAUNCHING CIPHERNODE: ({})", address);
     let config = load_config(&args.config)?;
+
     let (bus, handle) =
         MainCiphernode::attach(config, address, args.data_location.as_deref()).await?;
 

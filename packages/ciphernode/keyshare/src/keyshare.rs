@@ -1,3 +1,4 @@
+use crate::{decrypt_data, encrypt_data};
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -8,8 +9,10 @@ use enclave_core::{
 };
 use fhe::{DecryptCiphertext, Fhe};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::env;
+use std::{process, sync::Arc};
 use tracing::warn;
+use zeroize::Zeroizing;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
@@ -44,6 +47,21 @@ impl Keyshare {
             secret: None,
             address: params.address,
         }
+    }
+
+    fn set_secret(&mut self, mut data: Vec<u8>) -> Result<()> {
+        let encrypted = encrypt_data(&mut data)?;
+        self.secret = Some(encrypted);
+        Ok(())
+    }
+
+    fn get_secret(&self) -> Result<Vec<u8>> {
+        let encrypted = self
+            .secret
+            .clone()
+            .ok_or(anyhow!("No secret share available on Keyshare"))?;
+        let decrypted = decrypt_data(&encrypted)?;
+        Ok(decrypted)
     }
 }
 
@@ -107,7 +125,13 @@ impl Handler<CiphernodeSelected> for Keyshare {
         };
 
         // Save secret on state
-        self.secret = Some(secret);
+        let Ok(()) = self.set_secret(secret) else {
+            self.bus.do_send(EnclaveEvent::from_error(
+                EnclaveErrorType::KeyGeneration,
+                anyhow!("Error encrypting Keyshare for {e3_id}"),
+            ));
+            return;
+        };
 
         // Broadcast the KeyshareCreated message
         self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
@@ -134,10 +158,10 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             ciphertext_output,
         } = event;
 
-        let Some(secret) = &self.secret else {
+        let Ok(secret) = &self.get_secret() else {
             self.bus.err(
                 EnclaveErrorType::Decryption,
-                anyhow!("secret not found on Keyshare for e3_id {e3_id}"),
+                anyhow!("Secret not available for Keyshare for e3_id {e3_id}"),
             );
             return;
         };

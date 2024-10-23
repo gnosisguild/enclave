@@ -8,12 +8,13 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-enclave_node = { path = "../enclave_node" }
-alloy = { workspace = true }
-clap = { workspace = true }
 actix = { workspace = true }
 actix-rt = { workspace = true }
-tokio = { workspace = true }
+alloy = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
 config = "0.14.0"
+enclave_node = { path = "../enclave_node" }
+tokio = { workspace = true }
 tracing-subscriber = { workspace = true } 
 tracing = { workspace = true }

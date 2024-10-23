@@ -824,6 +824,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
 
 [[package]]
+name = "argon2"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c3610892ee6e0cbce8ae2700349fcf8f98adb0dbfbee85aec3c9179d29cc072"
+dependencies = [
+ "base64ct",
+ "blake2",
+ "cpufeatures",
+ "password-hash",
+]
+
+[[package]]
 name = "ark-ff"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2113,6 +2125,7 @@ dependencies = [
  "actix",
  "actix-rt",
  "alloy",
+ "anyhow",
  "clap",
  "config",
  "enclave_node",
@@ -3230,13 +3243,18 @@ name = "keyshare"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "aes-gcm",
  "anyhow",
+ "argon2",
  "async-trait",
  "data",
  "enclave-core",
  "fhe 0.1.0",
+ "proptest",
+ "rand",
  "serde",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -4460,6 +4478,17 @@ dependencies = [
  "redox_syscall 0.5.3",
  "smallvec",
  "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "password-hash"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "346f04948ba92c43e8469c1ee6736c7563d71012b17d40745260fe106aac2166"
+dependencies = [
+ "base64ct",
+ "rand_core",
+ "subtle",
 ]
 
 [[package]]
