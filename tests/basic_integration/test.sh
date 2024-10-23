@@ -18,6 +18,7 @@ export RUST_LOG=info
 RPC_URL="ws://localhost:8545"
 
 PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+CIPHERNODE_SECRET="We are the music makers and we are the dreamers of the dreams."
 
 # These contracts are based on the deterministic order of hardhat deploy
 # We _may_ wish to get these off the hardhat environment somehow?
@@ -30,6 +31,7 @@ CIPHERNODE_ADDRESS_1="0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
 CIPHERNODE_ADDRESS_2="0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
 CIPHERNODE_ADDRESS_3="0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
 CIPHERNODE_ADDRESS_4="0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+
 
 # Function to clean up background processes
 cleanup() {
@@ -78,8 +80,9 @@ waiton-files() {
 
 launch_ciphernode() {
     local address="$1"
+    local secret="$2"
     heading "Launch ciphernode $address"
-    yarn ciphernode:launch \
+    CIPHERNODE_SECRET=$secret yarn ciphernode:launch \
       --address "$address" \
       --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" \
       --data-location "$SCRIPT_DIR/output/$address.db" &
@@ -115,10 +118,10 @@ done
 
 # Launch 4 ciphernodes
 
-launch_ciphernode "$CIPHERNODE_ADDRESS_1"
-launch_ciphernode "$CIPHERNODE_ADDRESS_2"
-launch_ciphernode "$CIPHERNODE_ADDRESS_3"
-launch_ciphernode "$CIPHERNODE_ADDRESS_4"
+launch_ciphernode "$CIPHERNODE_ADDRESS_1" "$CIPHERNODE_SECRET"
+launch_ciphernode "$CIPHERNODE_ADDRESS_2" "$CIPHERNODE_SECRET"
+launch_ciphernode "$CIPHERNODE_ADDRESS_3" "$CIPHERNODE_SECRET"
+launch_ciphernode "$CIPHERNODE_ADDRESS_4" "$CIPHERNODE_SECRET"
 launch_aggregator "$PRIVATE_KEY"
 
 sleep 1
