@@ -1,0 +1,10 @@
+[package]
+name = "config"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dirs = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+figment = { workspace = true }

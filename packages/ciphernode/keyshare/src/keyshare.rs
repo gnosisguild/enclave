@@ -9,7 +9,7 @@ use enclave_core::{
 };
 use fhe::{DecryptCiphertext, Fhe};
 use serde::{Deserialize, Serialize};
-use std::{process, sync::Arc};
+use std::sync::Arc;
 use tracing::warn;
 
 pub struct Keyshare {
@@ -127,12 +127,11 @@ impl Handler<CiphernodeSelected> for Keyshare {
         };
 
         // Save secret on state
-        let Ok(()) = self.set_secret(secret) else {
+        if let Err(err) = self.set_secret(secret) {
             self.bus.do_send(EnclaveEvent::from_error(
                 EnclaveErrorType::KeyGeneration,
-                anyhow!("Error encrypting Keyshare for {e3_id}"),
-            ));
-            return;
+                err,
+            ))
         };
 
         // Broadcast the KeyshareCreated message

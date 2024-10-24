@@ -31,7 +31,6 @@ pub struct EnvPasswordManager(pub Option<Zeroizing<Vec<u8>>>);
 impl EnvPasswordManager {
     pub fn new(value: &str) -> Result<Self> {
         let env_string = env::var(value)?.as_bytes().into();
-        env::remove_var(value);
         Ok(Self(Some(Zeroizing::new(env_string))))
     }
 }

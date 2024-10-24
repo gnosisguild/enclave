@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-use crate::EnclaveErrorType;
+use crate::{EnclaveError, EnclaveErrorType};
 
 use super::events::{EnclaveEvent, EventId, FromError};
 
@@ -24,6 +24,10 @@ impl Subscribe {
 #[derive(Message)]
 #[rtype(result = "Vec<EnclaveEvent>")]
 pub struct GetHistory;
+
+#[derive(Message)]
+#[rtype(result = "Vec<EnclaveError>")]
+pub struct GetErrors;
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -79,6 +83,21 @@ impl Handler<GetHistory> for EventBus {
         self.history.clone()
     }
 }
+
+impl Handler<GetErrors> for EventBus {
+    type Result = Vec<EnclaveError>;
+
+    fn handle(&mut self, _: GetErrors, _: &mut Context<Self>) -> Vec<EnclaveError> {
+        self.history.iter().filter_map(|evt| {
+            match evt {
+                EnclaveEvent::EnclaveError {data, .. } => Some(data),
+                _ => None
+            }
+        }).cloned().collect()
+    }
+}
+
+
 impl Handler<ResetHistory> for EventBus {
     type Result = ();
 

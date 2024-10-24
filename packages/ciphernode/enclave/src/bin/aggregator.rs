@@ -1,5 +1,5 @@
 use clap::Parser;
-use enclave::load_config;
+use config::load_config;
 use enclave_node::{listen_for_shutdown, MainAggregator};
 use tracing::info;
 
@@ -24,9 +24,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
     info!("LAUNCHING AGGREGATOR");
-    let config = load_config(&args.config)?;
+    let conf = load_config(&args.config)?;
     let (bus, handle) = MainAggregator::attach(
-        config,
+        conf,
         args.pubkey_write_path.as_deref(),
         args.plaintext_write_path.as_deref(),
         args.data_location.as_deref(),

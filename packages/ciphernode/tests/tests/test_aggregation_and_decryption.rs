@@ -1,8 +1,6 @@
 use data::{DataStore, InMemStore};
 use enclave_core::{
-    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated,
-    OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed, Shutdown,
+    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory, KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed, Shutdown
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
@@ -400,13 +398,18 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     .await?;
 
     let history = bus.send(GetHistory).await?;
+    let errors = bus.send(GetErrors).await?;
+
+    println!("{:?}", errors);
+
+    assert_eq!(errors.len(), 0);
 
     // SEND SHUTDOWN!
     bus.send(EnclaveEvent::from(Shutdown)).await?;
 
     // Reset history
     bus.send(ResetHistory).await?;
-
+    
     // Check event count is correct
     assert_eq!(history.len(), 7);
 
