@@ -1,7 +1,7 @@
-use crate::Encryptor;
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use cipher::Cipher;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
@@ -9,10 +9,8 @@ use enclave_core::{
 };
 use fhe::{DecryptCiphertext, Fhe};
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::{process, sync::Arc};
 use tracing::warn;
-use zeroize::Zeroizing;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
@@ -50,7 +48,7 @@ impl Keyshare {
     }
 
     fn set_secret(&mut self, mut data: Vec<u8>) -> Result<()> {
-        let encrypted = Encryptor::from_env("CIPHERNODE_SECRET")?.encrypt_data(&mut data)?;
+        let encrypted = Cipher::from_env("CIPHERNODE_SECRET")?.encrypt_data(&mut data)?;
 
         self.secret = Some(encrypted);
 
@@ -63,7 +61,7 @@ impl Keyshare {
             .clone()
             .ok_or(anyhow!("No secret share available on Keyshare"))?;
 
-        let decrypted = Encryptor::from_env("CIPHERNODE_SECRET")?.decrypt_data(&encrypted)?;
+        let decrypted = Cipher::from_env("CIPHERNODE_SECRET")?.decrypt_data(&encrypted)?;
 
         Ok(decrypted)
     }

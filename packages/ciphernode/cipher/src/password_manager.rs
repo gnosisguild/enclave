@@ -1,0 +1,154 @@
+use anyhow::*;
+use std::{
+    env,
+    fs::{self, OpenOptions, Permissions},
+    io::Write,
+    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    path::{Path, PathBuf},
+};
+use zeroize::Zeroizing;
+
+pub trait PasswordManager {
+    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>>;
+    fn delete_key(&mut self) -> Result<()>;
+    fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()>;
+}
+
+pub struct InMemPasswordManager(pub Option<Zeroizing<Vec<u8>>>);
+
+impl InMemPasswordManager {
+    pub fn new(value: Zeroizing<Vec<u8>>) -> Self {
+        Self(Some(value))
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        Self::new(Zeroizing::new(value.as_bytes().to_vec()))
+    }
+}
+
+pub struct EnvPasswordManager(pub Option<Zeroizing<Vec<u8>>>);
+
+impl EnvPasswordManager {
+    pub fn new(value: &str) -> Result<Self> {
+        let env_string = env::var(value)?.as_bytes().into();
+        env::remove_var(value);
+        Ok(Self(Some(Zeroizing::new(env_string))))
+    }
+}
+
+impl PasswordManager for EnvPasswordManager {
+    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+        if let Some(key) = self.0.clone() {
+            return Ok(key);
+        }
+        Err(anyhow!("No key found"))
+    }
+    fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
+        self.0 = Some(contents);
+        Ok(())
+    }
+
+    fn delete_key(&mut self) -> Result<()> {
+        self.0 = None;
+        Ok(())
+    }
+}
+
+impl PasswordManager for InMemPasswordManager {
+    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+        if let Some(key) = self.0.clone() {
+            return Ok(key);
+        }
+        Err(anyhow!("No key found"))
+    }
+    fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
+        self.0 = Some(contents);
+        Ok(())
+    }
+
+    fn delete_key(&mut self) -> Result<()> {
+        self.0 = None;
+        Ok(())
+    }
+}
+
+pub struct FilePasswordManager {
+    path: PathBuf,
+}
+
+impl FilePasswordManager {
+    pub fn new(path: impl AsRef<Path>) -> Self {
+        Self {
+            path: path.as_ref().to_owned(),
+        }
+    }
+}
+
+impl PasswordManager for FilePasswordManager {
+    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+        let path = &self.path;
+
+        ensure_file_permissions(path, 0o400)?;
+
+        let bytes = fs::read(&self.path).context("Failed to access keyfile")?;
+
+        Ok(Zeroizing::new(bytes))
+    }
+
+    fn delete_key(&mut self) -> Result<()> {
+        let path = &self.path;
+
+        ensure_file_permissions(path, 0o600)?;
+
+        fs::remove_file(path).context("Failed to remove keyfile")?;
+        Ok(())
+    }
+
+    fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
+        let path = &self.path;
+
+        // Check if file exists
+        if path.exists() {
+            bail!("Keyfile already exists. Refusing to overwrite.");
+        }
+
+        // Create new file with restrictive permissions from the start
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(path)
+            .context("Failed to create keyfile")?;
+
+        // Write the contents
+        file.write_all(&contents)
+            .context("Failed to write data to keyfile")?;
+
+        file.flush().context("Failed to flush data to keyfile")?;
+
+        // Close the file handle explicitly
+        drop(file);
+
+        // Set to read-only (400)
+        fs::set_permissions(path, Permissions::from_mode(0o400))
+            .context("Failed to set permissions on keyfile")?;
+
+        Ok(())
+    }
+}
+
+fn ensure_file_permissions(path: &PathBuf, perms: u32) -> Result<()> {
+    // Get current permissions
+    let metadata = fs::metadata(path).context("Failed to get metadata for keyfile")?;
+
+    let current_mode = metadata.permissions().mode() & 0o777;
+
+    // Check if permissions are already 400
+    if current_mode != perms {
+        // Set permissions to 400
+        fs::set_permissions(path, Permissions::from_mode(perms))
+            .context("Failed to set permissions for keyfile")?;
+    }
+
+    Ok(())
+}

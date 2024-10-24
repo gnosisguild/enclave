@@ -5,14 +5,11 @@ edition = "2021"
 
 [dependencies]
 actix = { workspace = true }
-aes-gcm = { workspace = true, version = "=0.10.3" }
 anyhow = { workspace = true }
-argon2  = { workspace = true, version = "=0.5.2" }
 async-trait = { workspace = true }
 data = { path = "../data" }
+cipher = { path = "../cipher" }
 enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
-rand = { workspace = true, version = "=0.8.5" }
 serde = { workspace = true }
 tracing = { workspace = true }
-zeroize = { workspace = true, version = "=1.6.0" }
