@@ -1,5 +1,3 @@
-use std::env;
-
 use alloy::primitives::Address;
 use anyhow::{Context, Result};
 use clap::Parser;
