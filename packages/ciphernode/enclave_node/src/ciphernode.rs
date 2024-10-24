@@ -1,6 +1,7 @@
 use actix::{Actor, Addr, Context};
 use alloy::primitives::Address;
 use anyhow::Result;
+use config::AppConfig;
 use data::{DataStore, InMemStore, SledStore};
 use enclave_core::EventBus;
 use evm::{CiphernodeRegistrySol, EnclaveSolReader};
@@ -15,7 +16,6 @@ use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
-use crate::app_config::AppConfig;
 
 /// Main Ciphernode Actor
 /// Suprvises all children

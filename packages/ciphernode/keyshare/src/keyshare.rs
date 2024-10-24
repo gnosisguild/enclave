@@ -1,6 +1,7 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use cipher::Cipher;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
@@ -44,6 +45,25 @@ impl Keyshare {
             secret: None,
             address: params.address,
         }
+    }
+
+    fn set_secret(&mut self, mut data: Vec<u8>) -> Result<()> {
+        let encrypted = Cipher::from_env("CIPHERNODE_SECRET")?.encrypt_data(&mut data)?;
+
+        self.secret = Some(encrypted);
+
+        Ok(())
+    }
+
+    fn get_secret(&self) -> Result<Vec<u8>> {
+        let encrypted = self
+            .secret
+            .clone()
+            .ok_or(anyhow!("No secret share available on Keyshare"))?;
+
+        let decrypted = Cipher::from_env("CIPHERNODE_SECRET")?.decrypt_data(&encrypted)?;
+
+        Ok(decrypted)
     }
 }
 
@@ -107,7 +127,12 @@ impl Handler<CiphernodeSelected> for Keyshare {
         };
 
         // Save secret on state
-        self.secret = Some(secret);
+        if let Err(err) = self.set_secret(secret) {
+            self.bus.do_send(EnclaveEvent::from_error(
+                EnclaveErrorType::KeyGeneration,
+                err,
+            ))
+        };
 
         // Broadcast the KeyshareCreated message
         self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
@@ -134,17 +159,17 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             ciphertext_output,
         } = event;
 
-        let Some(secret) = &self.secret else {
+        let Ok(secret) = self.get_secret() else {
             self.bus.err(
                 EnclaveErrorType::Decryption,
-                anyhow!("secret not found on Keyshare for e3_id {e3_id}"),
+                anyhow!("Secret not available for Keyshare for e3_id {e3_id}"),
             );
             return;
         };
 
         let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
             ciphertext: ciphertext_output.clone(),
-            unsafe_secret: secret.to_vec(),
+            unsafe_secret: secret,
         }) else {
             self.bus.err(
                 EnclaveErrorType::Decryption,

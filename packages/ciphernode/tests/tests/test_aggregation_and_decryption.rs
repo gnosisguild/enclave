@@ -1,8 +1,6 @@
 use data::{DataStore, InMemStore};
 use enclave_core::{
-    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetHistory, KeyshareCreated,
-    OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed, Shutdown,
+    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory, KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed, Shutdown
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
@@ -24,7 +22,7 @@ use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::{sync::Arc, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::{sync::mpsc::channel, time::sleep};
 
@@ -271,6 +269,7 @@ fn get_common_setup() -> Result<(
 #[actix::test]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // Setup
+    env::set_var("CIPHERNODE_SECRET", "Don't tell anyone my secret");
     let (bus, rng, seed, params, crpoly, e3_id) = get_common_setup()?;
 
     // Setup actual ciphernodes and dispatch add events
@@ -376,6 +375,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
 #[actix::test]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
+    env::set_var("CIPHERNODE_SECRET", "Don't tell anyone my secret");
     let (bus, rng, seed, params, crpoly, e3_id) = get_common_setup()?;
 
     let eth_addrs = create_random_eth_addrs(2);
@@ -398,13 +398,18 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     .await?;
 
     let history = bus.send(GetHistory).await?;
+    let errors = bus.send(GetErrors).await?;
+
+    println!("{:?}", errors);
+
+    assert_eq!(errors.len(), 0);
 
     // SEND SHUTDOWN!
     bus.send(EnclaveEvent::from(Shutdown)).await?;
 
     // Reset history
     bus.send(ResetHistory).await?;
-
+    
     // Check event count is correct
     assert_eq!(history.len(), 7);
 

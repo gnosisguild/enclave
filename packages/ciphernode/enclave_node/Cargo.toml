@@ -16,6 +16,7 @@ alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 bfv = { path = "../bfv" }
 bincode = { workspace = true }
+config = { path = "../config" }
 clap = { workspace = true }
 data = { path = "../data" }
 enclave-core = { path = "../core" }

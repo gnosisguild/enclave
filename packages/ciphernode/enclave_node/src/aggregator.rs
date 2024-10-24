@@ -1,5 +1,6 @@
 use actix::{Actor, Addr, Context};
 use anyhow::Result;
+use config::AppConfig;
 use data::{DataStore, InMemStore, SledStore};
 use enclave_core::EventBus;
 use evm::{
@@ -18,7 +19,6 @@ use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
 
-use crate::app_config::AppConfig;
 
 /// Main Ciphernode Actor
 /// Suprvises all children

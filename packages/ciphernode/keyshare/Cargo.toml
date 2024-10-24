@@ -4,11 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-data = { path = "../data" }
-enclave-core = { path = "../core" }
-fhe = { path = "../fhe" }
 actix = { workspace = true }
 anyhow = { workspace = true }
-serde = { workspace = true }
 async-trait = { workspace = true }
+data = { path = "../data" }
+cipher = { path = "../cipher" }
+enclave-core = { path = "../core" }
+fhe = { path = "../fhe" }
+serde = { workspace = true }
 tracing = { workspace = true }

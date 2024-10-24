@@ -1,6 +1,7 @@
 use alloy::primitives::Address;
+use anyhow::{Context, Result};
 use clap::Parser;
-use enclave::load_config;
+use config::load_config;
 use enclave_node::{listen_for_shutdown, MainCiphernode};
 use tracing::info;
 
@@ -31,14 +32,15 @@ pub struct Args {
 }
 
 #[actix_rt::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     println!("\n\n\n\n\n{}", OWO);
     println!("\n\n\n\n");
     let args = Args::parse();
-    let address = Address::parse_checksummed(&args.address, None).expect("Invalid address");
+    let address = Address::parse_checksummed(&args.address, None).context("Invalid address")?;
     info!("LAUNCHING CIPHERNODE: ({})", address);
     let config = load_config(&args.config)?;
+
     let (bus, handle) =
         MainCiphernode::attach(config, address, args.data_location.as_deref()).await?;
 
