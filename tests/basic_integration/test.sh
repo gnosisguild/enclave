@@ -97,8 +97,8 @@ launch_ciphernode() {
 
 
 # XXX: WE NEED TO NOW ADD THE PRIVATE KEY TO BE STORED ON THE DATASTORE
-# - Setup command files one for each command
-# - Setup cli parsing for the commands that defer to the commands
+# - [x] Setup command files one for each command
+# - [x] Setup cli parsing for the commands that defer to the commands
 # - We must have access to the config
 #
 # enclave set-password
