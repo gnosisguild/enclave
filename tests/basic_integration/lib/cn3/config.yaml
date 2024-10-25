@@ -1,0 +1,9 @@
+config_dir: .
+address: 0xdD2FD4581271e230360230F9337D5c0430Bf44C0
+chains:
+  - name: "hardhat"
+    rpc_url: "ws://localhost:8545"
+    contracts:
+      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      ciphernode_registry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
