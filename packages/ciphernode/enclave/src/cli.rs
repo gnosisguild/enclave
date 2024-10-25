@@ -3,8 +3,8 @@ use anyhow::*;
 use clap::Parser;
 
 #[derive(Parser)]
-#[command(name = "mycli")]
-#[command(about = "A CLI application", long_about = None)]
+#[command(name = "enclave")]
+#[command(about = "A CLI for interacting with Enclave the open-source protocol for Encrypted Execution Environments (E3)", long_about = None)]
 pub struct Cli {
     /// Path to config file
     #[arg(long, global = true)]
