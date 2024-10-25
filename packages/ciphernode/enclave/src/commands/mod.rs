@@ -14,6 +14,7 @@ pub enum Commands {
         address: String,
     },
 
+    /// Aggregator node management commands
     Aggregator {
         #[command(subcommand)]
         command: AggregatorCommands,
