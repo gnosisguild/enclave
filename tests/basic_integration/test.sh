@@ -78,16 +78,33 @@ waiton-files() {
   done
 }
 
-launch_ciphernode() {
-    local address="$1"
-    local secret="$2"
-    heading "Launch ciphernode $address"
-    CIPHERNODE_SECRET=$secret yarn ciphernode:launch \
-      --address "$address" \
-      --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" \
-      --data-location "$SCRIPT_DIR/output/$address.db" &
+# This is temporary until we write the command api
+set_password() {
+  local name="$1"
+  local password="$2"
+  local config_dir="$SCRIPT_DIR/lib/$name"
+  mkdir -p $config_dir
+  echo "$password" > "$config_dir/key"
+  chmod 400 "$config_dir/key"
 }
 
+launch_ciphernode() {
+    local name="$1"
+    heading "Launch ciphernode $name"
+    yarn ciphernode:launch \
+      --config "$SCRIPT_DIR/lib/$name/config.yaml"
+}
+
+
+# XXX: WE NEED TO NOW ADD THE PRIVATE KEY TO BE STORED ON THE DATASTORE
+# - Setup command files one for each command
+# - Setup cli parsing for the commands that defer to the commands
+# - We must have access to the config
+#
+# enclave set-password
+# <Blind password entry>
+#
+# enclave set-private-key
 launch_aggregator() {
     local private_key="$1"
     PRIVATE_KEY=$private_key yarn ciphernode:aggregator \
@@ -116,8 +133,13 @@ until curl -f -s "http://localhost:8545" > /dev/null; do
   sleep 1
 done
 
-# Launch 4 ciphernodes
+# Set the password for all ciphernodes
+set_password cn1 "$CIPHERNODE_SECRET"
+set_password cn2 "$CIPHERNODE_SECRET"
+set_password cn3 "$CIPHERNODE_SECRET"
+set_password ag "$CIPHERNODE_SECRET"
 
+# Launch 4 ciphernodes
 launch_ciphernode "$CIPHERNODE_ADDRESS_1" "$CIPHERNODE_SECRET"
 launch_ciphernode "$CIPHERNODE_ADDRESS_2" "$CIPHERNODE_SECRET"
 launch_ciphernode "$CIPHERNODE_ADDRESS_3" "$CIPHERNODE_SECRET"

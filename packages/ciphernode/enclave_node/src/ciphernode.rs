@@ -16,7 +16,6 @@ use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
-
 /// Main Ciphernode Actor
 /// Suprvises all children
 // TODO: add supervision logic
@@ -54,16 +53,16 @@ impl MainCiphernode {
     pub async fn attach(
         config: AppConfig,
         address: Address,
-        data_location: Option<&str>,
     ) -> Result<(Addr<EventBus>, JoinHandle<()>)> {
         let rng = Arc::new(Mutex::new(
             rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
         ));
         let bus = EventBus::new(true).start();
 
-        let store: DataStore = match data_location {
-            Some(loc) => (&SledStore::new(&bus, loc)?.start()).into(),
-            None => (&InMemStore::new(true).start()).into(),
+        let store: DataStore = if !config.use_in_mem_store() {
+            (&SledStore::new(&bus, &config.db_file().to_string_lossy())?.start()).into()
+        } else {
+            (&InMemStore::new(true).start()).into()
         };
 
         let repositories = store.repositories();
@@ -72,7 +71,7 @@ impl MainCiphernode {
         let selector = CiphernodeSelector::attach(&bus, &sortition, &address.to_string());
 
         for chain in config
-            .chains
+            .chains()
             .iter()
             .filter(|chain| chain.enabled.unwrap_or(true))
         {
