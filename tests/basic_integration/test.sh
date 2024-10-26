@@ -26,6 +26,7 @@ ENCLAVE_CONTRACT="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 REGISTRY_CONTRACT="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
 REGISTRY_FILTER_CONTRACT="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 INPUT_VALIDATOR_CONTRACT="0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+
 # These are random addresses for now
 CIPHERNODE_ADDRESS_1="0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
 CIPHERNODE_ADDRESS_2="0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
@@ -91,7 +92,7 @@ set_password() {
 launch_ciphernode() {
     local name="$1"
     heading "Launch ciphernode $name"
-    yarn ciphernode:launch \
+    yarn enclave \
       --config "$SCRIPT_DIR/lib/$name/config.yaml"
 }
 

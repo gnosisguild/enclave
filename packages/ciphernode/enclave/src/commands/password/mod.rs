@@ -1,24 +1,35 @@
-mod set;
+mod delete;
+mod overwrite;
+mod create;
 use anyhow::*;
 use clap::Subcommand;
+use config::AppConfig;
 
 #[derive(Subcommand)]
 pub enum PasswordCommands {
-    /// Set a new password
-    Set {
+    /// Create a new password
+    Create {
         /// The new password
         #[arg(short, long)]
-        value: String,
+        password: Option<String>,
+    },
+
+    /// Delete the current password
+    Delete,
+
+    /// Overwrite the current password
+    Overwrite {
+        /// The new password
+        #[arg(short, long)]
+        password: Option<String>,
     },
 }
 
-pub async fn execute(command: PasswordCommands, config_path: Option<&str>) -> Result<()> {
-    if let Some(path) = config_path {
-        println!("Using config from: {}", path);
-    }
-
+pub async fn execute(command: PasswordCommands, config: AppConfig) -> Result<()> {
     match command {
-        PasswordCommands::Set { value } => set::execute(value) 
+        PasswordCommands::Create { password } => create::execute(&config, password).await?,
+        PasswordCommands::Delete => delete::execute(&config).await?,
+        PasswordCommands::Overwrite { password } => overwrite::execute(&config, password).await?,
     };
 
     Ok(())

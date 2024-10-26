@@ -1,12 +1,12 @@
 use anyhow::*;
-use config::load_config;
-use enclave_node::{listen_for_shutdown, MainAggregator};
+use config::AppConfig;
+use enclave_node::{listen_for_shutdown, setup_aggregator};
 use tracing::info;
 
 use crate::owo;
 
 pub async fn execute(
-    config_path:Option<&str>,
+    config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
 ) -> Result<()> {
@@ -14,13 +14,7 @@ pub async fn execute(
 
     info!("LAUNCHING AGGREGATOR");
 
-    let conf = load_config(config_path)?;
-    let (bus, handle) = MainAggregator::attach(
-        conf,
-        pubkey_write_path,
-        plaintext_write_path,
-    )
-    .await?;
+    let (bus, handle) = setup_aggregator(config, pubkey_write_path, plaintext_write_path).await?;
 
     tokio::spawn(listen_for_shutdown(bus.into(), handle));
 

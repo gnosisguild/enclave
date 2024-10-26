@@ -1,4 +1,5 @@
 use anyhow::*;
+use async_trait::async_trait;
 use std::{
     env,
     fs::{self, OpenOptions, Permissions},
@@ -8,10 +9,11 @@ use std::{
 };
 use zeroize::Zeroizing;
 
+#[async_trait]
 pub trait PasswordManager {
-    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>>;
-    fn delete_key(&mut self) -> Result<()>;
-    fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()>;
+    async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>>;
+    async fn delete_key(&mut self) -> Result<()>;
+    async fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()>;
 }
 
 pub struct InMemPasswordManager(pub Option<Zeroizing<Vec<u8>>>);
@@ -35,37 +37,39 @@ impl EnvPasswordManager {
     }
 }
 
+#[async_trait]
 impl PasswordManager for EnvPasswordManager {
-    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+    async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
         if let Some(key) = self.0.clone() {
             return Ok(key);
         }
         Err(anyhow!("No key found"))
     }
-    fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
+    async fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
         self.0 = Some(contents);
         Ok(())
     }
 
-    fn delete_key(&mut self) -> Result<()> {
+    async fn delete_key(&mut self) -> Result<()> {
         self.0 = None;
         Ok(())
     }
 }
 
+#[async_trait]
 impl PasswordManager for InMemPasswordManager {
-    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+    async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
         if let Some(key) = self.0.clone() {
             return Ok(key);
         }
         Err(anyhow!("No key found"))
     }
-    fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
+    async fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
         self.0 = Some(contents);
         Ok(())
     }
 
-    fn delete_key(&mut self) -> Result<()> {
+    async fn delete_key(&mut self) -> Result<()> {
         self.0 = None;
         Ok(())
     }
@@ -83,8 +87,9 @@ impl FilePasswordManager {
     }
 }
 
+#[async_trait]
 impl PasswordManager for FilePasswordManager {
-    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+    async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
         let path = &self.path;
 
         ensure_file_permissions(path, 0o400)?;
@@ -94,7 +99,7 @@ impl PasswordManager for FilePasswordManager {
         Ok(Zeroizing::new(bytes))
     }
 
-    fn delete_key(&mut self) -> Result<()> {
+    async fn delete_key(&mut self) -> Result<()> {
         let path = &self.path;
 
         ensure_file_permissions(path, 0o600)?;
@@ -103,7 +108,7 @@ impl PasswordManager for FilePasswordManager {
         Ok(())
     }
 
-    fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
+    async fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
         let path = &self.path;
 
         // Check if file exists

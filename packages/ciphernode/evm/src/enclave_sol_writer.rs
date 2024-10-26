@@ -12,6 +12,7 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
+use data::DataStore;
 use enclave_core::Shutdown;
 use enclave_core::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};
@@ -37,6 +38,7 @@ impl EnclaveSolWriter {
         contract_address: Address,
         signer: &Arc<PrivateKeySigner>,
     ) -> Result<Self> {
+
         Ok(Self {
             provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
             contract_address,

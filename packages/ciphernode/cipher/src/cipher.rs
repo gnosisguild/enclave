@@ -1,13 +1,19 @@
+use std::path::Path;
+
 use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
 use anyhow::{anyhow, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
+use config::AppConfig;
 use rand::{rngs::OsRng, RngCore};
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::password_manager::{EnvPasswordManager, InMemPasswordManager, PasswordManager};
+use crate::{
+    password_manager::{EnvPasswordManager, InMemPasswordManager, PasswordManager},
+    FilePasswordManager,
+};
 
 // ARGON2 PARAMS
 const ARGON2_M_COST: u32 = 32 * 1024; // 32 MiB
@@ -100,21 +106,29 @@ pub struct Cipher {
 }
 
 impl Cipher {
-    pub fn new<P>(pm: P) -> Result<Self>
+    pub async fn new<P>(pm: P) -> Result<Self>
     where
         P: PasswordManager,
     {
         // Get the key from the password manager when created
-        let key = pm.get_key()?;
+        let key = pm.get_key().await?;
         Ok(Self { key })
     }
 
-    pub fn from_password(value: &str) -> Result<Self> {
-        Ok(Self::new(InMemPasswordManager::from_str(value))?)
+    pub async fn from_password(value: &str) -> Result<Self> {
+        Ok(Self::new(InMemPasswordManager::from_str(value)).await?)
     }
 
-    pub fn from_env(value: &str) -> Result<Self> {
-        Ok(Self::new(EnvPasswordManager::new(value)?)?)
+    pub async fn from_env(value: &str) -> Result<Self> {
+        Ok(Self::new(EnvPasswordManager::new(value)?).await?)
+    }
+
+    pub async fn from_file(value: impl AsRef<Path>) -> Result<Self> {
+        Ok(Self::new(FilePasswordManager::new(value)).await?)
+    }
+
+    pub async fn from_config(config: &AppConfig) -> Result<Self> {
+        Ok(Self::new(FilePasswordManager::new(config.key_file())).await?)
     }
 
     pub fn encrypt_data(&self, data: &mut Vec<u8>) -> Result<Vec<u8>> {
@@ -139,13 +153,13 @@ mod tests {
     use anyhow::*;
     use std::time::Instant;
 
-    #[test]
-    fn test_basic_encryption_decryption() -> Result<()> {
+    #[tokio::test]
+    async fn test_basic_encryption_decryption() -> Result<()> {
         let data = b"Hello, world!";
 
         let start = Instant::now();
 
-        let cipher = Cipher::from_password("test_password")?;
+        let cipher = Cipher::from_password("test_password").await?;
         let encrypted = cipher.encrypt_data(&mut data.to_vec()).unwrap();
         let encryption_time = start.elapsed();
 
@@ -161,9 +175,9 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_empty_data() -> Result<()> {
-        let cipher = Cipher::from_password("test_password")?;
+    #[tokio::test]
+    async fn test_empty_data() -> Result<()> {
+        let cipher = Cipher::from_password("test_password").await?;
         let data = vec![];
 
         let encrypted = cipher.encrypt_data(&mut data.clone()).unwrap();
@@ -173,9 +187,9 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_large_data() -> Result<()> {
-        let cipher = Cipher::from_password("test_password")?;
+    #[tokio::test]
+    async fn test_large_data() -> Result<()> {
+        let cipher = Cipher::from_password("test_password").await?;
         let data = vec![1u8; 1024 * 1024]; // 1MB of data
 
         let start = Instant::now();
@@ -193,25 +207,25 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_different_passwords() -> Result<()> {
+    #[tokio::test]
+    async fn test_different_passwords() -> Result<()> {
         // Encrypt with one password
-        let cipher = Cipher::from_password("password1")?;
+        let cipher = Cipher::from_password("password1").await?;
 
         let data = b"Secret message";
         let encrypted = cipher.encrypt_data(&mut data.to_vec()).unwrap();
 
         // Try to decrypt with a different password
-        let cipher = Cipher::from_password("password2")?;
+        let cipher = Cipher::from_password("password2").await?;
         let result = cipher.decrypt_data(&encrypted);
 
         assert!(result.is_err());
         Ok(())
     }
 
-    #[test]
-    fn test_binary_data() -> Result<()> {
-        let cipher = Cipher::from_password("test_password")?;
+    #[tokio::test]
+    async fn test_binary_data() -> Result<()> {
+        let cipher = Cipher::from_password("test_password").await?;
 
         let data = vec![0xFF, 0x00, 0xAA, 0x55, 0x12, 0xED];
 
@@ -222,9 +236,9 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_unicode_data() -> Result<()> {
-        let cipher = Cipher::from_password("test_password")?;
+    #[tokio::test]
+    async fn test_unicode_data() -> Result<()> {
+        let cipher = Cipher::from_password("test_password").await?;
         let data = "Hello 🌍 привет 世界".as_bytes().to_vec();
 
         let encrypted = cipher.encrypt_data(&mut data.clone()).unwrap();
@@ -234,17 +248,17 @@ mod tests {
         Ok(())
     }
 
-    #[test]
+    #[tokio::test]
     #[should_panic(expected = "Invalid encrypted data length")]
-    fn test_invalid_encrypted_data() {
-        let cipher = Cipher::from_password("test_password").unwrap();
+    async fn test_invalid_encrypted_data() {
+        let cipher = Cipher::from_password("test_password").await.unwrap();
         let invalid_data = vec![0u8; 10]; // Too short to be valid encrypted data
         cipher.decrypt_data(&invalid_data).unwrap();
     }
 
-    #[test]
-    fn test_multiple_encrypt_decrypt_cycles() {
-        let cipher = Cipher::from_password("test_password").unwrap();
+    #[tokio::test]
+    async fn test_multiple_encrypt_decrypt_cycles() {
+        let cipher = Cipher::from_password("test_password").await.unwrap();
         let original_data = b"Multiple encryption cycles test";
 
         let mut data = original_data.to_vec();
@@ -256,9 +270,9 @@ mod tests {
         assert_eq!(original_data.to_vec(), data);
     }
 
-    #[test]
-    fn test_corrupted_data() {
-        let cipher = Cipher::from_password("test_password").unwrap();
+    #[tokio::test]
+    async fn test_corrupted_data() {
+        let cipher = Cipher::from_password("test_password").await.unwrap();
         let data = b"Test corrupted data";
 
         let mut encrypted = cipher.encrypt_data(&mut data.to_vec()).unwrap();

@@ -18,6 +18,7 @@ bfv = { path = "../bfv" }
 bincode = { workspace = true }
 config = { path = "../config" }
 clap = { workspace = true }
+cipher = { path = "../cipher" }
 data = { path = "../data" }
 enclave-core = { path = "../core" }
 evm = { path = "../evm" }
