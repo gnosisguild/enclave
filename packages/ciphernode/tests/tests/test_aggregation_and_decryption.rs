@@ -1,6 +1,10 @@
+use cipher::Cipher;
 use data::{DataStore, InMemStore};
 use enclave_core::{
-    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory, KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed, Shutdown
+    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
+    E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory,
+    KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
+    Shutdown,
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
@@ -22,7 +26,7 @@ use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::{env, sync::Arc, time::Duration};
+use std::{env, path::Path, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::{sync::mpsc::channel, time::sleep};
 
@@ -41,12 +45,12 @@ async fn setup_local_ciphernode(
     logging: bool,
     addr: &str,
     data: Option<Addr<InMemStore>>,
+    cipher: &Arc<Cipher>,
 ) -> Result<LocalCiphernodeTuple> {
     // create data actor for saving data
     let data_actor = data.unwrap_or_else(|| InMemStore::new(logging).start());
     let store = DataStore::from(&data_actor);
     let repositories = store.repositories();
-
     // create ciphernode actor for managing ciphernode flow
     let sortition = Sortition::attach(&bus, repositories.sortition());
     CiphernodeSelector::attach(&bus, &sortition, addr);
@@ -55,7 +59,7 @@ async fn setup_local_ciphernode(
         .add_feature(FheFeature::create(&bus, &rng))
         .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
         .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))
-        .add_feature(KeyshareFeature::create(&bus, addr))
+        .add_feature(KeyshareFeature::create(&bus, addr, &cipher))
         .build()
         .await?;
 
@@ -152,11 +156,12 @@ async fn create_local_ciphernodes(
     bus: &Addr<EventBus>,
     rng: &SharedRng,
     count: u32,
+    cipher: &Arc<Cipher>,
 ) -> Result<Vec<LocalCiphernodeTuple>> {
     let eth_addrs = create_random_eth_addrs(count);
     let mut result = vec![];
     for addr in &eth_addrs {
-        let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None).await?;
+        let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None, cipher).await?;
         result.push(tuple);
     }
 
@@ -269,11 +274,11 @@ fn get_common_setup() -> Result<(
 #[actix::test]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // Setup
-    env::set_var("CIPHERNODE_SECRET", "Don't tell anyone my secret");
     let (bus, rng, seed, params, crpoly, e3_id) = get_common_setup()?;
+    let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
 
     // Setup actual ciphernodes and dispatch add events
-    let ciphernode_addrs = create_local_ciphernodes(&bus, &rng, 3).await?;
+    let ciphernode_addrs = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
     let eth_addrs = ciphernode_addrs
         .iter()
         .map(|tup| tup.0.to_owned())
@@ -375,13 +380,13 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
 #[actix::test]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
-    env::set_var("CIPHERNODE_SECRET", "Don't tell anyone my secret");
     let (bus, rng, seed, params, crpoly, e3_id) = get_common_setup()?;
+    let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
 
     let eth_addrs = create_random_eth_addrs(2);
 
-    let cn1 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[0], None).await?;
-    let cn2 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[1], None).await?;
+    let cn1 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[0], None, &cipher).await?;
+    let cn2 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[1], None, &cipher).await?;
     add_ciphernodes(&bus, &eth_addrs).await?;
 
     // Send e3request
@@ -409,7 +414,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     // Reset history
     bus.send(ResetHistory).await?;
-    
+
     // Check event count is correct
     assert_eq!(history.len(), 7);
 
@@ -420,8 +425,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     // Apply the address and data node to two new actors
     // Here we test that hydration occurred sucessfully
-    setup_local_ciphernode(&bus, &rng, true, &addr1, Some(data1)).await?;
-    setup_local_ciphernode(&bus, &rng, true, &addr2, Some(data2)).await?;
+    setup_local_ciphernode(&bus, &rng, true, &addr1, Some(data1), &cipher).await?;
+    setup_local_ciphernode(&bus, &rng, true, &addr2, Some(data2), &cipher).await?;
     // get the public key from history.
     let pubkey: PublicKey = history
         .iter()

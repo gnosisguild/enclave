@@ -9,3 +9,6 @@ argon2  = { workspace = true, version = "=0.5.2" }
 rand = { workspace = true, version = "=0.8.5" }
 zeroize = { workspace = true, version = "=1.6.0" }
 anyhow = { workspace = true }
+tokio = { workspace = true }
+config = { path = "../config" }
+async-trait = { workspace = true }

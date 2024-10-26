@@ -1,6 +1,7 @@
 mod start;
 use anyhow::*;
 use clap::Subcommand;
+use config::AppConfig;
 
 #[derive(Subcommand)]
 pub enum AggregatorCommands {
@@ -16,14 +17,14 @@ pub enum AggregatorCommands {
     },
 }
 
-pub async fn execute(command: AggregatorCommands, config_path: Option<&str>) -> Result<()> {
+pub async fn execute(command: AggregatorCommands, config: AppConfig) -> Result<()> {
     match command {
         AggregatorCommands::Start {
             pubkey_write_path,
             plaintext_write_path,
         } => {
             start::execute(
-                config_path,
+                config,
                 pubkey_write_path.as_deref(),
                 plaintext_write_path.as_deref(),
             )

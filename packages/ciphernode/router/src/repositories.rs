@@ -68,6 +68,10 @@ impl Repositories {
     pub fn sortition(&self) -> Repository<SortitionModule> {
         Repository::new(self.store.scope(format!("//sortition")))
     }
+
+    pub fn eth_private_key(&self) -> Repository<Vec<u8>> {
+        Repository::new(self.store.scope(format!("//eth_private_key")))
+    }
 }
 
 pub trait RepositoriesFactory {

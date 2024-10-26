@@ -12,9 +12,16 @@ actix = { workspace = true }
 actix-rt = { workspace = true }
 alloy = { workspace = true }
 anyhow = { workspace = true }
+cipher = { path = "../cipher" }
 clap = { workspace = true }
-enclave_node = { path = "../enclave_node" }
-tokio = { workspace = true }
-tracing-subscriber = { workspace = true } 
-tracing = { workspace = true }
 config = { path = "../config" }
+enclave-core = { path = "../core" }
+data = { path = "../data" }
+router = { path = "../router" }
+dialoguer = "0.11.0"
+enclave_node = { path = "../enclave_node" }
+rpassword = "7.3.1"
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true } 
+zeroize = { workspace = true }

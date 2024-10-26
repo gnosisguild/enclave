@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
-use commands::{aggregator, password, start, Commands};
-pub mod cli;
+use commands::{aggregator, password, start, wallet, Commands};
+use config::load_config;
 pub mod commands;
 
 const OWO: &str = r#"
@@ -40,15 +40,19 @@ impl Cli {
     pub async fn execute(self) -> Result<()> {
         let config_path = self.config.as_deref();
 
+        let config = load_config(config_path)?;
+
         match self.command {
-            Commands::Start { address } => start::execute(config_path, &address).await?,
-            Commands::Password { command } => password::execute(command, config_path).await?,
-            Commands::Aggregator { command } => aggregator::execute(command, config_path).await?,
+            Commands::Start { address } => start::execute(config, &address).await?,
+            Commands::Password { command } => password::execute(command, config).await?,
+            Commands::Aggregator { command } => aggregator::execute(command, config).await?,
+            Commands::Wallet { command } => wallet::execute(command, config).await?,
         }
 
         Ok(())
     }
 }
+
 #[actix_rt::main]
 pub async fn main() {
     tracing_subscriber::fmt::init();
@@ -57,6 +61,9 @@ pub async fn main() {
 
     match cli.execute().await {
         Ok(_) => (),
-        Err(_) => println!("There was a problem running. Goodbye"),
+        Err(err) => {
+            println!("{}", err);
+            println!("There was a problem running. Goodbye")
+        }
     }
 }

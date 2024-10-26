@@ -18,6 +18,7 @@ pub struct Keyshare {
     bus: Addr<EventBus>,
     secret: Option<Vec<u8>>,
     address: String,
+    cipher: Arc<Cipher>,
 }
 
 impl Actor for Keyshare {
@@ -29,6 +30,7 @@ pub struct KeyshareParams {
     pub store: Repository<KeyshareState>,
     pub fhe: Arc<Fhe>,
     pub address: String,
+    pub cipher: Arc<Cipher>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -44,11 +46,12 @@ impl Keyshare {
             store: params.store,
             secret: None,
             address: params.address,
+            cipher: params.cipher,
         }
     }
 
     fn set_secret(&mut self, mut data: Vec<u8>) -> Result<()> {
-        let encrypted = Cipher::from_env("CIPHERNODE_SECRET")?.encrypt_data(&mut data)?;
+        let encrypted = self.cipher.encrypt_data(&mut data)?;
 
         self.secret = Some(encrypted);
 
@@ -61,7 +64,7 @@ impl Keyshare {
             .clone()
             .ok_or(anyhow!("No secret share available on Keyshare"))?;
 
-        let decrypted = Cipher::from_env("CIPHERNODE_SECRET")?.decrypt_data(&encrypted)?;
+        let decrypted = self.cipher.decrypt_data(&encrypted)?;
 
         Ok(decrypted)
     }
@@ -93,6 +96,7 @@ impl FromSnapshotWithParams for Keyshare {
             store: params.store,
             secret: snapshot.secret,
             address: params.address,
+            cipher: params.cipher,
         })
     }
 }

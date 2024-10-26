@@ -1603,7 +1603,10 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "argon2",
+ "async-trait",
+ "config",
  "rand",
+ "tokio",
  "zeroize",
 ]
 
@@ -1681,6 +1684,19 @@ dependencies = [
  "dirs",
  "figment",
  "serde",
+]
+
+[[package]]
+name = "console"
+version = "0.15.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e1f83fc076bd6dd27517eacdf25fef6c4dfe5f1d7448bafaaf3a26f13b5e4eb"
+dependencies = [
+ "encode_unicode",
+ "lazy_static",
+ "libc",
+ "unicode-width",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1974,6 +1990,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dialoguer"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "658bce805d770f407bc62102fca7c2c64ceef2fbcb2b8bd19d2765ce093980de"
+dependencies = [
+ "console",
+ "shell-words",
+ "tempfile",
+ "thiserror",
+ "zeroize",
+]
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2122,12 +2151,19 @@ dependencies = [
  "actix-rt",
  "alloy",
  "anyhow",
+ "cipher 0.1.0",
  "clap",
  "config",
+ "data",
+ "dialoguer",
+ "enclave-core",
  "enclave_node",
+ "router",
+ "rpassword",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "zeroize",
 ]
 
 [[package]]
@@ -2158,6 +2194,7 @@ dependencies = [
  "anyhow",
  "bfv",
  "bincode",
+ "cipher 0.1.0",
  "clap",
  "config",
  "data",
@@ -2176,6 +2213,12 @@ dependencies = [
  "tokio",
  "tracing",
 ]
+
+[[package]]
+name = "encode_unicode"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "enum-as-inner"
@@ -2257,6 +2300,7 @@ dependencies = [
  "alloy",
  "alloy-primitives 0.6.4",
  "anyhow",
+ "data",
  "enclave-core",
  "futures-util",
  "sortition",
@@ -5201,6 +5245,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "cipher 0.1.0",
  "data",
  "enclave-core",
  "fhe 0.1.0",
@@ -5208,6 +5253,17 @@ dependencies = [
  "serde",
  "sortition",
  "tracing",
+]
+
+[[package]]
+name = "rpassword"
+version = "7.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80472be3c897911d0137b2d2b9055faf6eeac5b14e324073d83bc17b191d7e3f"
+dependencies = [
+ "libc",
+ "rtoolbox",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -5224,6 +5280,16 @@ dependencies = [
  "nix",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "rtoolbox"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c247d24e63230cdb56463ae328478bd5eac8b8faa8c69461a77e8e323afac90e"
+dependencies = [
+ "libc",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -5595,6 +5661,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell-words"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24188a676b6ae68c3b2cb3a01be17fbf7240ce009799bb56d5b1409051e78fde"
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5918,6 +5990,7 @@ dependencies = [
  "base64 0.22.1",
  "bfv",
  "bincode",
+ "cipher 0.1.0",
  "clap",
  "data",
  "enclave-core",
@@ -6326,6 +6399,12 @@ checksum = "a56d1686db2308d901306f92a263857ef59ea39678a5458e7cb17f01415101f5"
 dependencies = [
  "tinyvec",
 ]
+
+[[package]]
+name = "unicode-width"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
 name = "unicode-xid"
