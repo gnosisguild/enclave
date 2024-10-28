@@ -1,3 +1,4 @@
+#!/usr/bin/env sh
 clean_folders() {
     local SCRIPT_DIR=$1
 
