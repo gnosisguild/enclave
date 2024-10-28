@@ -42,6 +42,5 @@ jobs:
 
     - name: Run tests
       run: |
-        env &&
         cd ./packages/ciphernode/
         cargo test
