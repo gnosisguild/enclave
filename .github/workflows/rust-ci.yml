@@ -10,8 +10,6 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    env:
-      TMPDIR: ${{ runner.temp }}
     steps:
     - uses: actions/checkout@v2
 
@@ -43,6 +41,8 @@ jobs:
       run: cd ./packages/ciphernode && cargo fmt -- --check
 
     - name: Run tests
+      env:
+        TMPDIR: ${{ runner.temp }}
       run: |
         env &&
         cd ./packages/ciphernode/
