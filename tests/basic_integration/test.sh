@@ -113,16 +113,7 @@ launch_aggregator() {
       --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
 }
 
-clean_folders() {
-    # Delete output artifacts
-    rm -rf "$SCRIPT_DIR/output/"*
 
-    # Delete enclave artifacts
-    for name in cn1 cn2 cn3 cn4 ag; do
-        # List all files and directories except config.yaml, then delete them
-        find "$SCRIPT_DIR/lib/$name" -mindepth 1 ! -regex '.*/config\.yaml$' -exec rm -rf {} +
-    done
-}
 
 pkill -9 -f "target/debug/enclave" || true
 pkill -9 -f "hardhat node" || true
@@ -130,9 +121,8 @@ pkill -9 -f "hardhat node" || true
 # Set up trap to catch errors and interrupts
 trap 'cleanup $?' ERR INT TERM
 
-# Tidy up files from previous runs
-clean_folders
 
+$SCRIPT_DIR/lib/clean_folders.sh "$SCRIPT_DIR"
 $SCRIPT_DIR/lib/prebuild.sh
 
 heading "Start the EVM node"
