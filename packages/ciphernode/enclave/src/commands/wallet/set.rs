@@ -6,7 +6,6 @@ use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
 
 pub async fn execute(config: &AppConfig, input: String) -> Result<()> {
-    println!("WALLET KEY: {}", input);
     let cipher = Cipher::from_config(config).await?;
     let encrypted = cipher.encrypt_data(&mut input.as_bytes().to_vec())?;
     let bus = EventBus::new(true).start();
