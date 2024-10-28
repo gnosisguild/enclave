@@ -75,18 +75,30 @@ impl AppConfig {
     }
 
     fn resolve_base_dir(&self, base_dir: &PathBuf, default_base_dir: &PathBuf) -> PathBuf {
+        println!(
+            "### resolve_base_dir {:?}<::>{:?}",
+            base_dir, default_base_dir
+        );
         if base_dir.is_relative() {
             // ConfigDir is relative and the config file is absolute then use the location of the
             // config file. That way all paths are relative to the config file
+            println!("### base_dir.is_relative() !");
+
             if self.config_file.is_absolute() {
+                println!("### config_file.is_absolute() !");
+
                 self.config_file
                     .parent()
                     .map_or_else(|| base_dir.clone(), |p| p.join(base_dir))
             } else {
+                println!("### config_file.is_NOT_absolute() !");
+
                 // If the config_file is not set but there are relative paths use the default dir use the default dir
                 default_base_dir.join(base_dir)
             }
         } else {
+            println!("### DECIDED TO JUST use base_dir!");
+
             // Use the absolute base_dir
             base_dir.to_owned()
         }
