@@ -16,9 +16,10 @@ use crate::{
 };
 
 // ARGON2 PARAMS
-const ARGON2_M_COST: u32 = 32 * 1024; // 32 MiB
+// https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+const ARGON2_M_COST: u32 = 19 * 1024; // 19 MiB
 const ARGON2_T_COST: u32 = 2;
-const ARGON2_P_COST: u32 = 2;
+const ARGON2_P_COST: u32 = 1;
 const ARGON2_OUTPUT_LEN: usize = 32;
 const ARGON2_ALGORITHM: Algorithm = Algorithm::Argon2id;
 const ARGON2_VERSION: Version = Version::V0x13;
