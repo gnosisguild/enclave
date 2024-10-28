@@ -268,7 +268,10 @@ chains:
 "#,
             )?;
 
-            println!("AppConfig::default().config_file: {:?}", AppConfig::default().config_file());
+            println!(
+                "AppConfig::default().config_file: {:?}",
+                AppConfig::default().config_file()
+            );
             let config: AppConfig = load_config(None).map_err(|err| err.to_string())?;
             let chain = config.chains().first().unwrap();
 
