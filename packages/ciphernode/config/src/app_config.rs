@@ -249,6 +249,7 @@ mod tests {
     fn test_config() {
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
+            println!(">>> HOME: {}", &home);
             jail.set_env("HOME", &home);
 
             let filename = format!("{}/.config/enclave/config.yaml", home);
