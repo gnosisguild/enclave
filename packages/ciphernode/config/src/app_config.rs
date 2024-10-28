@@ -193,17 +193,18 @@ mod tests {
     #[test]
     fn test_ensure_relative_path() {
         Jail::expect_with(|jail| {
-            jail.set_env("HOME", "/home/testuser");
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/home/testuser".to_string());
+            jail.set_env("HOME", &home);
 
             let config = AppConfig {
-                config_file: "/home/testuser/docs/myconfig.yaml".into(),
+                config_file: format!("{}/docs/myconfig.yaml", &home).into(),
                 config_dir: "../foo".into(),
                 data_dir: "../bar".into(),
                 ..AppConfig::default()
             };
 
-            assert_eq!(config.key_file(), PathBuf::from("/home/testuser/foo/key"));
-            assert_eq!(config.db_file(), PathBuf::from("/home/testuser/bar/db"));
+            assert_eq!(config.key_file(), PathBuf::from(format!("{}/foo/key",home)));
+            assert_eq!(config.db_file(), PathBuf::from(format!("{}/bar/db", home)));
 
             Ok(())
         });
@@ -212,28 +213,29 @@ mod tests {
     #[test]
     fn test_defaults() {
         Jail::expect_with(|jail| {
-            jail.set_env("HOME", "/home/testuser");
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/home/testuser".to_string());
+            jail.set_env("HOME", &home);
 
             let config = AppConfig::default();
 
             assert_eq!(
                 config.key_file(),
-                PathBuf::from("/home/testuser/.config/enclave/key")
+                PathBuf::from(format!("{}/.config/enclave/key",home))
             );
 
             assert_eq!(
                 config.db_file(),
-                PathBuf::from("/home/testuser/.local/share/enclave/db")
+                PathBuf::from(format!("{}/.local/share/enclave/db", home))
             );
 
             assert_eq!(
                 config.config_file(),
-                PathBuf::from("/home/testuser/.config/enclave/config.yaml")
+                PathBuf::from(format!("{}/.config/enclave/config.yaml",home))
             );
 
             assert_eq!(
                 config.config_dir(),
-                PathBuf::from("/home/testuser/.config/enclave/")
+                PathBuf::from(format!("{}/.config/enclave/", home))
             );
 
             Ok(())
@@ -244,11 +246,11 @@ mod tests {
     fn test_config() {
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
+            jail.set_env("HOME", &home);
+
             let filename = format!("{}/.config/enclave/config.yaml", home);
             let filedir = format!("{}/.config/enclave", home);
-
             jail.create_dir(filedir)?;
-            jail.set_env("HOME", &home);
             jail.create_file(
                 filename,
                 r#"
