@@ -143,9 +143,12 @@ pub fn load_config(config_file: Option<&str>) -> Result<AppConfig> {
     Ok(config)
 }
 
-/// Utility to normalize paths
+// Utility to normalize paths
+// We use this so we can avoid using canonicalize() and having to have real files in order to
+// manipulate and validate paths: https://doc.rust-lang.org/std/fs/fn.canonicalize.html
 fn normalize_path(path: impl AsRef<Path>) -> PathBuf {
-    let path = path.as_ref();
+    let path = expand_tilde(path.as_ref());
+
     let mut components = Vec::new();
 
     for component in path.components() {
@@ -174,6 +177,28 @@ fn normalize_path(path: impl AsRef<Path>) -> PathBuf {
     result
 }
 
+fn expand_tilde(path: &Path) -> PathBuf {
+    let path_str = match path.to_str() {
+        None => return path.to_path_buf(),
+        Some(s) => s,
+    };
+
+    if !path_str.starts_with('~') {
+        return path.to_path_buf();
+    }
+
+    let home_dir = match env::var("HOME") {
+        Err(_) => return path.to_path_buf(),
+        Ok(dir) => dir,
+    };
+
+    if path_str.len() == 1 {
+        PathBuf::from(home_dir)
+    } else {
+        PathBuf::from(format!("{}{}", home_dir, &path_str[1..]))
+    }
+}
+
 struct OsDirs;
 impl OsDirs {
     pub fn config_dir() -> PathBuf {
@@ -189,6 +214,16 @@ impl OsDirs {
 mod tests {
     use super::*;
     use figment::Jail;
+
+    #[test]
+    fn test_normalization() {
+        Jail::expect_with(|jail| {
+            jail.set_env("HOME", "/home/user");
+            let path = normalize_path(&PathBuf::from("~/foo/bar/../baz.txt"));
+            assert_eq!(path, PathBuf::from(format!("/home/user/foo/baz.txt")));
+            Ok(())
+        })
+    }
 
     #[test]
     fn test_ensure_relative_path() {
