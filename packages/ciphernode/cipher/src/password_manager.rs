@@ -90,7 +90,7 @@ impl FilePasswordManager {
 #[async_trait]
 impl PasswordManager for FilePasswordManager {
     // We are assuming a secrets manager will mount the secret on the volume. Hence we would expect
-    // the password to be a string of random characters. 
+    // the password to be a string of random characters.
     //
     // We may setup a system where we create a tool for creating an Argon2id hash as a secret
     // clientside and allow the user to upload that although this is something we should talk about
