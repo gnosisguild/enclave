@@ -203,7 +203,10 @@ mod tests {
                 ..AppConfig::default()
             };
 
-            assert_eq!(config.key_file(), PathBuf::from(format!("{}/foo/key",home)));
+            assert_eq!(
+                config.key_file(),
+                PathBuf::from(format!("{}/foo/key", home))
+            );
             assert_eq!(config.db_file(), PathBuf::from(format!("{}/bar/db", home)));
 
             Ok(())
@@ -220,7 +223,7 @@ mod tests {
 
             assert_eq!(
                 config.key_file(),
-                PathBuf::from(format!("{}/.config/enclave/key",home))
+                PathBuf::from(format!("{}/.config/enclave/key", home))
             );
 
             assert_eq!(
@@ -230,7 +233,7 @@ mod tests {
 
             assert_eq!(
                 config.config_file(),
-                PathBuf::from(format!("{}/.config/enclave/config.yaml",home))
+                PathBuf::from(format!("{}/.config/enclave/config.yaml", home))
             );
 
             assert_eq!(
