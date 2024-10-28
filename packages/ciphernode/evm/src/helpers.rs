@@ -1,5 +1,3 @@
-use std::{env, sync::Arc};
-
 use actix::Recipient;
 use alloy::{
     network::{Ethereum, EthereumWallet},
@@ -17,8 +15,10 @@ use cipher::Cipher;
 use data::Repository;
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
+use std::{env, sync::Arc};
 use tokio::{select, sync::oneshot};
 use tracing::{info, trace};
+use zeroize::Zeroizing;
 
 pub async fn stream_from_evm<P: Provider>(
     provider: WithChainId<P>,
@@ -148,9 +148,9 @@ pub async fn get_signer_from_repository(
         bail!("No private key was found!")
     };
 
-    let encoded_private_key = cipher.decrypt_data(&private_key_encrypted)?;
+    let encoded_private_key = Zeroizing::new(cipher.decrypt_data(&private_key_encrypted)?);
 
-    let private_key = String::from_utf8(encoded_private_key)?;
+    let private_key = Zeroizing::new(String::from_utf8(encoded_private_key.to_vec())?);
 
     let signer = private_key.parse()?;
     Ok(Arc::new(signer))

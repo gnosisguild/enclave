@@ -15,3 +15,4 @@ sortition = { path = "../sortition" }
 cipher = { path = "../cipher" }
 tokio = { workspace = true }
 tracing = { workspace = true }
+zeroize = { workspace = true }
