@@ -91,6 +91,10 @@ impl FilePasswordManager {
 impl PasswordManager for FilePasswordManager {
     // We are assuming a secrets manager will mount the secret on the volume. Hence we would expect
     // the password to be a string provided by the user.
+    // See the following for more info:
+    //   https://docs.docker.com/engine/swarm/secrets/
+    //   https://kubernetes.io/docs/concepts/configuration/secret/
+    //   https://developer.hashicorp.com/vault/docs/platform/k8s/injector
     async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
         let path = &self.path;
 
