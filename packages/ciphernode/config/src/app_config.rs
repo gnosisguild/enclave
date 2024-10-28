@@ -268,8 +268,10 @@ chains:
 "#,
             )?;
 
+            println!("AppConfig::default().config_file: {:?}", AppConfig::default().config_file());
             let config: AppConfig = load_config(None).map_err(|err| err.to_string())?;
             let chain = config.chains().first().unwrap();
+
             assert_eq!(chain.name, "hardhat");
             assert_eq!(chain.rpc_url, "ws://localhost:8545");
             assert_eq!(
