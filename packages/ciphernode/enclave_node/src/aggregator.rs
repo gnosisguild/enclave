@@ -1,10 +1,10 @@
 use actix::{Actor, Addr};
-use anyhow::Result;
+use anyhow::{bail, Result};
+use cipher::Cipher;
 use config::AppConfig;
-use data::{DataStore, InMemStore, SledStore};
 use enclave_core::EventBus;
 use evm::{
-    helpers::pull_eth_signer_from_env, CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
+    helpers::get_signer_from_repository, CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
 };
 use logger::SimpleLogger;
 use p2p::P2p;
@@ -33,7 +33,8 @@ pub async fn setup_aggregator(
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
     let sortition = Sortition::attach(&bus, repositories.sortition());
-    let signer = pull_eth_signer_from_env("PRIVATE_KEY").await?;
+    let cipher = Arc::new(Cipher::from_config(&config).await?);
+    let signer = get_signer_from_repository(repositories.eth_private_key(),&cipher).await?;
     for chain in config
         .chains()
         .iter()

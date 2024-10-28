@@ -8,3 +8,4 @@ dirs = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 figment = { workspace = true }
+alloy = { workspace = true }

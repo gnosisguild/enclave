@@ -27,7 +27,7 @@ pub async fn setup_ciphernode(
         rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
     ));
     let bus = EventBus::new(true).start();
-    let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
+    let cipher = Arc::new(Cipher::from_config(&config).await?);
     let store = setup_datastore(&config, &bus)?;
 
     let repositories = store.repositories();

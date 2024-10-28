@@ -12,7 +12,9 @@ use alloy::{
     signers::local::PrivateKeySigner,
     transports::BoxTransport,
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use cipher::Cipher;
+use data::Repository;
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
 use tokio::{select, sync::oneshot};
@@ -135,6 +137,22 @@ pub async fn pull_eth_signer_from_env(var: &str) -> Result<Arc<PrivateKeySigner>
     let private_key = env::var(var)?;
     let signer = private_key.parse()?;
     env::remove_var(var);
+    Ok(Arc::new(signer))
+}
+
+pub async fn get_signer_from_repository(
+    repository: Repository<Vec<u8>>,
+    cipher: &Arc<Cipher>,
+) -> Result<Arc<PrivateKeySigner>> {
+    let Some(private_key_encrypted) = repository.read().await? else {
+        bail!("No private key was found!")
+    };
+
+    let encoded_private_key = cipher.decrypt_data(&private_key_encrypted)?;
+
+    let private_key = String::from_utf8(encoded_private_key)?;
+
+    let signer = private_key.parse()?;
     Ok(Arc::new(signer))
 }
 

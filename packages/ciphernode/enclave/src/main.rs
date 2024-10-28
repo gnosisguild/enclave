@@ -43,7 +43,7 @@ impl Cli {
         let config = load_config(config_path)?;
 
         match self.command {
-            Commands::Start { address } => start::execute(config, &address).await?,
+            Commands::Start => start::execute(config).await?,
             Commands::Password { command } => password::execute(command, config).await?,
             Commands::Aggregator { command } => aggregator::execute(command, config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,

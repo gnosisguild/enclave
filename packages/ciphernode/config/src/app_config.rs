@@ -1,3 +1,4 @@
+use alloy::primitives::Address;
 use anyhow::Result;
 use figment::{
     providers::{Format, Serialized, Yaml},
@@ -40,6 +41,8 @@ pub struct AppConfig {
     cwd: PathBuf,
     /// The default config dir for the operating system this should not be changed
     default_dir: PathBuf,
+    /// Ethereum Address for the node
+    address: Option<Address>,
 }
 
 impl Default for AppConfig {
@@ -53,6 +56,7 @@ impl Default for AppConfig {
             config_file: PathBuf::from("config.yaml"), // ~/.config/enclave/config.yaml
             cwd: env::current_dir().unwrap_or_default(),
             default_dir, // ~/.config/enclave
+            address: None,
         }
     }
 }
@@ -95,6 +99,10 @@ impl AppConfig {
         false
     }
 
+    pub fn address(&self) -> Option<Address> {
+        self.address
+    }
+    
     pub fn config_dir(&self) -> PathBuf {
         normalize_path(self.config_dir_impl())
     }

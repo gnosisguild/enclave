@@ -15,11 +15,12 @@ anyhow = { workspace = true }
 cipher = { path = "../cipher" }
 clap = { workspace = true }
 config = { path = "../config" }
-enclave-core = { path = "../core" }
 data = { path = "../data" }
-router = { path = "../router" }
 dialoguer = "0.11.0"
+enclave-core = { path = "../core" }
 enclave_node = { path = "../enclave_node" }
+hex = { workspace = true }
+router = { path = "../router" }
 rpassword = "7.3.1"
 tokio = { workspace = true }
 tracing = { workspace = true }

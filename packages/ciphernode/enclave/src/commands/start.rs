@@ -1,15 +1,17 @@
-use alloy::primitives::Address;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Result};
 use config::AppConfig;
 use enclave_node::{listen_for_shutdown, setup_ciphernode};
 use tracing::info;
 
 use crate::owo;
 
-pub async fn execute(config: AppConfig, address: &str) -> Result<()> {
+pub async fn execute(config: AppConfig) -> Result<()> {
     owo();
 
-    let address = Address::parse_checksummed(&address, None).context("Invalid address")?;
+    // let address = Address::parse_checksummed(&config.address(), None).context("Invalid address")?;
+    let Some(address) = config.address() else {
+        return Err(anyhow!("You must provide an address"));
+    };
 
     info!("LAUNCHING CIPHERNODE: ({})", address);
 

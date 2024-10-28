@@ -11,10 +11,7 @@ use self::password::PasswordCommands;
 #[derive(Subcommand)]
 pub enum Commands {
     /// Start the application
-    Start {
-        #[arg(long)]
-        address: String,
-    },
+    Start,
 
     /// Aggregator node management commands
     Aggregator {

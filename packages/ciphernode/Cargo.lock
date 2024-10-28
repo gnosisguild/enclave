@@ -1680,6 +1680,7 @@ dependencies = [
 name = "config"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "dirs",
  "figment",
@@ -2158,6 +2159,7 @@ dependencies = [
  "dialoguer",
  "enclave-core",
  "enclave_node",
+ "hex",
  "router",
  "rpassword",
  "tokio",
@@ -2300,6 +2302,7 @@ dependencies = [
  "alloy",
  "alloy-primitives 0.6.4",
  "anyhow",
+ "cipher 0.1.0",
  "data",
  "enclave-core",
  "futures-util",

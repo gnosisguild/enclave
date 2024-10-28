@@ -1,5 +1,5 @@
 config_dir: .
-address: 0xbDA5747bFD65F08deb54cb465eB87D40e51B197E
+address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
 chains:
   - name: "hardhat"
     rpc_url: "ws://localhost:8545"

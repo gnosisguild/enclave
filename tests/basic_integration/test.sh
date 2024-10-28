@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -eu  # Exit immediately if a command exits with a non-zero status
-#
+
 # Get the script's location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -79,50 +79,59 @@ waiton-files() {
   done
 }
 
-# This is temporary until we write the command api
 set_password() {
   local name="$1"
   local password="$2"
-  local config_dir="$SCRIPT_DIR/lib/$name"
-  mkdir -p $config_dir
-  echo "$password" > "$config_dir/key"
-  chmod 400 "$config_dir/key"
+  yarn enclave password create \
+    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --password "$password"
 }
 
 launch_ciphernode() {
     local name="$1"
     heading "Launch ciphernode $name"
-    yarn enclave \
-      --config "$SCRIPT_DIR/lib/$name/config.yaml"
+    yarn enclave start \
+      --config "$SCRIPT_DIR/lib/$name/config.yaml" &
 }
 
+set_private_key() {
+  local name="$1"
+  local private_key="$2"
 
-# XXX: WE NEED TO NOW ADD THE PRIVATE KEY TO BE STORED ON THE DATASTORE
-# - [x] Setup command files one for each command
-# - [x] Setup cli parsing for the commands that defer to the commands
-# - We must have access to the config
-#
-# enclave set-password
-# <Blind password entry>
-#
-# enclave set-private-key
+  yarn enclave wallet set \
+    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --private-key "$private_key"
+}
+
 launch_aggregator() {
-    local private_key="$1"
-    PRIVATE_KEY=$private_key yarn ciphernode:aggregator \
-      --config "$SCRIPT_DIR/lib/ciphernode_config.yaml" \
+    local name="$1"
+    heading "Launch aggregator $name"
+
+    yarn enclave aggregator start \
+      --config "$SCRIPT_DIR/lib/$name/config.yaml" \
       --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
       --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
 }
 
+clean_folders() {
+    # Delete output artifacts
+    rm -rf "$SCRIPT_DIR/output/"*
+
+    # Delete enclave artifacts
+    for name in cn1 cn2 cn3 cn4 ag; do
+        # List all files and directories except config.yaml, then delete them
+        find "$SCRIPT_DIR/lib/$name" -mindepth 1 ! -regex '.*/config\.yaml$' -exec rm -rf {} +
+    done
+}
+
 pkill -9 -f "target/debug/enclave" || true
 pkill -9 -f "hardhat node" || true
-pkill -9 -f "target/debug/aggregator" || true
 
 # Set up trap to catch errors and interrupts
 trap 'cleanup $?' ERR INT TERM
 
-# Delete output artifacts
-rm -rf $ROOT_DIR/tests/basic_integration/output/*
+# Tidy up files from previous runs
+clean_folders
 
 $SCRIPT_DIR/lib/prebuild.sh
 
@@ -138,18 +147,21 @@ done
 set_password cn1 "$CIPHERNODE_SECRET"
 set_password cn2 "$CIPHERNODE_SECRET"
 set_password cn3 "$CIPHERNODE_SECRET"
+set_password cn4 "$CIPHERNODE_SECRET"
 set_password ag "$CIPHERNODE_SECRET"
 
+set_private_key ag "$PRIVATE_KEY"
+
 # Launch 4 ciphernodes
-launch_ciphernode "$CIPHERNODE_ADDRESS_1" "$CIPHERNODE_SECRET"
-launch_ciphernode "$CIPHERNODE_ADDRESS_2" "$CIPHERNODE_SECRET"
-launch_ciphernode "$CIPHERNODE_ADDRESS_3" "$CIPHERNODE_SECRET"
-launch_ciphernode "$CIPHERNODE_ADDRESS_4" "$CIPHERNODE_SECRET"
-launch_aggregator "$PRIVATE_KEY"
+launch_ciphernode cn1
+launch_ciphernode cn2
+launch_ciphernode cn3
+launch_ciphernode cn4
+launch_aggregator ag
 
 sleep 1
 
-waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/aggregator" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
+waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 
 heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
@@ -202,6 +214,22 @@ if [[ "$ACTUAL" != "$PLAINTEXT"* ]]; then
 fi
 
 heading "Test PASSED !"
+echo -e "\033[32m                                                              
+                                               ██████         
+                                             ██████           
+                                           ██████             
+                                         ██████               
+                                       ██████                 
+                                     ██████                   
+                       ██          ██████                     
+                       ████      ██████                       
+                       ██████  ██████                         
+                        ██████████                            
+                         ████████                             
+                          ██████                              
+                           ████                               
+                            ██                                
+                                                              \033[0m"
 
 pkill -15 -f "target/debug/enclave" || true
 pkill -15 -f "target/debug/aggregator" || true
