@@ -62,8 +62,9 @@ pub async fn main() {
     match cli.execute().await {
         Ok(_) => (),
         Err(err) => {
-            println!("{}", err);
-            println!("There was a problem running. Goodbye")
+            eprintln!("{}", err);
+            eprintln!("There was a problem running. Goodbye");
+            std::process::exit(1);
         }
     }
 }
