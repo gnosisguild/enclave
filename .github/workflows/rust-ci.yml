@@ -41,6 +41,9 @@ jobs:
     - name: Checking code format
       run: cd ./packages/ciphernode && cargo fmt -- --check
 
+    - name: debug
+      run: env
+    
     - name: Run tests
       run: |
         cd ./packages/ciphernode/
