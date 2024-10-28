@@ -61,7 +61,7 @@ impl Keyshare {
     fn get_secret(&self) -> Result<Vec<u8>> {
         let encrypted = self
             .secret
-            .clone()
+            .as_ref()
             .ok_or(anyhow!("No secret share available on Keyshare"))?;
 
         let decrypted = self.cipher.decrypt_data(&encrypted)?;
