@@ -263,7 +263,7 @@ mod tests {
             let home = format!("{}", jail.directory().to_string_lossy());
             println!(">>> HOME: {}", &home);
             jail.set_env("HOME", &home);
-
+            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
             let filename = format!("{}/.config/enclave/config.yaml", home);
             let filedir = format!("{}/.config/enclave", home);
             jail.create_dir(filedir)?;
