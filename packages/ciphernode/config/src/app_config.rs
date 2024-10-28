@@ -267,7 +267,6 @@ chains:
 "#,
             )?;
 
-
             let config: AppConfig = load_config(None).map_err(|err| err.to_string())?;
             let chain = config.chains().first().unwrap();
 

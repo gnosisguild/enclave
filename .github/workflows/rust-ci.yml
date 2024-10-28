@@ -41,9 +41,7 @@ jobs:
       run: cd ./packages/ciphernode && cargo fmt -- --check
 
     - name: Run tests
-      env:
-        TMPDIR: ${{ runner.temp }}
       run: |
         env &&
         cd ./packages/ciphernode/
-        cargo test -- --nocapture
+        cargo test

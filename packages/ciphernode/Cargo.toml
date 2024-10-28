@@ -14,7 +14,8 @@ members = [
   "test_helpers",
   "logger",
   "tests",
-  "cipher", "config",
+  "cipher",
+  "config",
 ]
 
 [workspace.dependencies]
