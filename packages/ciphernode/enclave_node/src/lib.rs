@@ -1,9 +1,9 @@
 mod aggregator;
 mod ciphernode;
-mod shutdown;
 mod datastore;
+mod shutdown;
 
 pub use aggregator::*;
 pub use ciphernode::*;
-pub use shutdown::*;
 pub use datastore::*;
+pub use shutdown::*;

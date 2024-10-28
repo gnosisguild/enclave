@@ -49,10 +49,10 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             chains: vec![],
-            key_file: PathBuf::from("key"), // ~/.config/enclave/key
-            db_file: PathBuf::from("db"),   // ~/.config/enclave/db
+            key_file: PathBuf::from("key"),   // ~/.config/enclave/key
+            db_file: PathBuf::from("db"),     // ~/.config/enclave/db
             config_dir: OsDirs::config_dir(), // ~/.config/enclave
-            data_dir: OsDirs::data_dir(),                       // ~/.config/enclave
+            data_dir: OsDirs::data_dir(),     // ~/.config/enclave
             config_file: PathBuf::from("config.yaml"), // ~/.config/enclave/config.yaml
             cwd: env::current_dir().unwrap_or_default(),
             address: None,
@@ -61,7 +61,7 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    fn ensure_full_path(&self, dir:&PathBuf, file: &PathBuf) -> PathBuf {
+    fn ensure_full_path(&self, dir: &PathBuf, file: &PathBuf) -> PathBuf {
         normalize_path({
             // If this is absolute return it
             if file.is_absolute() || file.to_string_lossy().starts_with("~") {
@@ -74,8 +74,7 @@ impl AppConfig {
         })
     }
 
-    fn resolve_base_dir(&self, base_dir:&PathBuf, default_base_dir:&PathBuf) -> PathBuf {
-
+    fn resolve_base_dir(&self, base_dir: &PathBuf, default_base_dir: &PathBuf) -> PathBuf {
         if base_dir.is_relative() {
             // ConfigDir is relative and the config file is absolute then use the location of the
             // config file. That way all paths are relative to the config file
@@ -276,5 +275,3 @@ chains:
         });
     }
 }
-
-

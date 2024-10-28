@@ -1,12 +1,12 @@
-pub mod start;
-pub mod password;
 pub mod aggregator;
+pub mod password;
+pub mod start;
 pub mod wallet;
 
+use self::password::PasswordCommands;
 use aggregator::AggregatorCommands;
 use clap::Subcommand;
 use wallet::WalletCommands;
-use self::password::PasswordCommands;
 
 #[derive(Subcommand)]
 pub enum Commands {
@@ -18,7 +18,7 @@ pub enum Commands {
         #[command(subcommand)]
         command: AggregatorCommands,
     },
-    
+
     /// Password management commands
     Password {
         #[command(subcommand)]
@@ -28,7 +28,6 @@ pub enum Commands {
     /// Wallet management commands
     Wallet {
         #[command(subcommand)]
-        command: WalletCommands
-    }
+        command: WalletCommands,
+    },
 }
-

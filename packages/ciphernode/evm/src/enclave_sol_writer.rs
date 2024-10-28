@@ -38,7 +38,6 @@ impl EnclaveSolWriter {
         contract_address: Address,
         signer: &Arc<PrivateKeySigner>,
     ) -> Result<Self> {
-
         Ok(Self {
             provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
             contract_address,

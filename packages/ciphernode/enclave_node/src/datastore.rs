@@ -14,8 +14,7 @@ pub fn setup_datastore(config: &AppConfig, bus: &Addr<EventBus>) -> Result<DataS
     Ok(store)
 }
 
-pub fn get_repositories(config: &AppConfig, bus:&Addr<EventBus>) -> Result<Repositories> {
+pub fn get_repositories(config: &AppConfig, bus: &Addr<EventBus>) -> Result<Repositories> {
     let store = setup_datastore(config, &bus)?;
     Ok(store.repositories())
 }
-

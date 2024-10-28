@@ -87,15 +87,15 @@ impl E3Feature for FheFeature {
 pub struct KeyshareFeature {
     bus: Addr<EventBus>,
     address: String,
-    cipher: Arc<Cipher>
+    cipher: Arc<Cipher>,
 }
 
 impl KeyshareFeature {
-    pub fn create(bus: &Addr<EventBus>, address: &str, cipher:&Arc<Cipher>) -> Box<Self> {
+    pub fn create(bus: &Addr<EventBus>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             address: address.to_owned(),
-            cipher: cipher.to_owned()
+            cipher: cipher.to_owned(),
         })
     }
 }
@@ -127,7 +127,7 @@ impl E3Feature for KeyshareFeature {
                 store: ctx.repositories().keyshare(&e3_id),
                 fhe: fhe.clone(),
                 address: self.address.clone(),
-                cipher: self.cipher.clone()
+                cipher: self.cipher.clone(),
             })
             .start(),
         );
@@ -166,7 +166,7 @@ impl E3Feature for KeyshareFeature {
                 bus: self.bus.clone(),
                 store,
                 address: self.address.clone(),
-                cipher: self.cipher.clone()
+                cipher: self.cipher.clone(),
             },
             snap,
         )

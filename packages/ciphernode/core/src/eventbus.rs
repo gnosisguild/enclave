@@ -88,15 +88,16 @@ impl Handler<GetErrors> for EventBus {
     type Result = Vec<EnclaveError>;
 
     fn handle(&mut self, _: GetErrors, _: &mut Context<Self>) -> Vec<EnclaveError> {
-        self.history.iter().filter_map(|evt| {
-            match evt {
-                EnclaveEvent::EnclaveError {data, .. } => Some(data),
-                _ => None
-            }
-        }).cloned().collect()
+        self.history
+            .iter()
+            .filter_map(|evt| match evt {
+                EnclaveEvent::EnclaveError { data, .. } => Some(data),
+                _ => None,
+            })
+            .cloned()
+            .collect()
     }
 }
-
 
 impl Handler<ResetHistory> for EventBus {
     type Result = ();

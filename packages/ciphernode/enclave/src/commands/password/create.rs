@@ -25,11 +25,11 @@ fn get_zeroizing_pw_vec(input: Option<String>) -> Result<Zeroizing<Vec<u8>>> {
     }
 
     let pw = Zeroizing::new(pw_str.trim().as_bytes().to_owned());
-    
+
     // Clean up sensitive data
     pw_str.zeroize();
     confirm_pw_str.zeroize();
-    
+
     Ok(pw)
 }
 

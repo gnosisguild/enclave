@@ -63,8 +63,12 @@ pub struct SledDb {
 
 impl SledDb {
     pub fn new(path: &PathBuf) -> Result<Self> {
-        let db = sled::open(path)
-            .with_context(|| format!("Could not open database at path '{}'", path.to_string_lossy()))?;
+        let db = sled::open(path).with_context(|| {
+            format!(
+                "Could not open database at path '{}'",
+                path.to_string_lossy()
+            )
+        })?;
         Ok(Self { db })
     }
 

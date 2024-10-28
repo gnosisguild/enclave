@@ -1,5 +1,5 @@
-use super::delete::{prompt_delete, DeleteMode};
 use super::create::execute as set_password;
+use super::delete::{prompt_delete, DeleteMode};
 use anyhow::Result;
 use config::AppConfig;
 
