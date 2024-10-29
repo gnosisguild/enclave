@@ -21,6 +21,22 @@ impl Subscribe {
     }
 }
 
+#[derive(Message, Debug)]
+#[rtype(result = "()")]
+pub struct Unsubscribe {
+    pub event_type: String,
+    pub listener: Recipient<EnclaveEvent>,
+}
+
+impl Unsubscribe {
+    pub fn new(event_type: impl Into<String>, listener: Recipient<EnclaveEvent>) -> Self {
+        Self {
+            event_type: event_type.into(),
+            listener,
+        }
+    }
+}
+
 #[derive(Message)]
 #[rtype(result = "Vec<EnclaveEvent>")]
 pub struct GetHistory;
@@ -61,7 +77,6 @@ impl EventBus {
 
     fn add_to_history(&mut self, event: EnclaveEvent) {
         self.history.push(event.clone());
-        self.ids.insert(event.into());
     }
 }
 
@@ -73,6 +88,19 @@ impl Handler<Subscribe> for EventBus {
             .entry(event.event_type)
             .or_default()
             .push(event.listener);
+    }
+}
+
+impl Handler<Unsubscribe> for EventBus {
+    type Result = ();
+
+    fn handle(&mut self, event: Unsubscribe, _: &mut Context<Self>) {
+        if let Some(recipients) = self.listeners.get_mut(&event.event_type) {
+            recipients.retain(|recipient| recipient != &event.listener);
+            if recipients.is_empty() {
+                self.listeners.remove(&event.event_type);
+            }
+        }
     }
 }
 
@@ -129,6 +157,8 @@ impl Handler<EnclaveEvent> for EventBus {
                 listener.do_send(event.clone())
             }
         }
+
+        self.ids.insert(event.get_id());
 
         if self.capture {
             self.add_to_history(event);

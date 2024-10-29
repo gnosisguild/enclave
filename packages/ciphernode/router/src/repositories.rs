@@ -4,7 +4,7 @@ use data::{DataStore, Repository};
 use enclave_core::E3id;
 use fhe::FheSnapshot;
 use keyshare::KeyshareState;
-use sortition::SortitionModule;
+use sortition::{SortitionModule, SortitionSnapshot};
 
 pub struct Repositories {
     store: DataStore,
@@ -65,7 +65,7 @@ impl Repositories {
         Repository::new(self.store.scope(format!("//router")))
     }
 
-    pub fn sortition(&self) -> Repository<SortitionModule> {
+    pub fn sortition(&self) -> Repository<SortitionSnapshot> {
         Repository::new(self.store.scope(format!("//sortition")))
     }
 

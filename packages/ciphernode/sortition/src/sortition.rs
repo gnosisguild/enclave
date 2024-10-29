@@ -5,9 +5,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
-    BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
-    Subscribe,
+    BusError, Die, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Seed, Subscribe, Unsubscribe,
 };
+use tracing::trace;
 use std::collections::HashSet;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
@@ -43,8 +43,8 @@ impl Default for SortitionModule {
     }
 }
 
-impl SortitionList<String> for SortitionModule {
-    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
+impl SortitionList<&str> for SortitionModule {
+    fn contains(&self, seed: Seed, size: usize, address: &str) -> Result<bool> {
         if self.nodes.len() == 0 {
             return Err(anyhow!("No nodes registered!"));
         }
@@ -68,12 +68,12 @@ impl SortitionList<String> for SortitionModule {
             .any(|(_, addr)| addr.to_string() == address))
     }
 
-    fn add(&mut self, address: String) {
-        self.nodes.insert(address);
+    fn add(&mut self, address: &str) {
+        self.nodes.insert(address.to_string());
     }
 
-    fn remove(&mut self, address: String) {
-        self.nodes.remove(&address);
+    fn remove(&mut self, address: &str) {
+        self.nodes.remove(address);
     }
 }
 
@@ -84,12 +84,19 @@ pub struct GetNodes;
 pub struct Sortition {
     list: SortitionModule,
     bus: Addr<EventBus>,
-    store: Repository<SortitionModule>,
+    store: Repository<SortitionSnapshot>,
+    processed: HashSet<EventId>,
 }
 
 pub struct SortitionParams {
     pub bus: Addr<EventBus>,
-    pub store: Repository<SortitionModule>,
+    pub store: Repository<SortitionSnapshot>,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct SortitionSnapshot {
+    pub list: SortitionModule,
+    pub processed: HashSet<EventId>,
 }
 
 impl Sortition {
@@ -98,17 +105,35 @@ impl Sortition {
             list: SortitionModule::new(),
             bus: params.bus,
             store: params.store,
+            processed: HashSet::new(),
         }
     }
 
-    pub fn attach(bus: &Addr<EventBus>, store: Repository<SortitionModule>) -> Addr<Sortition> {
-        let addr = Sortition::new(SortitionParams {
-            bus: bus.clone(),
-            store,
-        })
-        .start();
+    pub async fn load(
+        bus: &Addr<EventBus>,
+        store: &Repository<SortitionSnapshot>,
+    ) -> Result<Addr<Sortition>> {
+        let addr = if let Some(snapshot) = store.read().await? {
+            Sortition::from_snapshot(
+                SortitionParams {
+                    bus: bus.clone(),
+                    store: store.clone(),
+                },
+                snapshot,
+            )
+            .await?
+            .start()
+        } else {
+            Sortition::new(SortitionParams {
+                bus: bus.clone(),
+                store: store.clone(),
+            })
+            .start()
+        };
+
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
-        addr
+        bus.do_send(Subscribe::new("CiphernodeRemoved", addr.clone().into()));
+        Ok(addr)
     }
 
     pub fn get_nodes(&self) -> Vec<String> {
@@ -121,9 +146,12 @@ impl Actor for Sortition {
 }
 
 impl Snapshot for Sortition {
-    type Snapshot = SortitionModule;
+    type Snapshot = SortitionSnapshot;
     fn snapshot(&self) -> Self::Snapshot {
-        self.list.clone()
+        SortitionSnapshot {
+            list: self.list.clone(),
+            processed: self.processed.clone(),
+        }
     }
 }
 
@@ -134,46 +162,42 @@ impl FromSnapshotWithParams for Sortition {
         Ok(Sortition {
             bus: params.bus,
             store: params.store,
-            list: snapshot,
+            list: snapshot.list,
+            processed: snapshot.processed,
         })
     }
 }
 
 impl Checkpoint for Sortition {
-    fn repository(&self) -> Repository<SortitionModule> {
+    fn repository(&self) -> Repository<SortitionSnapshot> {
         self.store.clone()
     }
 }
 
 impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::CiphernodeAdded { data, .. } => ctx.notify(data.clone()),
-            EnclaveEvent::CiphernodeRemoved { data, .. } => ctx.notify(data.clone()),
+    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+        if self.processed.contains(&msg.get_id()) {
+            trace!("Skipping processing event {} as has been seen before.", msg.get_id());
+            return;
+        };
+
+        match &msg {
+            EnclaveEvent::CiphernodeAdded { data, .. } => self.list.add(&data.address),
+            EnclaveEvent::CiphernodeRemoved { data, .. } => self.list.remove(&data.address),
             _ => (),
         }
-    }
-}
 
-impl Handler<CiphernodeAdded> for Sortition {
-    type Result = ();
-    fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
-        self.list.add(msg.address);
-    }
-}
-
-impl Handler<CiphernodeRemoved> for Sortition {
-    type Result = ();
-    fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
-        self.list.remove(msg.address);
+        // Store processed event
+        self.processed.insert(msg.get_id());
+        self.checkpoint();
     }
 }
 
 impl Handler<GetHasNode> for Sortition {
     type Result = bool;
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
-        match self.list.contains(msg.seed, msg.size, msg.address) {
+        match self.list.contains(msg.seed, msg.size, &msg.address) {
             Ok(val) => val,
             Err(err) => {
                 self.bus.err(EnclaveErrorType::Sortition, err);
@@ -188,5 +212,118 @@ impl Handler<GetNodes> for Sortition {
 
     fn handle(&mut self, _msg: GetNodes, _ctx: &mut Self::Context) -> Self::Result {
         self.get_nodes()
+    }
+}
+
+impl Handler<Die> for Sortition {
+    type Result = ();
+    fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
+        self.bus
+            .do_send(Unsubscribe::new("CiphernodeAdded", ctx.address().into()));
+
+        self.bus
+            .do_send(Unsubscribe::new("CiphernodeRemoved", ctx.address().into()));
+
+        ctx.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Sortition, SortitionSnapshot};
+    use actix::{clock::sleep, Actor};
+    use alloy::primitives::Address;
+    use anyhow::{bail, Result};
+    use data::{DataStore, Repository};
+    use enclave_core::{CiphernodeAdded, CiphernodeRemoved, Die, EnclaveEvent, EventBus};
+    use rand::Rng;
+    use std::time::Duration;
+
+    fn generate_random_address() -> String {
+        let mut rng = rand::thread_rng();
+        let mut bytes = [0u8; 20];
+        rng.fill(&mut bytes);
+        let address = Address::from_slice(&bytes);
+        format!("{:?}", address)
+    }
+
+    #[actix::test]
+    async fn test_sortition_hydration() -> Result<()> {
+        let store = DataStore::in_mem();
+        let repo: Repository<SortitionSnapshot> =
+            Repository::new(store.scope(format!("//sortition")));
+
+        let bus_1 = EventBus::new(true).start();
+        let sortition = Sortition::load(&bus_1, &repo).await?;
+
+        let mut num_nodes = 0;
+        let adds: Vec<CiphernodeAdded> = (0..6)
+            .map(|i| {
+                num_nodes += 1;
+                CiphernodeAdded {
+                    address: generate_random_address(),
+                    index: i,
+                    num_nodes,
+                }
+            })
+            .collect();
+        let removes: Vec<CiphernodeRemoved> = (0..6)
+            .map(|i| {
+                num_nodes -= 1;
+                CiphernodeRemoved {
+                    address: generate_random_address(),
+                    index: i,
+                    num_nodes,
+                }
+            })
+            .collect();
+
+        for event in adds.iter() {
+            bus_1.do_send(EnclaveEvent::from(event.clone()));
+        }
+
+        sleep(Duration::from_millis(1)).await;
+
+        sortition.do_send(Die);
+
+        let Some(snapshot) = repo.read().await? else {
+            bail!("Snapshot must exit")
+        };
+
+        assert_eq!(snapshot.processed.len(), 6);
+
+        let bus_2 = EventBus::new(true).start();
+
+        Sortition::load(&bus_2, &repo).await?;
+
+        for event in adds.iter() {
+            bus_2.do_send(EnclaveEvent::from(event.clone()));
+        }
+
+        sleep(Duration::from_millis(1)).await;
+
+        let Some(snapshot) = repo.read().await? else {
+            bail!("Snapshot must exit")
+        };
+
+        assert_eq!(
+            snapshot.processed.len(),
+            6,
+            "Snapshot events should not have changed"
+        );
+
+        for event in removes.iter() {
+            bus_2.do_send(EnclaveEvent::from(event.clone()));
+        }
+
+        sleep(Duration::from_millis(1)).await;
+
+        let Some(snapshot) = repo.read().await? else {
+            bail!("Snapshot must exit")
+        };
+
+        assert_eq!(snapshot.processed.len(), 12);
+
+        Ok(())
     }
 }

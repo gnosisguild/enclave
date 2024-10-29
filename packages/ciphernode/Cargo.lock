@@ -5787,6 +5787,7 @@ dependencies = [
  "num",
  "rand",
  "serde",
+ "tokio",
  "tracing",
 ]
 

@@ -30,7 +30,7 @@ pub async fn stream_from_evm<P: Provider>(
 
     info!("Fetching historical events");
 
-    // historical events
+    // Historical events
     match provider
         .get_provider()
         .get_logs(&filter)

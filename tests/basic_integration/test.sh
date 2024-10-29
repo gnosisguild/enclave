@@ -142,6 +142,10 @@ set_password ag "$CIPHERNODE_SECRET"
 
 set_private_key ag "$PRIVATE_KEY"
 
+# Send an evm event before the nodes are launched
+heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
+yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
+
 # Launch 4 ciphernodes
 launch_ciphernode cn1
 launch_ciphernode cn2
@@ -152,10 +156,6 @@ launch_aggregator ag
 sleep 1
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
-
-heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
-yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
-
 heading "Add ciphernode $CIPHERNODE_ADDRESS_2"
 yarn ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_2 --network localhost
 

@@ -6,12 +6,11 @@ use enclave_core::EventBus;
 use router::{Repositories, RepositoriesFactory};
 
 pub fn setup_datastore(config: &AppConfig, bus: &Addr<EventBus>) -> Result<DataStore> {
-    let store: DataStore = if !config.use_in_mem_store() {
-        (&SledStore::new(&bus, &config.db_file())?.start()).into()
-    } else {
-        (&InMemStore::new(true).start()).into()
-    };
-    Ok(store)
+    if config.use_in_mem_store() {
+        return Ok(DataStore::in_mem());
+    }
+
+    Ok(DataStore::persistent(&bus, &config.db_file())?)
 }
 
 pub fn get_repositories(config: &AppConfig, bus: &Addr<EventBus>) -> Result<Repositories> {

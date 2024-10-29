@@ -32,7 +32,7 @@ pub async fn setup_ciphernode(
 
     let repositories = store.repositories();
 
-    let sortition = Sortition::attach(&bus, repositories.sortition());
+    let sortition = Sortition::load(&bus, &repositories.sortition()).await?;
     CiphernodeSelector::attach(&bus, &sortition, &address.to_string());
 
     for chain in config

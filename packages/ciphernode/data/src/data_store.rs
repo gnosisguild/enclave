@@ -1,8 +1,9 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, path::PathBuf};
 
 use crate::{InMemStore, IntoKey, SledStore};
-use actix::{Addr, Message, Recipient};
+use actix::{Actor, Addr, Message, Recipient};
 use anyhow::Result;
+use enclave_core::EventBus;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -113,6 +114,14 @@ impl DataStore {
             insert: self.insert.clone(),
             scope: key.into_key(),
         }
+    }
+
+    pub fn in_mem() -> DataStore {
+        (&InMemStore::new(true).start()).into()
+    }
+
+    pub fn persistent(bus: &Addr<EventBus>, path: &PathBuf) -> Result<DataStore> {
+        Ok((&SledStore::new(bus, path)?.start()).into())
     }
 }
 

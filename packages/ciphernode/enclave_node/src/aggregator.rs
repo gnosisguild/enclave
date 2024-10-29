@@ -32,7 +32,7 @@ pub async fn setup_aggregator(
     ));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
-    let sortition = Sortition::attach(&bus, repositories.sortition());
+    let sortition = Sortition::load(&bus, &repositories.sortition()).await?;
     let cipher = Arc::new(Cipher::from_config(&config).await?);
     let signer = get_signer_from_repository(repositories.eth_private_key(), &cipher).await?;
     for chain in config
