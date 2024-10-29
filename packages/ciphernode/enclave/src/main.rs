@@ -63,7 +63,6 @@ pub async fn main() {
         Ok(_) => (),
         Err(err) => {
             eprintln!("{}", err);
-            eprintln!("There was a problem running. Goodbye");
             std::process::exit(1);
         }
     }

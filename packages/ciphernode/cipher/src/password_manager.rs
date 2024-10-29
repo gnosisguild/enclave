@@ -117,9 +117,13 @@ impl PasswordManager for FilePasswordManager {
     async fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()> {
         let path = &self.path;
 
+        if contents.len() == 0 {
+            bail!("Password must contain data!")
+        }
+
         // Check if file exists
         if path.exists() {
-            bail!("Keyfile already exists. Refusing to overwrite.");
+            bail!("Keyfile already exists. Refusing to overwrite.")
         }
 
         // Create new file with restrictive permissions from the start
