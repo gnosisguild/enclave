@@ -15,5 +15,3 @@ bincode = { workspace = true }
 tracing = { workspace = true }
 async-trait = { workspace = true }
 
-[dev-dependencies]
-actix-rt = { workspace = true }
