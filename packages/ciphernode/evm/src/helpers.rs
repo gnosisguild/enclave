@@ -17,7 +17,7 @@ use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
 use std::{env, sync::Arc};
 use tokio::{select, sync::oneshot};
-use tracing::{info, trace};
+use tracing::{info, trace, warn};
 use zeroize::Zeroizing;
 
 pub async fn stream_from_evm<P: Provider>(
@@ -27,6 +27,36 @@ pub async fn stream_from_evm<P: Provider>(
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
 ) {
+
+    info!("Fetching historical events");
+
+    // historical events
+    match provider
+        .get_provider()
+        .get_logs(&filter)
+        .await
+        .context("Could not fetch historical events")
+    {
+        Ok(historical_logs) => {
+            info!("Fetched {} historical events", historical_logs.len());
+            for log in historical_logs {
+                if let Some(event) = extractor(log.data(), log.topic0(), provider.get_chain_id()) {
+                    trace!("Processing historical log");
+                    bus.do_send(event);
+                }
+            }
+        }
+        Err(e) => {
+            warn!("Failed to fetch historical events: {}", e);
+            bus.err(EnclaveErrorType::Evm, e);
+            return;
+        }
+    }
+
+    trace!("Finished fetching historical events");
+    info!("Listening to live stream for new events");
+
+    // New events
     match provider
         .get_provider()
         .subscribe_logs(&filter)
@@ -46,7 +76,7 @@ pub async fn stream_from_evm<P: Provider>(
                                     trace!("Failed to extract log from EVM");
                                     continue;
                                 };
-                                info!("Extracted log from evm sending now.");
+                                trace!("Extracted log from evm sending now.");
                                 bus.do_send(event);
                             }
                             None => break, // Stream ended
