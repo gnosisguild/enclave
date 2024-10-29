@@ -7,8 +7,8 @@ use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     BusError, Die, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Seed, Subscribe, Unsubscribe,
 };
-use tracing::trace;
 use std::collections::HashSet;
+use tracing::trace;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
@@ -178,7 +178,10 @@ impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         if self.processed.contains(&msg.get_id()) {
-            trace!("Skipping processing event {} as has been seen before.", msg.get_id());
+            trace!(
+                "Skipping processing event {} as has been seen before.",
+                msg.get_id()
+            );
             return;
         };
 

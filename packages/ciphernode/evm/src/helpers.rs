@@ -27,7 +27,6 @@ pub async fn stream_from_evm<P: Provider>(
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
 ) {
-
     info!("Fetching historical events");
 
     // Historical events
