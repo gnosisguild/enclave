@@ -1,9 +1,8 @@
 use actix::Message;
 use alloy::{
     hex,
-    primitives::{Uint, U256},
+    primitives::{Uint,ruint::ParseError, U256},
 };
-use alloy_primitives::ruint::ParseError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{

@@ -1,3 +1,11 @@
+
+# Prerequisites
+
+These versions of dependencies are known to work:
+
+- rust 1.81.0
+- solc 0.8.21 (for creating test fixtures)
+
 # E3 Requested
 
 ```mermaid

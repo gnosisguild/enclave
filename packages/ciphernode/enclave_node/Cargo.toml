@@ -12,7 +12,6 @@ actix = { workspace = true }
 actix-rt = { workspace = true }
 aggregator = { path = "../aggregator" }
 alloy = { workspace = true }
-alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 bfv = { path = "../bfv" }
 bincode = { workspace = true }

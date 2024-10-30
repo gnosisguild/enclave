@@ -23,7 +23,7 @@ fhe-util = { workspace = true }
 async-std = { workspace = true }
 tokio = { workspace = true }
 actix-rt = { workspace = true }
-alloy-primitives = { workspace = true }
+# alloy-primitives = { workspace = true }
 alloy = { workspace = true }
 clap = { workspace = true }
 rand_chacha = { workspace = true }

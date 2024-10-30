@@ -6,13 +6,19 @@ edition = "2021"
 [dependencies]
 actix = { workspace = true }
 alloy = { workspace = true }
-alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
-enclave-core = { path = "../core" }
-data = { path = "../data" }
+enclave-core = { workspace = true }
+data = { workspace = true }
 futures-util = { workspace = true }
-sortition = { path = "../sortition" }
-cipher = { path = "../cipher" }
+anvil = { workspace = true }
+foundry-common = { workspace = true }
+sortition = { workspace = true }
+cipher = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 zeroize = { workspace = true }
+# required by anvil
+revm-inspectors = "0.10.0"
+eyre = "0.6.12"
+alloy-signer-local = { workspace = true } 
+alloy-network = { workspace = true}

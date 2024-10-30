@@ -3,7 +3,10 @@ use alloy::{
     network::{Ethereum, EthereumWallet},
     primitives::{LogData, B256},
     providers::{
-        fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
+        fillers::{
+            BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+            WalletFiller,
+        },
         Identity, Provider, ProviderBuilder, RootProvider,
     },
     rpc::types::Filter,
@@ -139,12 +142,15 @@ pub async fn create_readonly_provider(rpc_url: &str) -> Result<ReadonlyProvider>
 pub type SignerProvider = WithChainId<
     FillProvider<
         JoinFill<
-            JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>,
+            JoinFill<
+                Identity,
+                JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+            >,
             WalletFiller<EthereumWallet>,
         >,
         RootProvider<BoxTransport>,
         BoxTransport,
-        Ethereum,
+        Ethereum
     >,
 >;
 

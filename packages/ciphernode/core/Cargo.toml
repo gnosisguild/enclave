@@ -16,6 +16,4 @@ serde = { workspace = true }
 bincode = { workspace = true }
 futures-util = { workspace = true }
 alloy = { workspace = true }
-alloy-primitives = { workspace = true }
-alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }

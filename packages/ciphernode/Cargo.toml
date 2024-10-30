@@ -17,21 +17,25 @@ members = [
   "cipher",
   "config",
 ]
+resolver = "2"
+
 
 [workspace.dependencies]
+enclave-core = { path = "core" }
+data = { path = "data" }
+sortition = { path = "sortition" }
+cipher = { path = "cipher" }
 actix = "0.13.5"
 actix-rt = "2.10.0"
 aes-gcm = "0.10.3"
-alloy = { version = "0.3.3", features = ["full"] }
-alloy-primitives = { version = "0.6", default-features = false, features = [
-  "rlp",
-  "serde",
-  "std",
-] }
-alloy-sol-types = { version = "0.6" }
+alloy = { version = "=0.5.4", features = ["full"] }
+alloy-signer-local = "=0.5.4"
+alloy-network = "=0.5.4"
 argon2 = "0.5.2" 
 anyhow = "1.0.86"
 async-std = { version = "1.12", features = ["attributes"] }
+anvil = { git = "https://github.com/foundry-rs/foundry", package = "anvil" }
+foundry-common = { git = "https://github.com/foundry-rs/foundry", package = "foundry-common" }
 async-trait = "0.1"
 bincode = "1.3.3"
 bs58 = "0.5.1"
@@ -68,4 +72,9 @@ libp2p = { version = "0.53.2", features = [
   "gossipsub",
   "quic",
 ] }
-zeroize = "1.6.0" 
+zeroize = "1.6.0"
+
+[workspace.metadata.resolver]
+alloy-signer-local = "=0.5.4"
+alloy-network = "=0.5.4"
+
