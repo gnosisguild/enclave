@@ -1,5 +1,5 @@
 {
-  "address": "0xA707C73146757ebe00FAcD22e96Cd9e0cCA5baC7",
+  "address": "0xbB2735f8190c023c1523858a2dcdF9726C895F18",
   "abi": [
     {
       "inputs": [],
@@ -36,25 +36,25 @@
       "type": "function"
     }
   ],
-  "transactionHash": "0x2e08b6f5257abdd783e14d7a284626f942326f5199607c3c2d48053f2e65ca81",
+  "transactionHash": "0xb9f2d9641189b761c66fc496da0bbcf9914d6a40ffbd37ea613c71b3f2e50a1d",
   "receipt": {
     "to": null,
-    "from": "0x485E60C486671E932fd9C53d4110cdEab1E7F0eb",
-    "contractAddress": "0xA707C73146757ebe00FAcD22e96Cd9e0cCA5baC7",
-    "transactionIndex": 14,
+    "from": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B",
+    "contractAddress": "0xbB2735f8190c023c1523858a2dcdF9726C895F18",
+    "transactionIndex": 27,
     "gasUsed": "128651",
     "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "blockHash": "0xbe8adc20b70a39d1ab4a362b624f235e4634004943b801925ae5cce6ac4e4b40",
-    "transactionHash": "0x2e08b6f5257abdd783e14d7a284626f942326f5199607c3c2d48053f2e65ca81",
+    "blockHash": "0x376831e31160384cdafcc7e8522c8a72d8f8ad4b3a11509c8deaba957e04264c",
+    "transactionHash": "0xb9f2d9641189b761c66fc496da0bbcf9914d6a40ffbd37ea613c71b3f2e50a1d",
     "logs": [],
-    "blockNumber": 6795926,
-    "cumulativeGasUsed": "6097635",
+    "blockNumber": 6982717,
+    "cumulativeGasUsed": "6411800",
     "status": 1,
     "byzantium": true
   },
   "args": [],
   "numDeployments": 1,
-  "solcInputHash": "21fe30cc06e4cb96958a78cd2e5aab1b",
+  "solcInputHash": "c9b7037486bd8b1125ffad462d6531cb",
   "metadata": "{\"compiler\":{\"version\":\"0.8.27+commit.40a35a09\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"invalidParams\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"params\",\"type\":\"bytes\"}],\"name\":\"validate\",\"outputs\":[{\"internalType\":\"contract IDecryptionVerifier\",\"name\":\"decryptionVerifier\",\"type\":\"address\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/test/MockComputeProvider.sol\":\"MockComputeProvider\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"none\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":800},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/interfaces/IComputeProvider.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\nimport { IDecryptionVerifier } from \\\"./IDecryptionVerifier.sol\\\";\\n\\ninterface IComputeProvider {\\n    /// @notice This function should be called by the Enclave contract to validate the compute provider parameters.\\n    /// @param params ABI encoded compute provider parameters.\\n    function validate(\\n        uint256 e3Id,\\n        uint256 seed,\\n        bytes calldata params\\n    ) external returns (IDecryptionVerifier decryptionVerifier);\\n}\\n\",\"keccak256\":\"0x265fea4a55770649aca73fbf4d7ccc01ba654565ec18247597b73d36dac27fe1\",\"license\":\"LGPL-3.0-only\"},\"contracts/interfaces/IDecryptionVerifier.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\ninterface IDecryptionVerifier {\\n    /// @notice This function should be called by the Enclave contract to verify the\\n    /// decryption of output of a computation.\\n    /// @param e3Id ID of the E3.\\n    /// @param plaintextOutputHash The keccak256 hash of the plaintext output to be verified.\\n    /// @param proof ABI encoded proof of the given output hash.\\n    /// @return success Whether or not the plaintextOutputHash was successfully verified.\\n    function verify(\\n        uint256 e3Id,\\n        bytes32 plaintextOutputHash,\\n        bytes memory proof\\n    ) external view returns (bool success);\\n}\\n\",\"keccak256\":\"0xb92991a581d3c18cdc273497687ec1c6e3016674314f21fe56917aece5d10863\",\"license\":\"LGPL-3.0-only\"},\"contracts/test/MockComputeProvider.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\nimport {\\n    IComputeProvider,\\n    IDecryptionVerifier\\n} from \\\"../interfaces/IComputeProvider.sol\\\";\\n\\ncontract MockComputeProvider is IComputeProvider {\\n    error invalidParams();\\n\\n    function validate(\\n        uint256,\\n        uint256,\\n        bytes memory params\\n    ) external pure returns (IDecryptionVerifier decryptionVerifier) {\\n        require(params.length == 32, invalidParams());\\n        // solhint-disable no-inline-assembly\\n        assembly {\\n            decryptionVerifier := mload(add(params, 32))\\n        }\\n        (decryptionVerifier) = abi.decode(params, (IDecryptionVerifier));\\n    }\\n}\\n\",\"keccak256\":\"0x129807f1fc79c9cdd1fff120a39f91f8d31826ac9a6fe4e2d714c5ee1bd367aa\",\"license\":\"LGPL-3.0-only\"}},\"version\":1}",
   "bytecode": "0x6080806040523460155761015d908161001b8239f35b600080fdfe6080604052600436101561001257600080fd5b60003560e01c6323e7fd591461002757600080fd5b346100ea5760603660031901126100ea5760443567ffffffffffffffff81116100ea57366023820112156100ea5780600401359067ffffffffffffffff82116100ef57604051601f8301601f19908116603f0116810167ffffffffffffffff8111828210176100ef5760405282815236602484840101116100ea5760006020846100e69560246100bf96018386013783010152610105565b60405173ffffffffffffffffffffffffffffffffffffffff90911681529081906020820190565b0390f35b600080fd5b634e487b7160e01b600052604160045260246000fd5b602081510361013f576020818051810103126100ea576020015173ffffffffffffffffffffffffffffffffffffffff811681036100ea5790565b63be64db2760e01b60005260046000fdfea164736f6c634300081b000a",
   "deployedBytecode": "0x6080604052600436101561001257600080fd5b60003560e01c6323e7fd591461002757600080fd5b346100ea5760603660031901126100ea5760443567ffffffffffffffff81116100ea57366023820112156100ea5780600401359067ffffffffffffffff82116100ef57604051601f8301601f19908116603f0116810167ffffffffffffffff8111828210176100ef5760405282815236602484840101116100ea5760006020846100e69560246100bf96018386013783010152610105565b60405173ffffffffffffffffffffffffffffffffffffffff90911681529081906020820190565b0390f35b600080fd5b634e487b7160e01b600052604160045260246000fd5b602081510361013f576020818051810103126100ea576020015173ffffffffffffffffffffffffffffffffffffffff811681036100ea5790565b63be64db2760e01b60005260046000fdfea164736f6c634300081b000a",

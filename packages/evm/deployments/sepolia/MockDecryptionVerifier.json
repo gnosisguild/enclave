@@ -1,5 +1,5 @@
 {
-  "address": "0x81C00a1FD136a49FBBD8e692817b97ecB8BC2Ca8",
+  "address": "0x1C768fB51e9D33EE1eE9E725cE9241f73a0A2047",
   "abi": [
     {
       "inputs": [
@@ -31,25 +31,25 @@
       "type": "function"
     }
   ],
-  "transactionHash": "0xe66dc491386f471a8bfe5c1e52b6c8d96b8061d02f0259a0c8ab764ddb99cc27",
+  "transactionHash": "0x5c5d61983080c09c801c48fa04b050b7310abe2dab1b69e313f8820ac57f34dd",
   "receipt": {
     "to": null,
-    "from": "0x485E60C486671E932fd9C53d4110cdEab1E7F0eb",
-    "contractAddress": "0x81C00a1FD136a49FBBD8e692817b97ecB8BC2Ca8",
-    "transactionIndex": 7,
+    "from": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B",
+    "contractAddress": "0x1C768fB51e9D33EE1eE9E725cE9241f73a0A2047",
+    "transactionIndex": 9,
     "gasUsed": "103723",
     "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "blockHash": "0x3ab24746f8ec38dd7f4b9ffacce99d1bc6398e146c96ef5fa3177b3632089760",
-    "transactionHash": "0xe66dc491386f471a8bfe5c1e52b6c8d96b8061d02f0259a0c8ab764ddb99cc27",
+    "blockHash": "0x4197779e4354ae92153585d34224d8f73f7f1473cab9fad2c39b82ac3bb73559",
+    "transactionHash": "0x5c5d61983080c09c801c48fa04b050b7310abe2dab1b69e313f8820ac57f34dd",
     "logs": [],
-    "blockNumber": 6795927,
-    "cumulativeGasUsed": "2374816",
+    "blockNumber": 6982718,
+    "cumulativeGasUsed": "609655",
     "status": 1,
     "byzantium": true
   },
   "args": [],
   "numDeployments": 1,
-  "solcInputHash": "21fe30cc06e4cb96958a78cd2e5aab1b",
+  "solcInputHash": "c9b7037486bd8b1125ffad462d6531cb",
   "metadata": "{\"compiler\":{\"version\":\"0.8.27+commit.40a35a09\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"verify\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/test/MockDecryptionVerifier.sol\":\"MockDecryptionVerifier\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"none\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":800},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/interfaces/IDecryptionVerifier.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\ninterface IDecryptionVerifier {\\n    /// @notice This function should be called by the Enclave contract to verify the\\n    /// decryption of output of a computation.\\n    /// @param e3Id ID of the E3.\\n    /// @param plaintextOutputHash The keccak256 hash of the plaintext output to be verified.\\n    /// @param proof ABI encoded proof of the given output hash.\\n    /// @return success Whether or not the plaintextOutputHash was successfully verified.\\n    function verify(\\n        uint256 e3Id,\\n        bytes32 plaintextOutputHash,\\n        bytes memory proof\\n    ) external view returns (bool success);\\n}\\n\",\"keccak256\":\"0xb92991a581d3c18cdc273497687ec1c6e3016674314f21fe56917aece5d10863\",\"license\":\"LGPL-3.0-only\"},\"contracts/test/MockDecryptionVerifier.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\nimport { IDecryptionVerifier } from \\\"../interfaces/IDecryptionVerifier.sol\\\";\\n\\ncontract MockDecryptionVerifier is IDecryptionVerifier {\\n    function verify(\\n        uint256,\\n        bytes32,\\n        bytes memory data\\n    ) external pure returns (bool success) {\\n        data;\\n\\n        if (data.length > 0) success = true;\\n    }\\n}\\n\",\"keccak256\":\"0x85a320eb4c9079cf73b32a259cd8709ad0c4475171521ab92adb2e9a863faf8d\",\"license\":\"LGPL-3.0-only\"}},\"version\":1}",
   "bytecode": "0x6080806040523460145760e9908161001a8239f35b600080fdfe60806004361015600e57600080fd5b60003560e01c632f0e1bbf14602257600080fd5b3460c157606036600319011260c15760443567ffffffffffffffff811160c1573660238201121560c15780600401359067ffffffffffffffff821160c657601f8201601f19908116603f0116830167ffffffffffffffff81118482101760c657604052818352366024838301011160c1578160009260246020930183860137830101526000905160ba575b6020906040519015158152f35b50600160ad565b600080fd5b634e487b7160e01b600052604160045260246000fdfea164736f6c634300081b000a",
   "deployedBytecode": "0x60806004361015600e57600080fd5b60003560e01c632f0e1bbf14602257600080fd5b3460c157606036600319011260c15760443567ffffffffffffffff811160c1573660238201121560c15780600401359067ffffffffffffffff821160c657601f8201601f19908116603f0116830167ffffffffffffffff81118482101760c657604052818352366024838301011160c1578160009260246020930183860137830101526000905160ba575b6020906040519015158152f35b50600160ad565b600080fd5b634e487b7160e01b600052604160045260246000fdfea164736f6c634300081b000a",
