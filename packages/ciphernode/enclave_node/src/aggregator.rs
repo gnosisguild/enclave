@@ -47,8 +47,16 @@ pub async fn setup_aggregator(
     {
         let rpc_url = &chain.rpc_url;
         let read_provider = create_readonly_provider(&ensure_ws_rpc(rpc_url)).await?;
-        let write_provider = create_provider_with_signer(&ensure_http_rpc(rpc_url), &signer).await?;
-        EnclaveSol::attach(&bus, &read_provider, &write_provider, &chain.contracts.enclave, &signer).await?;
+        let write_provider =
+            create_provider_with_signer(&ensure_http_rpc(rpc_url), &signer).await?;
+        EnclaveSol::attach(
+            &bus,
+            &read_provider,
+            &write_provider,
+            &chain.contracts.enclave,
+            &signer,
+        )
+        .await?;
         RegistryFilterSol::attach(&bus, &write_provider, &chain.contracts.filter_registry).await?;
         CiphernodeRegistrySol::attach(&bus, &read_provider, &chain.contracts.ciphernode_registry)
             .await?;

@@ -107,7 +107,11 @@ impl CiphernodeRegistrySolReader {
 
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
-    pub async fn attach(bus: &Addr<EventBus>, provider: &ReadonlyProvider, contract_address: &str) -> Result<()> {
+    pub async fn attach(
+        bus: &Addr<EventBus>,
+        provider: &ReadonlyProvider,
+        contract_address: &str,
+    ) -> Result<()> {
         CiphernodeRegistrySolReader::attach(bus, provider, contract_address).await?;
         Ok(())
     }
