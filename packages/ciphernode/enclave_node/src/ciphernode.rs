@@ -5,7 +5,7 @@ use cipher::Cipher;
 use config::AppConfig;
 use data::{DataStore, InMemStore, SledStore};
 use enclave_core::EventBus;
-use evm::{CiphernodeRegistrySol, EnclaveSolReader};
+use evm::{helpers::{create_readonly_provider, ensure_ws_rpc}, CiphernodeRegistrySol, EnclaveSolReader};
 use logger::SimpleLogger;
 use p2p::P2p;
 use rand::SeedableRng;
@@ -42,8 +42,9 @@ pub async fn setup_ciphernode(
     {
         let rpc_url = &chain.rpc_url;
 
-        EnclaveSolReader::attach(&bus, rpc_url, &chain.contracts.enclave).await?;
-        CiphernodeRegistrySol::attach(&bus, rpc_url, &chain.contracts.ciphernode_registry).await?;
+        let read_provider = create_readonly_provider(&ensure_ws_rpc(rpc_url)).await?;
+        EnclaveSolReader::attach(&bus, &read_provider, &chain.contracts.enclave).await?;
+        CiphernodeRegistrySol::attach(&bus, &read_provider, &chain.contracts.ciphernode_registry).await?;
     }
 
     E3RequestRouter::builder(&bus, store.clone())

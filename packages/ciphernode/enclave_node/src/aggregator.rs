@@ -4,7 +4,11 @@ use cipher::Cipher;
 use config::AppConfig;
 use enclave_core::EventBus;
 use evm::{
-    helpers::get_signer_from_repository, CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
+    helpers::{
+        create_provider_with_signer, create_readonly_provider, ensure_http_rpc, ensure_ws_rpc,
+        get_signer_from_repository,
+    },
+    CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
 };
 use logger::SimpleLogger;
 use p2p::P2p;
@@ -35,15 +39,19 @@ pub async fn setup_aggregator(
     let sortition = Sortition::attach(&bus, repositories.sortition());
     let cipher = Arc::new(Cipher::from_config(&config).await?);
     let signer = get_signer_from_repository(repositories.eth_private_key(), &cipher).await?;
+
     for chain in config
         .chains()
         .iter()
         .filter(|chain| chain.enabled.unwrap_or(true))
     {
         let rpc_url = &chain.rpc_url;
-        EnclaveSol::attach(&bus, rpc_url, &chain.contracts.enclave, &signer).await?;
-        RegistryFilterSol::attach(&bus, rpc_url, &chain.contracts.filter_registry, &signer).await?;
-        CiphernodeRegistrySol::attach(&bus, rpc_url, &chain.contracts.ciphernode_registry).await?;
+        let read_provider = create_readonly_provider(&ensure_ws_rpc(rpc_url)).await?;
+        let write_provider = create_provider_with_signer(&ensure_http_rpc(rpc_url), &signer).await?;
+        EnclaveSol::attach(&bus, &read_provider, &chain.contracts.enclave, &signer).await?;
+        RegistryFilterSol::attach(&bus, &write_provider, &chain.contracts.filter_registry).await?;
+        CiphernodeRegistrySol::attach(&bus, &read_provider, &chain.contracts.ciphernode_registry)
+            .await?;
     }
 
     E3RequestRouter::builder(&bus, store)

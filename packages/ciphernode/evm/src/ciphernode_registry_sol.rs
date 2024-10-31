@@ -1,4 +1,4 @@
-use crate::EvmEventReader;
+use crate::{helpers::ReadonlyProvider, EvmEventReader};
 use actix::Addr;
 use alloy::{
     primitives::{LogData, B256},
@@ -97,18 +97,18 @@ pub struct CiphernodeRegistrySolReader;
 impl CiphernodeRegistrySolReader {
     pub async fn attach(
         bus: &Addr<EventBus>,
-        rpc_url: &str,
+        provider: &ReadonlyProvider,
         contract_address: &str,
     ) -> Result<Addr<EvmEventReader>> {
-        let addr = EvmEventReader::attach(bus, rpc_url, extractor, contract_address).await?;
+        let addr = EvmEventReader::attach(bus, provider, extractor, contract_address).await?;
         Ok(addr)
     }
 }
 
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
-    pub async fn attach(bus: &Addr<EventBus>, rpc_url: &str, contract_address: &str) -> Result<()> {
-        CiphernodeRegistrySolReader::attach(bus, rpc_url, contract_address).await?;
+    pub async fn attach(bus: &Addr<EventBus>, provider: &ReadonlyProvider, contract_address: &str) -> Result<()> {
+        CiphernodeRegistrySolReader::attach(bus, provider, contract_address).await?;
         Ok(())
     }
 }
