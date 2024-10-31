@@ -66,6 +66,9 @@ pub async fn stream_from_evm<P: Provider>(
     info!("Exiting stream loop");
 }
 
+
+/// We need to cache the chainId so we can easily use it in a non-async situation
+/// This wrapper just stores the chain_id with the Provider
 #[derive(Clone)]
 pub struct WithChainId<P>
 where
