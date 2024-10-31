@@ -9,7 +9,10 @@ alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 enclave-core = { path = "../core" }
+data = { path = "../data" }
 futures-util = { workspace = true }
 sortition = { path = "../sortition" }
+cipher = { path = "../cipher" }
 tokio = { workspace = true }
 tracing = { workspace = true }
+zeroize = { workspace = true }

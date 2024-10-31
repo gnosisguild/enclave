@@ -13,6 +13,7 @@ keyshare = { path = "../keyshare" }
 aggregator = { path = "../aggregator" }
 anyhow = { workspace = true }
 serde = { workspace = true }
+cipher = { path = "../cipher" }
 bincode = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }

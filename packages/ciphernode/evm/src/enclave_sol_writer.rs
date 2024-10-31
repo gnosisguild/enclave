@@ -12,6 +12,7 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
+use data::DataStore;
 use enclave_core::Shutdown;
 use enclave_core::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
 use enclave_core::{EnclaveEvent, EventBus};

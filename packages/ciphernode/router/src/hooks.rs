@@ -6,13 +6,13 @@ use aggregator::{
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use cipher::Cipher;
 use data::{FromSnapshotWithParams, Snapshot};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::{Keyshare, KeyshareParams};
 use sortition::Sortition;
-use std::sync::{mpsc::Receiver, Arc};
-use tracing::error;
+use std::sync::Arc;
 
 /// TODO: move these to each package with access on MyStruct::launcher()
 pub struct FheFeature {
@@ -87,13 +87,15 @@ impl E3Feature for FheFeature {
 pub struct KeyshareFeature {
     bus: Addr<EventBus>,
     address: String,
+    cipher: Arc<Cipher>,
 }
 
 impl KeyshareFeature {
-    pub fn create(bus: &Addr<EventBus>, address: &str) -> Box<Self> {
+    pub fn create(bus: &Addr<EventBus>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             address: address.to_owned(),
+            cipher: cipher.to_owned(),
         })
     }
 }
@@ -119,12 +121,13 @@ impl E3Feature for KeyshareFeature {
 
         let e3_id = data.clone().e3_id;
 
-        let _ = ctx.set_keyshare(
+        ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
                 bus: self.bus.clone(),
                 store: ctx.repositories().keyshare(&e3_id),
                 fhe: fhe.clone(),
                 address: self.address.clone(),
+                cipher: self.cipher.clone(),
             })
             .start(),
         );
@@ -163,6 +166,7 @@ impl E3Feature for KeyshareFeature {
                 bus: self.bus.clone(),
                 store,
                 address: self.address.clone(),
+                cipher: self.cipher.clone(),
             },
             snap,
         )

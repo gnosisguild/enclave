@@ -1,8 +1,8 @@
-use alloy::primitives::Address;
+use anyhow::Result;
 use clap::Parser;
-use enclave::load_config;
-use enclave_node::{listen_for_shutdown, MainCiphernode};
-use tracing::info;
+use commands::{aggregator, password, start, wallet, Commands};
+use config::load_config;
+pub mod commands;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
@@ -19,32 +19,51 @@ const OWO: &str = r#"
                                                                       
 "#;
 
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-pub struct Args {
-    #[arg(short, long)]
-    pub address: String,
-    #[arg(short, long)]
-    pub config: String,
-    #[arg(short, long = "data-location")]
-    pub data_location: Option<String>,
+pub fn owo() {
+    println!("\n\n\n\n\n{}", OWO);
+    println!("\n\n\n\n");
+}
+
+#[derive(Parser)]
+#[command(name = "enclave")]
+#[command(about = "A CLI for interacting with Enclave the open-source protocol for Encrypted Execution Environments (E3)", long_about = None)]
+pub struct Cli {
+    /// Path to config file
+    #[arg(long, global = true)]
+    config: Option<String>,
+
+    #[command(subcommand)]
+    command: Commands,
+}
+
+impl Cli {
+    pub async fn execute(self) -> Result<()> {
+        let config_path = self.config.as_deref();
+
+        let config = load_config(config_path)?;
+
+        match self.command {
+            Commands::Start => start::execute(config).await?,
+            Commands::Password { command } => password::execute(command, config).await?,
+            Commands::Aggregator { command } => aggregator::execute(command, config).await?,
+            Commands::Wallet { command } => wallet::execute(command, config).await?,
+        }
+
+        Ok(())
+    }
 }
 
 #[actix_rt::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn main() {
     tracing_subscriber::fmt::init();
-    println!("\n\n\n\n\n{}", OWO);
-    println!("\n\n\n\n");
-    let args = Args::parse();
-    let address = Address::parse_checksummed(&args.address, None).expect("Invalid address");
-    info!("LAUNCHING CIPHERNODE: ({})", address);
-    let config = load_config(&args.config)?;
-    let (bus, handle) =
-        MainCiphernode::attach(config, address, args.data_location.as_deref()).await?;
 
-    tokio::spawn(listen_for_shutdown(bus.into(), handle));
+    let cli = Cli::parse();
 
-    std::future::pending::<()>().await;
-
-    Ok(())
+    match cli.execute().await {
+        Ok(_) => (),
+        Err(err) => {
+            eprintln!("{}", err);
+            std::process::exit(1);
+        }
+    }
 }

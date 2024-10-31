@@ -1,6 +1,7 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use cipher::Cipher;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
@@ -17,6 +18,7 @@ pub struct Keyshare {
     bus: Addr<EventBus>,
     secret: Option<Vec<u8>>,
     address: String,
+    cipher: Arc<Cipher>,
 }
 
 impl Actor for Keyshare {
@@ -28,6 +30,7 @@ pub struct KeyshareParams {
     pub store: Repository<KeyshareState>,
     pub fhe: Arc<Fhe>,
     pub address: String,
+    pub cipher: Arc<Cipher>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -43,7 +46,27 @@ impl Keyshare {
             store: params.store,
             secret: None,
             address: params.address,
+            cipher: params.cipher,
         }
+    }
+
+    fn set_secret(&mut self, mut data: Vec<u8>) -> Result<()> {
+        let encrypted = self.cipher.encrypt_data(&mut data)?;
+
+        self.secret = Some(encrypted);
+
+        Ok(())
+    }
+
+    fn get_secret(&self) -> Result<Vec<u8>> {
+        let encrypted = self
+            .secret
+            .as_ref()
+            .ok_or(anyhow!("No secret share available on Keyshare"))?;
+
+        let decrypted = self.cipher.decrypt_data(&encrypted)?;
+
+        Ok(decrypted)
     }
 }
 
@@ -73,6 +96,7 @@ impl FromSnapshotWithParams for Keyshare {
             store: params.store,
             secret: snapshot.secret,
             address: params.address,
+            cipher: params.cipher,
         })
     }
 }
@@ -107,7 +131,12 @@ impl Handler<CiphernodeSelected> for Keyshare {
         };
 
         // Save secret on state
-        self.secret = Some(secret);
+        if let Err(err) = self.set_secret(secret) {
+            self.bus.do_send(EnclaveEvent::from_error(
+                EnclaveErrorType::KeyGeneration,
+                err,
+            ))
+        };
 
         // Broadcast the KeyshareCreated message
         self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
@@ -134,17 +163,17 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             ciphertext_output,
         } = event;
 
-        let Some(secret) = &self.secret else {
+        let Ok(secret) = self.get_secret() else {
             self.bus.err(
                 EnclaveErrorType::Decryption,
-                anyhow!("secret not found on Keyshare for e3_id {e3_id}"),
+                anyhow!("Secret not available for Keyshare for e3_id {e3_id}"),
             );
             return;
         };
 
         let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
             ciphertext: ciphertext_output.clone(),
-            unsafe_secret: secret.to_vec(),
+            unsafe_secret: secret,
         }) else {
             self.bus.err(
                 EnclaveErrorType::Decryption,
