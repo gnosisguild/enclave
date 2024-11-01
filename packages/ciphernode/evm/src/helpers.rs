@@ -3,25 +3,29 @@ use alloy::{
     network::{Ethereum, EthereumWallet},
     primitives::{LogData, B256},
     providers::{
-        fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
+        fillers::{
+            BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+            WalletFiller,
+        },
         Identity, Provider, ProviderBuilder, RootProvider,
     },
     rpc::types::Filter,
     signers::local::PrivateKeySigner,
-    transports::BoxTransport,
+    transports::{BoxTransport, Transport},
 };
+use anyhow::anyhow;
 use anyhow::{bail, Context, Result};
 use cipher::Cipher;
 use data::Repository;
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
-use std::{env, sync::Arc};
+use std::{env, marker::PhantomData, sync::Arc};
 use tokio::{select, sync::oneshot};
 use tracing::{info, trace};
 use zeroize::Zeroizing;
 
-pub async fn stream_from_evm<P: Provider>(
-    provider: WithChainId<P>,
+pub async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
+    provider: WithChainId<P, T>,
     filter: Filter,
     bus: Recipient<EnclaveEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
@@ -31,7 +35,6 @@ pub async fn stream_from_evm<P: Provider>(
         .get_provider()
         .subscribe_logs(&filter)
         .await
-        .context("Could not subscribe to stream")
     {
         Ok(subscription) => {
             let mut stream = subscription.into_stream();
@@ -60,7 +63,7 @@ pub async fn stream_from_evm<P: Provider>(
             }
         }
         Err(e) => {
-            bus.err(EnclaveErrorType::Evm, e);
+            bus.err(EnclaveErrorType::Evm, anyhow!("{}",e));
         }
     };
     info!("Exiting stream loop");
@@ -69,23 +72,29 @@ pub async fn stream_from_evm<P: Provider>(
 /// We need to cache the chainId so we can easily use it in a non-async situation
 /// This wrapper just stores the chain_id with the Provider
 #[derive(Clone)]
-pub struct WithChainId<P>
+// We have to be generic over T as the transport provider in order to handle different transport
+// mechanisms such as the HttpClient etc.
+pub struct WithChainId<P, T = BoxTransport>
 where
-    P: Provider,
+    P: Provider<T>,
+    T: Transport + Clone,
 {
     provider: Arc<P>,
     chain_id: u64,
+    _t: PhantomData<T>,
 }
 
-impl<P> WithChainId<P>
+impl<P, T> WithChainId<P, T>
 where
-    P: Provider,
+    P: Provider<T>,
+    T: Transport + Clone,
 {
     pub async fn new(provider: P) -> Result<Self> {
         let chain_id = provider.get_chain_id().await?;
         Ok(Self {
             provider: Arc::new(provider),
             chain_id,
+            _t: PhantomData,
         })
     }
 
@@ -98,33 +107,36 @@ where
     }
 }
 
-pub type ReadonlyProvider = WithChainId<RootProvider<BoxTransport>>;
+pub type ReadonlyProvider = RootProvider<BoxTransport>;
 
-pub async fn create_readonly_provider(rpc_url: &str) -> Result<ReadonlyProvider> {
+pub async fn create_readonly_provider(
+    rpc_url: &str,
+) -> Result<WithChainId<ReadonlyProvider, BoxTransport>> {
     let provider = ProviderBuilder::new()
         .on_builtin(rpc_url)
         .await
         .context("Could not create ReadOnlyProvider")?
         .into();
-    Ok(ReadonlyProvider::new(provider).await?)
+    Ok(WithChainId::new(provider).await?)
 }
 
-pub type SignerProvider = WithChainId<
-    FillProvider<
+pub type SignerProvider = FillProvider<
+    JoinFill<
         JoinFill<
-            JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>,
-            WalletFiller<EthereumWallet>,
+            Identity,
+            JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
         >,
-        RootProvider<BoxTransport>,
-        BoxTransport,
-        Ethereum,
+        WalletFiller<EthereumWallet>,
     >,
+    RootProvider<BoxTransport>,
+    BoxTransport,
+    Ethereum,
 >;
 
 pub async fn create_provider_with_signer(
     rpc_url: &str,
     signer: &Arc<PrivateKeySigner>,
-) -> Result<SignerProvider> {
+) -> Result<WithChainId<SignerProvider, BoxTransport>> {
     let wallet = EthereumWallet::from(signer.clone());
     let provider = ProviderBuilder::new()
         .with_recommended_fillers()
@@ -132,7 +144,7 @@ pub async fn create_provider_with_signer(
         .on_builtin(rpc_url)
         .await?;
 
-    Ok(SignerProvider::new(provider).await?)
+    Ok(WithChainId::new(provider).await?)
 }
 
 pub async fn pull_eth_signer_from_env(var: &str) -> Result<Arc<PrivateKeySigner>> {

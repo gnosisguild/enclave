@@ -1,7 +1,7 @@
 use crate::{
     enclave_sol_reader::EnclaveSolReader,
     enclave_sol_writer::EnclaveSolWriter,
-    helpers::{ReadonlyProvider, SignerProvider},
+    helpers::{ReadonlyProvider, SignerProvider, WithChainId},
 };
 use actix::Addr;
 use anyhow::Result;
@@ -11,8 +11,8 @@ pub struct EnclaveSol;
 impl EnclaveSol {
     pub async fn attach(
         bus: &Addr<EventBus>,
-        read_provider: &ReadonlyProvider,
-        write_provider: &SignerProvider,
+        read_provider: &WithChainId<ReadonlyProvider>,
+        write_provider: &WithChainId<SignerProvider>,
         contract_address: &str,
     ) -> Result<()> {
         EnclaveSolReader::attach(bus, read_provider, contract_address).await?;

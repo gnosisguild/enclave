@@ -22,7 +22,7 @@ members = [
 actix = "0.13.5"
 actix-rt = "2.10.0"
 aes-gcm = "0.10.3"
-alloy = { version = "0.3.3", features = ["full"] }
+alloy = { version = "0.5.2", features = ["full", "node-bindings"] }
 alloy-primitives = { version = "0.6", default-features = false, features = [
   "rlp",
   "serde",

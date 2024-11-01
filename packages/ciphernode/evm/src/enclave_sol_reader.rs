@@ -1,7 +1,8 @@
-use crate::helpers::ReadonlyProvider;
+use crate::helpers::{ReadonlyProvider, WithChainId};
 use crate::EvmEventReader;
 use actix::Addr;
 use alloy::primitives::{LogData, B256};
+use alloy::transports::BoxTransport;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus};
@@ -83,9 +84,9 @@ pub struct EnclaveSolReader;
 impl EnclaveSolReader {
     pub async fn attach(
         bus: &Addr<EventBus>,
-        provider: &ReadonlyProvider,
+        provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
-    ) -> Result<Addr<EvmEventReader>> {
+    ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
         let addr = EvmEventReader::attach(bus, provider, extractor, contract_address).await?;
         Ok(addr)
     }

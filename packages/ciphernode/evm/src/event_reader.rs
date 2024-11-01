@@ -1,35 +1,47 @@
-use crate::helpers::{self, create_readonly_provider, ensure_ws_rpc, ReadonlyProvider};
+use std::marker::PhantomData;
+
+use crate::helpers::{self, WithChainId};
 use actix::prelude::*;
 use actix::{Addr, Recipient};
 use alloy::primitives::{LogData, B256};
+use alloy::providers::Provider;
+use alloy::transports::{BoxTransport, Transport};
 use alloy::{eips::BlockNumberOrTag, primitives::Address, rpc::types::Filter};
 use anyhow::{anyhow, Result};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
 use tokio::sync::oneshot;
 use tracing::info;
 
-pub type ExtractorFn = fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>;
+pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
 /// Connects to Enclave.sol converting EVM events to EnclaveEvents
-pub struct EvmEventReader {
-    provider: Option<ReadonlyProvider>,
+pub struct EvmEventReader<P, T = BoxTransport>
+where
+    P: Provider<T> + Clone + 'static,
+    T: Transport + Clone + Unpin,
+{
+    provider: Option<WithChainId<P, T>>,
     contract_address: Address,
     bus: Recipient<EnclaveEvent>,
-    extractor: ExtractorFn,
+    extractor: ExtractorFn<EnclaveEvent>,
     shutdown_rx: Option<oneshot::Receiver<()>>,
     shutdown_tx: Option<oneshot::Sender<()>>,
 }
 
-impl EvmEventReader {
-    pub async fn new(
+impl<P, T> EvmEventReader<P, T>
+where
+    P: Provider<T> + Clone + 'static,
+    T: Transport + Clone + Unpin,
+{
+    pub fn new(
         bus: &Addr<EventBus>,
-        provider: &ReadonlyProvider,
-        extractor: ExtractorFn,
-        contract_address: Address,
+        provider: &WithChainId<P, T>,
+        extractor: ExtractorFn<EnclaveEvent>,
+        contract_address: &Address,
     ) -> Result<Self> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         Ok(Self {
-            contract_address,
+            contract_address: contract_address.clone(),
             provider: Some(provider.clone()),
             extractor,
             bus: bus.clone().into(),
@@ -40,13 +52,12 @@ impl EvmEventReader {
 
     pub async fn attach(
         bus: &Addr<EventBus>,
-        provider: &ReadonlyProvider,
-        extractor: ExtractorFn,
+        provider: &WithChainId<P, T>,
+        extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &str,
     ) -> Result<Addr<Self>> {
-        let addr = EvmEventReader::new(bus, provider, extractor, contract_address.parse()?)
-            .await?
-            .start();
+        let addr =
+            EvmEventReader::new(bus, provider, extractor, &contract_address.parse()?)?.start();
 
         bus.send(Subscribe::new("Shutdown", addr.clone().into()))
             .await?;
@@ -56,7 +67,11 @@ impl EvmEventReader {
     }
 }
 
-impl Actor for EvmEventReader {
+impl<P, T> Actor for EvmEventReader<P, T>
+where
+    P: Provider<T> + Clone + 'static,
+    T: Transport + Clone + Unpin,
+{
     type Context = actix::Context<Self>;
     fn started(&mut self, ctx: &mut Self::Context) {
         let bus = self.bus.clone();
@@ -80,7 +95,11 @@ impl Actor for EvmEventReader {
     }
 }
 
-impl Handler<EnclaveEvent> for EvmEventReader {
+impl<P, T> Handler<EnclaveEvent> for EvmEventReader<P, T>
+where
+    P: Provider<T> + Clone + 'static,
+    T: Transport + Clone + Unpin,
+{
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::Shutdown { .. } = msg {
