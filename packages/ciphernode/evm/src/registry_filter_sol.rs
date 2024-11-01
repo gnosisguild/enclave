@@ -1,9 +1,8 @@
-use crate::helpers::{create_provider_with_signer, ensure_http_rpc, SignerProvider};
+use crate::helpers::SignerProvider;
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
     rpc::types::TransactionReceipt,
-    signers::local::PrivateKeySigner,
     sol,
 };
 use anyhow::Result;
@@ -11,7 +10,6 @@ use enclave_core::{
     BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
     Shutdown, Subscribe,
 };
-use std::sync::Arc;
 use tracing::info;
 
 sol!(
@@ -29,12 +27,11 @@ pub struct RegistryFilterSolWriter {
 impl RegistryFilterSolWriter {
     pub async fn new(
         bus: &Addr<EventBus>,
-        rpc_url: &str,
+        provider: &SignerProvider,
         contract_address: Address,
-        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Self> {
         Ok(Self {
-            provider: create_provider_with_signer(&ensure_http_rpc(rpc_url), signer).await?,
+            provider: provider.clone(),
             contract_address,
             bus: bus.clone(),
         })
@@ -42,11 +39,10 @@ impl RegistryFilterSolWriter {
 
     pub async fn attach(
         bus: &Addr<EventBus>,
-        rpc_url: &str,
+        provider: &SignerProvider,
         contract_address: &str,
-        signer: &Arc<PrivateKeySigner>,
     ) -> Result<Addr<RegistryFilterSolWriter>> {
-        let addr = RegistryFilterSolWriter::new(bus, rpc_url, contract_address.parse()?, signer)
+        let addr = RegistryFilterSolWriter::new(bus, provider, contract_address.parse()?)
             .await?
             .start();
         let _ = bus
@@ -132,11 +128,10 @@ pub struct RegistryFilterSol;
 impl RegistryFilterSol {
     pub async fn attach(
         bus: &Addr<EventBus>,
-        rpc_url: &str,
+        provider: &SignerProvider,
         contract_address: &str,
-        signer: &Arc<PrivateKeySigner>,
     ) -> Result<()> {
-        RegistryFilterSolWriter::attach(bus, rpc_url, contract_address, signer).await?;
+        RegistryFilterSolWriter::attach(bus, provider, contract_address).await?;
         Ok(())
     }
 }
