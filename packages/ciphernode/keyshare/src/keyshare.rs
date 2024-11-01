@@ -206,7 +206,7 @@ impl Handler<E3RequestComplete> for Keyshare {
 impl Handler<Die> for Keyshare {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
-        warn!("Keyshare is shutting down");
+        warn!("Keyshare is shutting down now");
         ctx.stop()
     }
 }
