@@ -1,9 +1,8 @@
-use crate::helpers::{create_provider_with_signer, ensure_http_rpc, SignerProvider};
+use crate::helpers::SignerProvider;
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
     rpc::types::TransactionReceipt,
-    signers::local::PrivateKeySigner,
     sol,
 };
 use anyhow::Result;
@@ -11,7 +10,6 @@ use enclave_core::{
     BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
     Shutdown, Subscribe,
 };
-use std::sync::Arc;
 use tracing::info;
 
 sol!(

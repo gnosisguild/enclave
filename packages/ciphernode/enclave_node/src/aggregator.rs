@@ -54,7 +54,6 @@ pub async fn setup_aggregator(
             &read_provider,
             &write_provider,
             &chain.contracts.enclave,
-            &signer,
         )
         .await?;
         RegistryFilterSol::attach(&bus, &write_provider, &chain.contracts.filter_registry).await?;
