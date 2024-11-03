@@ -23,7 +23,6 @@ jobs:
     - name: Install Foundry
       uses: foundry-rs/foundry-toolchain@v1 
 
-
     - name: Install solc
       run: |
         sudo add-apt-repository ppa:ethereum/ethereum \
