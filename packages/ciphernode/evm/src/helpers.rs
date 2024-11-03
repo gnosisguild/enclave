@@ -31,11 +31,7 @@ pub async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
 ) {
-    match provider
-        .get_provider()
-        .subscribe_logs(&filter)
-        .await
-    {
+    match provider.get_provider().subscribe_logs(&filter).await {
         Ok(subscription) => {
             let mut stream = subscription.into_stream();
             loop {
@@ -63,7 +59,7 @@ pub async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
             }
         }
         Err(e) => {
-            bus.err(EnclaveErrorType::Evm, anyhow!("{}",e));
+            bus.err(EnclaveErrorType::Evm, anyhow!("{}", e));
         }
     };
     info!("Exiting stream loop");

@@ -3,7 +3,8 @@ use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
     rpc::types::TransactionReceipt,
-    sol, transports::BoxTransport,
+    sol,
+    transports::BoxTransport,
 };
 use anyhow::Result;
 use enclave_core::{
