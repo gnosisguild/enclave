@@ -66,5 +66,15 @@ async fn test_logs() -> Result<()> {
 
     assert_eq!(history.len(), 2);
 
+    let msgs: Vec<_> = history
+        .into_iter()
+        .filter_map(|evt| match evt {
+            EnclaveEvent::TestEvent { data, .. } => Some(data.msg),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(msgs, vec!["hello", "world!"]);
+
     Ok(())
 }
