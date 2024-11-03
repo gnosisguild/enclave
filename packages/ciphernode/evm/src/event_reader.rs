@@ -23,15 +23,14 @@ pub struct EvmEventReader {
 impl EvmEventReader {
     pub async fn new(
         bus: &Addr<EventBus>,
-        rpc_url: &str,
+        provider: &ReadonlyProvider,
         extractor: ExtractorFn,
         contract_address: Address,
     ) -> Result<Self> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let provider = create_readonly_provider(&ensure_ws_rpc(rpc_url)).await?;
         Ok(Self {
             contract_address,
-            provider: Some(provider),
+            provider: Some(provider.clone()),
             extractor,
             bus: bus.clone().into(),
             shutdown_rx: Some(shutdown_rx),
@@ -41,11 +40,11 @@ impl EvmEventReader {
 
     pub async fn attach(
         bus: &Addr<EventBus>,
-        rpc_url: &str,
+        provider: &ReadonlyProvider,
         extractor: ExtractorFn,
         contract_address: &str,
     ) -> Result<Addr<Self>> {
-        let addr = EvmEventReader::new(bus, rpc_url, extractor, contract_address.parse()?)
+        let addr = EvmEventReader::new(bus, provider, extractor, contract_address.parse()?)
             .await?
             .start();
 
