@@ -2,8 +2,7 @@ use actix::Actor;
 use alloy::{
     node_bindings::Anvil,
     primitives::{FixedBytes, LogData},
-    providers::{ProviderBuilder, RootProvider, WsConnect},
-    pubsub::PubSubFrontend,
+    providers::{ProviderBuilder, WsConnect},
     sol,
     sol_types::SolEvent,
 };
