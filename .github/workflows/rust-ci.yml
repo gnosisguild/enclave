@@ -18,7 +18,11 @@ jobs:
       with:
         toolchain: 1.81.0
         override: true
-      
+
+      # We must install foundry in order to be able to test anvil
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1 
+
       # We need to setup node in order to compile the hardhat contracts to get the artifacts 
     - name: "Setup node"
       uses: actions/setup-node@v2
@@ -35,10 +39,6 @@ jobs:
 
     - name: "Compile the contracts and generate the TypeChain bindings"
       run: "yarn typechain"
-
-      # We must install foundry in order to be able to test anvil
-    - name: Install Foundry
-      uses: foundry-rs/foundry-toolchain@v1
 
       # Now we can check rust formatting and run tests
     - name: Checking code format
