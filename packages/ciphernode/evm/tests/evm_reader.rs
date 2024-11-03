@@ -9,7 +9,7 @@ use alloy::{
 use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus, GetHistory, TestEvent};
 use evm::{helpers::WithChainId, EvmEventReader};
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 use tokio::time::sleep;
 
 sol!(
@@ -29,7 +29,8 @@ fn test_event_extractor(
                 return None;
             };
             Some(EnclaveEvent::from(TestEvent {
-                msg: event.newValue,
+                msg: event.value,
+                entropy: event.count.try_into().unwrap(), // This prevents de-duplication in tests 
             }))
         }
         _ => None,
@@ -37,7 +38,7 @@ fn test_event_extractor(
 }
 
 #[actix::test]
-async fn test_evm_reader() -> Result<()> {
+async fn evm_reader() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
@@ -52,6 +53,7 @@ async fn test_evm_reader() -> Result<()> {
         &arc_provider,
         test_event_extractor,
         &contract.address().to_string(),
+        None,
     )
     .await?;
 
@@ -89,7 +91,7 @@ async fn test_evm_reader() -> Result<()> {
 }
 
 #[actix::test]
-async fn test_ensure_historical_events() -> Result<()> {
+async fn ensure_historical_events() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
@@ -116,6 +118,7 @@ async fn test_ensure_historical_events() -> Result<()> {
         &arc_provider,
         test_event_extractor,
         &contract.address().to_string(),
+        None,
     )
     .await?;
 
@@ -133,7 +136,6 @@ async fn test_ensure_historical_events() -> Result<()> {
     let expected: Vec<_> = historical_msgs.into_iter().chain(live_events).collect();
 
     let history = bus.send(GetHistory).await?;
-
     assert_eq!(history.len(), 8);
 
     let msgs: Vec<_> = history

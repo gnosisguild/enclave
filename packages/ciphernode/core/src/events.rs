@@ -552,6 +552,7 @@ impl Display for Shutdown {
 #[rtype(result = "()")]
 pub struct TestEvent {
     pub msg: String,
+    pub entropy: u64
 }
 
 #[cfg(test)]

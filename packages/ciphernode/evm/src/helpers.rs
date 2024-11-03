@@ -1,7 +1,5 @@
-use actix::Recipient;
 use alloy::{
     network::{Ethereum, EthereumWallet},
-    primitives::{LogData, B256},
     providers::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
@@ -9,61 +7,14 @@ use alloy::{
         },
         Identity, Provider, ProviderBuilder, RootProvider,
     },
-    rpc::types::Filter,
     signers::local::PrivateKeySigner,
     transports::{BoxTransport, Transport},
 };
-use anyhow::anyhow;
 use anyhow::{bail, Context, Result};
 use cipher::Cipher;
 use data::Repository;
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
-use futures_util::stream::StreamExt;
 use std::{env, marker::PhantomData, sync::Arc};
-use tokio::{select, sync::oneshot};
-use tracing::{info, trace};
 use zeroize::Zeroizing;
-
-pub async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
-    provider: WithChainId<P, T>,
-    filter: Filter,
-    bus: Recipient<EnclaveEvent>,
-    extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
-    mut shutdown: oneshot::Receiver<()>,
-) {
-    match provider.get_provider().subscribe_logs(&filter).await {
-        Ok(subscription) => {
-            let mut stream = subscription.into_stream();
-            loop {
-                select! {
-                    maybe_log = stream.next() => {
-                        match maybe_log {
-                            Some(log) => {
-                                trace!("Received log from EVM");
-                                let Some(event) = extractor(log.data(), log.topic0(), provider.get_chain_id())
-                                else {
-                                    trace!("Failed to extract log from EVM");
-                                    continue;
-                                };
-                                info!("Extracted log from evm sending now.");
-                                bus.do_send(event);
-                            }
-                            None => break, // Stream ended
-                        }
-                    }
-                    _ = &mut shutdown => {
-                        info!("Received shutdown signal, stopping EVM stream");
-                        break;
-                    }
-                }
-            }
-        }
-        Err(e) => {
-            bus.err(EnclaveErrorType::Evm, anyhow!("{}", e));
-        }
-    };
-    info!("Exiting stream loop");
-}
 
 /// We need to cache the chainId so we can easily use it in a non-async situation
 /// This wrapper just stores the chain_id with the Provider

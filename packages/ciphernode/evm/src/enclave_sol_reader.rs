@@ -87,7 +87,7 @@ impl EnclaveSolReader {
         provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
     ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
-        let addr = EvmEventReader::attach(bus, provider, extractor, contract_address).await?;
+        let addr = EvmEventReader::attach(bus, provider, extractor, contract_address,None).await?;
         Ok(addr)
     }
 }
