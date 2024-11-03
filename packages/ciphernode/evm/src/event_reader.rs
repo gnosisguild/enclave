@@ -33,7 +33,7 @@ where
     /// A shutdown receiver to listen to for shutdown signals sent to the loop this is only used
     /// internally. You should send the Shutdown signal to the reader directly or via the EventBus
     shutdown_rx: Option<oneshot::Receiver<()>>,
-    /// The sender for the shutdown signal this is only used internally 
+    /// The sender for the shutdown signal this is only used internally
     shutdown_tx: Option<oneshot::Sender<()>>,
     /// The deployment block of the contract
     deployment_block: Option<u64>,

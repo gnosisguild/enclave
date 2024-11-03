@@ -30,7 +30,7 @@ fn test_event_extractor(
             };
             Some(EnclaveEvent::from(TestEvent {
                 msg: event.value,
-                entropy: event.count.try_into().unwrap(), // This prevents de-duplication in tests 
+                entropy: event.count.try_into().unwrap(), // This prevents de-duplication in tests
             }))
         }
         _ => None,
