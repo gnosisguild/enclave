@@ -557,7 +557,7 @@ pub struct TestEvent {
 #[cfg(test)]
 impl Display for TestEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Shutdown",)
+        write!(f, "TestEvent(msg: {})", self.msg)
     }
 }
 
