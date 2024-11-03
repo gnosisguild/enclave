@@ -36,6 +36,10 @@ jobs:
     - name: "Compile the contracts and generate the TypeChain bindings"
       run: "yarn typechain"
 
+      # We must install foundry in order to be able to test anvil
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+
       # Now we can check rust formatting and run tests
     - name: Checking code format
       run: cd ./packages/ciphernode && cargo fmt -- --check
