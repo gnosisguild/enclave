@@ -119,14 +119,12 @@ impl EnclaveSolReader {
         }
     }
 
-    pub async fn load(params: EnclaveSolReaderParams) -> Result<Addr<Self>> {
-        let addr = if let Some(snapshot) = params.repository.read().await? {
+    pub async fn load(params: EnclaveSolReaderParams) -> Result<Self> {
+        Ok(if let Some(snapshot) = params.repository.read().await? {
             Self::from_snapshot(params, snapshot).await?
         } else {
             Self::new(params)
-        }
-        .start();
-        Ok(addr)
+        })
     }
 
     pub async fn attach(
@@ -135,19 +133,22 @@ impl EnclaveSolReader {
         contract_address: &str,
         repository: &Repository<EnclaveSolReaderState>,
     ) -> Result<Addr<Self>> {
-        let addr = Self::load(EnclaveSolReaderParams {
+        let params = EnclaveSolReaderParams {
             bus: bus.clone(),
             repository: repository.clone(),
-        })
-        .await?;
+        };
+
+        let actor = Self::load(params).await?;
+        let last_block = actor.state.last_block;
+        let addr = actor.start();
 
         EvmEventReader::attach(
-            &addr.clone().into(),
+            &addr.clone().recipient(),
             provider,
             extractor,
             contract_address,
-            None,
-            &bus.clone().into(),
+            last_block,
+            &bus.clone(),
         )
         .await?;
 

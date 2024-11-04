@@ -126,14 +126,12 @@ impl CiphernodeRegistrySolReader {
         }
     }
 
-    pub async fn load(params: CiphernodeRegistryReaderParams) -> Result<Addr<Self>> {
-        let addr = if let Some(snapshot) = params.repository.read().await? {
+    pub async fn load(params: CiphernodeRegistryReaderParams) -> Result<Self> {
+        Ok(if let Some(snapshot) = params.repository.read().await? {
             Self::from_snapshot(params, snapshot).await?
         } else {
             Self::new(params)
-        }
-        .start();
-        Ok(addr)
+        })
     }
 
     pub async fn attach(
@@ -147,14 +145,16 @@ impl CiphernodeRegistrySolReader {
             repository: repository.clone(),
         };
 
-        let addr = Self::load(params).await?;
+        let actor = Self::load(params).await?;
+        let last_block = actor.state.last_block;
+        let addr = actor.start();
 
         EvmEventReader::attach(
             &addr.clone().into(),
             provider,
             extractor,
             contract_address,
-            None,
+            last_block,
             &bus.clone().into(),
         )
         .await?;

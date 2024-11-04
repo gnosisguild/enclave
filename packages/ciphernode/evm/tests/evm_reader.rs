@@ -1,4 +1,4 @@
-use actix::Actor;
+use actix::{Actor, Addr, Handler};
 use alloy::{
     node_bindings::Anvil,
     primitives::{FixedBytes, LogData},
@@ -8,7 +8,7 @@ use alloy::{
 };
 use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus, GetHistory, TestEvent};
-use evm::{helpers::WithChainId, EvmEventReader};
+use evm::{helpers::WithChainId, EnclaveEvmEvent, EvmEventReader};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -37,6 +37,21 @@ fn test_event_extractor(
     }
 }
 
+struct EvmEventUnwrapper {
+    bus: Addr<EventBus>,
+}
+
+impl Actor for EvmEventUnwrapper {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<EnclaveEvmEvent> for EvmEventUnwrapper {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
+        self.bus.do_send(msg.event);
+    }
+}
+
 #[actix::test]
 async fn evm_reader() -> Result<()> {
     // Create a WS provider
@@ -47,13 +62,14 @@ async fn evm_reader() -> Result<()> {
     let arc_provider = WithChainId::new(provider).await?;
     let contract = EmitLogs::deploy(arc_provider.get_provider()).await?;
     let bus = EventBus::new(true).start();
-
+    let unwrapper = EvmEventUnwrapper { bus: bus.clone() }.start();
     EvmEventReader::attach(
-        &bus.clone().into(),
+        &unwrapper.clone().into(),
         &arc_provider,
         test_event_extractor,
         &contract.address().to_string(),
         None,
+        &bus,
     )
     .await?;
 
@@ -100,7 +116,7 @@ async fn ensure_historical_events() -> Result<()> {
     let arc_provider = WithChainId::new(provider).await?;
     let contract = EmitLogs::deploy(arc_provider.get_provider()).await?;
     let bus = EventBus::new(true).start();
-
+    let unwrapper = EvmEventUnwrapper { bus: bus.clone() }.start();
     let historical_msgs = vec!["these", "are", "historical", "events"];
     let live_events = vec!["these", "events", "are", "live"];
 
@@ -114,11 +130,12 @@ async fn ensure_historical_events() -> Result<()> {
     }
 
     EvmEventReader::attach(
-        &bus.clone().into(),
+        &unwrapper.clone().into(),
         &arc_provider,
         test_event_extractor,
         &contract.address().to_string(),
         None,
+        &bus,
     )
     .await?;
 
