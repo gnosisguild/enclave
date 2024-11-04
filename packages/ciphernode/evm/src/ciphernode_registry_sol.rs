@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    event_reader::EventReader,
+    event_reader::{EnclaveEvmEvent, EventReader},
     helpers::{ReadonlyProvider, WithChainId},
     EvmEventReader,
 };
@@ -102,30 +102,26 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<Enclave
 /// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
 pub struct CiphernodeRegistrySolReader {
     bus: Addr<EventBus>,
-    reader: Addr<EventReader>,
     state: CiphernodeRegistryReaderState,
     repository: Repository<CiphernodeRegistryReaderState>,
 }
 
 pub struct CiphernodeRegistryReaderParams {
     bus: Addr<EventBus>,
-    reader: Addr<EventReader>,
     repository: Repository<CiphernodeRegistryReaderState>,
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct CiphernodeRegistryReaderState {
-    ids: HashSet<EventId>,
+    pub ids: HashSet<EventId>,
+    pub last_block: Option<u64>,
 }
 
 impl CiphernodeRegistrySolReader {
     pub fn new(params: CiphernodeRegistryReaderParams) -> Self {
         Self {
             bus: params.bus,
-            reader: params.reader,
-            state: CiphernodeRegistryReaderState {
-                ids: HashSet::new(),
-            },
+            state: CiphernodeRegistryReaderState::default(),
             repository: params.repository,
         }
     }
@@ -148,21 +144,20 @@ impl CiphernodeRegistrySolReader {
     ) -> Result<Addr<Self>> {
         let params = CiphernodeRegistryReaderParams {
             bus: bus.clone(),
-            reader: EvmEventReader::attach(
-                &bus.clone().into(),
-                provider,
-                extractor,
-                contract_address,
-                None,
-            )
-            .await?,
             repository: repository.clone(),
         };
 
         let addr = Self::load(params).await?;
 
-        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
-            .await?;
+        EvmEventReader::attach(
+            &addr.clone().into(),
+            provider,
+            extractor,
+            contract_address,
+            None,
+            &bus.clone().into(),
+        )
+        .await?;
 
         info!(address=%contract_address, "EnclaveSolReader is listening to address");
 
@@ -174,17 +169,10 @@ impl Actor for CiphernodeRegistrySolReader {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for CiphernodeRegistrySolReader {
+impl Handler<EnclaveEvmEvent> for CiphernodeRegistrySolReader {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        // If this is a shutdown signal it will be coming from the event bus forward it to the reader
-        if let EnclaveEvent::Shutdown { .. } = msg {
-            self.reader.do_send(msg);
-            return;
-        }
-
-        // Other enclave events will be coming from the reader - check the event id cache forward to the event bus
-        let event_id = msg.get_id();
+    fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
+        let event_id = wrapped.event.get_id();
         if self.state.ids.contains(&event_id) {
             trace!(
                 "Event id {} has already been seen and was not forwarded to the bus",
@@ -194,10 +182,11 @@ impl Handler<EnclaveEvent> for CiphernodeRegistrySolReader {
         }
 
         // Forward everything else to the event bus
-        self.bus.do_send(msg);
+        self.bus.do_send(wrapped.event);
 
         // Save processed ids
         self.state.ids.insert(event_id);
+        self.state.last_block = wrapped.block;
         self.checkpoint();
     }
 }
@@ -221,7 +210,6 @@ impl FromSnapshotWithParams for CiphernodeRegistrySolReader {
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         Ok(Self {
             bus: params.bus,
-            reader: params.reader,
             state: snapshot,
             repository: params.repository,
         })

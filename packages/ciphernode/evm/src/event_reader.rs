@@ -10,11 +10,24 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use alloy::transports::{BoxTransport, Transport};
 use anyhow::{anyhow, Result};
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
+use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
 use futures_util::stream::StreamExt;
 use tokio::select;
 use tokio::sync::{oneshot, Mutex};
 use tracing::{info, trace, warn};
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[rtype(result = "()")]
+pub struct EnclaveEvmEvent {
+    pub event: EnclaveEvent,
+    pub block: Option<u64>,
+}
+
+impl EnclaveEvmEvent {
+    fn new(event: EnclaveEvent, block: Option<u64>) -> Self {
+        Self { event, block }
+    }
+}
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
@@ -31,7 +44,7 @@ where
     /// The contract address
     contract_address: Address,
     /// The EnclaveEvent Recipient to send events to
-    bus: Recipient<EnclaveEvent>,
+    parent: Recipient<EnclaveEvmEvent>,
     /// The Extractor function to determine which events to extract and convert to EnclaveEvents
     extractor: ExtractorFn<EnclaveEvent>,
     /// A shutdown receiver to listen to for shutdown signals sent to the loop this is only used
@@ -41,8 +54,8 @@ where
     shutdown_tx: Option<oneshot::Sender<()>>,
     /// The block that processing should start from
     start_block: Option<u64>,
-    /// Last block processed
-    last_block: Arc<Mutex<Option<u64>>>,
+    /// Event bus for error propagation
+    bus: Addr<EventBus>,
 }
 
 impl<P, T> EvmEventReader<P, T>
@@ -51,40 +64,46 @@ where
     T: Transport + Clone + Unpin,
 {
     pub fn new(
-        bus: &Recipient<EnclaveEvent>,
+        parent: &Recipient<EnclaveEvmEvent>,
         provider: &WithChainId<P, T>,
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &Address,
         start_block: Option<u64>,
+        bus: &Addr<EventBus>,
     ) -> Result<Self> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         Ok(Self {
             contract_address: contract_address.clone(),
             provider: Some(provider.clone()),
             extractor,
-            bus: bus.clone(),
+            parent: parent.clone(),
             shutdown_rx: Some(shutdown_rx),
             shutdown_tx: Some(shutdown_tx),
             start_block,
-            last_block: Arc::new(Mutex::new(None)),
+            bus: bus.clone(),
         })
     }
 
     pub async fn attach(
-        bus: &Recipient<EnclaveEvent>,
+        parent: &Recipient<EnclaveEvmEvent>,
         provider: &WithChainId<P, T>,
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &str,
         start_block: Option<u64>,
+        bus: &Addr<EventBus>,
     ) -> Result<Addr<Self>> {
         let addr = EvmEventReader::new(
-            bus,
+            parent,
             provider,
             extractor,
             &contract_address.parse()?,
             start_block,
+            bus,
         )?
         .start();
+
+        bus.do_send(Subscribe::new("Shutdown", addr.clone().into()));
+
         Ok(addr)
     }
 }
@@ -96,6 +115,7 @@ where
 {
     type Context = actix::Context<Self>;
     fn started(&mut self, ctx: &mut Self::Context) {
+        let parent = self.parent.clone();
         let bus = self.bus.clone();
         let Some(provider) = self.provider.take() else {
             tracing::error!("Could not start event reader as provider has already been used.");
@@ -110,17 +130,16 @@ where
 
         let contract_address = self.contract_address;
         let start_block = self.start_block;
-        let last_block = self.last_block.clone();
         ctx.spawn(
             async move {
                 stream_from_evm(
                     provider,
                     &contract_address,
-                    bus,
+                    &parent,
                     extractor,
                     shutdown,
                     start_block,
-                    last_block,
+                    &bus,
                 )
                 .await
             }
@@ -132,11 +151,11 @@ where
 async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     provider: WithChainId<P, T>,
     contract_address: &Address,
-    bus: Recipient<EnclaveEvent>,
+    parent: &Recipient<EnclaveEvmEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
-    last_block: Arc<Mutex<Option<u64>>>,
+    bus: &Addr<EventBus>,
 ) {
     let chain_id = provider.get_chain_id();
     let provider = provider.get_provider();
@@ -155,9 +174,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                 let block_number = log.block_number;
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
                     trace!("Processing historical log");
-                    bus.do_send(event);
-                    let mut guard = last_block.lock().await;
-                    *guard = block_number;
+                    parent.do_send(EnclaveEvmEvent::new(event, block_number));
                 }
             }
         }
@@ -184,9 +201,8 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                                     continue;
                                 };
                                 info!("Extracted log from evm sending now.");
-                                bus.do_send(event);
-                                let mut guard = last_block.lock().await;
-                                *guard = block_number;
+                                parent.do_send(EnclaveEvmEvent::new(event, block_number));
+
                             }
                             None => break, // Stream ended
                         }

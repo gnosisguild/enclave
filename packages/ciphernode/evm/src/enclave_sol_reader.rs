@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::event_reader::EventReader;
+use crate::event_reader::{EnclaveEvmEvent, EventReader};
 use crate::helpers::{ReadonlyProvider, WithChainId};
 use crate::EvmEventReader;
 use actix::{Actor, Addr, Handler};
@@ -10,7 +10,7 @@ use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use async_trait::async_trait;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
-use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
+use enclave_core::{EnclaveEvent, EventBus, EventId};
 use tracing::{error, info, trace};
 
 sol!(
@@ -86,12 +86,14 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct EnclaveSolReaderState {
     pub ids: HashSet<EventId>,
+    pub last_block: Option<u64>,
 }
 
 impl Default for EnclaveSolReaderState {
     fn default() -> Self {
         Self {
             ids: HashSet::new(),
+            last_block: None,
         }
     }
 }
@@ -99,14 +101,12 @@ impl Default for EnclaveSolReaderState {
 /// Connects to Enclave.sol converting EVM events to EnclaveEvents
 pub struct EnclaveSolReader {
     bus: Addr<EventBus>,
-    reader: Addr<EventReader>,
     state: EnclaveSolReaderState,
     repository: Repository<EnclaveSolReaderState>,
 }
 
 pub struct EnclaveSolReaderParams {
     bus: Addr<EventBus>,
-    reader: Addr<EventReader>,
     repository: Repository<EnclaveSolReaderState>,
 }
 
@@ -114,7 +114,6 @@ impl EnclaveSolReader {
     pub fn new(params: EnclaveSolReaderParams) -> Self {
         Self {
             bus: params.bus,
-            reader: params.reader,
             state: EnclaveSolReaderState::default(),
             repository: params.repository,
         }
@@ -136,22 +135,21 @@ impl EnclaveSolReader {
         contract_address: &str,
         repository: &Repository<EnclaveSolReaderState>,
     ) -> Result<Addr<Self>> {
-        let params = EnclaveSolReaderParams {
+        let addr = Self::load(EnclaveSolReaderParams {
             bus: bus.clone(),
-            reader: EvmEventReader::attach(
-                &bus.clone().into(),
-                provider,
-                extractor,
-                contract_address,
-                None,
-            )
-            .await?,
             repository: repository.clone(),
-        };
+        })
+        .await?;
 
-        let addr = Self::load(params).await?;
-        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
-            .await?;
+        EvmEventReader::attach(
+            &addr.clone().into(),
+            provider,
+            extractor,
+            contract_address,
+            None,
+            &bus.clone().into(),
+        )
+        .await?;
 
         info!(address=%contract_address, "EnclaveSolReader is listening to address");
 
@@ -163,17 +161,10 @@ impl Actor for EnclaveSolReader {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for EnclaveSolReader {
+impl Handler<EnclaveEvmEvent> for EnclaveSolReader {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        // If this is a shutdown signal it will be coming from the event bus forward it to the reader
-        if let EnclaveEvent::Shutdown { .. } = msg {
-            self.reader.do_send(msg);
-            return;
-        }
-
-        // Other enclave events will be coming from the reader - check the event id cache forward to the event bus
-        let event_id = msg.get_id();
+    fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
+        let event_id = wrapped.event.get_id();
         if self.state.ids.contains(&event_id) {
             trace!(
                 "Event id {} has already been seen and was not forwarded to the bus",
@@ -183,10 +174,11 @@ impl Handler<EnclaveEvent> for EnclaveSolReader {
         }
 
         // Forward everything else to the event bus
-        self.bus.do_send(msg);
+        self.bus.do_send(wrapped.event);
 
         // Save processed ids
         self.state.ids.insert(event_id);
+        self.state.last_block = wrapped.block;
         self.checkpoint();
     }
 }
@@ -210,7 +202,6 @@ impl FromSnapshotWithParams for EnclaveSolReader {
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         Ok(Self {
             bus: params.bus,
-            reader: params.reader,
             state: snapshot,
             repository: params.repository,
         })
