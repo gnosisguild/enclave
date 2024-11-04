@@ -80,7 +80,10 @@ impl Repositories {
                 .scope(format!("//evm_readers/enclave/{chain_id}")),
         )
     }
-    pub fn ciphernode_registry_reader(&self, chain_id: u64) -> Repository<CiphernodeRegistryReaderState> {
+    pub fn ciphernode_registry_reader(
+        &self,
+        chain_id: u64,
+    ) -> Repository<CiphernodeRegistryReaderState> {
         Repository::new(
             self.store
                 .scope(format!("//evm_readers/ciphernode_registry/{chain_id}")),

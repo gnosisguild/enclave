@@ -11,4 +11,3 @@ pub use into_key::IntoKey;
 pub use repository::*;
 pub use sled_store::*;
 pub use snapshot::*;
-
