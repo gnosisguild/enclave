@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::{
     event_reader::EventReader,
     helpers::{ReadonlyProvider, WithChainId},
-     EvmEventReader,
+    EvmEventReader,
 };
 use actix::{Actor, Addr, Handler};
 use alloy::{
@@ -234,9 +234,9 @@ impl CiphernodeRegistrySol {
         bus: &Addr<EventBus>,
         provider: &WithChainId<ReadonlyProvider>,
         contract_address: &str,
-        repository: &Repository<CiphernodeRegistryReaderState>
+        repository: &Repository<CiphernodeRegistryReaderState>,
     ) -> Result<()> {
-        CiphernodeRegistrySolReader::attach(bus, provider, contract_address,repository).await?;
+        CiphernodeRegistrySolReader::attach(bus, provider, contract_address, repository).await?;
         // TODO: Writer if needed
         Ok(())
     }
