@@ -49,7 +49,7 @@ async fn evm_reader() -> Result<()> {
     let bus = EventBus::new(true).start();
 
     EvmEventReader::attach(
-        &bus,
+        &bus.clone().into(),
         &arc_provider,
         test_event_extractor,
         &contract.address().to_string(),
@@ -114,7 +114,7 @@ async fn ensure_historical_events() -> Result<()> {
     }
 
     EvmEventReader::attach(
-        &bus,
+        &bus.clone().into(),
         &arc_provider,
         test_event_extractor,
         &contract.address().to_string(),

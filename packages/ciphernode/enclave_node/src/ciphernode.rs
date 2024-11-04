@@ -3,7 +3,6 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
-use data::{DataStore, InMemStore, SledStore};
 use enclave_core::EventBus;
 use evm::{
     helpers::{create_readonly_provider, ensure_ws_rpc},
@@ -46,9 +45,20 @@ pub async fn setup_ciphernode(
         let rpc_url = &chain.rpc_url;
 
         let read_provider = create_readonly_provider(&ensure_ws_rpc(rpc_url)).await?;
-        EnclaveSolReader::attach(&bus, &read_provider, &chain.contracts.enclave).await?;
-        CiphernodeRegistrySol::attach(&bus, &read_provider, &chain.contracts.ciphernode_registry)
-            .await?;
+        EnclaveSolReader::attach(
+            &bus,
+            &read_provider,
+            &chain.contracts.enclave,
+            &repositories.enclave_sol_reader(read_provider.get_chain_id()),
+        )
+        .await?;
+        CiphernodeRegistrySol::attach(
+            &bus,
+            &read_provider,
+            &chain.contracts.ciphernode_registry,
+            &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
+        )
+        .await?;
     }
 
     E3RequestRouter::builder(&bus, store.clone())

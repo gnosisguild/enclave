@@ -54,11 +54,17 @@ pub async fn setup_aggregator(
             &read_provider,
             &write_provider,
             &chain.contracts.enclave,
+            &repositories.enclave_sol_reader(read_provider.get_chain_id()),
         )
         .await?;
         RegistryFilterSol::attach(&bus, &write_provider, &chain.contracts.filter_registry).await?;
-        CiphernodeRegistrySol::attach(&bus, &read_provider, &chain.contracts.ciphernode_registry)
-            .await?;
+        CiphernodeRegistrySol::attach(
+            &bus,
+            &read_provider,
+            &chain.contracts.ciphernode_registry,
+            &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
+        )
+        .await?;
     }
 
     E3RequestRouter::builder(&bus, store)

@@ -143,7 +143,7 @@ impl E3RequestContext {
 
 impl RepositoriesFactory for E3RequestContext {
     fn repositories(&self) -> Repositories {
-        self.repository().into()
+        self.repository().clone().into()
     }
 }
 
@@ -186,7 +186,7 @@ impl FromSnapshotWithParams for E3RequestContext {
 }
 
 impl Checkpoint for E3RequestContext {
-    fn repository(&self) -> Repository<E3RequestContextSnapshot> {
-        self.store.clone()
+    fn repository(&self) -> &Repository<E3RequestContextSnapshot> {
+        &self.store
     }
 }

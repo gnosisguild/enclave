@@ -140,8 +140,8 @@ impl FromSnapshotWithParams for Sortition {
 }
 
 impl Checkpoint for Sortition {
-    fn repository(&self) -> Repository<SortitionModule> {
-        self.store.clone()
+    fn repository(&self) -> &Repository<SortitionModule> {
+        &self.store
     }
 }
 

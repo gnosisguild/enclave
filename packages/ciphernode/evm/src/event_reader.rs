@@ -1,4 +1,4 @@
-use crate::helpers::WithChainId;
+use crate::helpers::{ReadonlyProvider, WithChainId};
 use actix::prelude::*;
 use actix::{Addr, Recipient};
 use alloy::eips::BlockNumberOrTag;
@@ -8,13 +8,15 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use alloy::transports::{BoxTransport, Transport};
 use anyhow::{anyhow, Result};
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
+use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
 use tokio::select;
 use tokio::sync::oneshot;
 use tracing::{info, trace, warn};
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
+
+pub type EventReader = EvmEventReader<ReadonlyProvider>;
 
 /// Connects to Enclave.sol converting EVM events to EnclaveEvents
 pub struct EvmEventReader<P, T = BoxTransport>
@@ -45,7 +47,7 @@ where
     T: Transport + Clone + Unpin,
 {
     pub fn new(
-        bus: &Addr<EventBus>,
+        bus: &Recipient<EnclaveEvent>,
         provider: &WithChainId<P, T>,
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &Address,
@@ -56,7 +58,7 @@ where
             contract_address: contract_address.clone(),
             provider: Some(provider.clone()),
             extractor,
-            bus: bus.clone().into(),
+            bus: bus.clone(),
             shutdown_rx: Some(shutdown_rx),
             shutdown_tx: Some(shutdown_tx),
             deployment_block,
@@ -64,7 +66,7 @@ where
     }
 
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Recipient<EnclaveEvent>,
         provider: &WithChainId<P, T>,
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &str,
@@ -78,11 +80,6 @@ where
             deployment_block,
         )?
         .start();
-
-        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
-            .await?;
-
-        info!(address=%contract_address, "Evm is listening to address");
         Ok(addr)
     }
 }
