@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::helpers::{ReadonlyProvider, WithChainId};
 use actix::prelude::*;
 use actix::{Addr, Recipient};
@@ -11,7 +13,7 @@ use anyhow::{anyhow, Result};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent};
 use futures_util::stream::StreamExt;
 use tokio::select;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, Mutex};
 use tracing::{info, trace, warn};
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
@@ -37,8 +39,10 @@ where
     shutdown_rx: Option<oneshot::Receiver<()>>,
     /// The sender for the shutdown signal this is only used internally
     shutdown_tx: Option<oneshot::Sender<()>>,
-    /// The deployment block of the contract
-    deployment_block: Option<u64>,
+    /// The block that processing should start from
+    start_block: Option<u64>,
+    /// Last block processed
+    last_block: Arc<Mutex<Option<u64>>>,
 }
 
 impl<P, T> EvmEventReader<P, T>
@@ -51,7 +55,7 @@ where
         provider: &WithChainId<P, T>,
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &Address,
-        deployment_block: Option<u64>,
+        start_block: Option<u64>,
     ) -> Result<Self> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         Ok(Self {
@@ -61,7 +65,8 @@ where
             bus: bus.clone(),
             shutdown_rx: Some(shutdown_rx),
             shutdown_tx: Some(shutdown_tx),
-            deployment_block,
+            start_block,
+            last_block: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -70,14 +75,14 @@ where
         provider: &WithChainId<P, T>,
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &str,
-        deployment_block: Option<u64>,
+        start_block: Option<u64>,
     ) -> Result<Addr<Self>> {
         let addr = EvmEventReader::new(
             bus,
             provider,
             extractor,
             &contract_address.parse()?,
-            deployment_block,
+            start_block,
         )?
         .start();
         Ok(addr)
@@ -104,8 +109,8 @@ where
         };
 
         let contract_address = self.contract_address;
-        let deployment_block = self.deployment_block;
-
+        let start_block = self.start_block;
+        let last_block = self.last_block.clone();
         ctx.spawn(
             async move {
                 stream_from_evm(
@@ -114,7 +119,8 @@ where
                     bus,
                     extractor,
                     shutdown,
-                    deployment_block,
+                    start_block,
+                    last_block,
                 )
                 .await
             }
@@ -129,13 +135,14 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     bus: Recipient<EnclaveEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
-    deployment_block: Option<u64>,
+    start_block: Option<u64>,
+    last_block: Arc<Mutex<Option<u64>>>,
 ) {
     let chain_id = provider.get_chain_id();
     let provider = provider.get_provider();
     let historical_filter = Filter::new()
         .address(contract_address.clone())
-        .from_block(deployment_block.unwrap_or(0));
+        .from_block(start_block.unwrap_or(0));
     let current_filter = Filter::new()
         .address(*contract_address)
         .from_block(BlockNumberOrTag::Latest);
@@ -145,9 +152,12 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
         Ok(historical_logs) => {
             info!("Fetched {} historical events", historical_logs.len());
             for log in historical_logs {
+                let block_number = log.block_number;
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
                     trace!("Processing historical log");
                     bus.do_send(event);
+                    let mut guard = last_block.lock().await;
+                    *guard = block_number;
                 }
             }
         }
@@ -166,6 +176,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                     maybe_log = stream.next() => {
                         match maybe_log {
                             Some(log) => {
+                                let block_number = log.block_number;
                                 trace!("Received log from EVM");
                                 let Some(event) = extractor(log.data(), log.topic0(), chain_id)
                                 else {
@@ -174,6 +185,8 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                                 };
                                 info!("Extracted log from evm sending now.");
                                 bus.do_send(event);
+                                let mut guard = last_block.lock().await;
+                                *guard = block_number;
                             }
                             None => break, // Stream ended
                         }
