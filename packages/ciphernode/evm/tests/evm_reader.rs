@@ -192,12 +192,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
 
     let repository = Repository::new(get_in_mem_store());
 
-    let before = vec!["before", "online"];
-    let online = vec!["live", "events"];
-    let after_shutdown = vec!["these", "are", "not", "lost"];
-    let resume = vec!["resumed", "data"];
-
-    for msg in before.clone() {
+    for msg in ["before", "online"] {
         contract
             .setValue(msg.to_string())
             .send()
@@ -216,7 +211,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     )
     .await?;
 
-    for msg in online.clone() {
+    for msg in ["live", "events"] {
         contract
             .setValue(msg.to_string())
             .send()
@@ -229,7 +224,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     sleep(Duration::from_millis(1)).await;
     addr1.send(EnclaveEvent::from(Shutdown)).await?;
 
-    for msg in after_shutdown.clone() {
+    for msg in ["these", "are", "not", "lost"] {
         contract
             .setValue(msg.to_string())
             .send()
@@ -240,7 +235,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
 
     sleep(Duration::from_millis(1)).await;
     let msgs = get_msgs(&bus).await?;
-    assert_eq!(msgs, vec!["before", "online", "live", "events"]);
+    assert_eq!(msgs, ["before", "online", "live", "events"]);
 
     let _ = EvmEventReader::attach(
         &provider,
@@ -256,10 +251,10 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     let msgs = get_msgs(&bus).await?;
     assert_eq!(
         msgs,
-        vec!["before", "online", "live", "events", "these", "are", "not", "lost"]
+        ["before", "online", "live", "events", "these", "are", "not", "lost"]
     );
 
-    for msg in resume.clone() {
+    for msg in ["resumed", "data"] {
         contract
             .setValue(msg.to_string())
             .send()
@@ -272,7 +267,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     let msgs = get_msgs(&bus).await?;
     assert_eq!(
         msgs,
-        vec![
+        [
             "before", "online", "live", "events", "these", "are", "not", "lost", "resumed", "data"
         ]
     );
