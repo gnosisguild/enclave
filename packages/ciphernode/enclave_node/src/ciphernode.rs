@@ -48,15 +48,17 @@ pub async fn setup_ciphernode(
         EnclaveSolReader::attach(
             &bus,
             &read_provider,
-            &chain.contracts.enclave,
+            &chain.contracts.enclave.address(),
             &repositories.enclave_sol_reader(read_provider.get_chain_id()),
+            chain.contracts.enclave.deploy_block(),
         )
         .await?;
         CiphernodeRegistrySol::attach(
             &bus,
             &read_provider,
-            &chain.contracts.ciphernode_registry,
+            &chain.contracts.ciphernode_registry.address(),
             &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
+            chain.contracts.ciphernode_registry.deploy_block()
         )
         .await?;
     }

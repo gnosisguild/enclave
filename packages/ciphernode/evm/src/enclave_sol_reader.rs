@@ -89,12 +89,13 @@ impl EnclaveSolReader {
         provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
+        start_block: Option<u64>
     ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
         let addr = EvmEventReader::attach(
             provider,
             extractor,
             contract_address,
-            None,
+            start_block,
             &bus.clone(),
             repository,
         )

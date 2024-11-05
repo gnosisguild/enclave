@@ -105,12 +105,13 @@ impl CiphernodeRegistrySolReader {
         provider: &WithChainId<ReadonlyProvider>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
+        start_block: Option<u64>
     ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
         let addr = EvmEventReader::attach(
             provider,
             extractor,
             contract_address,
-            None,
+            start_block,
             &bus.clone().into(),
             repository,
         )
@@ -134,8 +135,9 @@ impl CiphernodeRegistrySol {
         provider: &WithChainId<ReadonlyProvider>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
+        start_block: Option<u64>
     ) -> Result<()> {
-        CiphernodeRegistrySolReader::attach(bus, provider, contract_address, repository).await?;
+        CiphernodeRegistrySolReader::attach(bus, provider, contract_address, repository, start_block).await?;
         // TODO: Writer if needed
         Ok(())
     }
