@@ -98,7 +98,6 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<Enclave
 
 /// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
 pub struct CiphernodeRegistrySolReader;
-
 impl CiphernodeRegistrySolReader {
     pub async fn attach(
         bus: &Addr<EventBus>,
@@ -123,11 +122,7 @@ impl CiphernodeRegistrySolReader {
     }
 }
 
-impl Actor for CiphernodeRegistrySolReader {
-    type Context = actix::Context<Self>;
-}
-
-/// Eventual wrapper for both a reader and a writer
+/// Wrapper for a reader and a future writer
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
     pub async fn attach(
