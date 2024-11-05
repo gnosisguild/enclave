@@ -19,7 +19,7 @@
     "ciphernode:lint": "cd packages/ciphernode && cargo fmt -- --check",
     "ciphernode:add": "cd packages/evm && yarn ciphernode:add",
     "ciphernode:remove": "cd packages/evm && yarn ciphernode:remove",
-    "ciphernode:test": "cd packages/ciphernode && cargo test",
+    "ciphernode:test": "cd packages/ciphernode && ./scripts/test.sh",
     "ciphernode:build": "cd packages/ciphernode && cargo build --release",
     "preciphernode:build": "yarn evm:compile",
     "committee:new": "cd packages/evm && yarn committee:new",

@@ -18,7 +18,17 @@ jobs:
       with:
         toolchain: 1.81.0
         override: true
-      
+
+      # We must install foundry in order to be able to test anvil
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1 
+
+    - name: Install solc
+      run: |
+        sudo add-apt-repository ppa:ethereum/ethereum \
+        && sudo apt-get update -y \
+        && sudo apt-get install -y solc
+
       # We need to setup node in order to compile the hardhat contracts to get the artifacts 
     - name: "Setup node"
       uses: actions/setup-node@v2
@@ -41,6 +51,4 @@ jobs:
       run: cd ./packages/ciphernode && cargo fmt -- --check
 
     - name: Run tests
-      run: |
-        cd ./packages/ciphernode/
-        cargo test
+      run: "yarn ciphernode:test"

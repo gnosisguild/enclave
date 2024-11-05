@@ -123,10 +123,16 @@ pub enum EnclaveEvent {
     Shutdown {
         id: EventId,
         data: Shutdown,
-    }, // CommitteeSelected,
-       // OutputDecrypted,
-       // CiphernodeRegistered,
-       // CiphernodeDeregistered,
+    },
+    /// This is a test event to use in testing
+    TestEvent {
+        id: EventId,
+        data: TestEvent,
+    },
+    // CommitteeSelected,
+    // OutputDecrypted,
+    // CiphernodeRegistered,
+    // CiphernodeDeregistered,
 }
 
 impl EnclaveEvent {
@@ -171,6 +177,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::EnclaveError { id, .. } => id,
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
+            EnclaveEvent::TestEvent { id, .. } => id,
         }
     }
 }
@@ -202,6 +209,7 @@ impl EnclaveEvent {
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
+            EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
     }
@@ -317,6 +325,15 @@ impl From<Shutdown> for EnclaveEvent {
         EnclaveEvent::Shutdown {
             id: EventId::from(data.clone()),
             data: data.clone(),
+        }
+    }
+}
+
+impl From<TestEvent> for EnclaveEvent {
+    fn from(value: TestEvent) -> Self {
+        EnclaveEvent::TestEvent {
+            id: EventId::from(value.clone()),
+            data: value.clone(),
         }
     }
 }
@@ -528,6 +545,19 @@ pub struct Shutdown;
 impl Display for Shutdown {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Shutdown",)
+    }
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct TestEvent {
+    pub msg: String,
+}
+
+#[cfg(test)]
+impl Display for TestEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TestEvent(msg: {})", self.msg)
     }
 }
 
