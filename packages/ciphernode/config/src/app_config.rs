@@ -325,7 +325,9 @@ chains:
     rpc_url: "ws://localhost:8545"
     contracts:
       enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-      ciphernode_registry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+      ciphernode_registry:
+        address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+        deploy_block: 1764352873645
       filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 "#,
             )?;
@@ -336,10 +338,15 @@ chains:
             assert_eq!(chain.name, "hardhat");
             assert_eq!(chain.rpc_url, "ws://localhost:8545");
             assert_eq!(
-                chain.contracts.enclave,
+                chain.contracts.enclave.address(),
                 "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
             );
-
+            assert_eq!(
+                chain.contracts.ciphernode_registry.address(),
+                "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+            );
+            assert_eq!(chain.contracts.enclave.deploy_block(), None);
+            assert_eq!(chain.contracts.ciphernode_registry.deploy_block(), Some(1764352873645));
             Ok(())
         });
     }
