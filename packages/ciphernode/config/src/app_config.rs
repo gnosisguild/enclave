@@ -346,7 +346,10 @@ chains:
                 "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
             );
             assert_eq!(chain.contracts.enclave.deploy_block(), None);
-            assert_eq!(chain.contracts.ciphernode_registry.deploy_block(), Some(1764352873645));
+            assert_eq!(
+                chain.contracts.ciphernode_registry.deploy_block(),
+                Some(1764352873645)
+            );
             Ok(())
         });
     }
