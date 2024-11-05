@@ -6,12 +6,9 @@ mod event_reader;
 pub mod helpers;
 mod registry_filter_sol;
 
-pub use ciphernode_registry_sol::{
-    CiphernodeRegistryReaderParams, CiphernodeRegistryReaderState, CiphernodeRegistrySol,
-    CiphernodeRegistrySolReader,
-};
+pub use ciphernode_registry_sol::{CiphernodeRegistrySol, CiphernodeRegistrySolReader};
 pub use enclave_sol::EnclaveSol;
-pub use enclave_sol_reader::{EnclaveSolReader, EnclaveSolReaderParams, EnclaveSolReaderState};
+pub use enclave_sol_reader::EnclaveSolReader;
 pub use enclave_sol_writer::EnclaveSolWriter;
-pub use event_reader::{EnclaveEvmEvent, EvmEventReader, ExtractorFn};
+pub use event_reader::{EnclaveEvmEvent,EvmEventReaderState, EvmEventReader, ExtractorFn};
 pub use registry_filter_sol::{RegistryFilterSol, RegistryFilterSolWriter};

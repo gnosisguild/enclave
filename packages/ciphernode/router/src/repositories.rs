@@ -2,7 +2,7 @@ use crate::{CommitteeMeta, E3RequestContextSnapshot, E3RequestRouterSnapshot};
 use aggregator::{PlaintextAggregatorState, PublicKeyAggregatorState};
 use data::{DataStore, Repository};
 use enclave_core::E3id;
-use evm::{CiphernodeRegistryReaderState, EnclaveSolReaderState};
+use evm::EvmEventReaderState;
 use fhe::FheSnapshot;
 use keyshare::KeyshareState;
 use sortition::SortitionModule;
@@ -74,16 +74,13 @@ impl Repositories {
         Repository::new(self.store.scope(format!("//eth_private_key")))
     }
 
-    pub fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EnclaveSolReaderState> {
+    pub fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
         Repository::new(
             self.store
                 .scope(format!("//evm_readers/enclave/{chain_id}")),
         )
     }
-    pub fn ciphernode_registry_reader(
-        &self,
-        chain_id: u64,
-    ) -> Repository<CiphernodeRegistryReaderState> {
+    pub fn ciphernode_registry_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
         Repository::new(
             self.store
                 .scope(format!("//evm_readers/ciphernode_registry/{chain_id}")),

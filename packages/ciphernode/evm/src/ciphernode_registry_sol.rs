@@ -1,20 +1,17 @@
-use std::collections::HashSet;
-
 use crate::{
-    event_reader::{EnclaveEvmEvent, EventReader},
+    event_reader::EvmEventReaderState,
     helpers::{ReadonlyProvider, WithChainId},
     EvmEventReader,
 };
-use actix::{Actor, Addr, Handler};
+use actix::{Actor, Addr};
 use alloy::{
     primitives::{LogData, B256},
     sol,
     sol_types::SolEvent,
 };
 use anyhow::Result;
-use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
-use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
+use data::Repository;
+use enclave_core::{EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 
 sol!(
@@ -100,62 +97,22 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<Enclave
 }
 
 /// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
-pub struct CiphernodeRegistrySolReader {
-    bus: Addr<EventBus>,
-    state: CiphernodeRegistryReaderState,
-    repository: Repository<CiphernodeRegistryReaderState>,
-}
-
-pub struct CiphernodeRegistryReaderParams {
-    bus: Addr<EventBus>,
-    repository: Repository<CiphernodeRegistryReaderState>,
-}
-
-#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct CiphernodeRegistryReaderState {
-    pub ids: HashSet<EventId>,
-    pub last_block: Option<u64>,
-}
+pub struct CiphernodeRegistrySolReader;
 
 impl CiphernodeRegistrySolReader {
-    pub fn new(params: CiphernodeRegistryReaderParams) -> Self {
-        Self {
-            bus: params.bus,
-            state: CiphernodeRegistryReaderState::default(),
-            repository: params.repository,
-        }
-    }
-
-    pub async fn load(params: CiphernodeRegistryReaderParams) -> Result<Self> {
-        Ok(if let Some(snapshot) = params.repository.read().await? {
-            Self::from_snapshot(params, snapshot).await?
-        } else {
-            Self::new(params)
-        })
-    }
-
     pub async fn attach(
         bus: &Addr<EventBus>,
         provider: &WithChainId<ReadonlyProvider>,
         contract_address: &str,
-        repository: &Repository<CiphernodeRegistryReaderState>,
-    ) -> Result<Addr<Self>> {
-        let params = CiphernodeRegistryReaderParams {
-            bus: bus.clone(),
-            repository: repository.clone(),
-        };
-
-        let actor = Self::load(params).await?;
-        let last_block = actor.state.last_block;
-        let addr = actor.start();
-
-        EvmEventReader::attach(
-            &addr.clone().into(),
+        repository: &Repository<EvmEventReaderState>,
+    ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
+        let addr = EvmEventReader::attach(
             provider,
             extractor,
             contract_address,
-            last_block,
+            None,
             &bus.clone().into(),
+            repository,
         )
         .await?;
 
@@ -169,52 +126,6 @@ impl Actor for CiphernodeRegistrySolReader {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<EnclaveEvmEvent> for CiphernodeRegistrySolReader {
-    type Result = ();
-    fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        let event_id = wrapped.event.get_id();
-        if self.state.ids.contains(&event_id) {
-            trace!(
-                "Event id {} has already been seen and was not forwarded to the bus",
-                &event_id
-            );
-            return;
-        }
-
-        // Forward everything else to the event bus
-        self.bus.do_send(wrapped.event);
-
-        // Save processed ids
-        self.state.ids.insert(event_id);
-        self.state.last_block = wrapped.block;
-        self.checkpoint();
-    }
-}
-
-impl Snapshot for CiphernodeRegistrySolReader {
-    type Snapshot = CiphernodeRegistryReaderState;
-    fn snapshot(&self) -> Self::Snapshot {
-        self.state.clone()
-    }
-}
-
-impl Checkpoint for CiphernodeRegistrySolReader {
-    fn repository(&self) -> &Repository<Self::Snapshot> {
-        &self.repository
-    }
-}
-
-#[async_trait]
-impl FromSnapshotWithParams for CiphernodeRegistrySolReader {
-    type Params = CiphernodeRegistryReaderParams;
-    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
-        Ok(Self {
-            bus: params.bus,
-            state: snapshot,
-            repository: params.repository,
-        })
-    }
-}
 /// Eventual wrapper for both a reader and a writer
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
@@ -222,7 +133,7 @@ impl CiphernodeRegistrySol {
         bus: &Addr<EventBus>,
         provider: &WithChainId<ReadonlyProvider>,
         contract_address: &str,
-        repository: &Repository<CiphernodeRegistryReaderState>,
+        repository: &Repository<EvmEventReaderState>,
     ) -> Result<()> {
         CiphernodeRegistrySolReader::attach(bus, provider, contract_address, repository).await?;
         // TODO: Writer if needed

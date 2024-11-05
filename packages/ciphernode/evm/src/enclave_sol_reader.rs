@@ -1,16 +1,13 @@
-use std::collections::HashSet;
-
-use crate::event_reader::{EnclaveEvmEvent, EventReader};
+use crate::event_reader::EvmEventReaderState;
 use crate::helpers::{ReadonlyProvider, WithChainId};
 use crate::EvmEventReader;
-use actix::{Actor, Addr, Handler};
+use actix::Addr;
 use alloy::primitives::{LogData, B256};
 use alloy::transports::BoxTransport;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
-use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
-use enclave_core::{EnclaveEvent, EventBus, EventId};
+use data::Repository;
+use enclave_core::{EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 
 sol!(
@@ -83,128 +80,28 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
-pub struct EnclaveSolReaderState {
-    pub ids: HashSet<EventId>,
-    pub last_block: Option<u64>,
-}
-
-impl Default for EnclaveSolReaderState {
-    fn default() -> Self {
-        Self {
-            ids: HashSet::new(),
-            last_block: None,
-        }
-    }
-}
-
 /// Connects to Enclave.sol converting EVM events to EnclaveEvents
-pub struct EnclaveSolReader {
-    bus: Addr<EventBus>,
-    state: EnclaveSolReaderState,
-    repository: Repository<EnclaveSolReaderState>,
-}
-
-pub struct EnclaveSolReaderParams {
-    bus: Addr<EventBus>,
-    repository: Repository<EnclaveSolReaderState>,
-}
+pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
-    pub fn new(params: EnclaveSolReaderParams) -> Self {
-        Self {
-            bus: params.bus,
-            state: EnclaveSolReaderState::default(),
-            repository: params.repository,
-        }
-    }
-
-    pub async fn load(params: EnclaveSolReaderParams) -> Result<Self> {
-        Ok(if let Some(snapshot) = params.repository.read().await? {
-            Self::from_snapshot(params, snapshot).await?
-        } else {
-            Self::new(params)
-        })
-    }
-
     pub async fn attach(
         bus: &Addr<EventBus>,
         provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
-        repository: &Repository<EnclaveSolReaderState>,
-    ) -> Result<Addr<Self>> {
-        let params = EnclaveSolReaderParams {
-            bus: bus.clone(),
-            repository: repository.clone(),
-        };
-
-        let actor = Self::load(params).await?;
-        let last_block = actor.state.last_block;
-        let addr = actor.start();
-
-        EvmEventReader::attach(
-            &addr.clone().recipient(),
+        repository: &Repository<EvmEventReaderState>,
+    ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
+        let addr = EvmEventReader::attach(
             provider,
             extractor,
             contract_address,
-            last_block,
+            None,
             &bus.clone(),
+            repository,
         )
         .await?;
 
         info!(address=%contract_address, "EnclaveSolReader is listening to address");
 
         Ok(addr)
-    }
-}
-
-impl Actor for EnclaveSolReader {
-    type Context = actix::Context<Self>;
-}
-
-impl Handler<EnclaveEvmEvent> for EnclaveSolReader {
-    type Result = ();
-    fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        let event_id = wrapped.event.get_id();
-        if self.state.ids.contains(&event_id) {
-            trace!(
-                "Event id {} has already been seen and was not forwarded to the bus",
-                &event_id
-            );
-            return;
-        }
-
-        // Forward everything else to the event bus
-        self.bus.do_send(wrapped.event);
-
-        // Save processed ids
-        self.state.ids.insert(event_id);
-        self.state.last_block = wrapped.block;
-        self.checkpoint();
-    }
-}
-
-impl Snapshot for EnclaveSolReader {
-    type Snapshot = EnclaveSolReaderState;
-    fn snapshot(&self) -> Self::Snapshot {
-        self.state.clone()
-    }
-}
-
-impl Checkpoint for EnclaveSolReader {
-    fn repository(&self) -> &Repository<Self::Snapshot> {
-        &self.repository
-    }
-}
-
-#[async_trait]
-impl FromSnapshotWithParams for EnclaveSolReader {
-    type Params = EnclaveSolReaderParams;
-    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
-        Ok(Self {
-            bus: params.bus,
-            state: snapshot,
-            repository: params.repository,
-        })
     }
 }

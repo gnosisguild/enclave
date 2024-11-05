@@ -2356,6 +2356,7 @@ dependencies = [
  "cipher 0.1.0",
  "data",
  "enclave-core",
+ "enclave_node",
  "futures-util",
  "serde",
  "sortition",

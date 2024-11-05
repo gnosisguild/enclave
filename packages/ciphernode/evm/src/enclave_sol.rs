@@ -1,8 +1,5 @@
 use crate::{
-    enclave_sol_reader::EnclaveSolReader,
-    enclave_sol_writer::EnclaveSolWriter,
-    helpers::{ReadonlyProvider, SignerProvider, WithChainId},
-    EnclaveSolReaderState,
+    enclave_sol_reader::EnclaveSolReader, enclave_sol_writer::EnclaveSolWriter, event_reader::EvmEventReaderState, helpers::{ReadonlyProvider, SignerProvider, WithChainId}
 };
 use actix::Addr;
 use anyhow::Result;
@@ -16,7 +13,7 @@ impl EnclaveSol {
         read_provider: &WithChainId<ReadonlyProvider>,
         write_provider: &WithChainId<SignerProvider>,
         contract_address: &str,
-        repository: &Repository<EnclaveSolReaderState>,
+        repository: &Repository<EvmEventReaderState>,
     ) -> Result<()> {
         EnclaveSolReader::attach(bus, read_provider, contract_address, repository).await?;
         EnclaveSolWriter::attach(bus, write_provider, contract_address).await?;
