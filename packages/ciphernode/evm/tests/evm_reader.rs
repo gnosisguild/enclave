@@ -57,15 +57,18 @@ async fn evm_reader() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
-    let ws = WsConnect::new(anvil.ws_endpoint());
-    let provider = ProviderBuilder::new().on_ws(ws).await?;
-    let arc_provider = WithChainId::new(provider).await?;
-    let contract = EmitLogs::deploy(arc_provider.get_provider()).await?;
+    let provider = WithChainId::new(
+        ProviderBuilder::new()
+            .on_ws(WsConnect::new(anvil.ws_endpoint()))
+            .await?,
+    )
+    .await?;
+    let contract = EmitLogs::deploy(provider.get_provider()).await?;
     let bus = EventBus::new(true).start();
-    let unwrapper = EvmEventUnwrapper { bus: bus.clone() }.start();
+
     EvmEventReader::attach(
-        &unwrapper.clone().into(),
-        &arc_provider,
+        &EvmEventUnwrapper { bus: bus.clone() }.start().into(),
+        &provider,
         test_event_extractor,
         &contract.address().to_string(),
         None,
@@ -111,12 +114,15 @@ async fn ensure_historical_events() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
-    let ws = WsConnect::new(anvil.ws_endpoint());
-    let provider = ProviderBuilder::new().on_ws(ws).await?;
-    let arc_provider = WithChainId::new(provider).await?;
-    let contract = EmitLogs::deploy(arc_provider.get_provider()).await?;
+    let provider = WithChainId::new(
+        ProviderBuilder::new()
+            .on_ws(WsConnect::new(anvil.ws_endpoint()))
+            .await?,
+    )
+    .await?;
+    let contract = EmitLogs::deploy(provider.get_provider()).await?;
     let bus = EventBus::new(true).start();
-    let unwrapper = EvmEventUnwrapper { bus: bus.clone() }.start();
+
     let historical_msgs = vec!["these", "are", "historical", "events"];
     let live_events = vec!["these", "events", "are", "live"];
 
@@ -130,8 +136,8 @@ async fn ensure_historical_events() -> Result<()> {
     }
 
     EvmEventReader::attach(
-        &unwrapper.clone().into(),
-        &arc_provider,
+        &EvmEventUnwrapper { bus: bus.clone() }.start().into(),
+        &provider,
         test_event_extractor,
         &contract.address().to_string(),
         None,
