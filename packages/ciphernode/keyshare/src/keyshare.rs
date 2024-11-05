@@ -5,7 +5,7 @@ use cipher::Cipher;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
-    EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
+    E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
 use fhe::{DecryptCiphertext, Fhe};
 use serde::{Deserialize, Serialize};
@@ -68,6 +68,10 @@ impl Keyshare {
 
         Ok(decrypted)
     }
+
+    fn clear_secret(&mut self) {
+        self.secret = None;
+    }
 }
 
 impl Snapshot for Keyshare {
@@ -108,7 +112,7 @@ impl Handler<EnclaveEvent> for Keyshare {
         match event {
             EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
             EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
-            EnclaveEvent::E3RequestComplete { .. } => ctx.notify(Die),
+            EnclaveEvent::E3RequestComplete { data, .. } => ctx.notify(data),
             EnclaveEvent::Shutdown { .. } => ctx.notify(Die),
             _ => (),
         }
@@ -190,10 +194,19 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
     }
 }
 
+impl Handler<E3RequestComplete> for Keyshare {
+    type Result = ();
+    fn handle(&mut self, _: E3RequestComplete, ctx: &mut Self::Context) -> Self::Result {
+        self.clear_secret();
+        self.checkpoint();
+        ctx.notify(Die);
+    }
+}
+
 impl Handler<Die> for Keyshare {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
-        warn!("Keyshare is shutting down");
+        warn!("Keyshare is shutting down now");
         ctx.stop()
     }
 }
