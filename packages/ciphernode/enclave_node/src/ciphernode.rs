@@ -58,7 +58,7 @@ pub async fn setup_ciphernode(
             &read_provider,
             &chain.contracts.ciphernode_registry.address(),
             &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
-            chain.contracts.ciphernode_registry.deploy_block()
+            chain.contracts.ciphernode_registry.deploy_block(),
         )
         .await?;
     }

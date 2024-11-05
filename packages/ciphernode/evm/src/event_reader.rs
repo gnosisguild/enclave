@@ -74,7 +74,9 @@ where
     start_block: Option<u64>,
     /// Event bus for error propagation
     bus: Addr<EventBus>,
+    /// The in memory state of the event reader
     state: EvmEventReaderState,
+    /// Repository to save the state of the event reader
     repository: Repository<EvmEventReaderState>,
 }
 
@@ -122,7 +124,7 @@ where
             bus: bus.clone(),
             repository: repository.clone(),
         };
-        let addr = EvmEventReader::new(params).start();
+        let addr = EvmEventReader::load(params).await?.start();
 
         bus.do_send(Subscribe::new("Shutdown", addr.clone().into()));
 
