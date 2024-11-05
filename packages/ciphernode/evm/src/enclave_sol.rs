@@ -17,9 +17,16 @@ impl EnclaveSol {
         write_provider: &WithChainId<SignerProvider>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
-        start_block: Option<u64>
+        start_block: Option<u64>,
     ) -> Result<()> {
-        EnclaveSolReader::attach(bus, read_provider, contract_address, repository, start_block).await?;
+        EnclaveSolReader::attach(
+            bus,
+            read_provider,
+            contract_address,
+            repository,
+            start_block,
+        )
+        .await?;
         EnclaveSolWriter::attach(bus, write_provider, contract_address).await?;
         Ok(())
     }
