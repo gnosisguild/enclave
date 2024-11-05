@@ -267,9 +267,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     let msgs = get_msgs(&bus).await?;
     assert_eq!(
         msgs,
-        [
-            "before", "online", "live", "events", "these", "are", "not", "lost", "resumed", "data"
-        ]
+        ["before", "online", "live", "events", "these", "are", "not", "lost", "resumed", "data"]
     );
 
     Ok(())
