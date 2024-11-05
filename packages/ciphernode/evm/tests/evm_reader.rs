@@ -1,4 +1,4 @@
-use actix::Actor;
+use actix::{Actor, Addr};
 use alloy::{
     node_bindings::Anvil,
     primitives::{FixedBytes, LogData},
@@ -8,7 +8,7 @@ use alloy::{
 };
 use anyhow::Result;
 use data::Repository;
-use enclave_core::{EnclaveEvent, EventBus, GetHistory, TestEvent};
+use enclave_core::{EnclaveEvent, EventBus, GetHistory, Shutdown, TestEvent};
 use enclave_node::get_in_mem_store;
 use evm::{helpers::WithChainId, EvmEventReader};
 use std::time::Duration;
@@ -159,6 +159,115 @@ async fn ensure_historical_events() -> Result<()> {
         .collect();
 
     assert_eq!(msgs, expected);
+
+    Ok(())
+}
+
+#[actix::test]
+async fn ensure_resume_after_shutdown() -> Result<()> {
+    // Create a WS provider
+    // NOTE: Anvil must be available on $PATH
+    let anvil = Anvil::new().block_time(1).try_spawn()?;
+    let provider = WithChainId::new(
+        ProviderBuilder::new()
+            .on_ws(WsConnect::new(anvil.ws_endpoint()))
+            .await?,
+    )
+    .await?;
+    let contract = EmitLogs::deploy(provider.get_provider()).await?;
+    let bus = EventBus::new(true).start();
+
+    async fn get_msgs(bus: &Addr<EventBus>) -> Result<Vec<String>> {
+        let history = bus.send(GetHistory).await?;
+        let msgs: Vec<String> = history
+            .into_iter()
+            .filter_map(|evt| match evt {
+                EnclaveEvent::TestEvent { data, .. } => Some(data.msg),
+                _ => None,
+            })
+            .collect();
+
+        Ok(msgs)
+    }
+
+    let repository = Repository::new(get_in_mem_store());
+
+    let before = vec!["before", "online"];
+    let online = vec!["live", "events"];
+    let after_shutdown = vec!["these", "are", "not", "lost"];
+    let resume = vec!["resumed", "data"];
+
+    for msg in before.clone() {
+        contract
+            .setValue(msg.to_string())
+            .send()
+            .await?
+            .watch()
+            .await?;
+    }
+
+    let addr1 = EvmEventReader::attach(
+        &provider,
+        test_event_extractor,
+        &contract.address().to_string(),
+        None,
+        &bus,
+        &repository,
+    )
+    .await?;
+
+    for msg in online.clone() {
+        contract
+            .setValue(msg.to_string())
+            .send()
+            .await?
+            .watch()
+            .await?;
+    }
+
+    // Ensure shutdown doesn't cause event to be lost.
+    sleep(Duration::from_millis(1)).await;
+    addr1.send(EnclaveEvent::from(Shutdown)).await?;
+
+    for msg in after_shutdown.clone() {
+        contract
+            .setValue(msg.to_string())
+            .send()
+            .await?
+            .watch()
+            .await?;
+    }
+
+    sleep(Duration::from_millis(1)).await;
+    let msgs = get_msgs(&bus).await?;
+    assert_eq!(msgs, vec!["before", "online", "live", "events"]);
+
+    let _ = EvmEventReader::attach(
+        &provider,
+        test_event_extractor,
+        &contract.address().to_string(),
+        None,
+        &bus,
+        &repository,
+    )
+    .await?;
+
+    sleep(Duration::from_millis(1)).await;
+    let msgs = get_msgs(&bus).await?;
+    assert_eq!(msgs, vec!["before", "online", "live", "events", "these", "are", "not", "lost"]);
+
+    for msg in resume.clone() {
+        contract
+            .setValue(msg.to_string())
+            .send()
+            .await?
+            .watch()
+            .await?;
+    }
+
+    sleep(Duration::from_millis(1)).await;
+    let msgs = get_msgs(&bus).await?;
+    assert_eq!(msgs,  vec!["before", "online", "live", "events", "these", "are", "not", "lost", "resumed", "data"]);
 
     Ok(())
 }
