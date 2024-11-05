@@ -1,4 +1,4 @@
-use actix::{Actor, Addr, Handler};
+use actix::Actor;
 use alloy::{
     node_bindings::Anvil,
     primitives::{FixedBytes, LogData},
@@ -7,10 +7,10 @@ use alloy::{
     sol_types::SolEvent,
 };
 use anyhow::Result;
-use data::{DataStore, InMemStore, Repository};
+use data::Repository;
 use enclave_core::{EnclaveEvent, EventBus, GetHistory, TestEvent};
 use enclave_node::get_in_mem_store;
-use evm::{helpers::WithChainId, EnclaveEvmEvent, EvmEventReader};
+use evm::{helpers::WithChainId, EvmEventReader};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -39,21 +39,6 @@ fn test_event_extractor(
     }
 }
 
-// struct EvmEventUnwrapper {
-//     bus: Addr<EventBus>,
-// }
-//
-// impl Actor for EvmEventUnwrapper {
-//     type Context = actix::Context<Self>;
-// }
-//
-// impl Handler<EnclaveEvmEvent> for EvmEventUnwrapper {
-//     type Result = ();
-//     fn handle(&mut self, msg: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-//         self.bus.do_send(msg.event);
-//     }
-// }
-//
 #[actix::test]
 async fn evm_reader() -> Result<()> {
     // Create a WS provider
@@ -145,7 +130,7 @@ async fn ensure_historical_events() -> Result<()> {
         &contract.address().to_string(),
         None,
         &bus,
-        &repository
+        &repository,
     )
     .await?;
 
