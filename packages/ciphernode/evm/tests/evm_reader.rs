@@ -254,7 +254,10 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
 
     sleep(Duration::from_millis(1)).await;
     let msgs = get_msgs(&bus).await?;
-    assert_eq!(msgs, vec!["before", "online", "live", "events", "these", "are", "not", "lost"]);
+    assert_eq!(
+        msgs,
+        vec!["before", "online", "live", "events", "these", "are", "not", "lost"]
+    );
 
     for msg in resume.clone() {
         contract
@@ -267,7 +270,12 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
 
     sleep(Duration::from_millis(1)).await;
     let msgs = get_msgs(&bus).await?;
-    assert_eq!(msgs,  vec!["before", "online", "live", "events", "these", "are", "not", "lost", "resumed", "data"]);
+    assert_eq!(
+        msgs,
+        vec![
+            "before", "online", "live", "events", "these", "are", "not", "lost", "resumed", "data"
+        ]
+    );
 
     Ok(())
 }

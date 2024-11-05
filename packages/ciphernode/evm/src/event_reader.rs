@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use crate::helpers::{ReadonlyProvider, WithChainId};
 use actix::prelude::*;
 use actix::{Addr, Recipient};
@@ -13,6 +12,7 @@ use async_trait::async_trait;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
 use futures_util::stream::StreamExt;
+use std::collections::HashSet;
 use tokio::select;
 use tokio::sync::oneshot;
 use tracing::{info, trace, warn};

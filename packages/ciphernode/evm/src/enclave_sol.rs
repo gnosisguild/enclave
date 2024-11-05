@@ -1,5 +1,8 @@
 use crate::{
-    enclave_sol_reader::EnclaveSolReader, enclave_sol_writer::EnclaveSolWriter, event_reader::EvmEventReaderState, helpers::{ReadonlyProvider, SignerProvider, WithChainId}
+    enclave_sol_reader::EnclaveSolReader,
+    enclave_sol_writer::EnclaveSolWriter,
+    event_reader::EvmEventReaderState,
+    helpers::{ReadonlyProvider, SignerProvider, WithChainId},
 };
 use actix::Addr;
 use anyhow::Result;
