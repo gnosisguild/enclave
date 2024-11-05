@@ -53,7 +53,7 @@ impl Cli {
     }
 }
 
-#[actix_rt::main]
+#[actix::main]
 pub async fn main() {
     tracing_subscriber::fmt::init();
 

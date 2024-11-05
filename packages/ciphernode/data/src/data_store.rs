@@ -82,7 +82,7 @@ impl DataStore {
     /// use actix::Actor;
     /// use anyhow::Result;
     ///
-    /// #[actix_rt::main]
+    /// #[actix::main]
     /// async fn main() -> Result<()>{  
     ///   let addr = InMemStore::new(false).start();
     ///   let store = DataStore::from(&addr);
