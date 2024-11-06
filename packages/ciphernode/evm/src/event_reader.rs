@@ -139,7 +139,7 @@ where
 {
     type Context = actix::Context<Self>;
     fn started(&mut self, ctx: &mut Self::Context) {
-        let parent = ctx.address().recipient();
+        let processor = ctx.address().recipient();
         let bus = self.bus.clone();
         let Some(provider) = self.provider.take() else {
             tracing::error!("Could not start event reader as provider has already been used.");
@@ -159,7 +159,7 @@ where
                 stream_from_evm(
                     provider,
                     &contract_address,
-                    &parent,
+                    &processor,
                     extractor,
                     shutdown,
                     start_block,
@@ -175,7 +175,7 @@ where
 async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     provider: WithChainId<P, T>,
     contract_address: &Address,
-    parent: &Recipient<EnclaveEvmEvent>,
+    processor: &Recipient<EnclaveEvmEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
@@ -198,7 +198,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                 let block_number = log.block_number;
                 if let Some(event) = extractor(log.data(), log.topic0(), chain_id) {
                     trace!("Processing historical log");
-                    parent.do_send(EnclaveEvmEvent::new(event, block_number));
+                    processor.do_send(EnclaveEvmEvent::new(event, block_number));
                 }
             }
         }
@@ -225,7 +225,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                                     continue;
                                 };
                                 info!("Extracted log from evm sending now.");
-                                parent.do_send(EnclaveEvmEvent::new(event, block_number));
+                                processor.do_send(EnclaveEvmEvent::new(event, block_number));
 
                             }
                             None => break, // Stream ended
