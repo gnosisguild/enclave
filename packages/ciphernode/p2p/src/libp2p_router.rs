@@ -1,6 +1,12 @@
+use anyhow::{anyhow, Result};
 use futures::stream::StreamExt;
 use libp2p::{
-    gossipsub, identity, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux,
+    gossipsub,
+    identity::{self, Keypair},
+    mdns, noise,
+    swarm::NetworkBehaviour,
+    swarm::SwarmEvent,
+    tcp, yamux,
 };
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
@@ -8,22 +14,40 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::{io, select};
-use tracing::{error, info, trace};
-use tracing_subscriber::EnvFilter;
+use tracing::{error, trace};
 
 #[derive(NetworkBehaviour)]
-pub struct MyBehaviour {
+pub struct EnclaveNetBehaviour {
     gossipsub: gossipsub::Behaviour,
     mdns: mdns::tokio::Behaviour,
+}
+
+impl EnclaveNetBehaviour {
+    fn new(key: &Keypair, gossipsub_config: gossipsub::Config) -> Result<Self> {
+        let gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(key.clone()),
+            gossipsub_config.clone(),
+        )
+        .map_err(|e| anyhow!("{}", e))?;
+
+        let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())?;
+
+        Ok(EnclaveNetBehaviour { gossipsub, mdns })
+    }
 }
 
 pub struct EnclaveRouter {
     pub identity: Option<identity::Keypair>,
     pub gossipsub_config: gossipsub::Config,
-    pub swarm: Option<libp2p::Swarm<MyBehaviour>>,
+    pub swarm: Option<libp2p::Swarm<EnclaveNetBehaviour>>,
     pub topic: Option<gossipsub::IdentTopic>,
     evt_tx: Sender<Vec<u8>>,
     cmd_rx: Receiver<Vec<u8>>,
+}
+
+pub enum DiscoveryType {
+    Mdns,
+    Bootstrap,
 }
 
 impl EnclaveRouter {
@@ -62,40 +86,23 @@ impl EnclaveRouter {
         self.identity = Some(keypair);
     }
 
-    pub fn connect_swarm(&mut self, discovery_type: String) -> Result<&Self, Box<dyn Error>> {
-        match discovery_type.as_str() {
-            "mdns" => {
-                let _ = tracing_subscriber::fmt()
-                    .with_env_filter(EnvFilter::from_default_env())
-                    .try_init();
-
-                // TODO: Use key if assigned already
-                let mut swarm = libp2p::SwarmBuilder::with_new_identity()
-                    .with_tokio()
-                    .with_tcp(
-                        tcp::Config::default(),
-                        noise::Config::new,
-                        yamux::Config::default,
-                    )?
-                    .with_quic()
-                    .with_behaviour(|key| {
-                        let gossipsub = gossipsub::Behaviour::new(
-                            gossipsub::MessageAuthenticity::Signed(key.clone()),
-                            self.gossipsub_config.clone(),
-                        )?;
-
-                        let mdns = mdns::tokio::Behaviour::new(
-                            mdns::Config::default(),
-                            key.public().to_peer_id(),
-                        )?;
-                        Ok(MyBehaviour { gossipsub, mdns })
-                    })?
-                    .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
-                    .build();
-                self.swarm = Some(swarm);
-            }
-            _ => info!("Defaulting to MDNS discovery"),
-        }
+    pub fn connect_swarm(&mut self) -> Result<&Self, Box<dyn Error>> {
+        // match discovery_type {
+        // DiscoveryType::Mdns => {
+        // TODO: Use key if assigned already
+        let gossipsub_config = self.gossipsub_config.clone();
+        let swarm = libp2p::SwarmBuilder::with_new_identity()
+            .with_tokio()
+            .with_tcp(
+                tcp::Config::default(),
+                noise::Config::new,
+                yamux::Config::default,
+            )?
+            .with_quic()
+            .with_behaviour(|key| Ok(EnclaveNetBehaviour::new(key, gossipsub_config)?))?
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+            .build();
+        self.swarm = Some(swarm);
         Ok(self)
     }
 
@@ -131,19 +138,19 @@ impl EnclaveRouter {
                     }
                 }
                 event = self.swarm.as_mut().unwrap().select_next_some() => match event {
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
+                    SwarmEvent::Behaviour(EnclaveNetBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
                             trace!("mDNS discovered a new peer: {peer_id}");
                             self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                         }
                     },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
+                    SwarmEvent::Behaviour(EnclaveNetBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                         for (peer_id, _multiaddr) in list {
                             trace!("mDNS discover peer has expired: {peer_id}");
                             self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                         }
                     },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                    SwarmEvent::Behaviour(EnclaveNetBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                         propagation_source: peer_id,
                         message_id: id,
                         message,

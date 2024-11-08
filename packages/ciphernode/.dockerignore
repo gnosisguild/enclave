@@ -1,0 +1,28 @@
+# First ignore absolutely everything
+*
+**/*
+
+# Then explicitly allow only the minimal files needed
+!Cargo.toml
+!Cargo.lock
+
+!**/Cargo.toml
+!**/src/**/*.rs
+
+# Double-check common large directories are ignored
+.git/
+.github/
+target/
+**/target/
+debug/
+**/debug/
+**/node_modules/
+**/*.tar.gz
+**/*.tar
+**/*.gz
+**/*.zip
+**/*.7z
+**/*.rar
+**/tmp/
+**/temp/
+**/.env

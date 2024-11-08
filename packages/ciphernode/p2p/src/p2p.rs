@@ -1,6 +1,6 @@
 use std::{collections::HashSet, error::Error};
 
-use crate::libp2p_router::EnclaveRouter;
+use crate::{libp2p_router::EnclaveRouter, DiscoveryType};
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
@@ -42,16 +42,13 @@ impl P2p {
         mut rx: Receiver<Vec<u8>>, // Receive byte events from the network
     ) -> Addr<Self> {
         // Create a new Actor
-        let p2p = P2p::new(bus.clone(), tx).start();
+        let addr = P2p::new(bus.clone(), tx).start();
 
         // Listen on all events
-        bus.do_send(Subscribe {
-            event_type: String::from("*"),
-            listener: p2p.clone().recipient(),
-        });
+        bus.do_send(Subscribe::new("*", addr.clone().recipient()));
 
         // Clone this to go in the spawned future
-        let p2p_addr = p2p.clone();
+        let p2p_addr = addr.clone();
         tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
                 p2p_addr.do_send(LibP2pEvent(msg))
@@ -59,7 +56,7 @@ impl P2p {
         });
 
         // Return the address
-        p2p
+        addr
     }
 
     /// Spawn a Libp2p instance. Calls spawn and listen
@@ -67,7 +64,7 @@ impl P2p {
         bus: Addr<EventBus>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<()>), Box<dyn Error>> {
         let (mut libp2p, tx, rx) = EnclaveRouter::new()?;
-        libp2p.connect_swarm("mdns".to_string())?;
+        libp2p.connect_swarm()?;
         libp2p.join_topic("enclave-keygen-01")?;
 
         let p2p_addr = Self::spawn_and_listen(bus, tx, rx);

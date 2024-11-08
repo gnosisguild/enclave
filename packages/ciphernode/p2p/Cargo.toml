@@ -5,6 +5,19 @@ edition = "2021"
 description = ": coordinates the encryption and decryption of enclave computations"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
+[[bin]]
+name = "discover"
+path = "src/bin/discover.rs"
+
+[[bin]]
+name = "register"
+path = "src/bin/register.rs"
+
+[[bin]]
+name = "rendezvous"
+path = "src/bin/rendezvous.rs"
+
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

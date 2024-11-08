@@ -1,0 +1,17 @@
+# Start by ignoring everything
+*
+*/*
+
+# Allow only what this specific test needs
+!../../Cargo.toml
+!../../Cargo.lock
+!../../p2p/Cargo.toml
+!../../p2p/src/
+!../../p2p/src/**/*.rs
+
+# Always ignore build artifacts
+**/target/
+**/.git/
+**/*.log
+**/tmp/
+
