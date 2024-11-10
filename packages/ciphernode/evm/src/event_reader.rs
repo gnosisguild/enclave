@@ -15,7 +15,7 @@ use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;
 use tokio::sync::oneshot;
-use tracing::{info, trace, warn};
+use tracing::{error, info, info_span, instrument, trace, warn};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
@@ -25,8 +25,12 @@ pub struct EnclaveEvmEvent {
 }
 
 impl EnclaveEvmEvent {
-    fn new(event: EnclaveEvent, block: Option<u64>) -> Self {
+    pub fn new(event: EnclaveEvent, block: Option<u64>) -> Self {
         Self { event, block }
+    }
+
+    pub fn get_id(&self) -> EventId {
+        EventId::hash(self.clone())
     }
 }
 
@@ -45,6 +49,7 @@ where
     start_block: Option<u64>,
     bus: Addr<EventBus>,
     repository: Repository<EvmEventReaderState>,
+    tag: String,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Clone)]
@@ -78,6 +83,8 @@ where
     state: EvmEventReaderState,
     /// Repository to save the state of the event reader
     repository: Repository<EvmEventReaderState>,
+    /// An identifier for logs
+    tag: String,
 }
 
 impl<P, T> EvmEventReader<P, T>
@@ -97,13 +104,19 @@ where
             bus: params.bus,
             state: EvmEventReaderState::default(),
             repository: params.repository,
+            tag: params.tag,
         }
     }
 
     pub async fn load(params: EvmEventReaderParams<P, T>) -> Result<Self> {
+        let id = params.tag.clone();
+        let span = info_span!("evm_event_reader", %id);
+        let _guard = span.enter();
         Ok(if let Some(snapshot) = params.repository.read().await? {
+            info!("Loading from snapshot");
             Self::from_snapshot(params, snapshot).await?
         } else {
+            info!("Loading from params");
             Self::new(params)
         })
     }
@@ -115,6 +128,7 @@ where
         start_block: Option<u64>,
         bus: &Addr<EventBus>,
         repository: &Repository<EvmEventReaderState>,
+        tag: &str,
     ) -> Result<Addr<Self>> {
         let params = EvmEventReaderParams {
             provider: provider.clone(),
@@ -123,6 +137,7 @@ where
             start_block,
             bus: bus.clone(),
             repository: repository.clone(),
+            tag: tag.to_string(),
         };
         let addr = EvmEventReader::load(params).await?.start();
 
@@ -154,6 +169,7 @@ where
 
         let contract_address = self.contract_address;
         let start_block = self.start_block;
+        let tag = self.tag.clone();
         ctx.spawn(
             async move {
                 stream_from_evm(
@@ -164,6 +180,7 @@ where
                     shutdown,
                     start_block,
                     &bus,
+                    &tag,
                 )
                 .await
             }
@@ -172,6 +189,7 @@ where
     }
 }
 
+#[instrument(name = "evm_event_reader", skip_all, fields(id=id))]
 async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     provider: WithChainId<P, T>,
     contract_address: &Address,
@@ -180,9 +198,11 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
     bus: &Addr<EventBus>,
+    id: &str,
 ) {
     let chain_id = provider.get_chain_id();
     let provider = provider.get_provider();
+
     let historical_filter = Filter::new()
         .address(contract_address.clone())
         .from_block(start_block.unwrap_or(0));
@@ -209,6 +229,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
         }
     }
 
+    info!("subscribing to live events");
     match provider.subscribe_logs(&current_filter).await {
         Ok(subscription) => {
             let mut stream = subscription.into_stream();
@@ -221,10 +242,10 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                                 trace!("Received log from EVM");
                                 let Some(event) = extractor(log.data(), log.topic0(), chain_id)
                                 else {
-                                    trace!("Failed to extract log from EVM");
+                                    warn!("Failed to extract log from EVM.");
                                     continue;
                                 };
-                                info!("Extracted log from evm sending now.");
+                                info!("Extracted Evm Event: {}", event);
                                 processor.do_send(EnclaveEvmEvent::new(event, block_number));
 
                             }
@@ -267,19 +288,26 @@ where
 {
     type Result = ();
     fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        let event_id = wrapped.event.get_id();
+        let id = self.tag.clone();
+        let span = info_span!("evm_event_reader", %id);
+        let _guard = span.enter();
+        let event_id = wrapped.get_id();
+        info!("Processing event: {}", event_id);
+        info!("cache length: {}", self.state.ids.len());
         if self.state.ids.contains(&event_id) {
-            trace!(
+            error!(
                 "Event id {} has already been seen and was not forwarded to the bus",
                 &event_id
             );
             return;
         }
+        let event_type = wrapped.event.event_type();
 
         // Forward everything else to the event bus
         self.bus.do_send(wrapped.event);
 
         // Save processed ids
+        info!("Storing event(EVM) in cache {}({})", event_type, event_id);
         self.state.ids.insert(event_id);
         self.state.last_block = wrapped.block;
         self.checkpoint();
@@ -326,6 +354,7 @@ where
             bus: params.bus,
             state: snapshot,
             repository: params.repository,
+            tag: params.tag,
         })
     }
 }

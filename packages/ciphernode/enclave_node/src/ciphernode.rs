@@ -24,7 +24,8 @@ use crate::setup_datastore;
 pub async fn setup_ciphernode(
     config: AppConfig,
     address: Address,
-) -> Result<(Addr<EventBus>, JoinHandle<()>)> {
+    tag: &str
+) -> Result<(Addr<EventBus>, JoinHandle<()>, String)> {
     let rng = Arc::new(Mutex::new(
         rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
     ));
@@ -51,6 +52,7 @@ pub async fn setup_ciphernode(
             &chain.contracts.enclave.address(),
             &repositories.enclave_sol_reader(read_provider.get_chain_id()),
             chain.contracts.enclave.deploy_block(),
+            tag
         )
         .await?;
         CiphernodeRegistrySol::attach(
@@ -59,6 +61,7 @@ pub async fn setup_ciphernode(
             &chain.contracts.ciphernode_registry.address(),
             &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
             chain.contracts.ciphernode_registry.deploy_block(),
+            tag
         )
         .await?;
     }
@@ -69,10 +72,10 @@ pub async fn setup_ciphernode(
         .build()
         .await?;
 
-    let (_, join_handle) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
+    let (_, join_handle, peer_id) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
 
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
     SimpleLogger::attach(&nm, bus.clone());
 
-    Ok((bus, join_handle))
+    Ok((bus, join_handle, peer_id))
 }

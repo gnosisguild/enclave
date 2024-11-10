@@ -3,7 +3,7 @@ use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum WalletCommands {
     /// Set a new Wallet Private Key
     Set {
@@ -22,7 +22,7 @@ fn ensure_hex(s: &str) -> Result<String> {
     Ok(s.to_string())
 }
 
-pub async fn execute(command: WalletCommands, config: AppConfig) -> Result<()> {
+pub async fn execute(command: WalletCommands, config: AppConfig, id: &str) -> Result<()> {
     match command {
         WalletCommands::Set { private_key } => set::execute(&config, private_key).await?,
     };

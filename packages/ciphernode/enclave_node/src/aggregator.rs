@@ -29,7 +29,8 @@ pub async fn setup_aggregator(
     config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
-) -> Result<(Addr<EventBus>, JoinHandle<()>)> {
+    tag: &str
+) -> Result<(Addr<EventBus>, JoinHandle<()>, String)> {
     let bus = EventBus::new(true).start();
     let rng = Arc::new(Mutex::new(
         ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -57,6 +58,7 @@ pub async fn setup_aggregator(
             &chain.contracts.enclave.address(),
             &repositories.enclave_sol_reader(read_provider.get_chain_id()),
             chain.contracts.enclave.deploy_block(),
+            tag
         )
         .await?;
         RegistryFilterSol::attach(
@@ -71,6 +73,7 @@ pub async fn setup_aggregator(
             &chain.contracts.ciphernode_registry.address(),
             &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
             chain.contracts.ciphernode_registry.deploy_block(),
+            tag
         )
         .await?;
     }
@@ -82,7 +85,7 @@ pub async fn setup_aggregator(
         .build()
         .await?;
 
-    let (_, join_handle) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
+    let (_, join_handle, peer_id) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());
@@ -94,5 +97,5 @@ pub async fn setup_aggregator(
 
     SimpleLogger::attach("AGG", bus.clone());
 
-    Ok((bus, join_handle))
+    Ok((bus, join_handle, peer_id))
 }

@@ -5,7 +5,7 @@ use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum PasswordCommands {
     /// Create a new password
     Create {
@@ -25,7 +25,7 @@ pub enum PasswordCommands {
     },
 }
 
-pub async fn execute(command: PasswordCommands, config: AppConfig) -> Result<()> {
+pub async fn execute(command: PasswordCommands, config: AppConfig, id: &str) -> Result<()> {
     match command {
         PasswordCommands::Create { password } => create::execute(&config, password).await?,
         PasswordCommands::Delete => delete::execute(&config).await?,

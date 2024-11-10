@@ -91,6 +91,7 @@ launch_ciphernode() {
     local name="$1"
     heading "Launch ciphernode $name"
     yarn enclave start \
+      --tag "$name" \
       --config "$SCRIPT_DIR/lib/$name/config.yaml" &
 }
 
@@ -108,12 +109,11 @@ launch_aggregator() {
     heading "Launch aggregator $name"
 
     yarn enclave aggregator start \
+      --tag "$name" \
       --config "$SCRIPT_DIR/lib/$name/config.yaml" \
       --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
       --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" &
 }
-
-
 
 pkill -9 -f "target/debug/enclave" || true
 pkill -9 -f "hardhat node" || true
@@ -139,7 +139,6 @@ set_password cn2 "$CIPHERNODE_SECRET"
 set_password cn3 "$CIPHERNODE_SECRET"
 set_password cn4 "$CIPHERNODE_SECRET"
 set_password ag "$CIPHERNODE_SECRET"
-
 set_private_key ag "$PRIVATE_KEY"
 
 # Launch 4 ciphernodes
@@ -148,8 +147,6 @@ launch_ciphernode cn2
 launch_ciphernode cn3
 launch_ciphernode cn4
 launch_aggregator ag
-
-sleep 1
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 

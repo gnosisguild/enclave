@@ -8,7 +8,7 @@ use aggregator::AggregatorCommands;
 use clap::Subcommand;
 use wallet::WalletCommands;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Start the application
     Start,

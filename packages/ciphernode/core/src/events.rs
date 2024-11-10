@@ -56,7 +56,7 @@ impl TryFrom<E3id> for U256 {
 pub struct EventId(pub [u8; 32]);
 
 impl EventId {
-    fn from<T: Hash>(value: T) -> Self {
+    pub fn hash<T: Hash>(value: T) -> Self {
         let mut hasher = Sha256::new();
         let mut std_hasher = DefaultHasher::new();
         value.hash(&mut std_hasher);
@@ -224,7 +224,7 @@ pub trait FromError {
 impl From<KeyshareCreated> for EnclaveEvent {
     fn from(data: KeyshareCreated) -> Self {
         EnclaveEvent::KeyshareCreated {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -233,7 +233,7 @@ impl From<KeyshareCreated> for EnclaveEvent {
 impl From<E3Requested> for EnclaveEvent {
     fn from(data: E3Requested) -> Self {
         EnclaveEvent::E3Requested {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -242,7 +242,7 @@ impl From<E3Requested> for EnclaveEvent {
 impl From<PublicKeyAggregated> for EnclaveEvent {
     fn from(data: PublicKeyAggregated) -> Self {
         EnclaveEvent::PublicKeyAggregated {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -251,7 +251,7 @@ impl From<PublicKeyAggregated> for EnclaveEvent {
 impl From<CiphertextOutputPublished> for EnclaveEvent {
     fn from(data: CiphertextOutputPublished) -> Self {
         EnclaveEvent::CiphertextOutputPublished {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -260,7 +260,7 @@ impl From<CiphertextOutputPublished> for EnclaveEvent {
 impl From<DecryptionshareCreated> for EnclaveEvent {
     fn from(data: DecryptionshareCreated) -> Self {
         EnclaveEvent::DecryptionshareCreated {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -269,7 +269,7 @@ impl From<DecryptionshareCreated> for EnclaveEvent {
 impl From<PlaintextAggregated> for EnclaveEvent {
     fn from(data: PlaintextAggregated) -> Self {
         EnclaveEvent::PlaintextAggregated {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -278,7 +278,7 @@ impl From<PlaintextAggregated> for EnclaveEvent {
 impl From<E3RequestComplete> for EnclaveEvent {
     fn from(data: E3RequestComplete) -> Self {
         EnclaveEvent::E3RequestComplete {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -287,7 +287,7 @@ impl From<E3RequestComplete> for EnclaveEvent {
 impl From<CiphernodeSelected> for EnclaveEvent {
     fn from(data: CiphernodeSelected) -> Self {
         EnclaveEvent::CiphernodeSelected {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -296,7 +296,7 @@ impl From<CiphernodeSelected> for EnclaveEvent {
 impl From<CiphernodeAdded> for EnclaveEvent {
     fn from(data: CiphernodeAdded) -> Self {
         EnclaveEvent::CiphernodeAdded {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -305,7 +305,7 @@ impl From<CiphernodeAdded> for EnclaveEvent {
 impl From<CiphernodeRemoved> for EnclaveEvent {
     fn from(data: CiphernodeRemoved) -> Self {
         EnclaveEvent::CiphernodeRemoved {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -314,7 +314,7 @@ impl From<CiphernodeRemoved> for EnclaveEvent {
 impl From<EnclaveError> for EnclaveEvent {
     fn from(data: EnclaveError) -> Self {
         EnclaveEvent::EnclaveError {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -323,7 +323,7 @@ impl From<EnclaveError> for EnclaveEvent {
 impl From<Shutdown> for EnclaveEvent {
     fn from(data: Shutdown) -> Self {
         EnclaveEvent::Shutdown {
-            id: EventId::from(data.clone()),
+            id: EventId::hash(data.clone()),
             data: data.clone(),
         }
     }
@@ -332,7 +332,7 @@ impl From<Shutdown> for EnclaveEvent {
 impl From<TestEvent> for EnclaveEvent {
     fn from(value: TestEvent) -> Self {
         EnclaveEvent::TestEvent {
-            id: EventId::from(value.clone()),
+            id: EventId::hash(value.clone()),
             data: value.clone(),
         }
     }
