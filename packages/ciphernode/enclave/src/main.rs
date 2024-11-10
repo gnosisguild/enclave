@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use commands::{aggregator, password, start, wallet, Commands};
 use config::load_config;
+use enclave_core::{get_tag, set_tag};
 use tracing::{instrument::WithSubscriber, span, Instrument, Level};
 use tracing_subscriber::EnvFilter;
 pub mod commands;
@@ -50,10 +51,10 @@ impl Cli {
         let config = load_config(config_path)?;
 
         match self.command {
-            Commands::Start => start::execute(config, &id).await?,
-            Commands::Password { command } => password::execute(command, config, &id).await?,
-            Commands::Aggregator { command } => aggregator::execute(command, config, &id).await?,
-            Commands::Wallet { command } => wallet::execute(command, config, &id).await?,
+            Commands::Start => start::execute(config).await?,
+            Commands::Password { command } => password::execute(command, config).await?,
+            Commands::Aggregator { command } => aggregator::execute(command, config).await?,
+            Commands::Wallet { command } => wallet::execute(command, config).await?,
         }
 
         Ok(())
@@ -80,7 +81,8 @@ pub async fn main() {
         // .with_env_filter("[app{id=ag}]=info")
         .init();
     let cli = Cli::parse();
-    let id = cli.get_tag();
+    set_tag(cli.get_tag());
+    let id = get_tag();
     let span = span!(Level::INFO, "app", %id);
     let _guard = span.enter();
     match cli.execute().instrument(span.clone()).await {

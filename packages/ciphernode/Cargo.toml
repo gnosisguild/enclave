@@ -44,6 +44,7 @@ fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-bet
 futures = "0.3.30"
 futures-util = "0.3"
 hex = "0.4.3"
+lazy_static = "1.5.0"
 num = "0.4.3"
 rand_chacha = "0.3.1"
 rand = "0.8.5"

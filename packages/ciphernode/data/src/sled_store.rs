@@ -1,13 +1,14 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::{Get, Insert};
-use actix::{Actor, Addr, Handler};
+use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
-use enclave_core::{BusError, EnclaveErrorType, EventBus};
+use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
 use sled::Db;
+use tracing::{error, info};
 
 pub struct SledStore {
-    db: SledDb,
+    db: Option<SledDb>,
     bus: Addr<EventBus>,
 }
 
@@ -16,17 +17,24 @@ impl Actor for SledStore {
 }
 
 impl SledStore {
-    pub fn new(bus: &Addr<EventBus>, path: &PathBuf) -> Result<Self> {
+    pub fn new(bus: &Addr<EventBus>, path: &PathBuf) -> Result<Addr<Self>> {
+        info!("Starting SledStore");
         let db = SledDb::new(path)?;
-        Ok(Self {
-            db,
+
+        let store = Self {
+            db: Some(db),
             bus: bus.clone(),
-        })
+        }
+        .start();
+
+        bus.do_send(Subscribe::new("Shutdown", store.clone().into()));
+
+        Ok(store)
     }
 
     pub fn from_db(db: SledDb) -> Result<Self> {
         Ok(Self {
-            db,
+            db: Some(db),
             bus: EventBus::new(false).start(),
         })
     }
@@ -36,9 +44,11 @@ impl Handler<Insert> for SledStore {
     type Result = ();
 
     fn handle(&mut self, event: Insert, _: &mut Self::Context) -> Self::Result {
-        match self.db.insert(event) {
-            Err(err) => self.bus.err(EnclaveErrorType::Data, err),
-            _ => (),
+        if let Some(ref mut db) = &mut self.db {
+            match db.insert(event) {
+                Err(err) => self.bus.err(EnclaveErrorType::Data, err),
+                _ => (),
+            }
         }
     }
 }
@@ -47,13 +57,28 @@ impl Handler<Get> for SledStore {
     type Result = Option<Vec<u8>>;
 
     fn handle(&mut self, event: Get, _: &mut Self::Context) -> Self::Result {
-        return match self.db.get(event) {
-            Ok(v) => v,
-            Err(err) => {
-                self.bus.err(EnclaveErrorType::Data, err);
-                None
-            }
-        };
+        if let Some(ref mut db) = &mut self.db {
+            return match db.get(event) {
+                Ok(v) => v,
+                Err(err) => {
+                    self.bus.err(EnclaveErrorType::Data, err);
+                    None
+                }
+            };
+        } else {
+            error!("Attempt to get data from dropped db");
+            None
+        }
+    }
+}
+
+impl Handler<EnclaveEvent> for SledStore {
+    type Result = ();
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        if let EnclaveEvent::Shutdown { .. } = msg {
+            let _db = self.db.take(); // db will be dropped
+            ctx.stop()
+        }
     }
 }
 

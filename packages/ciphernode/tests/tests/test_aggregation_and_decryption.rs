@@ -52,7 +52,7 @@ async fn setup_local_ciphernode(
     let store = DataStore::from(&data_actor);
     let repositories = store.repositories();
     // create ciphernode actor for managing ciphernode flow
-    let sortition = Sortition::attach(&bus, repositories.sortition());
+    let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     CiphernodeSelector::attach(&bus, &sortition, addr);
 
     let router = E3RequestRouter::builder(&bus, store)

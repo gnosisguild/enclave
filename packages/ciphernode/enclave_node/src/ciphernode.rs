@@ -24,7 +24,6 @@ use crate::setup_datastore;
 pub async fn setup_ciphernode(
     config: AppConfig,
     address: Address,
-    tag: &str
 ) -> Result<(Addr<EventBus>, JoinHandle<()>, String)> {
     let rng = Arc::new(Mutex::new(
         rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -35,7 +34,7 @@ pub async fn setup_ciphernode(
 
     let repositories = store.repositories();
 
-    let sortition = Sortition::attach(&bus, repositories.sortition());
+    let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     CiphernodeSelector::attach(&bus, &sortition, &address.to_string());
 
     for chain in config
@@ -52,7 +51,6 @@ pub async fn setup_ciphernode(
             &chain.contracts.enclave.address(),
             &repositories.enclave_sol_reader(read_provider.get_chain_id()),
             chain.contracts.enclave.deploy_block(),
-            tag
         )
         .await?;
         CiphernodeRegistrySol::attach(
@@ -61,7 +59,6 @@ pub async fn setup_ciphernode(
             &chain.contracts.ciphernode_registry.address(),
             &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
             chain.contracts.ciphernode_registry.deploy_block(),
-            tag
         )
         .await?;
     }

@@ -4,6 +4,7 @@ clean_folders() {
 
     # Delete output artifacts
     rm -rf "$SCRIPT_DIR/output/"*
+    rm -rf "/tmp/enclave.*.pid"
 
     # Delete enclave artifacts
     for name in cn1 cn2 cn3 cn4 ag; do

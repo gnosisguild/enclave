@@ -29,7 +29,6 @@ pub async fn setup_aggregator(
     config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
-    tag: &str
 ) -> Result<(Addr<EventBus>, JoinHandle<()>, String)> {
     let bus = EventBus::new(true).start();
     let rng = Arc::new(Mutex::new(
@@ -37,7 +36,7 @@ pub async fn setup_aggregator(
     ));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
-    let sortition = Sortition::attach(&bus, repositories.sortition());
+    let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     let cipher = Arc::new(Cipher::from_config(&config).await?);
     let signer = get_signer_from_repository(repositories.eth_private_key(), &cipher).await?;
 
@@ -58,7 +57,6 @@ pub async fn setup_aggregator(
             &chain.contracts.enclave.address(),
             &repositories.enclave_sol_reader(read_provider.get_chain_id()),
             chain.contracts.enclave.deploy_block(),
-            tag
         )
         .await?;
         RegistryFilterSol::attach(
@@ -73,7 +71,6 @@ pub async fn setup_aggregator(
             &chain.contracts.ciphernode_registry.address(),
             &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
             chain.contracts.ciphernode_registry.deploy_block(),
-            tag
         )
         .await?;
     }

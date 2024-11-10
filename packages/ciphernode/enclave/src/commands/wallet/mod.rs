@@ -22,7 +22,7 @@ fn ensure_hex(s: &str) -> Result<String> {
     Ok(s.to_string())
 }
 
-pub async fn execute(command: WalletCommands, config: AppConfig, id: &str) -> Result<()> {
+pub async fn execute(command: WalletCommands, config: AppConfig) -> Result<()> {
     match command {
         WalletCommands::Set { private_key } => set::execute(&config, private_key).await?,
     };

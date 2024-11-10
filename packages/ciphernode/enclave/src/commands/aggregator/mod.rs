@@ -17,7 +17,7 @@ pub enum AggregatorCommands {
     },
 }
 
-pub async fn execute(command: AggregatorCommands, config: AppConfig, id: &str) -> Result<()> {
+pub async fn execute(command: AggregatorCommands, config: AppConfig) -> Result<()> {
     match command {
         AggregatorCommands::Start {
             pubkey_write_path,
@@ -27,7 +27,6 @@ pub async fn execute(command: AggregatorCommands, config: AppConfig, id: &str) -
                 config,
                 pubkey_write_path.as_deref(),
                 plaintext_write_path.as_deref(),
-                id
             )
             .await?
         }

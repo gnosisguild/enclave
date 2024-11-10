@@ -2231,6 +2231,7 @@ dependencies = [
  "bincode",
  "bs58",
  "futures-util",
+ "lazy_static",
  "serde",
  "sha2",
 ]

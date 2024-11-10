@@ -10,7 +10,9 @@ use alloy::transports::{BoxTransport, Transport};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
+use enclave_core::{
+    get_tag, BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe,
+};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;
@@ -49,7 +51,6 @@ where
     start_block: Option<u64>,
     bus: Addr<EventBus>,
     repository: Repository<EvmEventReaderState>,
-    tag: String,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Clone)]
@@ -83,8 +84,6 @@ where
     state: EvmEventReaderState,
     /// Repository to save the state of the event reader
     repository: Repository<EvmEventReaderState>,
-    /// An identifier for logs
-    tag: String,
 }
 
 impl<P, T> EvmEventReader<P, T>
@@ -104,12 +103,11 @@ where
             bus: params.bus,
             state: EvmEventReaderState::default(),
             repository: params.repository,
-            tag: params.tag,
         }
     }
 
     pub async fn load(params: EvmEventReaderParams<P, T>) -> Result<Self> {
-        let id = params.tag.clone();
+        let id = get_tag();
         let span = info_span!("evm_event_reader", %id);
         let _guard = span.enter();
         Ok(if let Some(snapshot) = params.repository.read().await? {
@@ -128,7 +126,6 @@ where
         start_block: Option<u64>,
         bus: &Addr<EventBus>,
         repository: &Repository<EvmEventReaderState>,
-        tag: &str,
     ) -> Result<Addr<Self>> {
         let params = EvmEventReaderParams {
             provider: provider.clone(),
@@ -137,7 +134,6 @@ where
             start_block,
             bus: bus.clone(),
             repository: repository.clone(),
-            tag: tag.to_string(),
         };
         let addr = EvmEventReader::load(params).await?.start();
 
@@ -169,7 +165,7 @@ where
 
         let contract_address = self.contract_address;
         let start_block = self.start_block;
-        let tag = self.tag.clone();
+        let tag = get_tag();
         ctx.spawn(
             async move {
                 stream_from_evm(
@@ -288,7 +284,7 @@ where
 {
     type Result = ();
     fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        let id = self.tag.clone();
+        let id = get_tag();
         let span = info_span!("evm_event_reader", %id);
         let _guard = span.enter();
         let event_id = wrapped.get_id();
@@ -354,7 +350,6 @@ where
             bus: params.bus,
             state: snapshot,
             repository: params.repository,
-            tag: params.tag,
         })
     }
 }

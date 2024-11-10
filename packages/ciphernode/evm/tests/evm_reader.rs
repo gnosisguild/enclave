@@ -61,7 +61,6 @@ async fn evm_reader() -> Result<()> {
         None,
         &bus,
         &repository,
-        "mytag"
     )
     .await?;
 
@@ -132,7 +131,6 @@ async fn ensure_historical_events() -> Result<()> {
         None,
         &bus,
         &repository,
-        "mytag"
     )
     .await?;
 
