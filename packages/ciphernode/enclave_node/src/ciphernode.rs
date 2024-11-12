@@ -16,9 +16,9 @@ use router::{
     CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, RepositoriesFactory,
 };
 use sortition::Sortition;
-use tracing::instrument;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
+use tracing::instrument;
 
 use crate::setup_datastore;
 
