@@ -9,7 +9,7 @@ use enclave_core::{
     EventBus, Seed, Subscribe,
 };
 use std::collections::HashSet;
-use tracing::{info, info_span, instrument};
+use tracing::{info, instrument};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
@@ -107,6 +107,7 @@ impl Sortition {
         }
     }
 
+    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
     pub async fn attach(
         bus: &Addr<EventBus>,
         store: Repository<SortitionModule>,
@@ -121,10 +122,8 @@ impl Sortition {
         Ok(addr)
     }
 
+    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
     pub async fn load(params: SortitionParams) -> Result<Self> {
-        let id = get_tag();
-        let span = info_span!("sorition", %id);
-        let _guard = span.enter();
         Ok(if let Some(snapshot) = params.store.read().await? {
             info!("Loading from snapshot");
             Self::from_snapshot(params, snapshot).await?
@@ -154,8 +153,13 @@ impl Snapshot for Sortition {
 impl FromSnapshotWithParams for Sortition {
     type Params = SortitionParams;
 
+    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         info!("Loaded snapshot with {} nodes", snapshot.nodes().len());
+        info!(
+            "Nodes:\n\n{:?}\n",
+            snapshot.nodes().into_iter().collect::<Vec<_>>()
+        );
         Ok(Sortition {
             bus: params.bus,
             store: params.store,
@@ -183,20 +187,30 @@ impl Handler<EnclaveEvent> for Sortition {
 
 impl Handler<CiphernodeAdded> for Sortition {
     type Result = ();
+
+    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
+        info!("Adding node: {}", msg.address);
         self.list.add(msg.address);
+        self.checkpoint();
     }
 }
 
 impl Handler<CiphernodeRemoved> for Sortition {
     type Result = ();
+
+    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
     fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
+        info!("Removing node: {}", msg.address);
         self.list.remove(msg.address);
+        self.checkpoint();
     }
 }
 
 impl Handler<GetHasNode> for Sortition {
     type Result = bool;
+
+    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
         match self.list.contains(msg.seed, msg.size, msg.address) {
             Ok(val) => val,

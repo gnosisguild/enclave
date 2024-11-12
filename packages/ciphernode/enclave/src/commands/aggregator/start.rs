@@ -1,10 +1,12 @@
 use anyhow::*;
 use config::AppConfig;
+use enclave_core::get_tag;
 use enclave_node::{listen_for_shutdown, setup_aggregator};
-use tracing::info;
+use tracing::{info, instrument};
 
 use crate::owo;
 
+#[instrument(name="app", skip_all,fields(id = get_tag()))]
 pub async fn execute(
     config: AppConfig,
     pubkey_write_path: Option<&str>,

@@ -3,7 +3,7 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
-use enclave_core::EventBus;
+use enclave_core::{get_tag, EventBus};
 use evm::{
     helpers::{create_readonly_provider, ensure_ws_rpc},
     CiphernodeRegistrySol, EnclaveSolReader,
@@ -16,11 +16,13 @@ use router::{
     CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, RepositoriesFactory,
 };
 use sortition::Sortition;
+use tracing::instrument;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
 use crate::setup_datastore;
 
+#[instrument(name="app", skip_all,fields(id = get_tag()))]
 pub async fn setup_ciphernode(
     config: AppConfig,
     address: Address,

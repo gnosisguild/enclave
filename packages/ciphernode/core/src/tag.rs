@@ -1,22 +1,12 @@
-use std::sync::RwLock;
+use std::sync::OnceLock;
 
-use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref TAG: RwLock<String> = RwLock::new(String::from("_"));
-}
+static TAG: OnceLock<String> = OnceLock::new();
 
 pub fn get_tag() -> String {
-    let tag_guard = TAG.read().expect("Failed to acquire read lock");
-    tag_guard.clone()
+    TAG.get().cloned().unwrap_or_else(|| String::from("_"))
 }
 
 pub fn set_tag(new_tag: impl Into<String>) -> Result<(), &'static str> {
-    match TAG.write() {
-        Ok(mut tag_guard) => {
-            *tag_guard = new_tag.into();
-            Ok(())
-        }
-        Err(_) => Err("Failed to acquire write lock"),
-    }
+    TAG.set(new_tag.into())
+        .map_err(|_| "Tag has already been initialized")
 }

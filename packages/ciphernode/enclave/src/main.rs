@@ -1,11 +1,9 @@
-use std::env;
-
 use anyhow::Result;
 use clap::Parser;
 use commands::{aggregator, password, start, wallet, Commands};
 use config::load_config;
 use enclave_core::{get_tag, set_tag};
-use tracing::{instrument::WithSubscriber, span, Instrument, Level};
+use tracing::instrument;
 use tracing_subscriber::EnvFilter;
 pub mod commands;
 
@@ -45,9 +43,9 @@ pub struct Cli {
 }
 
 impl Cli {
+    #[instrument(skip(self),fields(id = get_tag()))]
     pub async fn execute(self) -> Result<()> {
         let config_path = self.config.as_deref();
-        let id = self.get_tag();
         let config = load_config(config_path)?;
 
         match self.command {
@@ -81,15 +79,15 @@ pub async fn main() {
         // .with_env_filter("[app{id=ag}]=info")
         .init();
     let cli = Cli::parse();
-    set_tag(cli.get_tag());
-    let id = get_tag();
-    let span = span!(Level::INFO, "app", %id);
-    let _guard = span.enter();
-    match cli.execute().instrument(span.clone()).await {
-        Ok(_) => (),
-        Err(err) => {
-            eprintln!("{}", err);
-            std::process::exit(1);
-        }
+
+    // Set the tag for all future traces
+    if let Err(err) = set_tag(cli.get_tag()) {
+        eprintln!("{}", err);
+    }
+
+    // Execute the cli
+    if let Err(err) = cli.execute().await {
+        eprintln!("{}", err);
+        std::process::exit(1);
     }
 }

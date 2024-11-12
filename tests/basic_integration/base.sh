@@ -10,7 +10,7 @@ source "$THIS_DIR/fns.sh"
 
 heading "Start the EVM node"
 
-yarn evm:node &
+launch_evm
 
 until curl -f -s "http://localhost:8545" > /dev/null; do
   sleep 1

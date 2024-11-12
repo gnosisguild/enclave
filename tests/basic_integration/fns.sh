@@ -10,8 +10,6 @@ if [[ "$ROOT_DIR" != "$(pwd)" ]]; then
   exit 1
 fi
 
-export RUST_LOG=info
-
 # Environment variables
 RPC_URL="ws://localhost:8545"
 
@@ -125,6 +123,14 @@ kill_proc() {
 metallica() {
   pkill -9 -f "target/debug/enclave" || true
   pkill -9 -f "hardhat node" || true
+}
+
+launch_evm() {
+  if [ ! -z "${SILENT_EVM:-}" ]; then
+    yarn evm:node &> /dev/null &
+  else
+    yarn evm:node &
+  fi
 }
 
 metallica

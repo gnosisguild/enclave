@@ -17,7 +17,7 @@ use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;
 use tokio::sync::oneshot;
-use tracing::{error, info, info_span, instrument, trace, warn};
+use tracing::{error, info, instrument, trace, warn};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
@@ -106,10 +106,8 @@ where
         }
     }
 
+    #[instrument(name="evm_event_reader", skip_all, fields(id = get_tag()))]
     pub async fn load(params: EvmEventReaderParams<P, T>) -> Result<Self> {
-        let id = get_tag();
-        let span = info_span!("evm_event_reader", %id);
-        let _guard = span.enter();
         Ok(if let Some(snapshot) = params.repository.read().await? {
             info!("Loading from snapshot");
             Self::from_snapshot(params, snapshot).await?
@@ -283,10 +281,9 @@ where
     T: Transport + Clone + Unpin,
 {
     type Result = ();
+
+    #[instrument(name="evm_event_reader", skip_all, fields(id = get_tag()))]
     fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        let id = get_tag();
-        let span = info_span!("evm_event_reader", %id);
-        let _guard = span.enter();
         let event_id = wrapped.get_id();
         info!("Processing event: {}", event_id);
         info!("cache length: {}", self.state.ids.len());
