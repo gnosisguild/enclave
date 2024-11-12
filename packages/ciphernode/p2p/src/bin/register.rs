@@ -6,15 +6,19 @@ use libp2p::{
     tcp, yamux, Multiaddr,
 };
 use std::time::Duration;
+use tokio::time::sleep;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() {
+    println!("RUNNING REGISTER");
+
+    sleep(Duration::from_secs(1)).await;
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
 
-    let rendezvous_point_address = "/ip4/127.0.0.1/tcp/62649".parse::<Multiaddr>().unwrap();
+    let rendezvous_point_address = "/ip4/172.20.0.2/tcp/62649".parse::<Multiaddr>().unwrap();
     let rendezvous_point = "12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN"
         .parse()
         .unwrap();
@@ -37,7 +41,7 @@ async fn main() {
 
     // In production the external address should be the publicly facing IP address of the rendezvous point.
     // This address is recorded in the registration entry by the rendezvous point.
-    let external_address = "/ip4/127.0.0.1/tcp/0".parse::<Multiaddr>().unwrap();
+    let external_address = "/ip4/172.20.0.3/tcp/0".parse::<Multiaddr>().unwrap();
     swarm.add_external_address(external_address);
 
     swarm.dial(rendezvous_point_address.clone()).unwrap();

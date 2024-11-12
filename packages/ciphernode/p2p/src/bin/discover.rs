@@ -1,4 +1,3 @@
-
 use futures::StreamExt;
 use libp2p::{
     multiaddr::Protocol,
@@ -8,20 +7,22 @@ use libp2p::{
 };
 use std::error::Error;
 use std::time::Duration;
+use tokio::time::sleep;
 use tracing_subscriber::EnvFilter;
 
 const NAMESPACE: &str = "rendezvous";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    println!("RUNNING DISCOVER");
+    sleep(Duration::from_secs(3)).await;
+
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
 
-    let rendezvous_point_address = "/ip4/127.0.0.1/tcp/62649".parse::<Multiaddr>().unwrap();
-    let rendezvous_point = "12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN"
-        .parse()
-        .unwrap();
+    let rendezvous_point_address = "/ip4/172.20.0.2/tcp/62649".parse::<Multiaddr>()?;
+    let rendezvous_point = "12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN".parse()?;
 
     let mut swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_tokio()
@@ -36,7 +37,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })?
         .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(5)))
         .build();
-
     swarm.dial(rendezvous_point_address.clone()).unwrap();
 
     let mut discover_tick = tokio::time::interval(Duration::from_secs(30));
