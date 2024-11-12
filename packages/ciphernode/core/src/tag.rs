@@ -1,5 +1,5 @@
 //! Tag management for EVM event processing.
-//! 
+//!
 //! This module provides thread-safe access to a global string tag that's used to
 //! differentiate between different EVM contract instances during event processing.
 //! The tag helps track and manage historical and live events for specific contracts.
