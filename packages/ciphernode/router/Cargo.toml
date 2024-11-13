@@ -11,6 +11,7 @@ fhe = { path = "../fhe" }
 data = { path = "../data" }
 keyshare = { path = "../keyshare" }
 aggregator = { path = "../aggregator" }
+evm = { path = "../evm" }
 anyhow = { workspace = true }
 serde = { workspace = true }
 cipher = { path = "../cipher" }

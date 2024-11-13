@@ -65,14 +65,16 @@ impl P2p {
     /// Spawn a Libp2p instance. Calls spawn and listen
     pub fn spawn_libp2p(
         bus: Addr<EventBus>,
-    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<()>), Box<dyn Error>> {
+    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<()>, String), Box<dyn Error>> {
         let (mut libp2p, tx, rx) = EnclaveRouter::new()?;
+        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        libp2p.with_identity(&keypair);
         libp2p.connect_swarm("mdns".to_string())?;
         libp2p.join_topic("enclave-keygen-01")?;
 
         let p2p_addr = Self::spawn_and_listen(bus, tx, rx);
         let handle = tokio::spawn(async move { libp2p.start().await.unwrap() });
-        Ok((p2p_addr, handle))
+        Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
 

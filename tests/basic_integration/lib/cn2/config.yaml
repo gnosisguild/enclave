@@ -1,4 +1,5 @@
 config_dir: .
+data_dir: .
 address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
 chains:
   - name: "hardhat"

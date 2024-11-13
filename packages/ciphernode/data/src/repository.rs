@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use crate::DataStore;
 
+#[derive(Debug)]
 pub struct Repository<S> {
     store: DataStore,
     _p: PhantomData<S>,

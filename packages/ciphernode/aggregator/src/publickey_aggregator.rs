@@ -261,7 +261,7 @@ impl FromSnapshotWithParams for PublicKeyAggregator {
 }
 
 impl Checkpoint for PublicKeyAggregator {
-    fn repository(&self) -> Repository<PublicKeyAggregatorState> {
-        self.store.clone()
+    fn repository(&self) -> &Repository<PublicKeyAggregatorState> {
+        &self.store
     }
 }

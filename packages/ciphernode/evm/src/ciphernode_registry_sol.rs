@@ -1,19 +1,22 @@
 use crate::{
+    event_reader::EvmEventReaderState,
     helpers::{ReadonlyProvider, WithChainId},
     EvmEventReader,
 };
-use actix::Addr;
+use actix::{Actor, Addr};
 use alloy::{
     primitives::{LogData, B256},
     sol,
     sol_types::SolEvent,
 };
 use anyhow::Result;
+use data::Repository;
 use enclave_core::{EnclaveEvent, EventBus};
-use tracing::{error, trace};
+use tracing::{error, info, trace};
 
 sol!(
     #[sol(rpc)]
+    #[derive(Debug)]
     ICiphernodeRegistry,
     "../../evm/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json"
 );
@@ -96,26 +99,49 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<Enclave
 
 /// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
 pub struct CiphernodeRegistrySolReader;
-
 impl CiphernodeRegistrySolReader {
     pub async fn attach(
         bus: &Addr<EventBus>,
         provider: &WithChainId<ReadonlyProvider>,
         contract_address: &str,
+        repository: &Repository<EvmEventReaderState>,
+        start_block: Option<u64>,
     ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
-        let addr = EvmEventReader::attach(bus, provider, extractor, contract_address).await?;
+        let addr = EvmEventReader::attach(
+            provider,
+            extractor,
+            contract_address,
+            start_block,
+            &bus.clone().into(),
+            repository,
+        )
+        .await?;
+
+        info!(address=%contract_address, "EnclaveSolReader is listening to address");
+
         Ok(addr)
     }
 }
 
+/// Wrapper for a reader and a future writer
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
     pub async fn attach(
         bus: &Addr<EventBus>,
         provider: &WithChainId<ReadonlyProvider>,
         contract_address: &str,
+        repository: &Repository<EvmEventReaderState>,
+        start_block: Option<u64>,
     ) -> Result<()> {
-        CiphernodeRegistrySolReader::attach(bus, provider, contract_address).await?;
+        CiphernodeRegistrySolReader::attach(
+            bus,
+            provider,
+            contract_address,
+            repository,
+            start_block,
+        )
+        .await?;
+        // TODO: Writer if needed
         Ok(())
     }
 }

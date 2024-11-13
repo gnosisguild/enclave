@@ -236,7 +236,7 @@ impl FromSnapshotWithParams for PlaintextAggregator {
 }
 
 impl Checkpoint for PlaintextAggregator {
-    fn repository(&self) -> Repository<PlaintextAggregatorState> {
-        self.store.clone()
+    fn repository(&self) -> &Repository<PlaintextAggregatorState> {
+        &self.store
     }
 }

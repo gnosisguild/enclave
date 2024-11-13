@@ -3,8 +3,7 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
-use data::{DataStore, InMemStore, SledStore};
-use enclave_core::EventBus;
+use enclave_core::{get_tag, EventBus};
 use evm::{
     helpers::{create_readonly_provider, ensure_ws_rpc},
     CiphernodeRegistrySol, EnclaveSolReader,
@@ -19,13 +18,15 @@ use router::{
 use sortition::Sortition;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
+use tracing::instrument;
 
 use crate::setup_datastore;
 
+#[instrument(name="app", skip_all,fields(id = get_tag()))]
 pub async fn setup_ciphernode(
     config: AppConfig,
     address: Address,
-) -> Result<(Addr<EventBus>, JoinHandle<()>)> {
+) -> Result<(Addr<EventBus>, JoinHandle<()>, String)> {
     let rng = Arc::new(Mutex::new(
         rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
     ));
@@ -35,7 +36,7 @@ pub async fn setup_ciphernode(
 
     let repositories = store.repositories();
 
-    let sortition = Sortition::attach(&bus, repositories.sortition());
+    let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     CiphernodeSelector::attach(&bus, &sortition, &address.to_string());
 
     for chain in config
@@ -46,9 +47,22 @@ pub async fn setup_ciphernode(
         let rpc_url = &chain.rpc_url;
 
         let read_provider = create_readonly_provider(&ensure_ws_rpc(rpc_url)).await?;
-        EnclaveSolReader::attach(&bus, &read_provider, &chain.contracts.enclave).await?;
-        CiphernodeRegistrySol::attach(&bus, &read_provider, &chain.contracts.ciphernode_registry)
-            .await?;
+        EnclaveSolReader::attach(
+            &bus,
+            &read_provider,
+            &chain.contracts.enclave.address(),
+            &repositories.enclave_sol_reader(read_provider.get_chain_id()),
+            chain.contracts.enclave.deploy_block(),
+        )
+        .await?;
+        CiphernodeRegistrySol::attach(
+            &bus,
+            &read_provider,
+            &chain.contracts.ciphernode_registry.address(),
+            &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
+            chain.contracts.ciphernode_registry.deploy_block(),
+        )
+        .await?;
     }
 
     E3RequestRouter::builder(&bus, store.clone())
@@ -57,10 +71,10 @@ pub async fn setup_ciphernode(
         .build()
         .await?;
 
-    let (_, join_handle) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
+    let (_, join_handle, peer_id) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
 
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
     SimpleLogger::attach(&nm, bus.clone());
 
-    Ok((bus, join_handle))
+    Ok((bus, join_handle, peer_id))
 }

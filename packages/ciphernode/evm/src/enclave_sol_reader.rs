@@ -1,3 +1,4 @@
+use crate::event_reader::EvmEventReaderState;
 use crate::helpers::{ReadonlyProvider, WithChainId};
 use crate::EvmEventReader;
 use actix::Addr;
@@ -5,8 +6,9 @@ use alloy::primitives::{LogData, B256};
 use alloy::transports::BoxTransport;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
+use data::Repository;
 use enclave_core::{EnclaveEvent, EventBus};
-use tracing::{error, trace};
+use tracing::{error, info, trace};
 
 sol!(
     #[sol(rpc)]
@@ -86,8 +88,21 @@ impl EnclaveSolReader {
         bus: &Addr<EventBus>,
         provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
+        repository: &Repository<EvmEventReaderState>,
+        start_block: Option<u64>,
     ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
-        let addr = EvmEventReader::attach(bus, provider, extractor, contract_address).await?;
+        let addr = EvmEventReader::attach(
+            provider,
+            extractor,
+            contract_address,
+            start_block,
+            &bus.clone(),
+            repository,
+        )
+        .await?;
+
+        info!(address=%contract_address, "EnclaveSolReader is listening to address");
+
         Ok(addr)
     }
 }

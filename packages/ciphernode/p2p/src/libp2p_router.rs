@@ -9,7 +9,6 @@ use std::time::Duration;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::{io, select};
 use tracing::{error, info, trace};
-use tracing_subscriber::EnvFilter;
 
 #[derive(NetworkBehaviour)]
 pub struct MyBehaviour {
@@ -58,19 +57,22 @@ impl EnclaveRouter {
         ))
     }
 
-    pub fn with_identiy(&mut self, keypair: identity::Keypair) {
-        self.identity = Some(keypair);
+    pub fn with_identity(&mut self, keypair: &identity::Keypair) {
+        self.identity = Some(keypair.clone());
     }
 
     pub fn connect_swarm(&mut self, discovery_type: String) -> Result<&Self, Box<dyn Error>> {
         match discovery_type.as_str() {
             "mdns" => {
-                let _ = tracing_subscriber::fmt()
-                    .with_env_filter(EnvFilter::from_default_env())
-                    .try_init();
-
                 // TODO: Use key if assigned already
-                let mut swarm = libp2p::SwarmBuilder::with_new_identity()
+
+                let swarm = self
+                    .identity
+                    .clone()
+                    .map_or_else(
+                        || libp2p::SwarmBuilder::with_new_identity(),
+                        |id| libp2p::SwarmBuilder::with_existing_identity(id),
+                    )
                     .with_tokio()
                     .with_tcp(
                         tcp::Config::default(),
@@ -92,6 +94,7 @@ impl EnclaveRouter {
                     })?
                     .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
                     .build();
+
                 self.swarm = Some(swarm);
             }
             _ => info!("Defaulting to MDNS discovery"),
