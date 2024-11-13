@@ -37,7 +37,7 @@ impl Get {
 }
 
 /// Generate proxy for the DB
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DataStore {
     scope: Vec<u8>,
     get: Recipient<Get>,

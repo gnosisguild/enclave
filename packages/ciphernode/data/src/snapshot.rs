@@ -20,7 +20,7 @@ where
 /// This trait enables the self type to checkpoint its state
 pub trait Checkpoint: Snapshot {
     /// Declare the DataStore instance available on the object
-    fn repository(&self) -> Repository<Self::Snapshot>;
+    fn repository(&self) -> &Repository<Self::Snapshot>;
 
     /// Write the current snapshot to the `Repository` provided by `repository()`
     fn checkpoint(&self) {

@@ -190,8 +190,8 @@ impl Snapshot for E3RequestRouter {
 }
 
 impl Checkpoint for E3RequestRouter {
-    fn repository(&self) -> Repository<E3RequestRouterSnapshot> {
-        self.store.clone()
+    fn repository(&self) -> &Repository<E3RequestRouterSnapshot> {
+        &self.store
     }
 }
 

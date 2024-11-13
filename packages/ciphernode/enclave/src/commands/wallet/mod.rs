@@ -3,7 +3,7 @@ use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum WalletCommands {
     /// Set a new Wallet Private Key
     Set {

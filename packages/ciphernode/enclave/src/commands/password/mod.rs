@@ -5,7 +5,7 @@ use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum PasswordCommands {
     /// Create a new password
     Create {

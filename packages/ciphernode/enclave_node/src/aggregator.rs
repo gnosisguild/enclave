@@ -29,14 +29,14 @@ pub async fn setup_aggregator(
     config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
-) -> Result<(Addr<EventBus>, JoinHandle<()>)> {
+) -> Result<(Addr<EventBus>, JoinHandle<()>, String)> {
     let bus = EventBus::new(true).start();
     let rng = Arc::new(Mutex::new(
         ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
     ));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
-    let sortition = Sortition::attach(&bus, repositories.sortition());
+    let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     let cipher = Arc::new(Cipher::from_config(&config).await?);
     let signer = get_signer_from_repository(repositories.eth_private_key(), &cipher).await?;
 
@@ -49,16 +49,30 @@ pub async fn setup_aggregator(
         let read_provider = create_readonly_provider(&ensure_ws_rpc(rpc_url)).await?;
         let write_provider =
             create_provider_with_signer(&ensure_http_rpc(rpc_url), &signer).await?;
+
         EnclaveSol::attach(
             &bus,
             &read_provider,
             &write_provider,
-            &chain.contracts.enclave,
+            &chain.contracts.enclave.address(),
+            &repositories.enclave_sol_reader(read_provider.get_chain_id()),
+            chain.contracts.enclave.deploy_block(),
         )
         .await?;
-        RegistryFilterSol::attach(&bus, &write_provider, &chain.contracts.filter_registry).await?;
-        CiphernodeRegistrySol::attach(&bus, &read_provider, &chain.contracts.ciphernode_registry)
-            .await?;
+        RegistryFilterSol::attach(
+            &bus,
+            &write_provider,
+            &chain.contracts.filter_registry.address(),
+        )
+        .await?;
+        CiphernodeRegistrySol::attach(
+            &bus,
+            &read_provider,
+            &chain.contracts.ciphernode_registry.address(),
+            &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
+            chain.contracts.ciphernode_registry.deploy_block(),
+        )
+        .await?;
     }
 
     E3RequestRouter::builder(&bus, store)
@@ -68,7 +82,7 @@ pub async fn setup_aggregator(
         .build()
         .await?;
 
-    let (_, join_handle) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
+    let (_, join_handle, peer_id) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());
@@ -80,5 +94,5 @@ pub async fn setup_aggregator(
 
     SimpleLogger::attach("AGG", bus.clone());
 
-    Ok((bus, join_handle))
+    Ok((bus, join_handle, peer_id))
 }

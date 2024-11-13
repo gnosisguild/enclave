@@ -80,3 +80,36 @@ sequenceDiagram
     PTA--)PTA: Stop
     KS--)-KS: Stop
 ```
+
+# Debugging
+
+You can debug using the `RUST_LOG` environment var to alter what output is produced by the node
+
+
+```
+RUST_LOG=info enclave start
+```
+
+if you supply a tag as an argument you can filter for that tag
+
+```
+RUST_LOG="[sortition{id=cn1}]" enclave start --tag cn1
+```
+
+This helps filter noise during tests where you might have multiple instances running and you need to see the output of a specific one.
+
+In order to add tracing to a method or function it is recommended to use the `instrument` macro.
+
+```rust
+impl Sorition {
+    // ...
+    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
+    pub async fn attach(
+        bus: &Addr<EventBus>,
+        store: Repository<SortitionModule>,
+    ) -> Result<Addr<Sortition>> {
+      // ...
+    }
+}
+```
+
