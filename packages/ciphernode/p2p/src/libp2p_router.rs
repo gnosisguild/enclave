@@ -1,6 +1,9 @@
-use futures::stream::StreamExt;
+use libp2p::connection_limits::ConnectionLimits;
+use libp2p::identify;
 use libp2p::{
-    gossipsub, identity, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux,
+    connection_limits, futures::StreamExt, gossipsub, identify::Behaviour as IdentifyBehaviour,
+    identity, kad::store::MemoryStore, kad::Behaviour as KademliaBehaviour,
+    swarm::NetworkBehaviour, swarm::SwarmEvent,
 };
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
@@ -8,18 +11,20 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::{io, select};
-use tracing::{error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(NetworkBehaviour)]
-pub struct MyBehaviour {
+pub struct NodeBehaviour {
     gossipsub: gossipsub::Behaviour,
-    mdns: mdns::tokio::Behaviour,
+    kademlia: KademliaBehaviour<MemoryStore>,
+    connection_limits: connection_limits::Behaviour,
+    identify: IdentifyBehaviour,
 }
 
 pub struct EnclaveRouter {
     pub identity: Option<identity::Keypair>,
     pub gossipsub_config: gossipsub::Config,
-    pub swarm: Option<libp2p::Swarm<MyBehaviour>>,
+    pub swarm: Option<libp2p::Swarm<NodeBehaviour>>,
     pub topic: Option<gossipsub::IdentTopic>,
     evt_tx: Sender<Vec<u8>>,
     cmd_rx: Receiver<Vec<u8>>,
@@ -34,7 +39,6 @@ impl EnclaveRouter {
             message.data.hash(&mut s);
             gossipsub::MessageId::from(s.finish().to_string())
         };
-
         // TODO: Allow for config inputs to new()
         let gossipsub_config = gossipsub::ConfigBuilder::default()
             .heartbeat_interval(Duration::from_secs(10))
@@ -61,44 +65,44 @@ impl EnclaveRouter {
         self.identity = Some(keypair.clone());
     }
 
-    pub fn connect_swarm(&mut self, discovery_type: String) -> Result<&Self, Box<dyn Error>> {
-        match discovery_type.as_str() {
-            "mdns" => {
-                // TODO: Use key if assigned already
+    pub fn connect_swarm(&mut self) -> Result<&Self, Box<dyn Error>> {
+        let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
+        let identify_config = IdentifyBehaviour::new(
+            identify::Config::new(
+                "/kad/0.1.0".into(),
+                self.identity.as_ref().unwrap().public(),
+            )
+            .with_interval(Duration::from_secs(60)), // do this so we can get timeouts for dropped WebRTC connections
+        );
+        let swarm = self
+            .identity
+            .clone()
+            .map_or_else(
+                || libp2p::SwarmBuilder::with_new_identity(),
+                |id| libp2p::SwarmBuilder::with_existing_identity(id),
+            )
+            .with_tokio()
+            .with_quic()
+            .with_behaviour(|key| {
+                let gossipsub = gossipsub::Behaviour::new(
+                    gossipsub::MessageAuthenticity::Signed(key.clone()),
+                    self.gossipsub_config.clone(),
+                )
+                .expect("Failed to create gossipsub behavior");
 
-                let swarm = self
-                    .identity
-                    .clone()
-                    .map_or_else(
-                        || libp2p::SwarmBuilder::with_new_identity(),
-                        |id| libp2p::SwarmBuilder::with_existing_identity(id),
-                    )
-                    .with_tokio()
-                    .with_tcp(
-                        tcp::Config::default(),
-                        noise::Config::new,
-                        yamux::Config::default,
-                    )?
-                    .with_quic()
-                    .with_behaviour(|key| {
-                        let gossipsub = gossipsub::Behaviour::new(
-                            gossipsub::MessageAuthenticity::Signed(key.clone()),
-                            self.gossipsub_config.clone(),
-                        )?;
+                NodeBehaviour {
+                    gossipsub,
+                    kademlia: KademliaBehaviour::new(
+                        key.public().to_peer_id(),
+                        MemoryStore::new(key.public().to_peer_id()),
+                    ),
+                    connection_limits,
+                    identify: identify_config,
+                }
+            })?
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+            .build();
 
-                        let mdns = mdns::tokio::Behaviour::new(
-                            mdns::Config::default(),
-                            key.public().to_peer_id(),
-                        )?;
-                        Ok(MyBehaviour { gossipsub, mdns })
-                    })?
-                    .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
-                    .build();
-
-                self.swarm = Some(swarm);
-            }
-            _ => info!("Defaulting to MDNS discovery"),
-        }
         Ok(self)
     }
 
@@ -120,49 +124,51 @@ impl EnclaveRouter {
             .as_mut()
             .unwrap()
             .listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
-        self.swarm
-            .as_mut()
-            .unwrap()
-            .listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
+
         loop {
             select! {
-                Some(line) = self.cmd_rx.recv() => {
-                    if let Err(e) = self.swarm.as_mut().unwrap()
-                        .behaviour_mut().gossipsub
-                        .publish(self.topic.as_mut().unwrap().clone(), line) {
-                        error!(error=?e, "Error publishing line to swarm");
-                    }
-                }
-                event = self.swarm.as_mut().unwrap().select_next_some() => match event {
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                        for (peer_id, _multiaddr) in list {
-                            trace!("mDNS discovered a new peer: {peer_id}");
-                            self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                        }
-                    },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                        for (peer_id, _multiaddr) in list {
-                            trace!("mDNS discover peer has expired: {peer_id}");
-                            self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                        }
-                    },
-                    SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                        propagation_source: peer_id,
-                        message_id: id,
-                        message,
-                    })) => {
-                        trace!(
-                            "Got message with id: {id} from peer: {peer_id}",
-                        );
-                        trace!("{:?}", message);
-                        self.evt_tx.send(message.data).await?;
-                    },
-                    SwarmEvent::NewListenAddr { address, .. } => {
-                        trace!("Local node is listening on {address}");
-                    }
-                    _ => {}
-                }
+                       Some(line) = self.cmd_rx.recv() => {
+                           if let Err(e) = self.swarm.as_mut().unwrap()
+                               .behaviour_mut().gossipsub
+                               .publish(self.topic.as_mut().unwrap().clone(), line) {
+                               error!(error=?e, "Error publishing line to swarm");
+                           }
+                       }
+
+                       event = self.swarm.as_mut().unwrap().select_next_some() => match event {
+
+                             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                                    info!("Connected to {peer_id}");
+                                }
+            SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
+                warn!("Failed to dial {peer_id:?}: {error}");
             }
+            SwarmEvent::IncomingConnectionError { error, .. } => {
+                warn!("{:#}", anyhow::Error::from(error))
+            }
+             SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
+                debug!("Kademlia event: {:?}", e);
+            }
+
+
+                           SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                               propagation_source: peer_id,
+                               message_id: id,
+                               message,
+                           })) => {
+                               trace!(
+                                   "Got message with id: {id} from peer: {peer_id}",
+                               );
+                               trace!("{:?}", message);
+                               self.evt_tx.send(message.data).await?;
+                           },
+                           SwarmEvent::NewListenAddr { address, .. } => {
+                               trace!("Local node is listening on {address}");
+                           }
+                           _ => {}
+
+                   }
+                   }
         }
     }
 }

@@ -1,4 +1,12 @@
-use std::{collections::HashSet, error::Error};
+use std::{
+    collections::HashSet,
+    error::Error,
+    net::{IpAddr, Ipv6Addr},
+};
+
+use libp2p::multiaddr::{Multiaddr, Protocol};
+
+use crate::constants::PORT_QUIC;
 
 use crate::libp2p_router::EnclaveRouter;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
@@ -69,8 +77,19 @@ impl P2p {
         let (mut libp2p, tx, rx) = EnclaveRouter::new()?;
         let keypair = libp2p::identity::Keypair::generate_ed25519();
         libp2p.with_identity(&keypair);
-        libp2p.connect_swarm("mdns".to_string())?;
+        libp2p.connect_swarm()?;
         libp2p.join_topic("enclave-keygen-01")?;
+
+        let address_quic = Multiaddr::from(IpAddr::V6(Ipv6Addr::UNSPECIFIED))
+            .with(Protocol::Udp(PORT_QUIC))
+            .with(Protocol::QuicV1);
+
+        libp2p
+            .swarm
+            .as_mut()
+            .unwrap()
+            .listen_on(address_quic.clone())
+            .expect("listen on quic");
 
         let p2p_addr = Self::spawn_and_listen(bus, tx, rx);
         let handle = tokio::spawn(async move { libp2p.start().await.unwrap() });

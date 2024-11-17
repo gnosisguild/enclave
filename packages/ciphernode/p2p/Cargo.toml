@@ -17,11 +17,9 @@ libp2p = { workspace = true, features = [
   "macros",
   "noise",
   "ping",
-  "rendezvous",
-  "tcp",
+  "kad",
   "tokio",
   "yamux",
-  "mdns",
   "gossipsub",
   "quic",
 ] }
