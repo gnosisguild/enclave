@@ -6,12 +6,12 @@ use libp2p::{
 };
 use libp2p::{identify, mdns};
 use std::collections::hash_map::DefaultHasher;
-use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::{io, select};
 use tracing::{debug, error, info, trace, warn};
+use anyhow::Result;
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -32,7 +32,7 @@ pub struct EnclaveRouter {
 }
 
 impl EnclaveRouter {
-    pub fn new() -> Result<(Self, Sender<Vec<u8>>, Receiver<Vec<u8>>), Box<dyn Error>> {
+    pub fn new() -> Result<(Self, Sender<Vec<u8>>, Receiver<Vec<u8>>)> {
         let (evt_tx, evt_rx) = channel(100); // TODO : tune this param
         let (cmd_tx, cmd_rx) = channel(100); // TODO : tune this param
         let message_id_fn = |message: &gossipsub::Message| {
@@ -62,11 +62,12 @@ impl EnclaveRouter {
         ))
     }
 
-    pub fn with_identity(&mut self, keypair: &identity::Keypair) {
+    pub fn with_identity(&mut self, keypair: &identity::Keypair) -> &mut Self {
         self.identity = Some(keypair.clone());
+        self
     }
 
-    pub fn connect_swarm(&mut self) -> Result<&Self, Box<dyn Error>> {
+    pub fn connect_swarm(&mut self) -> Result<&mut Self> {
         let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
         let identify_config = IdentifyBehaviour::new(
             identify::Config::new(
@@ -112,7 +113,7 @@ impl EnclaveRouter {
         Ok(self)
     }
 
-    pub fn join_topic(&mut self, topic_name: &str) -> Result<&Self, Box<dyn Error>> {
+    pub fn join_topic(&mut self, topic_name: &str) -> Result<&mut Self> {
         let topic = gossipsub::IdentTopic::new(topic_name);
         self.topic = Some(topic.clone());
         self.swarm
@@ -125,7 +126,7 @@ impl EnclaveRouter {
     }
 
     /// Listen on the default multiaddr
-    pub async fn start(&mut self) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    pub async fn start(&mut self) -> Result<()> {
         self.swarm
             .as_mut()
             .unwrap()
