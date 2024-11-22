@@ -4,7 +4,7 @@ use libp2p::{
     identity, kad::store::MemoryStore, kad::Behaviour as KademliaBehaviour,
     swarm::NetworkBehaviour, swarm::SwarmEvent,
 };
-use libp2p::{identify, mdns, noise, tcp, yamux};
+use libp2p::{identify, mdns};
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
@@ -83,11 +83,6 @@ impl EnclaveRouter {
                 |id| libp2p::SwarmBuilder::with_existing_identity(id),
             )
             .with_tokio()
-            .with_tcp(
-                tcp::Config::default(),
-                noise::Config::new,
-                yamux::Config::default,
-            )?
             .with_quic()
             .with_behaviour(|key| {
                 let gossipsub = gossipsub::Behaviour::new(
@@ -135,10 +130,7 @@ impl EnclaveRouter {
             .as_mut()
             .unwrap()
             .listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
-        self.swarm
-            .as_mut()
-            .unwrap()
-            .listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
+
         loop {
             select! {
                 Some(line) = self.cmd_rx.recv() => {
