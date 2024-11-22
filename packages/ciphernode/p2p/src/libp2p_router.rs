@@ -1,10 +1,10 @@
 use libp2p::connection_limits::ConnectionLimits;
-use libp2p::identify;
 use libp2p::{
     connection_limits, futures::StreamExt, gossipsub, identify::Behaviour as IdentifyBehaviour,
     identity, kad::store::MemoryStore, kad::Behaviour as KademliaBehaviour,
     swarm::NetworkBehaviour, swarm::SwarmEvent,
 };
+use libp2p::{identify, mdns, noise, tcp, yamux};
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
@@ -18,6 +18,7 @@ pub struct NodeBehaviour {
     gossipsub: gossipsub::Behaviour,
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
+    mdns: mdns::tokio::Behaviour,
     identify: IdentifyBehaviour,
 }
 
@@ -82,6 +83,11 @@ impl EnclaveRouter {
                 |id| libp2p::SwarmBuilder::with_existing_identity(id),
             )
             .with_tokio()
+            .with_tcp(
+                tcp::Config::default(),
+                noise::Config::new,
+                yamux::Config::default,
+            )?
             .with_quic()
             .with_behaviour(|key| {
                 let gossipsub = gossipsub::Behaviour::new(
@@ -90,19 +96,24 @@ impl EnclaveRouter {
                 )
                 .expect("Failed to create gossipsub behavior");
 
-                NodeBehaviour {
+                let mdns = mdns::tokio::Behaviour::new(
+                    mdns::Config::default(),
+                    key.public().to_peer_id(),
+                )?;
+                Ok(NodeBehaviour {
                     gossipsub,
                     kademlia: KademliaBehaviour::new(
                         key.public().to_peer_id(),
                         MemoryStore::new(key.public().to_peer_id()),
                     ),
+                    mdns,
                     connection_limits,
                     identify: identify_config,
-                }
+                })
             })?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
-
+        self.swarm = Some(swarm);
         Ok(self)
     }
 
@@ -124,7 +135,10 @@ impl EnclaveRouter {
             .as_mut()
             .unwrap()
             .listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
-
+        self.swarm
+            .as_mut()
+            .unwrap()
+            .listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
         loop {
             select! {
                 Some(line) = self.cmd_rx.recv() => {
@@ -152,7 +166,18 @@ impl EnclaveRouter {
                 SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
                     debug!("Kademlia event: {:?}", e);
                 }
-
+                SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
+                    for (peer_id, _multiaddr) in list {
+                        trace!("mDNS discovered a new peer: {peer_id}");
+                        self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                    }
+                },
+                SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
+                    for (peer_id, _multiaddr) in list {
+                        trace!("mDNS discover peer has expired: {peer_id}");
+                        self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                    }
+                },
 
                 SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                     propagation_source: peer_id,

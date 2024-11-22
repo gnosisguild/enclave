@@ -80,16 +80,16 @@ impl P2p {
         libp2p.connect_swarm()?;
         libp2p.join_topic("enclave-keygen-01")?;
 
-        let address_quic = Multiaddr::from(IpAddr::V6(Ipv6Addr::UNSPECIFIED))
-            .with(Protocol::Udp(PORT_QUIC))
-            .with(Protocol::QuicV1);
-
-        libp2p
-            .swarm
-            .as_mut()
-            .unwrap()
-            .listen_on(address_quic.clone())
-            .expect("listen on quic");
+        // let address_quic = Multiaddr::from(IpAddr::V6(Ipv6Addr::UNSPECIFIED))
+        //     .with(Protocol::Udp(PORT_QUIC))
+        //     .with(Protocol::QuicV1);
+        //
+        // libp2p
+        //     .swarm
+        //     .as_mut()
+        //     .unwrap()
+        //     .listen_on(address_quic.clone())
+        //     .expect("listen on quic");
 
         let p2p_addr = Self::spawn_and_listen(bus, tx, rx);
         let handle = tokio::spawn(async move { libp2p.start().await.unwrap() });

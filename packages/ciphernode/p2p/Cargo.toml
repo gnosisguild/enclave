@@ -13,15 +13,17 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 libp2p = { workspace = true, features = [
   "async-std",
+  "gossipsub",
   "identify",
+  "kad",
   "macros",
+  "mdns",
   "noise",
   "ping",
-  "kad",
+  "quic",
+  "tcp",
   "tokio",
   "yamux",
-  "gossipsub",
-  "quic",
 ] }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
