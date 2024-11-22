@@ -1,6 +1,6 @@
 #![crate_name = "p2p"]
 #![crate_type = "lib"]
-#![warn(missing_docs, unused_imports)]
+// #![warn(missing_docs, unused_imports)]
 
 mod constants;
 mod libp2p_router;
