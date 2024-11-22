@@ -127,48 +127,50 @@ impl EnclaveRouter {
 
         loop {
             select! {
-                       Some(line) = self.cmd_rx.recv() => {
-                           if let Err(e) = self.swarm.as_mut().unwrap()
-                               .behaviour_mut().gossipsub
-                               .publish(self.topic.as_mut().unwrap().clone(), line) {
-                               error!(error=?e, "Error publishing line to swarm");
-                           }
-                       }
+                Some(line) = self.cmd_rx.recv() => {
+                    if let Err(e) = self.swarm.as_mut().unwrap()
+                        .behaviour_mut().gossipsub
+                        .publish(self.topic.as_mut().unwrap().clone(), line) {
+                        error!(error=?e, "Error publishing line to swarm");
+                    }
+                }
 
-                       event = self.swarm.as_mut().unwrap().select_next_some() => match event {
+                event = self.swarm.as_mut().unwrap().select_next_some() => match event {
 
-                             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                                    info!("Connected to {peer_id}");
-                                }
-            SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
-                warn!("Failed to dial {peer_id:?}: {error}");
+                SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                    info!("Connected to {peer_id}");
+                }
+
+                SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
+                    warn!("Failed to dial {peer_id:?}: {error}");
+                }
+
+                SwarmEvent::IncomingConnectionError { error, .. } => {
+                    warn!("{:#}", anyhow::Error::from(error))
+                }
+
+                SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
+                    debug!("Kademlia event: {:?}", e);
+                }
+
+
+                SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                    propagation_source: peer_id,
+                    message_id: id,
+                    message,
+                })) => {
+                    trace!(
+                        "Got message with id: {id} from peer: {peer_id}",
+                    );
+                    trace!("{:?}", message);
+                        self.evt_tx.send(message.data).await?;
+                    },
+                    SwarmEvent::NewListenAddr { address, .. } => {
+                        trace!("Local node is listening on {address}");
+                    }
+                    _ => {}
+                }
             }
-            SwarmEvent::IncomingConnectionError { error, .. } => {
-                warn!("{:#}", anyhow::Error::from(error))
-            }
-             SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
-                debug!("Kademlia event: {:?}", e);
-            }
-
-
-                           SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                               propagation_source: peer_id,
-                               message_id: id,
-                               message,
-                           })) => {
-                               trace!(
-                                   "Got message with id: {id} from peer: {peer_id}",
-                               );
-                               trace!("{:?}", message);
-                               self.evt_tx.send(message.data).await?;
-                           },
-                           SwarmEvent::NewListenAddr { address, .. } => {
-                               trace!("Local node is listening on {address}");
-                           }
-                           _ => {}
-
-                   }
-                   }
         }
     }
 }
