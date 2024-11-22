@@ -4368,6 +4368,7 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-trait",
+ "config",
  "enclave-core",
  "futures",
  "libp2p",

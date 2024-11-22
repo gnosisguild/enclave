@@ -20,6 +20,15 @@ pub enum Contract {
     AddressOnly(String),
 }
 
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub enum NetMode {
+    #[serde(rename = "mdns")]
+    Mdns,
+    #[serde(rename = "kademlia")]
+    Kademlia,
+    // TODO: Should we have both mdns and kademlia?
+}
+
 impl Contract {
     pub fn address(&self) -> &String {
         use Contract::*;
@@ -71,6 +80,8 @@ pub struct AppConfig {
     data_dir: PathBuf,
     /// Ethereum Address for the node
     address: Option<Address>,
+    /// Networking mode determines how this node with connect to other nodes in the network
+    net_mode: NetMode,
 }
 
 impl Default for AppConfig {
@@ -84,6 +95,7 @@ impl Default for AppConfig {
             config_file: PathBuf::from("config.yaml"), // ~/.config/enclave/config.yaml
             cwd: env::current_dir().unwrap_or_default(),
             address: None,
+            net_mode: NetMode::Kademlia,
         }
     }
 }
