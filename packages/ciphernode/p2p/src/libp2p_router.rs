@@ -51,7 +51,7 @@ pub enum DiscoveryType {
 }
 
 impl EnclaveRouter {
-    pub fn new() -> Result<(Self, Sender<Vec<u8>>, Receiver<Vec<u8>>), Box<dyn Error>> {
+    pub fn new() -> Result<(Self, Sender<Vec<u8>>, Receiver<Vec<u8>>)> {
         let (evt_tx, evt_rx) = channel(100); // TODO : tune this param
         let (cmd_tx, cmd_rx) = channel(100); // TODO : tune this param
         let message_id_fn = |message: &gossipsub::Message| {
@@ -86,7 +86,7 @@ impl EnclaveRouter {
         self.identity = Some(keypair);
     }
 
-    pub fn connect_swarm(&mut self) -> Result<&Self, Box<dyn Error>> {
+    pub fn connect_swarm(&mut self) -> Result<&mut Self> {
         // match discovery_type {
         // DiscoveryType::Mdns => {
         // TODO: Use key if assigned already
@@ -106,7 +106,7 @@ impl EnclaveRouter {
         Ok(self)
     }
 
-    pub fn join_topic(&mut self, topic_name: &str) -> Result<&Self, Box<dyn Error>> {
+    pub fn join_topic(&mut self, topic_name: &str) -> Result<&Self> {
         let topic = gossipsub::IdentTopic::new(topic_name);
         self.topic = Some(topic.clone());
         self.swarm
