@@ -112,13 +112,13 @@ impl EnclaveRouter {
                 let gossipsub = gossipsub::Behaviour::new(
                     gossipsub::MessageAuthenticity::Signed(key.clone()),
                     self.gossipsub_config.clone(),
-                )
-                .expect("Failed to create gossipsub behavior");
+                )?;
 
                 let mdns = mdns::tokio::Behaviour::new(
                     mdns::Config::default(),
                     key.public().to_peer_id(),
                 )?;
+
                 Ok(NodeBehaviour {
                     gossipsub,
                     kademlia: KademliaBehaviour::new(
