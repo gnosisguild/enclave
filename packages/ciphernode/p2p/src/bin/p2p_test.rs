@@ -5,6 +5,13 @@ use std::{collections::HashSet, env, process};
 use tokio::time::{sleep, timeout};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
+// So this is a simple test to test our networking configuration
+// Here we ensure we can send a gossipsub message to all connected nodes
+// Each node is assigned a name alice, bob or charlie and expects to receive the other two 
+// names via gossipsub or the node will exit with an error code
+// We have a docker test harness that runs the nodes and blocks things like mdns ports to ensure
+// that basic discovery is working
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
@@ -18,7 +25,7 @@ async fn main() -> Result<()> {
         .ok()
         .and_then(|p| p.parse::<u16>().ok());
 
-    let maybe_dial = env::var("DIAL_TO")
+    let dial_to = env::var("DIAL_TO")
         .ok()
         .and_then(|p| p.parse::<String>().ok());
 
@@ -34,7 +41,7 @@ async fn main() -> Result<()> {
         router.with_udp_port(port);
     }
 
-    let peers: Vec<String> = maybe_dial.iter().cloned().collect();
+    let peers: Vec<String> = dial_to.iter().cloned().collect();
 
     let router_task = tokio::spawn({
         let name = name.clone();
