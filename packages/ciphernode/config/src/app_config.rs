@@ -71,6 +71,8 @@ pub struct AppConfig {
     data_dir: PathBuf,
     /// Ethereum Address for the node
     address: Option<Address>,
+    /// A list of libp2p multiaddrs to dial to as peers when joining the network
+    peers: Vec<String>
 }
 
 impl Default for AppConfig {
@@ -83,6 +85,8 @@ impl Default for AppConfig {
             data_dir: OsDirs::data_dir(),     // ~/.config/enclave
             config_file: PathBuf::from("config.yaml"), // ~/.config/enclave/config.yaml
             cwd: env::current_dir().unwrap_or_default(),
+            peers: vec![], // NOTE: This should remain empty and we should look at config
+                           // generation via ipns fetch for the latest nodes
             address: None,
         }
     }
@@ -155,6 +159,11 @@ impl AppConfig {
     pub fn cwd(&self) -> PathBuf {
         self.cwd.to_owned()
     }
+
+    pub fn peers(&self) -> Vec<String> {
+        self.peers.clone()
+    }
+
 }
 
 /// Load the config at the config_file or the default location if not provided
