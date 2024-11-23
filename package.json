@@ -13,7 +13,7 @@
     "lint": "yarn evm:lint",
     "typechain": "yarn evm:typechain",
     "test": "yarn evm:test && yarn ciphernode:test",
-    "test:integration": "./tests/integration/test.sh",
+    "test:integration": "./tests/basic_integration/test.sh",
     "coverage": "yarn evm:coverage",
     "enclave": "cd packages/ciphernode && ./scripts/launch.sh",
     "ciphernode:lint": "cd packages/ciphernode && cargo fmt -- --check",
