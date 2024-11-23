@@ -7,7 +7,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 // So this is a simple test to test our networking configuration
 // Here we ensure we can send a gossipsub message to all connected nodes
-// Each node is assigned a name alice, bob or charlie and expects to receive the other two 
+// Each node is assigned a name alice, bob or charlie and expects to receive the other two
 // names via gossipsub or the node will exit with an error code
 // We have a docker test harness that runs the nodes and blocks things like mdns ports to ensure
 // that basic discovery is working
