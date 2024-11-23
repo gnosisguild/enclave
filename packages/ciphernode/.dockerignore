@@ -1,0 +1,30 @@
+# First ignore everything
+*
+**/*
+
+# Then allow cargo workspace files
+!Cargo.toml
+!Cargo.lock
+
+# Allow core crate
+!core/
+!core/Cargo.toml
+!core/src/**/*.rs
+
+# p2p
+!p2p/
+!p2p/Cargo.toml
+!p2p/src/**/*.rs
+
+
+# Allow all other workspace members (adjust paths as needed)
+!*/Cargo.toml
+!*/src/**/*.rs
+
+# Explicitly ignore build artifacts everywhere
+**/target/
+**/.git/
+**/.gitignore
+**/.DS_Store
+**/tests/tmp/
+**/*.log

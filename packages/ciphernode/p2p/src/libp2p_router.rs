@@ -1,17 +1,17 @@
+use anyhow::Result;
 use libp2p::connection_limits::ConnectionLimits;
 use libp2p::{
     connection_limits, futures::StreamExt, gossipsub, identify::Behaviour as IdentifyBehaviour,
     identity, kad::store::MemoryStore, kad::Behaviour as KademliaBehaviour,
     swarm::NetworkBehaviour, swarm::SwarmEvent,
 };
-use libp2p::{identify, mdns};
+use libp2p::{identify, mdns, Multiaddr};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::{io, select};
 use tracing::{debug, error, info, trace, warn};
-use anyhow::Result;
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -27,6 +27,7 @@ pub struct EnclaveRouter {
     pub gossipsub_config: gossipsub::Config,
     pub swarm: Option<libp2p::Swarm<NodeBehaviour>>,
     pub topic: Option<gossipsub::IdentTopic>,
+    udp_port: Option<u16>,
     evt_tx: Sender<Vec<u8>>,
     cmd_rx: Receiver<Vec<u8>>,
 }
@@ -56,14 +57,36 @@ impl EnclaveRouter {
                 topic: None,
                 evt_tx,
                 cmd_rx,
+                udp_port: None,
             },
             cmd_tx,
             evt_rx,
         ))
     }
 
+    pub async fn dial_peer(&mut self, addr: &str) -> Result<()> {
+        let multiaddr: Multiaddr = addr.parse()?;
+        let swarm = self
+            .swarm
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Swarm not initialized"))?;
+        swarm.dial(multiaddr.clone()).map_err(|e| {
+            error!("Failed to dial {}: {}", multiaddr, e);
+            anyhow::anyhow!("Failed to dial peer: {}", e)
+        })?;
+        info!("Dailed peer successfully at {}", multiaddr);
+        Ok(())
+    }
+
+    // TODO: create proper builder instead of this fudgy version
+    // get working for now then refactor
     pub fn with_identity(&mut self, keypair: &identity::Keypair) -> &mut Self {
         self.identity = Some(keypair.clone());
+        self
+    }
+
+    pub fn with_udp_port(&mut self, port: u16) -> &mut Self {
+        self.udp_port = Some(port);
         self
     }
 
@@ -126,11 +149,18 @@ impl EnclaveRouter {
     }
 
     /// Listen on the default multiaddr
-    pub async fn start(&mut self) -> Result<()> {
-        self.swarm
-            .as_mut()
-            .unwrap()
-            .listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
+    pub async fn start(&mut self, peers: Vec<String>) -> Result<()> {
+        let addr = match self.udp_port {
+            Some(port) => format!("/ip4/0.0.0.0/udp/{}/quic-v1", port),
+            None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
+        };
+        info!("Requesting node.listen_on('{}')", addr);
+        self.swarm.as_mut().unwrap().listen_on(addr.parse()?)?;
+
+        info!("Peers to dial: {:?}", peers);
+        for addr in peers {
+            self.dial_peer(&addr).await?;
+        }
 
         loop {
             select! {
@@ -159,12 +189,14 @@ impl EnclaveRouter {
                 SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
                     debug!("Kademlia event: {:?}", e);
                 }
+
                 SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                     for (peer_id, _multiaddr) in list {
                         trace!("mDNS discovered a new peer: {peer_id}");
                         self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                     }
                 },
+
                 SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                     for (peer_id, _multiaddr) in list {
                         trace!("mDNS discover peer has expired: {peer_id}");
@@ -184,7 +216,7 @@ impl EnclaveRouter {
                         self.evt_tx.send(message.data).await?;
                     },
                     SwarmEvent::NewListenAddr { address, .. } => {
-                        trace!("Local node is listening on {address}");
+                        warn!("Local node is listening on {address}");
                     }
                     _ => {}
                 }

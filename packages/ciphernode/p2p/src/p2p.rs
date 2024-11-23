@@ -92,7 +92,7 @@ impl P2p {
         //     .expect("listen on quic");
 
         let p2p_addr = Self::spawn_and_listen(bus, tx, rx);
-        let handle = tokio::spawn(async move { libp2p.start().await.unwrap() });
+        let handle = tokio::spawn(async move { libp2p.start(vec![]).await.unwrap() });
         Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
