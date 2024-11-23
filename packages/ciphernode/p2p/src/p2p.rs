@@ -1,12 +1,7 @@
 use std::{
     collections::HashSet,
     error::Error,
-    net::{IpAddr, Ipv6Addr},
 };
-
-use libp2p::multiaddr::{Multiaddr, Protocol};
-
-use crate::constants::PORT_QUIC;
 
 use crate::libp2p_router::EnclaveRouter;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
