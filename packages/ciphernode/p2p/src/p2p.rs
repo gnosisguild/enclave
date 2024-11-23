@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    error::Error,
-};
+use std::{collections::HashSet, error::Error};
 
 use crate::libp2p_router::EnclaveRouter;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
@@ -12,7 +9,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
 use tracing::{error, trace};
 
-/// P2p Actor converts between EVentBus events and Libp2p events
+/// P2p Actor converts between EventBus events and Libp2p events
 pub struct P2p {
     bus: Addr<EventBus>,
     tx: Sender<Vec<u8>>,
@@ -74,17 +71,6 @@ impl P2p {
         libp2p.with_identity(&keypair);
         libp2p.connect_swarm()?;
         libp2p.join_topic("enclave-keygen-01")?;
-
-        // let address_quic = Multiaddr::from(IpAddr::V6(Ipv6Addr::UNSPECIFIED))
-        //     .with(Protocol::Udp(PORT_QUIC))
-        //     .with(Protocol::QuicV1);
-        //
-        // libp2p
-        //     .swarm
-        //     .as_mut()
-        //     .unwrap()
-        //     .listen_on(address_quic.clone())
-        //     .expect("listen on quic");
 
         let p2p_addr = Self::spawn_and_listen(bus, tx, rx);
         let handle = tokio::spawn(async move { libp2p.start(vec![]).await.unwrap() });
