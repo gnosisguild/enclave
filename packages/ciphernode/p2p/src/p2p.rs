@@ -65,7 +65,7 @@ impl P2p {
     /// Spawn a Libp2p instance. Calls spawn and listen
     pub fn spawn_libp2p(
         bus: Addr<EventBus>,
-        peers: Vec<String>
+        peers: Vec<String>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<()>, String), Box<dyn Error>> {
         let (mut libp2p, tx, rx) = EnclaveRouter::new()?;
         let keypair = libp2p::identity::Keypair::generate_ed25519();

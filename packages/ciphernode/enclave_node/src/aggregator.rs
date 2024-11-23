@@ -82,7 +82,8 @@ pub async fn setup_aggregator(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = P2p::spawn_libp2p(bus.clone(), config.peers()).expect("Failed to setup libp2p");
+    let (_, join_handle, peer_id) =
+        P2p::spawn_libp2p(bus.clone(), config.peers()).expect("Failed to setup libp2p");
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());
