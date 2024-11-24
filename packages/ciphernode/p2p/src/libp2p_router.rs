@@ -5,7 +5,7 @@ use libp2p::{
     identity, kad::store::MemoryStore, kad::Behaviour as KademliaBehaviour,
     swarm::NetworkBehaviour, swarm::SwarmEvent,
 };
-use libp2p::{identify, mdns, Multiaddr};
+use libp2p::{identify, mdns, Multiaddr, Swarm};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
@@ -172,55 +172,66 @@ impl EnclaveRouter {
                     }
                 }
 
-                event = self.swarm.as_mut().unwrap().select_next_some() => match event {
-
-                SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                    info!("Connected to {peer_id}");
-                }
-
-                SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
-                    warn!("Failed to dial {peer_id:?}: {error}");
-                }
-
-                SwarmEvent::IncomingConnectionError { error, .. } => {
-                    warn!("{:#}", anyhow::Error::from(error))
-                }
-
-                SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
-                    debug!("Kademlia event: {:?}", e);
-                }
-
-                SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                    for (peer_id, _multiaddr) in list {
-                        trace!("mDNS discovered a new peer: {peer_id}");
-                        self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                    }
-                },
-
-                SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                    for (peer_id, _multiaddr) in list {
-                        trace!("mDNS discover peer has expired: {peer_id}");
-                        self.swarm.as_mut().unwrap().behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                    }
-                },
-
-                SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                    propagation_source: peer_id,
-                    message_id: id,
-                    message,
-                })) => {
-                    trace!(
-                        "Got message with id: {id} from peer: {peer_id}",
-                    );
-                    trace!("{:?}", message);
-                        self.evt_tx.send(message.data).await?;
-                    },
-                    SwarmEvent::NewListenAddr { address, .. } => {
-                        warn!("Local node is listening on {address}");
-                    }
-                    _ => {}
+                event = self.swarm.as_mut().unwrap().select_next_some() =>  {
+                    process_swarm_event(self.swarm.as_mut().unwrap(), &mut self.evt_tx, event).await?
                 }
             }
         }
     }
+}
+
+async fn process_swarm_event(
+    swarm: &mut Swarm<NodeBehaviour>,
+    evt_tx: &mut Sender<Vec<u8>>,
+    event: SwarmEvent<NodeBehaviourEvent>,
+) -> Result<()> {
+    match event {
+        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+            info!("Connected to {peer_id}");
+        }
+
+        SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
+            warn!("Failed to dial {peer_id:?}: {error}");
+        }
+
+        SwarmEvent::IncomingConnectionError { error, .. } => {
+            warn!("{:#}", anyhow::Error::from(error))
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
+            debug!("Kademlia event: {:?}", e);
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
+            for (peer_id, _multiaddr) in list {
+                trace!("mDNS discovered a new peer: {peer_id}");
+                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+            }
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
+            for (peer_id, _multiaddr) in list {
+                trace!("mDNS discover peer has expired: {peer_id}");
+                swarm
+                    .behaviour_mut()
+                    .gossipsub
+                    .remove_explicit_peer(&peer_id);
+            }
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+            propagation_source: peer_id,
+            message_id: id,
+            message,
+        })) => {
+            trace!("Got message with id: {id} from peer: {peer_id}",);
+            trace!("{:?}", message);
+            evt_tx.send(message.data).await?;
+        }
+        SwarmEvent::NewListenAddr { address, .. } => {
+            warn!("Local node is listening on {address}");
+        }
+        _ => {}
+    };
+    Ok(())
 }
