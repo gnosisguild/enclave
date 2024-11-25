@@ -1,4 +1,5 @@
-set -eu  # Exit immediately if a command exits with a non-zero status
+#!/usr/bin/env bash
+set -euo pipefail  # Stricter error handling
 
 # Get the script's location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

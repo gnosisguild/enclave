@@ -82,8 +82,7 @@ pub async fn setup_aggregator(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) =
-        NetworkRelay::setup_with_peer(bus.clone(), config.peers())?;
+    let (_, join_handle, peer_id) = NetworkRelay::setup_with_peer(bus.clone(), config.peers())?;
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());
