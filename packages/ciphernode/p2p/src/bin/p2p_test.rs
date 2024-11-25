@@ -1,5 +1,5 @@
 use anyhow::Result;
-use p2p::EnclaveRouter;
+use p2p::NetworkPeer;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::time::{sleep, timeout};
@@ -19,6 +19,7 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
     let name = env::args().nth(1).expect("need name");
+
     println!("{} starting up", name);
 
     let udp_port = env::var("QUIC_PORT")
@@ -29,25 +30,20 @@ async fn main() -> Result<()> {
         .ok()
         .and_then(|p| p.parse::<String>().ok());
 
-    let (mut router, tx, mut rx) = EnclaveRouter::new()?;
-    let keypair = libp2p::identity::Keypair::generate_ed25519();
-
-    router
-        .with_identity(&keypair)
-        .connect_swarm()?
-        .join_topic("test-topic")?;
-
-    if let Some(port) = udp_port {
-        router.with_udp_port(port);
-    }
-
     let peers: Vec<String> = dial_to.iter().cloned().collect();
+
+    let id = libp2p::identity::Keypair::generate_ed25519();
+    let mut peer = NetworkPeer::new(&id, peers, udp_port, "test-topic")?;
+
+    // Extract input and outputs
+    let tx = peer.tx();
+    let mut rx = peer.rx().unwrap();
 
     let router_task = tokio::spawn({
         let name = name.clone();
         async move {
             println!("{} starting router task", name);
-            if let Err(e) = router.start(peers).await {
+            if let Err(e) = peer.start().await {
                 println!("{} router task failed: {}", name, e);
             }
             println!("{} router task finished", name);

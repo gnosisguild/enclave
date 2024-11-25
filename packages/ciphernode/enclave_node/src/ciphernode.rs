@@ -26,7 +26,7 @@ use crate::setup_datastore;
 pub async fn setup_ciphernode(
     config: AppConfig,
     address: Address,
-) -> Result<(Addr<EventBus>, JoinHandle<()>, String)> {
+) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(
         rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
     ));
@@ -72,7 +72,7 @@ pub async fn setup_ciphernode(
         .await?;
 
     let (_, join_handle, peer_id) =
-        P2p::spawn_libp2p(bus.clone(), config.peers()).expect("Failed to setup libp2p");
+        P2p::setup_with_peer(bus.clone(), config.peers()).expect("Failed to setup libp2p");
 
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
     SimpleLogger::attach(&nm, bus.clone());

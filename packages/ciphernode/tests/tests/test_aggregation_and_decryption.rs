@@ -468,7 +468,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let (tx, mut output) = channel(100); // Transmit byte events to the network
     let (input, rx) = channel(100); // Receive byte events from the network
     let bus = EventBus::new(true).start();
-    P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
+    P2p::setup(bus.clone(), tx.clone(), rx);
 
     // Capture messages from output on msgs vec
     let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
@@ -535,7 +535,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     let (tx, _) = channel(100); // Transmit byte events to the network
     let (input, rx) = channel(100); // Receive byte events from the network
     let bus = EventBus::new(true).start();
-    P2p::spawn_and_listen(bus.clone(), tx.clone(), rx);
+    P2p::setup(bus.clone(), tx.clone(), rx);
 
     // Capture messages from output on msgs vec
     let event = EnclaveEvent::from(E3Requested {
