@@ -66,7 +66,7 @@ impl NetworkRelay {
     pub fn setup_with_peer(
         bus: Addr<EventBus>,
         peers: Vec<String>,
-    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String), Box<dyn Error>> {
+    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
         let keypair = libp2p::identity::Keypair::generate_ed25519();
         let mut peer = NetworkPeer::new(&keypair, peers, None, "tmp-enclave-gossip-topic")?;
         let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;

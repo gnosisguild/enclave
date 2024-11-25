@@ -83,7 +83,7 @@ pub async fn setup_aggregator(
         .await?;
 
     let (_, join_handle, peer_id) =
-        NetworkRelay::setup_with_peer(bus.clone(), config.peers()).expect("Failed to setup libp2p");
+        NetworkRelay::setup_with_peer(bus.clone(), config.peers())?;
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());
