@@ -1,5 +1,5 @@
 use actix::{Actor, Addr};
-use anyhow::{bail, Result};
+use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
 use enclave_core::EventBus;
@@ -11,7 +11,7 @@ use evm::{
     CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
 };
 use logger::SimpleLogger;
-use p2p::NetworkRelay;
+use net::NetworkRelay;
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
 use router::{

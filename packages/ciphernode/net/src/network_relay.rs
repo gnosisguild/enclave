@@ -10,7 +10,8 @@ use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, trace};
 
-/// NetworkRelay Actor converts between EventBus events and Libp2p events
+/// NetworkRelay Actor converts between EventBus events and Libp2p events forwarding them to a
+/// NetworkPeer for propagation over the p2p network
 pub struct NetworkRelay {
     bus: Addr<EventBus>,
     tx: Sender<Vec<u8>>,

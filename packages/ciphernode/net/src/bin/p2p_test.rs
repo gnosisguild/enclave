@@ -1,5 +1,5 @@
 use anyhow::Result;
-use p2p::NetworkPeer;
+use net::NetworkPeer;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::time::{sleep, timeout};

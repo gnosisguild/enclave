@@ -2,4 +2,4 @@
 
 set -eu
 
-cd ./packages/ciphernode/p2p/tests && ./run.sh
+cd ./packages/ciphernode/net/tests && ./run.sh

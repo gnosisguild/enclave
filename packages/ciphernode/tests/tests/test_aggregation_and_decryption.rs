@@ -8,7 +8,7 @@ use enclave_core::{
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
-use p2p::NetworkRelay;
+use net::NetworkRelay;
 use router::{
     CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
     PublicKeyAggregatorFeature, RepositoriesFactory,

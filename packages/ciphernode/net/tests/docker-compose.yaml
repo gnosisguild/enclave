@@ -1,7 +1,7 @@
 services:
   alice:
     build: 
-      dockerfile: p2p/tests/Dockerfile
+      dockerfile: net/tests/Dockerfile
       context: ../..
     networks:
       app_net:
@@ -16,7 +16,7 @@ services:
 
   bob:
     build: 
-      dockerfile: p2p/tests/Dockerfile
+      dockerfile: net/tests/Dockerfile
       context: ../..
     networks:
       app_net:
@@ -32,7 +32,7 @@ services:
 
   charlie:
     build: 
-      dockerfile: p2p/tests/Dockerfile
+      dockerfile: net/tests/Dockerfile
       context: ../..
     networks:
       app_net:

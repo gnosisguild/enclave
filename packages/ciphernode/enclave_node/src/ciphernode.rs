@@ -9,7 +9,7 @@ use evm::{
     CiphernodeRegistrySol, EnclaveSolReader,
 };
 use logger::SimpleLogger;
-use p2p::NetworkRelay;
+use net::NetworkRelay;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use router::{

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -85,7 +85,10 @@ impl NetworkPeer {
         };
         info!("Requesting node.listen_on('{}')", addr);
 
-        self.swarm.behaviour_mut().gossipsub.subscribe(&self.topic)?;
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&self.topic)?;
         self.swarm.listen_on(addr.parse()?)?;
 
         info!("Peers to dial: {:?}", self.peers);

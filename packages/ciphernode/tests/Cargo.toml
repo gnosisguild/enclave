@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-p2p = { path = "../p2p" }
+net = { path = "../net" }
 bfv = { path = "../bfv" }
 sortition = { path = "../sortition" }
 enclave-core = { path = "../core" }

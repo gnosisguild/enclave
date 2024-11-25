@@ -24,7 +24,7 @@ evm = { path = "../evm" }
 fhe = { path = "../fhe" }
 keyshare = { path = "../keyshare" }
 logger = { path = "../logger" }
-p2p = { path = "../p2p" }
+net = { path = "../net" }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 router = { path = "../router" }

@@ -3,7 +3,7 @@ members = [
   "core",
   "enclave",
   "enclave_node",
-  "p2p",
+  "net",
   "bfv",
   "data",
   "evm",

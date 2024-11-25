@@ -11,10 +11,10 @@
 !core/Cargo.toml
 !core/src/**/*.rs
 
-# p2p
-!p2p/
-!p2p/Cargo.toml
-!p2p/src/**/*.rs
+# net
+!net/
+!net/Cargo.toml
+!net/src/**/*.rs
 
 
 # Allow all other workspace members (adjust paths as needed)
