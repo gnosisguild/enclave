@@ -72,7 +72,7 @@ pub async fn setup_ciphernode(
         .await?;
 
     let (_, join_handle, peer_id) =
-        NetworkRelay::setup_with_peer(bus.clone(), config.peers()).expect("Failed to setup libp2p");
+        NetworkRelay::setup_with_peer(bus.clone(), config.peers())?;
 
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
     SimpleLogger::attach(&nm, bus.clone());
