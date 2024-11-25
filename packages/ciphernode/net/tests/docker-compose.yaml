@@ -12,7 +12,9 @@ services:
       DIAL_TO: "/ip4/172.16.238.12/udp/9091/quic-v1"
       BLOCK_MDNS: ${BLOCK_MDNS:-false}
     entrypoint: ["/app/entrypoint.sh"]
-    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
 
   bob:
     build: 
@@ -27,7 +29,9 @@ services:
       DIAL_TO: "/ip4/172.16.238.12/udp/9091/quic-v1"
       BLOCK_MDNS: ${BLOCK_MDNS:-false}
     entrypoint: ["/app/entrypoint.sh"]
-    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
 
 
   charlie:
@@ -42,7 +46,9 @@ services:
       QUIC_PORT: 9091
       BLOCK_MDNS: ${BLOCK_MDNS:-false}
     entrypoint: ["/app/entrypoint.sh"]
-    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
 
 
 networks:
