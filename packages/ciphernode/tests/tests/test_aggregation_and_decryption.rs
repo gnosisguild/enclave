@@ -8,7 +8,7 @@ use enclave_core::{
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
-use p2p::P2p;
+use p2p::NetworkRelay;
 use router::{
     CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
     PublicKeyAggregatorFeature, RepositoriesFactory,
@@ -468,7 +468,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let (tx, mut output) = channel(100); // Transmit byte events to the network
     let (input, rx) = channel(100); // Receive byte events from the network
     let bus = EventBus::new(true).start();
-    P2p::setup(bus.clone(), tx.clone(), rx);
+    NetworkRelay::setup(bus.clone(), tx.clone(), rx);
 
     // Capture messages from output on msgs vec
     let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
@@ -514,14 +514,14 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     assert_eq!(
         *msgs.lock().await,
         vec![evt_1.to_bytes()?, evt_2.to_bytes()?], // notice no local events
-        "P2p did not transmit correct events to the network"
+        "NetworkRelay did not transmit correct events to the network"
     );
 
     assert_eq!(
         history,
         vec![evt_1, evt_2, local_evt_3], // all local events that have been broadcast but no
         // events from the loopback
-        "P2p must not retransmit forwarded event to event bus"
+        "NetworkRelay must not retransmit forwarded event to event bus"
     );
 
     Ok(())
@@ -535,7 +535,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     let (tx, _) = channel(100); // Transmit byte events to the network
     let (input, rx) = channel(100); // Receive byte events from the network
     let bus = EventBus::new(true).start();
-    P2p::setup(bus.clone(), tx.clone(), rx);
+    NetworkRelay::setup(bus.clone(), tx.clone(), rx);
 
     // Capture messages from output on msgs vec
     let event = EnclaveEvent::from(E3Requested {

@@ -11,7 +11,7 @@ use evm::{
     CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
 };
 use logger::SimpleLogger;
-use p2p::P2p;
+use p2p::NetworkRelay;
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
 use router::{
@@ -83,7 +83,7 @@ pub async fn setup_aggregator(
         .await?;
 
     let (_, join_handle, peer_id) =
-        P2p::setup_with_peer(bus.clone(), config.peers()).expect("Failed to setup libp2p");
+        NetworkRelay::setup_with_peer(bus.clone(), config.peers()).expect("Failed to setup libp2p");
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());
