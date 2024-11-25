@@ -4,8 +4,8 @@ use crate::NetworkPeer;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
-use anyhow::Result;
 use anyhow::anyhow;
+use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, trace};
