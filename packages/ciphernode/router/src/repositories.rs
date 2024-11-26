@@ -1,106 +1,35 @@
-use crate::{CommitteeMeta, E3RequestContextSnapshot, E3RequestRouterSnapshot};
-use aggregator::{PlaintextAggregatorState, PublicKeyAggregatorState};
-use data::{DataStore, Repository};
+use config::StoreKeys;
+use data::{Repositories, Repository};
 use enclave_core::E3id;
-use evm::EvmEventReaderState;
-use fhe::FheSnapshot;
-use keyshare::KeyshareState;
-use sortition::SortitionModule;
 
-pub struct Repositories {
-    store: DataStore,
+use crate::{CommitteeMeta, E3RequestContextSnapshot, E3RequestRouterSnapshot};
+
+pub trait MetaRepositoryFactory {
+    fn meta(&self, e3_id: &E3id) -> Repository<CommitteeMeta>;
 }
 
-impl From<DataStore> for Repositories {
-    fn from(value: DataStore) -> Self {
-        Repositories { store: value }
-    }
-}
-impl From<&DataStore> for Repositories {
-    fn from(value: &DataStore) -> Self {
-        Repositories {
-            store: value.clone(),
-        }
+impl MetaRepositoryFactory for Repositories {
+    fn meta(&self, e3_id: &E3id) -> Repository<CommitteeMeta> {
+        Repository::new(self.store.scope(StoreKeys::meta(e3_id)))
     }
 }
 
-impl Repositories {
-    pub fn new(store: DataStore) -> Self {
-        Repositories { store }
+pub trait ContextRepositoryFactory {
+    fn context(&self, e3_id: &E3id) -> Repository<E3RequestContextSnapshot>;
+}
+
+impl ContextRepositoryFactory for Repositories {
+    fn context(&self, e3_id: &E3id) -> Repository<E3RequestContextSnapshot> {
+        Repository::new(self.store.scope(StoreKeys::context(e3_id)))
     }
 }
 
-impl<T> From<Repository<T>> for Repositories {
-    fn from(value: Repository<T>) -> Self {
-        let store: DataStore = value.into();
-        store.into()
-    }
+pub trait RouterRepositoryFactory {
+    fn router(&self) -> Repository<E3RequestRouterSnapshot>;
 }
 
-impl Repositories {
-    pub fn keyshare(&self, e3_id: &E3id) -> Repository<KeyshareState> {
-        Repository::new(self.store.scope(format!("//keyshare/{e3_id}")))
-    }
-
-    pub fn plaintext(&self, e3_id: &E3id) -> Repository<PlaintextAggregatorState> {
-        Repository::new(self.store.scope(format!("//plaintext/{e3_id}")))
-    }
-
-    pub fn publickey(&self, e3_id: &E3id) -> Repository<PublicKeyAggregatorState> {
-        Repository::new(self.store.scope(format!("//publickey/{e3_id}")))
-    }
-
-    pub fn fhe(&self, e3_id: &E3id) -> Repository<FheSnapshot> {
-        Repository::new(self.store.scope(format!("//fhe/{e3_id}")))
-    }
-
-    pub fn meta(&self, e3_id: &E3id) -> Repository<CommitteeMeta> {
-        Repository::new(self.store.scope(format!("//meta/{e3_id}")))
-    }
-
-    pub fn context(&self, e3_id: &E3id) -> Repository<E3RequestContextSnapshot> {
-        Repository::new(self.store.scope(format!("//context/{e3_id}")))
-    }
-
-    pub fn router(&self) -> Repository<E3RequestRouterSnapshot> {
-        Repository::new(self.store.scope(format!("//router")))
-    }
-
-    pub fn sortition(&self) -> Repository<SortitionModule> {
-        Repository::new(self.store.scope(format!("//sortition")))
-    }
-
-    pub fn eth_private_key(&self) -> Repository<Vec<u8>> {
-        Repository::new(self.store.scope(format!("//eth_private_key")))
-    }
-
-    pub fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
-        Repository::new(
-            self.store
-                .scope(format!("//evm_readers/enclave/{chain_id}")),
-        )
-    }
-    pub fn ciphernode_registry_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
-        Repository::new(
-            self.store
-                .scope(format!("//evm_readers/ciphernode_registry/{chain_id}")),
-        )
-    }
-}
-
-pub trait RepositoriesFactory {
-    fn repositories(&self) -> Repositories;
-}
-
-impl RepositoriesFactory for DataStore {
-    fn repositories(&self) -> Repositories {
-        self.into()
-    }
-}
-
-impl<T> RepositoriesFactory for Repository<T> {
-    fn repositories(&self) -> Repositories {
-        let store: DataStore = self.into();
-        store.repositories()
+impl RouterRepositoryFactory for Repositories {
+    fn router(&self) -> Repository<E3RequestRouterSnapshot> {
+        Repository::new(self.store.scope(StoreKeys::router()))
     }
 }

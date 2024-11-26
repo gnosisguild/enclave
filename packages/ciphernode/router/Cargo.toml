@@ -9,6 +9,7 @@ enclave-core = { path = "../core" }
 sortition = { path = "../sortition" }
 fhe = { path = "../fhe" }
 data = { path = "../data" }
+config = { path = "../config" }
 keyshare = { path = "../keyshare" }
 aggregator = { path = "../aggregator" }
 evm = { path = "../evm" }

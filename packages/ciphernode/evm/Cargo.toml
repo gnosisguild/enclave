@@ -10,6 +10,7 @@ alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 enclave-core = { path = "../core" }
+config = { path = "../config" }
 data = { path = "../data" }
 futures-util = { workspace = true }
 sortition = { path = "../sortition" }
