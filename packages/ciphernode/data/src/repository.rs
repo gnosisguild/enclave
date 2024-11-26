@@ -56,6 +56,10 @@ where
         self.store.read().await
     }
 
+    pub async fn has(&self) -> bool {
+        self.read().await.ok().flatten().is_some()
+    }
+
     pub fn write(&self, value: &T) {
         self.store.write(value)
     }

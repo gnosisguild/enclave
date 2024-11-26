@@ -5,6 +5,7 @@ mod repository;
 mod repositories;
 mod sled_store;
 mod snapshot;
+mod persistable;
 
 pub use data_store::*;
 pub use in_mem::*;
@@ -13,3 +14,5 @@ pub use repository::*;
 pub use repositories::*;
 pub use sled_store::*;
 pub use snapshot::*;
+pub use persistable::*;
+

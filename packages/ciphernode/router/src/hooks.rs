@@ -8,8 +8,8 @@ use aggregator::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cipher::Cipher;
-use data::RepositoriesFactory;
 use data::{FromSnapshotWithParams, Snapshot};
+use data::{RepositoriesFactory, WithPersistable};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, FheRepositoryFactory, SharedRng};
 use keyshare::{Keyshare, KeyshareParams, KeyshareRepositoryFactory};
@@ -122,11 +122,13 @@ impl E3Feature for KeyshareFeature {
         };
 
         let e3_id = data.clone().e3_id;
+        let repo = ctx.repositories().keyshare(&e3_id);
+        let container = repo.persistable(None);
 
         ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
                 bus: self.bus.clone(),
-                store: ctx.repositories().keyshare(&e3_id),
+                secret: container,
                 fhe: fhe.clone(),
                 address: self.address.clone(),
                 cipher: self.cipher.clone(),
@@ -145,10 +147,14 @@ impl E3Feature for KeyshareFeature {
             return Ok(());
         };
 
-        let store = ctx.repositories().keyshare(&snapshot.e3_id);
+        let store = ctx
+            .repositories()
+            .keyshare(&snapshot.e3_id)
+            .synced()
+            .await?;
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = store.read().await? else {
+        if !store.has() {
             return Ok(());
         };
 
@@ -162,17 +168,13 @@ impl E3Feature for KeyshareFeature {
         };
 
         // Construct from snapshot
-        let value = Keyshare::from_snapshot(
-            KeyshareParams {
-                fhe,
-                bus: self.bus.clone(),
-                store,
-                address: self.address.clone(),
-                cipher: self.cipher.clone(),
-            },
-            snap,
-        )
-        .await?
+        let value = Keyshare::new(KeyshareParams {
+            fhe,
+            bus: self.bus.clone(),
+            secret: store,
+            address: self.address.clone(),
+            cipher: self.cipher.clone(),
+        })
         .start();
 
         // send to context
