@@ -210,3 +210,4 @@ impl Handler<Die> for Keyshare {
         ctx.stop()
     }
 }
+

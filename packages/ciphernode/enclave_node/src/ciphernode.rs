@@ -3,19 +3,20 @@ use alloy::primitives::Address;
 use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
+use data::RepositoriesFactory;
 use enclave_core::{get_tag, EventBus};
 use evm::{
     helpers::{ProviderConfig, RPC},
-    CiphernodeRegistrySol, EnclaveSolReader,
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSolReader,
+    EnclaveSolReaderRepositoryFactory,
 };
 use logger::SimpleLogger;
 use net::NetworkRelay;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{
-    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, RepositoriesFactory,
-};
+use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature};
 use sortition::Sortition;
+use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 use tracing::instrument;

@@ -1,15 +1,15 @@
-use std::sync::Arc;
-
-use crate::{CommitteeMeta, E3Feature, EventBuffer, Repositories, RepositoriesFactory};
+use crate::{CommitteeMeta, E3Feature, EventBuffer};
 use actix::{Addr, Recipient};
 use aggregator::{PlaintextAggregator, PublicKeyAggregator};
 use anyhow::Result;
 use async_trait::async_trait;
 use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
+use data::{Repositories, RepositoriesFactory};
 use enclave_core::{E3id, EnclaveEvent};
 use fhe::Fhe;
 use keyshare::Keyshare;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Context that is set to each event hook. Hooks can use this context to gather dependencies if
 /// they need to instantiate struct instances or actors.

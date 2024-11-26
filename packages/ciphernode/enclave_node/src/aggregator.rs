@@ -2,20 +2,20 @@ use actix::{Actor, Addr};
 use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
+use data::RepositoriesFactory;
 use enclave_core::EventBus;
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig, RPC},
     CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
 use logger::SimpleLogger;
 use net::NetworkRelay;
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
-use router::{
-    E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature,
-    RepositoriesFactory,
-};
-use sortition::Sortition;
+use router::{E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
+use sortition::{Sortition, SortitionRepositoryFactory};
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;

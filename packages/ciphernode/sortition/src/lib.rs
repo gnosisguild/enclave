@@ -5,7 +5,9 @@
 mod distance;
 mod index;
 mod sortition;
+mod repositories;
 
 pub use distance::*;
 pub use index::*;
 pub use sortition::*;
+pub use repositories::*;

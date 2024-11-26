@@ -4,6 +4,7 @@ use cipher::Cipher;
 use config::AppConfig;
 use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
+use evm::EthPrivateKeyRepositoryFactory;
 
 pub async fn execute(config: &AppConfig, input: String) -> Result<()> {
     let cipher = Cipher::from_config(config).await?;
