@@ -1,4 +1,5 @@
 use cipher::Cipher;
+use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
@@ -11,12 +12,12 @@ use logger::SimpleLogger;
 use net::NetworkRelay;
 use router::{
     CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
-    PublicKeyAggregatorFeature, RepositoriesFactory,
+    PublicKeyAggregatorFeature,
 };
-use sortition::Sortition;
+use sortition::{Sortition, SortitionRepositoryFactory};
 
 use actix::prelude::*;
-use alloy::{primitives::Address, signers::k256::sha2::digest::Reset};
+use alloy::primitives::Address;
 use anyhow::*;
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
@@ -26,7 +27,7 @@ use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::{env, path::Path, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::{sync::mpsc::channel, time::sleep};
 

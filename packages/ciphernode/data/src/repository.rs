@@ -6,7 +6,8 @@ use crate::DataStore;
 
 #[derive(Debug)]
 pub struct Repository<S> {
-    store: DataStore,
+    /// store is currently set to be a scopeable key value store
+    store: DataStore, // this could change and be abstracted if need be
     _p: PhantomData<S>,
 }
 
