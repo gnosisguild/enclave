@@ -246,8 +246,8 @@ impl Handler<Die> for PublicKeyAggregator {
 impl Snapshot for PublicKeyAggregator {
     type Snapshot = PublicKeyAggregatorState;
 
-    fn snapshot(&self) -> Self::Snapshot {
-        self.state.clone()
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(self.state.clone())
     }
 }
 

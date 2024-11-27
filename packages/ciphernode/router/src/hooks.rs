@@ -8,8 +8,8 @@ use aggregator::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cipher::Cipher;
+use data::{AutoPersist, RepositoriesFactory};
 use data::{FromSnapshotWithParams, Snapshot};
-use data::{RepositoriesFactory, AutoPersist};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, FheRepositoryFactory, SharedRng};
 use keyshare::{Keyshare, KeyshareParams, KeyshareRepositoryFactory};
@@ -59,7 +59,14 @@ impl E3Feature for FheFeature {
         let fhe = Arc::new(fhe_inner);
 
         // FHE doesn't implement Checkpoint so we are going to store it manually
-        ctx.repositories().fhe(&e3_id).write(&fhe.snapshot());
+        let Ok(snapshot) = fhe.snapshot() else {
+            self.bus.err(
+                EnclaveErrorType::KeyGeneration,
+                anyhow!("Failed to get snapshot"),
+            );
+            return;
+        };
+        ctx.repositories().fhe(&e3_id).write(&snapshot);
 
         let _ = ctx.set_fhe(fhe);
     }
@@ -225,22 +232,23 @@ impl E3Feature for PlaintextAggregatorFeature {
         };
 
         let e3_id = data.e3_id.clone();
+        let repo = ctx.repositories().plaintext(&e3_id);
+        let sync_state = repo.sync_new(Some(PlaintextAggregatorState::init(
+            meta.threshold_m,
+            meta.seed,
+            data.ciphertext_output.clone(),
+        )));
 
-        let _ = ctx.set_plaintext(
+        ctx.set_plaintext(
             PlaintextAggregator::new(
                 PlaintextAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.repositories().plaintext(&e3_id),
                     sortition: self.sortition.clone(),
-                    e3_id,
+                    e3_id: e3_id.clone(),
                     src_chain_id: meta.src_chain_id,
                 },
-                PlaintextAggregatorState::init(
-                    meta.threshold_m,
-                    meta.seed,
-                    data.ciphertext_output.clone(),
-                ),
+                sync_state,
             )
             .start(),
         );
@@ -256,10 +264,11 @@ impl E3Feature for PlaintextAggregatorFeature {
             return Ok(());
         }
 
-        let store = ctx.repositories().plaintext(&snapshot.e3_id);
+        let repo = ctx.repositories().plaintext(&snapshot.e3_id);
+        let sync_state = repo.sync_load().await?;
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = store.read().await? else {
+        if !sync_state.has() {
             return Ok(());
         };
 
@@ -280,18 +289,16 @@ impl E3Feature for PlaintextAggregatorFeature {
             return Ok(());
         };
 
-        let value = PlaintextAggregator::from_snapshot(
+        let value = PlaintextAggregator::new(
             PlaintextAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
-                store,
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 src_chain_id: meta.src_chain_id,
             },
-            snap,
+            sync_state,
         )
-        .await?
         .start();
 
         // send to context

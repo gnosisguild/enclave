@@ -562,7 +562,7 @@ impl Display for TestEvent {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Seed(pub [u8; 32]);
 impl From<Seed> for u64 {
     fn from(value: Seed) -> Self {

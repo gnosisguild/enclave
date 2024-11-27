@@ -2,6 +2,7 @@ use crate::Repository;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
+use tracing::error;
 
 /// This trait enables the self type to report their state snapshot
 pub trait Snapshot
@@ -14,7 +15,7 @@ where
     type Snapshot: Serialize + DeserializeOwned;
 
     /// Return the Snapshot object for the implementor
-    fn snapshot(&self) -> Self::Snapshot;
+    fn snapshot(&self) -> Result<Self::Snapshot>;
 }
 
 /// This trait enables the self type to checkpoint its state
@@ -24,7 +25,15 @@ pub trait Checkpoint: Snapshot {
 
     /// Write the current snapshot to the `Repository` provided by `repository()`
     fn checkpoint(&self) {
-        self.repository().write(&self.snapshot());
+       let snapshot = match self.snapshot() {
+            Ok(v) => v,
+            Err(err) => {
+                error!("{}",err);
+                return;
+            }
+        };
+        
+        self.repository().write(&snapshot);
     }
 }
 

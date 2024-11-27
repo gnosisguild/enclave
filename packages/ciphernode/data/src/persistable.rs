@@ -91,14 +91,11 @@ where
     /// Mutate the content if it is available or return an error if not.
     pub fn try_mutate<F>(&mut self, mutator: F) -> Result<()>
     where
-        F: FnOnce(T) -> T,
+        F: FnOnce(T) -> Result<T>,
     {
         let current = std::mem::take(&mut self.data);
-        if current.is_none() {
-            self.data = None; // probably not necessary but just incase
-            return Err(anyhow!("Data has not been set"));
-        }
-        self.data = current.map(mutator);
+        let content = current.ok_or(anyhow!("Data has not been set"))?;
+        self.data = Some(mutator(content)?);
         self.checkpoint();
         Ok(())
     }
@@ -147,8 +144,11 @@ where
     T: PersistableData,
 {
     type Snapshot = T;
-    fn snapshot(&self) -> Self::Snapshot {
-        self.data.clone().unwrap_or_default()
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(self
+            .data
+            .clone()
+            .ok_or(anyhow!("No data stored on container"))?)
     }
 }
 
