@@ -64,4 +64,8 @@ where
     pub fn write(&self, value: &T) {
         self.store.write(value)
     }
+
+    pub fn clear(&self) {
+        self.store.write::<Option<T>>(None)
+    }
 }

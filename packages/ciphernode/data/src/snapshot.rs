@@ -28,12 +28,16 @@ pub trait Checkpoint: Snapshot {
        let snapshot = match self.snapshot() {
             Ok(v) => v,
             Err(err) => {
-                error!("{}",err);
+                error!("Not saving data because '{}'",err);
                 return;
             }
         };
         
         self.repository().write(&snapshot);
+    }
+
+    fn clear_checkpoint(&self) {
+        self.repository().clear()
     }
 }
 

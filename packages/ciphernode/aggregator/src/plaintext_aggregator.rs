@@ -1,7 +1,6 @@
 use actix::prelude::*;
 use anyhow::Result;
-use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Persistable, Repository, Snapshot};
+use data::Persistable;
 use enclave_core::{
     DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
     Seed,
@@ -234,26 +233,3 @@ impl Handler<Die> for PlaintextAggregator {
         ctx.stop()
     }
 }
-//
-// impl Snapshot for PlaintextAggregator {
-//     type Snapshot = PlaintextAggregatorState;
-//
-//     fn snapshot(&self) -> Result<Self::Snapshot> {
-//         Ok(self.state)
-//     }
-// }
-
-// #[async_trait]
-// impl FromSnapshotWithParams for PlaintextAggregator {
-//     type Params = PlaintextAggregatorParams;
-//
-//     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
-//         Ok(PlaintextAggregator::new(params, snapshot))
-//     }
-// }
-//
-// impl Checkpoint for PlaintextAggregator {
-//     fn repository(&self) -> &Repository<PlaintextAggregatorState> {
-//         &self.store
-//     }
-// }
