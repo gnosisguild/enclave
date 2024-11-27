@@ -36,7 +36,8 @@ impl Get {
     }
 }
 
-/// Generate proxy for the DB
+/// Generate proxy for the DB / KV store
+/// DataStore is scopable
 #[derive(Clone, Debug)]
 pub struct DataStore {
     scope: Vec<u8>,

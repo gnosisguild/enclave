@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cipher::Cipher;
 use data::{FromSnapshotWithParams, Snapshot};
-use data::{RepositoriesFactory, WithPersistable};
+use data::{RepositoriesFactory, AutoPersist};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::{Keyshare, KeyshareParams};
@@ -122,7 +122,7 @@ impl E3Feature for KeyshareFeature {
 
         let e3_id = data.clone().e3_id;
         let repo = ctx.repositories().keyshare(&e3_id);
-        let container = repo.persistable(None);
+        let container = repo.sync_new(None);
 
         ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
@@ -146,14 +146,14 @@ impl E3Feature for KeyshareFeature {
             return Ok(());
         };
 
-        let store = ctx
+        let sync_secret = ctx
             .repositories()
             .keyshare(&snapshot.e3_id)
-            .synced()
+            .sync_load()
             .await?;
 
-        // No Snapshot returned from the store -> bail
-        if !store.has() {
+        // No Snapshot returned from the sync_secret -> bail
+        if !sync_secret.has() {
             return Ok(());
         };
 
@@ -170,7 +170,7 @@ impl E3Feature for KeyshareFeature {
         let value = Keyshare::new(KeyshareParams {
             fhe,
             bus: self.bus.clone(),
-            secret: store,
+            secret: sync_secret,
             address: self.address.clone(),
             cipher: self.cipher.clone(),
         })
