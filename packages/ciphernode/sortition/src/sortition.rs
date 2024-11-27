@@ -121,17 +121,6 @@ impl Sortition {
         Ok(addr)
     }
 
-    // #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
-    // pub async fn load(params: SortitionParams) -> Result<Self> {
-    //     Ok(if let Some(snapshot) = params.store.read().await? {
-    //         info!("Loading from snapshot");
-    //         Self::from_snapshot(params, snapshot).await?
-    //     } else {
-    //         info!("Loading from params");
-    //         Self::new(params)
-    //     })
-    // }
-
     pub fn get_nodes(&self) -> Vec<String> {
         self.list.get().unwrap().nodes.clone().into_iter().collect()
     }
@@ -140,39 +129,7 @@ impl Sortition {
 impl Actor for Sortition {
     type Context = actix::Context<Self>;
 }
-//
-// impl Snapshot for Sortition {
-//     type Snapshot = SortitionModule;
-//     fn snapshot(&self) -> Self::Snapshot {
-//         self.list.clone()
-//     }
-// }
-//
-// #[async_trait]
-// impl FromSnapshotWithParams for Sortition {
-//     type Params = SortitionParams;
-//
-//     #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
-//     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
-//         info!("Loaded snapshot with {} nodes", snapshot.nodes().len());
-//         info!(
-//             "Nodes:\n\n{:?}\n",
-//             snapshot.nodes().into_iter().collect::<Vec<_>>()
-//         );
-//         Ok(Sortition {
-//             bus: params.bus,
-//             store: params.store,
-//             list: snapshot,
-//         })
-//     }
-// }
-//
-// impl Checkpoint for Sortition {
-//     fn repository(&self) -> &Repository<SortitionModule> {
-//         &self.store
-//     }
-// }
-//
+
 impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
@@ -192,7 +149,7 @@ impl Handler<CiphernodeAdded> for Sortition {
         info!("Adding node: {}", msg.address);
         match self.list.try_mutate(|mut list| {
             list.add(msg.address);
-            list
+            Ok(list)
         }) {
             Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
             _ => (),
@@ -208,7 +165,7 @@ impl Handler<CiphernodeRemoved> for Sortition {
         info!("Removing node: {}", msg.address);
         match self.list.try_mutate(|mut list| {
             list.remove(msg.address);
-            list
+            Ok(list)
         }) {
             Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
             _ => (),

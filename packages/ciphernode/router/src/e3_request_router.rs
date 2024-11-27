@@ -178,14 +178,14 @@ pub struct E3RequestRouterSnapshot {
 
 impl Snapshot for E3RequestRouter {
     type Snapshot = E3RequestRouterSnapshot;
-    fn snapshot(&self) -> Self::Snapshot {
+    fn snapshot(&self) -> Result<Self::Snapshot> {
         let contexts = self.contexts.keys().cloned().collect();
         let completed = self.completed.clone();
 
-        Self::Snapshot {
+        Ok(Self::Snapshot {
             completed,
             contexts,
-        }
+        })
     }
 }
 
