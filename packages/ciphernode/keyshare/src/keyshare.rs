@@ -108,9 +108,6 @@ impl Handler<CiphernodeSelected> for Keyshare {
             e3_id,
             node: self.address.clone(),
         }));
-
-        // Write the snapshot to the store
-        // self.checkpoint()
     }
 }
 

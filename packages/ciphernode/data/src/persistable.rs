@@ -12,29 +12,40 @@ impl<T> PersistableData for T where
 {
 }
 
+/// AutoPersist enables a repository to generate a persistable container
 #[async_trait]
-pub trait WithPersistable<T>
+pub trait AutoPersist<T>
 where
     T: PersistableData,
 {
-    async fn synced(self) -> Result<Persistable<T>>;
-    fn persistable(self, data: Option<T>) -> Persistable<T>;
+    /// Load the data from the repository into an auto persist container
+    async fn sync_load(self) -> Result<Persistable<T>>;
+    /// Create a new autosync container and set some data on it to sync back to the db
+    fn sync_new(self, data: Option<T>) -> Persistable<T>;
+    /// Load the data from the repository into an auto persist container if there is no persisted data then persist the given default data  
+    async fn sync_or_default(self, default: T) -> Result<Persistable<T>>;
 }
 
 #[async_trait]
-impl<T> WithPersistable<T> for Repository<T>
+impl<T> AutoPersist<T> for Repository<T>
 where
     T: PersistableData,
 {
-    async fn synced(self) -> Result<Persistable<T>> {
+    async fn sync_load(self) -> Result<Persistable<T>> {
         Ok(Persistable::load(self).await?)
     }
 
-    fn persistable(self, data: Option<T>) -> Persistable<T> {
-        Persistable::new(data, self)
+    fn sync_new(self, data: Option<T>) -> Persistable<T> {
+        Persistable::new(data, self).save()
+    }
+
+    async fn sync_or_default(self, default: T) -> Result<Persistable<T>> {
+        Ok(Persistable::load_or_default(self, default).await?)
     }
 }
 
+/// A container that automatically persists it's content every time it is mutated
+#[derive(Debug)]
 pub struct Persistable<T> {
     data: Option<T>,
     repo: Repository<T>,
@@ -54,13 +65,42 @@ where
         Ok(Self { data, repo })
     }
 
+    pub async fn load_or_default(repo: Repository<T>, default: T) -> Result<Self> {
+        Ok(Self {
+            data: Some(repo.read().await?.unwrap_or(default)),
+            repo,
+        })
+    }
+
+    pub fn save(self) -> Self {
+        self.checkpoint();
+        self
+    }
+
+    /// If the content is available it will be mutated with the mutator function. NOTE: If the content is
+    /// not available nothing will happen.
     pub fn mutate<F>(&mut self, mutator: F)
     where
-        F: FnOnce(Option<T>) -> T,
+        F: FnOnce(T) -> T,
     {
         let current = std::mem::take(&mut self.data);
-        self.data = Some(mutator(current));
+        self.data = current.map(mutator);
         self.checkpoint();
+    }
+
+    /// Mutate the content if it is available or return an error if not.
+    pub fn try_mutate<F>(&mut self, mutator: F) -> Result<()>
+    where
+        F: FnOnce(T) -> T,
+    {
+        let current = std::mem::take(&mut self.data);
+        if current.is_none() {
+            self.data = None; // probably not necessary but just incase
+            return Err(anyhow!("Data has not been set"));
+        }
+        self.data = current.map(mutator);
+        self.checkpoint();
+        Ok(())
     }
 
     pub fn set(&mut self, data: T) {
@@ -79,6 +119,26 @@ where
 
     pub fn has(&self) -> bool {
         self.data.is_some()
+    }
+
+    pub fn with<F, U>(&self, default: U, f: F) -> U
+    where
+        F: FnOnce(&T) -> U,
+    {
+        match &self.data {
+            Some(data) => f(data),
+            None => default,
+        }
+    }
+
+    pub fn try_with<F, U>(&self, default: U, f: F) -> Result<U>
+    where
+        F: FnOnce(&T) -> Result<U>,
+    {
+        match &self.data {
+            Some(data) => f(data),
+            None => Ok(default),
+        }
     }
 }
 
