@@ -4,11 +4,11 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 
 pub trait PersistableData:
-    Serialize + DeserializeOwned + Clone + Default + Send + Sync + 'static
+    Serialize + DeserializeOwned + Clone + Send + Sync + 'static
 {
 }
 impl<T> PersistableData for T where
-    T: Serialize + DeserializeOwned + Clone + Default + Send + Sync + 'static
+    T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static
 {
 }
 
@@ -107,7 +107,7 @@ where
 
     pub fn clear(&mut self) {
         self.data = None;
-        self.checkpoint();
+        self.clear_checkpoint();
     }
 
     pub fn get(&self) -> Option<T> {
@@ -145,6 +145,7 @@ where
 {
     type Snapshot = T;
     fn snapshot(&self) -> Result<Self::Snapshot> {
+        // XXX: This should clear the snapshot when None instead this leaves the data there!
         Ok(self
             .data
             .clone()
