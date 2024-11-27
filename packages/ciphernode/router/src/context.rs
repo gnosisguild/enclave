@@ -151,15 +151,15 @@ impl RepositoriesFactory for E3RequestContext {
 impl Snapshot for E3RequestContext {
     type Snapshot = E3RequestContextSnapshot;
 
-    fn snapshot(&self) -> Self::Snapshot {
-        Self::Snapshot {
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(Self::Snapshot {
             e3_id: self.e3_id.clone(),
             meta: self.meta.is_some(),
             fhe: self.fhe.is_some(),
             publickey: self.publickey.is_some(),
             plaintext: self.plaintext.is_some(),
             keyshare: self.keyshare.is_some(),
-        }
+        })
     }
 }
 

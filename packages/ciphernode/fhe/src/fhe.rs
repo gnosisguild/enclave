@@ -127,11 +127,11 @@ impl Fhe {
 
 impl Snapshot for Fhe {
     type Snapshot = FheSnapshot;
-    fn snapshot(&self) -> Self::Snapshot {
-        FheSnapshot {
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(FheSnapshot {
             crp: self.crp.to_bytes(),
             params: self.params.to_bytes(),
-        }
+        })
     }
 }
 

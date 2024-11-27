@@ -313,8 +313,8 @@ where
     T: Transport + Clone + Unpin,
 {
     type Snapshot = EvmEventReaderState;
-    fn snapshot(&self) -> Self::Snapshot {
-        self.state.clone()
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(self.state.clone())
     }
 }
 
