@@ -145,7 +145,6 @@ where
 {
     type Snapshot = T;
     fn snapshot(&self) -> Result<Self::Snapshot> {
-        // XXX: This should clear the snapshot when None instead this leaves the data there!
         Ok(self
             .data
             .clone()
