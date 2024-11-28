@@ -76,7 +76,11 @@ This worked well especially for objects who's persistable state needs to be deri
 
 Persistable is a struct that connects a repository and some in memory state and ensures that every time the in memory state is mutated that the state is saved to the repository.
 
-Aside from being less verbose it means we now have a centralized point at which we can implement batching should we need in the future and it means we should have less touch points for persistence in future. 
+This has several benefits:
+- Less verbose
+- Centralized batching point for logical operations
+- Can remove complex "snapshot" traits 
+- Simpler initialization
 
 ```rust
 
