@@ -1,55 +1,50 @@
 services:
   alice:
-    build: 
+    build:
       dockerfile: net/tests/Dockerfile
       context: ../..
+    image: p2p-test-image
     networks:
       app_net:
         ipv4_address: 172.16.238.10
-    command: cargo run --bin p2p_test alice
+    command: ["/app/p2p_test", "alice"]
     environment:
       QUIC_PORT: 9091
       DIAL_TO: "/ip4/172.16.238.12/udp/9091/quic-v1"
-      BLOCK_MDNS: ${BLOCK_MDNS:-false}
+      BLOCK_MDNS: "${BLOCK_MDNS:-false}"
     entrypoint: ["/app/entrypoint.sh"]
     cap_add:
       - NET_ADMIN
       - NET_RAW
 
   bob:
-    build: 
-      dockerfile: net/tests/Dockerfile
-      context: ../..
+    image: p2p-test-image
     networks:
       app_net:
         ipv4_address: 172.16.238.11
-    command: cargo run --bin p2p_test bob
+    command: ["/app/p2p_test", "bob"]
     environment:
       QUIC_PORT: 9091
       DIAL_TO: "/ip4/172.16.238.12/udp/9091/quic-v1"
-      BLOCK_MDNS: ${BLOCK_MDNS:-false}
+      BLOCK_MDNS: "${BLOCK_MDNS:-false}"
     entrypoint: ["/app/entrypoint.sh"]
     cap_add:
       - NET_ADMIN
       - NET_RAW
 
-
   charlie:
-    build: 
-      dockerfile: net/tests/Dockerfile
-      context: ../..
+    image: p2p-test-image
     networks:
       app_net:
         ipv4_address: 172.16.238.12
-    command: cargo run --bin p2p_test charlie
+    command: ["/app/p2p_test", "charlie"]
     environment:
       QUIC_PORT: 9091
-      BLOCK_MDNS: ${BLOCK_MDNS:-false}
+      BLOCK_MDNS: "${BLOCK_MDNS:-false}"
     entrypoint: ["/app/entrypoint.sh"]
     cap_add:
       - NET_ADMIN
       - NET_RAW
-
 
 networks:
   app_net:

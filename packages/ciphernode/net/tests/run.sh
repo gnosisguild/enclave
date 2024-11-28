@@ -3,6 +3,11 @@
 set -e
 
 echo ""
+echo "Building docker image"
+echo ""
+docker compose build
+
+echo ""
 echo "TEST 1: Using MDNS with separate IP addresses"
 echo ""
 docker compose up --build --abort-on-container-exit
