@@ -76,14 +76,27 @@ This worked well especially for objects who's persistable state needs to be deri
 
 Persistable is a struct that connects a repository and some in memory state and ensures that every time the in memory state is mutated that the state is saved to the repository.
 
-```mermaid
-graph TD
-    S[State]
-    R[Repository]
-    P[Persistable]
-    S --> P
-    R --> P
-```
-
 Aside from being less verbose it means we now have a centralized point at which we can implement batching should we need in the future and it means we should have less touch points for persistence in future. 
 
+```rust
+
+// Some how we get a repository for a type
+let repo:Repository<Vec<String>> = get_repo();
+
+// We can use the sync_load to create a persistable object from the contents of the persistance layer that the repository encapsulates
+let persistable:Persistable<Vec<String>> = repo.sync_load().await?;
+
+// If we add a name to the list the list is automatically synced to the database
+persistable.mutate(|&mut list| {
+  list.push("Fred");
+  list
+});
+
+// We can set a new object
+persistable.set(vec![String::from("Hello")]);
+
+// We can access properties of the underlying object using `with`
+if persistable.with(false, |list| list.len() > 10) {
+    // do something
+}
+```
