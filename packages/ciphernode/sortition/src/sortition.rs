@@ -2,9 +2,8 @@ use crate::DistanceSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
+use data::Repository;
 use data::{AutoPersist, Persistable};
-use data::{Checkpoint, FromSnapshotWithParams, RepositoriesFactory, Repository, Snapshot};
 use enclave_core::{
     get_tag, BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent,
     EventBus, Seed, Subscribe,

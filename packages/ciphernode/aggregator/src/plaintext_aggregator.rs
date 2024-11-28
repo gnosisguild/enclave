@@ -28,20 +28,6 @@ pub enum PlaintextAggregatorState {
     },
 }
 
-// This is required in order to satisfy PersistableData - it is only used to cover an error
-// conition where there is no state in the persistable
-// TODO: alter Snapshot in order to return a result snapshot
-impl Default for PlaintextAggregatorState {
-    fn default() -> Self {
-        PlaintextAggregatorState::Collecting {
-            threshold_m: 0,
-            shares: OrderedSet::default(),
-            seed: Seed::default(),
-            ciphertext_output: vec![],
-        }
-    }
-}
-
 impl PlaintextAggregatorState {
     pub fn init(threshold_m: usize, seed: Seed, ciphertext_output: Vec<u8>) -> Self {
         PlaintextAggregatorState::Collecting {
