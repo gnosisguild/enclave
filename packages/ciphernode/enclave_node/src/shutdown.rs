@@ -1,13 +1,14 @@
 use actix::Recipient;
+use anyhow::Result;
 use enclave_core::{EnclaveEvent, Shutdown};
 use std::time::Duration;
 use tokio::{
     signal::unix::{signal, SignalKind},
     task::JoinHandle,
 };
-use tracing::{error, info};
+use tracing::info;
 
-pub async fn listen_for_shutdown(bus: Recipient<EnclaveEvent>, handle: JoinHandle<()>) {
+pub async fn listen_for_shutdown(bus: Recipient<EnclaveEvent>, handle: JoinHandle<Result<()>>) {
     let mut sigterm =
         signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal stream");
 

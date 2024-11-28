@@ -1,5 +1,5 @@
 use actix::{Actor, Addr};
-use anyhow::{bail, Result};
+use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
 use enclave_core::EventBus;
@@ -11,7 +11,7 @@ use evm::{
     CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
 };
 use logger::SimpleLogger;
-use p2p::P2p;
+use net::NetworkRelay;
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
 use router::{
@@ -29,7 +29,7 @@ pub async fn setup_aggregator(
     config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
-) -> Result<(Addr<EventBus>, JoinHandle<()>, String)> {
+) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
     let bus = EventBus::new(true).start();
     let rng = Arc::new(Mutex::new(
         ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
@@ -82,7 +82,7 @@ pub async fn setup_aggregator(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = P2p::spawn_libp2p(bus.clone()).expect("Failed to setup libp2p");
+    let (_, join_handle, peer_id) = NetworkRelay::setup_with_peer(bus.clone(), config.peers())?;
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());
