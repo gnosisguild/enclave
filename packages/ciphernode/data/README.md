@@ -65,7 +65,7 @@ graph LR
     R["Repository<T>"]
     DB[(SledDB)]
     Client --> R
-    R -".write()"-> D[DataStore]
+    R --".write()"--> D[DataStore]
     D -.-> SledStore
     D -.-> InMemStore
     InMemStore -.-> BTreeMap
