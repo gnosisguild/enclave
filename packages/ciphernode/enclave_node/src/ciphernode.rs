@@ -47,7 +47,7 @@ pub async fn setup_ciphernode(
         let rpc_url = RPC::from_url(&chain.rpc_url).map_err(|e| {
             anyhow::anyhow!("Failed to parse RPC URL for chain {}: {}", chain.name, e)
         })?;
-        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone().into());
+        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
         let read_provider = provider_config.create_readonly_provider().await?;
         EnclaveSolReader::attach(
             &bus,

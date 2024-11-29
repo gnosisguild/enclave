@@ -342,7 +342,7 @@ mod tests {
             let filedir = format!("{}/.config/enclave", home);
             jail.create_dir(filedir)?;
             jail.create_file(
-                filename,
+                filename.clone(),
                 r#"
 chains:
   - name: "hardhat"
@@ -361,8 +361,8 @@ chains:
 "#,
             )?;
 
-            let config: AppConfig = load_config(None).map_err(|err| err.to_string())?;
-            let chain = config.chains().first().unwrap();
+            let mut config: AppConfig = load_config(None).map_err(|err| err.to_string())?;
+            let mut chain = config.chains().first().unwrap();
 
             assert_eq!(chain.name, "hardhat");
             assert_eq!(chain.rpc_url, "ws://localhost:8545");
@@ -386,6 +386,48 @@ chains:
                 chain.contracts.ciphernode_registry.deploy_block(),
                 Some(1764352873645)
             );
+
+            jail.create_file(
+                filename.clone(),
+                r#"
+chains:
+  - name: "hardhat"
+    rpc_url: "ws://localhost:8545"
+    contracts:
+      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      ciphernode_registry:
+        address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+        deploy_block: 1764352873645
+      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+"#,
+            )?;
+            config = load_config(None).map_err(|err| err.to_string())?;
+            chain = config.chains().first().unwrap();
+
+            assert_eq!(chain.rpc_auth, RpcAuth::None);
+
+            jail.create_file(
+                filename,
+                r#"
+chains:
+  - name: "hardhat"
+    rpc_url: "ws://localhost:8545"
+    rpc_auth:
+      type: "Bearer"
+      credentials: "testToken"
+    contracts:
+      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      ciphernode_registry:
+        address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+        deploy_block: 1764352873645
+      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+"#,
+            )?;
+
+            config = load_config(None).map_err(|err| err.to_string())?;
+            chain = config.chains().first().unwrap();
+            assert_eq!(chain.rpc_auth, RpcAuth::Bearer("testToken".to_string()));
+
             Ok(())
         });
     }

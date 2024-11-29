@@ -25,7 +25,7 @@ use alloy::{
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use cipher::Cipher;
-use config::RpcAuth as ConfigRpcAuth;
+use config::RpcAuth;
 use data::Repository;
 use std::{env, marker::PhantomData, sync::Arc};
 use url::Url;
@@ -55,7 +55,7 @@ impl RPC {
         match self {
             RPC::Http(url) | RPC::Https(url) => url.clone(),
             RPC::Ws(url) | RPC::Wss(url) => {
-                let mut parsed = Url::parse(url).expect("URL was validated in constructor");
+                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
                 parsed
                     .set_scheme(if self.is_secure() { "https" } else { "http" })
                     .expect("http(s) are valid schemes");
@@ -68,7 +68,7 @@ impl RPC {
         match self {
             RPC::Ws(url) | RPC::Wss(url) => url.clone(),
             RPC::Http(url) | RPC::Https(url) => {
-                let mut parsed = Url::parse(url).expect("URL was validated in constructor");
+                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
                 parsed
                     .set_scheme(if self.is_secure() { "wss" } else { "ws" })
                     .expect("ws(s) are valid schemes");
@@ -86,21 +86,19 @@ impl RPC {
     }
 }
 
-#[derive(Clone)]
-pub enum RpcAuth {
-    None,
-    Basic { username: String, password: String },
-    Bearer(String),
+pub trait AuthConversions {
+    fn to_header_value(&self) -> Option<HeaderValue>;
+    fn to_ws_auth(&self) -> Option<Authorization>;
 }
 
-impl RpcAuth {
+impl AuthConversions for RpcAuth {
     fn to_header_value(&self) -> Option<HeaderValue> {
         match self {
             RpcAuth::None => None,
             RpcAuth::Basic { username, password } => {
                 let auth = format!(
                     "Basic {}",
-                    STANDARD.encode(format!("{}:{}", username, password))
+                    STANDARD.encode(Zeroizing::new(format!("{}:{}", username, password)))
                 );
                 HeaderValue::from_str(&auth).ok()
             }
@@ -113,26 +111,6 @@ impl RpcAuth {
             RpcAuth::None => None,
             RpcAuth::Basic { username, password } => Some(Authorization::basic(username, password)),
             RpcAuth::Bearer(token) => Some(Authorization::bearer(token)),
-        }
-    }
-}
-
-impl From<ConfigRpcAuth> for RpcAuth {
-    fn from(value: ConfigRpcAuth) -> Self {
-        match value {
-            ConfigRpcAuth::None => RpcAuth::None,
-            ConfigRpcAuth::Basic { username, password } => RpcAuth::Basic { username, password },
-            ConfigRpcAuth::Bearer(token) => RpcAuth::Bearer(token),
-        }
-    }
-}
-
-impl From<RpcAuth> for ConfigRpcAuth {
-    fn from(value: RpcAuth) -> Self {
-        match value {
-            RpcAuth::None => ConfigRpcAuth::None,
-            RpcAuth::Basic { username, password } => ConfigRpcAuth::Basic { username, password },
-            RpcAuth::Bearer(token) => ConfigRpcAuth::Bearer(token),
         }
     }
 }
@@ -267,7 +245,10 @@ impl ProviderConfig {
         if let Some(auth_header) = self.auth.to_header_value() {
             headers.insert(AUTHORIZATION, auth_header);
         }
-        let client = Client::builder().default_headers(headers).build()?;
+        let client = Client::builder()
+            .default_headers(headers)
+            .build()
+            .context("Failed to create HTTP client")?;
         let http = Http::with_client(client, self.rpc.as_http_url().parse()?);
         Ok(RpcClient::new(http, false))
     }

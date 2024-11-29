@@ -45,7 +45,7 @@ pub async fn setup_aggregator(
         let rpc_url = RPC::from_url(&chain.rpc_url).map_err(|e| {
             anyhow::anyhow!("Failed to parse RPC URL for chain {}: {}", chain.name, e)
         })?;
-        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone().into());
+        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
         let read_provider = provider_config.create_readonly_provider().await?;
         let write_provider = provider_config.create_ws_signer_provider(&signer).await?;
 
