@@ -1,6 +1,6 @@
 # On Persistence patterns
 
-_The way persistence is managed within this codebase is 'interesting'. So here is the story as to how this works and why it has been done like this_
+_The way persistence is managed within this codebase has a few elements to it. So here is the story as to how this works and why it has been done like this_
 
 Persistence within an Actor Model tends to be based around the idea that actors need to be able to have their state persistable and hydratable upon restart. This enables any actor to be able to just crash on error and restart as required.
 
