@@ -154,11 +154,7 @@ impl E3Feature for KeyshareFeature {
             return Ok(());
         };
 
-        let sync_secret = ctx
-            .repositories()
-            .keyshare(&snapshot.e3_id)
-            .load()
-            .await?;
+        let sync_secret = ctx.repositories().keyshare(&snapshot.e3_id).load().await?;
 
         // No Snapshot returned from the sync_secret -> bail
         if !sync_secret.has() {
