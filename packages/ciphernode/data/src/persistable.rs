@@ -13,11 +13,11 @@ where
     T: PersistableData,
 {
     /// Load the data from the repository into an auto persist container
-    async fn load(self) -> Result<Persistable<T>>;
+    async fn load(&self) -> Result<Persistable<T>>;
     /// Create a new auto persist container and set some data on it to send back to the repository
-    fn send(self, data: Option<T>) -> Persistable<T>;
+    fn send(&self, data: Option<T>) -> Persistable<T>;
     /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
-    async fn load_or_default(self, default: T) -> Result<Persistable<T>>;
+    async fn load_or_default(&self, default: T) -> Result<Persistable<T>>;
 }
 
 #[async_trait]
@@ -26,17 +26,17 @@ where
     T: PersistableData,
 {
     /// Load the data from the repository into an auto persist container
-    async fn load(self) -> Result<Persistable<T>> {
+    async fn load(&self) -> Result<Persistable<T>> {
         Ok(Persistable::load(self).await?)
     }
 
     /// Create a new auto persist container and set some data on it to send back to the repository
-    fn send(self, data: Option<T>) -> Persistable<T> {
+    fn send(&self, data: Option<T>) -> Persistable<T> {
         Persistable::new(data, self).save()
     }
 
     /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
-    async fn load_or_default(self, default: T) -> Result<Persistable<T>> {
+    async fn load_or_default(&self, default: T) -> Result<Persistable<T>> {
         Ok(Persistable::load_or_default(self, default).await?)
     }
 }
@@ -53,26 +53,25 @@ where
     T: PersistableData,
 {
     /// Create a new container with the given option data and repository
-    pub fn new(data: Option<T>, repo: Repository<T>) -> Self {
-        Self { data, repo }
+    pub fn new(data: Option<T>, repo: &Repository<T>) -> Self {
+        Self {
+            data,
+            repo: repo.clone(),
+        }
     }
 
     /// Load data from the repository to the container
-    pub async fn load(repo: Repository<T>) -> Result<Self> {
+    pub async fn load(repo: &Repository<T>) -> Result<Self> {
         let data = repo.read().await?;
 
-        Ok(Self { data, repo })
+        Ok(Self::new(data, repo))
     }
 
     /// Load the data from the repo or save and sync the given default value
-    pub async fn load_or_default(repo: Repository<T>, default: T) -> Result<Self> {
-        let instance = Self {
-            data: Some(repo.read().await?.unwrap_or(default)),
-            repo,
-        };
+    pub async fn load_or_default(repo: &Repository<T>, default: T) -> Result<Self> {
+        let instance = Self::new(Some(repo.read().await?.unwrap_or(default)), repo);
 
-        // Ok(instance.save())
-        Ok(instance)
+        Ok(instance.save())
     }
 
     /// Save the data in the container to the database
@@ -165,6 +164,91 @@ where
 {
     type Params = Repository<T>;
     async fn from_snapshot(params: Repository<T>, snapshot: T) -> Result<Self> {
-        Ok(Persistable::new(Some(snapshot), params))
+        Ok(Persistable::new(Some(snapshot), &params))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{AutoPersist, DataStore, GetLog, InMemStore, Repository};
+    use actix::{Actor, Addr};
+    use anyhow::Result;
+
+    fn get_repo<T>() -> (Repository<T>, Addr<InMemStore>) {
+        let addr = InMemStore::new(true).start();
+        let store = DataStore::from(&addr);
+        let repo: Repository<T> = Repository::new(store);
+        (repo, addr)
+    }
+
+    #[actix::test]
+    async fn persistable_loads_with_default() -> Result<()> {
+        let (repo, addr) = get_repo::<Vec<String>>();
+        let container = repo
+            .clone()
+            .load_or_default(vec!["berlin".to_string()])
+            .await?;
+
+        assert_eq!(addr.send(GetLog).await?.len(), 1);
+        assert_eq!(repo.read().await?, Some(vec!["berlin".to_string()]));
+        assert_eq!(container.get(), Some(vec!["berlin".to_string()]));
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn persistable_loads_with_default_override() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        repo.write(&vec!["berlin".to_string()]);
+        let container = repo
+            .clone()
+            .load_or_default(vec!["amsterdam".to_string()])
+            .await?;
+
+        assert_eq!(repo.read().await?, Some(vec!["berlin".to_string()]));
+        assert_eq!(container.get(), Some(vec!["berlin".to_string()]));
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn persistable_load() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        repo.write(&vec!["berlin".to_string()]);
+        let container = repo.clone().load().await?;
+
+        assert_eq!(repo.read().await?, Some(vec!["berlin".to_string()]));
+        assert_eq!(container.get(), Some(vec!["berlin".to_string()]));
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn persistable_send() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        repo.write(&vec!["amsterdam".to_string()]);
+        let container = repo.clone().send(Some(vec!["berlin".to_string()]));
+
+        assert_eq!(repo.read().await?, Some(vec!["berlin".to_string()]));
+        assert_eq!(container.get(), Some(vec!["berlin".to_string()]));
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn persistable_mutate() -> Result<()> {
+        let (repo, addr) = get_repo::<Vec<String>>();
+
+        let mut container = repo.clone().send(Some(vec!["berlin".to_string()]));
+
+        container.try_mutate(|mut list| {
+            list.push(String::from("amsterdam"));
+            Ok(list)
+        })?;
+
+        assert_eq!(
+            repo.read().await?,
+            Some(vec!["berlin".to_string(), "amsterdam".to_string()])
+        );
+
+        assert_eq!(addr.send(GetLog).await?.len(), 2);
+
+        Ok(())
     }
 }

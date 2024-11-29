@@ -10,6 +10,7 @@ actix = { workspace = true }
 enclave-core = { path = "../core" }
 anyhow = { workspace = true }
 serde = { workspace = true }
+tokio = { workspace = true }
 sled = { workspace = true }
 bincode = { workspace = true }
 tracing = { workspace = true }

@@ -91,16 +91,21 @@ let repo:Repository<Vec<String>> = get_repo();
 let persistable:Persistable<Vec<String>> = repo.load().await?;
 
 // If we add a name to the list the list is automatically synced to the database
-persistable.mutate(|&mut list| {
+persistable.try_mutate(|mut list| {
   list.push("Fred");
-  list
-});
+  Ok(list)
+})?;
 
-// We can set a new object
+// We can set new state
 persistable.set(vec![String::from("Hello")]);
 
-// We can access properties of the underlying object using `with`
-if persistable.with(false, |list| list.len() > 10) {
-    // do something
+// We can try and get the data if it is set on the object
+if persistable.try_get()?.len() > 0 {
+    println!("Repo has names!")
 }
+
+// We an clear the object which will clear the repo
+persistable.clear();
+
+assert_eq!(persistable.get(), None);
 ```
