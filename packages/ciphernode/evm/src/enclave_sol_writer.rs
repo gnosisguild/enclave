@@ -1,4 +1,4 @@
-use crate::helpers::{SignerProvider, WithChainId, RpcWSClient};
+use crate::helpers::{RpcWSClient, SignerProvider, WithChainId};
 use actix::prelude::*;
 use actix::Addr;
 use alloy::{primitives::Address, sol};

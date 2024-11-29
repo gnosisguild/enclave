@@ -7,7 +7,8 @@ use actix::{Actor, Addr};
 use alloy::{
     primitives::{LogData, B256},
     sol,
-    sol_types::SolEvent, transports::BoxTransport,
+    sol_types::SolEvent,
+    transports::BoxTransport,
 };
 use anyhow::Result;
 use data::Repository;

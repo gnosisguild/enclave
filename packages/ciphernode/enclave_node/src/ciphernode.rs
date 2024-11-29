@@ -5,7 +5,7 @@ use cipher::Cipher;
 use config::AppConfig;
 use enclave_core::{get_tag, EventBus};
 use evm::{
-    helpers::{RPC, ProviderConfig},
+    helpers::{ProviderConfig, RPC},
     CiphernodeRegistrySol, EnclaveSolReader,
 };
 use logger::SimpleLogger;

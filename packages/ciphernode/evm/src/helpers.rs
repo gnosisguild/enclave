@@ -25,11 +25,11 @@ use alloy::{
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use cipher::Cipher;
+use config::RpcAuth as ConfigRpcAuth;
 use data::Repository;
 use std::{env, marker::PhantomData, sync::Arc};
 use url::Url;
 use zeroize::Zeroizing;
-use config::RpcAuth as ConfigRpcAuth;
 
 #[derive(Clone)]
 pub enum RPC {
@@ -89,11 +89,8 @@ impl RPC {
 #[derive(Clone)]
 pub enum RpcAuth {
     None,
-    Basic {
-        username: String,
-        password: String,
-    },
-    Bearer(String)
+    Basic { username: String, password: String },
+    Bearer(String),
 }
 
 impl RpcAuth {
@@ -114,14 +111,11 @@ impl RpcAuth {
     fn to_ws_auth(&self) -> Option<Authorization> {
         match self {
             RpcAuth::None => None,
-            RpcAuth::Basic { username, password } => {
-                Some(Authorization::basic(username, password))
-            }
+            RpcAuth::Basic { username, password } => Some(Authorization::basic(username, password)),
             RpcAuth::Bearer(token) => Some(Authorization::bearer(token)),
         }
     }
 }
-
 
 impl From<ConfigRpcAuth> for RpcAuth {
     fn from(value: ConfigRpcAuth) -> Self {
@@ -142,7 +136,6 @@ impl From<RpcAuth> for ConfigRpcAuth {
         }
     }
 }
-
 
 /// We need to cache the chainId so we can easily use it in a non-async situation
 /// This wrapper just stores the chain_id with the Provider
@@ -199,7 +192,6 @@ pub type SignerProvider<T> = FillProvider<
 
 pub type ReadonlyProvider = RootProvider<BoxTransport>;
 
-
 #[derive(Clone)]
 pub struct ProviderConfig {
     rpc: RPC,
@@ -223,9 +215,10 @@ impl ProviderConfig {
             .on_client(self.create_http_client()?)
             .boxed())
     }
-    
 
-    pub async fn create_readonly_provider(&self) -> Result<WithChainId<ReadonlyProvider, BoxTransport>> {
+    pub async fn create_readonly_provider(
+        &self,
+    ) -> Result<WithChainId<ReadonlyProvider, BoxTransport>> {
         let provider = if self.rpc.is_websocket() {
             self.create_ws_provider().await?
         } else {
@@ -243,8 +236,9 @@ impl ProviderConfig {
             .with_recommended_fillers()
             .wallet(wallet)
             .on_ws(self.create_ws_connect())
-            .await.context("Failed to create WS signer provider")?;
-        
+            .await
+            .context("Failed to create WS signer provider")?;
+
         WithChainId::new(provider).await
     }
 
@@ -273,9 +267,7 @@ impl ProviderConfig {
         if let Some(auth_header) = self.auth.to_header_value() {
             headers.insert(AUTHORIZATION, auth_header);
         }
-        let client = Client::builder()
-            .default_headers(headers)
-            .build()?;
+        let client = Client::builder().default_headers(headers).build()?;
         let http = Http::with_client(client, self.rpc.as_http_url().parse()?);
         Ok(RpcClient::new(http, false))
     }
@@ -343,7 +335,9 @@ mod test {
         assert!(RPC::from_url("wss://example.com/").unwrap().is_secure());
 
         assert!(!RPC::from_url("http://example.com/").unwrap().is_websocket());
-        assert!(!RPC::from_url("https://example.com/").unwrap().is_websocket());
+        assert!(!RPC::from_url("https://example.com/")
+            .unwrap()
+            .is_websocket());
         assert!(RPC::from_url("ws://example.com/").unwrap().is_websocket());
         assert!(RPC::from_url("wss://example.com/").unwrap().is_websocket());
     }
