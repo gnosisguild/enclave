@@ -3,14 +3,8 @@ use anyhow::*;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 
-pub trait PersistableData:
-    Serialize + DeserializeOwned + Clone + Send + Sync + 'static
-{
-}
-impl<T> PersistableData for T where
-    T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static
-{
-}
+pub trait PersistableData: Serialize + DeserializeOwned + Clone + Send + Sync + 'static {}
+impl<T> PersistableData for T where T: Serialize + DeserializeOwned + Clone + Send + Sync + 'static {}
 
 /// AutoPersist enables a repository to generate a persistable container
 #[async_trait]

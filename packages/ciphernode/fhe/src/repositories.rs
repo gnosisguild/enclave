@@ -1,4 +1,3 @@
-
 use config::StoreKeys;
 use data::{Repositories, Repository};
 use enclave_core::E3id;

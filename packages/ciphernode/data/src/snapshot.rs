@@ -25,14 +25,14 @@ pub trait Checkpoint: Snapshot {
 
     /// Write the current snapshot to the `Repository` provided by `repository()`
     fn checkpoint(&self) {
-       let snapshot = match self.snapshot() {
+        let snapshot = match self.snapshot() {
             Ok(v) => v,
             Err(err) => {
-                error!("Not saving data because '{}'",err);
+                error!("Not saving data because '{}'", err);
                 return;
             }
         };
-        
+
         self.repository().write(&snapshot);
     }
 

@@ -19,10 +19,7 @@ pub trait EnclaveSolReaderRepositoryFactory {
 
 impl EnclaveSolReaderRepositoryFactory for Repositories {
     fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
-        Repository::new(
-            self.store
-                .scope(StoreKeys::enclave_sol_reader(chain_id)),
-        )
+        Repository::new(self.store.scope(StoreKeys::enclave_sol_reader(chain_id)))
     }
 }
 
@@ -38,4 +35,3 @@ impl CiphernodeRegistryReaderRepositoryFactory for Repositories {
         )
     }
 }
-
