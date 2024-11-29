@@ -1,8 +1,8 @@
 # On Persistence patterns
 
-_The way persistence is managed within this codebase is 'interesting' here is the story as to how this works and why it has been done like this_ 
+_The way persistence is managed within this codebase is 'interesting' here is the story as to how this works and why it has been done like this_
 
-Persistence within an Actor Model tends to be based around the idea that actors need to be able to have their state persistable and hydratable upon restart. This enables any actor to be able to just crash on error and restart as required. 
+Persistence within an Actor Model tends to be based around the idea that actors need to be able to have their state persistable and hydratable upon restart. This enables any actor to be able to just crash on error and restart as required.
 
 We started persistence by creating an Actor that wraps the database which is good practice within an Actor Model. This has advantages because we can interleave database writes to become a stream of events enabling high throughput. We can create delivery guarantees by storing events in a persistent queue at a later point if need be.
 
@@ -48,19 +48,39 @@ store.base("//foo")
   .get_scope()?, // "//foo/bar/baz"
 ```
 
-
 ## Repository
 
-There was an attempt to use this throughout the app but it became apparent this was causing the knowledge of where data was saved to be spread throughout the codebase. What we needed was for the components not to really care how their data was saved but for us to be able to easily have a sense of the different keys under which data was being saved in a centralized place. 
+There was an attempt to use this throughout the app but it became apparent this was causing the knowledge of where data was saved to be spread throughout the codebase. What we needed was for the components not to really care how their data was saved but for us to be able to easily have a sense of the different keys under which data was being saved in a centralized place.
 
-It also made sense to create a `Repository<T>` interface to encapsulate saving of data from within an actor or routine in theory the repository could use whatever data store it requires to save the data. This could even be a SQL DB or the filesystem if required.
+Also the data in the DataStore was effectively untyped as it only could get and set raw bytes with `Vec<u8>`.
+
+It made sense to create a typed `Repository<T>` interface to encapsulate saving of data from within an actor or routine in theory the repository could use whatever data store it requires to save the data. This could even be a SQL DB or the filesystem if required. Whatever it was a Repository knows how to save it.
 
 We also created a `Repositories` struct to provide a central point for the repositories however this was leading to cargo dependency issues as this was a struct that dependend on every package for it's types but was also depended on by every package which made placing it somewhere within our dependency heirarchy challenging. This clearly was an issue.
 
+The tradeoff is we get a slightly deeper stack but each layer adds a responsibility to the data saving stack:
+
+```mermaid
+graph LR
+    R[Repository<T>]
+    DB[(SledDB)]
+    Client --> R
+    R --> D[DataStore]
+    D -.-> SledStore
+    D -.-> InMemStore
+    InMemStore -.-> BTreeMap
+    SledStore --> DB
+```
+
+| Layer               | Functionality                                                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `Repository<T>`     | Strongly typed Data persistence. Configured to know how to save its data.                                              |
+| `DataStore`         | KV store. Client can scope to specific namespace. Can be backed by polymorphic data actor to handle testing scenarios. |
+| `{InMem,Sled}Store` | Actor to receive `Insert` and `Get` requests can only save raw bytes.                                                  |
 
 ## Snapshotting
 
-We had a way to save bytes data with the `DataStore` and had a way to specify where that could be saved but actors need to be restartable and be able to be hydrated and we needed a standard way to accomplish this. To do this in typical Rust fashion we creaed a set of traits: 
+We had a way to save bytes data with the `DataStore` and had a way to specify where that could be saved but actors need to be restartable and be able to be hydrated and we needed a standard way to accomplish this. To do this in typical Rust fashion we creaed a set of traits:
 
 - [`Snapshot`](https://github.com/gnosisguild/enclave/blob/main/packages/ciphernode/data/src/snapshot.rs) for defining how an object can create a snapshot of it's state
 - [`Checkpoint`](https://github.com/gnosisguild/enclave/blob/main/packages/ciphernode/data/src/snapshot.rs) for defining how to save that snapshot to a repository
@@ -77,9 +97,10 @@ This worked well especially for objects who's persistable state needs to be deri
 Persistable is a struct that connects a repository and some in memory state and ensures that every time the in memory state is mutated that the state is saved to the repository.
 
 This has several benefits:
+
 - Less verbose
 - Centralized batching point for logical operations
-- Can remove complex "snapshot" traits 
+- Can remove complex "snapshot" traits
 - Simpler initialization
 
 ```rust
