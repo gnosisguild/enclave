@@ -2313,6 +2313,7 @@ dependencies = [
  "async-trait",
  "base64",
  "cipher 0.1.0",
+ "config",
  "data",
  "enclave-core",
  "enclave_node",

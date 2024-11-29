@@ -7,15 +7,29 @@ use alloy::{
         },
         Identity, Provider, ProviderBuilder, RootProvider,
     },
+    pubsub::PubSubFrontend,
+    rpc::client::RpcClient,
     signers::local::PrivateKeySigner,
-    transports::{BoxTransport, Transport},
+    transports::{
+        http::{
+            reqwest::{
+                header::{HeaderMap, HeaderValue, AUTHORIZATION},
+                Client,
+            },
+            Http,
+        },
+        ws::WsConnect,
+        Authorization, BoxTransport, Transport,
+    },
 };
 use anyhow::{bail, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use cipher::Cipher;
 use data::Repository;
 use std::{env, marker::PhantomData, sync::Arc};
 use url::Url;
 use zeroize::Zeroizing;
+use config::RpcAuth as ConfigRpcAuth;
 
 #[derive(Clone)]
 pub enum RPC {
@@ -107,6 +121,63 @@ where
 
     pub fn get_chain_id(&self) -> u64 {
         self.chain_id
+    }
+}
+
+#[derive(Clone)]
+pub enum RpcAuth {
+    None,
+    Basic {
+        username: String,
+        password: String,
+    },
+    Bearer(String)
+}
+
+impl RpcAuth {
+    fn to_header_value(&self) -> Option<HeaderValue> {
+        match self {
+            RpcAuth::None => None,
+            RpcAuth::Basic { username, password } => {
+                let auth = format!(
+                    "Basic {}",
+                    STANDARD.encode(format!("{}:{}", username, password))
+                );
+                HeaderValue::from_str(&auth).ok()
+            }
+            RpcAuth::Bearer(token) => HeaderValue::from_str(&format!("Bearer {}", token)).ok(),
+        }
+    }
+
+    fn to_ws_auth(&self) -> Option<Authorization> {
+        match self {
+            RpcAuth::None => None,
+            RpcAuth::Basic { username, password } => {
+                Some(Authorization::basic(username, password))
+            }
+            RpcAuth::Bearer(token) => Some(Authorization::bearer(token)),
+        }
+    }
+}
+
+
+impl From<ConfigRpcAuth> for RpcAuth {
+    fn from(value: ConfigRpcAuth) -> Self {
+        match value {
+            ConfigRpcAuth::None => RpcAuth::None,
+            ConfigRpcAuth::Basic { username, password } => RpcAuth::Basic { username, password },
+            ConfigRpcAuth::Bearer(token) => RpcAuth::Bearer(token),
+        }
+    }
+}
+
+impl From<RpcAuth> for ConfigRpcAuth {
+    fn from(value: RpcAuth) -> Self {
+        match value {
+            RpcAuth::None => ConfigRpcAuth::None,
+            RpcAuth::Basic { username, password } => ConfigRpcAuth::Basic { username, password },
+            RpcAuth::Bearer(token) => ConfigRpcAuth::Bearer(token),
+        }
     }
 }
 
