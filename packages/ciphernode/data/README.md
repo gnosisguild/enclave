@@ -2,7 +2,7 @@
 
 _The way persistence is managed within this codebase has a few elements to it. So here is the story as to how this works and why it has been done like this_
 
-Persistence within an Actor Model tends to be based around the idea that actors need to be able to have their state persistable and hydratable upon restart. This enables any actor to be able to just crash on error and restart as required.
+Persistence within an Actor Model tends to be based around the idea that actors need to be able to have their state persistable and hydratable upon restart. This enables in an ideal scenario any actor to be able to just crash on error and restart as required.
 
 We started persistence by creating an Actor that wraps the database which is good practice within an Actor Model. This has advantages because we can interleave database writes to become a stream of events enabling high throughput. We can create delivery guarantees by storing events in a persistent queue at a later point if need be.
 
