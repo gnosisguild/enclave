@@ -9,6 +9,7 @@ alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+base64 = { workspace = true }
 enclave-core = { path = "../core" }
 data = { path = "../data" }
 futures-util = { workspace = true }

@@ -10,11 +10,60 @@ use alloy::{
     signers::local::PrivateKeySigner,
     transports::{BoxTransport, Transport},
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{bail,Context, Result};
 use cipher::Cipher;
 use data::Repository;
 use std::{env, marker::PhantomData, sync::Arc};
 use zeroize::Zeroizing;
+
+
+#[derive(Clone)]
+pub enum RPC {
+    Http(String),
+    Https(String),
+    Ws(String),
+    Wss(String),
+}
+
+impl RPC {
+    pub fn from_url(url: &str) -> Result<Self> {
+        if url.starts_with("http://") {
+            Ok(RPC::Http(url.to_string()))
+        } else if url.starts_with("https://") {
+            Ok(RPC::Https(url.to_string()))
+        } else if url.starts_with("ws://") {
+            Ok(RPC::Ws(url.to_string()))
+        } else if url.starts_with("wss://") {
+            Ok(RPC::Wss(url.to_string()))
+        } else {
+            bail!("Invalid RPC URL, Please specify a protocol. (http://, https://, ws://, wss://)");
+        }
+    }
+
+    pub fn as_http_url(&self) -> String {
+        match self {
+            RPC::Http(url) | RPC::Https(url) => url.clone(),
+            RPC::Ws(url) => url.replacen("ws://", "http://", 1),
+            RPC::Wss(url) => url.replacen("wss://", "https://", 1),
+        }
+    }
+
+    pub fn as_ws_url(&self) -> String {
+        match self {
+            RPC::Http(url) => url.replacen("http://", "ws://", 1),
+            RPC::Https(url) => url.replacen("https://", "wss://", 1),
+            RPC::Ws(url) | RPC::Wss(url) => url.clone(),
+        }
+    }
+
+    pub fn is_websocket(&self) -> bool {
+        matches!(self, RPC::Ws(_) | RPC::Wss(_))
+    }
+
+    pub fn is_secure(&self) -> bool {
+        matches!(self, RPC::Https(_) | RPC::Wss(_))
+    }
+}
 
 /// We need to cache the chainId so we can easily use it in a non-async situation
 /// This wrapper just stores the chain_id with the Provider
@@ -117,40 +166,58 @@ pub async fn get_signer_from_repository(
     Ok(Arc::new(signer))
 }
 
-pub fn ensure_http_rpc(rpc_url: &str) -> String {
-    if rpc_url.starts_with("ws://") {
-        return rpc_url.replacen("ws://", "http://", 1);
-    } else if rpc_url.starts_with("wss://") {
-        return rpc_url.replacen("wss://", "https://", 1);
-    }
-    rpc_url.to_string()
-}
-
-pub fn ensure_ws_rpc(rpc_url: &str) -> String {
-    if rpc_url.starts_with("http://") {
-        return rpc_url.replacen("http://", "ws://", 1);
-    } else if rpc_url.starts_with("https://") {
-        return rpc_url.replacen("https://", "wss://", 1);
-    }
-    rpc_url.to_string()
-}
 
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn test_ensure_http_rpc() {
-        assert_eq!(ensure_http_rpc("http://foo.com"), "http://foo.com");
-        assert_eq!(ensure_http_rpc("https://foo.com"), "https://foo.com");
-        assert_eq!(ensure_http_rpc("ws://foo.com"), "http://foo.com");
-        assert_eq!(ensure_http_rpc("wss://foo.com"), "https://foo.com");
+    fn test_rpc_type_conversion() {
+        // Test HTTP URLs
+        let http = RPC::from_url("http://localhost:8545").unwrap();
+        assert!(matches!(http, RPC::Http(_)));
+        assert_eq!(http.as_http_url(), "http://localhost:8545");
+        assert_eq!(http.as_ws_url(), "ws://localhost:8545");
+
+        // Test HTTPS URLs
+        let https = RPC::from_url("https://example.com").unwrap();
+        assert!(matches!(https, RPC::Https(_)));
+        assert_eq!(https.as_http_url(), "https://example.com");
+        assert_eq!(https.as_ws_url(), "wss://example.com");
+
+        // Test WS URLs
+        let ws = RPC::from_url("ws://localhost:8545").unwrap();
+        assert!(matches!(ws, RPC::Ws(_)));
+        assert_eq!(ws.as_http_url(), "http://localhost:8545");
+        assert_eq!(ws.as_ws_url(), "ws://localhost:8545");
+
+        // Test WSS URLs
+        let wss = RPC::from_url("wss://example.com").unwrap();
+        assert!(matches!(wss, RPC::Wss(_)));
+        assert_eq!(wss.as_http_url(), "https://example.com");
+        assert_eq!(wss.as_ws_url(), "wss://example.com");
     }
+
     #[test]
-    fn test_ensure_ws_rpc() {
-        assert_eq!(ensure_ws_rpc("http://foo.com"), "ws://foo.com");
-        assert_eq!(ensure_ws_rpc("https://foo.com"), "wss://foo.com");
-        assert_eq!(ensure_ws_rpc("wss://foo.com"), "wss://foo.com");
-        assert_eq!(ensure_ws_rpc("ws://foo.com"), "ws://foo.com");
+    fn test_rpc_type_properties() {
+        assert!(!RPC::from_url("http://example.com").unwrap().is_secure());
+        assert!(RPC::from_url("https://example.com")
+            .unwrap()
+            .is_secure());
+        assert!(!RPC::from_url("ws://example.com").unwrap().is_secure());
+        assert!(RPC::from_url("wss://example.com").unwrap().is_secure());
+
+        assert!(!RPC::from_url("http://example.com")
+            .unwrap()
+            .is_websocket());
+        assert!(!RPC::from_url("https://example.com")
+            .unwrap()
+            .is_websocket());
+        assert!(RPC::from_url("ws://example.com")
+            .unwrap()
+            .is_websocket());
+        assert!(RPC::from_url("wss://example.com")
+            .unwrap()
+            .is_websocket());
     }
 }

@@ -2311,6 +2311,7 @@ dependencies = [
  "alloy-primitives 0.6.4",
  "anyhow",
  "async-trait",
+ "base64",
  "cipher 0.1.0",
  "data",
  "enclave-core",
