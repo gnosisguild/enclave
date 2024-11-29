@@ -18,6 +18,7 @@ cipher = { path = "../cipher" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
+url = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]

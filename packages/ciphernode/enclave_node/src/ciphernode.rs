@@ -44,8 +44,9 @@ pub async fn setup_ciphernode(
         .iter()
         .filter(|chain| chain.enabled.unwrap_or(true))
     {
-        let rpc_url = RPC::from_url(&chain.rpc_url).unwrap();
-
+        let rpc_url = RPC::from_url(&chain.rpc_url).map_err(|e| {
+            anyhow::anyhow!("Failed to parse RPC URL for chain {}: {}", chain.name, e)
+        })?;
         let read_provider = create_readonly_provider(&rpc_url.as_ws_url()).await?;
         EnclaveSolReader::attach(
             &bus,

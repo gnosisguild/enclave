@@ -54,6 +54,7 @@ sha2 = "0.10.8"
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.5.4"
 libp2p = { version = "0.54.1", features = [
   "async-std",
   "identify",
