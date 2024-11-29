@@ -86,8 +86,7 @@ where
     where
         F: FnOnce(T) -> Result<T>,
     {
-        let current = std::mem::take(&mut self.data);
-        let content = current.ok_or(anyhow!("Data has not been set"))?;
+        let content = self.data.clone().ok_or(anyhow!("Data has not been set"))?;
         self.data = Some(mutator(content)?);
         self.checkpoint();
         Ok(())
@@ -172,11 +171,11 @@ where
 mod tests {
     use crate::{AutoPersist, DataStore, GetLog, InMemStore, Repository};
     use actix::{Actor, Addr};
-    use anyhow::Result;
+    use anyhow::{anyhow, Result};
 
     fn get_repo<T>() -> (Repository<T>, Addr<InMemStore>) {
         let addr = InMemStore::new(true).start();
-        let store = DataStore::from(&addr);
+        let store = DataStore::from(&addr).scope("/");
         let repo: Repository<T> = Repository::new(store);
         (repo, addr)
     }
@@ -249,6 +248,94 @@ mod tests {
 
         assert_eq!(addr.send(GetLog).await?.len(), 2);
 
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_clear_persistable() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let repo_ref = &repo;
+        let mut container = repo_ref.send(Some(vec!["berlin".to_string()]));
+
+        assert!(container.has());
+        container.clear();
+        assert!(!container.has());
+        assert_eq!(repo_ref.read().await?, None);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_set_persistable() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let mut container = repo.clone().send(None);
+
+        container.set(vec!["amsterdam".to_string()]);
+
+        assert!(container.has());
+        assert_eq!(repo.read().await?, Some(vec!["amsterdam".to_string()]));
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_try_get_with_data() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let container = repo.clone().send(Some(vec!["berlin".to_string()]));
+
+        let result = container.try_get()?;
+        assert_eq!(result, vec!["berlin".to_string()]);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_try_get_without_data() {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let container = repo.clone().send(None);
+
+        assert!(container.try_get().is_err());
+    }
+
+    #[actix::test]
+    async fn test_try_with_success() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let container = repo.clone().send(Some(vec!["berlin".to_string()]));
+
+        let length = container.try_with(|data| Ok(data.len()))?;
+        assert_eq!(length, 1);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_try_with_failure() {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let container = repo.clone().send(None);
+
+        let result = container.try_with(|data| Ok(data.len()));
+        assert!(result.is_err());
+    }
+
+    #[actix::test]
+    async fn test_try_mutate_failure() {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let mut container = repo.clone().send(None);
+
+        let result = container.try_mutate(|mut list| {
+            list.push(String::from("amsterdam"));
+            Ok(list)
+        });
+        assert!(result.is_err());
+    }
+
+    #[actix::test]
+    async fn test_mutate_with_error() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let mut container = repo.clone().send(Some(vec!["berlin".to_string()]));
+
+        let result =
+            container.try_mutate(|_| -> Result<Vec<String>> { Err(anyhow!("Mutation failed")) });
+
+        assert!(result.is_err());
+        // Original data should remain unchanged
+        assert_eq!(container.try_get()?, vec!["berlin".to_string()]);
         Ok(())
     }
 }
