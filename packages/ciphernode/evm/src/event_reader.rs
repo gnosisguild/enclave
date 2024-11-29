@@ -112,7 +112,7 @@ where
     ) -> Result<Addr<Self>> {
         let sync_state = repository
             .clone()
-            .sync_or_default(EvmEventReaderState::default())
+            .load_or_default(EvmEventReaderState::default())
             .await?;
 
         let params = EvmEventReaderParams {
@@ -275,34 +275,29 @@ where
 
     #[instrument(name="evm_event_reader", skip_all, fields(id = get_tag()))]
     fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        let event_id = wrapped.get_id();
-        info!("Processing event: {}", event_id);
-
-        self.state
-            .with((), |state| info!("cache length: {}", state.ids.len()));
-
-        if self
-            .state
-            .with(false, |state| state.ids.contains(&event_id))
-        {
-            error!(
-                "Event id {} has already been seen and was not forwarded to the bus",
-                &event_id
-            );
-            return;
-        }
-
-        let event_type = wrapped.event.event_type();
-
-        // Forward everything else to the event bus
-        self.bus.do_send(wrapped.event);
-
-        // Save processed ids
-        info!("Storing event(EVM) in cache {}({})", event_type, event_id);
-
         match self.state.try_mutate(|mut state| {
+            let event_id = wrapped.get_id();
+            info!("Processing event: {}", event_id);
+            info!("cache length: {}", state.ids.len());
+            if state.ids.contains(&event_id) {
+                error!(
+                    "Event id {} has already been seen and was not forwarded to the bus",
+                    &event_id
+                );
+                return Ok(state);
+            }
+
+            let event_type = wrapped.event.event_type();
+
+            // Forward everything else to the event bus
+            self.bus.do_send(wrapped.event);
+
+            // Save processed ids
+            info!("Storing event(EVM) in cache {}({})", event_type, event_id);
+
             state.ids.insert(event_id);
             state.last_block = wrapped.block;
+
             Ok(state)
         }) {
             Ok(_) => (),

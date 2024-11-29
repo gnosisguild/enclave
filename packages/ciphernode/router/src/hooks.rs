@@ -130,7 +130,7 @@ impl E3Feature for KeyshareFeature {
 
         let e3_id = data.clone().e3_id;
         let repo = ctx.repositories().keyshare(&e3_id);
-        let container = repo.sync_new(None);
+        let container = repo.send(None);
 
         ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
@@ -157,7 +157,7 @@ impl E3Feature for KeyshareFeature {
         let sync_secret = ctx
             .repositories()
             .keyshare(&snapshot.e3_id)
-            .sync_load()
+            .load()
             .await?;
 
         // No Snapshot returned from the sync_secret -> bail
@@ -233,7 +233,7 @@ impl E3Feature for PlaintextAggregatorFeature {
 
         let e3_id = data.e3_id.clone();
         let repo = ctx.repositories().plaintext(&e3_id);
-        let sync_state = repo.sync_new(Some(PlaintextAggregatorState::init(
+        let sync_state = repo.send(Some(PlaintextAggregatorState::init(
             meta.threshold_m,
             meta.seed,
             data.ciphertext_output.clone(),
@@ -265,7 +265,7 @@ impl E3Feature for PlaintextAggregatorFeature {
         }
 
         let repo = ctx.repositories().plaintext(&snapshot.e3_id);
-        let sync_state = repo.sync_load().await?;
+        let sync_state = repo.load().await?;
 
         // No Snapshot returned from the store -> bail
         if !sync_state.has() {
@@ -350,7 +350,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
 
         let e3_id = data.e3_id.clone();
         let repo = ctx.repositories().publickey(&e3_id);
-        let sync_state = repo.sync_new(Some(PublicKeyAggregatorState::init(
+        let sync_state = repo.send(Some(PublicKeyAggregatorState::init(
             meta.threshold_m,
             meta.seed,
         )));
@@ -380,7 +380,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         let repo = ctx.repositories().publickey(&ctx.e3_id);
-        let sync_state = repo.sync_load().await?;
+        let sync_state = repo.load().await?;
 
         // No Snapshot returned from the store -> bail
         if !sync_state.has() {

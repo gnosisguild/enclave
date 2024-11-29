@@ -87,8 +87,8 @@ This has several benefits:
 // Some how we get a repository for a type
 let repo:Repository<Vec<String>> = get_repo();
 
-// We can use the sync_load to create a persistable object from the contents of the persistance layer that the repository encapsulates
-let persistable:Persistable<Vec<String>> = repo.sync_load().await?;
+// We can use the load to create a persistable object from the contents of the persistance layer that the repository encapsulates
+let persistable:Persistable<Vec<String>> = repo.load().await?;
 
 // If we add a name to the list the list is automatically synced to the database
 persistable.mutate(|&mut list| {

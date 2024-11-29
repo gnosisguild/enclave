@@ -13,11 +13,11 @@ where
     T: PersistableData,
 {
     /// Load the data from the repository into an auto persist container
-    async fn sync_load(self) -> Result<Persistable<T>>;
-    /// Create a new autosync container and set some data on it to sync back to the db
-    fn sync_new(self, data: Option<T>) -> Persistable<T>;
-    /// Load the data from the repository into an auto persist container if there is no persisted data then persist the given default data  
-    async fn sync_or_default(self, default: T) -> Result<Persistable<T>>;
+    async fn load(self) -> Result<Persistable<T>>;
+    /// Create a new auto persist container and set some data on it to send back to the repository
+    fn send(self, data: Option<T>) -> Persistable<T>;
+    /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
+    async fn load_or_default(self, default: T) -> Result<Persistable<T>>;
 }
 
 #[async_trait]
@@ -25,20 +25,23 @@ impl<T> AutoPersist<T> for Repository<T>
 where
     T: PersistableData,
 {
-    async fn sync_load(self) -> Result<Persistable<T>> {
+    /// Load the data from the repository into an auto persist container
+    async fn load(self) -> Result<Persistable<T>> {
         Ok(Persistable::load(self).await?)
     }
 
-    fn sync_new(self, data: Option<T>) -> Persistable<T> {
+    /// Create a new auto persist container and set some data on it to send back to the repository
+    fn send(self, data: Option<T>) -> Persistable<T> {
         Persistable::new(data, self).save()
     }
 
-    async fn sync_or_default(self, default: T) -> Result<Persistable<T>> {
+    /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
+    async fn load_or_default(self, default: T) -> Result<Persistable<T>> {
         Ok(Persistable::load_or_default(self, default).await?)
     }
 }
 
-/// A container that automatically persists it's content every time it is mutated
+/// A container that automatically persists it's content every time it is mutated or changed.
 #[derive(Debug)]
 pub struct Persistable<T> {
     data: Option<T>,
@@ -49,40 +52,37 @@ impl<T> Persistable<T>
 where
     T: PersistableData,
 {
+    /// Create a new container with the given option data and repository
     pub fn new(data: Option<T>, repo: Repository<T>) -> Self {
         Self { data, repo }
     }
 
+    /// Load data from the repository to the container
     pub async fn load(repo: Repository<T>) -> Result<Self> {
         let data = repo.read().await?;
 
         Ok(Self { data, repo })
     }
 
+    /// Load the data from the repo or save and sync the given default value
     pub async fn load_or_default(repo: Repository<T>, default: T) -> Result<Self> {
-        Ok(Self {
+        let instance = Self {
             data: Some(repo.read().await?.unwrap_or(default)),
             repo,
-        })
+        };
+
+        // Ok(instance.save())
+        Ok(instance)
     }
 
+    /// Save the data in the container to the database
     pub fn save(self) -> Self {
         self.checkpoint();
         self
     }
 
-    /// If the content is available it will be mutated with the mutator function. NOTE: If the content is
-    /// not available nothing will happen.
-    pub fn mutate<F>(&mut self, mutator: F)
-    where
-        F: FnOnce(T) -> T,
-    {
-        let current = std::mem::take(&mut self.data);
-        self.data = current.map(mutator);
-        self.checkpoint();
-    }
-
-    /// Mutate the content if it is available or return an error if not.
+    /// Mutate the content if it is available or return an error if either the mutator function
+    /// fails or if the data has not been set.
     pub fn try_mutate<F>(&mut self, mutator: F) -> Result<()>
     where
         F: FnOnce(T) -> Result<T>,
@@ -94,41 +94,44 @@ where
         Ok(())
     }
 
+    /// Set the data on both the persistable and the repository.
     pub fn set(&mut self, data: T) {
         self.data = Some(data);
         self.checkpoint();
     }
 
+    /// Clear the data from both the persistable and the repository.
     pub fn clear(&mut self) {
         self.data = None;
         self.clear_checkpoint();
     }
 
+    /// Get the data currently stored on the container as an Option<T>
     pub fn get(&self) -> Option<T> {
         self.data.clone()
     }
 
+    /// Get the data from the container or return an error.
+    pub fn try_get(&self) -> Result<T> {
+        self.data
+            .clone()
+            .ok_or(anyhow!("Data was not set on container."))
+    }
+
+    /// Returns true if there is data on the container and false if there is not.
     pub fn has(&self) -> bool {
         self.data.is_some()
     }
 
-    pub fn with<F, U>(&self, default: U, f: F) -> U
-    where
-        F: FnOnce(&T) -> U,
-    {
-        match &self.data {
-            Some(data) => f(data),
-            None => default,
-        }
-    }
-
-    pub fn try_with<F, U>(&self, default: U, f: F) -> Result<U>
+    /// Get an immutable reference to the data on the container if the data is not set on the
+    /// container return an error
+    pub fn try_with<F, U>(&self, f: F) -> Result<U>
     where
         F: FnOnce(&T) -> Result<U>,
     {
         match &self.data {
             Some(data) => f(data),
-            None => Ok(default),
+            None => Err(anyhow!("Data was not set on container.")),
         }
     }
 }

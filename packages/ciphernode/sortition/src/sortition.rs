@@ -110,7 +110,7 @@ impl Sortition {
         bus: &Addr<EventBus>,
         store: Repository<SortitionModule>,
     ) -> Result<Addr<Sortition>> {
-        let list = store.sync_or_default(SortitionModule::default()).await?;
+        let list = store.load_or_default(SortitionModule::default()).await?;
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
@@ -178,7 +178,7 @@ impl Handler<GetHasNode> for Sortition {
     #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
         self.list
-            .try_with(false, |list| list.contains(msg.seed, msg.size, msg.address))
+            .try_with(|list| list.contains(msg.seed, msg.size, msg.address))
             .unwrap_or_else(|err| {
                 self.bus.err(EnclaveErrorType::Sortition, err);
                 false
