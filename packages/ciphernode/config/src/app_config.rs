@@ -45,11 +45,30 @@ pub struct ContractAddresses {
     pub filter_registry: Contract,
 }
 
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(tag = "type", content = "credentials")]
+pub enum RpcAuth {
+    None,
+    Basic {
+        username: String,
+        password: String,
+    },
+    Bearer(String)
+}
+
+impl Default for RpcAuth {
+    fn default() -> Self {
+        RpcAuth::None
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ChainConfig {
     pub enabled: Option<bool>,
     pub name: String,
     pub rpc_url: String, // We may need multiple per chain for redundancy at a later point
+    #[serde(default)]
+    pub rpc_auth: RpcAuth,
     pub contracts: ContractAddresses,
 }
 
@@ -331,6 +350,11 @@ mod tests {
 chains:
   - name: "hardhat"
     rpc_url: "ws://localhost:8545"
+    rpc_auth:
+      type: "Basic"
+      credentials:
+        username: "testUser"
+        password: "testPassword"
     contracts:
       enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
       ciphernode_registry:
@@ -353,6 +377,10 @@ chains:
                 chain.contracts.ciphernode_registry.address(),
                 "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
             );
+            assert_eq!(chain.rpc_auth, RpcAuth::Basic {
+                username: "testUser".to_string(),
+                password: "testPassword".to_string(),
+            });
             assert_eq!(chain.contracts.enclave.deploy_block(), None);
             assert_eq!(
                 chain.contracts.ciphernode_registry.deploy_block(),
