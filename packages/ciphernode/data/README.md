@@ -62,7 +62,7 @@ The tradeoff is we get a slightly deeper stack but each layer adds a responsibil
 
 ```mermaid
 graph LR
-    R['Repository\<T\>']
+    R["Repository&lt;T&gt;"]
     DB[(SledDB)]
     Client --"write()"--> R
     R --> D[DataStore]
