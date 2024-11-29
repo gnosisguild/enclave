@@ -138,3 +138,5 @@ struct MyActor {
   state: Persistable<Vec<String>>
 }
 ```
+
+We have also extracted the key calculation mechanism to a [`StoreKeys`](https://github.com/gnosisguild/enclave/blob/ry/180-persistence/packages/ciphernode/config/src/store_keys.rs) struct. This is used in various places when creating repsitory factories for example [here](https://github.com/gnosisguild/enclave/blob/ry/180-persistence/packages/ciphernode/aggregator/src/repositories.rs)
