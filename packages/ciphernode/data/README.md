@@ -42,10 +42,8 @@ The `DataStore` actor also has some convenience methods within it where it is po
 
 ```rust
 let store = DataStore::from(&addr);
-store.base("//foo")
-  .scope("bar")
-  .scope("/baz")
-  .get_scope()?, // "//foo/bar/baz"
+let scoped = store.scope("//foo/bar/baz");
+scoped.write(some_data);
 ```
 
 ## Repository
