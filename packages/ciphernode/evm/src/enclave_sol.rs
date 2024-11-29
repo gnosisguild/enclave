@@ -2,9 +2,10 @@ use crate::{
     enclave_sol_reader::EnclaveSolReader,
     enclave_sol_writer::EnclaveSolWriter,
     event_reader::EvmEventReaderState,
-    helpers::{ReadonlyProvider, SignerProvider, WithChainId},
+    helpers::{ReadonlyProvider, SignerProvider, WithChainId, RpcWSClient},
 };
 use actix::Addr;
+use alloy::transports::BoxTransport;
 use anyhow::Result;
 use data::Repository;
 use enclave_core::EventBus;
@@ -13,8 +14,8 @@ pub struct EnclaveSol;
 impl EnclaveSol {
     pub async fn attach(
         bus: &Addr<EventBus>,
-        read_provider: &WithChainId<ReadonlyProvider>,
-        write_provider: &WithChainId<SignerProvider>,
+        read_provider: &WithChainId<ReadonlyProvider, BoxTransport>,
+        write_provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,

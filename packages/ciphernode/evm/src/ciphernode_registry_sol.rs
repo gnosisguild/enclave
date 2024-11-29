@@ -7,7 +7,7 @@ use actix::{Actor, Addr};
 use alloy::{
     primitives::{LogData, B256},
     sol,
-    sol_types::SolEvent,
+    sol_types::SolEvent, transports::BoxTransport,
 };
 use anyhow::Result;
 use data::Repository;
@@ -102,7 +102,7 @@ pub struct CiphernodeRegistrySolReader;
 impl CiphernodeRegistrySolReader {
     pub async fn attach(
         bus: &Addr<EventBus>,
-        provider: &WithChainId<ReadonlyProvider>,
+        provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
@@ -128,7 +128,7 @@ pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
     pub async fn attach(
         bus: &Addr<EventBus>,
-        provider: &WithChainId<ReadonlyProvider>,
+        provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,

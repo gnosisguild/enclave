@@ -45,7 +45,7 @@ pub struct ContractAddresses {
     pub filter_registry: Contract,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(tag = "type", content = "credentials")]
 pub enum RpcAuth {
     None,

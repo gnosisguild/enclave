@@ -5,7 +5,7 @@ use cipher::Cipher;
 use config::AppConfig;
 use enclave_core::{get_tag, EventBus};
 use evm::{
-    helpers::{create_readonly_provider, RPC},
+    helpers::{RPC, ProviderConfig},
     CiphernodeRegistrySol, EnclaveSolReader,
 };
 use logger::SimpleLogger;
@@ -47,7 +47,8 @@ pub async fn setup_ciphernode(
         let rpc_url = RPC::from_url(&chain.rpc_url).map_err(|e| {
             anyhow::anyhow!("Failed to parse RPC URL for chain {}: {}", chain.name, e)
         })?;
-        let read_provider = create_readonly_provider(&rpc_url.as_ws_url()).await?;
+        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone().into());
+        let read_provider = provider_config.create_readonly_provider().await?;
         EnclaveSolReader::attach(
             &bus,
             &read_provider,

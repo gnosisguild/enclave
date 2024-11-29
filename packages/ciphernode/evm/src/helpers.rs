@@ -86,44 +86,6 @@ impl RPC {
     }
 }
 
-/// We need to cache the chainId so we can easily use it in a non-async situation
-/// This wrapper just stores the chain_id with the Provider
-#[derive(Clone)]
-// We have to be generic over T as the transport provider in order to handle different transport
-// mechanisms such as the HttpClient etc.
-pub struct WithChainId<P, T = BoxTransport>
-where
-    P: Provider<T>,
-    T: Transport + Clone,
-{
-    provider: Arc<P>,
-    chain_id: u64,
-    _t: PhantomData<T>,
-}
-
-impl<P, T> WithChainId<P, T>
-where
-    P: Provider<T>,
-    T: Transport + Clone,
-{
-    pub async fn new(provider: P) -> Result<Self> {
-        let chain_id = provider.get_chain_id().await?;
-        Ok(Self {
-            provider: Arc::new(provider),
-            chain_id,
-            _t: PhantomData,
-        })
-    }
-
-    pub fn get_provider(&self) -> Arc<P> {
-        self.provider.clone()
-    }
-
-    pub fn get_chain_id(&self) -> u64 {
-        self.chain_id
-    }
-}
-
 #[derive(Clone)]
 pub enum RpcAuth {
     None,
@@ -181,20 +143,48 @@ impl From<RpcAuth> for ConfigRpcAuth {
     }
 }
 
-pub type ReadonlyProvider = RootProvider<BoxTransport>;
 
-pub async fn create_readonly_provider(
-    rpc_url: &str,
-) -> Result<WithChainId<ReadonlyProvider, BoxTransport>> {
-    let provider = ProviderBuilder::new()
-        .on_builtin(rpc_url)
-        .await
-        .context("Could not create ReadOnlyProvider")?
-        .into();
-    Ok(WithChainId::new(provider).await?)
+/// We need to cache the chainId so we can easily use it in a non-async situation
+/// This wrapper just stores the chain_id with the Provider
+#[derive(Clone)]
+// We have to be generic over T as the transport provider in order to handle different transport
+// mechanisms such as the HttpClient etc.
+pub struct WithChainId<P, T>
+where
+    P: Provider<T>,
+    T: Transport + Clone,
+{
+    provider: Arc<P>,
+    chain_id: u64,
+    _t: PhantomData<T>,
 }
 
-pub type SignerProvider = FillProvider<
+impl<P, T> WithChainId<P, T>
+where
+    P: Provider<T>,
+    T: Transport + Clone,
+{
+    pub async fn new(provider: P) -> Result<Self> {
+        let chain_id = provider.get_chain_id().await?;
+        Ok(Self {
+            provider: Arc::new(provider),
+            chain_id,
+            _t: PhantomData,
+        })
+    }
+
+    pub fn get_provider(&self) -> Arc<P> {
+        self.provider.clone()
+    }
+
+    pub fn get_chain_id(&self) -> u64 {
+        self.chain_id
+    }
+}
+
+pub type RpcWSClient = PubSubFrontend;
+pub type RpcHttpClient = Http<Client>;
+pub type SignerProvider<T> = FillProvider<
     JoinFill<
         JoinFill<
             Identity,
@@ -202,23 +192,93 @@ pub type SignerProvider = FillProvider<
         >,
         WalletFiller<EthereumWallet>,
     >,
-    RootProvider<BoxTransport>,
-    BoxTransport,
+    RootProvider<T>,
+    T,
     Ethereum,
 >;
 
-pub async fn create_provider_with_signer(
-    rpc_url: &str,
-    signer: &Arc<PrivateKeySigner>,
-) -> Result<WithChainId<SignerProvider, BoxTransport>> {
-    let wallet = EthereumWallet::from(signer.clone());
-    let provider = ProviderBuilder::new()
-        .with_recommended_fillers()
-        .wallet(wallet)
-        .on_builtin(rpc_url)
-        .await?;
+pub type ReadonlyProvider = RootProvider<BoxTransport>;
 
-    Ok(WithChainId::new(provider).await?)
+
+#[derive(Clone)]
+pub struct ProviderConfig {
+    rpc: RPC,
+    auth: RpcAuth,
+}
+
+impl ProviderConfig {
+    pub fn new(rpc: RPC, auth: RpcAuth) -> Self {
+        Self { rpc, auth }
+    }
+
+    async fn create_ws_provider(&self) -> Result<RootProvider<BoxTransport>> {
+        Ok(ProviderBuilder::new()
+            .on_ws(self.create_ws_connect())
+            .await?
+            .boxed())
+    }
+
+    async fn create_http_provider(&self) -> Result<RootProvider<BoxTransport>> {
+        Ok(ProviderBuilder::new()
+            .on_client(self.create_http_client()?)
+            .boxed())
+    }
+    
+
+    pub async fn create_readonly_provider(&self) -> Result<WithChainId<ReadonlyProvider, BoxTransport>> {
+        let provider = if self.rpc.is_websocket() {
+            self.create_ws_provider().await?
+        } else {
+            self.create_http_provider().await?
+        };
+        WithChainId::new(provider).await
+    }
+
+    pub async fn create_ws_signer_provider(
+        &self,
+        signer: &Arc<PrivateKeySigner>,
+    ) -> Result<WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>> {
+        let wallet = EthereumWallet::from(signer.clone());
+        let provider = ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(wallet)
+            .on_ws(self.create_ws_connect())
+            .await.context("Failed to create WS signer provider")?;
+        
+        WithChainId::new(provider).await
+    }
+
+    pub async fn create_http_signer_provider(
+        &self,
+        signer: &Arc<PrivateKeySigner>,
+    ) -> Result<WithChainId<SignerProvider<RpcHttpClient>, RpcHttpClient>> {
+        let wallet = EthereumWallet::from(signer.clone());
+        let provider = ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(wallet)
+            .on_client(self.create_http_client()?);
+        WithChainId::new(provider).await
+    }
+
+    fn create_ws_connect(&self) -> WsConnect {
+        if let Some(ws_auth) = self.auth.to_ws_auth() {
+            WsConnect::new(self.rpc.as_ws_url()).with_auth(ws_auth)
+        } else {
+            WsConnect::new(self.rpc.as_ws_url())
+        }
+    }
+
+    fn create_http_client(&self) -> Result<RpcClient<Http<Client>>> {
+        let mut headers = HeaderMap::new();
+        if let Some(auth_header) = self.auth.to_header_value() {
+            headers.insert(AUTHORIZATION, auth_header);
+        }
+        let client = Client::builder()
+            .default_headers(headers)
+            .build()?;
+        let http = Http::with_client(client, self.rpc.as_http_url().parse()?);
+        Ok(RpcClient::new(http, false))
+    }
 }
 
 pub async fn pull_eth_signer_from_env(var: &str) -> Result<Arc<PrivateKeySigner>> {

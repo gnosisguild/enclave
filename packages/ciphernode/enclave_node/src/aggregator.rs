@@ -5,7 +5,7 @@ use config::AppConfig;
 use enclave_core::EventBus;
 use evm::{
     helpers::{
-        create_provider_with_signer, create_readonly_provider, get_signer_from_repository, RPC,
+        get_signer_from_repository, RPC, ProviderConfig
     },
     CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
 };
@@ -46,9 +46,10 @@ pub async fn setup_aggregator(
     {
         let rpc_url = RPC::from_url(&chain.rpc_url).map_err(|e| {
             anyhow::anyhow!("Failed to parse RPC URL for chain {}: {}", chain.name, e)
-        })?;
-        let read_provider = create_readonly_provider(&rpc_url.as_ws_url()).await?;
-        let write_provider = create_provider_with_signer(&rpc_url.as_http_url(), &signer).await?;
+        })?;    
+        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone().into());
+        let read_provider = provider_config.create_readonly_provider().await?;
+        let write_provider = provider_config.create_ws_signer_provider(&signer).await?;
 
         EnclaveSol::attach(
             &bus,
