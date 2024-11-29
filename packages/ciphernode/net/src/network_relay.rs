@@ -1,22 +1,24 @@
 use std::{collections::HashSet, error::Error};
 
-use crate::libp2p_router::EnclaveRouter;
+use crate::NetworkPeer;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
-use tokio::sync::mpsc::{Receiver, Sender};
-
+use anyhow::anyhow;
+use anyhow::Result;
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, trace};
 
-/// P2p Actor converts between EVentBus events and Libp2p events
-pub struct P2p {
+/// NetworkRelay Actor converts between EventBus events and Libp2p events forwarding them to a
+/// NetworkPeer for propagation over the p2p network
+pub struct NetworkRelay {
     bus: Addr<EventBus>,
     tx: Sender<Vec<u8>>,
     sent_events: HashSet<EventId>,
 }
 
-impl Actor for P2p {
+impl Actor for NetworkRelay {
     type Context = Context<Self>;
 }
 
@@ -24,8 +26,8 @@ impl Actor for P2p {
 #[rtype(result = "anyhow::Result<()>")]
 struct LibP2pEvent(pub Vec<u8>);
 
-impl P2p {
-    /// Create a new P2p actor
+impl NetworkRelay {
+    /// Create a new NetworkRelay actor
     pub fn new(bus: Addr<EventBus>, tx: Sender<Vec<u8>>) -> Self {
         Self {
             bus,
@@ -34,51 +36,47 @@ impl P2p {
         }
     }
 
-    /// Start a new P2p actor listening for libp2p messages on the given Receiver and forwarding
-    /// them to the actor
-    pub fn spawn_and_listen(
+    pub fn setup(
         bus: Addr<EventBus>,
-        tx: Sender<Vec<u8>>,       // Transmit byte events to the network
-        mut rx: Receiver<Vec<u8>>, // Receive byte events from the network
+        tx: Sender<Vec<u8>>,
+        mut rx: Receiver<Vec<u8>>,
     ) -> Addr<Self> {
-        // Create a new Actor
-        let p2p = P2p::new(bus.clone(), tx).start();
+        let addr = NetworkRelay::new(bus.clone(), tx).start();
 
         // Listen on all events
         bus.do_send(Subscribe {
             event_type: String::from("*"),
-            listener: p2p.clone().recipient(),
+            listener: addr.clone().recipient(),
         });
 
-        // Clone this to go in the spawned future
-        let p2p_addr = p2p.clone();
-        tokio::spawn(async move {
-            while let Some(msg) = rx.recv().await {
-                p2p_addr.do_send(LibP2pEvent(msg))
+        tokio::spawn({
+            let addr = addr.clone();
+
+            async move {
+                while let Some(msg) = rx.recv().await {
+                    addr.do_send(LibP2pEvent(msg))
+                }
             }
         });
 
-        // Return the address
-        p2p
+        addr
     }
 
-    /// Spawn a Libp2p instance. Calls spawn and listen
-    pub fn spawn_libp2p(
+    /// Spawn a Libp2p peer and hook it up to this actor
+    pub fn setup_with_peer(
         bus: Addr<EventBus>,
-    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<()>, String), Box<dyn Error>> {
-        let (mut libp2p, tx, rx) = EnclaveRouter::new()?;
+        peers: Vec<String>,
+    ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
         let keypair = libp2p::identity::Keypair::generate_ed25519();
-        libp2p.with_identity(&keypair);
-        libp2p.connect_swarm("mdns".to_string())?;
-        libp2p.join_topic("enclave-keygen-01")?;
-
-        let p2p_addr = Self::spawn_and_listen(bus, tx, rx);
-        let handle = tokio::spawn(async move { libp2p.start().await.unwrap() });
+        let mut peer = NetworkPeer::new(&keypair, peers, None, "tmp-enclave-gossip-topic")?;
+        let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;
+        let p2p_addr = NetworkRelay::setup(bus, peer.tx(), rx);
+        let handle = tokio::spawn(async move { Ok(peer.start().await?) });
         Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
 
-impl Handler<LibP2pEvent> for P2p {
+impl Handler<LibP2pEvent> for NetworkRelay {
     type Result = anyhow::Result<()>;
     fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
         let LibP2pEvent(bytes) = msg;
@@ -93,7 +91,7 @@ impl Handler<LibP2pEvent> for P2p {
     }
 }
 
-impl Handler<EnclaveEvent> for P2p {
+impl Handler<EnclaveEvent> for NetworkRelay {
     type Result = ResponseFuture<()>;
     fn handle(&mut self, event: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let sent_events = self.sent_events.clone();
