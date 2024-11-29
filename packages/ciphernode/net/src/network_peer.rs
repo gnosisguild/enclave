@@ -14,7 +14,7 @@ use std::hash::{Hash, Hasher};
 use std::{hash::DefaultHasher, io::Error, time::Duration};
 use tokio::{
     select,
-    sync::mpsc::{self, channel, Receiver, Sender},
+    sync::mpsc::{channel, Receiver, Sender},
 };
 use tracing::{debug, error, info, trace, warn};
 
