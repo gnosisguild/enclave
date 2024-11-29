@@ -130,3 +130,11 @@ persistable.clear();
 
 assert_eq!(persistable.get(), None);
 ```
+
+To use it we can just have it as a field on a struct or actor:
+
+```rust
+struct MyActor {
+  state: Persistable<Vec<String>>
+}
+```
