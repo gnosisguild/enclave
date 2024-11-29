@@ -72,11 +72,11 @@ graph LR
     SledStore --> DB
 ```
 
-| Layer               | Functionality                                                                                                          |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `Repository<T>`     | Strongly typed Data persistence for a single item. Configured to know how to save its data.                                              |
+| Layer               | Functionality                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `Repository<T>`     | Strongly typed Data persistence for a single item. Configured to know how to save its data.                                     |
 | `DataStore`         | Flexible KV store. Client can scope to specific namespace. Can be backed by polymorphic data actor to handle testing scenarios. |
-| `{InMem,Sled}Store` | Actor to receive `Insert` and `Get` requests can only save raw bytes.                                                  |
+| `{InMem,Sled}Store` | Actor to receive `Insert` and `Get` requests can only save raw bytes.                                                           |
 
 ## Snapshotting
 
