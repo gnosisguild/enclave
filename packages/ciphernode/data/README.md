@@ -48,13 +48,11 @@ scoped.write(some_data);
 
 ## Repository
 
-There was an attempt to use the `DataStore` throughout the app but it became apparent this was causing the knowledge of where data was saved to be spread throughout the codebase. What we needed was for the components not to really care how their data was saved but for us to be able to easily have a sense of the different keys under which data was being saved in a centralized place.
+There was an attempt to use the `DataStore` throughout the app but it became apparent this was causing the knowledge of where and how the data was saved to be spread throughout the codebase. What we needed was for the components not to really care how their data was saved but for us to be able to easily have a sense of the different keys under which data was being saved in a centralized place.
 
-Also the data in the DataStore was effectively untyped as it only could get and set raw bytes with `Vec<u8>`.
+Also `DataStore` can take any type of serializable data to save at a key location but this means the data in the DataStore was effectively untyped.
 
-It made sense to create a typed `Repository<T>` interface to encapsulate saving of data from within an actor or routine in theory the repository could use whatever data store it requires to save the data. This could even be a SQL DB or the filesystem if required. Whatever it was a Repository knows how to save it.
-
-We also created a `Repositories` struct to provide a central point for the repositories however this was leading to cargo dependency issues as this was a struct that dependend on every package for it's types but was also depended on by every package which made placing it somewhere within our dependency heirarchy challenging. This clearly was an issue.
+TO solve this it made sense to create a typed `Repository<T>` interface to encapsulate saving of data from within an actor or routine and in theory the repository could use whatever underlying mechanism requires to save the data. This could even be a SQL DB or the filesystem if required. Whatever it's type T the Repository knows how to save it.
 
 The tradeoff is we get a slightly deeper stack but each layer adds a responsibility to the data saving stack:
 
@@ -69,6 +67,7 @@ graph LR
     InMemStore -.-> BTreeMap
     SledStore --> DB
 ```
+
 
 | Layer               | Functionality                                                                                                                   |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
