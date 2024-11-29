@@ -50,7 +50,7 @@ store.base("//foo")
 
 ## Repository
 
-There was an attempt to use this throughout the app but it became apparent this was causing the knowledge of where data was saved to be spread throughout the codebase. What we needed was for the components not to really care how their data was saved but for us to be able to easily have a sense of the different keys under which data was being saved in a centralized place.
+There was an attempt to use the `DataStore` throughout the app but it became apparent this was causing the knowledge of where data was saved to be spread throughout the codebase. What we needed was for the components not to really care how their data was saved but for us to be able to easily have a sense of the different keys under which data was being saved in a centralized place.
 
 Also the data in the DataStore was effectively untyped as it only could get and set raw bytes with `Vec<u8>`.
 
@@ -75,7 +75,7 @@ graph LR
 | Layer               | Functionality                                                                                                          |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `Repository<T>`     | Strongly typed Data persistence. Configured to know how to save its data.                                              |
-| `DataStore`         | KV store. Client can scope to specific namespace. Can be backed by polymorphic data actor to handle testing scenarios. |
+| `DataStore`         | Flexible KV store. Client can scope to specific namespace. Can be backed by polymorphic data actor to handle testing scenarios. |
 | `{InMem,Sled}Store` | Actor to receive `Insert` and `Get` requests can only save raw bytes.                                                  |
 
 ## Snapshotting
