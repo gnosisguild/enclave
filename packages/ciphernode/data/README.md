@@ -102,6 +102,7 @@ This has several benefits:
 - Centralized batching point for logical operations
 - Can remove complex "snapshot" traits
 - Simpler initialization
+- No need to consider the underlying data saving mechanism - logic can be [persistence ignorant](https://medium.com/@serhatalftkn/persistence-ignorance-principle-entity-and-service-relationships-in-net-8-8e441aad20d7).
 
 ```rust
 
