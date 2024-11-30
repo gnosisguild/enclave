@@ -1,5 +1,4 @@
-use crate::helpers::SignerProvider;
-use crate::helpers::WithChainId;
+use crate::helpers::{RpcWSClient, SignerProvider, WithChainId};
 use actix::prelude::*;
 use actix::Addr;
 use alloy::{primitives::Address, sol};
@@ -21,7 +20,7 @@ sol!(
 
 /// Consumes events from the event bus and calls EVM methods on the Enclave.sol contract
 pub struct EnclaveSolWriter {
-    provider: WithChainId<SignerProvider>,
+    provider: WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
     contract_address: Address,
     bus: Addr<EventBus>,
 }
@@ -29,7 +28,7 @@ pub struct EnclaveSolWriter {
 impl EnclaveSolWriter {
     pub fn new(
         bus: &Addr<EventBus>,
-        provider: &WithChainId<SignerProvider>,
+        provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: Address,
     ) -> Result<Self> {
         Ok(Self {
@@ -41,7 +40,7 @@ impl EnclaveSolWriter {
 
     pub async fn attach(
         bus: &Addr<EventBus>,
-        provider: &WithChainId<SignerProvider>,
+        provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter>> {
         let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
@@ -108,7 +107,7 @@ impl Handler<Shutdown> for EnclaveSolWriter {
 }
 
 async fn publish_plaintext_output(
-    provider: WithChainId<SignerProvider>,
+    provider: WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
     contract_address: Address,
     e3_id: E3id,
     decrypted_output: Vec<u8>,

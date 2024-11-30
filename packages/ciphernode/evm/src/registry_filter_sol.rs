@@ -1,10 +1,9 @@
-use crate::helpers::{SignerProvider, WithChainId};
+use crate::helpers::{RpcWSClient, SignerProvider, WithChainId};
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
     rpc::types::TransactionReceipt,
     sol,
-    transports::BoxTransport,
 };
 use anyhow::Result;
 use enclave_core::{
@@ -20,7 +19,7 @@ sol!(
 );
 
 pub struct RegistryFilterSolWriter {
-    provider: WithChainId<SignerProvider>,
+    provider: WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
     contract_address: Address,
     bus: Addr<EventBus>,
 }
@@ -28,7 +27,7 @@ pub struct RegistryFilterSolWriter {
 impl RegistryFilterSolWriter {
     pub async fn new(
         bus: &Addr<EventBus>,
-        provider: &WithChainId<SignerProvider>,
+        provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: Address,
     ) -> Result<Self> {
         Ok(Self {
@@ -40,7 +39,7 @@ impl RegistryFilterSolWriter {
 
     pub async fn attach(
         bus: &Addr<EventBus>,
-        provider: &WithChainId<SignerProvider>,
+        provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: &str,
     ) -> Result<Addr<RegistryFilterSolWriter>> {
         let addr = RegistryFilterSolWriter::new(bus, provider, contract_address.parse()?)
@@ -107,7 +106,7 @@ impl Handler<Shutdown> for RegistryFilterSolWriter {
 }
 
 pub async fn publish_committee(
-    provider: WithChainId<SignerProvider>,
+    provider: WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
     contract_address: Address,
     e3_id: E3id,
     nodes: OrderedSet<String>,
@@ -129,7 +128,7 @@ pub struct RegistryFilterSol;
 impl RegistryFilterSol {
     pub async fn attach(
         bus: &Addr<EventBus>,
-        provider: &WithChainId<SignerProvider>,
+        provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: &str,
     ) -> Result<()> {
         RegistryFilterSolWriter::attach(bus, provider, contract_address).await?;

@@ -7,21 +7,120 @@ use alloy::{
         },
         Identity, Provider, ProviderBuilder, RootProvider,
     },
+    pubsub::PubSubFrontend,
+    rpc::client::RpcClient,
     signers::local::PrivateKeySigner,
-    transports::{BoxTransport, Transport},
+    transports::{
+        http::{
+            reqwest::{
+                header::{HeaderMap, HeaderValue, AUTHORIZATION},
+                Client,
+            },
+            Http,
+        },
+        ws::WsConnect,
+        Authorization, BoxTransport, Transport,
+    },
 };
 use anyhow::{bail, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use cipher::Cipher;
+use config::RpcAuth;
 use data::Repository;
 use std::{env, marker::PhantomData, sync::Arc};
+use url::Url;
 use zeroize::Zeroizing;
+
+#[derive(Clone)]
+pub enum RPC {
+    Http(String),
+    Https(String),
+    Ws(String),
+    Wss(String),
+}
+
+impl RPC {
+    pub fn from_url(url: &str) -> Result<Self> {
+        let parsed = Url::parse(url).context("Invalid URL format")?;
+        match parsed.scheme() {
+            "http" => Ok(RPC::Http(url.to_string())),
+            "https" => Ok(RPC::Https(url.to_string())),
+            "ws" => Ok(RPC::Ws(url.to_string())),
+            "wss" => Ok(RPC::Wss(url.to_string())),
+            _ => bail!("Invalid protocol. Expected: http://, https://, ws://, wss://"),
+        }
+    }
+
+    pub fn as_http_url(&self) -> String {
+        match self {
+            RPC::Http(url) | RPC::Https(url) => url.clone(),
+            RPC::Ws(url) | RPC::Wss(url) => {
+                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
+                parsed
+                    .set_scheme(if self.is_secure() { "https" } else { "http" })
+                    .expect("http(s) are valid schemes");
+                parsed.to_string()
+            }
+        }
+    }
+
+    pub fn as_ws_url(&self) -> String {
+        match self {
+            RPC::Ws(url) | RPC::Wss(url) => url.clone(),
+            RPC::Http(url) | RPC::Https(url) => {
+                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
+                parsed
+                    .set_scheme(if self.is_secure() { "wss" } else { "ws" })
+                    .expect("ws(s) are valid schemes");
+                parsed.to_string()
+            }
+        }
+    }
+
+    pub fn is_websocket(&self) -> bool {
+        matches!(self, RPC::Ws(_) | RPC::Wss(_))
+    }
+
+    pub fn is_secure(&self) -> bool {
+        matches!(self, RPC::Https(_) | RPC::Wss(_))
+    }
+}
+
+pub trait AuthConversions {
+    fn to_header_value(&self) -> Option<HeaderValue>;
+    fn to_ws_auth(&self) -> Option<Authorization>;
+}
+
+impl AuthConversions for RpcAuth {
+    fn to_header_value(&self) -> Option<HeaderValue> {
+        match self {
+            RpcAuth::None => None,
+            RpcAuth::Basic { username, password } => {
+                let auth = format!(
+                    "Basic {}",
+                    STANDARD.encode(Zeroizing::new(format!("{}:{}", username, password)))
+                );
+                HeaderValue::from_str(&auth).ok()
+            }
+            RpcAuth::Bearer(token) => HeaderValue::from_str(&format!("Bearer {}", token)).ok(),
+        }
+    }
+
+    fn to_ws_auth(&self) -> Option<Authorization> {
+        match self {
+            RpcAuth::None => None,
+            RpcAuth::Basic { username, password } => Some(Authorization::basic(username, password)),
+            RpcAuth::Bearer(token) => Some(Authorization::bearer(token)),
+        }
+    }
+}
 
 /// We need to cache the chainId so we can easily use it in a non-async situation
 /// This wrapper just stores the chain_id with the Provider
 #[derive(Clone)]
 // We have to be generic over T as the transport provider in order to handle different transport
 // mechanisms such as the HttpClient etc.
-pub struct WithChainId<P, T = BoxTransport>
+pub struct WithChainId<P, T>
 where
     P: Provider<T>,
     T: Transport + Clone,
@@ -54,20 +153,9 @@ where
     }
 }
 
-pub type ReadonlyProvider = RootProvider<BoxTransport>;
-
-pub async fn create_readonly_provider(
-    rpc_url: &str,
-) -> Result<WithChainId<ReadonlyProvider, BoxTransport>> {
-    let provider = ProviderBuilder::new()
-        .on_builtin(rpc_url)
-        .await
-        .context("Could not create ReadOnlyProvider")?
-        .into();
-    Ok(WithChainId::new(provider).await?)
-}
-
-pub type SignerProvider = FillProvider<
+pub type RpcWSClient = PubSubFrontend;
+pub type RpcHttpClient = Http<Client>;
+pub type SignerProvider<T> = FillProvider<
     JoinFill<
         JoinFill<
             Identity,
@@ -75,23 +163,95 @@ pub type SignerProvider = FillProvider<
         >,
         WalletFiller<EthereumWallet>,
     >,
-    RootProvider<BoxTransport>,
-    BoxTransport,
+    RootProvider<T>,
+    T,
     Ethereum,
 >;
 
-pub async fn create_provider_with_signer(
-    rpc_url: &str,
-    signer: &Arc<PrivateKeySigner>,
-) -> Result<WithChainId<SignerProvider, BoxTransport>> {
-    let wallet = EthereumWallet::from(signer.clone());
-    let provider = ProviderBuilder::new()
-        .with_recommended_fillers()
-        .wallet(wallet)
-        .on_builtin(rpc_url)
-        .await?;
+pub type ReadonlyProvider = RootProvider<BoxTransport>;
 
-    Ok(WithChainId::new(provider).await?)
+#[derive(Clone)]
+pub struct ProviderConfig {
+    rpc: RPC,
+    auth: RpcAuth,
+}
+
+impl ProviderConfig {
+    pub fn new(rpc: RPC, auth: RpcAuth) -> Self {
+        Self { rpc, auth }
+    }
+
+    async fn create_ws_provider(&self) -> Result<RootProvider<BoxTransport>> {
+        Ok(ProviderBuilder::new()
+            .on_ws(self.create_ws_connect())
+            .await?
+            .boxed())
+    }
+
+    async fn create_http_provider(&self) -> Result<RootProvider<BoxTransport>> {
+        Ok(ProviderBuilder::new()
+            .on_client(self.create_http_client()?)
+            .boxed())
+    }
+
+    pub async fn create_readonly_provider(
+        &self,
+    ) -> Result<WithChainId<ReadonlyProvider, BoxTransport>> {
+        let provider = if self.rpc.is_websocket() {
+            self.create_ws_provider().await?
+        } else {
+            self.create_http_provider().await?
+        };
+        WithChainId::new(provider).await
+    }
+
+    pub async fn create_ws_signer_provider(
+        &self,
+        signer: &Arc<PrivateKeySigner>,
+    ) -> Result<WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>> {
+        let wallet = EthereumWallet::from(signer.clone());
+        let provider = ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(wallet)
+            .on_ws(self.create_ws_connect())
+            .await
+            .context("Failed to create WS signer provider")?;
+
+        WithChainId::new(provider).await
+    }
+
+    pub async fn create_http_signer_provider(
+        &self,
+        signer: &Arc<PrivateKeySigner>,
+    ) -> Result<WithChainId<SignerProvider<RpcHttpClient>, RpcHttpClient>> {
+        let wallet = EthereumWallet::from(signer.clone());
+        let provider = ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(wallet)
+            .on_client(self.create_http_client()?);
+        WithChainId::new(provider).await
+    }
+
+    fn create_ws_connect(&self) -> WsConnect {
+        if let Some(ws_auth) = self.auth.to_ws_auth() {
+            WsConnect::new(self.rpc.as_ws_url()).with_auth(ws_auth)
+        } else {
+            WsConnect::new(self.rpc.as_ws_url())
+        }
+    }
+
+    fn create_http_client(&self) -> Result<RpcClient<Http<Client>>> {
+        let mut headers = HeaderMap::new();
+        if let Some(auth_header) = self.auth.to_header_value() {
+            headers.insert(AUTHORIZATION, auth_header);
+        }
+        let client = Client::builder()
+            .default_headers(headers)
+            .build()
+            .context("Failed to create HTTP client")?;
+        let http = Http::with_client(client, self.rpc.as_http_url().parse()?);
+        Ok(RpcClient::new(http, false))
+    }
 }
 
 pub async fn pull_eth_signer_from_env(var: &str) -> Result<Arc<PrivateKeySigner>> {
@@ -117,40 +277,49 @@ pub async fn get_signer_from_repository(
     Ok(Arc::new(signer))
 }
 
-pub fn ensure_http_rpc(rpc_url: &str) -> String {
-    if rpc_url.starts_with("ws://") {
-        return rpc_url.replacen("ws://", "http://", 1);
-    } else if rpc_url.starts_with("wss://") {
-        return rpc_url.replacen("wss://", "https://", 1);
-    }
-    rpc_url.to_string()
-}
-
-pub fn ensure_ws_rpc(rpc_url: &str) -> String {
-    if rpc_url.starts_with("http://") {
-        return rpc_url.replacen("http://", "ws://", 1);
-    } else if rpc_url.starts_with("https://") {
-        return rpc_url.replacen("https://", "wss://", 1);
-    }
-    rpc_url.to_string()
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn test_ensure_http_rpc() {
-        assert_eq!(ensure_http_rpc("http://foo.com"), "http://foo.com");
-        assert_eq!(ensure_http_rpc("https://foo.com"), "https://foo.com");
-        assert_eq!(ensure_http_rpc("ws://foo.com"), "http://foo.com");
-        assert_eq!(ensure_http_rpc("wss://foo.com"), "https://foo.com");
+    fn test_rpc_type_conversion() {
+        // Test HTTP URLs
+        let http = RPC::from_url("http://localhost:8545/").unwrap();
+        assert!(matches!(http, RPC::Http(_)));
+        assert_eq!(http.as_http_url(), "http://localhost:8545/");
+        assert_eq!(http.as_ws_url(), "ws://localhost:8545/");
+
+        // Test HTTPS URLs
+        let https = RPC::from_url("https://example.com/").unwrap();
+        assert!(matches!(https, RPC::Https(_)));
+        assert_eq!(https.as_http_url(), "https://example.com/");
+        assert_eq!(https.as_ws_url(), "wss://example.com/");
+
+        // Test WS URLs
+        let ws = RPC::from_url("ws://localhost:8545/").unwrap();
+        assert!(matches!(ws, RPC::Ws(_)));
+        assert_eq!(ws.as_http_url(), "http://localhost:8545/");
+        assert_eq!(ws.as_ws_url(), "ws://localhost:8545/");
+
+        // Test WSS URLs
+        let wss = RPC::from_url("wss://example.com/").unwrap();
+        assert!(matches!(wss, RPC::Wss(_)));
+        assert_eq!(wss.as_http_url(), "https://example.com/");
+        assert_eq!(wss.as_ws_url(), "wss://example.com/");
     }
+
     #[test]
-    fn test_ensure_ws_rpc() {
-        assert_eq!(ensure_ws_rpc("http://foo.com"), "ws://foo.com");
-        assert_eq!(ensure_ws_rpc("https://foo.com"), "wss://foo.com");
-        assert_eq!(ensure_ws_rpc("wss://foo.com"), "wss://foo.com");
-        assert_eq!(ensure_ws_rpc("ws://foo.com"), "ws://foo.com");
+    fn test_rpc_type_properties() {
+        assert!(!RPC::from_url("http://example.com/").unwrap().is_secure());
+        assert!(RPC::from_url("https://example.com/").unwrap().is_secure());
+        assert!(!RPC::from_url("ws://example.com/").unwrap().is_secure());
+        assert!(RPC::from_url("wss://example.com/").unwrap().is_secure());
+
+        assert!(!RPC::from_url("http://example.com/").unwrap().is_websocket());
+        assert!(!RPC::from_url("https://example.com/")
+            .unwrap()
+            .is_websocket());
+        assert!(RPC::from_url("ws://example.com/").unwrap().is_websocket());
+        assert!(RPC::from_url("wss://example.com/").unwrap().is_websocket());
     }
 }
