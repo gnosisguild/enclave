@@ -6,9 +6,9 @@ use data::RepositoriesFactory;
 use enclave_core::EventBus;
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig, RPC},
-    CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
-    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, CiphernodeRegistrySol,
+    EnclaveSol, EnclaveSol, EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
+    RegistryFilterSol, RegistryFilterSol,
 };
 use logger::SimpleLogger;
 use net::NetworkRelay;
