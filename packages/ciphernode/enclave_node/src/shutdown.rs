@@ -6,14 +6,14 @@ use tokio::{
     signal::unix::{signal, SignalKind},
     task::JoinHandle,
 };
-use tracing::info;
+use tracing::{error, info};
 
 pub async fn listen_for_shutdown(bus: Recipient<EnclaveEvent>, handle: JoinHandle<Result<()>>) {
     let mut sigterm =
         signal(SignalKind::terminate()).expect("Failed to create SIGTERM signal stream");
 
     sigterm.recv().await;
-    info!("SIGTERM received, initiating graceful shutdown...");
+    error!("SIGTERM received, initiating graceful shutdown...");
 
     // Stop the actor system
     let _ = bus.send(EnclaveEvent::from(Shutdown)).await;

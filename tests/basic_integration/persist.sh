@@ -58,12 +58,16 @@ PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
 # kill aggregator
 kill_proc ag
 
-sleep 2
+echo "KILL has been run waiting for 20 seconds..."
+
+sleep 5
+
+echo "FINISHED now relaunching!"
 
 # relaunch the aggregator
 launch_aggregator ag
 
-sleep 2
+sleep 5
 
 heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT

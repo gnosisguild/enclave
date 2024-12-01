@@ -122,9 +122,12 @@ kill_proc() {
   kill $pid
 }
 
-metallica() {
+kill_all_procs() {
+  echo "KILLING existing processes"
   pkill -9 -f "target/debug/enclave" || true
   pkill -9 -f "hardhat node" || true
+  sleep 5
+  echo "Finished KILLING existing processes"
 }
 
 launch_evm() {
@@ -135,7 +138,7 @@ launch_evm() {
   fi
 }
 
-metallica
+kill_all_procs
 
 # Set up trap to catch errors and interrupts
 trap 'cleanup $?' ERR INT TERM

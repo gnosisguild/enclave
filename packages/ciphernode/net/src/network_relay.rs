@@ -12,7 +12,7 @@ use cipher::Cipher;
 use data::{AutoPersist, Repository};
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{error, trace};
+use tracing::{error, info, trace};
 
 /// NetworkRelay Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetworkPeer for propagation over the p2p network
@@ -73,11 +73,14 @@ impl NetworkRelay {
         repository: Repository<EncryptedKeypair>,
         cipher: &Arc<Cipher>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
-        let keypair = repository
-            .load_or_else(|| EncryptedKeypair::generate(cipher))
-            .await?
-            .try_get()?
-            .decrypt(cipher)?;
+        let keypair = EncryptedKeypair::generate(cipher)?.decrypt(cipher)?;
+        // let keypair = repository
+        //     .load_or_else(|| EncryptedKeypair::generate(cipher))
+        //     .await?
+        //     .try_get()?
+        //     .decrypt(cipher)?;
+
+        info!("Using ID: {}", keypair.public().to_peer_id());
         let mut peer = NetworkPeer::new(&keypair, peers, None, "tmp-enclave-gossip-topic")?;
         let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;
         let p2p_addr = NetworkRelay::setup(bus, peer.tx(), rx);

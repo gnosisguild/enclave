@@ -9,7 +9,7 @@ use enclave_core::{
     EventBus, Seed, Subscribe,
 };
 use std::collections::HashSet;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
@@ -67,6 +67,8 @@ impl SortitionList<String> for SortitionModule {
         else {
             return Err(anyhow!("Could not get committee!"));
         };
+
+        info!("Committee length is {}", committee.len());
 
         Ok(committee
             .iter()
@@ -177,8 +179,11 @@ impl Handler<GetHasNode> for Sortition {
 
     #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
+        info!("Sortition: GetHasNode({})", msg.address);
         self.list
-            .try_with(|list| list.contains(msg.seed, msg.size, msg.address))
+            .try_with(|list| {
+                list.contains(msg.seed, msg.size, msg.address)
+            })
             .unwrap_or_else(|err| {
                 self.bus.err(EnclaveErrorType::Sortition, err);
                 false
