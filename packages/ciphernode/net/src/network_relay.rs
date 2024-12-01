@@ -1,11 +1,15 @@
+use std::sync::Arc;
 use std::{collections::HashSet, error::Error};
 
+use crate::EncryptedKeypair;
 use crate::NetworkPeer;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
 use anyhow::anyhow;
 use anyhow::Result;
+use cipher::Cipher;
+use data::{AutoPersist, Repository};
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, trace};
@@ -19,7 +23,7 @@ pub struct NetworkRelay {
 }
 
 impl Actor for NetworkRelay {
-    type Context = Context<Self>;
+    type Context = actix::Context<Self>;
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
@@ -63,11 +67,17 @@ impl NetworkRelay {
     }
 
     /// Spawn a Libp2p peer and hook it up to this actor
-    pub fn setup_with_peer(
+    pub async fn setup_with_peer(
         bus: Addr<EventBus>,
         peers: Vec<String>,
+        repository: Repository<EncryptedKeypair>,
+        cipher: &Arc<Cipher>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
-        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        let keypair = repository
+            .load_or_else(|| EncryptedKeypair::generate(cipher))
+            .await?
+            .try_get()?
+            .decrypt(cipher)?;
         let mut peer = NetworkPeer::new(&keypair, peers, None, "tmp-enclave-gossip-topic")?;
         let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;
         let p2p_addr = NetworkRelay::setup(bus, peer.tx(), rx);

@@ -10,7 +10,7 @@ use evm::{
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
 use logger::SimpleLogger;
-use net::NetworkRelay;
+use net::{NetRepositoryFactory, NetworkRelay};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
 use router::{E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
@@ -80,7 +80,13 @@ pub async fn setup_aggregator(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = NetworkRelay::setup_with_peer(bus.clone(), config.peers())?;
+    let (_, join_handle, peer_id) = NetworkRelay::setup_with_peer(
+        bus.clone(),
+        config.peers(),
+        repositories.libp2p_key(),
+        &cipher,
+    )
+    .await?;
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());

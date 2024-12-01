@@ -11,7 +11,7 @@ use evm::{
     EnclaveSolReaderRepositoryFactory,
 };
 use logger::SimpleLogger;
-use net::NetworkRelay;
+use net::{NetRepositoryFactory, NetworkRelay};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use router::{CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature};
@@ -74,7 +74,13 @@ pub async fn setup_ciphernode(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = NetworkRelay::setup_with_peer(bus.clone(), config.peers())?;
+    let (_, join_handle, peer_id) = NetworkRelay::setup_with_peer(
+        bus.clone(),
+        config.peers(),
+        repositories.libp2p_key(),
+        &cipher,
+    )
+    .await?;
 
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
     SimpleLogger::attach(&nm, bus.clone());

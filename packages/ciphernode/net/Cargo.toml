@@ -11,6 +11,9 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 async-std = { workspace = true, features = ["attributes"] }
 async-trait = { workspace = true }
 futures = { workspace = true }
+config = { workspace = true }
+cipher = { workspace = true }
+data = { workspace = true }
 libp2p = { workspace = true, features = [
   "async-std",
   "gossipsub",
@@ -22,6 +25,7 @@ libp2p = { workspace = true, features = [
   "quic",
   "tokio",
 ] }
+serde = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

@@ -39,6 +39,10 @@ impl StoreKeys {
         String::from("//eth_private_key")
     }
 
+    pub fn libp2p_key() -> String {
+        String::from("//libp2p_key")
+    }
+
     pub fn enclave_sol_reader(chain_id: u64) -> String {
         format!("//evm_readers/enclave/{chain_id}")
     }

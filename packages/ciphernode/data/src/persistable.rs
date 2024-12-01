@@ -18,6 +18,10 @@ where
     fn send(&self, data: Option<T>) -> Persistable<T>;
     /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
     async fn load_or_default(&self, default: T) -> Result<Persistable<T>>;
+    /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
+    async fn load_or_else<F>(&self, f: F) -> Result<Persistable<T>>
+    where
+        F: Send + FnOnce() -> Result<T>;
 }
 
 #[async_trait]
@@ -38,6 +42,14 @@ where
     /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the given default data  
     async fn load_or_default(&self, default: T) -> Result<Persistable<T>> {
         Ok(Persistable::load_or_default(self, default).await?)
+    }
+
+    /// Load the data from the repository into an auto persist container. If there is no persisted data then persist the result of the callback
+    async fn load_or_else<F>(&self, f: F) -> Result<Persistable<T>>
+    where
+        F: Send + FnOnce() -> Result<T>,
+    {
+        Ok(Persistable::load_or_else(self, f).await?)
     }
 }
 
@@ -71,6 +83,21 @@ where
     pub async fn load_or_default(repo: &Repository<T>, default: T) -> Result<Self> {
         let instance = Self::new(Some(repo.read().await?.unwrap_or(default)), repo);
 
+        Ok(instance.save())
+    }
+
+    /// Load the data from the repo or save and sync the result of the given callback
+    pub async fn load_or_else<F>(repo: &Repository<T>, f: F) -> Result<Self>
+    where
+        F: FnOnce() -> Result<T>,
+    {
+        let data = repo
+            .read()
+            .await?
+            .ok_or_else(|| anyhow!("Not found"))
+            .or_else(|_| f())?;
+
+        let instance = Self::new(Some(data), repo);
         Ok(instance.save())
     }
 
@@ -338,4 +365,67 @@ mod tests {
         assert_eq!(container.try_get()?, vec!["berlin".to_string()]);
         Ok(())
     }
+
+    #[actix::test]
+    async fn test_load_or_else_success_with_empty_repo() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+
+        let container = repo
+            .clone()
+            .load_or_else(|| Ok(vec!["amsterdam".to_string()]))
+            .await?;
+
+        assert_eq!(container.try_get()?, vec!["amsterdam".to_string()]);
+        assert_eq!(repo.read().await?, Some(vec!["amsterdam".to_string()]));
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_load_or_else_skips_callback_when_data_exists() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        repo.write(&vec!["berlin".to_string()]);
+
+        let container = repo
+            .clone()
+            .load_or_else(|| {
+                panic!("This callback should not be called!");
+                #[allow(unreachable_code)]
+                Ok(vec!["amsterdam".to_string()])
+            })
+            .await?;
+
+        assert_eq!(container.try_get()?, vec!["berlin".to_string()]);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_load_or_else_propagates_callback_error() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+
+        let result = repo
+            .clone()
+            .load_or_else(|| Err(anyhow!("Failed to create default data")))
+            .await;
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to create default data"));
+        assert_eq!(repo.read().await?, None);
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_load_or_else_custom_error_message() -> Result<()> {
+        let (repo, _) = get_repo::<Vec<String>>();
+        let error_msg = "Custom initialization error";
+
+        let result = repo.load_or_else(|| Err(anyhow!(error_msg))).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains(error_msg));
+        Ok(())
+    }
+
 }
