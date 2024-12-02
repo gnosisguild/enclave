@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use commands::{aggregator, password, start, wallet, Commands};
+use commands::{aggregator, p2p, password, start, wallet, Commands};
 use config::load_config;
 use enclave_core::{get_tag, set_tag};
 use tracing::instrument;
@@ -53,6 +53,7 @@ impl Cli {
             Commands::Password { command } => password::execute(command, config).await?,
             Commands::Aggregator { command } => aggregator::execute(command, config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
+            Commands::P2p { command } => p2p::execute(command, config).await?
         }
 
         Ok(())
