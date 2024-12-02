@@ -74,6 +74,10 @@ impl Repositories {
         Repository::new(self.store.scope(format!("//eth_private_key")))
     }
 
+    pub fn libp2pid(&self) -> Repository<Vec<u8>> {
+        Repository::new(self.store.scope(format!("//libp2pid")))
+    }
+
     pub fn enclave_sol_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
         Repository::new(
             self.store

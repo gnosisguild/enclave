@@ -58,7 +58,8 @@ heading "Mock encrypted plaintext"
 $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT
 
 heading "Mock activate e3-id"
-yarn e3:activate --e3-id 0 --public-key "0x$PUBLIC_KEY" --network localhost
+# NOTE: using -s to avoid key spamming output
+yarn -s e3:activate --e3-id 0 --public-key "0x$PUBLIC_KEY" --network localhost
 
 heading "Mock publish input e3-id"
 yarn e3:publishInput --network localhost  --e3-id 0 --data 0x12345678

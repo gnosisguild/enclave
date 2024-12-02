@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{collections::HashSet, error::Error};
 
 use crate::NetworkPeer;
@@ -6,9 +7,12 @@ use crate::NetworkPeer;
 use actix::prelude::*;
 use anyhow::anyhow;
 use anyhow::Result;
+use cipher::Cipher;
+use data::Repository;
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
+use libp2p::identity::ed25519;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{error, trace};
+use tracing::{error, info, instrument, trace};
 
 /// NetworkRelay Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetworkPeer for propagation over the p2p network
@@ -63,11 +67,31 @@ impl NetworkRelay {
     }
 
     /// Spawn a Libp2p peer and hook it up to this actor
-    pub fn setup_with_peer(
+    #[instrument(name = "libp2p", skip_all)]
+    pub async fn setup_with_peer(
         bus: Addr<EventBus>,
         peers: Vec<String>,
+        cipher: &Arc<Cipher>,
+        repository: Repository<Vec<u8>>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
-        let keypair = libp2p::identity::Keypair::generate_ed25519();
+        info!("Reading from repository");
+        let bytes = if let Some(bytes) = repository.read().await? {
+            let decrypted = cipher.decrypt_data(&bytes)?;
+            info!("Found keypair in repository");
+            decrypted
+        } else {
+            let kp = libp2p::identity::Keypair::generate_ed25519();
+            info!("Generated new keypair {}", kp.public().to_peer_id());
+            let innerkp = kp.try_into_ed25519()?;
+            let bytes = innerkp.to_bytes().to_vec();
+            
+            repository.write(&cipher.encrypt_data(&mut bytes.clone())?);
+            info!("Saved new keypair to repository");
+            bytes
+        };
+
+        let ed25519_keypair = ed25519::Keypair::try_from_bytes(&mut bytes.clone())?;
+        let keypair: libp2p::identity::Keypair = ed25519_keypair.try_into()?;
         let mut peer = NetworkPeer::new(&keypair, peers, None, "tmp-enclave-gossip-topic")?;
         let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;
         let p2p_addr = NetworkRelay::setup(bus, peer.tx(), rx);
