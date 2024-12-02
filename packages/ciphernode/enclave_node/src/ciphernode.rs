@@ -9,7 +9,7 @@ use evm::{
     CiphernodeRegistrySol, EnclaveSolReader,
 };
 use logger::SimpleLogger;
-use net::NetworkRelay;
+use net::NetworkManager;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use router::{
@@ -73,7 +73,13 @@ pub async fn setup_ciphernode(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = NetworkRelay::setup_with_peer(bus.clone(), config.peers())?;
+    let (_, join_handle, peer_id) = NetworkManager::setup_with_peer(
+        bus.clone(),
+        config.peers(),
+        &cipher,
+        repositories.libp2pid(),
+    )
+    .await?;
 
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
     SimpleLogger::attach(&nm, bus.clone());

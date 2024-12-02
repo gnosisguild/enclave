@@ -57,6 +57,10 @@ where
     }
 
     pub fn write(&self, value: &T) {
-        self.store.write(value)
+        self.store.write(value);
+    }
+
+    pub fn clear(&self) {
+        self.store.clear();
     }
 }

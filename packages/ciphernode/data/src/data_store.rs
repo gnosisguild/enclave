@@ -36,12 +36,26 @@ impl Get {
     }
 }
 
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
+#[rtype(result = "()")]
+pub struct Remove(pub Vec<u8>);
+impl Remove {
+    pub fn new<K: IntoKey>(key: K) -> Self {
+        Self(key.into_key())
+    }
+
+    pub fn key(&self) -> &Vec<u8> {
+        &self.0
+    }
+}
+
 /// Generate proxy for the DB
 #[derive(Clone, Debug)]
 pub struct DataStore {
     scope: Vec<u8>,
     get: Recipient<Get>,
     insert: Recipient<Insert>,
+    remove: Recipient<Remove>,
 }
 
 impl DataStore {
@@ -67,6 +81,11 @@ impl DataStore {
         };
         let msg = Insert::new(&self.scope, serialized);
         self.insert.do_send(msg)
+    }
+
+    /// Removes data from the scope location
+    pub fn clear(&self) {
+        self.remove.do_send(Remove::new(&self.scope))
     }
 
     /// Get the scope as a string
@@ -103,6 +122,7 @@ impl DataStore {
         Self {
             get: self.get.clone(),
             insert: self.insert.clone(),
+            remove: self.remove.clone(),
             scope,
         }
     }
@@ -111,6 +131,7 @@ impl DataStore {
         Self {
             get: self.get.clone(),
             insert: self.insert.clone(),
+            remove: self.remove.clone(),
             scope: key.into_key(),
         }
     }
@@ -121,6 +142,7 @@ impl From<&Addr<SledStore>> for DataStore {
         Self {
             get: addr.clone().recipient(),
             insert: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
             scope: vec![],
         }
     }
@@ -131,6 +153,7 @@ impl From<&Addr<InMemStore>> for DataStore {
         Self {
             get: addr.clone().recipient(),
             insert: addr.clone().recipient(),
+            remove: addr.clone().recipient(),
             scope: vec![],
         }
     }

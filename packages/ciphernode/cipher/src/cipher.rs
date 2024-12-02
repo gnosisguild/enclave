@@ -132,6 +132,7 @@ impl Cipher {
         Ok(Self::new(FilePasswordManager::new(config.key_file())).await?)
     }
 
+    /// Encrypt the given data and zeroize the data after encryption
     pub fn encrypt_data(&self, data: &mut Vec<u8>) -> Result<Vec<u8>> {
         encrypt_data(&self.key, data)
     }

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{Get, Insert};
+use crate::{Get, Insert, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
@@ -46,6 +46,19 @@ impl Handler<Insert> for SledStore {
     fn handle(&mut self, event: Insert, _: &mut Self::Context) -> Self::Result {
         if let Some(ref mut db) = &mut self.db {
             match db.insert(event) {
+                Err(err) => self.bus.err(EnclaveErrorType::Data, err),
+                _ => (),
+            }
+        }
+    }
+}
+
+impl Handler<Remove> for SledStore {
+    type Result = ();
+
+    fn handle(&mut self, event: Remove, _: &mut Self::Context) -> Self::Result {
+        if let Some(ref mut db) = &mut self.db {
+            match db.remove(event) {
                 Err(err) => self.bus.err(EnclaveErrorType::Data, err),
                 _ => (),
             }
@@ -102,6 +115,13 @@ impl SledDb {
             .insert(msg.key(), msg.value().to_vec())
             .context("Could not insert data into db")?;
 
+        Ok(())
+    }
+
+    pub fn remove(&mut self, msg: Remove) -> Result<()> {
+        self.db
+            .remove(msg.key())
+            .context("Could not remove data from db")?;
         Ok(())
     }
 

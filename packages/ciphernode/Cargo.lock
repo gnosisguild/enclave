@@ -4121,12 +4121,15 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-trait",
+ "cipher 0.1.0",
+ "data",
  "enclave-core",
  "futures",
  "libp2p",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "zeroize",
 ]
 
 [[package]]
