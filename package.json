@@ -24,7 +24,7 @@
     "preciphernode:build": "yarn evm:compile",
     "committee:new": "cd packages/evm && yarn committee:new",
     "committee:publish": "cd packages/evm && yarn hardhat committee:publish",
-    "e3:activate": "cd packages/evm && yarn hardhat e3:activate",
+    "e3:activate": "cd packages/evm && yarn -s hardhat e3:activate",
     "e3:publishInput": "cd packages/evm && yarn hardhat e3:publishInput",
     "e3:publishCiphertext": "cd packages/evm && yarn hardhat e3:publishCiphertext",
     "evm:install": "cd packages/evm && yarn install",

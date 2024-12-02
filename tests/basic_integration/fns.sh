@@ -85,12 +85,23 @@ set_password() {
     --password "$password"
 }
 
+# launch_ciphernode() {
+#     local name="$1"
+#     heading "Launch ciphernode $name"
+#     yarn enclave start \
+#       --tag "$name" \
+#       --config "$SCRIPT_DIR/lib/$name/config.yaml" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+# }
+
 launch_ciphernode() {
     local name="$1"
+    local log_file="$SCRIPT_DIR/logs/$TEST_NAME/$name.log"
+    
     heading "Launch ciphernode $name"
     yarn enclave start \
       --tag "$name" \
-      --config "$SCRIPT_DIR/lib/$name/config.yaml" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+      --config "$SCRIPT_DIR/lib/${name}/config.yaml" 2>&1 | \
+      tee >(sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,3})*)?[mGK]//g" >> "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 set_private_key() {
@@ -102,17 +113,29 @@ set_private_key() {
     --private-key "$private_key"
 }
 
+# launch_aggregator() {
+#     local name="$1"
+#     heading "Launch aggregator $name"
+#
+#     yarn enclave aggregator start \
+#       --tag "$name" \
+#       --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+#       --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
+#       --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+# }
+
 launch_aggregator() {
     local name="$1"
+    local log_file="$SCRIPT_DIR/logs/$TEST_NAME/$name.log"
+    
     heading "Launch aggregator $name"
-
     yarn enclave aggregator start \
       --tag "$name" \
       --config "$SCRIPT_DIR/lib/$name/config.yaml" \
       --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
-      --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+      --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" 2>&1 | \
+      tee >(sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,3})*)?[mGK]//g" >> "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 
-    ps aux | grep aggregator
 }
 
 kill_proc() {
@@ -143,6 +166,7 @@ kill_all_procs
 # Set up trap to catch errors and interrupts
 trap 'cleanup $?' ERR INT TERM
 
+mkdir -p $SCRIPT_DIR/logs/$TEST_NAME
 $SCRIPT_DIR/lib/clean_folders.sh "$SCRIPT_DIR"
 $SCRIPT_DIR/lib/prebuild.sh
 

@@ -11,6 +11,7 @@ use anyhow::Result;
 use cipher::Cipher;
 use data::{AutoPersist, Repository};
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
+use libp2p::identity::Keypair;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, info, trace};
 
@@ -71,9 +72,21 @@ impl NetworkRelay {
         bus: Addr<EventBus>,
         peers: Vec<String>,
         repository: Repository<EncryptedKeypair>,
-        cipher: &Arc<Cipher>,
+        _cipher: &Arc<Cipher>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
-        let keypair = EncryptedKeypair::generate(cipher)?.decrypt(cipher)?;
+        let kp = libp2p::identity::Keypair::generate_ed25519();
+        let secret = kp.clone().try_into_ed25519()?.to_bytes()[..32].to_vec();
+        let cipher = Cipher::from_password("I am the music man").await?;
+        
+        let encrypted = cipher.encrypt_data(&mut secret.clone())?;
+        let decrypted = cipher.decrypt_data(&encrypted.clone())?;
+        let keypair = Keypair::ed25519_from_bytes(secret.clone())?;
+        // let keypair = kp;
+        // let keypair = EncryptedKeypair::extract_encrypted(cipher, &kp)
+        //     .expect("YIKES!!")
+        //     .decrypt(cipher)
+        //     .expect("YEGADS!!!");
+        // let keypair = kp;
         // let keypair = repository
         //     .load_or_else(|| EncryptedKeypair::generate(cipher))
         //     .await?

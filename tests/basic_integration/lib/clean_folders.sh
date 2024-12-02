@@ -3,6 +3,7 @@ clean_folders() {
     local SCRIPT_DIR=$1
 
     # Delete output artifacts
+    rm -rf $SCRIPT_DIR/logs/$TEST_NAME/*
     rm -rf "$SCRIPT_DIR/output/"*
     rm -rf "/tmp/enclave.*.pid"
 

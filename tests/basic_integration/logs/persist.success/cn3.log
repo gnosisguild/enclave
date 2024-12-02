@@ -1,0 +1,183 @@
+$ cd packages/ciphernode && ./scripts/launch.sh start --tag cn3 --config /home/ry/gh/gnosisrust/enclave/tests/basic_integration/lib/cn3/config.yaml
+
+
+
+
+
+
+      ___           ___           ___                         ___                         ___     
+     /\__\         /\  \         /\__\                       /\  \          ___          /\__\    
+    /:/ _/_        \:\  \       /:/  /                      /::\  \        /\  \        /:/ _/_   
+   /:/ /\__\        \:\  \     /:/  /                      /:/\:\  \       \:\  \      /:/ /\__\  
+  /:/ /:/ _/_   _____\:\  \   /:/  /  ___   ___     ___   /:/ /::\  \       \:\  \    /:/ /:/ _/_ 
+ /:/_/:/ /\__\ /::::::::\__\ /:/__/  /\__\ /\  \   /\__\ /:/_/:/\:\__\  ___  \:\__\  /:/_/:/ /\__\
+ \:\/:/ /:/  / \:\~~\~~\/__/ \:\  \ /:/  / \:\  \ /:/  / \:\/:/  \/__/ /\  \ |:|  |  \:\/:/ /:/  /
+  \::/_/:/  /   \:\  \        \:\  /:/  /   \:\  /:/  /   \::/__/      \:\  \|:|  |   \::/_/:/  / 
+   \:\/:/  /     \:\  \        \:\/:/  /     \:\/:/  /     \:\  \       \:\__|:|__|    \:\/:/  /  
+    \::/  /       \:\__\        \::/  /       \::/  /       \:\__\       \::::/__/      \::/  /   
+     \/__/         \/__/         \/__/         \/__/         \/__/        ~~~~           \/__/    
+                                                                      
+
+
+
+
+
+
+2024-12-01T19:23:46.503156Z  INFO execute{id="cn3"}:app{id="cn3"}:app{id="cn3"}: data::sled_store: Starting SledStore
+2024-12-01T19:23:46.594919Z  INFO execute{id="cn3"}:app{id="cn3"}:app{id="cn3"}: evm::enclave_sol_reader: EnclaveSolReader is listening to address address=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+2024-12-01T19:23:46.595450Z  INFO execute{id="cn3"}:app{id="cn3"}:app{id="cn3"}: evm::ciphernode_registry_sol: EnclaveSolReader is listening to address address=0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
+2024-12-01T19:23:46.596469Z  INFO execute{id="cn3"}:app{id="cn3"}:app{id="cn3"}: net::network_relay: Using ID: 12D3KooWFgZRYusw1s3TqMH6Qwk3hApLv7mNf6RvfzJ8Ndi7PUCa
+2024-12-01T19:23:46.599815Z  INFO execute{id="cn3"}:app{id="cn3"}:app{id="cn3"}: libp2p_swarm: local_peer_id=12D3KooWFgZRYusw1s3TqMH6Qwk3hApLv7mNf6RvfzJ8Ndi7PUCa
+2024-12-01T19:23:46.600181Z  INFO execute{id="cn3"}:app{id="cn3"}:app{id="cn3"}: logger::logger: READY! node=CIPHER(0xdD2)
+2024-12-01T19:23:46.600281Z  INFO execute{id="cn3"}:app{id="cn3"}: enclave::commands::start: LAUNCHING CIPHERNODE: (0xdD2FD4581271e230360230F9337D5c0430Bf44C0/12D3KooWFgZRYusw1s3TqMH6Qwk3hApLv7mNf6RvfzJ8Ndi7PUCa)
+2024-12-01T19:23:46.600505Z  INFO net::network_peer: Requesting node.listen_on('/ip4/0.0.0.0/udp/0/quic-v1')
+2024-12-01T19:23:46.600900Z  INFO net::network_peer: Peers to dial: []
+2024-12-01T19:23:46.602159Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Fetched 6 historical events
+2024-12-01T19:23:46.602223Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: subscribing to live events
+2024-12-01T19:23:46.602509Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Fetched 4 historical events
+2024-12-01T19:23:46.602680Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: subscribing to live events
+2024-12-01T19:23:46.602853Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Processing event: evt:3CyUVgGk
+2024-12-01T19:23:46.602897Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: cache length: 0
+2024-12-01T19:23:46.602932Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Storing event(EVM) in cache CiphernodeAdded(evt:3CyUVgGk)
+2024-12-01T19:23:46.603250Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=CiphernodeAdded(address: 0x2546BcD3c84621e976D8185a91A922aE77ECEc30, index: 0, num_nodes: 1)
+2024-12-01T19:23:46.603327Z  INFO sortition{id="cn3"}: sortition::sortition: Adding node: 0x2546BcD3c84621e976D8185a91A922aE77ECEc30
+2024-12-01T19:23:46.603740Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=192.168.188.142
+2024-12-01T19:23:46.603863Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=192.168.10.1
+2024-12-01T19:23:46.603920Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.29.0.1
+2024-12-01T19:23:46.603975Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.28.0.1
+2024-12-01T19:23:46.604027Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.18.0.1
+2024-12-01T19:23:46.604078Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.30.0.1
+2024-12-01T19:23:46.604159Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.16.238.1
+2024-12-01T19:23:46.604217Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.20.0.1
+2024-12-01T19:23:46.604267Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.17.0.1
+2024-12-01T19:23:46.604317Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.19.0.1
+2024-12-01T19:23:46.604365Z  INFO libp2p_mdns::behaviour::iface: creating instance on iface address address=172.21.0.1
+2024-12-01T19:23:46.604759Z  WARN net::network_peer: Local node is listening on /ip4/127.0.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.604883Z  WARN net::network_peer: Local node is listening on /ip4/192.168.188.142/udp/57065/quic-v1
+2024-12-01T19:23:46.604968Z  WARN net::network_peer: Local node is listening on /ip4/192.168.10.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605060Z  WARN net::network_peer: Local node is listening on /ip4/172.29.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605138Z  WARN net::network_peer: Local node is listening on /ip4/172.28.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605215Z  WARN net::network_peer: Local node is listening on /ip4/172.18.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605291Z  WARN net::network_peer: Local node is listening on /ip4/172.30.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605390Z  WARN net::network_peer: Local node is listening on /ip4/172.16.238.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605476Z  WARN net::network_peer: Local node is listening on /ip4/172.20.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605556Z  WARN net::network_peer: Local node is listening on /ip4/172.17.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605633Z  WARN net::network_peer: Local node is listening on /ip4/172.19.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.605713Z  WARN net::network_peer: Local node is listening on /ip4/172.21.0.1/udp/57065/quic-v1
+2024-12-01T19:23:46.964466Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.18.0.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.282329Z  WARN libp2p_kad::behaviour: Failed to trigger bootstrap: No known peers.
+2024-12-01T19:23:47.622349Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.28.0.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.622990Z  INFO net::network_peer: Connected to 12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.841122Z  INFO net::network_peer: Connected to 12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.842777Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.16.238.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.845743Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.30.0.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.847552Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/192.168.188.142/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.849378Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/192.168.10.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.850604Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.29.0.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.850848Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.18.0.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.853749Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/192.168.10.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.854416Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.18.0.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.855142Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.30.0.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.857941Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.19.0.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.858526Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.16.238.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.859170Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.28.0.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.860325Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.17.0.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.861499Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.20.0.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.861755Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.20.0.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.862468Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.29.0.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.863607Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.17.0.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.864722Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/192.168.10.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.866286Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.19.0.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.867370Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.16.238.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.867941Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.19.0.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.870331Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.21.0.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.870720Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.30.0.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.872282Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.28.0.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.872887Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.18.0.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.873756Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/192.168.188.142/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.874581Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.30.0.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:47.875548Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.21.0.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.876357Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.28.0.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.878232Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/192.168.188.142/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.879029Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.29.0.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.881022Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.19.0.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.881980Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/192.168.10.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.884195Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.17.0.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:47.885180Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/192.168.188.142/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.931044Z  INFO net::network_peer: Connected to 12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.937182Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD address=/ip4/172.29.0.1/udp/47947/quic-v1/p2p/12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:47.937921Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm address=/ip4/172.21.0.1/udp/33117/quic-v1/p2p/12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:47.999248Z  INFO net::network_peer: Connected to 12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:48.014523Z  INFO net::network_peer: Connected to 12D3KooWLTqtfie8YHinVVGuS15PhrSX76xFt6ULVWsAorrb2kWm
+2024-12-01T19:23:48.025467Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.17.0.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:48.028353Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.20.0.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:48.028651Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.21.0.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:48.031995Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb address=/ip4/172.16.238.1/udp/56581/quic-v1/p2p/12D3KooWLyQFfpVDmB2ejuoohmSJdk4tfGwwQ4hv6mW2U1ym6znb
+2024-12-01T19:23:48.072477Z  INFO net::network_peer: Connected to 12D3KooWM8m6qW7uvS4RvnNs8mLnRE1n6cdKzbmp92w8thzYiMJD
+2024-12-01T19:23:48.088364Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt address=/ip4/172.20.0.1/udp/49622/quic-v1/p2p/12D3KooWRRRmDBqqMb5s1sXJzrmytEbGGjmrMRn3RmQsQmeb1Mpt
+2024-12-01T19:23:48.502824Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Extracted Evm Event: CiphernodeAdded(address: 0xbDA5747bFD65F08deb54cb465eB87D40e51B197E, index: 1, num_nodes: 2)
+2024-12-01T19:23:48.503058Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Processing event: evt:4w6LQeCL
+2024-12-01T19:23:48.503103Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: cache length: 1
+2024-12-01T19:23:48.503134Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Storing event(EVM) in cache CiphernodeAdded(evt:4w6LQeCL)
+2024-12-01T19:23:48.503387Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=CiphernodeAdded(address: 0xbDA5747bFD65F08deb54cb465eB87D40e51B197E, index: 1, num_nodes: 2)
+2024-12-01T19:23:48.503464Z  INFO sortition{id="cn3"}: sortition::sortition: Adding node: 0xbDA5747bFD65F08deb54cb465eB87D40e51B197E
+2024-12-01T19:23:49.797444Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Extracted Evm Event: CiphernodeAdded(address: 0xdD2FD4581271e230360230F9337D5c0430Bf44C0, index: 2, num_nodes: 3)
+2024-12-01T19:23:49.797663Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Processing event: evt:GzEWpwt7
+2024-12-01T19:23:49.797717Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: cache length: 2
+2024-12-01T19:23:49.797756Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Storing event(EVM) in cache CiphernodeAdded(evt:GzEWpwt7)
+2024-12-01T19:23:49.798116Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=CiphernodeAdded(address: 0xdD2FD4581271e230360230F9337D5c0430Bf44C0, index: 2, num_nodes: 3)
+2024-12-01T19:23:49.798225Z  INFO sortition{id="cn3"}: sortition::sortition: Adding node: 0xdD2FD4581271e230360230F9337D5c0430Bf44C0
+2024-12-01T19:23:51.079889Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Extracted Evm Event: CiphernodeAdded(address: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199, index: 3, num_nodes: 4)
+2024-12-01T19:23:51.080143Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Processing event: evt:DudEdfSR
+2024-12-01T19:23:51.080185Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: cache length: 3
+2024-12-01T19:23:51.081266Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Storing event(EVM) in cache CiphernodeAdded(evt:DudEdfSR)
+2024-12-01T19:23:51.081712Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=CiphernodeAdded(address: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199, index: 3, num_nodes: 4)
+2024-12-01T19:23:51.081797Z  INFO sortition{id="cn3"}: sortition::sortition: Adding node: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199
+2024-12-01T19:23:52.662765Z  WARN evm_event_reader{id="cn3"}: evm::event_reader: Failed to extract log from EVM.
+2024-12-01T19:23:52.674011Z  WARN evm_event_reader{id="cn3"}: evm::event_reader: Failed to extract log from EVM.
+2024-12-01T19:23:52.675411Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Extracted Evm Event: E3Requested(e3_id: 0, threshold_m: 2, src_chain_id: 31337, seed: Seed(0x40c190a2ca5ef3770d149a19bdd9c21e6e8bd81995624605a733108590c838cb), params: <omitted>)
+2024-12-01T19:23:52.675573Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Processing event: evt:4sCVBpUp
+2024-12-01T19:23:52.675616Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: cache length: 0
+2024-12-01T19:23:52.675654Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Storing event(EVM) in cache E3Requested(evt:4sCVBpUp)
+2024-12-01T19:23:52.813698Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=E3Requested(e3_id: 0, threshold_m: 2, src_chain_id: 31337, seed: Seed(0x40c190a2ca5ef3770d149a19bdd9c21e6e8bd81995624605a733108590c838cb), params: <omitted>) e3_id=0
+2024-12-01T19:23:52.814248Z  INFO sortition{id="cn3"}: sortition::sortition: Sortition: GetHasNode(0xdD2FD4581271e230360230F9337D5c0430Bf44C0)
+2024-12-01T19:23:52.814747Z  INFO sortition{id="cn3"}: sortition::sortition: Committee length is 2
+2024-12-01T19:23:52.814914Z  INFO router::ciphernode_selector: Ciphernode was not selected node="0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
+2024-12-01T19:23:53.202927Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=KeyshareCreated(e3_id: 0, node: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199) e3_id=0
+2024-12-01T19:23:53.242306Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=KeyshareCreated(e3_id: 0, node: 0xbDA5747bFD65F08deb54cb465eB87D40e51B197E) e3_id=0
+2024-12-01T19:23:53.324357Z  WARN evm_event_reader{id="cn3"}: evm::event_reader: Failed to extract log from EVM.
+2024-12-01T19:23:53.359546Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=PublicKeyAggregated(e3_id: 0, src_chain_id: 31337, nodes: <omitted>, pubkey: <omitted>) e3_id=0
+2024-12-01T19:24:00.028981Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.19.0.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.300623Z  INFO net::network_peer: Connected to 12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.551775Z  INFO net::network_peer: Connected to 12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.563230Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.17.0.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.570792Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.20.0.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.589061Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.16.238.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.595031Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.30.0.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.602048Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.18.0.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.622288Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.28.0.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.625917Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.29.0.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.632313Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/192.168.10.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.633969Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/172.21.0.1/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:00.643532Z  INFO libp2p_mdns::behaviour: discovered peer on address peer=12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e address=/ip4/192.168.188.142/udp/36990/quic-v1/p2p/12D3KooWQGeSypgmqwxzQRqu1Wa1M3FGHa9Ej2qXrokWMcYu2z9e
+2024-12-01T19:24:05.358037Z  WARN evm_event_reader{id="cn3"}: evm::event_reader: Failed to extract log from EVM.
+2024-12-01T19:24:06.649603Z  WARN evm_event_reader{id="cn3"}: evm::event_reader: Failed to extract log from EVM.
+2024-12-01T19:24:11.914334Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Extracted Evm Event: CiphertextOutputPublished(e3_id: 0)
+2024-12-01T19:24:11.916091Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Processing event: evt:EzsQgDnD
+2024-12-01T19:24:11.916139Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: cache length: 1
+2024-12-01T19:24:11.917895Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Storing event(EVM) in cache CiphertextOutputPublished(evt:EzsQgDnD)
+2024-12-01T19:24:11.919848Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=CiphertextOutputPublished(e3_id: 0) e3_id=0
+2024-12-01T19:24:12.355311Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=DecryptionshareCreated(e3_id: 0, node: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199) e3_id=0
+2024-12-01T19:24:12.379244Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=DecryptionshareCreated(e3_id: 0, node: 0xbDA5747bFD65F08deb54cb465eB87D40e51B197E) e3_id=0
+2024-12-01T19:24:12.500656Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=PlaintextAggregated(e3_id: 0, src_chain_id: 31337) e3_id=0
+2024-12-01T19:24:12.501244Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=E3RequestComplete(e3_id: 0)
+2024-12-01T19:24:12.547718Z  WARN evm_event_reader{id="cn3"}: evm::event_reader: Failed to extract log from EVM.
+2024-12-01T19:24:12.978764Z ERROR enclave_node::shutdown: SIGTERM received, initiating graceful shutdown...
+2024-12-01T19:24:12.979082Z  INFO logger::logger: Event Broadcasted me="CIPHER(0xdD2)" evt=Shutdown(Shutdown)
+2024-12-01T19:24:12.986679Z  INFO router::ciphernode_selector: Killing CiphernodeSelector
+2024-12-01T19:24:12.986795Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Received shutdown signal, stopping EVM stream
+2024-12-01T19:24:12.986849Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Exiting stream loop
+2024-12-01T19:24:12.986930Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Received shutdown signal, stopping EVM stream
+2024-12-01T19:24:12.986947Z  INFO evm_event_reader{id="cn3"}: evm::event_reader: Exiting stream loop
+2024-12-01T19:24:12.987097Z  INFO alloy_pubsub::service: Pubsub service request channel closed. Shutting down.
+2024-12-01T19:24:14.987649Z  INFO enclave_node::shutdown: Graceful shutdown complete

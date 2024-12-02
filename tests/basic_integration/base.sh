@@ -5,6 +5,8 @@ set -eu  # Exit immediately if a command exits with a non-zero status
 # Get the directory of the currently executing script
 THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+export TEST_NAME=base
+
 # Source the file from the same directory
 source "$THIS_DIR/fns.sh"
 

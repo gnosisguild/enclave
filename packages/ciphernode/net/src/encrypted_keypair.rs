@@ -2,12 +2,13 @@ use anyhow::*;
 use cipher::Cipher;
 use libp2p::identity::Keypair;
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 /// Hold an encrypted libp2p keypair in a serializable way for storage
 #[derive(Clone, Serialize, Deserialize)]
 pub struct EncryptedKeypair {
     secret: Vec<u8>,
+    decrypted: Vec<u8>,
 }
 
 impl EncryptedKeypair {
@@ -26,26 +27,30 @@ impl EncryptedKeypair {
         Ok(Keypair::ed25519_from_bytes(bytes)?)
     }
 
-    fn extract_encrypted(cipher: &Cipher, keypair: &Keypair) -> Result<Self> {
-        let mut secret_raw = EncryptedKeypair::to_secretkey(keypair)?;
-        let secret = cipher.encrypt_data(&mut secret_raw)?;
-        Ok(Self { secret })
+    pub fn extract_encrypted(cipher: &Cipher, keypair: &Keypair) -> Result<Self> {
+        let secret_raw = EncryptedKeypair::to_secretkey(keypair)?;
+        let secret = cipher.encrypt_data(&mut secret_raw.clone())?;
+        Ok(Self {
+            secret,
+            decrypted: secret_raw,
+        })
     }
+
     /// Generate an encrypted Keypair and store it in memory encrypted to the given Cipher
     pub fn generate(cipher: &Cipher) -> Result<Self> {
         let keypair = EncryptedKeypair::generate_keypair();
-        warn!(
-            "Generating peer id: {}",
-            keypair.public().to_peer_id()
-        );
+        warn!("Generating peer id: {}", keypair.public().to_peer_id());
         Ok(EncryptedKeypair::extract_encrypted(cipher, &keypair)?)
     }
 
     /// Decrypt the Keypair with the given cipher and return it
     pub fn decrypt(&self, cipher: &Cipher) -> Result<Keypair> {
-        Ok(EncryptedKeypair::frombytes_ed25519(
-            cipher.decrypt_data(&self.secret)?,
-        )?)
+        let decrypted = cipher.decrypt_data(&self.secret.clone())?;
+        println!("{:?} {:?}", decrypted, self.decrypted);
+        if decrypted != self.decrypted {
+            error!("decrypted does not match!");
+        }
+        Ok(EncryptedKeypair::frombytes_ed25519(decrypted)?)
     }
 }
 
