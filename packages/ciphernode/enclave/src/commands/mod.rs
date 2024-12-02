@@ -2,12 +2,12 @@ pub mod aggregator;
 pub mod password;
 pub mod start;
 pub mod wallet;
-pub mod p2p;
+pub mod net;
 
 use self::password::PasswordCommands;
 use aggregator::AggregatorCommands;
 use clap::Subcommand;
-use p2p::P2pCommands;
+use net::NetCommands;
 use wallet::WalletCommands;
 
 #[derive(Subcommand, Debug)]
@@ -33,9 +33,9 @@ pub enum Commands {
         command: WalletCommands,
     },
 
-    /// Peer related commands
-    P2p {
+    /// Networking related commands
+    Net {
         #[command(subcommand)]
-        command: P2pCommands
+        command: NetCommands
     }
 }
