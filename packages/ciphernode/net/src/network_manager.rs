@@ -91,14 +91,12 @@ impl NetworkManager {
             bytes
         };
 
-        // We need to clone here to ensure bytes are not zeroized locally as this leads to a test failure.
-        let ed25519_keypair = ed25519::Keypair::try_from_bytes(&mut bytes.clone())?;
+        let ed25519_keypair = ed25519::Keypair::try_from_bytes(&mut bytes)?;
         let keypair: libp2p::identity::Keypair = ed25519_keypair.try_into()?;
         let mut peer = NetworkPeer::new(&keypair, peers, None, "tmp-enclave-gossip-topic")?;
         let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;
         let p2p_addr = NetworkManager::setup(bus, peer.tx(), rx);
         let handle = tokio::spawn(async move { Ok(peer.start().await?) });
-        bytes.zeroize();
         Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
