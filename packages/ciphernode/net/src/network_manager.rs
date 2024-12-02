@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use std::{collections::HashSet, error::Error};
-
 use crate::NetworkPeer;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -13,6 +12,7 @@ use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, info, instrument, trace};
+use zeroize::Zeroize;
 
 /// NetworkManager Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetworkPeer for propagation over the p2p network
@@ -75,7 +75,7 @@ impl NetworkManager {
         repository: Repository<Vec<u8>>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
         info!("Reading from repository");
-        let bytes = if let Some(bytes) = repository.read().await? {
+        let mut bytes = if let Some(bytes) = repository.read().await? {
             let decrypted = cipher.decrypt_data(&bytes)?;
             info!("Found keypair in repository");
             decrypted
@@ -85,17 +85,20 @@ impl NetworkManager {
             let innerkp = kp.try_into_ed25519()?;
             let bytes = innerkp.to_bytes().to_vec();
 
+            // We need to clone here so that returned bytes are not zeroized
             repository.write(&cipher.encrypt_data(&mut bytes.clone())?);
             info!("Saved new keypair to repository");
             bytes
         };
 
+        // We need to clone here to ensure bytes are not zeroized locally as this leads to a test failure.
         let ed25519_keypair = ed25519::Keypair::try_from_bytes(&mut bytes.clone())?;
         let keypair: libp2p::identity::Keypair = ed25519_keypair.try_into()?;
         let mut peer = NetworkPeer::new(&keypair, peers, None, "tmp-enclave-gossip-topic")?;
         let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;
         let p2p_addr = NetworkManager::setup(bus, peer.tx(), rx);
         let handle = tokio::spawn(async move { Ok(peer.start().await?) });
+        bytes.zeroize();
         Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }

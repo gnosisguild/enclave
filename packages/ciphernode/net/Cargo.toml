@@ -30,3 +30,4 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 enclave-core = { path = "../core" }
 anyhow = { workspace = true }
 actix = { workspace = true }
+zeroize = { workspace = true }
