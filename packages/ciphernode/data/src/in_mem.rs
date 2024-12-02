@@ -10,7 +10,7 @@ pub struct GetLog;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DataOp {
     Insert(Insert),
-    Remove(Remove)
+    Remove(Remove),
 }
 
 pub struct InMemStore {
