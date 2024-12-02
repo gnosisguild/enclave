@@ -2,7 +2,7 @@
 #![crate_type = "lib"]
 
 mod network_peer;
-mod network_relay;
+mod network_manager;
 
 pub use network_peer::*;
-pub use network_relay::*;
+pub use network_manager::*;

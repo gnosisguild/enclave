@@ -35,7 +35,7 @@ pub struct ResetHistory;
 
 /// Central EventBus for each node. Actors publish events to this bus by sending it EnclaveEvents.
 /// All events sent to this bus are assumed to be published over the network via pubsub.
-/// Other actors such as the NetworkRelay and Evm actor connect to outside services and control which events
+/// Other actors such as the NetworkManager and Evm actor connect to outside services and control which events
 /// actually get published as well as ensure that local events are not rebroadcast locally after
 /// being published.
 pub struct EventBus {
