@@ -81,7 +81,13 @@ pub async fn setup_aggregator(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = NetworkManager::setup_with_peer(bus.clone(), config.peers(), &cipher, repositories.libp2pid()).await?;
+    let (_, join_handle, peer_id) = NetworkManager::setup_with_peer(
+        bus.clone(),
+        config.peers(),
+        &cipher,
+        repositories.libp2pid(),
+    )
+    .await?;
 
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(path, bus.clone());

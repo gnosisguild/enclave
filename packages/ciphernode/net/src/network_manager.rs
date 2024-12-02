@@ -84,7 +84,7 @@ impl NetworkManager {
             info!("Generated new keypair {}", kp.public().to_peer_id());
             let innerkp = kp.try_into_ed25519()?;
             let bytes = innerkp.to_bytes().to_vec();
-            
+
             repository.write(&cipher.encrypt_data(&mut bytes.clone())?);
             info!("Saved new keypair to repository");
             bytes
