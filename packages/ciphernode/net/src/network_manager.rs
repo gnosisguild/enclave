@@ -1,5 +1,3 @@
-use std::sync::Arc;
-use std::{collections::HashSet, error::Error};
 use crate::NetworkPeer;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -10,6 +8,8 @@ use cipher::Cipher;
 use data::Repository;
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
+use std::sync::Arc;
+use std::{collections::HashSet, error::Error};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, info, instrument, trace};
 use zeroize::Zeroize;
