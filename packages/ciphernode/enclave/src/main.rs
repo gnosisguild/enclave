@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use commands::{aggregator, net, password, start, wallet, Commands};
+use commands::{aggregator, init, net, password, start, wallet, Commands};
 use config::load_config;
 use enclave_core::{get_tag, set_tag};
 use tracing::instrument;
@@ -50,6 +50,7 @@ impl Cli {
 
         match self.command {
             Commands::Start => start::execute(config).await?,
+            Commands::Init => init::execute().await?,
             Commands::Password { command } => password::execute(command, config).await?,
             Commands::Aggregator { command } => aggregator::execute(command, config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,

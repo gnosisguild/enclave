@@ -3,6 +3,7 @@ pub mod net;
 pub mod password;
 pub mod start;
 pub mod wallet;
+pub mod init;
 
 use self::password::PasswordCommands;
 use aggregator::AggregatorCommands;
@@ -38,4 +39,6 @@ pub enum Commands {
         #[command(subcommand)]
         command: NetCommands,
     },
+
+    Init
 }

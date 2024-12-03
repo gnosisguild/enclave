@@ -2164,6 +2164,7 @@ dependencies = [
  "config",
  "data",
  "dialoguer",
+ "dirs",
  "enclave-core",
  "enclave_node",
  "hex",
