@@ -14,4 +14,5 @@ fhe-util = { workspace = true }
 fhe_rs = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
+router = { path = "../router" }
 serde = { workspace = true }

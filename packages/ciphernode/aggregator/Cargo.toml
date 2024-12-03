@@ -12,5 +12,6 @@ async-trait = { workspace = true }
 enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
 sortition = { path = "../sortition" }
+router = { path = "../router" }
 data = { path = "../data" }
 tracing = { workspace = true }
