@@ -1,0 +1,19 @@
+services:
+  ciphernode:
+    build:
+      context: .
+      dockerfile: ./packages/ciphernode/Dockerfile
+    image: ciphernode:latest
+    container_name: ciphernode
+    volumes:
+      - ${PWD}/config/config.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
+      - ${PWD}/secrets/secrets.json:/home/ciphernode/secrets/secrets.json:ro  # Read-only secrets directory
+      - ciphernode-data:/home/ciphernode/.local/share/enclave  # Persistent data
+    environment:
+      RUST_LOG: "info"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  ciphernode-data:
