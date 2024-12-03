@@ -13,6 +13,7 @@ services:
       RUST_LOG: "info"
     ports:
       - "8080:8080"
+      - "47678:47678/udp"
     restart: unless-stopped
 
 volumes:
