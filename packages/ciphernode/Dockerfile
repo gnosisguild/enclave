@@ -1,4 +1,4 @@
-FROM node:20 AS evm-builder
+FROM node:22 AS evm-builder
 
 WORKDIR /build/packages/evm
 COPY ./packages/evm ./
