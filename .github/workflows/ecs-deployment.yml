@@ -15,8 +15,7 @@ on:
       - 'packages/evm/contracts/**'
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: ciphernode
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   DOCKERFILE_PATH: packages/ciphernode/Dockerfile
 
 permissions:
@@ -37,7 +36,7 @@ jobs:
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-        aws-region: ${{ env.AWS_REGION }}
+        aws-region: ${{ vars.AWS_REGION }}
 
     - name: Login to Amazon ECR
       id: login-ecr
