@@ -32,6 +32,10 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
+    - name: Mask Infomation
+      run: |
+        echo "::add-mask::${{ secrets.AWS_ACCOUNT_ID }}"
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
