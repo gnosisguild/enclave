@@ -1,4 +1,4 @@
-name: Build and Deploy Ciphernode 
+name: Build and Deploy Ciphernode
 
 on:
   push:
@@ -15,16 +15,16 @@ on:
       - 'packages/evm/contracts/**'
 
 env:
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   DOCKERFILE_PATH: packages/ciphernode/Dockerfile
+  IMAGE_NAME: ghcr.io/gnosisguild/ciphernode
 
 permissions:
   contents: read
-  id-token: write
+  packages: write
 
 jobs:
   deploy:
-    name: Deploy
+    name: Deploy to GHCR
     runs-on: ubuntu-latest
     environment: production
 
@@ -32,36 +32,25 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
-    - name: Mask Infomation
-      run: |
-        echo "::add-mask::${{ secrets.AWS_ACCOUNT_ID }}"
-
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
       with:
-        role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-        aws-region: ${{ vars.AWS_REGION }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
-
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Build, tag, and push image to GHCR
       id: build-image
       env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        CURRENT_IMAGE_ID=$(docker images -q $ECR_REGISTRY/$ECR_REPOSITORY:latest)
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f $DOCKERFILE_PATH .
-        if [ -n "$CURRENT_IMAGE_ID" ]; then
-          SHORT_SHA=${CURRENT_IMAGE_ID:0:12}
-          docker tag $CURRENT_IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA
-          docker rmi $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA
-        fi
-        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
+        # Build the image
+        docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest -f $DOCKERFILE_PATH .
+        
+        # Push both tagged and latest images
+        docker push $IMAGE_NAME:$IMAGE_TAG
+        docker push $IMAGE_NAME:latest
+
+        # Output image details
+        echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "image=$IMAGE_NAME:latest" >> $GITHUB_OUTPUT
