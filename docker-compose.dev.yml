@@ -1,9 +1,16 @@
 services:
   cn1:
-    network_mode: "host"
+    networks:
+      - cn-network
   cn2:
-    network_mode: "host"
+    networks:
+      - cn-network
   cn3:
-    network_mode: "host"
+    networks:
+      - cn-network
   aggregator:
-    network_mode: "host"
+    networks:
+      - cn-network
+
+networks:
+  cn-network:

@@ -1,9 +1,9 @@
 services:
   cn1:
-    image: ciphernode:latest
+    image: ghcr.io/gnosisguild/ciphernode:latest
     volumes:
-      - ./configs/cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
-      - cn1-data:/home/ciphernode/.local/share/enclave  # Persistent data
+      - ./configs/cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn1-data:/home/ciphernode/.local/share/enclave
     secrets:
       - secrets.json
     environment:
@@ -18,10 +18,10 @@ services:
 
 
   cn2:
-    image: ciphernode:latest
+    image: ghcr.io/gnosisguild/ciphernode:latest
     volumes:
-      - ./configs/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
-      - cn2-data:/home/ciphernode/.local/share/enclave  # Persistent data
+      - ./configs/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn2-data:/home/ciphernode/.local/share/enclave
     secrets:
       - secrets.json
     environment:
@@ -35,10 +35,10 @@ services:
       - cn2-network
 
   cn3:
-    image: ciphernode:latest
+    image: ghcr.io/gnosisguild/ciphernode:latest
     volumes:
-      - ./configs/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
-      - cn3-data:/home/ciphernode/.local/share/enclave  # Persistent data
+      - ./configs/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn3-data:/home/ciphernode/.local/share/enclave
     secrets:
       - secrets.json
     environment:
@@ -53,10 +53,10 @@ services:
 
 
   aggregator:
-    image: ciphernode:latest
+    image: ghcr.io/gnosisguild/ciphernode:latest
     volumes:
-      - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
-      - agg-data:/home/ciphernode/.local/share/enclave  # Persistent data
+      - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - agg-data:/home/ciphernode/.local/share/enclave
     secrets:
       - secrets.json
     environment:
