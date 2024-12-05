@@ -29,9 +29,13 @@ pub async fn prompt_delete(config: &AppConfig, delete_mode: DeleteMode) -> Resul
         .interact()?;
 
     if proceed {
-        let mut pw_str = prompt_password("\n\nPlease enter the current password: ")?;
         let key_file = config.key_file();
         let mut pm = FilePasswordManager::new(key_file);
+        if !pm.is_set() {
+            println!("Password is not set. Nothing to do.");
+            return Ok(false);
+        }
+        let mut pw_str = prompt_password("\n\nPlease enter the current password: ")?;
         let mut cur_pw = pm.get_key().await?;
 
         if pw_str != String::from_utf8_lossy(&cur_pw) {
