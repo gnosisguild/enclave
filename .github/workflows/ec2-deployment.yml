@@ -54,3 +54,23 @@ jobs:
         # Output image details
         echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
         echo "image=$IMAGE_NAME:latest" >> $GITHUB_OUTPUT
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v1.2.0
+      if: github.ref == 'refs/heads/main'
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          # Pull the latest image
+          docker pull $IMAGE_NAME:latest
+
+          # Cd into the directory
+          cd /home/ec2-user/enclave
+
+          # Pull the latest changes
+          git pull origin main
+
+          # Deploy the stack
+          docker stack deploy -c docker-compose.yml ciphernode-stack
