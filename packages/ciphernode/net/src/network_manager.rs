@@ -94,7 +94,8 @@ impl NetworkManager {
 
         let ed25519_keypair = ed25519::Keypair::try_from_bytes(&mut bytes)?;
         let keypair: libp2p::identity::Keypair = ed25519_keypair.try_into()?;
-        let mut peer = NetworkPeer::new(&keypair, peers, Some(quic_port), "tmp-enclave-gossip-topic")?;
+        let mut peer =
+            NetworkPeer::new(&keypair, peers, Some(quic_port), "tmp-enclave-gossip-topic")?;
         let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;
         let p2p_addr = NetworkManager::setup(bus, peer.tx(), rx);
         let handle = tokio::spawn(async move { Ok(peer.start().await?) });

@@ -26,9 +26,8 @@ RUN useradd -m -u 1000 -s /bin/bash ciphernode
 # Create necessary directories with proper permissions
 RUN mkdir -p /home/ciphernode/.config/enclave \
     /home/ciphernode/.local/share/enclave \
-    /home/ciphernode/secrets && \
-    chown -R ciphernode:ciphernode /home/ciphernode && \
-    chmod 700 /home/ciphernode/secrets
+    /run/secrets && \
+    chown -R ciphernode:ciphernode /home/ciphernode /run/secrets
 
 # Switch to non-root user
 USER ciphernode
@@ -36,14 +35,13 @@ WORKDIR /home/ciphernode
 
 # Copy binary from builder
 COPY --from=ciphernode-builder --chown=ciphernode:ciphernode /build/packages/ciphernode/target/release/enclave /usr/local/bin/
+COPY --from=ciphernode-builder --chmod=755 --chown=ciphernode:ciphernode /build/packages/ciphernode/ciphernode-entrypoint.sh /usr/local/bin/
 
 # Environment variables for configuration
 ENV CONFIG_DIR=/home/ciphernode/.config/enclave
-ENV SECRETS_DIR=/home/ciphernode/secrets
 ENV DATA_DIR=/home/ciphernode/.local/share/enclave
 ENV RUST_LOG=info
 
 # Add entrypoint script
-COPY --from=ciphernode-builder --chmod=755 --chown=ciphernode:ciphernode /build/packages/ciphernode/ciphernode-entrypoint.sh /usr/local/bin/
 
 ENTRYPOINT ["ciphernode-entrypoint.sh"]
