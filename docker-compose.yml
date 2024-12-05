@@ -1,17 +1,94 @@
 services:
-  ciphernode:
+  cn1:
+    container_name: cn1
     build:
       context: .
       dockerfile: ./packages/ciphernode/Dockerfile
     image: ciphernode:latest
     volumes:
-      - ${CONFIG_FILE}:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
-      - ${SECRETS_FILE}:/home/ciphernode/secrets/secrets.json:ro  # Read-only secrets directory
-      - ciphernode-data:/home/ciphernode/.local/share/enclave  # Persistent data
+      - ./configs/cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
+      - cn1-data:/home/ciphernode/.local/share/enclave  # Persistent data
+    secrets:
+      - secrets.json
     environment:
       RUST_LOG: "info"
       AGGREGATOR: "false"
-    restart: unless-stopped
+    deploy:
+      replicas: 1
+    networks:
+      - cn1-network
 
+
+  cn2:
+    container_name: cn2
+    build:
+      context: .
+      dockerfile: ./packages/ciphernode/Dockerfile
+    image: ciphernode:latest
+    volumes:
+      - ./configs/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
+      - cn2-data:/home/ciphernode/.local/share/enclave  # Persistent data
+    secrets:
+      - secrets.json
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "false"
+    deploy:
+      replicas: 1
+    networks:
+      - cn2-network
+
+  cn3:
+    container_name: cn3
+    build:
+      context: .
+      dockerfile: ./packages/ciphernode/Dockerfile
+    image: ciphernode:latest
+    volumes:
+      - ./configs/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
+      - cn3-data:/home/ciphernode/.local/share/enclave  # Persistent data
+    secrets:
+      - secrets.json
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "false"
+    deploy:
+      replicas: 1
+    networks:
+      - cn3-network
+
+
+  aggregator:
+    container_name: aggregator
+    build:
+      context: .
+      dockerfile: ./packages/ciphernode/Dockerfile
+    image: ciphernode:latest
+    volumes:
+      - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro  # Read-only config directory
+      - agg-data:/home/ciphernode/.local/share/enclave  # Persistent data
+    secrets:
+      - secrets.json
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "true"
+    deploy:
+      replicas: 1
+    networks:
+      - agg-network
+
+secrets:
+  secrets.json:
+    file: secrets.json
+    
 volumes:
-  ciphernode-data:
+  cn1-data:
+  cn2-data:
+  cn3-data:
+  agg-data:
+
+networks:
+  cn1-network:
+  cn2-network:
+  cn3-network:
+  agg-network:

@@ -77,6 +77,7 @@ pub async fn setup_ciphernode(
         bus.clone(),
         config.peers(),
         &cipher,
+        config.quic_port(),
         repositories.libp2pid(),
     )
     .await?;

@@ -89,6 +89,8 @@ pub struct AppConfig {
     address: Option<Address>,
     /// A list of libp2p multiaddrs to dial to as peers when joining the network
     peers: Vec<String>,
+    /// The port to use for the quic listener
+    quic_port: u16,
 }
 
 impl Default for AppConfig {
@@ -104,6 +106,7 @@ impl Default for AppConfig {
             peers: vec![], // NOTE: This should remain empty and we should look at config
             // generation via ipns fetch for the latest nodes
             address: None,
+            quic_port: 9091,
         }
     }
 }
@@ -178,6 +181,10 @@ impl AppConfig {
 
     pub fn peers(&self) -> Vec<String> {
         self.peers.clone()
+    }
+
+    pub fn quic_port(&self) -> u16 {
+        self.quic_port
     }
 }
 

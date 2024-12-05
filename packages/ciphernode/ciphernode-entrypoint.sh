@@ -3,7 +3,7 @@ set -e
 
 # Paths to config and secrets
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
-SECRETS_FILE="$SECRETS_DIR/secrets.json"
+SECRETS_FILE="/run/secrets/secrets.json"
 AGGREGATOR="$AGGREGATOR"
 
 # Ensure required files exist

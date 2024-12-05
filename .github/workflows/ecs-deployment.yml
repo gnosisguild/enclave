@@ -1,4 +1,4 @@
-name: Build and Deploy Ciphernode to ECS
+name: Build and Deploy Ciphernode 
 
 on:
   push:
@@ -52,7 +52,14 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
+        CURRENT_IMAGE_ID=$(docker images -q $ECR_REGISTRY/$ECR_REPOSITORY:latest)
         docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f $DOCKERFILE_PATH .
+        if [ -n "$CURRENT_IMAGE_ID" ]; then
+          SHORT_SHA=${CURRENT_IMAGE_ID:0:12}
+          docker tag $CURRENT_IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA
+          docker rmi $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$SHORT_SHA
+        fi
         docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest

@@ -1,3 +1,9 @@
 services:
-  ciphernode:
+  cn1:
+    network_mode: "host"
+  cn2:
+    network_mode: "host"
+  cn3:
+    network_mode: "host"
+  aggregator:
     network_mode: "host"
