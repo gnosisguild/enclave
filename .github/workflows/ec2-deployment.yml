@@ -57,7 +57,6 @@ jobs:
 
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v1.2.0
-      if: github.ref == 'refs/heads/main'
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
@@ -70,7 +69,7 @@ jobs:
           cd /home/ec2-user/enclave
 
           # Pull the latest changes
-          git pull origin main
+          git pull
 
           # Deploy the stack
           docker stack deploy -c docker-compose.yml ciphernode-stack
