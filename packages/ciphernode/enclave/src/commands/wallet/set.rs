@@ -7,22 +7,20 @@ use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
 
 pub fn validate_private_key(input: &String) -> Result<()> {
-    // Remove 0x prefix if present
-    let key = if input.starts_with("0x") {
-        &input[2..]
-    } else if input.len() == 64 {
-        input
-    } else {
+    // Require 0x prefix
+    if !input.starts_with("0x") {
         return Err(anyhow!(
-            "Invalid private key length: {}. Expected 64 characters (or 66 with '0x' prefix)",
-            input.len()
+            "Invalid private key format: must start with '0x' prefix"
         ));
-    };
+    }
+
+    // Remove 0x prefix
+    let key = &input[2..];
 
     // Check length
     if key.len() != 64 {
         return Err(anyhow!(
-            "Invalid private key length: {}. Expected 64 characters",
+            "Invalid private key length: {}. Expected 64 characters after '0x' prefix",
             key.len()
         ));
     }
