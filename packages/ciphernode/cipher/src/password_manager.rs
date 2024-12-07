@@ -57,7 +57,7 @@ impl PasswordManager for EnvPasswordManager {
     }
 
     fn is_set(&self) -> bool {
-        self.0.is_some() 
+        self.0.is_some()
     }
 }
 
@@ -80,7 +80,7 @@ impl PasswordManager for InMemPasswordManager {
     }
 
     fn is_set(&self) -> bool {
-        self.0.is_some() 
+        self.0.is_some()
     }
 }
 
