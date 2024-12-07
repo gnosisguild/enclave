@@ -40,9 +40,13 @@ fn get_zeroizing_pw_vec(input: Option<String>) -> Result<Zeroizing<Vec<u8>>> {
     Ok(pw)
 }
 
-pub async fn execute(config: &AppConfig, input: Option<String>) -> Result<()> {
+pub async fn execute(config: &AppConfig, input: Option<String>, overwrite: bool) -> Result<()> {
     let key_file = config.key_file();
     let mut pm = FilePasswordManager::new(key_file);
+
+    if overwrite {
+        pm.delete_key().await?;
+    }
 
     if pm.is_set() {
         bail!("Keyfile already exists. Refusing to overwrite. Try using `enclave password overwrite` or `enclave password delete` in order to change or delete your password.")

@@ -1,5 +1,4 @@
 use crate::commands::password::{self, PasswordCommands};
-use alloy::transports::http::reqwest::Url;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Result;
@@ -22,41 +21,68 @@ fn get_contract_info(name: &str) -> Result<&ContractInfo> {
         .ok_or(anyhow!("Could not get contract info"))?)
 }
 
-#[instrument(name = "app", skip_all, fields(id = get_tag()))]
-pub async fn execute() -> Result<()> {
-    let rpc_url = Input::<String>::new()
-        .with_prompt("Enter WebSocket devnet RPC URL")
-        .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
-        .validate_with(|input: &String| -> Result<()> {
-            RPC::from_url(input)?;
-            Ok(())
-        })
-        .interact_text()?;
+fn validate_rpc_url(url: &String) -> Result<()> {
+    RPC::from_url(url)?;
+    Ok(())
+}
 
-    let eth_address: Option<String> = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter your Ethereum address (press Enter to skip)")
-        .allow_empty(true)
-        .validate_with(|input: &String| -> Result<()> {
-            if input.is_empty() {
-                return Ok(());
+fn validate_eth_address(address: &String) -> Result<()> {
+    if address.is_empty() {
+        return Ok(());
+    }
+    if !address.starts_with("0x") {
+        bail!("Address must start with '0x'")
+    }
+    if address.len() != 42 {
+        bail!("Address must be 42 characters long (including '0x')")
+    }
+    for c in address[2..].chars() {
+        if !c.is_ascii_hexdigit() {
+            bail!("Address must contain only hexadecimal characters")
+        }
+    }
+    Ok(())
+}
+
+#[instrument(name = "app", skip_all, fields(id = get_tag()))]
+pub async fn execute(
+    rpc_url: Option<String>,
+    eth_address: Option<String>,
+    password: Option<String>,
+    skip_eth: bool,
+) -> Result<()> {
+    let rpc_url = match rpc_url {
+        Some(url) => {
+            validate_rpc_url(&url)?;
+            url
+        }
+        None => Input::<String>::new()
+            .with_prompt("Enter WebSocket devnet RPC URL")
+            .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
+            .validate_with(validate_rpc_url)
+            .interact_text()?,
+    };
+
+    let eth_address: Option<String> = match eth_address {
+        Some(address) => {
+            validate_eth_address(&address)?;
+            Some(address)
+        }
+        None => {
+            if skip_eth {
+                None
+            } else {
+                Input::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Enter your Ethereum address (press Enter to skip)")
+                    .allow_empty(true)
+                    .validate_with(validate_eth_address)
+                    .interact()
+                    .ok()
+                    .map(|s| if s.is_empty() { None } else { Some(s) })
+                    .flatten()
             }
-            if !input.starts_with("0x") {
-                bail!("Address must start with '0x'")
-            }
-            if input.len() != 42 {
-                bail!("Address must be 42 characters long (including '0x')")
-            }
-            for c in input[2..].chars() {
-                if !c.is_ascii_hexdigit() {
-                    bail!("Address must contain only hexadecimal characters")
-                }
-            }
-            Ok(())
-        })
-        .interact()
-        .ok()
-        .map(|s| if s.is_empty() { None } else { Some(s) })
-        .flatten();
+        }
+    };
 
     let config_dir = dirs::home_dir()
         .ok_or_else(|| anyhow!("Could not determine home directory"))?
@@ -102,7 +128,14 @@ chains:
     // Load with default location
     let config = load_config(Some(&config_path.display().to_string()))?;
 
-    password::execute(PasswordCommands::Create { password: None }, config).await?;
+    password::execute(
+        PasswordCommands::Create {
+            password,
+            overwrite: true,
+        },
+        config,
+    )
+    .await?;
 
     println!("Enclave configuration successfully created!");
     println!("You can start your node using `enclave start`");
