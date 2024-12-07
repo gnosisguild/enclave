@@ -2,7 +2,7 @@ use actix::Actor;
 use anyhow::{anyhow, bail, Result};
 use cipher::Cipher;
 use config::AppConfig;
-use dialoguer::{theme::ColorfulTheme, Input, Password};
+use dialoguer::{theme::ColorfulTheme, Password};
 use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
 
@@ -31,13 +31,6 @@ pub fn validate_private_key(input: &String) -> Result<()> {
         .map(|i| u8::from_str_radix(&key[i..i + 2], 16))
         .collect::<Result<Vec<u8>, _>>()
         .map_err(|e| anyhow!("Invalid hex character: {}", e))?;
-
-    // Check if the key is in the valid range (1 <= key < secp256k1_n)
-    let secp256k1_n =
-        hex::decode("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141").unwrap();
-    if bytes.len() != 32 || bytes > secp256k1_n || bytes.iter().all(|&b| b == 0) {
-        return Err(anyhow!("Private key value is out of valid range"));
-    }
 
     Ok(())
 }
