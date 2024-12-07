@@ -2,8 +2,9 @@ use anyhow::*;
 use cipher::{FilePasswordManager, PasswordManager};
 use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Confirm};
-use rpassword::prompt_password;
 use zeroize::Zeroize;
+
+use super::prompt_password;
 
 pub enum DeleteMode {
     Delete,
@@ -35,7 +36,7 @@ pub async fn prompt_delete(config: &AppConfig, delete_mode: DeleteMode) -> Resul
             println!("Password is not set. Nothing to do.");
             return Ok(false);
         }
-        let mut pw_str = prompt_password("\n\nPlease enter the current password: ")?;
+        let mut pw_str = prompt_password("Please enter the current password")?;
         let mut cur_pw = pm.get_key().await?;
 
         if pw_str != String::from_utf8_lossy(&cur_pw) {

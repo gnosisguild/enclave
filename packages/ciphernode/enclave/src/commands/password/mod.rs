@@ -1,9 +1,11 @@
 mod create;
 mod delete;
 mod overwrite;
+mod helpers;
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
+use helpers::*;
 
 #[derive(Subcommand, Debug)]
 pub enum PasswordCommands {
