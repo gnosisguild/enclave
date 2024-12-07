@@ -14,7 +14,7 @@ pub enum PasswordCommands {
         password: Option<String>,
 
         #[arg(short, long)]
-        overwrite: bool
+        overwrite: bool,
     },
 
     /// Delete the current password
@@ -30,7 +30,10 @@ pub enum PasswordCommands {
 
 pub async fn execute(command: PasswordCommands, config: AppConfig) -> Result<()> {
     match command {
-        PasswordCommands::Create { password, overwrite } => create::execute(&config, password, overwrite).await?,
+        PasswordCommands::Create {
+            password,
+            overwrite,
+        } => create::execute(&config, password, overwrite).await?,
         PasswordCommands::Delete => delete::execute(&config).await?,
         PasswordCommands::Overwrite { password } => overwrite::execute(&config, password).await?,
     };
