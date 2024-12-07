@@ -43,6 +43,7 @@ pub fn validate_private_key(input: &String) -> Result<()> {
 }
 pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<()> {
     let input = if let Some(private_key) = private_key {
+        validate_private_key(&private_key)?;
         private_key
     } else {
         Password::with_theme(&ColorfulTheme::default())
