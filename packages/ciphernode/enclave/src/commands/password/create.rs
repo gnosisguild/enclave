@@ -44,7 +44,7 @@ pub async fn execute(config: &AppConfig, input: Option<String>, overwrite: bool)
     let key_file = config.key_file();
     let mut pm = FilePasswordManager::new(key_file);
 
-    if overwrite {
+    if overwrite && pm.is_set() {
         pm.delete_key().await?;
     }
 

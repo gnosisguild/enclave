@@ -142,3 +142,25 @@ chains:
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::validate_eth_address;
+    use anyhow::Result;
+
+    #[test]
+    fn eth_address_validation() -> Result<()> {
+        assert!(
+            validate_eth_address(&"0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".to_string()).is_ok()
+        );
+        assert!(
+            validate_eth_address(&"d8dA6BF26964aF9D7eEd9e03E53415D37aA96045".to_string()).is_err()
+        );
+        assert!(validate_eth_address(&"0x1234567890abcdef".to_string()).is_err());
+        assert!(
+            validate_eth_address(&"0x0000000000000000000000000000000000000000".to_string()).is_ok()
+        );
+
+        Ok(())
+    }
+}
