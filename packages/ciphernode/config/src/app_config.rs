@@ -322,10 +322,12 @@ fn expand_tilde(path: &Path) -> PathBuf {
 struct OsDirs;
 impl OsDirs {
     pub fn config_dir() -> PathBuf {
+        // TODO: handle unwrap error case
         dirs::config_dir().unwrap().join("enclave")
     }
 
     pub fn data_dir() -> PathBuf {
+        // TODO: handle unwrap error case
         dirs::data_local_dir().unwrap().join("enclave")
     }
 }
