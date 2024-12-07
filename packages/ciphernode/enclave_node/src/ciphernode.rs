@@ -24,9 +24,7 @@ pub async fn setup_ciphernode(
     config: AppConfig,
     address: Address,
 ) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
-    let rng = Arc::new(Mutex::new(
-        rand_chacha::ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
-    ));
+    let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
     let bus = EventBus::new(true).start();
     let cipher = Arc::new(Cipher::from_config(&config).await?);
     let store = setup_datastore(&config, &bus)?;

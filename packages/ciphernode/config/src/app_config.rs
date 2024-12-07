@@ -48,7 +48,8 @@ impl RPC {
         match self {
             RPC::Http(url) | RPC::Https(url) => Ok(url.clone()),
             RPC::Ws(url) | RPC::Wss(url) => {
-                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
+                let mut parsed =
+                    Url::parse(url).context(format!("Failed to parse URL: {}", url))?;
                 parsed
                     .set_scheme(if self.is_secure() { "https" } else { "http" })
                     .map_err(|_| anyhow!("http(s) are valid schemes"))?;
