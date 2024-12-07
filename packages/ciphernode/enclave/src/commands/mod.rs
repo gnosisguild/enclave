@@ -41,11 +41,11 @@ pub enum Commands {
     },
 
     Init {
-        /// Testing only: A path to write the latest pubkey to
+        /// An rpc url for enclave to connect to
         #[arg(long = "rpc-url")]
         rpc_url: Option<String>,
 
-        /// Testing only: A path to write the latest plaintexts to
+        /// An Ethereum address that enclave should use to identify the node
         #[arg(long = "eth-address")]
         eth_address: Option<String>,
 
