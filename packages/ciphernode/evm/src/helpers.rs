@@ -225,30 +225,32 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_rpc_type_conversion() {
+    fn test_rpc_type_conversion() -> Result<()> {
         // Test HTTP URLs
         let http = RPC::from_url("http://localhost:8545/").unwrap();
         assert!(matches!(http, RPC::Http(_)));
-        assert_eq!(http.as_http_url(), "http://localhost:8545/");
-        assert_eq!(http.as_ws_url(), "ws://localhost:8545/");
+        assert_eq!(http.as_http_url()?, "http://localhost:8545/");
+        assert_eq!(http.as_ws_url()?, "ws://localhost:8545/");
 
         // Test HTTPS URLs
         let https = RPC::from_url("https://example.com/").unwrap();
         assert!(matches!(https, RPC::Https(_)));
-        assert_eq!(https.as_http_url(), "https://example.com/");
-        assert_eq!(https.as_ws_url(), "wss://example.com/");
+        assert_eq!(https.as_http_url()?, "https://example.com/");
+        assert_eq!(https.as_ws_url()?, "wss://example.com/");
 
         // Test WS URLs
         let ws = RPC::from_url("ws://localhost:8545/").unwrap();
         assert!(matches!(ws, RPC::Ws(_)));
-        assert_eq!(ws.as_http_url(), "http://localhost:8545/");
-        assert_eq!(ws.as_ws_url(), "ws://localhost:8545/");
+        assert_eq!(ws.as_http_url()?, "http://localhost:8545/");
+        assert_eq!(ws.as_ws_url()?, "ws://localhost:8545/");
 
         // Test WSS URLs
         let wss = RPC::from_url("wss://example.com/").unwrap();
         assert!(matches!(wss, RPC::Wss(_)));
-        assert_eq!(wss.as_http_url(), "https://example.com/");
-        assert_eq!(wss.as_ws_url(), "wss://example.com/");
+        assert_eq!(wss.as_http_url()?, "https://example.com/");
+        assert_eq!(wss.as_ws_url()?, "wss://example.com/");
+
+        Ok(())
     }
 
     #[test]
