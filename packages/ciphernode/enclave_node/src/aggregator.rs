@@ -29,7 +29,7 @@ pub async fn setup_aggregator(
 ) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
     let bus = EventBus::new(true).start();
     let rng = Arc::new(Mutex::new(
-        ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
+        ChaCha20Rng::from_rng(OsRng)?,
     ));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();

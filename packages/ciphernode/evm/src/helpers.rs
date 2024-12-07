@@ -126,7 +126,7 @@ impl ProviderConfig {
 
     async fn create_ws_provider(&self) -> Result<RootProvider<BoxTransport>> {
         Ok(ProviderBuilder::new()
-            .on_ws(self.create_ws_connect())
+            .on_ws(self.create_ws_connect()?)
             .await?
             .boxed())
     }
@@ -156,7 +156,7 @@ impl ProviderConfig {
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
-            .on_ws(self.create_ws_connect())
+            .on_ws(self.create_ws_connect()?)
             .await
             .context("Failed to create WS signer provider")?;
 
@@ -175,12 +175,12 @@ impl ProviderConfig {
         WithChainId::new(provider).await
     }
 
-    fn create_ws_connect(&self) -> WsConnect {
-        if let Some(ws_auth) = self.auth.to_ws_auth() {
-            WsConnect::new(self.rpc.as_ws_url()).with_auth(ws_auth)
+    fn create_ws_connect(&self) -> Result<WsConnect> {
+        Ok(if let Some(ws_auth) = self.auth.to_ws_auth() {
+            WsConnect::new(self.rpc.as_ws_url()?).with_auth(ws_auth)
         } else {
-            WsConnect::new(self.rpc.as_ws_url())
-        }
+            WsConnect::new(self.rpc.as_ws_url()?)
+        })
     }
 
     fn create_http_client(&self) -> Result<RpcClient<Http<Client>>> {
@@ -192,7 +192,7 @@ impl ProviderConfig {
             .default_headers(headers)
             .build()
             .context("Failed to create HTTP client")?;
-        let http = Http::with_client(client, self.rpc.as_http_url().parse()?);
+        let http = Http::with_client(client, self.rpc.as_http_url()?.parse()?);
         Ok(RpcClient::new(http, false))
     }
 }

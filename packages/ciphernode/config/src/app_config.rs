@@ -44,28 +44,29 @@ impl RPC {
         }
     }
 
-    pub fn as_http_url(&self) -> String {
+    pub fn as_http_url(&self) -> Result<String> {
         match self {
-            RPC::Http(url) | RPC::Https(url) => url.clone(),
+            RPC::Http(url) | RPC::Https(url) => Ok(url.clone()),
             RPC::Ws(url) | RPC::Wss(url) => {
                 let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
                 parsed
                     .set_scheme(if self.is_secure() { "https" } else { "http" })
-                    .expect("http(s) are valid schemes");
-                parsed.to_string()
+                    .map_err(|_| anyhow!("http(s) are valid schemes"))?;
+                Ok(parsed.to_string())
             }
         }
     }
 
-    pub fn as_ws_url(&self) -> String {
+    pub fn as_ws_url(&self) -> Result<String> {
         match self {
-            RPC::Ws(url) | RPC::Wss(url) => url.clone(),
+            RPC::Ws(url) | RPC::Wss(url) => Ok(url.clone()),
             RPC::Http(url) | RPC::Https(url) => {
-                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
+                let mut parsed =
+                    Url::parse(url).context(format!("Failed to parse URL: {}", url))?;
                 parsed
                     .set_scheme(if self.is_secure() { "wss" } else { "ws" })
-                    .expect("ws(s) are valid schemes");
-                parsed.to_string()
+                    .map_err(|_| anyhow!("ws(s) are valid schemes"))?;
+                Ok(parsed.to_string())
             }
         }
     }
