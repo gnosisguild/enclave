@@ -28,9 +28,7 @@ pub async fn setup_aggregator(
     plaintext_write_path: Option<&str>,
 ) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
     let bus = EventBus::new(true).start();
-    let rng = Arc::new(Mutex::new(
-        ChaCha20Rng::from_rng(OsRng)?,
-    ));
+    let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
     let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
