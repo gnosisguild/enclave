@@ -14,6 +14,7 @@ pub trait PasswordManager {
     async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>>;
     async fn delete_key(&mut self) -> Result<()>;
     async fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()>;
+    fn is_set(&self) -> bool;
 }
 
 pub struct InMemPasswordManager(pub Option<Zeroizing<Vec<u8>>>);
@@ -54,6 +55,10 @@ impl PasswordManager for EnvPasswordManager {
         self.0 = None;
         Ok(())
     }
+
+    fn is_set(&self) -> bool {
+        self.0.is_some()
+    }
 }
 
 #[async_trait]
@@ -72,6 +77,10 @@ impl PasswordManager for InMemPasswordManager {
     async fn delete_key(&mut self) -> Result<()> {
         self.0 = None;
         Ok(())
+    }
+
+    fn is_set(&self) -> bool {
+        self.0.is_some()
     }
 }
 
@@ -148,6 +157,11 @@ impl PasswordManager for FilePasswordManager {
             .context("Failed to set permissions on keyfile")?;
 
         Ok(())
+    }
+
+    fn is_set(&self) -> bool {
+        let path = &self.path;
+        path.exists()
     }
 }
 

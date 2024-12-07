@@ -1,4 +1,5 @@
 pub mod aggregator;
+pub mod init;
 pub mod net;
 pub mod password;
 pub mod start;
@@ -37,5 +38,23 @@ pub enum Commands {
     Net {
         #[command(subcommand)]
         command: NetCommands,
+    },
+
+    Init {
+        /// An rpc url for enclave to connect to
+        #[arg(long = "rpc-url")]
+        rpc_url: Option<String>,
+
+        /// An Ethereum address that enclave should use to identify the node
+        #[arg(long = "eth-address")]
+        eth_address: Option<String>,
+
+        /// The password
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Skip asking for eth
+        #[arg(long = "skip-eth")]
+        skip_eth: bool,
     },
 }

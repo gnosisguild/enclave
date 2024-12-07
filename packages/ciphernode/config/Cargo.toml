@@ -9,3 +9,5 @@ anyhow = { workspace = true }
 serde = { workspace = true }
 figment = { workspace = true }
 alloy = { workspace = true }
+url = { workspace = true }
+

@@ -25,67 +25,10 @@ use alloy::{
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use cipher::Cipher;
-use config::RpcAuth;
+use config::{RpcAuth, RPC};
 use data::Repository;
 use std::{env, marker::PhantomData, sync::Arc};
-use url::Url;
 use zeroize::Zeroizing;
-
-#[derive(Clone)]
-pub enum RPC {
-    Http(String),
-    Https(String),
-    Ws(String),
-    Wss(String),
-}
-
-impl RPC {
-    pub fn from_url(url: &str) -> Result<Self> {
-        let parsed = Url::parse(url).context("Invalid URL format")?;
-        match parsed.scheme() {
-            "http" => Ok(RPC::Http(url.to_string())),
-            "https" => Ok(RPC::Https(url.to_string())),
-            "ws" => Ok(RPC::Ws(url.to_string())),
-            "wss" => Ok(RPC::Wss(url.to_string())),
-            _ => bail!("Invalid protocol. Expected: http://, https://, ws://, wss://"),
-        }
-    }
-
-    pub fn as_http_url(&self) -> String {
-        match self {
-            RPC::Http(url) | RPC::Https(url) => url.clone(),
-            RPC::Ws(url) | RPC::Wss(url) => {
-                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
-                parsed
-                    .set_scheme(if self.is_secure() { "https" } else { "http" })
-                    .expect("http(s) are valid schemes");
-                parsed.to_string()
-            }
-        }
-    }
-
-    pub fn as_ws_url(&self) -> String {
-        match self {
-            RPC::Ws(url) | RPC::Wss(url) => url.clone(),
-            RPC::Http(url) | RPC::Https(url) => {
-                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
-                parsed
-                    .set_scheme(if self.is_secure() { "wss" } else { "ws" })
-                    .expect("ws(s) are valid schemes");
-                parsed.to_string()
-            }
-        }
-    }
-
-    pub fn is_websocket(&self) -> bool {
-        matches!(self, RPC::Ws(_) | RPC::Wss(_))
-    }
-
-    pub fn is_secure(&self) -> bool {
-        matches!(self, RPC::Https(_) | RPC::Wss(_))
-    }
-}
-
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
     fn to_ws_auth(&self) -> Option<Authorization>;
@@ -183,7 +126,7 @@ impl ProviderConfig {
 
     async fn create_ws_provider(&self) -> Result<RootProvider<BoxTransport>> {
         Ok(ProviderBuilder::new()
-            .on_ws(self.create_ws_connect())
+            .on_ws(self.create_ws_connect()?)
             .await?
             .boxed())
     }
@@ -213,7 +156,7 @@ impl ProviderConfig {
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
-            .on_ws(self.create_ws_connect())
+            .on_ws(self.create_ws_connect()?)
             .await
             .context("Failed to create WS signer provider")?;
 
@@ -232,12 +175,12 @@ impl ProviderConfig {
         WithChainId::new(provider).await
     }
 
-    fn create_ws_connect(&self) -> WsConnect {
-        if let Some(ws_auth) = self.auth.to_ws_auth() {
-            WsConnect::new(self.rpc.as_ws_url()).with_auth(ws_auth)
+    fn create_ws_connect(&self) -> Result<WsConnect> {
+        Ok(if let Some(ws_auth) = self.auth.to_ws_auth() {
+            WsConnect::new(self.rpc.as_ws_url()?).with_auth(ws_auth)
         } else {
-            WsConnect::new(self.rpc.as_ws_url())
-        }
+            WsConnect::new(self.rpc.as_ws_url()?)
+        })
     }
 
     fn create_http_client(&self) -> Result<RpcClient<Http<Client>>> {
@@ -249,7 +192,7 @@ impl ProviderConfig {
             .default_headers(headers)
             .build()
             .context("Failed to create HTTP client")?;
-        let http = Http::with_client(client, self.rpc.as_http_url().parse()?);
+        let http = Http::with_client(client, self.rpc.as_http_url()?.parse()?);
         Ok(RpcClient::new(http, false))
     }
 }
@@ -282,30 +225,32 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_rpc_type_conversion() {
+    fn test_rpc_type_conversion() -> Result<()> {
         // Test HTTP URLs
         let http = RPC::from_url("http://localhost:8545/").unwrap();
         assert!(matches!(http, RPC::Http(_)));
-        assert_eq!(http.as_http_url(), "http://localhost:8545/");
-        assert_eq!(http.as_ws_url(), "ws://localhost:8545/");
+        assert_eq!(http.as_http_url()?, "http://localhost:8545/");
+        assert_eq!(http.as_ws_url()?, "ws://localhost:8545/");
 
         // Test HTTPS URLs
         let https = RPC::from_url("https://example.com/").unwrap();
         assert!(matches!(https, RPC::Https(_)));
-        assert_eq!(https.as_http_url(), "https://example.com/");
-        assert_eq!(https.as_ws_url(), "wss://example.com/");
+        assert_eq!(https.as_http_url()?, "https://example.com/");
+        assert_eq!(https.as_ws_url()?, "wss://example.com/");
 
         // Test WS URLs
         let ws = RPC::from_url("ws://localhost:8545/").unwrap();
         assert!(matches!(ws, RPC::Ws(_)));
-        assert_eq!(ws.as_http_url(), "http://localhost:8545/");
-        assert_eq!(ws.as_ws_url(), "ws://localhost:8545/");
+        assert_eq!(ws.as_http_url()?, "http://localhost:8545/");
+        assert_eq!(ws.as_ws_url()?, "ws://localhost:8545/");
 
         // Test WSS URLs
         let wss = RPC::from_url("wss://example.com/").unwrap();
         assert!(matches!(wss, RPC::Wss(_)));
-        assert_eq!(wss.as_http_url(), "https://example.com/");
-        assert_eq!(wss.as_ws_url(), "wss://example.com/");
+        assert_eq!(wss.as_http_url()?, "https://example.com/");
+        assert_eq!(wss.as_ws_url()?, "wss://example.com/");
+
+        Ok(())
     }
 
     #[test]
