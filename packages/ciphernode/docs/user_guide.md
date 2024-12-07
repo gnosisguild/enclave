@@ -1,10 +1,59 @@
 # Running a Ciphernode
 
+_NOTE: passing an address to a node may not be required in future versions as we may be moving towards BLS keys_
+
+You can use the cli to setup your node:
+
 ```
-enclave init
+$ enclave init
+Enter WebSocket devnet RPC URL [wss://ethereum-sepolia-rpc.publicnode.com]: wss://ethereum-sepolia-rpc.publicnode.com
+✔ Enter your Ethereum address (press Enter to skip) · 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+
+
+Please enter a new password:
+Please confirm your password:
+Password sucessfully set.
+Enclave configuration successfully created!
+You can start your node using `enclave start`
 ```
 
-Will setup an initial configuration
+This will setup an initial configuration:
+
+```
+$ cat ~/.config/enclave/config.yaml
+---
+# Enclave Configuration File
+# Ethereum Account Configuration
+address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+chains:
+  - name: "devnet"
+    rpc_url: "wss://ethereum-sepolia-rpc.publicnode.com"
+    contracts:
+      enclave:
+        address: "0xCe087F31e20E2F76b6544A2E4A74D4557C8fDf77"
+        deploy_block: 7073317
+      ciphernode_registry:
+        address: "0x0952388f6028a9Eda93a5041a3B216Ea331d97Ab"
+        deploy_block: 7073318
+      filter_registry:
+        address: "0xcBaCE7C360b606bb554345b20884A28e41436934"
+        deploy_block: 7073319
+```
+
+It will also setup the nodes key_file in the following path:
+
+```
+~/.config/enclave/key
+```
+
+You can now setup your wallet if you have your node configured for writing to the blockchain:
+
+```
+$ enclave wallet set --private-key "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+```
+
+_*NOTE: the above key is known and taken from the default hardhat mnemonic._
+
 
 ## Configuration 
 
