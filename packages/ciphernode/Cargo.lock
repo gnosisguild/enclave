@@ -1694,6 +1694,7 @@ dependencies = [
  "dirs",
  "figment",
  "serde",
+ "url",
 ]
 
 [[package]]

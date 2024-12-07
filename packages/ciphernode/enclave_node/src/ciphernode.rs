@@ -4,10 +4,7 @@ use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
 use enclave_core::{get_tag, EventBus};
-use evm::{
-    helpers::{ProviderConfig, RPC},
-    CiphernodeRegistrySol, EnclaveSolReader,
-};
+use evm::{helpers::ProviderConfig, CiphernodeRegistrySol, EnclaveSolReader};
 use logger::SimpleLogger;
 use net::NetworkManager;
 use rand::SeedableRng;
@@ -44,9 +41,7 @@ pub async fn setup_ciphernode(
         .iter()
         .filter(|chain| chain.enabled.unwrap_or(true))
     {
-        let rpc_url = RPC::from_url(&chain.rpc_url).map_err(|e| {
-            anyhow::anyhow!("Failed to parse RPC URL for chain {}: {}", chain.name, e)
-        })?;
+        let rpc_url = chain.rpc_url()?;
         let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
         let read_provider = provider_config.create_readonly_provider().await?;
         EnclaveSolReader::attach(

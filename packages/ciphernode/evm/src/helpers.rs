@@ -25,67 +25,10 @@ use alloy::{
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use cipher::Cipher;
-use config::RpcAuth;
+use config::{RpcAuth, RPC};
 use data::Repository;
 use std::{env, marker::PhantomData, sync::Arc};
-use url::Url;
 use zeroize::Zeroizing;
-
-#[derive(Clone)]
-pub enum RPC {
-    Http(String),
-    Https(String),
-    Ws(String),
-    Wss(String),
-}
-
-impl RPC {
-    pub fn from_url(url: &str) -> Result<Self> {
-        let parsed = Url::parse(url).context("Invalid URL format")?;
-        match parsed.scheme() {
-            "http" => Ok(RPC::Http(url.to_string())),
-            "https" => Ok(RPC::Https(url.to_string())),
-            "ws" => Ok(RPC::Ws(url.to_string())),
-            "wss" => Ok(RPC::Wss(url.to_string())),
-            _ => bail!("Invalid protocol. Expected: http://, https://, ws://, wss://"),
-        }
-    }
-
-    pub fn as_http_url(&self) -> String {
-        match self {
-            RPC::Http(url) | RPC::Https(url) => url.clone(),
-            RPC::Ws(url) | RPC::Wss(url) => {
-                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
-                parsed
-                    .set_scheme(if self.is_secure() { "https" } else { "http" })
-                    .expect("http(s) are valid schemes");
-                parsed.to_string()
-            }
-        }
-    }
-
-    pub fn as_ws_url(&self) -> String {
-        match self {
-            RPC::Ws(url) | RPC::Wss(url) => url.clone(),
-            RPC::Http(url) | RPC::Https(url) => {
-                let mut parsed = Url::parse(url).expect(&format!("Failed to parse URL: {}", url));
-                parsed
-                    .set_scheme(if self.is_secure() { "wss" } else { "ws" })
-                    .expect("ws(s) are valid schemes");
-                parsed.to_string()
-            }
-        }
-    }
-
-    pub fn is_websocket(&self) -> bool {
-        matches!(self, RPC::Ws(_) | RPC::Wss(_))
-    }
-
-    pub fn is_secure(&self) -> bool {
-        matches!(self, RPC::Https(_) | RPC::Wss(_))
-    }
-}
-
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
     fn to_ws_auth(&self) -> Option<Authorization>;

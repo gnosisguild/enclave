@@ -1,8 +1,10 @@
 use crate::commands::password::{self, PasswordCommands};
 use alloy::transports::http::reqwest::Url;
 use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::Result;
 use config::load_config;
+use config::RPC;
 use dialoguer::{theme::ColorfulTheme, Input};
 use enclave_core::get_tag;
 use std::fs;
@@ -25,32 +27,28 @@ pub async fn execute() -> Result<()> {
     let rpc_url = Input::<String>::new()
         .with_prompt("Enter WebSocket devnet RPC URL")
         .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
-        .validate_with(|input: &String| {
-            if let Ok(url) = Url::parse(input) {
-                if url.scheme() == "wss" {
-                    return Ok(());
-                }
-            }
-            Err("Please enter a valid WSS URL")
+        .validate_with(|input: &String| -> Result<()> {
+            RPC::from_url(input)?;
+            Ok(())
         })
         .interact_text()?;
 
     let eth_address: Option<String> = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter your Ethereum address (press Enter to skip)")
         .allow_empty(true)
-        .validate_with(|input: &String| -> Result<(), &str> {
+        .validate_with(|input: &String| -> Result<()> {
             if input.is_empty() {
                 return Ok(());
             }
             if !input.starts_with("0x") {
-                return Err("Address must start with '0x'");
+                bail!("Address must start with '0x'")
             }
             if input.len() != 42 {
-                return Err("Address must be 42 characters long (including '0x')");
+                bail!("Address must be 42 characters long (including '0x')")
             }
             for c in input[2..].chars() {
                 if !c.is_ascii_hexdigit() {
-                    return Err("Address must contain only hexadecimal characters");
+                    bail!("Address must contain only hexadecimal characters")
                 }
             }
             Ok(())
@@ -61,7 +59,7 @@ pub async fn execute() -> Result<()> {
         .flatten();
 
     let config_dir = dirs::home_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?
+        .ok_or_else(|| anyhow!("Could not determine home directory"))?
         .join(".config")
         .join("enclave");
     fs::create_dir_all(&config_dir)?;
