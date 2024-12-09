@@ -78,6 +78,7 @@ pub async fn setup_ciphernode(
         config.peers(),
         &cipher,
         config.quic_port(),
+        config.enable_mdns(),
         repositories.libp2pid(),
     )
     .await?;

@@ -91,6 +91,8 @@ pub struct AppConfig {
     peers: Vec<String>,
     /// The port to use for the quic listener
     quic_port: u16,
+    /// Whether to enable mDNS discovery
+    enable_mdns: bool,
 }
 
 impl Default for AppConfig {
@@ -107,6 +109,7 @@ impl Default for AppConfig {
             // generation via ipns fetch for the latest nodes
             address: None,
             quic_port: 9091,
+            enable_mdns: false,
         }
     }
 }
@@ -185,6 +188,10 @@ impl AppConfig {
 
     pub fn quic_port(&self) -> u16 {
         self.quic_port
+    }
+
+    pub fn enable_mdns(&self) -> bool {
+        self.enable_mdns
     }
 }
 

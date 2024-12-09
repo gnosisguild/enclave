@@ -57,12 +57,14 @@ jobs:
 
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v1.2.0
+      if: github.ref == 'refs/heads/main'
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_KEY }}
         script: |
           # Pull the latest image
+          echo "Pulling latest image $IMAGE_NAME:latest"
           docker pull $IMAGE_NAME:latest
 
           # Cd into the directory

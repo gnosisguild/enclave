@@ -14,7 +14,7 @@ COPY --from=evm-builder /build/packages/evm/artifacts ../evm/artifacts
 RUN cargo build --release
 
 # Runtime stage
-FROM debian:bookworm-slim
+FROM debian:stable-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends iptables ca-certificates jq && \
