@@ -3,12 +3,14 @@ name: Build and Deploy Ciphernode
 on:
   push:
     branches:
+      - release
       - main
     paths:
       - 'packages/ciphernode/**'
       - 'packages/evm/contracts/**'
   pull_request:
     branches:
+      - release
       - main
     paths:
       - 'packages/ciphernode/**'
@@ -23,55 +25,61 @@ permissions:
   packages: write
 
 jobs:
-  deploy:
-    name: Deploy to GHCR
+  build:
+    name: Build Image
     runs-on: ubuntu-latest
-    environment: production
-
+    outputs:
+      image_tag: ${{ steps.version.outputs.version }}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+      
+      - name: Generate version tag
+        id: version
+        run: echo "version=$(date +'%Y%m%d')-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
 
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image
+        run: |
+          docker build -t $IMAGE_NAME:${{ steps.version.outputs.version }} -f $DOCKERFILE_PATH .
 
-    - name: Build, tag, and push image to GHCR
-      id: build-image
-      env:
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        # Build the image
-        docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest -f $DOCKERFILE_PATH .
-        
-        # Push both tagged and latest images
-        docker push $IMAGE_NAME:$IMAGE_TAG
-        docker push $IMAGE_NAME:latest
+      - name: Log in to GitHub Container Registry
+        if: github.ref == 'refs/heads/release'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-        # Output image details
-        echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        echo "image=$IMAGE_NAME:latest" >> $GITHUB_OUTPUT
+      - name: Push to GHCR
+        if: github.ref == 'refs/heads/release'
+        env:
+          IMAGE_TAG: ${{ steps.version.outputs.version }}
+        run: |
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:$IMAGE_TAG
+          docker push $IMAGE_NAME:latest
 
-    - name: Deploy to EC2
-      uses: appleboy/ssh-action@v1.2.0
-      if: github.ref == 'refs/heads/release'
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_KEY }}
-        script: |
-          # Pull the latest image
-          echo "Pulling latest image $IMAGE_NAME:latest"
-          docker pull $IMAGE_NAME:latest
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    environment: 
+      name: production
+    if: github.ref == 'refs/heads/release'
+    
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
+            echo "Deploying version: $IMAGE_TAG"
+            docker pull $IMAGE_NAME:$IMAGE_TAG
+            
+            cd /home/ec2-user/enclave
+            git pull
+            
+            docker stack deploy -c docker-compose.yml ciphernode-stack
 
-          # Cd into the directory
-          cd /home/ec2-user/enclave
-
-          # Pull the latest changes
-          git pull
-
-          # Deploy the stack
-          docker stack deploy -c docker-compose.yml ciphernode-stack
