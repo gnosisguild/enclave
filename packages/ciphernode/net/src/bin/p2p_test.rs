@@ -30,10 +30,15 @@ async fn main() -> Result<()> {
         .ok()
         .and_then(|p| p.parse::<String>().ok());
 
+    let enable_mdns = env::var("ENABLE_MDNS")
+        .unwrap_or("false".to_string())
+        .parse::<bool>()
+        .unwrap();
+
     let peers: Vec<String> = dial_to.iter().cloned().collect();
 
     let id = libp2p::identity::Keypair::generate_ed25519();
-    let mut peer = NetworkPeer::new(&id, peers, udp_port, "test-topic")?;
+    let mut peer = NetworkPeer::new(&id, peers, udp_port, "test-topic", enable_mdns)?;
 
     // Extract input and outputs
     let tx = peer.tx();

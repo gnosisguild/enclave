@@ -11,11 +11,8 @@ services:
     environment:
       QUIC_PORT: 9091
       DIAL_TO: "/ip4/172.16.238.12/udp/9091/quic-v1"
-      BLOCK_MDNS: "${BLOCK_MDNS:-false}"
+      ENABLE_MDNS: "${ENABLE_MDNS:-true}"
     entrypoint: ["/app/entrypoint.sh"]
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
 
   bob:
     image: p2p-test-image
@@ -26,11 +23,8 @@ services:
     environment:
       QUIC_PORT: 9091
       DIAL_TO: "/ip4/172.16.238.12/udp/9091/quic-v1"
-      BLOCK_MDNS: "${BLOCK_MDNS:-false}"
+      ENABLE_MDNS: "${ENABLE_MDNS:-true}"
     entrypoint: ["/app/entrypoint.sh"]
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
 
   charlie:
     image: p2p-test-image
@@ -40,11 +34,8 @@ services:
     command: ["/app/p2p_test", "charlie"]
     environment:
       QUIC_PORT: 9091
-      BLOCK_MDNS: "${BLOCK_MDNS:-false}"
+      ENABLE_MDNS: "${ENABLE_MDNS:-true}"
     entrypoint: ["/app/entrypoint.sh"]
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
 
 networks:
   app_net:

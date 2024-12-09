@@ -3,7 +3,7 @@ use crate::{
     helpers::{ReadonlyProvider, WithChainId},
     EvmEventReader,
 };
-use actix::{Actor, Addr};
+use actix::Addr;
 use alloy::{
     primitives::{LogData, B256},
     sol,

@@ -1,0 +1,86 @@
+services:
+  cn1:
+    image: ghcr.io/gnosisguild/ciphernode:latest
+    volumes:
+      - ./configs/cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn1-data:/home/ciphernode/.local/share/enclave
+    secrets:
+      - secrets.json
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "false"
+    ports:
+      - 9091:9091
+    deploy:
+      replicas: 1
+    networks:
+      - cn1-network
+
+
+  cn2:
+    image: ghcr.io/gnosisguild/ciphernode:latest
+    volumes:
+      - ./configs/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn2-data:/home/ciphernode/.local/share/enclave
+    secrets:
+      - secrets.json
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "false"
+    ports:
+      - 9092:9092
+    deploy:
+      replicas: 1
+    networks:
+      - cn2-network
+
+  cn3:
+    image: ghcr.io/gnosisguild/ciphernode:latest
+    volumes:
+      - ./configs/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn3-data:/home/ciphernode/.local/share/enclave
+    secrets:
+      - secrets.json
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "false"
+    ports:
+      - 9093:9093
+    deploy:
+      replicas: 1
+    networks:
+      - cn3-network
+
+
+  aggregator:
+    image: ghcr.io/gnosisguild/ciphernode:latest
+    volumes:
+      - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - agg-data:/home/ciphernode/.local/share/enclave
+    secrets:
+      - secrets.json
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "true"
+    ports:
+      - 9094:9094
+    deploy:
+      replicas: 1
+    networks:
+      - agg-network
+
+secrets:
+  secrets.json:
+    file: ./configs/secrets.json
+    
+volumes:
+  cn1-data:
+  cn2-data:
+  cn3-data:
+  agg-data:
+
+networks:
+  cn1-network:
+  cn2-network:
+  cn3-network:
+  agg-network:
