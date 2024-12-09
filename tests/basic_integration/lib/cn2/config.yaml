@@ -1,7 +1,7 @@
 config_dir: .
 data_dir: .
 address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
-quic_port: 9091
+quic_port: 9092
 enable_mdns: true
 chains:
   - name: "hardhat"
