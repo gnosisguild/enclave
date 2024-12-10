@@ -18,6 +18,8 @@ services:
       replicas: 1
     networks:
       - cn1-network
+    tty: true
+    stdin_open: true
     command:
       /bin/bash
 
@@ -41,6 +43,8 @@ services:
       replicas: 1
     networks:
       - cn2-network
+    tty: true
+    stdin_open: true
     command:
       /bin/bash
   cn3:
@@ -62,6 +66,8 @@ services:
       replicas: 1
     networks:
       - cn3-network
+    tty: true
+    stdin_open: true
     command:
       /bin/bash
 
@@ -84,6 +90,8 @@ services:
       replicas: 1
     networks:
       - agg-network
+    tty: true
+    stdin_open: true
     command:
       /bin/bash
 
