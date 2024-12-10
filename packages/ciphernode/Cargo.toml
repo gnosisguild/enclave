@@ -39,6 +39,7 @@ clap = { version = "4.5.17", features = ["derive"] }
 cipher = { path = "./cipher" }
 dirs = "5.0.1"
 data = { path = "./data" }
+shellexpand = "3.1.0"
 figment = { version = "0.10.19", features = ["yaml", "test"] }
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
@@ -53,6 +54,7 @@ rand = "0.8.5"
 serde = { version = "1.0.208", features = ["derive"] }
 sled = "0.34.7"
 sha2 = "0.10.8"
+tempfile = "3.14.0"
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

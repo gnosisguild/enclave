@@ -10,6 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::yaml::load_yaml_with_env;
+
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum Contract {
@@ -188,8 +190,10 @@ pub fn load_config(config_file: Option<&str>) -> Result<AppConfig> {
         defaults.config_file = file.into();
     }
 
+    let with_envs = load_yaml_with_env(&defaults.config_file())?;
+
     let config = Figment::from(Serialized::defaults(&defaults))
-        .merge(Yaml::file(defaults.config_file()))
+        .merge(Yaml::string(&with_envs))
         .extract()?;
 
     Ok(config)
@@ -427,6 +431,64 @@ chains:
             config = load_config(None).map_err(|err| err.to_string())?;
             chain = config.chains().first().unwrap();
             assert_eq!(chain.rpc_auth, RpcAuth::Bearer("testToken".to_string()));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn test_config_env_vars() {
+        Jail::expect_with(|jail| {
+            let home = format!("{}", jail.directory().to_string_lossy());
+            jail.set_env("HOME", &home);
+            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
+            jail.set_env("TEST_RPC_URL", "ws://test-endpoint:8545");
+            jail.set_env("TEST_USERNAME", "envUser");
+            jail.set_env("TEST_PASSWORD", "envPassword");
+            jail.set_env(
+                "TEST_CONTRACT_ADDRESS",
+                "0x1234567890123456789012345678901234567890",
+            );
+
+            let filename = format!("{}/.config/enclave/config.yaml", home);
+            let filedir = format!("{}/.config/enclave", home);
+            jail.create_dir(filedir)?;
+            jail.create_file(
+                filename,
+                r#"
+chains:
+  - name: "hardhat"
+    rpc_url: "${TEST_RPC_URL}"
+    rpc_auth:
+      type: "Basic"
+      credentials:
+        username: "${TEST_USERNAME}"
+        password: "${TEST_PASSWORD}"
+    contracts:
+      enclave: "${TEST_CONTRACT_ADDRESS}"
+      ciphernode_registry:
+        address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+        deploy_block: 1764352873645
+      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+"#,
+            )?;
+
+            let config: AppConfig = load_config(None).map_err(|err| err.to_string())?;
+            let chain = config.chains().first().unwrap();
+
+            // Test that environment variables are properly substituted
+            assert_eq!(chain.rpc_url, "ws://test-endpoint:8545");
+            assert_eq!(
+                chain.rpc_auth,
+                RpcAuth::Basic {
+                    username: "envUser".to_string(),
+                    password: "envPassword".to_string(),
+                }
+            );
+            assert_eq!(
+                chain.contracts.enclave.address(),
+                "0x1234567890123456789012345678901234567890"
+            );
 
             Ok(())
         });
