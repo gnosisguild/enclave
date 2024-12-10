@@ -10,8 +10,8 @@ serde = { workspace = true }
 figment = { workspace = true }
 alloy = { workspace = true }
 shellexpand = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-url = { workspace = true }
 

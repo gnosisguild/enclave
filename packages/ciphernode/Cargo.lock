@@ -1694,9 +1694,9 @@ dependencies = [
  "dirs",
  "figment",
  "serde",
- "url",
  "shellexpand",
  "tempfile",
+ "url",
 ]
 
 [[package]]
