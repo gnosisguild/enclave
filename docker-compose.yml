@@ -64,7 +64,7 @@ services:
     secrets:
       - secrets.json
     environment:
-      RUST_LOG: "debug"
+      RUST_LOG: "info"
       AGGREGATOR: "true"
     ports:
       - 9094:9094
