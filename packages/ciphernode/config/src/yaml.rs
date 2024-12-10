@@ -5,7 +5,7 @@ pub fn load_yaml_with_env(file_path: &PathBuf) -> Result<String> {
     // Read the file content to string
     let content = match fs::read_to_string(file_path) {
         Ok(val) => val,
-        Err(_) => "".to_string()
+        Err(_) => "".to_string(),
     };
 
     // Collect environment variables and perform substitution
