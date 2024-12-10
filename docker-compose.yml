@@ -2,7 +2,7 @@ services:
   cn1:
     image: ghcr.io/gnosisguild/ciphernode:latest
     volumes:
-      - ./configs/cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ./configs/cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - cn1-data:/home/ciphernode/.local/share/enclave
     secrets:
       - secrets.json
@@ -20,7 +20,7 @@ services:
   cn2:
     image: ghcr.io/gnosisguild/ciphernode:latest
     volumes:
-      - ./configs/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ./configs/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - cn2-data:/home/ciphernode/.local/share/enclave
     secrets:
       - secrets.json
@@ -37,7 +37,7 @@ services:
   cn3:
     image: ghcr.io/gnosisguild/ciphernode:latest
     volumes:
-      - ./configs/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ./configs/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - cn3-data:/home/ciphernode/.local/share/enclave
     secrets:
       - secrets.json
@@ -55,7 +55,7 @@ services:
   aggregator:
     image: ghcr.io/gnosisguild/ciphernode:latest
     volumes:
-      - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - agg-data:/home/ciphernode/.local/share/enclave
     secrets:
       - secrets.json
