@@ -9,3 +9,8 @@ anyhow = { workspace = true }
 serde = { workspace = true }
 figment = { workspace = true }
 alloy = { workspace = true }
+shellexpand = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
