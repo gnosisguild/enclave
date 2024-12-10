@@ -13,7 +13,9 @@ services:
       AGGREGATOR: "false"
     ports:
       - 9091:9091
-    # command: nc -l -p 9091
+    networks:
+      mynetwork:
+        ipv4_address: 172.20.0.1
 
   cn2:
     image: ghcr.io/gnosisguild/ciphernode:${VERSION:-latest}
@@ -31,7 +33,9 @@ services:
       AGGREGATOR: "false"
     ports:
       - 9092:9092
-    # command: nc -l -p 9092
+    networks:
+      mynetwork:
+        ipv4_address: 172.20.0.2
 
   cn3:
     image: ghcr.io/gnosisguild/ciphernode:${VERSION:-latest}
@@ -49,7 +53,9 @@ services:
       AGGREGATOR: "false"
     ports:
       - 9093:9093
-    # command: nc -l -p 9093
+    networks:
+      mynetwork:
+        ipv4_address: 172.20.0.3
 
 
   aggregator:
@@ -67,8 +73,10 @@ services:
       RUST_LOG: "info"
       AGGREGATOR: "true"
     ports:
-      - 9094:9094
-    # command: nc -l -p 9094
+      - 9095:9095
+    networks:
+      mynetwork:
+        ipv4_address: 172.20.0.5
 
 
 secrets:
@@ -80,4 +88,10 @@ volumes:
   cn2-data:
   cn3-data:
   agg-data:
+
+networks:
+  mynetwork:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
