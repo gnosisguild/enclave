@@ -4,6 +4,8 @@ services:
     volumes:
       - ./configs/cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - cn1-data:/home/ciphernode/.local/share/enclave
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     secrets:
       - secrets.json
     environment:
@@ -22,6 +24,8 @@ services:
     volumes:
       - ./configs/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - cn2-data:/home/ciphernode/.local/share/enclave
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     secrets:
       - secrets.json
     environment:
@@ -39,6 +43,8 @@ services:
     volumes:
       - ./configs/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - cn3-data:/home/ciphernode/.local/share/enclave
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     secrets:
       - secrets.json
     environment:
@@ -57,6 +63,8 @@ services:
     volumes:
       - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - agg-data:/home/ciphernode/.local/share/enclave
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     secrets:
       - secrets.json
     environment:
