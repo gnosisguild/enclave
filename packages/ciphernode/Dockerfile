@@ -11,6 +11,7 @@ FROM rust:1.81 AS ciphernode-builder
 WORKDIR /build/packages/ciphernode
 COPY ./packages/ciphernode ./
 COPY --from=evm-builder /build/packages/evm/artifacts ../evm/artifacts
+COPY --from=evm-builder /build/packages/evm/deployments ../evm/deployments
 RUN cargo build --release
 
 # Runtime stage
