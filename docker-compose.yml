@@ -24,6 +24,8 @@ services:
       - "host.docker.internal:host-gateway"
     secrets:
       - secrets.json
+    depends_on:
+      - cn1
     environment:
       RUST_LOG: "info"
       AGGREGATOR: "false"
@@ -40,6 +42,8 @@ services:
       - "host.docker.internal:host-gateway"
     secrets:
       - secrets.json
+    depends_on:
+      - cn1    
     environment:
       RUST_LOG: "info"
       AGGREGATOR: "false"
@@ -53,6 +57,8 @@ services:
     volumes:
       - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro,Z
       - agg-data:/home/ciphernode/.local/share/enclave
+    depends_on:
+      - cn1
     extra_hosts:
       - "host.docker.internal:host-gateway"
     secrets:
