@@ -16,7 +16,7 @@ services:
       - 9091:9091
     deploy:
       replicas: 1
-    command: sleep infinity
+    command: nc -l -p 9091
 
   cn2:
     # image: ghcr.io/gnosisguild/ciphernode:latest
@@ -35,7 +35,7 @@ services:
       - 9092:9092
     deploy:
       replicas: 1
-    command: sleep infinity
+    command: nc -l -p 9092
 
   cn3:
     # image: ghcr.io/gnosisguild/ciphernode:latest
@@ -54,7 +54,7 @@ services:
       - 9093:9093
     deploy:
       replicas: 1
-    command: sleep infinity
+    command: nc -l -p 9093
 
 
   aggregator:
@@ -74,7 +74,7 @@ services:
       - 9094:9094
     deploy:
       replicas: 1
-    command: sleep infinity
+    command: nc -l -p 9094
 
 
 secrets:
