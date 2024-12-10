@@ -4,7 +4,7 @@ use cipher::Cipher;
 use config::AppConfig;
 use enclave_core::EventBus;
 use evm::{
-    helpers::{get_signer_from_repository, ProviderConfig, RPC},
+    helpers::{get_signer_from_repository, ProviderConfig},
     CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
 };
 use logger::SimpleLogger;
@@ -28,9 +28,7 @@ pub async fn setup_aggregator(
     plaintext_write_path: Option<&str>,
 ) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
     let bus = EventBus::new(true).start();
-    let rng = Arc::new(Mutex::new(
-        ChaCha20Rng::from_rng(OsRng).expect("Failed to create RNG"),
-    ));
+    let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
     let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
@@ -42,9 +40,7 @@ pub async fn setup_aggregator(
         .iter()
         .filter(|chain| chain.enabled.unwrap_or(true))
     {
-        let rpc_url = RPC::from_url(&chain.rpc_url).map_err(|e| {
-            anyhow::anyhow!("Failed to parse RPC URL for chain {}: {}", chain.name, e)
-        })?;
+        let rpc_url = chain.rpc_url()?;
         let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
         let read_provider = provider_config.create_readonly_provider().await?;
         let write_provider = provider_config.create_ws_signer_provider(&signer).await?;
