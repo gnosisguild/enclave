@@ -73,10 +73,10 @@ services:
       RUST_LOG: "info"
       AGGREGATOR: "true"
     ports:
-      - 9095:9095
+      - 9094:9094
     networks:
       mynetwork:
-        ipv4_address: 172.28.0.5
+        ipv4_address: 172.28.0.4
 
 
 secrets:

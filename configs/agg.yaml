@@ -1,5 +1,5 @@
 address: "0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199"
-quic_port: 9095
+quic_port: 9094
 enable_mdns: false
 peers:
   - "/ip4/172.20.0.1/udp/9091/quic-v1"
