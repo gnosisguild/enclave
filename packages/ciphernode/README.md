@@ -30,6 +30,10 @@ If you get an error that looks similar to the following you likely need to upgra
 ERROR! event=EnclaveError(EnclaveError { err_type: Evm, message: "deserialization error: duplicate field `status` at line 1 column 34542" })
 ```
 
+# Deployment Prerequisites
+
+For deployment you need at least 2G RAM
+
 # E3 Requested
 
 ```mermaid
