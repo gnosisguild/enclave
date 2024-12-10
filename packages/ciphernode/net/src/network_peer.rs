@@ -94,11 +94,16 @@ impl NetworkPeer {
 
         info!("Peers to dial: {:?}", self.peers);
         for addr in self.peers.clone() {
+            info!("Dialing peer: {}", addr);
             let multiaddr: Multiaddr = addr.parse()?;
+            info!("Multiaddr: {:?}", multiaddr);
             self.swarm.dial(multiaddr)?;
+            info!("Dialed: {}", addr);
         }
+        info!("Dialed peers.");
 
         loop {
+            info!("Awaiting next command or event.");
             select! {
                 Some(line) = self.from_bus_rx.recv() => {
                     if let Err(e) = self.swarm
