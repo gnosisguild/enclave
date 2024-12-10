@@ -18,6 +18,8 @@ services:
       replicas: 1
     networks:
       - cn1-network
+    command:
+      /bin/bash
 
 
   cn2:
@@ -39,7 +41,8 @@ services:
       replicas: 1
     networks:
       - cn2-network
-
+    command:
+      /bin/bash
   cn3:
     # image: ghcr.io/gnosisguild/ciphernode:latest
     image: nicolaka/netshoot
@@ -59,7 +62,8 @@ services:
       replicas: 1
     networks:
       - cn3-network
-
+    command:
+      /bin/bash
 
   aggregator:
     # image: ghcr.io/gnosisguild/ciphernode:latest
@@ -80,6 +84,8 @@ services:
       replicas: 1
     networks:
       - agg-network
+    command:
+      /bin/bash
 
 secrets:
   secrets.json:
