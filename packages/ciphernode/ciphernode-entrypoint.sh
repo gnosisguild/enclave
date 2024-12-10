@@ -28,7 +28,7 @@ fi
 
 # Set password and private key
 echo "Setting password"
-enclave password create --config "$CONFIG_FILE" --password "$PASSWORD"
+enclave password create --config "$CONFIG_FILE" --password "$PASSWORD" || true
 
 if [ "$AGGREGATOR" = "true" ]; then
     echo "Setting private key"
