@@ -2,7 +2,7 @@ address: "0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199"
 quic_port: 9094
 enable_mdns: false
 peers:
-  - "/ip4/cn1/udp/9091/quic-v1/p2p/12D3KooWCxZkm6AtQGsiWRV3LNZt2HzSbopmD4LaUp7MUR1y8mV6"
+  - "/ip4/172.16.238.10/udp/9091/quic-v1/p2p/12D3KooWCxZkm6AtQGsiWRV3LNZt2HzSbopmD4LaUp7MUR1y8mV6"
 chains:
   - name: "hardhat"
     rpc_url: "ws://host.docker.internal:8545"
