@@ -30,15 +30,18 @@ mod tests {
         // Write test YAML content
         writeln!(
             file,
-            "database:\n  url: $DATABASE_URL\n  password: ${{DB_PASSWORD}}"
+            "database:\n  url: $MY_DATABASE_URL\n  password: ${{MY_DB_PASSWORD}}"
         )?;
 
         // Set environment variables
-        env::set_var("DATABASE_URL", "postgres://localhost:5432");
-        env::set_var("DB_PASSWORD", "secret123");
+        env::set_var("MY_DATABASE_URL", "postgres://localhost:5432");
+        env::set_var("MY_DB_PASSWORD", "secret123");
 
         // Test the function
         let processed = load_yaml_with_env(&file_path)?;
+
+        env::remove_var("MY_DATABASE_URL");
+        env::remove_var("MY_DB_PASSWORD");
 
         assert!(processed.contains("postgres://localhost:5432"));
         assert!(processed.contains("secret123"));
