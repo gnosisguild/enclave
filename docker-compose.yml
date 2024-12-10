@@ -18,8 +18,7 @@ services:
       replicas: 1
     networks:
       - cn1-network
-    command:
-      /bin/bash
+    command: sleep infinity
 
 
   cn2:
@@ -41,8 +40,8 @@ services:
       replicas: 1
     networks:
       - cn2-network
-    command:
-      /bin/bash
+    command: sleep infinity
+
   cn3:
     # image: ghcr.io/gnosisguild/ciphernode:latest
     image: nicolaka/netshoot
@@ -62,8 +61,8 @@ services:
       replicas: 1
     networks:
       - cn3-network
-    command:
-      /bin/bash
+    command: sleep infinity
+
 
   aggregator:
     # image: ghcr.io/gnosisguild/ciphernode:latest
@@ -84,8 +83,8 @@ services:
       replicas: 1
     networks:
       - agg-network
-    command:
-      /bin/bash
+    command: sleep infinity
+
 
 secrets:
   secrets.json:
