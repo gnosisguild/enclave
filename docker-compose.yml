@@ -10,15 +10,20 @@ services:
       RUST_LOG: "info"
       AGGREGATOR: "false"
     ports:
-      - 9091:9091
+      - target: 9091
+        published: 9091
+        protocol: udp
+        mode: host
     deploy:
       replicas: 1
     networks:
-      - cn1-network
+      - global-network
 
 
   cn2:
     image: ghcr.io/gnosisguild/ciphernode:latest
+    depends_on:
+      - cn1
     volumes:
       - ./configs/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn2-data:/home/ciphernode/.local/share/enclave
@@ -28,14 +33,19 @@ services:
       RUST_LOG: "info"
       AGGREGATOR: "false"
     ports:
-      - 9092:9092
+      - target: 9092
+        published: 9092
+        protocol: udp
+        mode: host
     deploy:
       replicas: 1
     networks:
-      - cn2-network
+      - global-network
 
   cn3:
     image: ghcr.io/gnosisguild/ciphernode:latest
+    depends_on:
+      - cn1
     volumes:
       - ./configs/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn3-data:/home/ciphernode/.local/share/enclave
@@ -45,15 +55,20 @@ services:
       RUST_LOG: "info"
       AGGREGATOR: "false"
     ports:
-      - 9093:9093
+      - target: 9093
+        published: 9093
+        protocol: udp
+        mode: host
     deploy:
       replicas: 1
     networks:
-      - cn3-network
+      - global-network
 
 
   aggregator:
     image: ghcr.io/gnosisguild/ciphernode:latest
+    depends_on:
+      - cn1
     volumes:
       - ./configs/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - agg-data:/home/ciphernode/.local/share/enclave
@@ -63,11 +78,14 @@ services:
       RUST_LOG: "info"
       AGGREGATOR: "true"
     ports:
-      - 9094:9094
+      - target: 9094
+        published: 9094
+        protocol: udp
+        mode: host
     deploy:
       replicas: 1
     networks:
-      - agg-network
+      - global-network
 
 secrets:
   secrets.json:
@@ -80,7 +98,5 @@ volumes:
   agg-data:
 
 networks:
-  cn1-network:
-  cn2-network:
-  cn3-network:
-  agg-network:
+  global-network:
+    driver: overlay
