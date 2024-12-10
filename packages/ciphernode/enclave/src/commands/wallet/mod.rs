@@ -10,7 +10,7 @@ pub enum WalletCommands {
         /// The new private key - note we are leaving as hex string as it is easier to manage with
         /// the allow Signer coercion
         #[arg(long = "private-key", value_parser = ensure_hex)]
-        private_key: String,
+        private_key: Option<String>,
     },
 }
 

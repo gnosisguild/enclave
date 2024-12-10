@@ -5,7 +5,7 @@ use config::AppConfig;
 
 pub async fn execute(config: &AppConfig, input: Option<String>) -> Result<()> {
     if prompt_delete(config, DeleteMode::Overwrite).await? {
-        set_password(config, input).await?;
+        set_password(config, input, true).await?;
     }
     Ok(())
 }
