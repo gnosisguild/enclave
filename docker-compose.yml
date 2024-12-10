@@ -16,10 +16,7 @@ services:
       - 9091:9091
     deploy:
       replicas: 1
-    networks:
-      - cn1-network
     command: sleep infinity
-
 
   cn2:
     # image: ghcr.io/gnosisguild/ciphernode:latest
@@ -38,8 +35,6 @@ services:
       - 9092:9092
     deploy:
       replicas: 1
-    networks:
-      - cn2-network
     command: sleep infinity
 
   cn3:
@@ -59,8 +54,6 @@ services:
       - 9093:9093
     deploy:
       replicas: 1
-    networks:
-      - cn3-network
     command: sleep infinity
 
 
@@ -81,8 +74,6 @@ services:
       - 9094:9094
     deploy:
       replicas: 1
-    networks:
-      - agg-network
     command: sleep infinity
 
 
@@ -96,8 +87,3 @@ volumes:
   cn3-data:
   agg-data:
 
-networks:
-  cn1-network:
-  cn2-network:
-  cn3-network:
-  agg-network:
