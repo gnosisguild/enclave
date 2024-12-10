@@ -13,7 +13,8 @@ services:
       AGGREGATOR: "false"
     ports:
       - 9091:9091
-
+    networks:
+      - p2p_network
 
   cn2:
     image: ghcr.io/gnosisguild/ciphernode:${VERSION:-latest}
@@ -31,7 +32,8 @@ services:
       AGGREGATOR: "false"
     ports:
       - 9092:9092
-
+    networks:
+      - p2p_network
 
   cn3:
     image: ghcr.io/gnosisguild/ciphernode:${VERSION:-latest}
@@ -49,7 +51,8 @@ services:
       AGGREGATOR: "false"
     ports:
       - 9093:9093
-
+    networks:
+      - p2p_network
 
 
   aggregator:
@@ -68,7 +71,8 @@ services:
       AGGREGATOR: "true"
     ports:
       - 9094:9094
-
+    networks:
+      - p2p_network
 
 
 secrets:
@@ -82,4 +86,6 @@ volumes:
   agg-data:
 
 
-
+networks:
+  p2p_network:
+    driver: bridge
