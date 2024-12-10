@@ -28,7 +28,7 @@
     "e3:publishInput": "cd packages/evm && yarn hardhat e3:publishInput",
     "e3:publishCiphertext": "cd packages/evm && yarn hardhat e3:publishCiphertext",
     "evm:install": "cd packages/evm && yarn install",
-    "evm:node": "cd packages/evm && yarn hardhat node",
+    "evm:node": "cd packages/evm && yarn hardhat node --hostname 0.0.0.0",
     "evm:compile": "cd packages/evm && yarn compile",
     "evm:lint": "cd packages/evm && yarn lint",
     "evm:typechain": "cd packages/evm && yarn typechain",
