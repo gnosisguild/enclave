@@ -14,7 +14,8 @@ services:
     ports:
       - 9091:9091
     networks:
-      - p2p_network
+      app_net:
+        ipv4_address: 172.16.238.10
 
   cn2:
     image: ghcr.io/gnosisguild/ciphernode:${VERSION:-latest}
@@ -33,7 +34,8 @@ services:
     ports:
       - 9092:9092
     networks:
-      - p2p_network
+      app_net:
+        ipv4_address: 172.16.238.11
 
   cn3:
     image: ghcr.io/gnosisguild/ciphernode:${VERSION:-latest}
@@ -52,7 +54,8 @@ services:
     ports:
       - 9093:9093
     networks:
-      - p2p_network
+      app_net:
+        ipv4_address: 172.16.238.12
 
 
   aggregator:
@@ -72,7 +75,9 @@ services:
     ports:
       - 9094:9094
     networks:
-      - p2p_network
+      app_net:
+        ipv4_address: 172.16.238.13
+
 
 
 secrets:
@@ -87,5 +92,9 @@ volumes:
 
 
 networks:
-  p2p_network:
+  app_net:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
