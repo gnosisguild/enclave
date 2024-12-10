@@ -1,0 +1,16 @@
+services:
+  cn1:
+    networks:
+      - cn-network
+  cn2:
+    networks:
+      - cn-network
+  cn3:
+    networks:
+      - cn-network
+  aggregator:
+    networks:
+      - cn-network
+
+networks:
+  cn-network:

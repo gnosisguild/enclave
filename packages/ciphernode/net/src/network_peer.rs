@@ -7,14 +7,14 @@ use libp2p::{
     identity::Keypair,
     kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
     mdns,
-    swarm::{NetworkBehaviour, SwarmEvent},
+    swarm::{behaviour::toggle::Toggle, NetworkBehaviour, SwarmEvent},
     Multiaddr, Swarm,
 };
 use std::hash::{Hash, Hasher};
 use std::{hash::DefaultHasher, io::Error, time::Duration};
 use tokio::{
     select,
-    sync::mpsc::{self, channel, Receiver, Sender},
+    sync::mpsc::{channel, Receiver, Sender},
 };
 use tracing::{debug, error, info, trace, warn};
 
@@ -23,7 +23,7 @@ pub struct NodeBehaviour {
     gossipsub: gossipsub::Behaviour,
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
-    mdns: mdns::tokio::Behaviour,
+    mdns: Toggle<mdns::tokio::Behaviour>,
     identify: IdentifyBehaviour,
 }
 
@@ -44,6 +44,7 @@ impl NetworkPeer {
         peers: Vec<String>,
         udp_port: Option<u16>,
         topic: &str,
+        enable_mdns: bool,
     ) -> Result<Self> {
         let (to_bus_tx, from_net_rx) = channel(100); // TODO : tune this param
         let (to_net_tx, from_bus_rx) = channel(100); // TODO : tune this param
@@ -51,7 +52,7 @@ impl NetworkPeer {
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
-            .with_behaviour(create_mdns_kad_behaviour())?
+            .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
@@ -115,50 +116,53 @@ impl NetworkPeer {
     }
 }
 
-fn create_mdns_kad_behaviour() -> impl FnOnce(
-    &Keypair,
-) -> std::result::Result<
-    NodeBehaviour,
-    Box<dyn std::error::Error + Send + Sync + 'static>,
-> {
-    |key| {
-        let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
-        let identify_config = IdentifyBehaviour::new(
-            identify::Config::new("/kad/0.1.0".into(), key.public())
-                .with_interval(Duration::from_secs(60)), // do this so we can get timeouts for dropped WebRTC connections
-        );
-        let message_id_fn = |message: &gossipsub::Message| {
-            let mut s = DefaultHasher::new();
-            message.data.hash(&mut s);
-            gossipsub::MessageId::from(s.finish().to_string())
-        };
+fn create_mdns_kad_behaviour(
+    enable_mdns: bool,
+    key: &Keypair,
+) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
+    let identify_config = IdentifyBehaviour::new(
+        identify::Config::new("/kad/0.1.0".into(), key.public())
+            .with_interval(Duration::from_secs(60)),
+    );
 
-        // TODO: Allow for config inputs to new()
-        let gossipsub_config = gossipsub::ConfigBuilder::default()
-            .heartbeat_interval(Duration::from_secs(10))
-            .validation_mode(gossipsub::ValidationMode::Strict)
-            .message_id_fn(message_id_fn)
-            .build()
-            .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
+    let message_id_fn = |message: &gossipsub::Message| {
+        let mut s = DefaultHasher::new();
+        message.data.hash(&mut s);
+        gossipsub::MessageId::from(s.finish().to_string())
+    };
 
-        let gossipsub = gossipsub::Behaviour::new(
-            gossipsub::MessageAuthenticity::Signed(key.clone()),
-            gossipsub_config,
-        )?;
+    let gossipsub_config = gossipsub::ConfigBuilder::default()
+        .heartbeat_interval(Duration::from_secs(10))
+        .validation_mode(gossipsub::ValidationMode::Strict)
+        .message_id_fn(message_id_fn)
+        .build()
+        .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
 
-        let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())?;
+    let gossipsub = gossipsub::Behaviour::new(
+        gossipsub::MessageAuthenticity::Signed(key.clone()),
+        gossipsub_config,
+    )?;
 
-        Ok(NodeBehaviour {
-            gossipsub,
-            kademlia: KademliaBehaviour::new(
-                key.public().to_peer_id(),
-                MemoryStore::new(key.public().to_peer_id()),
-            ),
-            mdns,
-            connection_limits,
-            identify: identify_config,
-        })
-    }
+    let mdns = if enable_mdns {
+        Toggle::from(Some(mdns::tokio::Behaviour::new(
+            mdns::Config::default(),
+            key.public().to_peer_id(),
+        )?))
+    } else {
+        Toggle::from(None)
+    };
+
+    Ok(NodeBehaviour {
+        gossipsub,
+        kademlia: KademliaBehaviour::new(
+            key.public().to_peer_id(),
+            MemoryStore::new(key.public().to_peer_id()),
+        ),
+        mdns,
+        connection_limits,
+        identify: identify_config,
+    })
 }
 
 async fn process_swarm_event(

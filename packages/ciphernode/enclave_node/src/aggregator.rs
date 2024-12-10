@@ -81,6 +81,8 @@ pub async fn setup_aggregator(
         bus.clone(),
         config.peers(),
         &cipher,
+        config.quic_port(),
+        config.enable_mdns(),
         repositories.libp2pid(),
     )
     .await?;
