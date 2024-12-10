@@ -442,7 +442,7 @@ chains:
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
             jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
-            jail.set_env("TEST_RPC_URL", "ws://test-endpoint:8545");
+            jail.set_env("TEST_RPC_URL_PORT", "8545");
             jail.set_env("TEST_USERNAME", "envUser");
             jail.set_env("TEST_PASSWORD", "envPassword");
             jail.set_env(
@@ -458,7 +458,7 @@ chains:
                 r#"
 chains:
   - name: "hardhat"
-    rpc_url: "${TEST_RPC_URL}"
+    rpc_url: "ws://test-endpoint:${TEST_RPC_URL_PORT}"
     rpc_auth:
       type: "Basic"
       credentials:
