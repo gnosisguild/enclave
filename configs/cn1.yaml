@@ -1,6 +1,6 @@
 address: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
 quic_port: 9091
-enable_mdns: true
+enable_mdns: false
 chains:
   - name: "hardhat"
     rpc_url: "ws://host.docker.internal:8545"
