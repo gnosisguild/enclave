@@ -10,13 +10,21 @@ use libp2p::{
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour, SwarmEvent},
     Multiaddr, Swarm,
 };
-use std::hash::{Hash, Hasher};
 use std::{hash::DefaultHasher, io::Error, time::Duration};
+use std::{
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 use tokio::{
     select,
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Mutex,
+    },
 };
 use tracing::{debug, error, info, trace, warn};
+
+use crate::retry::{RetryConfig, RetryHandler};
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -28,7 +36,7 @@ pub struct NodeBehaviour {
 }
 
 pub struct NetworkPeer {
-    swarm: Swarm<NodeBehaviour>,
+    swarm: Arc<Mutex<Swarm<NodeBehaviour>>>,
     peers: Vec<String>,
     udp_port: Option<u16>,
     topic: gossipsub::IdentTopic,
@@ -49,12 +57,14 @@ impl NetworkPeer {
         let (to_bus_tx, from_net_rx) = channel(100); // TODO : tune this param
         let (to_net_tx, from_bus_rx) = channel(100); // TODO : tune this param
 
-        let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
-            .with_tokio()
-            .with_quic()
-            .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
-            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
-            .build();
+        let swarm = Arc::new(Mutex::new(
+            libp2p::SwarmBuilder::with_existing_identity(id.clone())
+                .with_tokio()
+                .with_quic()
+                .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
+                .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+                .build(),
+        ));
 
         // TODO: Use topics to manage network traffic instead of just using a single topic
         let topic = gossipsub::IdentTopic::new(topic);
@@ -87,29 +97,39 @@ impl NetworkPeer {
         info!("Requesting node.listen_on('{}')", addr);
 
         self.swarm
+            .lock()
+            .await
             .behaviour_mut()
             .gossipsub
             .subscribe(&self.topic)?;
-        self.swarm.listen_on(addr.parse()?)?;
+        self.swarm.lock().await.listen_on(addr.parse()?)?;
 
-        info!("Peers to dial: {:?}", self.peers);
-        for addr in self.peers.clone() {
-            let multiaddr: Multiaddr = addr.parse()?;
-            self.swarm.dial(multiaddr)?;
-        }
+        tokio::spawn({
+            let peers = self.peers.clone();
+            let swarm = self.swarm.clone();
+            async move {
+                info!("Peers to dial: {:?}", peers);
+                for addr in peers {
+                    let multiaddr: Multiaddr = addr.parse()?;
+                    dial_peer(&swarm, &multiaddr).await?;
+                }
+                anyhow::Ok(())
+            }
+        });
 
         loop {
+            let swarm = &mut self.swarm.lock().await;
             select! {
                 Some(line) = self.from_bus_rx.recv() => {
-                    if let Err(e) = self.swarm
+                    if let Err(e) = swarm
                         .behaviour_mut().gossipsub
                         .publish(self.topic.clone(), line) {
                         error!(error=?e, "Error publishing line to swarm");
                     }
                 }
 
-                event = self.swarm.select_next_some() =>  {
-                    process_swarm_event(&mut self.swarm, &mut self.to_bus_tx, event).await?
+                event = swarm.select_next_some() =>  {
+                    process_swarm_event(&self.swarm, &mut self.to_bus_tx, event).await?
                 }
             }
         }
@@ -165,8 +185,27 @@ fn create_mdns_kad_behaviour(
     })
 }
 
+pub async fn dial_peer(swarm: &Arc<Mutex<Swarm<NodeBehaviour>>>, addr: &Multiaddr) -> Result<()> {
+    let retry_handler = RetryHandler::new(
+        RetryConfig::default()
+            .with_max_retries(5)
+            .with_initial_delay(Duration::from_secs(1)),
+    );
+
+    retry_handler
+        .retry(
+            || async {
+                let mut swarm = swarm.lock().await;
+                swarm.dial(addr.clone())?;
+                anyhow::Ok(())
+            },
+            &format!("Dialing peer {}", addr), // This is passed to logging
+        )
+        .await
+}
+
 async fn process_swarm_event(
-    swarm: &mut Swarm<NodeBehaviour>,
+    swarm: &Arc<Mutex<Swarm<NodeBehaviour>>>,
     to_bus_tx: &mut Sender<Vec<u8>>,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
@@ -190,7 +229,12 @@ async fn process_swarm_event(
         SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
             for (peer_id, _multiaddr) in list {
                 trace!("mDNS discovered a new peer: {peer_id}");
-                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                swarm
+                    .lock()
+                    .await
+                    .behaviour_mut()
+                    .gossipsub
+                    .add_explicit_peer(&peer_id);
             }
         }
 
@@ -198,6 +242,8 @@ async fn process_swarm_event(
             for (peer_id, _multiaddr) in list {
                 trace!("mDNS discover peer has expired: {peer_id}");
                 swarm
+                    .lock()
+                    .await
                     .behaviour_mut()
                     .gossipsub
                     .remove_explicit_peer(&peer_id);
