@@ -26,6 +26,6 @@ Remember to modify any highlighted files before use.
 # Run docker swarm
 
 ```
-docker stack deploy -c .deploy/docker-compose.yml p2p-stack
+docker stack deploy -c .deploy/docker-compose.yml enclave-stack
 ```
 
