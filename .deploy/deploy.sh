@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-if [ ! -f ".env" ]; then
-    echo "Environment file .env not found!"
+if [ ! -f "./.deploy/.env" ]; then
+    echo "Environment file ./.deploy/.env not found!"
     exit 1
 fi
 
