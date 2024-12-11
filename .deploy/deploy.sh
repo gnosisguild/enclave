@@ -5,6 +5,6 @@ if [ ! -f "./.deploy/.env" ]; then
     exit 1
 fi
 
-export $(cat .deploy/.env | xargs)
+source .deploy/.env
 
 docker stack deploy -c .deploy/docker-compose.yml enclave-stack --detach=false
