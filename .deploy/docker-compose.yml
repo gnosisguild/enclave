@@ -2,7 +2,7 @@ services:
   cn1:
     image: ghcr.io/gnosisguild/ciphernode:${TAG}
     volumes:
-      - ./.deploy/cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ./cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn1-data:/home/ciphernode/.local/share/enclave
     secrets:
       - source: secrets_cn1
@@ -29,7 +29,7 @@ services:
     depends_on:
       - cn1
     volumes:
-      - ./.deploy/cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ./cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn2-data:/home/ciphernode/.local/share/enclave
     secrets:
       - source: secrets_cn2
@@ -56,7 +56,7 @@ services:
     depends_on:
       - cn1
     volumes:
-      - ./.deploy/cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ./cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn3-data:/home/ciphernode/.local/share/enclave
     secrets:
       - source: secrets_cn3
@@ -83,7 +83,7 @@ services:
     depends_on:
       - cn1
     volumes:
-      - ./.deploy/agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - ./agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - agg-data:/home/ciphernode/.local/share/enclave
     secrets:
       - source: secrets_agg
@@ -107,13 +107,13 @@ services:
 
 secrets:
   secrets_cn1:
-    file: .deploy/cn1.secrets.json
+    file: cn1.secrets.json
   secrets_cn2:
-    file: .deploy/cn2.secrets.json
+    file: cn2.secrets.json
   secrets_cn3:
-    file: .deploy/cn3.secrets.json
+    file: cn3.secrets.json
   secrets_agg:
-    file: .deploy/agg.secrets.json   
+    file: agg.secrets.json   
 
 volumes:
   cn1-data:

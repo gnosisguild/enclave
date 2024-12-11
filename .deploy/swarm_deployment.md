@@ -25,7 +25,19 @@ Remember to modify any highlighted files before use.
 
 # Run docker swarm
 
+First we need to initialize swarm.
+
 ```
-docker stack deploy -c .deploy/docker-compose.yml enclave-stack
+docker swarm init
+```
+
+If you get an error about not being able to choose between IP addresses choose the more private IP address.
+
+```
+docker swarm init --advertise-addr 10.49.x.x
+```
+
+```
+TAG=latest docker stack deploy -c .deploy/docker-compose.yml enclave-stack --detach=false
 ```
 
