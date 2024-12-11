@@ -1,0 +1,10 @@
+address: "${AGG_ADDRESS}"
+quic_port: ${AGG_QUIC_PORT}
+enable_mdns: false
+chains:
+  - name: "sepolia"
+    rpc_url: "${RPC_URL}"
+    contracts:
+      enclave: "${SEPOLIA_ENCLAVE_ADDRESS}"
+      ciphernode_registry: "${SEPOLIA_CIPHERNODE_REGISTRY_ADDRESS}"
+      filter_registry: "${SEPOLIA_FILTER_REGISTRY}"
