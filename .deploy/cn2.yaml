@@ -1,5 +1,5 @@
-address: "${CN2_ADDRESS}"
-quic_port: ${CN2_QUIC_PORT}
+address: "${ADDRESS}"
+quic_port: ${QUIC_PORT}
 enable_mdns: false
 chains:
   - name: "sepolia"

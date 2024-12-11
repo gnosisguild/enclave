@@ -1,17 +1,20 @@
 services:
   cn1:
-    image: ghcr.io/gnosisguild/ciphernode:${TAG}
+    image: ghcr.io/gnosisguild/ciphernode:${TAG:-latest}
     volumes:
       - ./cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn1-data:/home/ciphernode/.local/share/enclave
     secrets:
       - source: secrets_cn1
         target: secrets.json
+    env_file: .env
     environment:
       RUST_LOG: "info"
       AGGREGATOR: "false"
+      ADDRESS: ${CN1_ADDRESS}
+      QUIC_PORT: 9091
     ports:
-      - 9091:9091
+      - "9091:9091"
     deploy:
       replicas: 1
       update_config:
@@ -25,7 +28,7 @@ services:
 
 
   cn2:
-    image: ghcr.io/gnosisguild/ciphernode:${TAG}
+    image: ghcr.io/gnosisguild/ciphernode:${TAG:-latest}
     depends_on:
       - cn1
     volumes:
@@ -34,11 +37,14 @@ services:
     secrets:
       - source: secrets_cn2
         target: secrets.json
+    env_file: .env
     environment:
       RUST_LOG: "info"
       AGGREGATOR: "false"
+      ADDRESS: ${CN2_ADDRESS}
+      QUIC_PORT: 9092
     ports:
-      - 9092:9092
+      - "9092:9092"
 
     deploy:
       replicas: 1
@@ -52,7 +58,7 @@ services:
       - global-network
 
   cn3:
-    image: ghcr.io/gnosisguild/ciphernode:${TAG}
+    image: ghcr.io/gnosisguild/ciphernode:${TAG:-latest}
     depends_on:
       - cn1
     volumes:
@@ -61,11 +67,14 @@ services:
     secrets:
       - source: secrets_cn3
         target: secrets.json
+    env_file: .env
     environment:
       RUST_LOG: "info"
       AGGREGATOR: "false"
+      ADDRESS: ${CN3_ADDRESS}
+      QUIC_PORT: 9093
     ports:
-      - 9093:9093
+      - "9093:9093"
     deploy:
       replicas: 1
       update_config:
@@ -79,7 +88,7 @@ services:
 
 
   aggregator:
-    image: ghcr.io/gnosisguild/ciphernode:${TAG}
+    image: ghcr.io/gnosisguild/ciphernode:${TAG:-latest}
     depends_on:
       - cn1
     volumes:
@@ -88,11 +97,14 @@ services:
     secrets:
       - source: secrets_agg
         target: secrets.json
+    env_file: .env
     environment:
       RUST_LOG: "info"
       AGGREGATOR: "true"
+      ADDRESS: ${AGG_ADDRESS}
+      QUIC_PORT: 9094
     ports:
-      - 9094:9094
+      - "9094:9094"
 
     deploy:
       replicas: 1
