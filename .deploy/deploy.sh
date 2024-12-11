@@ -5,4 +5,4 @@ if [ ! -f "./.deploy/.env" ]; then
     exit 1
 fi
 
-docker stack deploy --env-file ./.deploy/.env -c .deploy/docker-compose.yml enclave-stack --detach=false
+docker stack deploy -c .deploy/docker-compose.yml enclave-stack --detach=false
