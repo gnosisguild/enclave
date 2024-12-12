@@ -129,10 +129,10 @@ fn create_mdns_kad_behaviour(
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
     let identify_config = IdentifyBehaviour::new(
-        identify::Config::new("/ipfs/kad/1.0.0".into(), key.public())
+        identify::Config::new("/kad/1.0.0".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
-    let kad_config = kad::Config::new(StreamProtocol::new("/ipfs/kad/1.0.0"));
+    let kad_config = kad::Config::new(StreamProtocol::new("/kad/1.0.0"));
 
     let message_id_fn = |message: &gossipsub::Message| {
         let mut s = DefaultHasher::new();
