@@ -5,10 +5,10 @@ use libp2p::{
     gossipsub,
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
-    kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
-    mdns,
+    kad::{self, store::MemoryStore, Behaviour as KademliaBehaviour},
+    mdns, noise,
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour, SwarmEvent},
-    Multiaddr, Swarm,
+    tcp, yamux, Multiaddr, StreamProtocol, Swarm,
 };
 use std::hash::{Hash, Hasher};
 use std::{hash::DefaultHasher, io::Error, time::Duration};
@@ -51,7 +51,11 @@ impl NetworkPeer {
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
-            .with_quic()
+            .with_tcp(
+                tcp::Config::default(),
+                noise::Config::new,
+                yamux::Config::default,
+            )?
             .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
@@ -81,8 +85,8 @@ impl NetworkPeer {
 
     pub async fn start(&mut self) -> Result<()> {
         let addr = match self.udp_port {
-            Some(port) => format!("/ip4/0.0.0.0/udp/{}/quic-v1", port),
-            None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
+            Some(port) => format!("/ip4/0.0.0.0/tcp/{}", port),
+            None => "/ip4/0.0.0.0/tcp/0".to_string(),
         };
         info!("Requesting node.listen_on('{}')", addr);
 
@@ -90,12 +94,15 @@ impl NetworkPeer {
             .behaviour_mut()
             .gossipsub
             .subscribe(&self.topic)?;
-        self.swarm.listen_on(addr.parse()?)?;
+
+        if let Err(e) = self.swarm.listen_on(addr.parse()?) {
+            warn!("Failed to listen on {addr}: {e}");
+        }
 
         info!("Peers to dial: {:?}", self.peers);
         for addr in self.peers.clone() {
             let multiaddr: Multiaddr = addr.parse()?;
-            self.swarm.dial(multiaddr)?;
+            self.swarm.dial(multiaddr)?
         }
 
         loop {
@@ -109,7 +116,7 @@ impl NetworkPeer {
                 }
 
                 event = self.swarm.select_next_some() =>  {
-                    process_swarm_event(&mut self.swarm, &mut self.to_bus_tx, event).await?
+                    process_swarm_event(self, event).await?
                 }
             }
         }
@@ -122,9 +129,10 @@ fn create_mdns_kad_behaviour(
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
     let identify_config = IdentifyBehaviour::new(
-        identify::Config::new("/kad/0.1.0".into(), key.public())
+        identify::Config::new("/ipfs/kad/1.0.0".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
+    let kad_config = kad::Config::new(StreamProtocol::new("/ipfs/kad/1.0.0"));
 
     let message_id_fn = |message: &gossipsub::Message| {
         let mut s = DefaultHasher::new();
@@ -133,6 +141,9 @@ fn create_mdns_kad_behaviour(
     };
 
     let gossipsub_config = gossipsub::ConfigBuilder::default()
+        .mesh_n(3)
+        .mesh_n_low(2)
+        .mesh_outbound_min(1)
         .heartbeat_interval(Duration::from_secs(10))
         .validation_mode(gossipsub::ValidationMode::Strict)
         .message_id_fn(message_id_fn)
@@ -155,9 +166,10 @@ fn create_mdns_kad_behaviour(
 
     Ok(NodeBehaviour {
         gossipsub,
-        kademlia: KademliaBehaviour::new(
+        kademlia: KademliaBehaviour::with_config(
             key.public().to_peer_id(),
             MemoryStore::new(key.public().to_peer_id()),
+            kad_config,
         ),
         mdns,
         connection_limits,
@@ -166,38 +178,76 @@ fn create_mdns_kad_behaviour(
 }
 
 async fn process_swarm_event(
-    swarm: &mut Swarm<NodeBehaviour>,
-    to_bus_tx: &mut Sender<Vec<u8>>,
+    network_peer: &mut NetworkPeer,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
     match event {
-        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+        SwarmEvent::ConnectionEstablished {
+            peer_id, endpoint, ..
+        } => {
             info!("Connected to {peer_id}");
+
+            let remote_addr = endpoint.get_remote_address().clone();
+            network_peer
+                .swarm
+                .behaviour_mut()
+                .kademlia
+                .add_address(&peer_id, remote_addr);
+            info!("Added address to kademlia");
         }
 
         SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
             warn!("Failed to dial {peer_id:?}: {error}");
+
+            if let Some(peer_id) = peer_id {
+                let addr = network_peer
+                    .peers
+                    .iter()
+                    .find(|addr| addr.contains(&peer_id.to_string()));
+                if let Some(addr) = addr {
+                    let multiaddr: Multiaddr = match addr.parse() {
+                        Ok(maddr) => maddr,
+                        Err(e) => {
+                            warn!("Invalid address {addr}: {e}");
+                            return Ok(());
+                        }
+                    };
+                    if let Err(e) = network_peer.swarm.dial(multiaddr.clone()) {
+                        warn!("Failed to redial peer {peer_id}: {e}");
+                    } else {
+                        info!("Redialing peer {peer_id}...");
+                    }
+                }
+            }
         }
 
         SwarmEvent::IncomingConnectionError { error, .. } => {
             warn!("{:#}", anyhow::Error::from(error))
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
-            debug!("Kademlia event: {:?}", e);
-        }
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => match e {
+            kad::Event::InboundRequest { request } => {
+                debug!("Inbound Kademlia request: {:?}", request);
+            }
+            _ => debug!("Other Kademlia event: {:?}", e),
+        },
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
             for (peer_id, _multiaddr) in list {
                 trace!("mDNS discovered a new peer: {peer_id}");
-                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                network_peer
+                    .swarm
+                    .behaviour_mut()
+                    .gossipsub
+                    .add_explicit_peer(&peer_id);
             }
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
             for (peer_id, _multiaddr) in list {
                 trace!("mDNS discover peer has expired: {peer_id}");
-                swarm
+                network_peer
+                    .swarm
                     .behaviour_mut()
                     .gossipsub
                     .remove_explicit_peer(&peer_id);
@@ -211,7 +261,7 @@ async fn process_swarm_event(
         })) => {
             trace!("Got message with id: {id} from peer: {peer_id}",);
             trace!("{:?}", message);
-            to_bus_tx.send(message.data).await?;
+            network_peer.to_bus_tx.send(message.data).await?;
         }
         SwarmEvent::NewListenAddr { address, .. } => {
             warn!("Local node is listening on {address}");

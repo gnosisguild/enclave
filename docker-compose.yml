@@ -12,7 +12,7 @@ services:
     ports:
       - target: 9091
         published: 9091
-        protocol: udp
+        protocol: tcp
         mode: host
     deploy:
       replicas: 1
@@ -35,7 +35,7 @@ services:
     ports:
       - target: 9092
         published: 9092
-        protocol: udp
+        protocol: tcp
         mode: host
     deploy:
       replicas: 1
@@ -57,7 +57,7 @@ services:
     ports:
       - target: 9093
         published: 9093
-        protocol: udp
+        protocol: tcp
         mode: host
     deploy:
       replicas: 1
@@ -80,7 +80,7 @@ services:
     ports:
       - target: 9094
         published: 9094
-        protocol: udp
+        protocol: tcp
         mode: host
     deploy:
       replicas: 1
