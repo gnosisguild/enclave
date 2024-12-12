@@ -164,7 +164,6 @@ where
         let tag = get_tag();
         ctx.spawn(
             async move {
-                // XXX:      HOW DO WE WAIT FOR NETWORK READY??           bus.wait_for("NetworkReady").await;
                 stream_from_evm(
                     provider,
                     &contract_address,

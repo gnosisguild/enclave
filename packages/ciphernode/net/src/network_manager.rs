@@ -15,10 +15,13 @@ use tracing::{error, info, instrument, trace};
 
 /// NetworkManager Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetworkPeer for propagation over the p2p network
+/// NetworkManager needs to create a buffer of events to send until the connection with another
+/// peer has been made.
 pub struct NetworkManager {
     bus: Addr<EventBus>,
     tx: Sender<Vec<u8>>,
     sent_events: HashSet<EventId>,
+    buffer: EventBuffer<EnclaveEvent>,
 }
 
 impl Actor for NetworkManager {
@@ -36,6 +39,7 @@ impl NetworkManager {
             bus,
             tx,
             sent_events: HashSet::new(),
+            buffer: EventBuffer::new(),
         }
     }
 
@@ -129,12 +133,16 @@ impl Handler<EnclaveEvent> for NetworkManager {
         let sent_events = self.sent_events.clone();
         let tx = self.tx.clone();
         let evt = event.clone();
+        let mut buffer = self.buffer.clone();
         Box::pin(async move {
             let id: EventId = evt.clone().into();
-
+            if let EnclaveEvent::NetworkReady { .. } = evt {
+                let events = buffer.set_buffering(false);
+return;
+            }
             // if we have seen this event before dont rebroadcast
             if sent_events.contains(&id) {
-                trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
+                trace!(evt_id=%id,"Event was received from the network. Not rebroadcasting!");
                 return;
             }
 
@@ -144,16 +152,67 @@ impl Handler<EnclaveEvent> for NetworkManager {
                 return;
             }
 
-            match evt.to_bytes() {
-                Ok(bytes) => {
-                    if let Err(e) = tx.send(bytes).await {
-                        error!(error=?e, "Error sending bytes to libp2p");
-                    };
-                }
-                Err(error) => {
-                    error!(error=?error, "Could not convert event to bytes for serialization!")
-                }
+            // If we are buffering then buffer and bail
+            if buffer.is_buffering() {
+                buffer.push(evt);
+                return;
             }
+
+            match send_event_to_network(tx, evt).await {
+                Ok(_) => (),
+                Err(error) => {
+                    error!(error=?error, "{}", error);
+                }
+            };
         })
+    }
+}
+
+pub async fn send_event_to_network(tx: Sender<Vec<u8>>, event: EnclaveEvent) -> Result<()> {
+    use anyhow::Context;
+    let bytes = event
+        .to_bytes()
+        .context("Could not convert event to bytes for serialization!")?;
+
+    tx.send(bytes)
+        .await
+        .context("Error sending bytes to libp2p. Receiver is full or closed.")?;
+
+    Ok(())
+}
+
+use std::collections::VecDeque;
+
+#[derive(Clone)]
+pub struct EventBuffer<T> {
+    buffer: VecDeque<T>,
+    buffering: bool,
+}
+
+impl<T> EventBuffer<T> {
+    pub fn new() -> Self {
+        Self {
+            buffer: VecDeque::new(),
+            buffering: true,
+        }
+    }
+
+    pub fn push(&mut self, event: T) {
+        if self.buffering {
+            self.buffer.push_back(event);
+        }
+    }
+
+    pub fn set_buffering(&mut self) {
+        self.buffering = true;
+    }
+
+    pub fn clear_buffer(&mut self) -> Vec<T> {
+        self.buffering = false;
+        self.buffer.drain(..).collect()
+    }
+
+    pub fn is_buffering(&self) -> bool {
+        self.buffering
     }
 }
