@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-cd packages/ciphernode && RUSTFLAGS="-A warnings" cargo run --bin pack_e3_params -- "$@" 
+cd packages/ciphernode && cargo run --bin pack_e3_params -- "$@" 

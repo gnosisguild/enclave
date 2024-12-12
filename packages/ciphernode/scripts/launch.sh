@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-RUSTFLAGS="-A warnings" cargo run --quiet --bin enclave -- "$@"
+cargo run --bin enclave -- "$@"

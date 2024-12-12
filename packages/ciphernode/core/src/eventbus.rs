@@ -146,6 +146,7 @@ impl BusError for Addr<EventBus> {
         self.do_send(EnclaveEvent::from_error(err_type, err))
     }
 }
+
 impl BusError for Recipient<EnclaveEvent> {
     fn err(&self, err_type: EnclaveErrorType, err: anyhow::Error) {
         self.do_send(EnclaveEvent::from_error(err_type, err))

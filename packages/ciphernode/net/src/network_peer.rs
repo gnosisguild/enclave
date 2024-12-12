@@ -1,4 +1,5 @@
 use anyhow::Result;
+use enclave_core::{EnclaveEvent, NetworkReady};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -108,11 +109,13 @@ impl NetworkPeer {
             let peers = self.peers.clone();
             let swarm = self.swarm.clone();
             async move {
-                info!("Peers to dial: {:?}", peers);
-                for addr in peers {
+                info!("Peers to dial: {:?}", &peers);
+                for addr in peers.clone() {
                     let multiaddr: Multiaddr = addr.parse()?;
                     dial_peer(&swarm, &multiaddr).await?;
                 }
+                info!("Finished dialing: {:?}", &peers);
+
                 anyhow::Ok(())
             }
         });
@@ -212,6 +215,11 @@ async fn process_swarm_event(
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, .. } => {
             info!("Connected to {peer_id}");
+            // Send NetworkReady event which will be deduped because it contains no unique data
+            // This will allow other services to initialize based on network being ready
+            to_bus_tx
+                .send(EnclaveEvent::from(NetworkReady {}).to_bytes()?)
+                .await?;
         }
 
         SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {

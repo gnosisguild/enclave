@@ -124,6 +124,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: Shutdown,
     },
+    NetworkReady {
+        id: EventId,
+        data: NetworkReady,
+    },
     /// This is a test event to use in testing
     TestEvent {
         id: EventId,
@@ -157,6 +161,7 @@ impl EnclaveEvent {
             EnclaveEvent::CiphernodeRemoved { .. } => true,
             EnclaveEvent::E3RequestComplete { .. } => true,
             EnclaveEvent::Shutdown { .. } => true,
+            EnclaveEvent::NetworkReady { .. } => true,
             _ => false,
         }
     }
@@ -178,6 +183,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
             EnclaveEvent::TestEvent { id, .. } => id,
+            EnclaveEvent::NetworkReady { id, .. } => id,
         }
     }
 }
@@ -210,7 +216,7 @@ impl EnclaveEvent {
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
-            // _ => "<omitted>".to_string(),
+            EnclaveEvent::NetworkReady { data, .. } => format!("{:?}", data), // _ => "<omitted>".to_string(),
         }
     }
 }
@@ -314,6 +320,15 @@ impl From<CiphernodeRemoved> for EnclaveEvent {
 impl From<EnclaveError> for EnclaveEvent {
     fn from(data: EnclaveError) -> Self {
         EnclaveEvent::EnclaveError {
+            id: EventId::hash(data.clone()),
+            data: data.clone(),
+        }
+    }
+}
+
+impl From<NetworkReady> for EnclaveEvent {
+    fn from(data: NetworkReady) -> Self {
+        EnclaveEvent::NetworkReady {
             id: EventId::hash(data.clone()),
             data: data.clone(),
         }
@@ -448,6 +463,12 @@ impl Display for CiphertextOutputPublished {
         write!(f, "e3_id: {}", self.e3_id,)
     }
 }
+
+// NOTE: This will only fire once because it has no differentiating data and will be deduped
+// This is fine as this simply informs services that rely on connection to be stable to start
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct NetworkReady;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]

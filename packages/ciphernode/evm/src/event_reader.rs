@@ -1,4 +1,4 @@
-use crate::helpers::{ReadonlyProvider, WithChainId};
+use crate::helpers::WithChainId;
 use actix::prelude::*;
 use actix::{Addr, Recipient};
 use alloy::eips::BlockNumberOrTag;
@@ -37,8 +37,6 @@ impl EnclaveEvmEvent {
 }
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
-
-pub type EventReader = EvmEventReader<ReadonlyProvider>;
 
 pub struct EvmEventReaderParams<P, T>
 where
@@ -166,6 +164,7 @@ where
         let tag = get_tag();
         ctx.spawn(
             async move {
+                // XXX:      HOW DO WE WAIT FOR NETWORK READY??           bus.wait_for("NetworkReady").await;
                 stream_from_evm(
                     provider,
                     &contract_address,

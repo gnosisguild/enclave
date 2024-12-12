@@ -57,7 +57,7 @@ fn main() -> std::io::Result<()> {
     let dest_path = Path::new(&out_dir).join("contract_deployments.rs");
     fs::write(dest_path, contract_info)?;
 
-    println!("cargo:rerun-if-changed=../packages/evm/deployments/sepolia");
+    println!("cargo:rerun-if-changed=../../evm/deployments/sepolia");
 
     Ok(())
 }
