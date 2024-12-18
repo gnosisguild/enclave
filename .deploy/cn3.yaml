@@ -1,6 +1,8 @@
 address: "${ADDRESS}"
 quic_port: ${QUIC_PORT}
 enable_mdns: false
+peers:
+  - "/dns4/cn1/udp/9091/quick-v1"
 chains:
   - name: "sepolia"
     rpc_url: "${RPC_URL}"

@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 
-docker build -t ghcr.io/gnosisguild/ciphernode:mytest -f ./packages/ciphernode/Dockerfile .
+TAG=${1:-latest}
+
+docker build -t ghcr.io/gnosisguild/ciphernode:$TAG -f ./packages/ciphernode/Dockerfile .
