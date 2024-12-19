@@ -5,6 +5,7 @@ use config::AppConfig;
 use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
 use libp2p::identity::Keypair;
+use zeroize::Zeroize;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     let kp = Keypair::generate_ed25519();
@@ -12,11 +13,12 @@ pub async fn execute(config: &AppConfig) -> Result<()> {
         "Generated new keypair with peer ID: {}",
         kp.public().to_peer_id()
     );
-    let bytes = kp.try_into_ed25519()?.to_bytes().to_vec();
+    let mut bytes = kp.try_into_ed25519()?.to_bytes().to_vec();
     let cipher = Cipher::from_config(config).await?;
     let encrypted = cipher.encrypt_data(&mut bytes.clone())?;
     let bus = EventBus::new(true).start();
     let repositories = get_repositories(&config, &bus)?;
+    bytes.zeroize();
 
     // NOTE: We are writing an encrypted string here
     repositories.libp2p_keypair().write(&encrypted);
