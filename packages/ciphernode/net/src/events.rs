@@ -22,8 +22,6 @@ pub enum NetworkPeerCommand {
 pub enum NetworkPeerEvent {
     GossipData(Vec<u8>),
     GossipPublishError {
-        // TODO: return an error here? DialError is not Clonable so we have
-        // avoided passing it on
         correlation_id: CorrelationId,
         error: Arc<PublishError>,
     },
