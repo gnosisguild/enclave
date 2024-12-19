@@ -1,3 +1,12 @@
 #!/usr/bin/env bash
 
-docker build -t ghcr.io/gnosisguild/ciphernode:mytest -f ./packages/ciphernode/Dockerfile .
+# Enable BuildKit
+export DOCKER_BUILDKIT=1
+
+mkdir -p /tmp/docker-cache
+
+time docker buildx build \
+  --cache-from=type=local,src=/tmp/docker-cache \
+  --cache-to=type=local,dest=/tmp/docker-cache \
+  --load \
+  -t ghcr.io/gnosisguild/ciphernode -f ./packages/ciphernode/Dockerfile .
