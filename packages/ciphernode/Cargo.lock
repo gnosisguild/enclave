@@ -2171,6 +2171,7 @@ dependencies = [
  "enclave-core",
  "enclave_node",
  "hex",
+ "libp2p",
  "once_cell",
  "phf",
  "router",
