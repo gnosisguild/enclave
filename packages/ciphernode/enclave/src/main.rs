@@ -53,11 +53,21 @@ impl Cli {
             Commands::Init {
                 rpc_url,
                 eth_address,
-                password,   
+                password,
                 skip_eth,
                 net_keypair,
                 generate_net_keypair,
-            } => init::execute(rpc_url, eth_address, password, skip_eth, net_keypair, generate_net_keypair).await?,
+            } => {
+                init::execute(
+                    rpc_url,
+                    eth_address,
+                    password,
+                    skip_eth,
+                    net_keypair,
+                    generate_net_keypair,
+                )
+                .await?
+            }
             Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Aggregator { command } => aggregator::execute(command, config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,

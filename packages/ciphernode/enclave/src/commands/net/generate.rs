@@ -8,7 +8,10 @@ use libp2p::identity::Keypair;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     let kp = Keypair::generate_ed25519();
-    println!("Generated new keypair with peer ID: {}", kp.public().to_peer_id());
+    println!(
+        "Generated new keypair with peer ID: {}",
+        kp.public().to_peer_id()
+    );
     let bytes = kp.try_into_ed25519()?.to_bytes().to_vec();
     let cipher = Cipher::from_config(config).await?;
     let encrypted = cipher.encrypt_data(&mut bytes.clone())?;

@@ -1,6 +1,6 @@
+mod generate;
 mod purge;
 mod set;
-mod generate;
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;

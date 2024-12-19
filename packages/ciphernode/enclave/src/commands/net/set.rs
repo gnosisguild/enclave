@@ -1,5 +1,4 @@
 use actix::Actor;
-use libp2p::identity::Keypair;
 use alloy::primitives::hex;
 use anyhow::{bail, Result};
 use cipher::Cipher;
@@ -7,15 +6,14 @@ use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Password};
 use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
+use libp2p::identity::Keypair;
 
 pub fn create_keypair(input: &String) -> Result<Keypair> {
     match hex::check(input) {
-        Ok(()) => {
-            match Keypair::ed25519_from_bytes(hex::decode(input)?) {
-                Ok(kp) => Ok(kp),
-                Err(e) => bail!("Invalid network keypair: {}", e),
-            }
-        }
+        Ok(()) => match Keypair::ed25519_from_bytes(hex::decode(input)?) {
+            Ok(kp) => Ok(kp),
+            Err(e) => bail!("Invalid network keypair: {}", e),
+        },
         Err(e) => bail!("Error decoding network keypair: {}", e),
     }
 }
