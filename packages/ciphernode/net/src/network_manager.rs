@@ -2,8 +2,7 @@ use crate::NetworkPeer;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
-use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use cipher::Cipher;
 use data::Repository;
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
@@ -75,25 +74,18 @@ impl NetworkManager {
         enable_mdns: bool,
         repository: Repository<Vec<u8>>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
-        info!("Reading from repository");
-        let mut bytes = if let Some(bytes) = repository.read().await? {
-            let decrypted = cipher.decrypt_data(&bytes)?;
-            info!("Found keypair in repository");
-            decrypted
-        } else {
-            let kp = libp2p::identity::Keypair::generate_ed25519();
-            info!("Generated new keypair {}", kp.public().to_peer_id());
-            let innerkp = kp.try_into_ed25519()?;
-            let bytes = innerkp.to_bytes().to_vec();
-
-            // We need to clone here so that returned bytes are not zeroized
-            repository.write(&cipher.encrypt_data(&mut bytes.clone())?);
-            info!("Saved new keypair to repository");
-            bytes
+        // Get existing keypair or generate a new one
+        let mut bytes = match repository.read().await? {
+            Some(bytes) => {
+                info!("Found keypair in repository");
+                cipher.decrypt_data(&bytes)?
+            }
+            None => bail!("No network keypair found in repository, please generate a new one using `enclave net generate-key`"),
         };
 
-        let ed25519_keypair = ed25519::Keypair::try_from_bytes(&mut bytes)?;
-        let keypair: libp2p::identity::Keypair = ed25519_keypair.try_into()?;
+        // Create peer from keypair
+        let keypair: libp2p::identity::Keypair =
+            ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
         let mut peer = NetworkPeer::new(
             &keypair,
             peers,
@@ -101,9 +93,12 @@ impl NetworkManager {
             "tmp-enclave-gossip-topic",
             enable_mdns,
         )?;
+
+        // Setup and start network manager
         let rx = peer.rx().ok_or(anyhow!("Peer rx already taken"))?;
         let p2p_addr = NetworkManager::setup(bus, peer.tx(), rx);
         let handle = tokio::spawn(async move { Ok(peer.start().await?) });
+
         Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }

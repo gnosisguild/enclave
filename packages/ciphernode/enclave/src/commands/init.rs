@@ -1,7 +1,9 @@
-use crate::commands::password::{self, PasswordCommands};
-use anyhow::anyhow;
-use anyhow::bail;
-use anyhow::Result;
+use crate::commands::{
+    net,
+    password::{self, PasswordCommands},
+};
+use alloy::primitives::Address;
+use anyhow::{anyhow, bail, Result};
 use config::load_config;
 use config::RPC;
 use dialoguer::{theme::ColorfulTheme, Input};
@@ -27,21 +29,10 @@ fn validate_rpc_url(url: &String) -> Result<()> {
 }
 
 fn validate_eth_address(address: &String) -> Result<()> {
-    if address.is_empty() {
-        return Ok(());
+    match Address::parse_checksummed(address, None) {
+        Ok(_) => Ok(()),
+        Err(e) => bail!("Invalid Ethereum address: {}", e),
     }
-    if !address.starts_with("0x") {
-        bail!("Address must start with '0x'")
-    }
-    if address.len() != 42 {
-        bail!("Address must be 42 characters long (including '0x')")
-    }
-    for c in address[2..].chars() {
-        if !c.is_ascii_hexdigit() {
-            bail!("Address must contain only hexadecimal characters")
-        }
-    }
-    Ok(())
 }
 
 #[instrument(name = "app", skip_all, fields(id = get_tag()))]
@@ -50,6 +41,8 @@ pub async fn execute(
     eth_address: Option<String>,
     password: Option<String>,
     skip_eth: bool,
+    net_keypair: Option<String>,
+    generate_net_keypair: bool,
 ) -> Result<()> {
     let rpc_url = match rpc_url {
         Some(url) => {
@@ -133,9 +126,21 @@ chains:
             password,
             overwrite: true,
         },
-        config,
+        &config,
     )
     .await?;
+
+    if generate_net_keypair {
+        net::execute(net::NetCommands::GenerateKey, &config).await?;
+    } else {
+        net::execute(
+            net::NetCommands::SetKey {
+                net_keypair: net_keypair,
+            },
+            &config,
+        )
+        .await?;
+    }
 
     println!("Enclave configuration successfully created!");
     println!("You can start your node using `enclave start`");

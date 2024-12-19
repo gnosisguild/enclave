@@ -83,7 +83,7 @@ pub async fn setup_aggregator(
         &cipher,
         config.quic_port(),
         config.enable_mdns(),
-        repositories.libp2pid(),
+        repositories.libp2p_keypair(),
     )
     .await?;
 

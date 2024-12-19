@@ -16,6 +16,7 @@ fi
 RPC_URL="ws://localhost:8545"
 
 PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+NETWORK_PRIVATE_KEY_AG="0x51a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 CIPHERNODE_SECRET="We are the music makers and we are the dreamers of the dreams."
 
 # These contracts are based on the deterministic order of hardhat deploy
@@ -30,6 +31,12 @@ CIPHERNODE_ADDRESS_1="0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
 CIPHERNODE_ADDRESS_2="0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
 CIPHERNODE_ADDRESS_3="0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
 CIPHERNODE_ADDRESS_4="0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+
+# These are the network private keys for the ciphernodes
+NETWORK_PRIVATE_KEY_1="0x11a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
+NETWORK_PRIVATE_KEY_2="0x21a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
+NETWORK_PRIVATE_KEY_3="0x31a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
+NETWORK_PRIVATE_KEY_4="0x41a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 
 
 # Function to clean up background processes
@@ -100,6 +107,15 @@ set_private_key() {
   yarn enclave wallet set \
     --config "$SCRIPT_DIR/lib/$name/config.yaml" \
     --private-key "$private_key"
+}
+
+set_network_private_key() {
+  local name="$1"
+  local private_key="$2"
+
+  yarn enclave net set-key \
+    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --net-keypair "$private_key"
 }
 
 launch_aggregator() {
