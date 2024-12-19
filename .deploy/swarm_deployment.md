@@ -57,12 +57,17 @@ If you get an error about not being able to choose between IP addresses choose t
 docker swarm init --advertise-addr 10.49.x.x
 ```
 
+# Build the dockerfile image
+
+```
+./.deploy/build.sh
+```
 
 # Deploy a version to the stack
 
 To deploy 
 
 ```
-.deploy/deploy.sh
+./.deploy/deploy.sh
 ```
 

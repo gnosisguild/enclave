@@ -1,6 +1,6 @@
 services:
   cn1:
-    image: ghcr.io/gnosisguild/ciphernode:latest
+    image: ghcr.io/gnosisguild/ciphernode
     volumes:
       - ./cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn1-data:/home/ciphernode/.local/share/enclave
@@ -13,25 +13,14 @@ services:
       AGGREGATOR: "false"
       ADDRESS: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
       QUIC_PORT: 9091
-    ports:
-      - "9091:9091/udp"
-      - "9091:9091/tcp"
     deploy:
       replicas: 1
       endpoint_mode: dnsrr
-      update_config:
-        parallelism: 1
-        order: stop-first
-        failure_action: rollback
-      restart_policy:
-        condition: any
     networks:
       - global-network
 
   cn2:
-    image: ghcr.io/gnosisguild/ciphernode:latest
-    depends_on:
-      - cn1
+    image: ghcr.io/gnosisguild/ciphernode
     volumes:
       - ./cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn2-data:/home/ciphernode/.local/share/enclave
@@ -44,24 +33,14 @@ services:
       AGGREGATOR: "false"
       ADDRESS: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0" 
       QUIC_PORT: 9092
-    ports:
-      - "9092:9092/udp"
-      - "9092:9092/tcp"
     deploy:
       replicas: 1
-      update_config:
-        parallelism: 1
-        order: stop-first
-        failure_action: rollback
-      restart_policy:
-        condition: any
+      endpoint_mode: dnsrr
     networks:
       - global-network
 
   cn3:
-    image: ghcr.io/gnosisguild/ciphernode:latest
-    depends_on:
-      - cn1
+    image: ghcr.io/gnosisguild/ciphernode
     volumes:
       - ./cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn3-data:/home/ciphernode/.local/share/enclave
@@ -74,22 +53,14 @@ services:
       AGGREGATOR: "false"
       ADDRESS: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
       QUIC_PORT: 9093
-    ports:
-      - "9093:9093/udp"
-      - "9093:9093/tcp"
     deploy:
       replicas: 1
-      update_config:
-        parallelism: 1
-        order: stop-first
-        failure_action: rollback
-      restart_policy:
-        condition: any
+      endpoint_mode: dnsrr
     networks:
       - global-network
 
   aggregator:
-    image: ghcr.io/gnosisguild/ciphernode:latest
+    image: ghcr.io/gnosisguild/ciphernode
     depends_on:
       - cn1
     volumes:
@@ -104,17 +75,9 @@ services:
       AGGREGATOR: "true"
       ADDRESS: "0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199"
       QUIC_PORT: 9094
-    ports:
-      - "9094:9094/udp"
-      - "9094:9094/tcp"
     deploy:
       replicas: 1
-      update_config:
-        parallelism: 1
-        order: stop-first
-        failure_action: rollback
-      restart_policy:
-        condition: any
+      endpoint_mode: dnsrr
     networks:
       - global-network
 

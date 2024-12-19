@@ -23,5 +23,5 @@ wait_removed() {
 stack_name=${1:-enclave}
 docker stack rm $stack_name
 wait_removed $stack_name
-docker stack deploy -c docker-compose.yml --prune $stack_name
+docker stack deploy -c ./.deploy/docker-compose.yml --prune $stack_name
 wait_ready $stack_name
