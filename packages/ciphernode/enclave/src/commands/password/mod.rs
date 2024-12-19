@@ -30,7 +30,7 @@ pub enum PasswordCommands {
     },
 }
 
-pub async fn execute(command: PasswordCommands, config: AppConfig) -> Result<()> {
+pub async fn execute(command: PasswordCommands, config: &AppConfig) -> Result<()> {
     match command {
         PasswordCommands::Create {
             password,
