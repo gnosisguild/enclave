@@ -42,7 +42,7 @@ RUN cargo build --release
 FROM debian:stable-slim
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends iptables ca-certificates jq && \
+RUN apt-get update && apt-get install -y --no-install-recommends iptables dnsutils iputils-ping ca-certificates jq && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user

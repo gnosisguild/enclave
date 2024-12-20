@@ -60,7 +60,7 @@ docker swarm init --advertise-addr 10.49.x.x
 # Build the dockerfile image
 
 ```
-./.deploy/build.sh
+./.deploy/build.sh ghcr.io/gnosisguild/ciphernode
 ```
 
 # Deploy a version to the stack
@@ -68,6 +68,33 @@ docker swarm init --advertise-addr 10.49.x.x
 To deploy 
 
 ```
-./.deploy/deploy.sh
+./.deploy/deploy.sh enclave ghcr.io/gnosisguild/ciphernode:latest
 ```
+
+This will deploy the following services:
+
+```
+❯ docker service ls
+ID             NAME                 MODE         REPLICAS   IMAGE                  PORTS
+tr44go8vevh1   enclave_aggregator   replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest
+kdqktv85xcuv   enclave_cn1          replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest
+nguul381w6mu   enclave_cn2          replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest
+zgmwmv7cd63j   enclave_cn3          replicated   1/1        ghcr.io/gnosisguild/ciphernode:latest
+```
+
+# Get the logs
+
+You can get the logs:
+
+```
+docker service logs enclave_cn1
+```
+
+Notice the line:
+
+```
+enclave_cn2.1.zom4r645ophf@nixos    | 2024-12-19T23:47:08.582536Z  INFO enclave: COMPILATION ID: 'painfully_fluent_crane'
+```
+
+This can help you identify which compilation you are looking at. This works by generating a unique ID based on the complication time.
 

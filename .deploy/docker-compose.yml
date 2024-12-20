@@ -1,6 +1,6 @@
 services:
   cn1:
-    image: ghcr.io/gnosisguild/ciphernode
+    image: {{IMAGE}}
     volumes:
       - ./cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn1-data:/home/ciphernode/.local/share/enclave
@@ -20,7 +20,7 @@ services:
       - global-network
 
   cn2:
-    image: ghcr.io/gnosisguild/ciphernode
+    image: {{IMAGE}}
     volumes:
       - ./cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn2-data:/home/ciphernode/.local/share/enclave
@@ -40,7 +40,7 @@ services:
       - global-network
 
   cn3:
-    image: ghcr.io/gnosisguild/ciphernode
+    image: {{IMAGE}}
     volumes:
       - ./cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn3-data:/home/ciphernode/.local/share/enclave
@@ -60,7 +60,7 @@ services:
       - global-network
 
   aggregator:
-    image: ghcr.io/gnosisguild/ciphernode
+    image: {{IMAGE}}
     depends_on:
       - cn1
     volumes:
