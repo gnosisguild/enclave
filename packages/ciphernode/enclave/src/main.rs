@@ -3,9 +3,11 @@ use clap::Parser;
 use commands::{aggregator, init, net, password, start, wallet, Commands};
 use config::load_config;
 use enclave_core::{get_tag, set_tag};
-use tracing::instrument;
+use tracing::{info, instrument};
 use tracing_subscriber::EnvFilter;
+
 pub mod commands;
+mod compile_id;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
@@ -97,6 +99,9 @@ pub async fn main() {
         // .with_env_filter("[app{id=cn4}]=info")
         // .with_env_filter("[app{id=ag}]=info")
         .init();
+
+    info!("COMPILATION ID: '{}'", compile_id::generate_id());
+
     let cli = Cli::parse();
 
     // Set the tag for all future traces

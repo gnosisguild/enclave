@@ -1677,6 +1677,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 
 [[package]]
+name = "compile-time"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e55ede5279d4d7c528906853743abeb26353ae1e6c440fcd6d18316c2c2dd903"
+dependencies = [
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "rustc_version 0.4.0",
+ "semver 1.0.23",
+ "time",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2164,6 +2178,7 @@ dependencies = [
  "anyhow",
  "cipher 0.1.0",
  "clap",
+ "compile-time",
  "config",
  "data",
  "dialoguer",
@@ -2173,7 +2188,9 @@ dependencies = [
  "hex",
  "libp2p",
  "once_cell",
+ "petname",
  "phf",
+ "rand",
  "router",
  "serde",
  "serde_json",
@@ -4582,6 +4599,20 @@ checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
 dependencies = [
  "fixedbitset",
  "indexmap",
+]
+
+[[package]]
+name = "petname"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9cd31dcfdbbd7431a807ef4df6edd6473228e94d5c805e8cf671227a21bad068"
+dependencies = [
+ "anyhow",
+ "clap",
+ "itertools 0.13.0",
+ "proc-macro2",
+ "quote",
+ "rand",
 ]
 
 [[package]]
