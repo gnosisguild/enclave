@@ -1,5 +1,5 @@
-use std::{future::Future, time::Duration};
 use anyhow::Result;
+use std::{future::Future, time::Duration};
 use tokio::time::sleep;
 
 pub enum RetryError {
@@ -67,5 +67,3 @@ where
         }
     }
 }
-
-

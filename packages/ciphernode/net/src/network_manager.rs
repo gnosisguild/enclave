@@ -103,13 +103,7 @@ impl NetworkManager {
         // Create peer from keypair
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let mut peer = NetworkPeer::new(
-            &keypair,
-            peers,
-            Some(quic_port),
-            topic,
-            enable_mdns,
-        )?;
+        let mut peer = NetworkPeer::new(&keypair, peers, Some(quic_port), topic, enable_mdns)?;
 
         // Setup and start network manager
         let rx = peer.rx();

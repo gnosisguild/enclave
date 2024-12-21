@@ -1,13 +1,12 @@
 #![crate_name = "net"]
 #![crate_type = "lib"]
 
-mod network_manager;
-mod network_peer;
+pub mod correlation_id;
 mod dialer;
 pub mod events;
+mod network_manager;
+mod network_peer;
 mod retry;
-pub mod correlation_id;
 
 pub use network_manager::*;
 pub use network_peer::*;
-

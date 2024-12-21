@@ -5,7 +5,7 @@ use std::{
 
 static NEXT_CORRELATION_ID: AtomicUsize = AtomicUsize::new(1);
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct CorrelationId {
     id: usize,
 }
