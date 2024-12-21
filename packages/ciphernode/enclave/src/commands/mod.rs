@@ -56,5 +56,13 @@ pub enum Commands {
         /// Skip asking for eth
         #[arg(long = "skip-eth")]
         skip_eth: bool,
+
+        /// The network private key (ed25519)
+        #[arg(long = "net-keypair")]
+        net_keypair: Option<String>,
+
+        /// Generate a new network keypair
+        #[arg(long = "generate-net-keypair")]
+        generate_net_keypair: bool,
     },
 }

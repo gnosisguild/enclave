@@ -1,4 +1,5 @@
 use actix::Actor;
+use alloy::{hex::FromHex, primitives::FixedBytes, signers::local::PrivateKeySigner};
 use anyhow::{anyhow, bail, Result};
 use cipher::Cipher;
 use config::AppConfig;
@@ -7,33 +8,13 @@ use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
 
 pub fn validate_private_key(input: &String) -> Result<()> {
-    // Require 0x prefix
-    if !input.starts_with("0x") {
-        return Err(anyhow!(
-            "Invalid private key format: must start with '0x' prefix"
-        ));
-    }
-
-    // Remove 0x prefix
-    let key = &input[2..];
-
-    // Check length
-    if key.len() != 64 {
-        return Err(anyhow!(
-            "Invalid private key length: {}. Expected 64 characters after '0x' prefix",
-            key.len()
-        ));
-    }
-
-    // Validate hex characters and convert to bytes
-    let _ = (0..key.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(&key[i..i + 2], 16))
-        .collect::<Result<Vec<u8>, _>>()
-        .map_err(|e| anyhow!("Invalid hex character: {}", e))?;
-
+    let bytes =
+        FixedBytes::<32>::from_hex(input).map_err(|e| anyhow!("Invalid private key: {}", e))?;
+    let _ =
+        PrivateKeySigner::from_bytes(&bytes).map_err(|e| anyhow!("Invalid private key: {}", e))?;
     Ok(())
 }
+
 pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<()> {
     let input = if let Some(private_key) = private_key {
         validate_private_key(&private_key)?;
