@@ -1,7 +1,7 @@
 use anyhow::Result;
-use tracing::{error, warn};
 use std::{future::Future, time::Duration};
 use tokio::time::sleep;
+use tracing::{error, warn};
 
 pub enum RetryError {
     Failure(anyhow::Error),

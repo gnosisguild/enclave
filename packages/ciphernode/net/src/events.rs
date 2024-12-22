@@ -35,14 +35,10 @@ pub enum NetworkPeerEvent {
         message_id: MessageId,
     },
     /// There was an error Dialing a peer
-    DialError {
-        error: Arc<DialError>,
-    },
+    DialError { error: Arc<DialError> },
     /// A connection was established to a peer
-    ConnectionEstablished {
-        connection_id: ConnectionId,
-    },
-    /// There was an error creating a connection 
+    ConnectionEstablished { connection_id: ConnectionId },
+    /// There was an error creating a connection
     OutgoingConnectionError {
         connection_id: ConnectionId,
         error: Arc<DialError>,

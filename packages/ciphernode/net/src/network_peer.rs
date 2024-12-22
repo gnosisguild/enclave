@@ -40,7 +40,7 @@ pub struct NetworkPeer {
     udp_port: Option<u16>,
     /// The gossipsub topic that the peer should listen on
     topic: gossipsub::IdentTopic,
-    /// Broadcast channel to report NetworkPeerEvents to listeners 
+    /// Broadcast channel to report NetworkPeerEvents to listeners
     event_tx: broadcast::Sender<NetworkPeerEvent>,
     /// Transmission channel to send NetworkPeerCommands to the NetworkPeer
     cmd_tx: mpsc::Sender<NetworkPeerCommand>,

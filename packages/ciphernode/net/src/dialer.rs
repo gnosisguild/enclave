@@ -6,10 +6,10 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
     Multiaddr,
 };
-use tracing::info;
 use std::net::ToSocketAddrs;
 use tokio::sync::{broadcast, mpsc};
 use tracing::error;
+use tracing::info;
 
 use crate::{
     events::{NetworkPeerCommand, NetworkPeerEvent},
@@ -78,7 +78,7 @@ async fn attempt_connection(
 }
 
 /// Wait for results of a retry based on a given correlation id and return the correct variant of
-/// RetryError depending on the result from the downstream event 
+/// RetryError depending on the result from the downstream event
 async fn wait_for_connection(
     event_rx: &mut broadcast::Receiver<NetworkPeerEvent>,
     dial_connection: ConnectionId,
