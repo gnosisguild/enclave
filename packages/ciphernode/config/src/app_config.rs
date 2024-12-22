@@ -273,7 +273,6 @@ pub fn load_config(config_file: Option<&str>) -> Result<AppConfig> {
     }
 
     let with_envs = load_yaml_with_env(&defaults.config_file())?;
-    println!("{}", with_envs);
 
     let config = Figment::from(Serialized::defaults(&defaults))
         .merge(Yaml::string(&with_envs))

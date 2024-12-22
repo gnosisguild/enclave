@@ -1,4 +1,5 @@
 use anyhow::Result;
+use tracing::{error, warn};
 use std::{future::Future, time::Duration};
 use tokio::time::sleep;
 
@@ -49,7 +50,7 @@ where
                             ));
                         }
 
-                        println!(
+                        warn!(
                             "Attempt {}/{} failed, retrying in {}ms: {}",
                             current_attempt, max_attempts, delay_ms, e
                         );
@@ -59,7 +60,7 @@ where
                         delay_ms *= 2; // Exponential backoff
                     }
                     RetryError::Failure(e) => {
-                        println!("FAILURE!: returning to caller.");
+                        error!("FAILURE!: returning to caller.");
                         return Err(e);
                     }
                 }

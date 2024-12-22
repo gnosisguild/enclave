@@ -137,11 +137,11 @@ impl NetworkPeer {
                             }
                         },
                         NetworkPeerCommand::Dial(multi) => {
-                            println!("DIAL: {:?}", multi);
+                            info!("DIAL: {:?}", multi);
                             match self.swarm.dial(multi) {
-                                Ok(v) => println!("Dial returned {:?}", v),
+                                Ok(v) => info!("Dial returned {:?}", v),
                                 Err(error) => {
-                                    println!("Dialing error! {}", error);
+                                    info!("Dialing error! {}", error);
                                     event_tx.send(NetworkPeerEvent::DialError { error: error.into() })?;
                                 }
                             }

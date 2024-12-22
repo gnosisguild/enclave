@@ -6,6 +6,7 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
     Multiaddr,
 };
+use tracing::info;
 use std::net::ToSocketAddrs;
 use tokio::sync::{broadcast, mpsc};
 use tracing::error;
@@ -22,7 +23,7 @@ async fn dial_multiaddr(
     multiaddr_str: &str,
 ) -> Result<()> {
     let multiaddr = &multiaddr_str.parse()?;
-    println!("Now dialing in to {}", multiaddr);
+    info!("Now dialing in to {}", multiaddr);
     retry_with_backoff(
         || attempt_connection(cmd_tx, event_tx, multiaddr),
         BACKOFF_MAX_RETRIES,
@@ -68,7 +69,7 @@ async fn attempt_connection(
     let multi = get_resolved_multiaddr(multiaddr).map_err(to_retry)?;
     let opts: DialOpts = multi.clone().into();
     let dial_connection = opts.connection_id();
-    println!("Dialing: '{}' with connection '{}'", multi, dial_connection);
+    info!("Dialing: '{}' with connection '{}'", multi, dial_connection);
     cmd_tx
         .send(NetworkPeerCommand::Dial(opts))
         .await
@@ -86,16 +87,16 @@ async fn wait_for_connection(
         match event_rx.recv().await.map_err(to_retry)? {
             NetworkPeerEvent::ConnectionEstablished { connection_id } => {
                 if connection_id == dial_connection {
-                    println!("Connection Established");
+                    info!("Connection Established");
                     return Ok(());
                 }
             }
             NetworkPeerEvent::DialError { error } => {
-                println!("DialError!");
+                info!("DialError!");
                 return match error.as_ref() {
                     // If we are dialing ourself then we should just fail
                     DialError::NoAddresses { .. } => {
-                        println!("DialError received. Returning RetryError::Failure");
+                        info!("DialError received. Returning RetryError::Failure");
                         Err(RetryError::Failure(error.clone().into()))
                     }
                     // Try again otherwise
@@ -106,9 +107,9 @@ async fn wait_for_connection(
                 connection_id,
                 error,
             } => {
-                println!("OutgoingConnectionError!");
+                info!("OutgoingConnectionError!");
                 if connection_id == dial_connection {
-                    println!(
+                    info!(
                         "Connection {} failed because of error {}. Retrying...",
                         connection_id, error
                     );
