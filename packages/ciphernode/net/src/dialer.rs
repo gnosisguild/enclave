@@ -15,6 +15,7 @@ use crate::{
     retry::{retry_with_backoff, to_retry, RetryError, BACKOFF_DELAY, BACKOFF_MAX_RETRIES},
 };
 
+/// Dial a single Multiaddr with retries and return an error should those retries not work
 async fn dial_multiaddr(
     cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
     event_tx: &broadcast::Sender<NetworkPeerEvent>,
@@ -37,6 +38,12 @@ fn trace_error(r: Result<()>) {
     }
 }
 
+/// Initiates connections to multiple network peers
+///
+/// # Arguments
+/// * `cmd_tx` - Sender for network peer commands
+/// * `event_tx` - Broadcast sender for peer events
+/// * `peers` - List of peer addresses to connect to
 pub async fn dial_peers(
     cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
     event_tx: &broadcast::Sender<NetworkPeerEvent>,
@@ -51,6 +58,7 @@ pub async fn dial_peers(
     Ok(())
 }
 
+/// Attempt a connection with retrys to a multiaddr return an error if the connection could not be resolved after the retries.
 async fn attempt_connection(
     cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
     event_tx: &broadcast::Sender<NetworkPeerEvent>,
@@ -68,6 +76,8 @@ async fn attempt_connection(
     wait_for_connection(&mut event_rx, dial_connection).await
 }
 
+/// Wait for results of a retry based on a given correlation id and return the correct variant of
+/// RetryError depending on the result from the downstream event 
 async fn wait_for_connection(
     event_rx: &mut broadcast::Receiver<NetworkPeerEvent>,
     dial_connection: ConnectionId,
@@ -117,6 +127,7 @@ async fn wait_for_connection(
     }
 }
 
+/// Convert a Multiaddr to use a specific ip address with the ip4 or ip6 protocol
 fn dns_to_ip_addr(original: &Multiaddr, ip_str: &str) -> Result<Multiaddr> {
     let ip = ip_str.parse()?;
     let mut new_addr = Multiaddr::empty();
@@ -140,6 +151,7 @@ fn dns_to_ip_addr(original: &Multiaddr, ip_str: &str) -> Result<Multiaddr> {
     Ok(new_addr)
 }
 
+/// Detect the DNS host from a multiaddr
 fn extract_dns_host(addr: &Multiaddr) -> Option<String> {
     // Iterate through the protocols in the multiaddr
     for proto in addr.iter() {
@@ -154,9 +166,10 @@ fn extract_dns_host(addr: &Multiaddr) -> Option<String> {
     None
 }
 
+/// If the Multiaddr uses a DNS domain look it up and return a multiaddr that uses a resolved IP
+/// address
 fn get_resolved_multiaddr(value: &Multiaddr) -> Result<Multiaddr> {
-    let maybe_domain = extract_dns_host(value);
-    if let Some(domain) = maybe_domain {
+    if let Some(domain) = extract_dns_host(value) {
         let ip = resolve_ipv4(&domain)?;
         let multi = dns_to_ip_addr(value, &ip)?;
         return Ok(multi);

@@ -5,7 +5,7 @@ use crate::NetworkPeer;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use cipher::Cipher;
 use data::Repository;
 use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
@@ -30,6 +30,7 @@ impl Actor for NetworkManager {
     type Context = Context<Self>;
 }
 
+/// Libp2pEvent is used to send data to the NetworkPeer from the NetworkManager
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "anyhow::Result<()>")]
 struct LibP2pEvent(pub Vec<u8>);

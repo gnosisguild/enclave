@@ -29,14 +29,23 @@ pub struct NodeBehaviour {
     identify: IdentifyBehaviour,
 }
 
+/// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
+/// with it using channels.
 pub struct NetworkPeer {
+    /// The Libp2p Swarm instance
     swarm: Swarm<NodeBehaviour>,
+    /// A list of peers to automatically dial
     peers: Vec<String>,
+    /// The UDP port that the peer listens to over QUIC
     udp_port: Option<u16>,
+    /// The gossipsub topic that the peer should listen on
     topic: gossipsub::IdentTopic,
-    event_tx: broadcast::Sender<NetworkPeerEvent>, // to event bus
-    cmd_tx: mpsc::Sender<NetworkPeerCommand>,      // to network
-    cmd_rx: mpsc::Receiver<NetworkPeerCommand>,    // from event bus
+    /// Broadcast channel to report NetworkPeerEvents to listeners 
+    event_tx: broadcast::Sender<NetworkPeerEvent>,
+    /// Transmission channel to send NetworkPeerCommands to the NetworkPeer
+    cmd_tx: mpsc::Sender<NetworkPeerCommand>,
+    /// Local receiver to process NetworkPeerCommands from
+    cmd_rx: mpsc::Receiver<NetworkPeerCommand>,
 }
 
 impl NetworkPeer {
@@ -148,6 +157,7 @@ impl NetworkPeer {
     }
 }
 
+/// Create the libp2p behaviour
 fn create_mdns_kad_behaviour(
     enable_mdns: bool,
     key: &Keypair,
@@ -197,6 +207,7 @@ fn create_mdns_kad_behaviour(
     })
 }
 
+/// Process all swarm events
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetworkPeerEvent>,
