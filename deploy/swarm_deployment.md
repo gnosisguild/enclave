@@ -1,9 +1,83 @@
+# Setup a remote server
+
+Install docker
+
+```
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg lsb-release
+sudo mkdir -m 0755 -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo docker run hello-world
+```
+
+
+Initialize swarm
+
+```
+docker swarm init
+```
+
+NOTE: If you get an error about not being able to choose between IP addresses choose the more private IP address.
+
+
+```
+docker swarm init --advertise-addr 10.49.0.5
+```
+
+## Setting up Buildkit
+
+NOTE: You may need to setup buildkit:
+
+```
+echo '{
+  "builder": {
+    "gc": {
+      "enabled": true,
+      "defaultKeepStorage": "20GB"
+    }
+  },
+  "features": {
+    "buildkit": true,
+    "containerd-snapshotter": true
+  }
+}' | sudo tee /etc/docker/daemon.json
+```
+
+and then restart the docker daemon
+
+```
+sudo systemctl restart docker
+```
+
+## Setup the repo
+
+Clone the repo
+
+```
+git clone https://github.com/gnosisguild/enclave.git
+```
+
+Move to the new folder:
+
+```
+cd enclave/
+```
+
+Build the app
+
+```
+./deploy/build.sh
+```
+
 # Setup `.env` vars
 
 Copy the `.env.example` file to `.env`
 
 ```
-cp .env.example .env
+cp ./deploy/.env.example ./deploy/.env
 ```
 
 Alter the variables to reflect the correct values required for the stack:
@@ -15,12 +89,14 @@ export SEPOLIA_CIPHERNODE_REGISTRY_ADDRESS=0x0952388f6028a9Eda93a5041a3B216Ea331
 export SEPOLIA_FILTER_REGISTRY=0xcBaCE7C360b606bb554345b20884A28e41436934
 ```
 
-Pay special attention to the `TAG` and `RPC_URL` vars.
+Pay special attention to the `RPC_URL` vars as here we use a standin API key value.
 
 You can peruse the yaml config files for the nodes to see how the vars are used within the config.
 
-# Secrets Setup Script
+# Secrets Setup Utils Script
 
+We have created a secrets setup utility to aid setting up the secrets for each node.
+ 
 To deploy with swarm we need to set up the secrets file for our cluster.
 
 ## Run
@@ -41,34 +117,14 @@ Skipping cn2.secrets.json - file already exists
 ==> cn1.secrets.json <== # Yellow arrows indicate files that need customization
 ```
 
-Remember to modify any highlighted files before use.
-
-# Initialize docker swarm
-
-First we need to initialize swarm.
-
-```
-docker swarm init
-```
-
-If you get an error about not being able to choose between IP addresses choose the more private IP address.
-
-```
-docker swarm init --advertise-addr 10.49.x.x
-```
-
-# Build the dockerfile image
-
-```
-./.deploy/build.sh ghcr.io/gnosisguild/ciphernode
-```
+Remember to modify any highlighted files before use with unique secrets.
 
 # Deploy a version to the stack
 
 To deploy 
 
 ```
-./.deploy/deploy.sh enclave ghcr.io/gnosisguild/ciphernode:latest
+./deploy/deploy.sh enclave ghcr.io/gnosisguild/ciphernode:latest
 ```
 
 This will deploy the following services:
