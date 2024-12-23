@@ -45,8 +45,6 @@ fi
 
 sed "s|{{IMAGE}}|$2|g" $TEMPLATE_FILE > "${RUN_FILE}"
 
-cat $RUN_FILE
-
 STACK_NAME=$1
 docker stack rm $STACK_NAME
 wait_removed $STACK_NAME
