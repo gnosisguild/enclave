@@ -101,7 +101,7 @@ To deploy with swarm we need to set up the secrets file for our cluster.
 
 ## Run
 ```bash
-./.deploy/copy-secrets.sh
+./deploy/copy-secrets.sh
 ```
 
 ## What it does
