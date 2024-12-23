@@ -81,6 +81,5 @@ jobs:
             
             cd /home/ec2-user/enclave
             git pull
-            
-            docker stack deploy -c docker-compose.yml ciphernode-stack
 
+            ./deploy/deploy.sh enclave $IMAGE_NAME:$IMAGE_TAG
