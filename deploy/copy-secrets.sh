@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+set_network_private_key() {
+    echo "Setting network private key for $1"
+    jq --arg key "$2" '.network_private_key = $key' "$1.secrets.json" > "$1.secrets.json.tmp" && mv "$1.secrets.json.tmp" "$1.secrets.json"
+}
+
 # Set working directory to script location
 cd "$(dirname "$0")" || exit 1
 
@@ -13,6 +18,7 @@ NC='\033[0m' # No Color
 
 # List of target files
 TARGETS=("cn1" "cn2" "cn3" "agg")
+NET_KEYS=("0x11a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580" "0x21a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580" "0x31a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580" "0x41a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580")
 
 # Check if source file exists
 if [ ! -f "$SOURCE" ]; then
@@ -26,6 +32,8 @@ for target in "${TARGETS[@]}"; do
         echo "Skipping ${target}.secrets.json - file already exists"
     else
         cp "$SOURCE" "${target}.secrets.json"
+        set_network_private_key "${target}" "${NET_KEYS[${i:-0}]}"
+        ((i++))
         echo "Created ${target}.secrets.json"
     fi
 done
