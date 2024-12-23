@@ -1,0 +1,102 @@
+services:
+  cn1:
+    image: {{IMAGE}}
+    volumes:
+      - ./cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn1-data:/home/ciphernode/.local/share/enclave
+    secrets:
+      - source: secrets_cn1
+        target: secrets.json
+    env_file: .env
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "false"
+      ADDRESS: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+      QUIC_PORT: 9091
+    deploy:
+      replicas: 1
+      endpoint_mode: dnsrr
+    networks:
+      - global-network
+
+  cn2:
+    image: {{IMAGE}}
+    volumes:
+      - ./cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn2-data:/home/ciphernode/.local/share/enclave
+    secrets:
+      - source: secrets_cn2
+        target: secrets.json
+    env_file: .env
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "false"
+      ADDRESS: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0" 
+      QUIC_PORT: 9092
+    deploy:
+      replicas: 1
+      endpoint_mode: dnsrr
+    networks:
+      - global-network
+
+  cn3:
+    image: {{IMAGE}}
+    volumes:
+      - ./cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - cn3-data:/home/ciphernode/.local/share/enclave
+    secrets:
+      - source: secrets_cn3
+        target: secrets.json
+    env_file: .env
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "false"
+      ADDRESS: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
+      QUIC_PORT: 9093
+    deploy:
+      replicas: 1
+      endpoint_mode: dnsrr
+    networks:
+      - global-network
+
+  aggregator:
+    image: {{IMAGE}}
+    depends_on:
+      - cn1
+    volumes:
+      - ./agg.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
+      - agg-data:/home/ciphernode/.local/share/enclave
+    secrets:
+      - source: secrets_agg
+        target: secrets.json
+    env_file: .env
+    environment:
+      RUST_LOG: "info"
+      AGGREGATOR: "true"
+      ADDRESS: "0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+      QUIC_PORT: 9094
+    deploy:
+      replicas: 1
+      endpoint_mode: dnsrr
+    networks:
+      - global-network
+
+secrets:
+  secrets_cn1:
+    file: cn1.secrets.json
+  secrets_cn2:
+    file: cn2.secrets.json
+  secrets_cn3:
+    file: cn3.secrets.json
+  secrets_agg:
+    file: agg.secrets.json   
+
+volumes:
+  cn1-data:
+  cn2-data:
+  cn3-data:
+  agg-data:
+
+networks:
+  global-network:
+    driver: overlay

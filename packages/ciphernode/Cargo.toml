@@ -37,6 +37,7 @@ bs58 = "0.5.1"
 base64 = "0.22.1"
 clap = { version = "4.5.17", features = ["derive"] }
 cipher = { path = "./cipher" }
+compile-time = "0.2.0"
 dirs = "5.0.1"
 data = { path = "./data" }
 shellexpand = "3.1.0"

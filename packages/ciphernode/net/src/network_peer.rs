@@ -8,15 +8,17 @@ use libp2p::{
     kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
     mdns,
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour, SwarmEvent},
-    Multiaddr, Swarm,
+    Swarm,
 };
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use std::{hash::DefaultHasher, io::Error, time::Duration};
-use tokio::{
-    select,
-    sync::mpsc::{channel, Receiver, Sender},
-};
-use tracing::{debug, error, info, trace, warn};
+use tokio::{select, sync::broadcast, sync::mpsc};
+use tracing::{debug, info, trace, warn};
+
+use crate::dialer::dial_peers;
+use crate::events::NetworkPeerCommand;
+use crate::events::NetworkPeerEvent;
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -27,15 +29,23 @@ pub struct NodeBehaviour {
     identify: IdentifyBehaviour,
 }
 
+/// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
+/// with it using channels.
 pub struct NetworkPeer {
+    /// The Libp2p Swarm instance
     swarm: Swarm<NodeBehaviour>,
+    /// A list of peers to automatically dial
     peers: Vec<String>,
+    /// The UDP port that the peer listens to over QUIC
     udp_port: Option<u16>,
+    /// The gossipsub topic that the peer should listen on
     topic: gossipsub::IdentTopic,
-    to_bus_tx: Sender<Vec<u8>>,             // to event bus
-    from_net_rx: Option<Receiver<Vec<u8>>>, // from network
-    to_net_tx: Sender<Vec<u8>>,             // to network
-    from_bus_rx: Receiver<Vec<u8>>,         // from event bus
+    /// Broadcast channel to report NetworkPeerEvents to listeners
+    event_tx: broadcast::Sender<NetworkPeerEvent>,
+    /// Transmission channel to send NetworkPeerCommands to the NetworkPeer
+    cmd_tx: mpsc::Sender<NetworkPeerCommand>,
+    /// Local receiver to process NetworkPeerCommands from
+    cmd_rx: mpsc::Receiver<NetworkPeerCommand>,
 }
 
 impl NetworkPeer {
@@ -46,14 +56,13 @@ impl NetworkPeer {
         topic: &str,
         enable_mdns: bool,
     ) -> Result<Self> {
-        let (to_bus_tx, from_net_rx) = channel(100); // TODO : tune this param
-        let (to_net_tx, from_bus_rx) = channel(100); // TODO : tune this param
+        let (event_tx, _) = broadcast::channel(100); // TODO : tune this param
+        let (cmd_tx, cmd_rx) = mpsc::channel(100); // TODO : tune this param
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
             .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
-            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
         // TODO: Use topics to manage network traffic instead of just using a single topic
@@ -64,58 +73,91 @@ impl NetworkPeer {
             peers,
             udp_port,
             topic,
-            to_bus_tx,
-            from_net_rx: Some(from_net_rx),
-            to_net_tx,
-            from_bus_rx,
+            event_tx,
+            cmd_tx,
+            cmd_rx,
         })
     }
 
-    pub fn rx(&mut self) -> Option<Receiver<Vec<u8>>> {
-        self.from_net_rx.take()
+    pub fn rx(&mut self) -> broadcast::Receiver<NetworkPeerEvent> {
+        self.event_tx.subscribe()
     }
 
-    pub fn tx(&self) -> Sender<Vec<u8>> {
-        self.to_net_tx.clone()
+    pub fn tx(&self) -> mpsc::Sender<NetworkPeerCommand> {
+        self.cmd_tx.clone()
     }
 
     pub async fn start(&mut self) -> Result<()> {
-        let addr = match self.udp_port {
-            Some(port) => format!("/ip4/0.0.0.0/udp/{}/quic-v1", port),
-            None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
-        };
-        info!("Requesting node.listen_on('{}')", addr);
+        let event_tx = self.event_tx.clone();
+        let cmd_tx = self.cmd_tx.clone();
+        let cmd_rx = &mut self.cmd_rx;
 
+        // Subscribe to topic
         self.swarm
             .behaviour_mut()
             .gossipsub
             .subscribe(&self.topic)?;
+
+        // Listen on the quic port
+        let addr = match self.udp_port {
+            Some(port) => format!("/ip4/0.0.0.0/udp/{}/quic-v1", port),
+            None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
+        };
+
+        info!("Requesting node.listen_on('{}')", addr);
         self.swarm.listen_on(addr.parse()?)?;
 
         info!("Peers to dial: {:?}", self.peers);
-        for addr in self.peers.clone() {
-            let multiaddr: Multiaddr = addr.parse()?;
-            self.swarm.dial(multiaddr)?;
-        }
+        tokio::spawn({
+            let event_tx = event_tx.clone();
+            let peers = self.peers.clone();
+            async move {
+                dial_peers(&cmd_tx, &event_tx, &peers).await?;
+
+                return anyhow::Ok(());
+            }
+        });
 
         loop {
             select! {
-                Some(line) = self.from_bus_rx.recv() => {
-                    if let Err(e) = self.swarm
-                        .behaviour_mut().gossipsub
-                        .publish(self.topic.clone(), line) {
-                        error!(error=?e, "Error publishing line to swarm");
+                 // Process commands
+                Some(command) = cmd_rx.recv() => {
+                    match command {
+                        NetworkPeerCommand::GossipPublish { data, topic, correlation_id } => {
+                            let gossipsub_behaviour = &mut self.swarm.behaviour_mut().gossipsub;
+                            match gossipsub_behaviour
+                                .publish(gossipsub::IdentTopic::new(topic), data) {
+                                Ok(message_id) => {
+                                    event_tx.send(NetworkPeerEvent::GossipPublished { correlation_id, message_id })?;
+                                },
+                                Err(e) => {
+                                    warn!(error=?e, "Could not publish to swarm. Retrying...");
+                                    event_tx.send(NetworkPeerEvent::GossipPublishError { correlation_id, error: Arc::new(e) })?;
+                                }
+                            }
+                        },
+                        NetworkPeerCommand::Dial(multi) => {
+                            info!("DIAL: {:?}", multi);
+                            match self.swarm.dial(multi) {
+                                Ok(v) => info!("Dial returned {:?}", v),
+                                Err(error) => {
+                                    info!("Dialing error! {}", error);
+                                    event_tx.send(NetworkPeerEvent::DialError { error: error.into() })?;
+                                }
+                            }
+                        }
                     }
                 }
-
+                // Process events
                 event = self.swarm.select_next_some() =>  {
-                    process_swarm_event(&mut self.swarm, &mut self.to_bus_tx, event).await?
+                    process_swarm_event(&mut self.swarm, &event_tx, event).await?
                 }
             }
         }
     }
 }
 
+/// Create the libp2p behaviour
 fn create_mdns_kad_behaviour(
     enable_mdns: bool,
     key: &Keypair,
@@ -165,18 +207,42 @@ fn create_mdns_kad_behaviour(
     })
 }
 
+/// Process all swarm events
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
-    to_bus_tx: &mut Sender<Vec<u8>>,
+    event_tx: &broadcast::Sender<NetworkPeerEvent>,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
     match event {
-        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+        SwarmEvent::ConnectionEstablished {
+            peer_id,
+            endpoint,
+            connection_id,
+            ..
+        } => {
             info!("Connected to {peer_id}");
+            let remote_addr = endpoint.get_remote_address().clone();
+            swarm
+                .behaviour_mut()
+                .kademlia
+                .add_address(&peer_id, remote_addr.clone());
+
+            info!("Added address to kademlia {}", remote_addr);
+            swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+            info!("Added peer to gossipsub {}", remote_addr);
+            event_tx.send(NetworkPeerEvent::ConnectionEstablished { connection_id })?;
         }
 
-        SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
-            warn!("Failed to dial {peer_id:?}: {error}");
+        SwarmEvent::OutgoingConnectionError {
+            peer_id,
+            error,
+            connection_id,
+        } => {
+            info!("Failed to dial {peer_id:?}: {error}");
+            event_tx.send(NetworkPeerEvent::OutgoingConnectionError {
+                connection_id,
+                error: Arc::new(error),
+            })?;
         }
 
         SwarmEvent::IncomingConnectionError { error, .. } => {
@@ -210,8 +276,7 @@ async fn process_swarm_event(
             message,
         })) => {
             trace!("Got message with id: {id} from peer: {peer_id}",);
-            trace!("{:?}", message);
-            to_bus_tx.send(message.data).await?;
+            event_tx.send(NetworkPeerEvent::GossipData(message.data))?;
         }
         SwarmEvent::NewListenAddr { address, .. } => {
             warn!("Local node is listening on {address}");

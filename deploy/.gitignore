@@ -1,0 +1,3 @@
+*.secrets.json
+.env
+!example.secrets.json

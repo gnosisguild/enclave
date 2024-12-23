@@ -13,8 +13,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends iptables ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/p2p_test /app/
-COPY net/tests/entrypoint.sh /app/
-RUN chmod +x /app/entrypoint.sh
+COPY --from=builder /app/target/release/p2p_test .
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/p2p_test"]

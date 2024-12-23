@@ -1,4 +1,6 @@
 use anyhow::Result;
+use net::correlation_id::CorrelationId;
+use net::events::{NetworkPeerCommand, NetworkPeerEvent};
 use net::NetworkPeer;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
@@ -18,8 +20,8 @@ async fn main() -> Result<()> {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .with(tracing_subscriber::fmt::layer())
         .init();
-    let name = env::args().nth(1).expect("need name");
-
+    let name = env::args().nth(2).expect("need name");
+    let topic = "test-topic";
     println!("{} starting up", name);
 
     let udp_port = env::var("QUIC_PORT")
@@ -42,7 +44,7 @@ async fn main() -> Result<()> {
 
     // Extract input and outputs
     let tx = peer.tx();
-    let mut rx = peer.rx().unwrap();
+    let mut rx = peer.rx();
 
     let router_task = tokio::spawn({
         let name = name.clone();
@@ -60,7 +62,12 @@ async fn main() -> Result<()> {
 
     // Send our message first
     println!("{} sending message", name);
-    tx.send(name.as_bytes().to_vec()).await?;
+    tx.send(NetworkPeerCommand::GossipPublish {
+        correlation_id: CorrelationId::new(),
+        topic: topic.to_string(),
+        data: name.as_bytes().to_vec(),
+    })
+    .await?;
     println!("{} message sent", name);
 
     let expected: HashSet<String> = vec![
@@ -79,8 +86,8 @@ async fn main() -> Result<()> {
     // Wrap the message receiving loop in a timeout
     let receive_result = timeout(Duration::from_secs(10), async {
         while received != expected {
-            if let Some(msg) = rx.recv().await {
-                match String::from_utf8(msg) {
+            match rx.recv().await? {
+                NetworkPeerEvent::GossipData(msg) => match String::from_utf8(msg) {
                     Ok(msg) => {
                         if !received.contains(&msg) {
                             println!("{} received '{}'", name, msg);
@@ -88,7 +95,8 @@ async fn main() -> Result<()> {
                         }
                     }
                     Err(e) => println!("{} received invalid UTF8: {}", name, e),
-                }
+                },
+                _ => (),
             }
         }
         Ok::<(), anyhow::Error>(())

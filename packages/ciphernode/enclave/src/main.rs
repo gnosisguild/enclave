@@ -3,9 +3,11 @@ use clap::Parser;
 use commands::{aggregator, init, net, password, start, wallet, Commands};
 use config::load_config;
 use enclave_core::{get_tag, set_tag};
-use tracing::instrument;
+use tracing::{info, instrument};
 use tracing_subscriber::EnvFilter;
+
 pub mod commands;
+mod compile_id;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
@@ -55,11 +57,23 @@ impl Cli {
                 eth_address,
                 password,
                 skip_eth,
-            } => init::execute(rpc_url, eth_address, password, skip_eth).await?,
-            Commands::Password { command } => password::execute(command, config).await?,
+                net_keypair,
+                generate_net_keypair,
+            } => {
+                init::execute(
+                    rpc_url,
+                    eth_address,
+                    password,
+                    skip_eth,
+                    net_keypair,
+                    generate_net_keypair,
+                )
+                .await?
+            }
+            Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Aggregator { command } => aggregator::execute(command, config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
-            Commands::Net { command } => net::execute(command, config).await?,
+            Commands::Net { command } => net::execute(command, &config).await?,
         }
 
         Ok(())
@@ -85,6 +99,9 @@ pub async fn main() {
         // .with_env_filter("[app{id=cn4}]=info")
         // .with_env_filter("[app{id=ag}]=info")
         .init();
+
+    info!("COMPILATION ID: '{}'", compile_id::generate_id());
+
     let cli = Cli::parse();
 
     // Set the tag for all future traces
