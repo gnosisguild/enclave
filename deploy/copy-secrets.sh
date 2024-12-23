@@ -32,6 +32,7 @@ if [ ! -f "$SOURCE" ]; then
     exit 1
 fi
 
+i=0
 # Copy file to each target, skipping if exists
 for target in "${TARGETS[@]}"; do
     if [ -f "${target}.secrets.json" ]; then
