@@ -6,18 +6,7 @@
 !Cargo.toml
 !Cargo.lock
 
-# Allow core crate
-!core/
-!core/Cargo.toml
-!core/src/**/*.rs
-
-# net
-!net/
-!net/Cargo.toml
-!net/src/**/*.rs
-
-
-# Allow all other workspace members (adjust paths as needed)
+# Allow all other workspace members
 !*/Cargo.toml
 !*/src/**/*.rs
 

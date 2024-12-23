@@ -3,44 +3,38 @@ services:
     build:
       dockerfile: net/tests/Dockerfile
       context: ../..
-    image: p2p-test-image
-    networks:
-      app_net:
-        ipv4_address: 172.16.238.10
     command: ["/app/p2p_test", "alice"]
     environment:
       QUIC_PORT: 9091
-      DIAL_TO: "/ip4/172.16.238.12/udp/9091/quic-v1"
+      DIAL_TO: "/dns4/charlie/udp/9091/quic-v1"
       ENABLE_MDNS: "${ENABLE_MDNS:-true}"
-    entrypoint: ["/app/entrypoint.sh"]
+    networks:
+      - p2p_test_net
 
   bob:
-    image: p2p-test-image
-    networks:
-      app_net:
-        ipv4_address: 172.16.238.11
+    build:
+      dockerfile: net/tests/Dockerfile
+      context: ../..
     command: ["/app/p2p_test", "bob"]
     environment:
       QUIC_PORT: 9091
-      DIAL_TO: "/ip4/172.16.238.12/udp/9091/quic-v1"
+      DIAL_TO: "/dns4/charlie/udp/9091/quic-v1"
       ENABLE_MDNS: "${ENABLE_MDNS:-true}"
-    entrypoint: ["/app/entrypoint.sh"]
+    networks:
+      - p2p_test_net
 
   charlie:
-    image: p2p-test-image
-    networks:
-      app_net:
-        ipv4_address: 172.16.238.12
+    build:
+      dockerfile: net/tests/Dockerfile
+      context: ../..
     command: ["/app/p2p_test", "charlie"]
     environment:
       QUIC_PORT: 9091
       ENABLE_MDNS: "${ENABLE_MDNS:-true}"
-    entrypoint: ["/app/entrypoint.sh"]
+    networks:
+      - p2p_test_net
 
 networks:
-  app_net:
+  p2p_test_net:
     driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.16.238.0/24
+
