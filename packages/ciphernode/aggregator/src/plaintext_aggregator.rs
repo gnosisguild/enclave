@@ -221,8 +221,8 @@ impl Handler<Die> for PlaintextAggregator {
 impl Snapshot for PlaintextAggregator {
     type Snapshot = PlaintextAggregatorState;
 
-    fn snapshot(&self) -> Self::Snapshot {
-        self.state.clone()
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(self.state.clone())
     }
 }
 

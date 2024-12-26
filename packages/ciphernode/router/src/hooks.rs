@@ -57,7 +57,14 @@ impl E3Feature for FheFeature {
         let fhe = Arc::new(fhe_inner);
 
         // FHE doesn't implement Checkpoint so we are going to store it manually
-        ctx.repositories().fhe(&e3_id).write(&fhe.snapshot());
+        let Ok(snapshot) = fhe.snapshot() else {
+            self.bus.err(
+                EnclaveErrorType::KeyGeneration,
+                anyhow!("Failed to get snapshot"),
+            );
+            return;
+        };
+        ctx.repositories().fhe(&e3_id).write(&snapshot);
 
         let _ = ctx.set_fhe(fhe);
     }

@@ -77,10 +77,10 @@ impl Keyshare {
 impl Snapshot for Keyshare {
     type Snapshot = KeyshareState;
 
-    fn snapshot(&self) -> Self::Snapshot {
-        KeyshareState {
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(KeyshareState {
             secret: self.secret.clone(),
-        }
+        })
     }
 }
 

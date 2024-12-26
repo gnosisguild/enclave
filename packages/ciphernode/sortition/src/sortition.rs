@@ -144,8 +144,8 @@ impl Actor for Sortition {
 
 impl Snapshot for Sortition {
     type Snapshot = SortitionModule;
-    fn snapshot(&self) -> Self::Snapshot {
-        self.list.clone()
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(self.list.clone())
     }
 }
 

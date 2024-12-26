@@ -1706,6 +1706,7 @@ dependencies = [
  "alloy",
  "anyhow",
  "dirs",
+ "enclave-core",
  "figment",
  "serde",
  "shellexpand",
