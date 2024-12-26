@@ -1,5 +1,5 @@
 mod app_config;
-mod yaml;
 mod store_keys;
+mod yaml;
 
 pub use app_config::*;

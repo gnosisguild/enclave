@@ -1,10 +1,10 @@
 mod data_store;
 mod in_mem;
 mod into_key;
+mod persistable;
 mod repository;
 mod sled_store;
 mod snapshot;
-mod persistable;
 
 pub use data_store::*;
 pub use in_mem::*;
