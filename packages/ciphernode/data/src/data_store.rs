@@ -68,6 +68,11 @@ impl DataStore {
             return Ok(None);
         };
 
+        // If we get a null value return None as this doesn't deserialize correctly
+        if bytes == [0] {
+            return Ok(None);
+        }
+
         Ok(Some(bincode::deserialize(&bytes)?))
     }
 

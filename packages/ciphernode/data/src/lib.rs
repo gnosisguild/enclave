@@ -9,6 +9,7 @@ mod snapshot;
 pub use data_store::*;
 pub use in_mem::*;
 pub use into_key::IntoKey;
+pub use persistable::*;
 pub use repository::*;
 pub use sled_store::*;
 pub use snapshot::*;
