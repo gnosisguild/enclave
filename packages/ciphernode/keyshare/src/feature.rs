@@ -83,7 +83,7 @@ impl E3Feature for KeyshareFeature {
         };
 
         // Has the FHE dependency been already setup? (hint: it should have)
-        let Some(fhe) = ctx.fhe.clone() else {
+        let Some(fhe) = ctx.get_fhe() else {
             self.bus.err(
                 EnclaveErrorType::KeyGeneration,
                 anyhow!(ERROR_KEYSHARE_FHE_MISSING),
@@ -93,7 +93,7 @@ impl E3Feature for KeyshareFeature {
 
         // Construct from snapshot
         let value = Keyshare::new(KeyshareParams {
-            fhe,
+            fhe: fhe.clone(),
             bus: self.bus.clone(),
             secret: sync_secret,
             address: self.address.clone(),

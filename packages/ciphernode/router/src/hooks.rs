@@ -68,7 +68,7 @@ impl E3Feature for FheFeature {
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
         // No ID on the snapshot -> bail without reporting
-        if !snapshot.fhe {
+        if !snapshot.contains("fhe") {
             return Ok(());
         };
 

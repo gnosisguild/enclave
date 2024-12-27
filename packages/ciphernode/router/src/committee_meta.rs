@@ -49,7 +49,7 @@ impl E3Feature for CommitteeMetaFeature {
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
         // No ID on the snapshot -> bail
-        if !snapshot.meta {
+        if !snapshot.contains("meta") {
             return Ok(());
         };
 

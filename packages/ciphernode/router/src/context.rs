@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{CommitteeMeta, E3Feature, EventBuffer};
+use crate::{CommitteeMeta, E3Feature, EventBuffer, HetrogenousMap, TypedKey};
 use actix::{Addr, Recipient};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -10,6 +10,9 @@ use data::{
 use enclave_core::{E3id, EnclaveEvent};
 use fhe::Fhe;
 use serde::{Deserialize, Serialize};
+
+const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
+const META_KEY: TypedKey<CommitteeMeta> = TypedKey::new("meta");
 
 fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
     HashMap::from([
@@ -28,8 +31,9 @@ fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
 pub struct E3RequestContext {
     pub e3_id: E3id,
     pub recipients: HashMap<String, Option<Recipient<EnclaveEvent>>>, // NOTE: can be a None value
-    pub fhe: Option<Arc<fhe::Fhe>>,
-    pub meta: Option<CommitteeMeta>,
+    // pub fhe: Option<Arc<fhe::Fhe>>,
+    // pub meta: Option<CommitteeMeta>,
+    pub dependencies: HetrogenousMap,
     pub store: Repository<E3RequestContextSnapshot>,
 }
 
@@ -37,8 +41,8 @@ pub struct E3RequestContext {
 pub struct E3RequestContextSnapshot {
     pub e3_id: E3id,
     pub recipients: Vec<String>,
-    pub fhe: bool,
-    pub meta: bool,
+    pub dependencies: Vec<String>, // pub fhe: bool,
+                                   // pub meta: bool,
 }
 
 impl E3RequestContextSnapshot {
@@ -59,8 +63,7 @@ impl E3RequestContext {
             e3_id: params.e3_id,
             store: params.store,
             recipients: init_recipients(),
-            fhe: None,
-            meta: None,
+            dependencies: HetrogenousMap::new(),
         }
     }
 
@@ -111,22 +114,22 @@ impl E3RequestContext {
     // We can wrap the thing we are storing in a polymorphic struct that takes a T and has a key() method
     /// Accept a DataStore ID and an Arc instance of the Fhe wrapper
     pub fn set_fhe(&mut self, value: Arc<Fhe>) {
-        self.fhe = Some(value.clone());
+        self.dependencies.insert(FHE_KEY, value.clone());
         self.checkpoint();
     }
 
     /// Accept a Datastore ID and a metadata object
     pub fn set_meta(&mut self, value: CommitteeMeta) {
-        self.meta = Some(value.clone());
+        self.dependencies.insert(META_KEY, value.clone());
         self.checkpoint();
     }
 
     pub fn get_fhe(&self) -> Option<&Arc<Fhe>> {
-        self.fhe.as_ref()
+        self.dependencies.get(FHE_KEY)
     }
 
     pub fn get_meta(&self) -> Option<&CommitteeMeta> {
-        self.meta.as_ref()
+        self.dependencies.get(META_KEY)
     }
 }
 
@@ -143,8 +146,7 @@ impl Snapshot for E3RequestContext {
     fn snapshot(&self) -> Result<Self::Snapshot> {
         Ok(Self::Snapshot {
             e3_id: self.e3_id.clone(),
-            meta: self.meta.is_some(),
-            fhe: self.fhe.is_some(),
+            dependencies: self.dependencies.keys(),
             recipients: self.recipients.keys().cloned().collect(),
         })
     }
@@ -157,9 +159,8 @@ impl FromSnapshotWithParams for E3RequestContext {
         let mut ctx = Self {
             e3_id: params.e3_id,
             store: params.store,
-            fhe: None,
-            meta: None,
             recipients: init_recipients(),
+            dependencies: HetrogenousMap::new(),
         };
 
         for feature in params.features.iter() {

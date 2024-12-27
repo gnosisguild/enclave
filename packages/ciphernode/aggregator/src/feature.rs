@@ -217,7 +217,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         // Get deps
-        let Some(fhe) = ctx.fhe.clone() else {
+        let Some(fhe) = ctx.get_fhe() else {
             self.bus.err(
                 EnclaveErrorType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_FHE_MISSING),
@@ -226,7 +226,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
             return Ok(());
         };
 
-        let Some(meta) = ctx.meta.clone() else {
+        let Some(meta) = ctx.get_meta() else {
             self.bus.err(
                 EnclaveErrorType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_META_MISSING),
