@@ -38,6 +38,7 @@ base64 = "0.22.1"
 clap = { version = "4.5.17", features = ["derive"] }
 cipher = { path = "./cipher" }
 compile-time = "0.2.0"
+config = { path = "./config" }
 dirs = "5.0.1"
 data = { path = "./data" }
 enclave-core = { path = "./core" }
