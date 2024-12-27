@@ -345,18 +345,21 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         let e3_id = data.e3_id.clone();
-
-        let _ = ctx.set_publickey(
+        let repo = ctx.repositories().publickey(&e3_id);
+        let sync_state = repo.send(Some(PublicKeyAggregatorState::init(
+            meta.threshold_m,
+            meta.seed,
+        )));
+        ctx.set_publickey(
             PublicKeyAggregator::new(
                 PublicKeyAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.repositories().publickey(&e3_id),
                     sortition: self.sortition.clone(),
                     e3_id,
                     src_chain_id: meta.src_chain_id,
                 },
-                PublicKeyAggregatorState::init(meta.threshold_m, meta.seed),
+                sync_state,
             )
             .start(),
         );
@@ -372,10 +375,11 @@ impl E3Feature for PublicKeyAggregatorFeature {
             return Ok(());
         };
 
-        let repository = ctx.repositories().publickey(&ctx.e3_id);
+        let repo = ctx.repositories().publickey(&ctx.e3_id);
+        let sync_state = repo.load().await?;
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = repository.read().await? else {
+        if !sync_state.has() {
             return Ok(());
         };
 
@@ -398,18 +402,16 @@ impl E3Feature for PublicKeyAggregatorFeature {
             return Ok(());
         };
 
-        let value = PublicKeyAggregator::from_snapshot(
+        let value = PublicKeyAggregator::new(
             PublicKeyAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
-                store: repository,
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 src_chain_id: meta.src_chain_id,
             },
-            snap,
+            sync_state,
         )
-        .await?
         .start();
 
         // send to context
