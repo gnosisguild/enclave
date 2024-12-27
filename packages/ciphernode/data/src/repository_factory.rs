@@ -1,5 +1,6 @@
 use crate::{DataStore, Repository};
 
+// TODO: Naming here is confusing
 pub struct Repositories {
     pub store: DataStore,
 }

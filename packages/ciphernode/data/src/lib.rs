@@ -3,6 +3,7 @@ mod in_mem;
 mod into_key;
 mod persistable;
 mod repository;
+mod repository_factory;
 mod sled_store;
 mod snapshot;
 
