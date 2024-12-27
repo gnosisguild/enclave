@@ -30,11 +30,12 @@ const ERROR_KEYSHARE_FHE_MISSING: &str =
 #[async_trait]
 impl E3Feature for KeyshareFeature {
     fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
-        // Save Ciphernode on CiphernodeSelected
+        // if this is NOT a CiphernodeSelected event then ignore
         let EnclaveEvent::CiphernodeSelected { data, .. } = evt else {
             return;
         };
 
+        // Has the FHE dependency been already setup? (hint: it should have)
         let Some(fhe) = ctx.get_fhe() else {
             self.bus.err(
                 EnclaveErrorType::KeyGeneration,
@@ -45,7 +46,7 @@ impl E3Feature for KeyshareFeature {
 
         let e3_id = data.clone().e3_id;
         let repo = ctx.repositories().keyshare(&e3_id);
-        let container = repo.send(None);
+        let container = repo.send(None); // New container with None
 
         ctx.set_event_recipient(
             "keyshare",
@@ -68,11 +69,12 @@ impl E3Feature for KeyshareFeature {
         ctx: &mut E3RequestContext,
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
-        // No ID on the snapshot -> bail
+        // No keyshare on the snapshot -> bail
         if !snapshot.contains("keyshare") {
             return Ok(());
         };
 
+        // Get the saved state as a persistable
         let sync_secret = ctx.repositories().keyshare(&snapshot.e3_id).load().await?;
 
         // No Snapshot returned from the sync_secret -> bail
@@ -80,7 +82,7 @@ impl E3Feature for KeyshareFeature {
             return Ok(());
         };
 
-        // Get deps
+        // Has the FHE dependency been already setup? (hint: it should have)
         let Some(fhe) = ctx.fhe.clone() else {
             self.bus.err(
                 EnclaveErrorType::KeyGeneration,

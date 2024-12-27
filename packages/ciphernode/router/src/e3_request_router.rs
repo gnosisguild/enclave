@@ -44,7 +44,11 @@ impl EventBuffer {
 /// Format of the hook that needs to be passed to E3RequestRouter
 #[async_trait]
 pub trait E3Feature: Send + Sync + 'static {
+    /// This function is triggered when an EnclaveEvent is sent to the router. Use this to
+    /// initialize the receiver using `ctx.set_event_receiver(my_receiver)`
     fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
+
+    /// This function it triggered when the request context is being hydrated from snapshot.
     async fn hydrate(
         &self,
         ctx: &mut E3RequestContext,
