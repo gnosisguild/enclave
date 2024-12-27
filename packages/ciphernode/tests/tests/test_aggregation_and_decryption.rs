@@ -1,3 +1,4 @@
+use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use cipher::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
@@ -8,14 +9,12 @@ use enclave_core::{
     Shutdown,
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use keyshare::KeyshareFeature;
 use logger::SimpleLogger;
 use net::{events::NetworkPeerEvent, NetworkManager};
-use router::{
-    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
-    PublicKeyAggregatorFeature,
-};
-use sortition::Sortition;
+use router::{E3RequestRouter, FheFeature};
 use sortition::SortitionRepositoryFactory;
+use sortition::{CiphernodeSelector, Sortition};
 
 use actix::prelude::*;
 use alloy::primitives::Address;
