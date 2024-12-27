@@ -41,11 +41,21 @@ impl EventBuffer {
     }
 }
 
-/// Format of the hook that needs to be passed to E3RequestRouter
+/// Format of a Feature that can be passed to E3RequestRouter. E3Features listen for EnclaveEvents
+/// that are braoadcast to know when to instantiate themselves. They define the events they respond
+/// to using the `on_event` handler. Within this handler they will typically use the request's
+/// context to construct a version of their requisite actors and save their addresses to the
+/// context using the `set_event_recipient` method on the context. Event recipients once set will
+/// then have all their events streamed to them from their buffer. Features can also reconstruct
+/// Actors based on their persisted state using the context snapshot and relevant repositories.
+/// Generally Features can ask the context to see if a dependency has already been set to know if
+/// it has everything it needs to construct the Feature
 #[async_trait]
 pub trait E3Feature: Send + Sync + 'static {
     /// This function is triggered when an EnclaveEvent is sent to the router. Use this to
-    /// initialize the receiver using `ctx.set_event_receiver(my_receiver)`
+    /// initialize the receiver using `ctx.set_event_receiver(my_address.into())`. Typically this
+    /// means filtering for specific e3_id enabled events that give rise to actors that have to
+    /// handle certain behaviour.
     fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
 
     /// This function it triggered when the request context is being hydrated from snapshot.
@@ -57,14 +67,16 @@ pub trait E3Feature: Send + Sync + 'static {
 }
 
 /// E3RequestRouter will register features that receive an E3_id specific context. After features
-/// have run e3_id specific messages are forwarded to all instances on the context. This enables
-/// features to lazily register instances that have the correct dependencies available per e3_id
-/// request
-// TODO: setup typestate pattern so that we have to place features within correct order of
-// dependencies
+/// have run e3_id specific messages are forwarded to all instances on the context as they come in.
+/// This enables features to lazily register instances that have the correct dependencies available
+/// per e3_id request.
+// TODO: setup so that we have to place features within correct order of dependencies
 pub struct E3RequestRouter {
+    /// The context for every E3 request
     contexts: HashMap<E3id, E3RequestContext>,
+    /// A list of completed requests
     completed: HashSet<E3id>,
+    /// The features this instance of the router is configured to listen for
     features: Arc<Vec<Box<dyn E3Feature>>>,
     buffer: EventBuffer,
     bus: Addr<EventBus>,
