@@ -1,4 +1,5 @@
 use cipher::Cipher;
+use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
@@ -8,15 +9,16 @@ use enclave_core::{
 };
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use logger::SimpleLogger;
-use net::{correlation_id::CorrelationId, events::NetworkPeerEvent, NetworkManager};
+use net::{events::NetworkPeerEvent, NetworkManager};
 use router::{
     CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
-    PublicKeyAggregatorFeature, RepositoriesFactory,
+    PublicKeyAggregatorFeature,
 };
 use sortition::Sortition;
+use sortition::SortitionRepositoryFactory;
 
 use actix::prelude::*;
-use alloy::{primitives::Address, signers::k256::sha2::digest::Reset};
+use alloy::primitives::Address;
 use anyhow::*;
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
@@ -26,7 +28,7 @@ use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::{env, path::Path, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 use tokio::{sync::mpsc, time::sleep};
 
