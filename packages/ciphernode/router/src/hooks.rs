@@ -1,16 +1,17 @@
-use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot, RepositoriesFactory};
+use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use actix::{Actor, Addr};
 use aggregator::{
-    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState, PublicKeyAggregator,
-    PublicKeyAggregatorParams, PublicKeyAggregatorState,
+    PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState,
+    PlaintextRepositoryFactory, PublicKeyAggregator, PublicKeyAggregatorParams,
+    PublicKeyAggregatorState, PublicKeyRepositoryFactory,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cipher::Cipher;
-use data::{AutoPersist, FromSnapshotWithParams, Snapshot};
+use data::{AutoPersist, FromSnapshotWithParams, RepositoriesFactory, Snapshot};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
-use fhe::{Fhe, SharedRng};
-use keyshare::{Keyshare, KeyshareParams};
+use fhe::{Fhe, FheRepositoryFactory, SharedRng};
+use keyshare::{Keyshare, KeyshareParams, KeyshareRepositoryFactory};
 use sortition::Sortition;
 use std::sync::Arc;
 

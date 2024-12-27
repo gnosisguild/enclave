@@ -1,6 +1,7 @@
-use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot, RepositoriesFactory};
+use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot, MetaRepositoryFactory};
 use anyhow::*;
 use async_trait::async_trait;
+use data::RepositoriesFactory;
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

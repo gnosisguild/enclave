@@ -7,6 +7,7 @@ use dialoguer::{theme::ColorfulTheme, Password};
 use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
 use libp2p::identity::Keypair;
+use net::NetRepositoryFactory;
 
 pub fn create_keypair(input: &String) -> Result<Keypair> {
     match hex::check(input) {

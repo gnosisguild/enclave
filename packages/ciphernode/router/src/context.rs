@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
-use crate::{CommitteeMeta, E3Feature, EventBuffer, Repositories, RepositoriesFactory};
+use crate::{CommitteeMeta, E3Feature, EventBuffer};
 use actix::{Addr, Recipient};
 use aggregator::{PlaintextAggregator, PublicKeyAggregator};
 use anyhow::Result;
 use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
+use data::{
+    Checkpoint, FromSnapshotWithParams, Repositories, RepositoriesFactory, Repository, Snapshot,
+};
 use enclave_core::{E3id, EnclaveEvent};
 use fhe::Fhe;
 use keyshare::Keyshare;

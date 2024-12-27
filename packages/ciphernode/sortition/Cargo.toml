@@ -13,6 +13,7 @@ actix = { workspace = true }
 alloy = { workspace = true, features = ["full"] }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+config = { workspace = true }
 data = { path = "../data" }
 enclave-core = { path = "../core" }
 num = { workspace = true }

@@ -6,6 +6,7 @@ use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Password};
 use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
+use evm::EthPrivateKeyRepositoryFactory;
 
 pub fn validate_private_key(input: &String) -> Result<()> {
     let bytes =

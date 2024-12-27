@@ -1,8 +1,9 @@
 use crate::CommitteeMetaFeature;
+use crate::ContextRepositoryFactory;
 use crate::E3RequestContext;
 use crate::E3RequestContextParams;
 use crate::E3RequestContextSnapshot;
-use crate::RepositoriesFactory;
+use crate::RouterRepositoryFactory;
 use actix::AsyncContext;
 use actix::{Actor, Addr, Context, Handler};
 use anyhow::*;
@@ -10,6 +11,7 @@ use async_trait::async_trait;
 use data::Checkpoint;
 use data::DataStore;
 use data::FromSnapshotWithParams;
+use data::RepositoriesFactory;
 use data::Repository;
 use data::Snapshot;
 use enclave_core::E3RequestComplete;

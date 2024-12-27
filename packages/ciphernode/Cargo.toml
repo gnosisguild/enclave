@@ -42,6 +42,7 @@ config = { path = "./config" }
 dirs = "5.0.1"
 data = { path = "./data" }
 enclave-core = { path = "./core" }
+evm = { path = "./evm" }
 shellexpand = "3.1.0"
 figment = { version = "0.10.19", features = ["yaml", "test"] }
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
@@ -52,6 +53,7 @@ futures-util = "0.3"
 hex = "0.4.3"
 lazy_static = "1.5.0"
 num = "0.4.3"
+net = { path = "./net" }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
 serde = { version = "1.0.208", features = ["derive"] }
