@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, FheRepositoryFactory, SharedRng};
-use sortition::Sortition;
 use std::sync::Arc;
 
 /// TODO: move these to each package with access on MyStruct::launcher()
@@ -84,97 +83,3 @@ impl E3Feature for FheFeature {
         Ok(())
     }
 }
-
-// pub struct KeyshareFeature {
-//     bus: Addr<EventBus>,
-//     address: String,
-//     cipher: Arc<Cipher>,
-// }
-//
-// impl KeyshareFeature {
-//     pub fn create(bus: &Addr<EventBus>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
-//         Box::new(Self {
-//             bus: bus.clone(),
-//             address: address.to_owned(),
-//             cipher: cipher.to_owned(),
-//         })
-//     }
-// }
-//
-// const ERROR_KEYSHARE_FHE_MISSING: &str =
-//     "Could not create Keyshare because the fhe instance it depends on was not set on the context.";
-//
-// #[async_trait]
-// impl E3Feature for KeyshareFeature {
-//     fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
-//         // Save Ciphernode on CiphernodeSelected
-//         let EnclaveEvent::CiphernodeSelected { data, .. } = evt else {
-//             return;
-//         };
-//
-//         let Some(fhe) = ctx.get_fhe() else {
-//             self.bus.err(
-//                 EnclaveErrorType::KeyGeneration,
-//                 anyhow!(ERROR_KEYSHARE_FHE_MISSING),
-//             );
-//             return;
-//         };
-//
-//         let e3_id = data.clone().e3_id;
-//         let repo = ctx.repositories().keyshare(&e3_id);
-//         let container = repo.send(None);
-//
-//         ctx.set_keyshare(
-//             Keyshare::new(KeyshareParams {
-//                 bus: self.bus.clone(),
-//                 secret: container,
-//                 fhe: fhe.clone(),
-//                 address: self.address.clone(),
-//                 cipher: self.cipher.clone(),
-//             })
-//             .start(),
-//         );
-//     }
-//
-//     async fn hydrate(
-//         &self,
-//         ctx: &mut E3RequestContext,
-//         snapshot: &E3RequestContextSnapshot,
-//     ) -> Result<()> {
-//         // No ID on the snapshot -> bail
-//         if !snapshot.keyshare {
-//             return Ok(());
-//         };
-//
-//         let sync_secret = ctx.repositories().keyshare(&snapshot.e3_id).load().await?;
-//
-//         // No Snapshot returned from the sync_secret -> bail
-//         if !sync_secret.has() {
-//             return Ok(());
-//         };
-//
-//         // Get deps
-//         let Some(fhe) = ctx.fhe.clone() else {
-//             self.bus.err(
-//                 EnclaveErrorType::KeyGeneration,
-//                 anyhow!(ERROR_KEYSHARE_FHE_MISSING),
-//             );
-//             return Ok(());
-//         };
-//
-//         // Construct from snapshot
-//         let value = Keyshare::new(KeyshareParams {
-//             fhe,
-//             bus: self.bus.clone(),
-//             secret: sync_secret,
-//             address: self.address.clone(),
-//             cipher: self.cipher.clone(),
-//         })
-//         .start();
-//
-//         // send to context
-//         ctx.set_keyshare(value);
-//
-//         Ok(())
-//     }
-// }
