@@ -1,18 +1,14 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{CommitteeMeta, E3Feature, EventBuffer, HetrogenousMap, TypedKey};
-use actix::{Addr, Recipient};
+use crate::{E3Feature, EventBuffer, HetrogenousMap, TypedKey};
+use actix::Recipient;
 use anyhow::Result;
 use async_trait::async_trait;
 use data::{
     Checkpoint, FromSnapshotWithParams, Repositories, RepositoriesFactory, Repository, Snapshot,
 };
 use enclave_core::{E3id, EnclaveEvent};
-use fhe::Fhe;
 use serde::{Deserialize, Serialize};
-
-const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
-const META_KEY: TypedKey<CommitteeMeta> = TypedKey::new("meta");
 
 fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
     HashMap::from([
@@ -31,8 +27,6 @@ fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
 pub struct E3RequestContext {
     pub e3_id: E3id,
     pub recipients: HashMap<String, Option<Recipient<EnclaveEvent>>>, // NOTE: can be a None value
-    // pub fhe: Option<Arc<fhe::Fhe>>,
-    // pub meta: Option<CommitteeMeta>,
     pub dependencies: HetrogenousMap,
     pub store: Repository<E3RequestContextSnapshot>,
 }
@@ -41,13 +35,12 @@ pub struct E3RequestContext {
 pub struct E3RequestContextSnapshot {
     pub e3_id: E3id,
     pub recipients: Vec<String>,
-    pub dependencies: Vec<String>, // pub fhe: bool,
-                                   // pub meta: bool,
+    pub dependencies: Vec<String>,
 }
 
 impl E3RequestContextSnapshot {
     pub fn contains(&self, key: &str) -> bool {
-        self.recipients.contains(&key.to_string())
+        self.recipients.contains(&key.to_string()) || self.dependencies.contains(&key.to_string())
     }
 }
 
@@ -110,26 +103,19 @@ impl E3RequestContext {
             .and_then(|opt| opt.as_ref())
     }
 
-    // TODO: consolidate to a simple set_dependency / get_dependency API.
-    // We can wrap the thing we are storing in a polymorphic struct that takes a T and has a key() method
-    /// Accept a DataStore ID and an Arc instance of the Fhe wrapper
-    pub fn set_fhe(&mut self, value: Arc<Fhe>) {
-        self.dependencies.insert(FHE_KEY, value.clone());
+    pub fn set_dependency<T>(&mut self, key: TypedKey<T>, value: T)
+    where
+        T: Send + Sync + 'static,
+    {
+        self.dependencies.insert(key, value);
         self.checkpoint();
     }
 
-    /// Accept a Datastore ID and a metadata object
-    pub fn set_meta(&mut self, value: CommitteeMeta) {
-        self.dependencies.insert(META_KEY, value.clone());
-        self.checkpoint();
-    }
-
-    pub fn get_fhe(&self) -> Option<&Arc<Fhe>> {
-        self.dependencies.get(FHE_KEY)
-    }
-
-    pub fn get_meta(&self) -> Option<&CommitteeMeta> {
-        self.dependencies.get(META_KEY)
+    pub fn get_dependency<T>(&self, key: TypedKey<T>) -> Option<&T>
+    where
+        T: Send + Sync + 'static,
+    {
+        self.dependencies.get(key)
     }
 }
 

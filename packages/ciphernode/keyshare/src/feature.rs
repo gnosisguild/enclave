@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use cipher::Cipher;
 use data::{AutoPersist, RepositoriesFactory};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
+use fhe::FHE_KEY;
 use router::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use std::sync::Arc;
 
@@ -36,7 +37,7 @@ impl E3Feature for KeyshareFeature {
         };
 
         // Has the FHE dependency been already setup? (hint: it should have)
-        let Some(fhe) = ctx.get_fhe() else {
+        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
                 EnclaveErrorType::KeyGeneration,
                 anyhow!(ERROR_KEYSHARE_FHE_MISSING),
@@ -83,7 +84,7 @@ impl E3Feature for KeyshareFeature {
         };
 
         // Has the FHE dependency been already setup? (hint: it should have)
-        let Some(fhe) = ctx.get_fhe() else {
+        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
                 EnclaveErrorType::KeyGeneration,
                 anyhow!(ERROR_KEYSHARE_FHE_MISSING),

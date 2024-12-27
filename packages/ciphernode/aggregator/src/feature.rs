@@ -8,7 +8,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{AutoPersist, RepositoriesFactory};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
-use router::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
+use fhe::FHE_KEY;
+use router::{E3Feature, E3RequestContext, E3RequestContextSnapshot, META_KEY};
 use sortition::Sortition;
 
 pub struct PlaintextAggregatorFeature {
@@ -35,7 +36,7 @@ impl E3Feature for PlaintextAggregatorFeature {
             return;
         };
 
-        let Some(fhe) = ctx.get_fhe() else {
+        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PlaintextAggregation,
                 anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
@@ -43,7 +44,7 @@ impl E3Feature for PlaintextAggregatorFeature {
             return;
         };
 
-        let Some(ref meta) = ctx.get_meta() else {
+        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PlaintextAggregation,
                 anyhow!(ERROR_PLAINTEXT_META_MISSING),
@@ -97,7 +98,7 @@ impl E3Feature for PlaintextAggregatorFeature {
         };
 
         // Get deps
-        let Some(fhe) = ctx.get_fhe() else {
+        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PlaintextAggregation,
                 anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
@@ -105,7 +106,7 @@ impl E3Feature for PlaintextAggregatorFeature {
             return Ok(());
         };
 
-        let Some(ref meta) = ctx.get_meta() else {
+        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PlaintextAggregation,
                 anyhow!(ERROR_PLAINTEXT_META_MISSING),
@@ -158,14 +159,14 @@ impl E3Feature for PublicKeyAggregatorFeature {
             return;
         };
 
-        let Some(fhe) = ctx.get_fhe() else {
+        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_FHE_MISSING),
             );
             return;
         };
-        let Some(ref meta) = ctx.get_meta() else {
+        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_META_MISSING),
@@ -217,7 +218,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         // Get deps
-        let Some(fhe) = ctx.get_fhe() else {
+        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_FHE_MISSING),
@@ -226,7 +227,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
             return Ok(());
         };
 
-        let Some(meta) = ctx.get_meta() else {
+        let Some(meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PublickeyAggregation,
                 anyhow!(ERROR_PUBKEY_META_MISSING),

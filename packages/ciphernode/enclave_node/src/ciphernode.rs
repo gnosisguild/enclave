@@ -10,12 +10,13 @@ use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
 };
+use fhe::FheFeature;
 use keyshare::KeyshareFeature;
 use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{E3RequestRouter, FheFeature};
+use router::E3RequestRouter;
 use sortition::CiphernodeSelector;
 use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;

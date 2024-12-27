@@ -2418,6 +2418,7 @@ dependencies = [
 name = "fhe"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "anyhow",
  "async-trait",
  "bincode",
@@ -2429,6 +2430,7 @@ dependencies = [
  "fhe-util",
  "rand",
  "rand_chacha",
+ "router",
  "serde",
 ]
 
@@ -5317,7 +5319,6 @@ dependencies = [
  "data",
  "enclave-core",
  "evm",
- "fhe 0.1.0",
  "serde",
  "sortition",
  "tracing",

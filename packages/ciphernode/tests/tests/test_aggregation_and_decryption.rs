@@ -8,11 +8,11 @@ use enclave_core::{
     KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
     Shutdown,
 };
-use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use fhe::{setup_crp_params, FheFeature, ParamsWithCrp, SharedRng};
 use keyshare::KeyshareFeature;
 use logger::SimpleLogger;
 use net::{events::NetworkPeerEvent, NetworkManager};
-use router::{E3RequestRouter, FheFeature};
+use router::E3RequestRouter;
 use sortition::SortitionRepositoryFactory;
 use sortition::{CiphernodeSelector, Sortition};
 
@@ -457,7 +457,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
         _ => None,
     });
-
     assert_eq!(actual, Some(expected));
 
     Ok(())

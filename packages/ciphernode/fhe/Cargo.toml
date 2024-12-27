@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
@@ -15,4 +16,5 @@ fhe-util = { workspace = true }
 fhe_rs = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
+router = { workspace = true }
 serde = { workspace = true }

@@ -11,11 +11,12 @@ use evm::{
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
+use fhe::FheFeature;
 use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
-use router::{E3RequestRouter, FheFeature};
+use router::E3RequestRouter;
 use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
