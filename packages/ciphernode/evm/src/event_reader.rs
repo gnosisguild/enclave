@@ -8,8 +8,7 @@ use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
 use alloy::transports::{BoxTransport, Transport};
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
+use data::{AutoPersist, Persistable, Repository};
 use enclave_core::{
     get_tag, BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe,
 };
@@ -50,7 +49,7 @@ where
     contract_address: Address,
     start_block: Option<u64>,
     bus: Addr<EventBus>,
-    repository: Repository<EvmEventReaderState>,
+    state: Persistable<EvmEventReaderState>,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Clone)]
@@ -80,10 +79,8 @@ where
     start_block: Option<u64>,
     /// Event bus for error propagation
     bus: Addr<EventBus>,
-    /// The in memory state of the event reader
-    state: EvmEventReaderState,
-    /// Repository to save the state of the event reader
-    repository: Repository<EvmEventReaderState>,
+    /// The auto persistable state of the event reader
+    state: Persistable<EvmEventReaderState>,
 }
 
 impl<P, T> EvmEventReader<P, T>
@@ -101,20 +98,8 @@ where
             shutdown_tx: Some(shutdown_tx),
             start_block: params.start_block,
             bus: params.bus,
-            state: EvmEventReaderState::default(),
-            repository: params.repository,
+            state: params.state,
         }
-    }
-
-    #[instrument(name="evm_event_reader", skip_all, fields(id = get_tag()))]
-    pub async fn load(params: EvmEventReaderParams<P, T>) -> Result<Self> {
-        Ok(if let Some(snapshot) = params.repository.read().await? {
-            info!("Loading from snapshot");
-            Self::from_snapshot(params, snapshot).await?
-        } else {
-            info!("Loading from params");
-            Self::new(params)
-        })
     }
 
     pub async fn attach(
@@ -125,15 +110,20 @@ where
         bus: &Addr<EventBus>,
         repository: &Repository<EvmEventReaderState>,
     ) -> Result<Addr<Self>> {
+        let sync_state = repository
+            .clone()
+            .load_or_default(EvmEventReaderState::default())
+            .await?;
+
         let params = EvmEventReaderParams {
             provider: provider.clone(),
             extractor,
             contract_address: contract_address.parse()?,
             start_block,
             bus: bus.clone(),
-            repository: repository.clone(),
+            state: sync_state,
         };
-        let addr = EvmEventReader::load(params).await?.start();
+        let addr = EvmEventReader::new(params).start();
 
         bus.do_send(Subscribe::new("Shutdown", addr.clone().into()));
 
@@ -284,69 +274,33 @@ where
 
     #[instrument(name="evm_event_reader", skip_all, fields(id = get_tag()))]
     fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
-        let event_id = wrapped.get_id();
-        info!("Processing event: {}", event_id);
-        info!("cache length: {}", self.state.ids.len());
-        if self.state.ids.contains(&event_id) {
-            error!(
-                "Event id {} has already been seen and was not forwarded to the bus",
-                &event_id
-            );
-            return;
+        match self.state.try_mutate(|mut state| {
+            let event_id = wrapped.get_id();
+            info!("Processing event: {}", event_id);
+            info!("cache length: {}", state.ids.len());
+            if state.ids.contains(&event_id) {
+                error!(
+                    "Event id {} has already been seen and was not forwarded to the bus",
+                    &event_id
+                );
+                return Ok(state);
+            }
+
+            let event_type = wrapped.event.event_type();
+
+            // Forward everything else to the event bus
+            self.bus.do_send(wrapped.event);
+
+            // Save processed ids
+            info!("Storing event(EVM) in cache {}({})", event_type, event_id);
+
+            state.ids.insert(event_id);
+            state.last_block = wrapped.block;
+
+            Ok(state)
+        }) {
+            Ok(_) => (),
+            Err(err) => self.bus.err(EnclaveErrorType::Evm, err),
         }
-        let event_type = wrapped.event.event_type();
-
-        // Forward everything else to the event bus
-        self.bus.do_send(wrapped.event);
-
-        // Save processed ids
-        info!("Storing event(EVM) in cache {}({})", event_type, event_id);
-        self.state.ids.insert(event_id);
-        self.state.last_block = wrapped.block;
-        self.checkpoint();
-    }
-}
-
-impl<P, T> Snapshot for EvmEventReader<P, T>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
-    type Snapshot = EvmEventReaderState;
-    fn snapshot(&self) -> Result<Self::Snapshot> {
-        Ok(self.state.clone())
-    }
-}
-
-impl<P, T> Checkpoint for EvmEventReader<P, T>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
-    fn repository(&self) -> &Repository<Self::Snapshot> {
-        &self.repository
-    }
-}
-
-#[async_trait]
-impl<P, T> FromSnapshotWithParams for EvmEventReader<P, T>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
-    type Params = EvmEventReaderParams<P, T>;
-    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        Ok(Self {
-            contract_address: params.contract_address,
-            provider: Some(params.provider),
-            extractor: params.extractor,
-            shutdown_rx: Some(shutdown_rx),
-            shutdown_tx: Some(shutdown_tx),
-            start_block: params.start_block,
-            bus: params.bus,
-            state: snapshot,
-            repository: params.repository,
-        })
     }
 }
