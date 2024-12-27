@@ -1,5 +1,3 @@
-use std::{collections::HashMap, sync::Arc};
-
 use crate::{E3Feature, EventBuffer, HetrogenousMap, TypedKey};
 use actix::Recipient;
 use anyhow::Result;
@@ -9,7 +7,11 @@ use data::{
 };
 use enclave_core::{E3id, EnclaveEvent};
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, sync::Arc};
 
+/// Initialize the HashMap with a list of expected Recipients. In order to know whether or not we
+/// should buffer we need to iterate over this list and determine which recipients are missing based
+/// on the recipient value is why we set it here to have keys with empty values.
 fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
     HashMap::from([
         ("keyshare".to_owned(), None),
@@ -25,9 +27,13 @@ fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
 // TODO: remove Arc<Fhe> import as we need to be able to move the Fhe feature out of the hooks
 // file without circular deps
 pub struct E3RequestContext {
+    /// The E3Request's ID
     pub e3_id: E3id,
+    /// A way to store EnclaveEvent recipients on the context
     pub recipients: HashMap<String, Option<Recipient<EnclaveEvent>>>, // NOTE: can be a None value
+    /// A way to store a feature's dependencies on the context
     pub dependencies: HetrogenousMap,
+    /// A Repository for storing this context's data snapshot
     pub store: Repository<E3RequestContextSnapshot>,
 }
 
@@ -60,6 +66,8 @@ impl E3RequestContext {
         }
     }
 
+    /// Return a list of expected recipient keys alongside any values that have or have not been
+    /// set.
     fn recipients(&self) -> Vec<(String, Option<Recipient<EnclaveEvent>>)> {
         self.recipients
             .iter()

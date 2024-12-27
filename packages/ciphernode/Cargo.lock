@@ -5314,13 +5314,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "cipher 0.1.0",
  "config",
  "data",
  "enclave-core",
- "evm",
  "serde",
- "sortition",
  "tracing",
 ]
 

@@ -6,13 +6,10 @@ edition = "2021"
 [dependencies]
 actix = { workspace = true }
 enclave-core = { path = "../core" }
-sortition = { path = "../sortition" }
 data = { path = "../data" }
-evm = { path = "../evm" }
 anyhow = { workspace = true }
 serde = { workspace = true }
 config = { workspace = true }
-cipher = { path = "../cipher" }
 bincode = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
