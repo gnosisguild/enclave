@@ -1,6 +1,5 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use cipher::Cipher;
 use data::Persistable;
 use enclave_core::{
@@ -8,7 +7,6 @@ use enclave_core::{
     E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
 use fhe::{DecryptCiphertext, Fhe};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::warn;
 
@@ -30,11 +28,6 @@ pub struct KeyshareParams {
     pub fhe: Arc<Fhe>,
     pub address: String,
     pub cipher: Arc<Cipher>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct KeyshareState {
-    secret: Option<Vec<u8>>,
 }
 
 impl Keyshare {

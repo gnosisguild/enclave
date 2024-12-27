@@ -4,7 +4,6 @@ use data::{DataStore, Repository};
 use enclave_core::E3id;
 use evm::EvmEventReaderState;
 use fhe::FheSnapshot;
-use keyshare::KeyshareState;
 use sortition::SortitionModule;
 
 pub struct Repositories {
@@ -38,7 +37,7 @@ impl<T> From<Repository<T>> for Repositories {
 }
 
 impl Repositories {
-    pub fn keyshare(&self, e3_id: &E3id) -> Repository<KeyshareState> {
+    pub fn keyshare(&self, e3_id: &E3id) -> Repository<Vec<u8>> {
         Repository::new(self.store.scope(format!("//keyshare/{e3_id}")))
     }
 

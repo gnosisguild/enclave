@@ -127,11 +127,13 @@ impl E3Feature for KeyshareFeature {
         };
 
         let e3_id = data.clone().e3_id;
+        let repo = ctx.repositories().keyshare(&e3_id);
+        let container = repo.send(None);
 
         ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
                 bus: self.bus.clone(),
-                store: ctx.repositories().keyshare(&e3_id),
+                secret: container,
                 fhe: fhe.clone(),
                 address: self.address.clone(),
                 cipher: self.cipher.clone(),
@@ -150,10 +152,10 @@ impl E3Feature for KeyshareFeature {
             return Ok(());
         };
 
-        let store = ctx.repositories().keyshare(&snapshot.e3_id);
+        let sync_secret = ctx.repositories().keyshare(&snapshot.e3_id).load().await?;
 
-        // No Snapshot returned from the store -> bail
-        let Some(snap) = store.read().await? else {
+        // No Snapshot returned from the sync_secret -> bail
+        if !sync_secret.has() {
             return Ok(());
         };
 
@@ -167,17 +169,13 @@ impl E3Feature for KeyshareFeature {
         };
 
         // Construct from snapshot
-        let value = Keyshare::from_snapshot(
-            KeyshareParams {
-                fhe,
-                bus: self.bus.clone(),
-                store,
-                address: self.address.clone(),
-                cipher: self.cipher.clone(),
-            },
-            snap,
-        )
-        .await?
+        let value = Keyshare::new(KeyshareParams {
+            fhe,
+            bus: self.bus.clone(),
+            secret: sync_secret,
+            address: self.address.clone(),
+            cipher: self.cipher.clone(),
+        })
         .start();
 
         // send to context
@@ -186,7 +184,6 @@ impl E3Feature for KeyshareFeature {
         Ok(())
     }
 }
-
 pub struct PlaintextAggregatorFeature {
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
