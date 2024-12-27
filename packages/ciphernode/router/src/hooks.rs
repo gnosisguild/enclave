@@ -7,7 +7,7 @@ use aggregator::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cipher::Cipher;
-use data::{FromSnapshotWithParams, Snapshot};
+use data::{AutoPersist, FromSnapshotWithParams, Snapshot};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::{Fhe, SharedRng};
 use keyshare::{Keyshare, KeyshareParams};
@@ -57,7 +57,14 @@ impl E3Feature for FheFeature {
         let fhe = Arc::new(fhe_inner);
 
         // FHE doesn't implement Checkpoint so we are going to store it manually
-        ctx.repositories().fhe(&e3_id).write(&fhe.snapshot());
+        let Ok(snapshot) = fhe.snapshot() else {
+            self.bus.err(
+                EnclaveErrorType::KeyGeneration,
+                anyhow!("Failed to get snapshot"),
+            );
+            return;
+        };
+        ctx.repositories().fhe(&e3_id).write(&snapshot);
 
         let _ = ctx.set_fhe(fhe);
     }
@@ -120,11 +127,13 @@ impl E3Feature for KeyshareFeature {
         };
 
         let e3_id = data.clone().e3_id;
+        let repo = ctx.repositories().keyshare(&e3_id);
+        let container = repo.send(None);
 
         ctx.set_keyshare(
             Keyshare::new(KeyshareParams {
                 bus: self.bus.clone(),
-                store: ctx.repositories().keyshare(&e3_id),
+                secret: container,
                 fhe: fhe.clone(),
                 address: self.address.clone(),
                 cipher: self.cipher.clone(),
@@ -143,10 +152,10 @@ impl E3Feature for KeyshareFeature {
             return Ok(());
         };
 
-        let store = ctx.repositories().keyshare(&snapshot.e3_id);
+        let sync_secret = ctx.repositories().keyshare(&snapshot.e3_id).load().await?;
 
-        // No Snapshot returned from the store -> bail
-        let Some(snap) = store.read().await? else {
+        // No Snapshot returned from the sync_secret -> bail
+        if !sync_secret.has() {
             return Ok(());
         };
 
@@ -160,17 +169,13 @@ impl E3Feature for KeyshareFeature {
         };
 
         // Construct from snapshot
-        let value = Keyshare::from_snapshot(
-            KeyshareParams {
-                fhe,
-                bus: self.bus.clone(),
-                store,
-                address: self.address.clone(),
-                cipher: self.cipher.clone(),
-            },
-            snap,
-        )
-        .await?
+        let value = Keyshare::new(KeyshareParams {
+            fhe,
+            bus: self.bus.clone(),
+            secret: sync_secret,
+            address: self.address.clone(),
+            cipher: self.cipher.clone(),
+        })
         .start();
 
         // send to context
@@ -179,7 +184,6 @@ impl E3Feature for KeyshareFeature {
         Ok(())
     }
 }
-
 pub struct PlaintextAggregatorFeature {
     bus: Addr<EventBus>,
     sortition: Addr<Sortition>,
@@ -221,22 +225,23 @@ impl E3Feature for PlaintextAggregatorFeature {
         };
 
         let e3_id = data.e3_id.clone();
+        let repo = ctx.repositories().plaintext(&e3_id);
+        let sync_state = repo.send(Some(PlaintextAggregatorState::init(
+            meta.threshold_m,
+            meta.seed,
+            data.ciphertext_output.clone(),
+        )));
 
-        let _ = ctx.set_plaintext(
+        ctx.set_plaintext(
             PlaintextAggregator::new(
                 PlaintextAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.repositories().plaintext(&e3_id),
                     sortition: self.sortition.clone(),
-                    e3_id,
+                    e3_id: e3_id.clone(),
                     src_chain_id: meta.src_chain_id,
                 },
-                PlaintextAggregatorState::init(
-                    meta.threshold_m,
-                    meta.seed,
-                    data.ciphertext_output.clone(),
-                ),
+                sync_state,
             )
             .start(),
         );
@@ -252,10 +257,11 @@ impl E3Feature for PlaintextAggregatorFeature {
             return Ok(());
         }
 
-        let store = ctx.repositories().plaintext(&snapshot.e3_id);
+        let repo = ctx.repositories().plaintext(&snapshot.e3_id);
+        let sync_state = repo.load().await?;
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = store.read().await? else {
+        if !sync_state.has() {
             return Ok(());
         };
 
@@ -276,18 +282,16 @@ impl E3Feature for PlaintextAggregatorFeature {
             return Ok(());
         };
 
-        let value = PlaintextAggregator::from_snapshot(
+        let value = PlaintextAggregator::new(
             PlaintextAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
-                store,
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 src_chain_id: meta.src_chain_id,
             },
-            snap,
+            sync_state,
         )
-        .await?
         .start();
 
         // send to context
@@ -338,18 +342,21 @@ impl E3Feature for PublicKeyAggregatorFeature {
         };
 
         let e3_id = data.e3_id.clone();
-
-        let _ = ctx.set_publickey(
+        let repo = ctx.repositories().publickey(&e3_id);
+        let sync_state = repo.send(Some(PublicKeyAggregatorState::init(
+            meta.threshold_m,
+            meta.seed,
+        )));
+        ctx.set_publickey(
             PublicKeyAggregator::new(
                 PublicKeyAggregatorParams {
                     fhe: fhe.clone(),
                     bus: self.bus.clone(),
-                    store: ctx.repositories().publickey(&e3_id),
                     sortition: self.sortition.clone(),
                     e3_id,
                     src_chain_id: meta.src_chain_id,
                 },
-                PublicKeyAggregatorState::init(meta.threshold_m, meta.seed),
+                sync_state,
             )
             .start(),
         );
@@ -365,10 +372,11 @@ impl E3Feature for PublicKeyAggregatorFeature {
             return Ok(());
         };
 
-        let repository = ctx.repositories().publickey(&ctx.e3_id);
+        let repo = ctx.repositories().publickey(&ctx.e3_id);
+        let sync_state = repo.load().await?;
 
         // No Snapshot returned from the store -> bail
-        let Some(snap) = repository.read().await? else {
+        if !sync_state.has() {
             return Ok(());
         };
 
@@ -391,18 +399,16 @@ impl E3Feature for PublicKeyAggregatorFeature {
             return Ok(());
         };
 
-        let value = PublicKeyAggregator::from_snapshot(
+        let value = PublicKeyAggregator::new(
             PublicKeyAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
-                store: repository,
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
                 src_chain_id: meta.src_chain_id,
             },
-            snap,
+            sync_state,
         )
-        .await?
         .start();
 
         // send to context

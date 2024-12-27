@@ -6,7 +6,8 @@ use crate::DataStore;
 
 #[derive(Debug)]
 pub struct Repository<S> {
-    store: DataStore,
+    /// store is currently set to be a scopeable key value store
+    store: DataStore, // this could change and be abstracted if need be
     _p: PhantomData<S>,
 }
 
@@ -16,13 +17,6 @@ impl<S> Repository<S> {
             store,
             _p: PhantomData,
         }
-    }
-}
-
-impl<S> Deref for Repository<S> {
-    type Target = DataStore;
-    fn deref(&self) -> &Self::Target {
-        &self.store
     }
 }
 
@@ -56,11 +50,15 @@ where
         self.store.read().await
     }
 
+    pub async fn has(&self) -> bool {
+        self.read().await.ok().flatten().is_some()
+    }
+
     pub fn write(&self, value: &T) {
-        self.store.write(value);
+        self.store.write(value)
     }
 
     pub fn clear(&self) {
-        self.store.clear();
+        self.store.write::<Option<T>>(None)
     }
 }

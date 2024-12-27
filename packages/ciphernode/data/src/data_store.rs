@@ -49,7 +49,8 @@ impl Remove {
     }
 }
 
-/// Generate proxy for the DB
+/// Generate proxy for the DB / KV store
+/// DataStore is scopable
 #[derive(Clone, Debug)]
 pub struct DataStore {
     scope: Vec<u8>,
@@ -67,6 +68,11 @@ impl DataStore {
         let Some(bytes) = self.get.send(Get::new(&self.scope)).await? else {
             return Ok(None);
         };
+
+        // If we get a null value return None as this doesn't deserialize correctly
+        if bytes == [0] {
+            return Ok(None);
+        }
 
         Ok(Some(bincode::deserialize(&bytes)?))
     }

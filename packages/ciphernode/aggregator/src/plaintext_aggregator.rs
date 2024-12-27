@@ -1,7 +1,6 @@
 use actix::prelude::*;
 use anyhow::Result;
-use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
+use data::Persistable;
 use enclave_core::{
     DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
     Seed,
@@ -50,28 +49,28 @@ struct ComputeAggregate {
 pub struct PlaintextAggregator {
     fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
-    store: Repository<PlaintextAggregatorState>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
-    state: PlaintextAggregatorState,
+    state: Persistable<PlaintextAggregatorState>,
     src_chain_id: u64,
 }
 
 pub struct PlaintextAggregatorParams {
     pub fhe: Arc<Fhe>,
     pub bus: Addr<EventBus>,
-    pub store: Repository<PlaintextAggregatorState>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub src_chain_id: u64,
 }
 
 impl PlaintextAggregator {
-    pub fn new(params: PlaintextAggregatorParams, state: PlaintextAggregatorState) -> Self {
+    pub fn new(
+        params: PlaintextAggregatorParams,
+        state: Persistable<PlaintextAggregatorState>,
+    ) -> Self {
         PlaintextAggregator {
             fhe: params.fhe,
             bus: params.bus,
-            store: params.store,
             sortition: params.sortition,
             e3_id: params.e3_id,
             src_chain_id: params.src_chain_id,
@@ -79,36 +78,40 @@ impl PlaintextAggregator {
         }
     }
 
-    pub fn add_share(&mut self, share: Vec<u8>) -> Result<PlaintextAggregatorState> {
-        let PlaintextAggregatorState::Collecting {
-            threshold_m,
-            shares,
-            ciphertext_output,
-            ..
-        } = &mut self.state
-        else {
-            return Err(anyhow::anyhow!("Can only add share in Collecting state"));
-        };
+    pub fn add_share(&mut self, share: Vec<u8>) -> Result<()> {
+        self.state.try_mutate(|mut state| {
+            let PlaintextAggregatorState::Collecting {
+                threshold_m,
+                shares,
+                ciphertext_output,
+                ..
+            } = &mut state
+            else {
+                return Err(anyhow::anyhow!("Can only add share in Collecting state"));
+            };
 
-        shares.insert(share);
-        if shares.len() == *threshold_m {
-            return Ok(PlaintextAggregatorState::Computing {
-                shares: shares.clone(),
-                ciphertext_output: ciphertext_output.to_vec(),
-            });
-        }
+            shares.insert(share);
 
-        Ok(self.state.clone())
+            if shares.len() == *threshold_m {
+                return Ok(PlaintextAggregatorState::Computing {
+                    shares: shares.clone(),
+                    ciphertext_output: ciphertext_output.to_vec(),
+                });
+            }
+
+            Ok(state)
+        })
     }
 
-    pub fn set_decryption(&mut self, decrypted: Vec<u8>) -> Result<PlaintextAggregatorState> {
-        let PlaintextAggregatorState::Computing { shares, .. } = &mut self.state else {
-            return Ok(self.state.clone());
-        };
+    pub fn set_decryption(&mut self, decrypted: Vec<u8>) -> Result<()> {
+        self.state.try_mutate(|mut state| {
+            let PlaintextAggregatorState::Computing { shares, .. } = &mut state else {
+                return Ok(state.clone());
+            };
+            let shares = shares.to_owned();
 
-        let shares = shares.to_owned();
-
-        Ok(PlaintextAggregatorState::Complete { decrypted, shares })
+            Ok(PlaintextAggregatorState::Complete { decrypted, shares })
+        })
     }
 }
 
@@ -131,9 +134,9 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
 
     fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
-        let PlaintextAggregatorState::Collecting {
+        let Some(PlaintextAggregatorState::Collecting {
             threshold_m, seed, ..
-        } = self.state
+        }) = self.state.get()
         else {
             error!(state=?self.state, "Aggregator has been closed for collecting.");
             return Box::pin(fut::ready(Ok(())));
@@ -165,14 +168,13 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                     }
 
                     // add the keyshare and
-                    act.state = act.add_share(decryption_share)?;
-                    act.checkpoint();
+                    act.add_share(decryption_share)?;
 
                     // Check the state and if it has changed to the computing
-                    if let PlaintextAggregatorState::Computing {
+                    if let Some(PlaintextAggregatorState::Computing {
                         shares,
                         ciphertext_output,
-                    } = &act.state
+                    }) = &act.state.get()
                     {
                         ctx.notify(ComputeAggregate {
                             shares: shares.clone(),
@@ -195,8 +197,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
         })?;
 
         // Update the local state
-        self.state = self.set_decryption(decrypted_output.clone())?;
-        self.checkpoint();
+        self.set_decryption(decrypted_output.clone())?;
 
         // Dispatch the PlaintextAggregated event
         let event = EnclaveEvent::from(PlaintextAggregated {
@@ -215,28 +216,5 @@ impl Handler<Die> for PlaintextAggregator {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop()
-    }
-}
-
-impl Snapshot for PlaintextAggregator {
-    type Snapshot = PlaintextAggregatorState;
-
-    fn snapshot(&self) -> Self::Snapshot {
-        self.state.clone()
-    }
-}
-
-#[async_trait]
-impl FromSnapshotWithParams for PlaintextAggregator {
-    type Params = PlaintextAggregatorParams;
-
-    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
-        Ok(PlaintextAggregator::new(params, snapshot))
-    }
-}
-
-impl Checkpoint for PlaintextAggregator {
-    fn repository(&self) -> &Repository<PlaintextAggregatorState> {
-        &self.store
     }
 }
