@@ -1,26 +1,27 @@
+use crate::setup_datastore;
 use actix::{Actor, Addr};
+use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
+use data::RepositoriesFactory;
 use enclave_core::EventBus;
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
-    CiphernodeRegistrySol, EnclaveSol, RegistryFilterSol,
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
+use fhe::FheFeature;
 use logger::SimpleLogger;
-use net::NetworkManager;
+use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
-use router::{
-    E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature,
-    RepositoriesFactory,
-};
+use router::E3RequestRouter;
 use sortition::Sortition;
+use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
-
-use crate::setup_datastore;
 
 pub async fn setup_aggregator(
     config: AppConfig,

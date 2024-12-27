@@ -116,9 +116,11 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "config",
  "data",
  "enclave-core",
  "fhe 0.1.0",
+ "router",
  "serde",
  "sortition",
  "tracing",
@@ -2186,8 +2188,10 @@ dependencies = [
  "dirs",
  "enclave-core",
  "enclave_node",
+ "evm",
  "hex",
  "libp2p",
+ "net",
  "once_cell",
  "petname",
  "phf",
@@ -2414,9 +2418,11 @@ dependencies = [
 name = "fhe"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "anyhow",
  "async-trait",
  "bincode",
+ "config",
  "data",
  "enclave-core",
  "fhe 0.1.0-beta.7",
@@ -2424,6 +2430,7 @@ dependencies = [
  "fhe-util",
  "rand",
  "rand_chacha",
+ "router",
  "serde",
 ]
 
@@ -3489,9 +3496,11 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cipher 0.1.0",
+ "config",
  "data",
  "enclave-core",
  "fhe 0.1.0",
+ "router",
  "serde",
  "tracing",
 ]
@@ -4147,6 +4156,7 @@ dependencies = [
  "async-std",
  "async-trait",
  "cipher 0.1.0",
+ "config",
  "data",
  "enclave-core",
  "futures",
@@ -5301,19 +5311,13 @@ name = "router"
 version = "0.1.0"
 dependencies = [
  "actix",
- "aggregator",
  "anyhow",
  "async-trait",
  "bincode",
- "cipher 0.1.0",
  "config",
  "data",
  "enclave-core",
- "evm",
- "fhe 0.1.0",
- "keyshare",
  "serde",
- "sortition",
  "tracing",
 ]
 
@@ -5838,6 +5842,7 @@ dependencies = [
  "alloy",
  "anyhow",
  "async-trait",
+ "config",
  "data",
  "enclave-core",
  "num",

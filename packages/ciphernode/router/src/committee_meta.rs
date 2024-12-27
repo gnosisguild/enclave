@@ -1,7 +1,12 @@
-use crate::{E3Feature, E3RequestContext, E3RequestContextSnapshot, RepositoriesFactory};
+use crate::{
+    E3Feature, E3RequestContext, E3RequestContextSnapshot, MetaRepositoryFactory, TypedKey,
+};
 use anyhow::*;
 use async_trait::async_trait;
+use data::RepositoriesFactory;
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
+
+pub const META_KEY: TypedKey<CommitteeMeta> = TypedKey::new("meta");
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CommitteeMeta {
@@ -39,7 +44,7 @@ impl E3Feature for CommitteeMetaFeature {
             src_chain_id,
         };
         ctx.repositories().meta(&e3_id).write(&meta);
-        let _ = ctx.set_meta(meta);
+        let _ = ctx.set_dependency(META_KEY, meta);
     }
 
     async fn hydrate(
@@ -48,7 +53,7 @@ impl E3Feature for CommitteeMetaFeature {
         snapshot: &E3RequestContextSnapshot,
     ) -> Result<()> {
         // No ID on the snapshot -> bail
-        if !snapshot.meta {
+        if !snapshot.contains("meta") {
             return Ok(());
         };
 
@@ -59,7 +64,7 @@ impl E3Feature for CommitteeMetaFeature {
             return Ok(());
         };
 
-        ctx.set_meta(value);
+        ctx.set_dependency(META_KEY, value);
 
         Ok(())
     }

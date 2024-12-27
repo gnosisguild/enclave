@@ -3,6 +3,7 @@ use anyhow::*;
 use config::AppConfig;
 use enclave_core::EventBus;
 use enclave_node::get_repositories;
+use net::NetRepositoryFactory;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     let bus = EventBus::new(true).start();

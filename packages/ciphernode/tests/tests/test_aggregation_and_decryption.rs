@@ -1,4 +1,6 @@
+use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use cipher::Cipher;
+use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
@@ -6,17 +8,16 @@ use enclave_core::{
     KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
     Shutdown,
 };
-use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use fhe::{setup_crp_params, FheFeature, ParamsWithCrp, SharedRng};
+use keyshare::KeyshareFeature;
 use logger::SimpleLogger;
-use net::{correlation_id::CorrelationId, events::NetworkPeerEvent, NetworkManager};
-use router::{
-    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
-    PublicKeyAggregatorFeature, RepositoriesFactory,
-};
-use sortition::Sortition;
+use net::{events::NetworkPeerEvent, NetworkManager};
+use router::E3RequestRouter;
+use sortition::SortitionRepositoryFactory;
+use sortition::{CiphernodeSelector, Sortition};
 
 use actix::prelude::*;
-use alloy::{primitives::Address, signers::k256::sha2::digest::Reset};
+use alloy::primitives::Address;
 use anyhow::*;
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
@@ -26,7 +27,7 @@ use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::{env, path::Path, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 use tokio::{sync::mpsc, time::sleep};
 
@@ -456,7 +457,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
         _ => None,
     });
-
     assert_eq!(actual, Some(expected));
 
     Ok(())

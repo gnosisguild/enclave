@@ -5,6 +5,7 @@ use config::AppConfig;
 use enclave_core::{EventBus, GetErrors};
 use enclave_node::get_repositories;
 use libp2p::identity::Keypair;
+use net::NetRepositoryFactory;
 use zeroize::Zeroize;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {

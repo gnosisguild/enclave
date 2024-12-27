@@ -1,23 +1,28 @@
+use crate::setup_datastore;
 use actix::{Actor, Addr};
 use alloy::primitives::Address;
 use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
+use data::RepositoriesFactory;
 use enclave_core::{get_tag, EventBus};
-use evm::{helpers::ProviderConfig, CiphernodeRegistrySol, EnclaveSolReader};
+use evm::{
+    helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
+    EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
+};
+use fhe::FheFeature;
+use keyshare::KeyshareFeature;
 use logger::SimpleLogger;
-use net::NetworkManager;
+use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
-use router::{
-    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, RepositoriesFactory,
-};
+use router::E3RequestRouter;
+use sortition::CiphernodeSelector;
 use sortition::Sortition;
+use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 use tracing::instrument;
-
-use crate::setup_datastore;
 
 #[instrument(name="app", skip_all,fields(id = get_tag()))]
 pub async fn setup_ciphernode(
