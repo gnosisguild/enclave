@@ -146,4 +146,4 @@ You can change the location of your keyfile by using the `key_file` option withi
 key_file: "/path/to/enclave/key"
 ```
 
-<!-- delete this comment once we are ready to merge the tech debt branch in -->
+
