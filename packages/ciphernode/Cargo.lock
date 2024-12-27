@@ -120,6 +120,7 @@ dependencies = [
  "data",
  "enclave-core",
  "fhe 0.1.0",
+ "router",
  "serde",
  "sortition",
  "tracing",
@@ -3497,6 +3498,7 @@ dependencies = [
  "data",
  "enclave-core",
  "fhe 0.1.0",
+ "router",
  "serde",
  "tracing",
 ]
@@ -5307,7 +5309,6 @@ name = "router"
 version = "0.1.0"
 dependencies = [
  "actix",
- "aggregator",
  "anyhow",
  "async-trait",
  "bincode",
@@ -5317,7 +5318,6 @@ dependencies = [
  "enclave-core",
  "evm",
  "fhe 0.1.0",
- "keyshare",
  "serde",
  "sortition",
  "tracing",

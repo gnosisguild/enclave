@@ -12,5 +12,6 @@ data = { path = "../data" }
 cipher = { path = "../cipher" }
 enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
+router = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

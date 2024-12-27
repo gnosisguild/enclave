@@ -1,8 +1,7 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{CommitteeMeta, E3Feature, EventBuffer};
 use actix::{Addr, Recipient};
-use aggregator::{PlaintextAggregator, PublicKeyAggregator};
 use anyhow::Result;
 use async_trait::async_trait;
 use data::{
@@ -10,29 +9,42 @@ use data::{
 };
 use enclave_core::{E3id, EnclaveEvent};
 use fhe::Fhe;
-use keyshare::Keyshare;
 use serde::{Deserialize, Serialize};
+
+fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
+    HashMap::from([
+        ("keyshare".to_owned(), None),
+        ("plaintext".to_owned(), None),
+        ("publickey".to_owned(), None),
+    ])
+}
 
 /// Context that is set to each event hook. Hooks can use this context to gather dependencies if
 /// they need to instantiate struct instances or actors.
+// TODO: remove Addr<T> imports as we need to be able to move the features out of the hooks file
+// without circular deps
+// TODO: remove Arc<Fhe> import as we need to be able to move the Fhe feature out of the hooks
+// file without circular deps
 pub struct E3RequestContext {
     pub e3_id: E3id,
-    pub keyshare: Option<Addr<Keyshare>>,
-    pub fhe: Option<Arc<Fhe>>,
-    pub plaintext: Option<Addr<PlaintextAggregator>>,
-    pub publickey: Option<Addr<PublicKeyAggregator>>,
+    pub recipients: HashMap<String, Option<Recipient<EnclaveEvent>>>, // NOTE: can be a None value
+    pub fhe: Option<Arc<fhe::Fhe>>,
     pub meta: Option<CommitteeMeta>,
     pub store: Repository<E3RequestContextSnapshot>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct E3RequestContextSnapshot {
-    pub keyshare: bool,
     pub e3_id: E3id,
+    pub recipients: Vec<String>,
     pub fhe: bool,
-    pub plaintext: bool,
-    pub publickey: bool,
     pub meta: bool,
+}
+
+impl E3RequestContextSnapshot {
+    pub fn contains(&self, key: &str) -> bool {
+        self.recipients.contains(&key.to_string())
+    }
 }
 
 pub struct E3RequestContextParams {
@@ -46,29 +58,17 @@ impl E3RequestContext {
         Self {
             e3_id: params.e3_id,
             store: params.store,
+            recipients: init_recipients(),
             fhe: None,
-            keyshare: None,
             meta: None,
-            plaintext: None,
-            publickey: None,
         }
     }
 
     fn recipients(&self) -> Vec<(String, Option<Recipient<EnclaveEvent>>)> {
-        vec![
-            (
-                "keyshare".to_owned(),
-                self.keyshare.clone().map(|addr| addr.into()),
-            ),
-            (
-                "plaintext".to_owned(),
-                self.plaintext.clone().map(|addr| addr.into()),
-            ),
-            (
-                "publickey".to_owned(),
-                self.publickey.clone().map(|addr| addr.into()),
-            ),
-        ]
+        self.recipients
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 
     pub fn forward_message(&self, msg: &EnclaveEvent, buffer: &mut EventBuffer) {
@@ -92,24 +92,23 @@ impl E3RequestContext {
         });
     }
 
-    /// Accept a DataStore ID and a Keystore actor address
-    pub fn set_keyshare(&mut self, value: Addr<Keyshare>) {
-        self.keyshare = Some(value);
+    pub fn set_event_recipient(
+        &mut self,
+        key: impl Into<String>,
+        value: Option<Recipient<EnclaveEvent>>,
+    ) {
+        self.recipients.insert(key.into(), value);
         self.checkpoint();
     }
 
-    /// Accept a DataStore ID and a Keystore actor address
-    pub fn set_plaintext(&mut self, value: Addr<PlaintextAggregator>) {
-        self.plaintext = Some(value);
-        self.checkpoint();
+    pub fn get_event_recipient(&self, key: impl Into<String>) -> Option<&Recipient<EnclaveEvent>> {
+        self.recipients
+            .get(&key.into())
+            .and_then(|opt| opt.as_ref())
     }
 
-    /// Accept a DataStore ID and a Keystore actor address
-    pub fn set_publickey(&mut self, value: Addr<PublicKeyAggregator>) {
-        self.publickey = Some(value);
-        self.checkpoint();
-    }
-
+    // TODO: consolidate to a simple set_dependency / get_dependency API.
+    // We can wrap the thing we are storing in a polymorphic struct that takes a T and has a key() method
     /// Accept a DataStore ID and an Arc instance of the Fhe wrapper
     pub fn set_fhe(&mut self, value: Arc<Fhe>) {
         self.fhe = Some(value.clone());
@@ -120,18 +119,6 @@ impl E3RequestContext {
     pub fn set_meta(&mut self, value: CommitteeMeta) {
         self.meta = Some(value.clone());
         self.checkpoint();
-    }
-
-    pub fn get_keyshare(&self) -> Option<&Addr<Keyshare>> {
-        self.keyshare.as_ref()
-    }
-
-    pub fn get_plaintext(&self) -> Option<&Addr<PlaintextAggregator>> {
-        self.plaintext.as_ref()
-    }
-
-    pub fn get_publickey(&self) -> Option<&Addr<PublicKeyAggregator>> {
-        self.publickey.as_ref()
     }
 
     pub fn get_fhe(&self) -> Option<&Arc<Fhe>> {
@@ -158,9 +145,7 @@ impl Snapshot for E3RequestContext {
             e3_id: self.e3_id.clone(),
             meta: self.meta.is_some(),
             fhe: self.fhe.is_some(),
-            publickey: self.publickey.is_some(),
-            plaintext: self.plaintext.is_some(),
-            keyshare: self.keyshare.is_some(),
+            recipients: self.recipients.keys().cloned().collect(),
         })
     }
 }
@@ -173,10 +158,8 @@ impl FromSnapshotWithParams for E3RequestContext {
             e3_id: params.e3_id,
             store: params.store,
             fhe: None,
-            keyshare: None,
             meta: None,
-            plaintext: None,
-            publickey: None,
+            recipients: init_recipients(),
         };
 
         for feature in params.features.iter() {

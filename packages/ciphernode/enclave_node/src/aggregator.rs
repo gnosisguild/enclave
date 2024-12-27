@@ -1,5 +1,6 @@
 use crate::setup_datastore;
 use actix::{Actor, Addr};
+use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
@@ -14,7 +15,7 @@ use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
-use router::{E3RequestRouter, FheFeature, PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
+use router::{E3RequestRouter, FheFeature};
 use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
