@@ -20,13 +20,6 @@ impl<S> Repository<S> {
     }
 }
 
-impl<S> Deref for Repository<S> {
-    type Target = DataStore;
-    fn deref(&self) -> &Self::Target {
-        &self.store
-    }
-}
-
 impl<S> From<Repository<S>> for DataStore {
     fn from(value: Repository<S>) -> Self {
         value.store
