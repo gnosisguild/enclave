@@ -1,8 +1,6 @@
 use actix::prelude::*;
 use anyhow::Result;
-use async_trait::async_trait;
 use data::Persistable;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
 use enclave_core::{
     DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
     Seed,
