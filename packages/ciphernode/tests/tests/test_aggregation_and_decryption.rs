@@ -2,6 +2,7 @@ use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use cipher::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
+use e3_request::E3RequestRouter;
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory,
@@ -12,7 +13,6 @@ use fhe::{setup_crp_params, FheFeature, ParamsWithCrp, SharedRng};
 use keyshare::KeyshareFeature;
 use logger::SimpleLogger;
 use net::{events::NetworkPeerEvent, NetworkManager};
-use router::E3RequestRouter;
 use sortition::SortitionRepositoryFactory;
 use sortition::{CiphernodeSelector, Sortition};
 

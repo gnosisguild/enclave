@@ -15,7 +15,7 @@ cipher = { path = "../cipher" }
 data = { path = "../data" }
 keyshare = { path = "../keyshare" }
 aggregator = { path = "../aggregator" }
-router = { path = "../router" }
+e3_request = { workspace = true }
 test-helpers = { path = "../test_helpers" }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }

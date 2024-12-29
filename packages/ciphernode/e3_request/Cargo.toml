@@ -1,5 +1,5 @@
 [package]
-name = "router"
+name = "e3_request"
 version = "0.1.0"
 edition = "2021"
 

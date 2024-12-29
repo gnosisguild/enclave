@@ -3,8 +3,8 @@ use actix::Addr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
+use e3_request::{E3Feature, E3RequestContext, E3RequestContextSnapshot, TypedKey};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
-use router::{E3Feature, E3RequestContext, E3RequestContextSnapshot, TypedKey};
 use std::sync::Arc;
 
 pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");

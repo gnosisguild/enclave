@@ -27,7 +27,7 @@ logger = { path = "../logger" }
 net = { path = "../net" }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
-router = { path = "../router" }
+e3_request = { workspace = true }
 serde = { workspace = true }
 sortition = { path = "../sortition" }
 test-helpers = { path = "../test_helpers" }

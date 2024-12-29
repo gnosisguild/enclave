@@ -4,9 +4,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cipher::Cipher;
 use data::{AutoPersist, RepositoriesFactory};
+use e3_request::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::FHE_KEY;
-use router::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
 use std::sync::Arc;
 
 pub struct KeyshareFeature {

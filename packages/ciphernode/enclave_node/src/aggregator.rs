@@ -5,6 +5,7 @@ use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
 use data::RepositoriesFactory;
+use e3_request::E3RequestRouter;
 use enclave_core::EventBus;
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
@@ -16,7 +17,6 @@ use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
-use router::E3RequestRouter;
 use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};

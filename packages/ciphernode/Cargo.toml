@@ -8,7 +8,7 @@ members = [
   "data",
   "evm",
   "fhe",
-  "router",
+  "e3_request",
   "keyshare",
   "aggregator",
   "test_helpers",
@@ -42,6 +42,7 @@ config = { path = "./config" }
 dirs = "5.0.1"
 data = { path = "./data" }
 enclave-core = { path = "./core" }
+enclave_node = { path = "./enclave_node" }
 evm = { path = "./evm" }
 shellexpand = "3.1.0"
 figment = { version = "0.10.19", features = ["yaml", "test"] }
@@ -56,7 +57,7 @@ num = "0.4.3"
 net = { path = "./net" }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
-router = { path = "./router" }
+e3_request = { path = "./e3_request" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.133" }
 sled = "0.34.7"
