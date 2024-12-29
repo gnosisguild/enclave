@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cipher::Cipher;
 use data::{AutoPersist, RepositoriesFactory};
-use e3_request::{ContextSnapshot, E3Feature, E3RequestContext};
+use e3_request::{E3Context, E3ContextSnapshot, E3Feature};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::FHE_KEY;
 use std::sync::Arc;
@@ -30,7 +30,7 @@ const ERROR_KEYSHARE_FHE_MISSING: &str =
 
 #[async_trait]
 impl E3Feature for KeyshareFeature {
-    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // if this is NOT a CiphernodeSelected event then ignore
         let EnclaveEvent::CiphernodeSelected { data, .. } = evt else {
             return;
@@ -65,7 +65,7 @@ impl E3Feature for KeyshareFeature {
         );
     }
 
-    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
         // No keyshare on the snapshot -> bail
         if !snapshot.contains("keyshare") {
             return Ok(());

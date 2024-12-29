@@ -26,7 +26,7 @@ fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
 // without circular deps
 // TODO: remove Arc<Fhe> import as we need to be able to move the Fhe feature out of the hooks
 // file without circular deps
-pub struct E3RequestContext {
+pub struct E3Context {
     /// The E3Request's ID
     pub e3_id: E3id,
     /// A way to store EnclaveEvent recipients on the context
@@ -34,30 +34,30 @@ pub struct E3RequestContext {
     /// A way to store a feature's dependencies on the context
     pub dependencies: HetrogenousMap,
     /// A Repository for storing this context's data snapshot
-    pub store: Repository<ContextSnapshot>,
+    pub store: Repository<E3ContextSnapshot>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ContextSnapshot {
+pub struct E3ContextSnapshot {
     pub e3_id: E3id,
     pub recipients: Vec<String>,
     pub dependencies: Vec<String>,
 }
 
-impl ContextSnapshot {
+impl E3ContextSnapshot {
     pub fn contains(&self, key: &str) -> bool {
         self.recipients.contains(&key.to_string()) || self.dependencies.contains(&key.to_string())
     }
 }
 
-pub struct E3RequestContextParams {
-    pub store: Repository<ContextSnapshot>,
+pub struct E3ContextParams {
+    pub store: Repository<E3ContextSnapshot>,
     pub e3_id: E3id,
     pub features: Arc<Vec<Box<dyn E3Feature>>>,
 }
 
-impl E3RequestContext {
-    pub fn from_params(params: E3RequestContextParams) -> Self {
+impl E3Context {
+    pub fn from_params(params: E3ContextParams) -> Self {
         Self {
             e3_id: params.e3_id,
             store: params.store,
@@ -127,15 +127,15 @@ impl E3RequestContext {
     }
 }
 
-impl RepositoriesFactory for E3RequestContext {
+impl RepositoriesFactory for E3Context {
     fn repositories(&self) -> Repositories {
         self.repository().clone().into()
     }
 }
 
 #[async_trait]
-impl Snapshot for E3RequestContext {
-    type Snapshot = ContextSnapshot;
+impl Snapshot for E3Context {
+    type Snapshot = E3ContextSnapshot;
 
     fn snapshot(&self) -> Result<Self::Snapshot> {
         Ok(Self::Snapshot {
@@ -147,8 +147,8 @@ impl Snapshot for E3RequestContext {
 }
 
 #[async_trait]
-impl FromSnapshotWithParams for E3RequestContext {
-    type Params = E3RequestContextParams;
+impl FromSnapshotWithParams for E3Context {
+    type Params = E3ContextParams;
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         let mut ctx = Self {
             e3_id: params.e3_id,
@@ -165,8 +165,8 @@ impl FromSnapshotWithParams for E3RequestContext {
     }
 }
 
-impl Checkpoint for E3RequestContext {
-    fn repository(&self) -> &Repository<ContextSnapshot> {
+impl Checkpoint for E3Context {
+    fn repository(&self) -> &Repository<E3ContextSnapshot> {
         &self.store
     }
 }

@@ -7,7 +7,7 @@ use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{AutoPersist, RepositoriesFactory};
-use e3_request::{ContextSnapshot, E3Feature, E3RequestContext, META_KEY};
+use e3_request::{E3Context, E3ContextSnapshot, E3Feature, META_KEY};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::FHE_KEY;
 use sortition::Sortition;
@@ -30,7 +30,7 @@ const ERROR_PLAINTEXT_META_MISSING:&str = "Could not create PlaintextAggregator 
 
 #[async_trait]
 impl E3Feature for PlaintextAggregatorFeature {
-    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Save plaintext aggregator
         let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
             return;
@@ -79,7 +79,7 @@ impl E3Feature for PlaintextAggregatorFeature {
         );
     }
 
-    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
         // No ID on the snapshot -> bail
         if !snapshot.contains("plaintext") {
             return Ok(());
@@ -149,7 +149,7 @@ const ERROR_PUBKEY_META_MISSING:&str = "Could not create PublicKeyAggregator bec
 
 #[async_trait]
 impl E3Feature for PublicKeyAggregatorFeature {
-    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Saving the publickey aggregator with deps on E3Requested
         let EnclaveEvent::E3Requested { data, .. } = evt else {
             return;
@@ -195,7 +195,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         );
     }
 
-    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
         // No ID on the snapshot -> bail
         if !snapshot.contains("publickey") {
             return Ok(());

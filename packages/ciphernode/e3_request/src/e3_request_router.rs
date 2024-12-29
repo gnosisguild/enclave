@@ -1,8 +1,8 @@
 use crate::CommitteeMetaFeature;
 use crate::ContextRepositoryFactory;
-use crate::ContextSnapshot;
-use crate::E3RequestContext;
-use crate::E3RequestContextParams;
+use crate::E3Context;
+use crate::E3ContextParams;
+use crate::E3ContextSnapshot;
 use crate::RouterRepositoryFactory;
 use actix::AsyncContext;
 use actix::{Actor, Addr, Context, Handler};
@@ -56,10 +56,10 @@ pub trait E3Feature: Send + Sync + 'static {
     /// initialize the receiver using `ctx.set_event_receiver(my_address.into())`. Typically this
     /// means filtering for specific e3_id enabled events that give rise to actors that have to
     /// handle certain behaviour.
-    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
+    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent);
 
     /// This function it triggered when the request context is being hydrated from snapshot.
-    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()>;
+    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()>;
 }
 
 /// E3RequestRouter will register features that receive an E3_id specific context. After features
@@ -69,7 +69,7 @@ pub trait E3Feature: Send + Sync + 'static {
 // TODO: setup so that we have to place features within correct order of dependencies
 pub struct E3RequestRouter {
     /// The context for every E3 request
-    contexts: HashMap<E3id, E3RequestContext>,
+    contexts: HashMap<E3id, E3Context>,
     /// A list of completed requests
     completed: HashSet<E3id>,
     /// The features this instance of the router is configured to listen for
@@ -136,7 +136,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
 
         let repositories = self.repository().repositories();
         let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
-            E3RequestContext::from_params(E3RequestContextParams {
+            E3Context::from_params(E3ContextParams {
                 e3_id: e3_id.clone(),
                 store: repositories.context(&e3_id),
                 features: self.features.clone(),
@@ -224,8 +224,8 @@ impl FromSnapshotWithParams for E3RequestRouter {
 
             contexts.insert(
                 e3_id.clone(),
-                E3RequestContext::from_snapshot(
-                    E3RequestContextParams {
+                E3Context::from_snapshot(
+                    E3ContextParams {
                         store: repositories.context(&e3_id),
                         e3_id: e3_id.clone(),
                         features: params.features.clone(),
