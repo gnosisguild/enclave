@@ -3,7 +3,7 @@ use actix::Addr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
-use e3_request::{E3Feature, E3RequestContext, E3RequestContextSnapshot, TypedKey};
+use e3_request::{ContextSnapshot, E3Feature, E3RequestContext, TypedKey};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use std::sync::Arc;
 
@@ -63,11 +63,7 @@ impl E3Feature for FheFeature {
         let _ = ctx.set_dependency(FHE_KEY, fhe);
     }
 
-    async fn hydrate(
-        &self,
-        ctx: &mut E3RequestContext,
-        snapshot: &E3RequestContextSnapshot,
-    ) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()> {
         // No ID on the snapshot -> bail without reporting
         if !snapshot.contains("fhe") {
             return Ok(());

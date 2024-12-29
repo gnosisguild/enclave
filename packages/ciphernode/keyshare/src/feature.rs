@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use cipher::Cipher;
 use data::{AutoPersist, RepositoriesFactory};
-use e3_request::{E3Feature, E3RequestContext, E3RequestContextSnapshot};
+use e3_request::{ContextSnapshot, E3Feature, E3RequestContext};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::FHE_KEY;
 use std::sync::Arc;
@@ -65,11 +65,7 @@ impl E3Feature for KeyshareFeature {
         );
     }
 
-    async fn hydrate(
-        &self,
-        ctx: &mut E3RequestContext,
-        snapshot: &E3RequestContextSnapshot,
-    ) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()> {
         // No keyshare on the snapshot -> bail
         if !snapshot.contains("keyshare") {
             return Ok(());

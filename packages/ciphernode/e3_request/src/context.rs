@@ -34,24 +34,24 @@ pub struct E3RequestContext {
     /// A way to store a feature's dependencies on the context
     pub dependencies: HetrogenousMap,
     /// A Repository for storing this context's data snapshot
-    pub store: Repository<E3RequestContextSnapshot>,
+    pub store: Repository<ContextSnapshot>,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct E3RequestContextSnapshot {
+pub struct ContextSnapshot {
     pub e3_id: E3id,
     pub recipients: Vec<String>,
     pub dependencies: Vec<String>,
 }
 
-impl E3RequestContextSnapshot {
+impl ContextSnapshot {
     pub fn contains(&self, key: &str) -> bool {
         self.recipients.contains(&key.to_string()) || self.dependencies.contains(&key.to_string())
     }
 }
 
 pub struct E3RequestContextParams {
-    pub store: Repository<E3RequestContextSnapshot>,
+    pub store: Repository<ContextSnapshot>,
     pub e3_id: E3id,
     pub features: Arc<Vec<Box<dyn E3Feature>>>,
 }
@@ -135,7 +135,7 @@ impl RepositoriesFactory for E3RequestContext {
 
 #[async_trait]
 impl Snapshot for E3RequestContext {
-    type Snapshot = E3RequestContextSnapshot;
+    type Snapshot = ContextSnapshot;
 
     fn snapshot(&self) -> Result<Self::Snapshot> {
         Ok(Self::Snapshot {
@@ -166,7 +166,7 @@ impl FromSnapshotWithParams for E3RequestContext {
 }
 
 impl Checkpoint for E3RequestContext {
-    fn repository(&self) -> &Repository<E3RequestContextSnapshot> {
+    fn repository(&self) -> &Repository<ContextSnapshot> {
         &self.store
     }
 }

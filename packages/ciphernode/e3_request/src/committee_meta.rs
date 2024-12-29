@@ -1,6 +1,4 @@
-use crate::{
-    E3Feature, E3RequestContext, E3RequestContextSnapshot, MetaRepositoryFactory, TypedKey,
-};
+use crate::{ContextSnapshot, E3Feature, E3RequestContext, MetaRepositoryFactory, TypedKey};
 use anyhow::*;
 use async_trait::async_trait;
 use data::RepositoriesFactory;
@@ -47,11 +45,7 @@ impl E3Feature for CommitteeMetaFeature {
         let _ = ctx.set_dependency(META_KEY, meta);
     }
 
-    async fn hydrate(
-        &self,
-        ctx: &mut E3RequestContext,
-        snapshot: &E3RequestContextSnapshot,
-    ) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()> {
         // No ID on the snapshot -> bail
         if !snapshot.contains("meta") {
             return Ok(());

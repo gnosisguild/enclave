@@ -7,7 +7,7 @@ use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{AutoPersist, RepositoriesFactory};
-use e3_request::{E3Feature, E3RequestContext, E3RequestContextSnapshot, META_KEY};
+use e3_request::{ContextSnapshot, E3Feature, E3RequestContext, META_KEY};
 use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::FHE_KEY;
 use sortition::Sortition;
@@ -79,11 +79,7 @@ impl E3Feature for PlaintextAggregatorFeature {
         );
     }
 
-    async fn hydrate(
-        &self,
-        ctx: &mut E3RequestContext,
-        snapshot: &E3RequestContextSnapshot,
-    ) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()> {
         // No ID on the snapshot -> bail
         if !snapshot.contains("plaintext") {
             return Ok(());
@@ -199,11 +195,7 @@ impl E3Feature for PublicKeyAggregatorFeature {
         );
     }
 
-    async fn hydrate(
-        &self,
-        ctx: &mut E3RequestContext,
-        snapshot: &E3RequestContextSnapshot,
-    ) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()> {
         // No ID on the snapshot -> bail
         if !snapshot.contains("publickey") {
             return Ok(());

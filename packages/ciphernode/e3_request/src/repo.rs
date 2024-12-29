@@ -2,7 +2,7 @@ use config::StoreKeys;
 use data::{Repositories, Repository};
 use enclave_core::E3id;
 
-use crate::{CommitteeMeta, E3RequestContextSnapshot, E3RequestRouterSnapshot};
+use crate::{CommitteeMeta, ContextSnapshot, E3RequestRouterSnapshot};
 
 pub trait MetaRepositoryFactory {
     fn meta(&self, e3_id: &E3id) -> Repository<CommitteeMeta>;
@@ -15,11 +15,11 @@ impl MetaRepositoryFactory for Repositories {
 }
 
 pub trait ContextRepositoryFactory {
-    fn context(&self, e3_id: &E3id) -> Repository<E3RequestContextSnapshot>;
+    fn context(&self, e3_id: &E3id) -> Repository<ContextSnapshot>;
 }
 
 impl ContextRepositoryFactory for Repositories {
-    fn context(&self, e3_id: &E3id) -> Repository<E3RequestContextSnapshot> {
+    fn context(&self, e3_id: &E3id) -> Repository<ContextSnapshot> {
         Repository::new(self.store.scope(StoreKeys::context(e3_id)))
     }
 }

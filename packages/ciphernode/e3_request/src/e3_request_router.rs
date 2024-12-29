@@ -1,8 +1,8 @@
 use crate::CommitteeMetaFeature;
 use crate::ContextRepositoryFactory;
+use crate::ContextSnapshot;
 use crate::E3RequestContext;
 use crate::E3RequestContextParams;
-use crate::E3RequestContextSnapshot;
 use crate::RouterRepositoryFactory;
 use actix::AsyncContext;
 use actix::{Actor, Addr, Context, Handler};
@@ -59,11 +59,7 @@ pub trait E3Feature: Send + Sync + 'static {
     fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent);
 
     /// This function it triggered when the request context is being hydrated from snapshot.
-    async fn hydrate(
-        &self,
-        ctx: &mut E3RequestContext,
-        snapshot: &E3RequestContextSnapshot,
-    ) -> Result<()>;
+    async fn hydrate(&self, ctx: &mut E3RequestContext, snapshot: &ContextSnapshot) -> Result<()>;
 }
 
 /// E3RequestRouter will register features that receive an E3_id specific context. After features
