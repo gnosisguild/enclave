@@ -1,8 +1,8 @@
-use crate::CommitteeMetaFeature;
 use crate::ContextRepositoryFactory;
 use crate::E3Context;
 use crate::E3ContextParams;
 use crate::E3ContextSnapshot;
+use crate::E3MetaFeature;
 use crate::RouterRepositoryFactory;
 use actix::AsyncContext;
 use actix::{Actor, Addr, Context, Handler};
@@ -95,7 +95,7 @@ impl E3Router {
         };
 
         // Everything needs the committe meta factory so adding it here by default
-        builder.add_feature(CommitteeMetaFeature::create())
+        builder.add_feature(E3MetaFeature::create())
     }
 
     pub fn from_params(params: E3RouterParams) -> Self {

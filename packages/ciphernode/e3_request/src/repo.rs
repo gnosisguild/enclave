@@ -2,14 +2,14 @@ use config::StoreKeys;
 use data::{Repositories, Repository};
 use enclave_core::E3id;
 
-use crate::{CommitteeMeta, E3ContextSnapshot, E3RouterSnapshot};
+use crate::{E3ContextSnapshot, E3Meta, E3RouterSnapshot};
 
 pub trait MetaRepositoryFactory {
-    fn meta(&self, e3_id: &E3id) -> Repository<CommitteeMeta>;
+    fn meta(&self, e3_id: &E3id) -> Repository<E3Meta>;
 }
 
 impl MetaRepositoryFactory for Repositories {
-    fn meta(&self, e3_id: &E3id) -> Repository<CommitteeMeta> {
+    fn meta(&self, e3_id: &E3id) -> Repository<E3Meta> {
         Repository::new(self.store.scope(StoreKeys::meta(e3_id)))
     }
 }

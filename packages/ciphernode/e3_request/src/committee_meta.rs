@@ -4,25 +4,25 @@ use async_trait::async_trait;
 use data::RepositoriesFactory;
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
-pub const META_KEY: TypedKey<CommitteeMeta> = TypedKey::new("meta");
+pub const META_KEY: TypedKey<E3Meta> = TypedKey::new("meta");
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CommitteeMeta {
+pub struct E3Meta {
     pub threshold_m: usize,
     pub seed: Seed,
     pub src_chain_id: u64,
 }
 
-pub struct CommitteeMetaFeature;
+pub struct E3MetaFeature;
 
-impl CommitteeMetaFeature {
+impl E3MetaFeature {
     pub fn create() -> Box<Self> {
         Box::new(Self {})
     }
 }
 
 #[async_trait]
-impl E3Feature for CommitteeMetaFeature {
+impl E3Feature for E3MetaFeature {
     fn on_event(&self, ctx: &mut crate::E3Context, event: &EnclaveEvent) {
         let EnclaveEvent::E3Requested { data, .. } = event else {
             return;
@@ -36,7 +36,7 @@ impl E3Feature for CommitteeMetaFeature {
         } = data.clone();
 
         // Meta doesn't implement Checkpoint so we are going to store it manually
-        let meta = CommitteeMeta {
+        let meta = E3Meta {
             threshold_m,
             seed,
             src_chain_id,
