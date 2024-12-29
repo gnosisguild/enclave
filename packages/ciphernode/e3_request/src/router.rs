@@ -138,7 +138,7 @@ impl Handler<EnclaveEvent> for E3Router {
         let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
             E3Context::from_params(E3ContextParams {
                 e3_id: e3_id.clone(),
-                store: repositories.context(&e3_id),
+                repository: repositories.context(&e3_id),
                 features: self.features.clone(),
             })
         });
@@ -226,7 +226,7 @@ impl FromSnapshotWithParams for E3Router {
                 e3_id.clone(),
                 E3Context::from_snapshot(
                     E3ContextParams {
-                        store: repositories.context(&e3_id),
+                        repository: repositories.context(&e3_id),
                         e3_id: e3_id.clone(),
                         features: params.features.clone(),
                     },

@@ -34,7 +34,7 @@ pub struct E3Context {
     /// A way to store a feature's dependencies on the context
     pub dependencies: HetrogenousMap,
     /// A Repository for storing this context's data snapshot
-    pub store: Repository<E3ContextSnapshot>,
+    pub repository: Repository<E3ContextSnapshot>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -51,7 +51,7 @@ impl E3ContextSnapshot {
 }
 
 pub struct E3ContextParams {
-    pub store: Repository<E3ContextSnapshot>,
+    pub repository: Repository<E3ContextSnapshot>,
     pub e3_id: E3id,
     pub features: Arc<Vec<Box<dyn E3Feature>>>,
 }
@@ -60,7 +60,7 @@ impl E3Context {
     pub fn from_params(params: E3ContextParams) -> Self {
         Self {
             e3_id: params.e3_id,
-            store: params.store,
+            repository: params.repository,
             recipients: init_recipients(),
             dependencies: HetrogenousMap::new(),
         }
@@ -152,7 +152,7 @@ impl FromSnapshotWithParams for E3Context {
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         let mut ctx = Self {
             e3_id: params.e3_id,
-            store: params.store,
+            repository: params.repository,
             recipients: init_recipients(),
             dependencies: HetrogenousMap::new(),
         };
@@ -167,6 +167,6 @@ impl FromSnapshotWithParams for E3Context {
 
 impl Checkpoint for E3Context {
     fn repository(&self) -> &Repository<E3ContextSnapshot> {
-        &self.store
+        &self.repository
     }
 }
