@@ -41,7 +41,7 @@ impl EventBuffer {
     }
 }
 
-/// Format of a Feature that can be passed to E3RequestRouter. E3Features listen for EnclaveEvents
+/// Format of a Feature that can be passed to E3Router. E3Features listen for EnclaveEvents
 /// that are braoadcast to know when to instantiate themselves. They define the events they respond
 /// to using the `on_event` handler. Within this handler they will typically use the request's
 /// context to construct a version of their requisite actors and save their addresses to the
@@ -62,12 +62,12 @@ pub trait E3Feature: Send + Sync + 'static {
     async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()>;
 }
 
-/// E3RequestRouter will register features that receive an E3_id specific context. After features
+/// E3Router will register features that receive an E3_id specific context. After features
 /// have run e3_id specific messages are forwarded to all instances on the context as they come in.
 /// This enables features to lazily register instances that have the correct dependencies available
 /// per e3_id request.
 // TODO: setup so that we have to place features within correct order of dependencies
-pub struct E3RequestRouter {
+pub struct E3Router {
     /// The context for every E3 request
     contexts: HashMap<E3id, E3Context>,
     /// A list of completed requests
@@ -76,19 +76,19 @@ pub struct E3RequestRouter {
     features: Arc<Vec<Box<dyn E3Feature>>>,
     buffer: EventBuffer,
     bus: Addr<EventBus>,
-    store: Repository<E3RequestRouterSnapshot>,
+    store: Repository<E3RouterSnapshot>,
 }
 
-pub struct E3RequestRouterParams {
+pub struct E3RouterParams {
     features: Arc<Vec<Box<dyn E3Feature>>>,
     bus: Addr<EventBus>,
-    store: Repository<E3RequestRouterSnapshot>,
+    store: Repository<E3RouterSnapshot>,
 }
 
-impl E3RequestRouter {
-    pub fn builder(bus: &Addr<EventBus>, store: DataStore) -> E3RequestRouterBuilder {
+impl E3Router {
+    pub fn builder(bus: &Addr<EventBus>, store: DataStore) -> E3RouterBuilder {
         let repositories = store.repositories();
-        let builder = E3RequestRouterBuilder {
+        let builder = E3RouterBuilder {
             bus: bus.clone(),
             features: vec![],
             store: repositories.router(),
@@ -98,7 +98,7 @@ impl E3RequestRouter {
         builder.add_feature(CommitteeMetaFeature::create())
     }
 
-    pub fn from_params(params: E3RequestRouterParams) -> Self {
+    pub fn from_params(params: E3RouterParams) -> Self {
         Self {
             features: params.features,
             bus: params.bus.clone(),
@@ -112,11 +112,11 @@ impl E3RequestRouter {
     }
 }
 
-impl Actor for E3RequestRouter {
+impl Actor for E3Router {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for E3RequestRouter {
+impl Handler<EnclaveEvent> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         // If we are shuttomg down then bail on anything else
@@ -174,7 +174,7 @@ impl Handler<EnclaveEvent> for E3RequestRouter {
     }
 }
 
-impl Handler<Shutdown> for E3RequestRouter {
+impl Handler<Shutdown> for E3Router {
     type Result = ();
     fn handle(&mut self, msg: Shutdown, _ctx: &mut Self::Context) -> Self::Result {
         let shutdown_evt = EnclaveEvent::from(msg);
@@ -185,13 +185,13 @@ impl Handler<Shutdown> for E3RequestRouter {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct E3RequestRouterSnapshot {
+pub struct E3RouterSnapshot {
     contexts: Vec<E3id>,
     completed: HashSet<E3id>,
 }
 
-impl Snapshot for E3RequestRouter {
-    type Snapshot = E3RequestRouterSnapshot;
+impl Snapshot for E3Router {
+    type Snapshot = E3RouterSnapshot;
     fn snapshot(&self) -> Result<Self::Snapshot> {
         let contexts = self.contexts.keys().cloned().collect();
         let completed = self.completed.clone();
@@ -203,15 +203,15 @@ impl Snapshot for E3RequestRouter {
     }
 }
 
-impl Checkpoint for E3RequestRouter {
-    fn repository(&self) -> &Repository<E3RequestRouterSnapshot> {
+impl Checkpoint for E3Router {
+    fn repository(&self) -> &Repository<E3RouterSnapshot> {
         &self.store
     }
 }
 
 #[async_trait]
-impl FromSnapshotWithParams for E3RequestRouter {
-    type Params = E3RequestRouterParams;
+impl FromSnapshotWithParams for E3Router {
+    type Params = E3RouterParams;
 
     async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
         let mut contexts = HashMap::new();
@@ -236,7 +236,7 @@ impl FromSnapshotWithParams for E3RequestRouter {
             );
         }
 
-        Ok(E3RequestRouter {
+        Ok(E3Router {
             contexts,
             completed: snapshot.completed,
             features: params.features.into(),
@@ -247,24 +247,24 @@ impl FromSnapshotWithParams for E3RequestRouter {
     }
 }
 
-/// Builder for E3RequestRouter
-pub struct E3RequestRouterBuilder {
+/// Builder for E3Router
+pub struct E3RouterBuilder {
     pub bus: Addr<EventBus>,
     pub features: Vec<Box<dyn E3Feature>>,
-    pub store: Repository<E3RequestRouterSnapshot>,
+    pub store: Repository<E3RouterSnapshot>,
 }
 
-impl E3RequestRouterBuilder {
+impl E3RouterBuilder {
     pub fn add_feature(mut self, listener: Box<dyn E3Feature>) -> Self {
         self.features.push(listener);
         self
     }
 
-    pub async fn build(self) -> Result<Addr<E3RequestRouter>> {
+    pub async fn build(self) -> Result<Addr<E3Router>> {
         let repositories = self.store.repositories();
         let router_repo = repositories.router();
-        let snapshot: Option<E3RequestRouterSnapshot> = router_repo.read().await?;
-        let params = E3RequestRouterParams {
+        let snapshot: Option<E3RouterSnapshot> = router_repo.read().await?;
+        let params = E3RouterParams {
             features: self.features.into(),
             bus: self.bus.clone(),
 
@@ -272,8 +272,8 @@ impl E3RequestRouterBuilder {
         };
 
         let e3r = match snapshot {
-            Some(snapshot) => E3RequestRouter::from_snapshot(params, snapshot).await?,
-            None => E3RequestRouter::from_params(params),
+            Some(snapshot) => E3Router::from_snapshot(params, snapshot).await?,
+            None => E3Router::from_params(params),
         };
 
         let addr = e3r.start();

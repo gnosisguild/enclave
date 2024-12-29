@@ -5,7 +5,7 @@ use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
 use data::RepositoriesFactory;
-use e3_request::E3RequestRouter;
+use e3_request::E3Router;
 use enclave_core::{get_tag, EventBus};
 use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
@@ -65,7 +65,7 @@ pub async fn setup_ciphernode(
         .await?;
     }
 
-    E3RequestRouter::builder(&bus, store.clone())
+    E3Router::builder(&bus, store.clone())
         .add_feature(FheFeature::create(&bus, &rng))
         .add_feature(KeyshareFeature::create(&bus, &address.to_string(), &cipher))
         .build()

@@ -5,7 +5,7 @@ use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
 use data::RepositoriesFactory;
-use e3_request::E3RequestRouter;
+use e3_request::E3Router;
 use enclave_core::EventBus;
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
@@ -71,7 +71,7 @@ pub async fn setup_aggregator(
         .await?;
     }
 
-    E3RequestRouter::builder(&bus, store)
+    E3Router::builder(&bus, store)
         .add_feature(FheFeature::create(&bus, &rng))
         .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
         .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))
