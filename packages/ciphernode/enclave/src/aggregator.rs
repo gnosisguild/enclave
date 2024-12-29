@@ -1,7 +1,8 @@
-mod start;
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
+
+use crate::aggregator_start;
 
 #[derive(Subcommand, Debug)]
 pub enum AggregatorCommands {
@@ -23,7 +24,7 @@ pub async fn execute(command: AggregatorCommands, config: AppConfig) -> Result<(
             pubkey_write_path,
             plaintext_write_path,
         } => {
-            start::execute(
+            aggregator_start::execute(
                 config,
                 pubkey_write_path.as_deref(),
                 plaintext_write_path.as_deref(),

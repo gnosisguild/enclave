@@ -1,10 +1,9 @@
+use crate::helpers::prompt_password::prompt_password;
 use anyhow::*;
 use cipher::{FilePasswordManager, PasswordManager};
 use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use zeroize::Zeroize;
-
-use super::prompt_password;
 
 pub enum DeleteMode {
     Delete,

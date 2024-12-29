@@ -1,13 +1,29 @@
+use aggregator::AggregatorCommands;
 use anyhow::Result;
-use clap::Parser;
-use commands::{aggregator, init, net, password, start, wallet, Commands};
+use clap::{command, Parser, Subcommand};
 use config::load_config;
 use enclave_core::{get_tag, set_tag};
+use net::NetCommands;
+use password::PasswordCommands;
 use tracing::{info, instrument};
 use tracing_subscriber::EnvFilter;
+use wallet::WalletCommands;
 
-pub mod commands;
-mod compile_id;
+mod aggregator;
+mod aggregator_start;
+pub mod helpers;
+mod init;
+pub mod net;
+mod net_generate;
+mod net_purge;
+mod net_set;
+mod password;
+mod password_create;
+mod password_delete;
+mod password_overwrite;
+mod start;
+mod wallet;
+mod wallet_set;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
@@ -88,6 +104,62 @@ impl Cli {
     }
 }
 
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Start the application
+    Start,
+
+    /// Aggregator node management commands
+    Aggregator {
+        #[command(subcommand)]
+        command: AggregatorCommands,
+    },
+
+    /// Password management commands
+    Password {
+        #[command(subcommand)]
+        command: PasswordCommands,
+    },
+
+    /// Wallet management commands
+    Wallet {
+        #[command(subcommand)]
+        command: WalletCommands,
+    },
+
+    /// Networking related commands
+    Net {
+        #[command(subcommand)]
+        command: NetCommands,
+    },
+
+    Init {
+        /// An rpc url for enclave to connect to
+        #[arg(long = "rpc-url")]
+        rpc_url: Option<String>,
+
+        /// An Ethereum address that enclave should use to identify the node
+        #[arg(long = "eth-address")]
+        eth_address: Option<String>,
+
+        /// The password
+        #[arg(short, long)]
+        password: Option<String>,
+
+        /// Skip asking for eth
+        #[arg(long = "skip-eth")]
+        skip_eth: bool,
+
+        /// The network private key (ed25519)
+        #[arg(long = "net-keypair")]
+        net_keypair: Option<String>,
+
+        /// Generate a new network keypair
+        #[arg(long = "generate-net-keypair")]
+        generate_net_keypair: bool,
+    },
+}
+
 #[actix::main]
 pub async fn main() {
     tracing_subscriber::fmt()
@@ -100,7 +172,7 @@ pub async fn main() {
         // .with_env_filter("[app{id=ag}]=info")
         .init();
 
-    info!("COMPILATION ID: '{}'", compile_id::generate_id());
+    info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
 
     let cli = Cli::parse();
 

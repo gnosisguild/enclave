@@ -3,7 +3,7 @@ use cipher::{FilePasswordManager, PasswordManager};
 use config::AppConfig;
 use zeroize::{Zeroize, Zeroizing};
 
-use super::prompt_password;
+use crate::helpers::prompt_password::prompt_password;
 
 fn get_zeroizing_pw_vec(input: Option<String>) -> Result<Zeroizing<Vec<u8>>> {
     if let Some(mut pw_str) = input {

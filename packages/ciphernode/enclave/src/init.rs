@@ -1,7 +1,3 @@
-use crate::commands::{
-    net,
-    password::{self, PasswordCommands},
-};
 use alloy::primitives::Address;
 use anyhow::{anyhow, bail, Result};
 use config::load_config;
@@ -10,6 +6,11 @@ use dialoguer::{theme::ColorfulTheme, Input};
 use enclave_core::get_tag;
 use std::fs;
 use tracing::instrument;
+
+use crate::net;
+use crate::net::NetCommands;
+use crate::password;
+use crate::password::PasswordCommands;
 
 // Import a built file:
 //   see /target/debug/enclave-xxxxxx/out/contract_deployments.rs
@@ -133,13 +134,7 @@ chains:
     if generate_net_keypair {
         net::execute(net::NetCommands::GenerateKey, &config).await?;
     } else {
-        net::execute(
-            net::NetCommands::SetKey {
-                net_keypair: net_keypair,
-            },
-            &config,
-        )
-        .await?;
+        net::execute(NetCommands::SetKey { net_keypair }, &config).await?;
     }
 
     println!("Enclave configuration successfully created!");
