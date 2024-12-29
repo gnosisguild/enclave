@@ -21,6 +21,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
+use tracing::error;
 
 /// Helper class to buffer events for downstream instances incase events arrive in the wrong order
 #[derive(Default)]
@@ -74,6 +75,7 @@ pub struct E3Router {
     completed: HashSet<E3id>,
     /// The features this instance of the router is configured to listen for
     features: Arc<Vec<Box<dyn E3Feature>>>,
+    /// A buffer for events to send to the
     buffer: EventBuffer,
     bus: Addr<EventBus>,
     store: Repository<E3RouterSnapshot>,
@@ -125,12 +127,14 @@ impl Handler<EnclaveEvent> for E3Router {
             return;
         }
 
+        // Only process events with e3_ids
         let Some(e3_id) = msg.get_e3_id() else {
             return;
         };
 
+        // If this e3_id has already been completed then we are not going to do anything here
         if self.completed.contains(&e3_id) {
-            // TODO: Log warning that e3 event was received for completed e3_id
+            error!("Received the following event to E3Id({}) despite already being completed:\n\n{:?}\n\n", e3_id, msg);
             return;
         }
 
