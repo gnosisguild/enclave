@@ -3,8 +3,8 @@ use actix::Addr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
+use e3_request::{E3Context, E3ContextSnapshot, E3Feature, TypedKey};
 use enclave_core::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
-use router::{E3Feature, E3RequestContext, E3RequestContextSnapshot, TypedKey};
 use std::sync::Arc;
 
 pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
@@ -28,7 +28,7 @@ const ERROR_FHE_FAILED_TO_DECODE: &str = "Failed to decode encoded FHE params";
 
 #[async_trait]
 impl E3Feature for FheFeature {
-    fn on_event(&self, ctx: &mut E3RequestContext, evt: &EnclaveEvent) {
+    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Saving the fhe on Committee Requested
         let EnclaveEvent::E3Requested { data, .. } = evt else {
             return;
@@ -63,11 +63,7 @@ impl E3Feature for FheFeature {
         let _ = ctx.set_dependency(FHE_KEY, fhe);
     }
 
-    async fn hydrate(
-        &self,
-        ctx: &mut E3RequestContext,
-        snapshot: &E3RequestContextSnapshot,
-    ) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
         // No ID on the snapshot -> bail without reporting
         if !snapshot.contains("fhe") {
             return Ok(());

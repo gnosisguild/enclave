@@ -13,6 +13,6 @@ async-trait = { workspace = true }
 enclave-core = { path = "../core" }
 fhe = { path = "../fhe" }
 sortition = { path = "../sortition" }
-router = { workspace = true }
+e3_request = { workspace = true }
 data = { path = "../data" }
 tracing = { workspace = true }

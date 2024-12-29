@@ -5,6 +5,7 @@ use anyhow::Result;
 use cipher::Cipher;
 use config::AppConfig;
 use data::RepositoriesFactory;
+use e3_request::E3Router;
 use enclave_core::EventBus;
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
@@ -16,7 +17,6 @@ use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
-use router::E3RequestRouter;
 use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
@@ -71,7 +71,7 @@ pub async fn setup_aggregator(
         .await?;
     }
 
-    E3RequestRouter::builder(&bus, store)
+    E3Router::builder(&bus, store)
         .add_feature(FheFeature::create(&bus, &rng))
         .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
         .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))

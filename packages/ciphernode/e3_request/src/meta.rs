@@ -1,31 +1,29 @@
-use crate::{
-    E3Feature, E3RequestContext, E3RequestContextSnapshot, MetaRepositoryFactory, TypedKey,
-};
+use crate::{E3Context, E3ContextSnapshot, E3Feature, MetaRepositoryFactory, TypedKey};
 use anyhow::*;
 use async_trait::async_trait;
 use data::RepositoriesFactory;
 use enclave_core::{E3Requested, EnclaveEvent, Seed};
 
-pub const META_KEY: TypedKey<CommitteeMeta> = TypedKey::new("meta");
+pub const META_KEY: TypedKey<E3Meta> = TypedKey::new("meta");
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CommitteeMeta {
+pub struct E3Meta {
     pub threshold_m: usize,
     pub seed: Seed,
     pub src_chain_id: u64,
 }
 
-pub struct CommitteeMetaFeature;
+pub struct E3MetaFeature;
 
-impl CommitteeMetaFeature {
+impl E3MetaFeature {
     pub fn create() -> Box<Self> {
         Box::new(Self {})
     }
 }
 
 #[async_trait]
-impl E3Feature for CommitteeMetaFeature {
-    fn on_event(&self, ctx: &mut crate::E3RequestContext, event: &EnclaveEvent) {
+impl E3Feature for E3MetaFeature {
+    fn on_event(&self, ctx: &mut crate::E3Context, event: &EnclaveEvent) {
         let EnclaveEvent::E3Requested { data, .. } = event else {
             return;
         };
@@ -38,7 +36,7 @@ impl E3Feature for CommitteeMetaFeature {
         } = data.clone();
 
         // Meta doesn't implement Checkpoint so we are going to store it manually
-        let meta = CommitteeMeta {
+        let meta = E3Meta {
             threshold_m,
             seed,
             src_chain_id,
@@ -47,11 +45,7 @@ impl E3Feature for CommitteeMetaFeature {
         let _ = ctx.set_dependency(META_KEY, meta);
     }
 
-    async fn hydrate(
-        &self,
-        ctx: &mut E3RequestContext,
-        snapshot: &E3RequestContextSnapshot,
-    ) -> Result<()> {
+    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
         // No ID on the snapshot -> bail
         if !snapshot.contains("meta") {
             return Ok(());

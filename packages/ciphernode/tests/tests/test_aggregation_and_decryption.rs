@@ -2,6 +2,7 @@ use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use cipher::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
+use e3_request::E3Router;
 use enclave_core::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory,
@@ -12,7 +13,6 @@ use fhe::{setup_crp_params, FheFeature, ParamsWithCrp, SharedRng};
 use keyshare::KeyshareFeature;
 use logger::SimpleLogger;
 use net::{events::NetworkPeerEvent, NetworkManager};
-use router::E3RequestRouter;
 use sortition::SortitionRepositoryFactory;
 use sortition::{CiphernodeSelector, Sortition};
 
@@ -36,7 +36,7 @@ type LocalCiphernodeTuple = (
     String, // Address
     Addr<InMemStore>,
     Addr<Sortition>,
-    Addr<E3RequestRouter>,
+    Addr<E3Router>,
     Addr<SimpleLogger>,
 );
 
@@ -56,7 +56,7 @@ async fn setup_local_ciphernode(
     let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     CiphernodeSelector::attach(&bus, &sortition, addr);
 
-    let router = E3RequestRouter::builder(&bus, store)
+    let router = E3Router::builder(&bus, store)
         .add_feature(FheFeature::create(&bus, &rng))
         .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
         .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))

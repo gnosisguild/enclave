@@ -118,9 +118,9 @@ dependencies = [
  "bincode",
  "config",
  "data",
+ "e3_request",
  "enclave-core",
  "fhe 0.1.0",
- "router",
  "serde",
  "sortition",
  "tracing",
@@ -2109,6 +2109,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "e3_request"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "config",
+ "data",
+ "enclave-core",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "ecdsa"
 version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2186,6 +2201,7 @@ dependencies = [
  "data",
  "dialoguer",
  "dirs",
+ "e3_request",
  "enclave-core",
  "enclave_node",
  "evm",
@@ -2196,7 +2212,6 @@ dependencies = [
  "petname",
  "phf",
  "rand",
- "router",
  "serde",
  "serde_json",
  "tokio",
@@ -2237,6 +2252,7 @@ dependencies = [
  "clap",
  "config",
  "data",
+ "e3_request",
  "enclave-core",
  "evm",
  "fhe 0.1.0",
@@ -2245,7 +2261,6 @@ dependencies = [
  "net",
  "rand",
  "rand_chacha",
- "router",
  "serde",
  "sortition",
  "test-helpers",
@@ -2424,13 +2439,13 @@ dependencies = [
  "bincode",
  "config",
  "data",
+ "e3_request",
  "enclave-core",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
  "fhe-util",
  "rand",
  "rand_chacha",
- "router",
  "serde",
 ]
 
@@ -3498,9 +3513,9 @@ dependencies = [
  "cipher 0.1.0",
  "config",
  "data",
+ "e3_request",
  "enclave-core",
  "fhe 0.1.0",
- "router",
  "serde",
  "tracing",
 ]
@@ -5307,21 +5322,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "router"
-version = "0.1.0"
-dependencies = [
- "actix",
- "anyhow",
- "async-trait",
- "bincode",
- "config",
- "data",
- "enclave-core",
- "serde",
- "tracing",
-]
-
-[[package]]
 name = "rtnetlink"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6063,6 +6063,7 @@ dependencies = [
  "cipher 0.1.0",
  "clap",
  "data",
+ "e3_request",
  "enclave-core",
  "evm",
  "fhe 0.1.0",
@@ -6074,7 +6075,6 @@ dependencies = [
  "net",
  "rand",
  "rand_chacha",
- "router",
  "sortition",
  "test-helpers",
  "tokio",

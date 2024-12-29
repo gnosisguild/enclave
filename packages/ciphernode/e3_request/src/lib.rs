@@ -1,11 +1,11 @@
-mod committee_meta;
 mod context;
-mod e3_request_router;
 mod hetrogenous_map;
+mod meta;
 mod repo;
+mod router;
 
-pub use committee_meta::*;
 pub use context::*;
-pub use e3_request_router::*;
 pub use hetrogenous_map::*;
+pub use meta::*;
 pub use repo::*;
+pub use router::*;
