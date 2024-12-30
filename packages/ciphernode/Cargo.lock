@@ -1432,17 +1432,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
-name = "bfv"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "fhe 0.1.0-beta.7",
- "fhe-traits",
- "fhe-util",
- "rand",
-]
-
-[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2218,7 +2207,6 @@ dependencies = [
  "alloy",
  "alloy-primitives 0.6.4",
  "anyhow",
- "bfv",
  "bincode",
  "clap",
  "config",
@@ -6052,7 +6040,6 @@ dependencies = [
  "anyhow",
  "async-std",
  "base64",
- "bfv",
  "bincode",
  "clap",
  "crypto",

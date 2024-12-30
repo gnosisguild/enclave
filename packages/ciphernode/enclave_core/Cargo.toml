@@ -12,7 +12,6 @@ aggregator = { path = "../aggregator" }
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
-bfv = { path = "../bfv" }
 bincode = { workspace = true }
 config = { path = "../config" }
 clap = { workspace = true }

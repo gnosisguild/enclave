@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 net = { path = "../net" }
-bfv = { path = "../bfv" }
 sortition = { path = "../sortition" }
 events = { workspace = true }
 evm = { path = "../evm" }
