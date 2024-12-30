@@ -1,40 +1,13 @@
-use alloy::primitives::Address;
-use anyhow::{anyhow, bail, Result};
-use config::load_config;
-use config::RPC;
+use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
 use enclave_core::get_tag;
-use std::fs;
+use enclave_node::init;
 use tracing::instrument;
 
 use crate::net;
 use crate::net::NetCommands;
 use crate::password;
 use crate::password::PasswordCommands;
-
-// Import a built file:
-//   see /target/debug/enclave-xxxxxx/out/contract_deployments.rs
-//   also see build.rs
-include!(concat!(env!("OUT_DIR"), "/contract_deployments.rs"));
-
-// Get the ContractInfo object
-fn get_contract_info(name: &str) -> Result<&ContractInfo> {
-    Ok(CONTRACT_DEPLOYMENTS
-        .get(name)
-        .ok_or(anyhow!("Could not get contract info"))?)
-}
-
-fn validate_rpc_url(url: &String) -> Result<()> {
-    RPC::from_url(url)?;
-    Ok(())
-}
-
-fn validate_eth_address(address: &String) -> Result<()> {
-    match Address::parse_checksummed(address, None) {
-        Ok(_) => Ok(()),
-        Err(e) => bail!("Invalid Ethereum address: {}", e),
-    }
-}
 
 #[instrument(name = "app", skip_all, fields(id = get_tag()))]
 pub async fn execute(
@@ -47,19 +20,19 @@ pub async fn execute(
 ) -> Result<()> {
     let rpc_url = match rpc_url {
         Some(url) => {
-            validate_rpc_url(&url)?;
+            init::validate_rpc_url(&url)?;
             url
         }
         None => Input::<String>::new()
             .with_prompt("Enter WebSocket devnet RPC URL")
             .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
-            .validate_with(validate_rpc_url)
+            .validate_with(init::validate_rpc_url)
             .interact_text()?,
     };
 
     let eth_address: Option<String> = match eth_address {
         Some(address) => {
-            validate_eth_address(&address)?;
+            init::validate_eth_address(&address)?;
             Some(address)
         }
         None => {
@@ -69,7 +42,7 @@ pub async fn execute(
                 Input::with_theme(&ColorfulTheme::default())
                     .with_prompt("Enter your Ethereum address (press Enter to skip)")
                     .allow_empty(true)
-                    .validate_with(validate_eth_address)
+                    .validate_with(init::validate_eth_address)
                     .interact()
                     .ok()
                     .map(|s| if s.is_empty() { None } else { Some(s) })
@@ -78,49 +51,7 @@ pub async fn execute(
         }
     };
 
-    let config_dir = dirs::home_dir()
-        .ok_or_else(|| anyhow!("Could not determine home directory"))?
-        .join(".config")
-        .join("enclave");
-    fs::create_dir_all(&config_dir)?;
-
-    let config_path = config_dir.join("config.yaml");
-
-    let config_content = format!(
-        r#"---
-# Enclave Configuration File
-{}
-chains:
-  - name: "devnet"
-    rpc_url: "{}"
-    contracts:
-      enclave:
-        address: "{}"
-        deploy_block: {}
-      ciphernode_registry:
-        address: "{}"
-        deploy_block: {}
-      filter_registry:
-        address: "{}"
-        deploy_block: {}
-"#,
-        eth_address.map_or(String::new(), |addr| format!(
-            "# Ethereum Account Configuration\naddress: \"{}\"",
-            addr
-        )),
-        rpc_url,
-        get_contract_info("Enclave")?.address,
-        get_contract_info("Enclave")?.deploy_block,
-        get_contract_info("CiphernodeRegistryOwnable")?.address,
-        get_contract_info("CiphernodeRegistryOwnable")?.deploy_block,
-        get_contract_info("NaiveRegistryFilter")?.address,
-        get_contract_info("NaiveRegistryFilter")?.deploy_block,
-    );
-
-    fs::write(config_path.clone(), config_content)?;
-
-    // Load with default location
-    let config = load_config(Some(&config_path.display().to_string()))?;
+    let config = init::execute(rpc_url, eth_address).await?;
 
     password::execute(
         PasswordCommands::Create {
@@ -141,26 +72,4 @@ chains:
     println!("You can start your node using `enclave start`");
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::validate_eth_address;
-    use anyhow::Result;
-
-    #[test]
-    fn eth_address_validation() -> Result<()> {
-        assert!(
-            validate_eth_address(&"0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".to_string()).is_ok()
-        );
-        assert!(
-            validate_eth_address(&"d8dA6BF26964aF9D7eEd9e03E53415D37aA96045".to_string()).is_err()
-        );
-        assert!(validate_eth_address(&"0x1234567890abcdef".to_string()).is_err());
-        assert!(
-            validate_eth_address(&"0x0000000000000000000000000000000000000000".to_string()).is_ok()
-        );
-
-        Ok(())
-    }
 }

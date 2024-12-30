@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
-use cipher::{FilePasswordManager, PasswordManager};
 use config::AppConfig;
+use enclave_node::password_create;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::helpers::prompt_password::prompt_password;
@@ -42,23 +42,13 @@ fn get_zeroizing_pw_vec(input: Option<String>) -> Result<Zeroizing<Vec<u8>>> {
 }
 
 pub async fn execute(config: &AppConfig, input: Option<String>, overwrite: bool) -> Result<()> {
-    let key_file = config.key_file();
-    let mut pm = FilePasswordManager::new(key_file);
-
-    if overwrite && pm.is_set() {
-        pm.delete_key().await?;
-    }
-
-    if pm.is_set() {
-        bail!("Keyfile already exists. Refusing to overwrite. Try using `enclave password overwrite` or `enclave password delete` in order to change or delete your password.")
-    }
+    password_create::preflight(config, overwrite).await?;
 
     let pw = get_zeroizing_pw_vec(input)?;
 
-    match pm.set_key(pw).await {
-        Ok(_) => println!("Password sucessfully set."),
-        Err(err) => println!("{}", err),
-    };
+    password_create::execute(config, pw, overwrite).await?;
+
+    println!("Password sucessfully set.");
 
     Ok(())
 }

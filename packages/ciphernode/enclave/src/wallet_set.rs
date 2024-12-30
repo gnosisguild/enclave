@@ -1,20 +1,7 @@
-use actix::Actor;
-use alloy::{hex::FromHex, primitives::FixedBytes, signers::local::PrivateKeySigner};
-use anyhow::{anyhow, bail, Result};
-use cipher::Cipher;
+use anyhow::Result;
 use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Password};
-use enclave_core::{EventBus, GetErrors};
-use enclave_node::get_repositories;
-use evm::EthPrivateKeyRepositoryFactory;
-
-pub fn validate_private_key(input: &String) -> Result<()> {
-    let bytes =
-        FixedBytes::<32>::from_hex(input).map_err(|e| anyhow!("Invalid private key: {}", e))?;
-    let _ =
-        PrivateKeySigner::from_bytes(&bytes).map_err(|e| anyhow!("Invalid private key: {}", e))?;
-    Ok(())
-}
+use enclave_node::wallet_set::{self, validate_private_key};
 
 pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<()> {
     let input = if let Some(private_key) = private_key {
@@ -29,23 +16,9 @@ pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<
             .to_string()
     };
 
-    let cipher = Cipher::from_config(config).await?;
-    let encrypted = cipher.encrypt_data(&mut input.as_bytes().to_vec())?;
-    let bus = EventBus::new(true).start();
-    let repositories = get_repositories(&config, &bus)?;
+    wallet_set::execute(config, input).await?;
 
-    // NOTE: We are writing an encrypted string here
-    repositories.eth_private_key().write(&encrypted);
-
-    let errors = bus.send(GetErrors).await?;
-    if errors.len() > 0 {
-        for error in errors.iter() {
-            println!("{error}");
-        }
-        bail!("There were errors setting the wallet key")
-    }
-
-    println!("WalletKey key has been successfully encrypted.");
+    println!("WalletKey key has been successfully stored and encrypted.");
 
     Ok(())
 }

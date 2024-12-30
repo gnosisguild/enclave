@@ -55,6 +55,7 @@ hex = "0.4.3"
 lazy_static = "1.5.0"
 num = "0.4.3"
 net = { path = "./net" }
+phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
 e3_request = { path = "./e3_request" }

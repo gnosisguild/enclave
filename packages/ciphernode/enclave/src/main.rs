@@ -45,12 +45,6 @@ pub fn owo() {
 pub async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
-        // .with_env_filter("error")
-        // .with_env_filter("[app{id=cn1}]=info")
-        // .with_env_filter("[app{id=cn2}]=info,libp2p_mdns::behaviour=error")
-        // .with_env_filter("[app{id=cn3}]=info")
-        // .with_env_filter("[app{id=cn4}]=info")
-        // .with_env_filter("[app{id=ag}]=info")
         .init();
 
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
