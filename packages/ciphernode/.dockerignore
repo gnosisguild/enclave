@@ -11,6 +11,7 @@
 !*/src/**/*.rs
 
 # Explicitly ignore build artifacts everywhere
+target/
 **/target/
 **/.git/
 **/.gitignore

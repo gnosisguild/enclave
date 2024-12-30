@@ -11,13 +11,13 @@ anyhow = { workspace = true }
 crypto = { workspace = true }
 clap = { workspace = true }
 compile-time = { workspace = true }
-config = { path = "../config" }
-dialoguer = "0.11.0"
+config = { workspace = true }
+dialoguer = { workspace = true }
 events = { workspace = true }
 enclave_core = { workspace = true }
 hex = { workspace = true }
-petname = "2.0.2"
 rand = { workspace = true }
+petname = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true } 

@@ -11,8 +11,8 @@ bincode = { workspace = true }
 config = { workspace = true }
 async-trait = { workspace = true }
 events = { workspace = true }
-fhe = { path = "../fhe" }
-sortition = { path = "../sortition" }
+fhe = { workspace = true  }
+sortition = {  workspace = true  }
 e3_request = { workspace = true }
-data = { path = "../data" }
+data = { workspace = true }
 tracing = { workspace = true }

@@ -11,11 +11,11 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 crypto = { workspace = true }
-config = { path = "../config" }
-data = { path = "../data" }
+config = { workspace = true }
+data = { workspace = true }
 events = { workspace = true }
 futures-util = { workspace = true }
-sortition = { path = "../sortition" }
+sortition = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
