@@ -37,6 +37,7 @@ COPY ./packages/ciphernode/net/Cargo.toml ./net/Cargo.toml
 COPY ./packages/ciphernode/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY ./packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
 COPY ./packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
+COPY ./packages/ciphernode/rust-toolchain.toml .
 
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
