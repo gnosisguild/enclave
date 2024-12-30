@@ -15,7 +15,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 config = { workspace = true }
 data = { path = "../data" }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 num = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

@@ -2,7 +2,7 @@ use crate::helpers::prompt_password::prompt_password;
 use anyhow::Result;
 use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Confirm};
-use enclave_node::password_delete;
+use enclave_core::password_delete;
 use zeroize::Zeroize;
 
 pub enum DeleteMode {

@@ -1,4 +1,4 @@
-use enclave_core::E3id;
+use events::E3id;
 
 pub struct StoreKeys;
 

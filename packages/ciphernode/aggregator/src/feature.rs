@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{AutoPersist, RepositoriesFactory};
 use e3_request::{E3Context, E3ContextSnapshot, E3Feature, META_KEY};
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
+use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::FHE_KEY;
 use sortition::Sortition;
 

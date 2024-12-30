@@ -1,8 +1,8 @@
 use crate::owo;
 use anyhow::{anyhow, Result};
 use config::AppConfig;
-use enclave_core::get_tag;
-use enclave_node::{listen_for_shutdown, start};
+use enclave_core::{listen_for_shutdown, start};
+use events::get_tag;
 use tracing::{info, instrument};
 
 #[instrument(name="app", skip_all,fields(id = get_tag()))]

@@ -1,9 +1,9 @@
 use actix::Actor;
 use alloy::{hex::FromHex, primitives::FixedBytes, signers::local::PrivateKeySigner};
 use anyhow::{anyhow, Result};
-use cipher::Cipher;
 use config::AppConfig;
-use enclave_core::{EventBus, GetErrors};
+use crypto::Cipher;
+use events::{EventBus, GetErrors};
 use evm::EthPrivateKeyRepositoryFactory;
 
 use crate::datastore::get_repositories;

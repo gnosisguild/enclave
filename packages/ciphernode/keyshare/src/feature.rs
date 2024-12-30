@@ -2,10 +2,10 @@ use crate::{Keyshare, KeyshareParams, KeyshareRepositoryFactory};
 use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use cipher::Cipher;
+use crypto::Cipher;
 use data::{AutoPersist, RepositoriesFactory};
 use e3_request::{E3Context, E3ContextSnapshot, E3Feature};
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
+use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::FHE_KEY;
 use std::sync::Arc;
 

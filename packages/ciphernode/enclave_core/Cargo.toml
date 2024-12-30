@@ -1,5 +1,5 @@
 [package]
-name = "enclave_node"
+name = "enclave_core"
 version = "0.1.0"
 edition = "2021"
 description = ": coordinates the encryption and decryption of enclave computations"
@@ -16,10 +16,10 @@ bfv = { path = "../bfv" }
 bincode = { workspace = true }
 config = { path = "../config" }
 clap = { workspace = true }
-cipher = { path = "../cipher" }
+crypto = { workspace = true }
 data = { path = "../data" }
 dirs = { workspace = true }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 evm = { path = "../evm" }
 fhe = { path = "../fhe" }
 keyshare = { path = "../keyshare" }

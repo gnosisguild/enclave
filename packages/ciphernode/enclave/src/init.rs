@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
-use enclave_core::get_tag;
-use enclave_node::init;
+use enclave_core::init;
+use events::get_tag;
 use tracing::instrument;
 
 use crate::net;

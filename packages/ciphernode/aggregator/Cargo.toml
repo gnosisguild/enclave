@@ -10,7 +10,7 @@ serde = { workspace = true }
 bincode = { workspace = true }
 config = { workspace = true }
 async-trait = { workspace = true }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 fhe = { path = "../fhe" }
 sortition = { path = "../sortition" }
 e3_request = { workspace = true }

@@ -1,9 +1,9 @@
 use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
-use cipher::Cipher;
+use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
 use e3_request::E3Router;
-use enclave_core::{
+use events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory,
     KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,

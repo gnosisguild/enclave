@@ -3,7 +3,7 @@ use anyhow::{anyhow, bail, Result};
 use config::load_config;
 use config::AppConfig;
 use config::RPC;
-use enclave_core::get_tag;
+use events::get_tag;
 use std::fs;
 use tracing::instrument;
 

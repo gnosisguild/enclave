@@ -10,10 +10,10 @@ alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
-cipher = { path = "../cipher" }
+crypto = { workspace = true }
 config = { path = "../config" }
 data = { path = "../data" }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 futures-util = { workspace = true }
 sortition = { path = "../sortition" }
 serde = { workspace = true }
@@ -23,5 +23,5 @@ url = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
-enclave_node = { path = "../enclave_node" }
+enclave_core = { workspace = true }
 

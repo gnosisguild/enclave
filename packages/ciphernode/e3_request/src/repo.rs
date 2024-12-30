@@ -1,6 +1,6 @@
 use config::StoreKeys;
 use data::{Repositories, Repository};
-use enclave_core::E3id;
+use events::E3id;
 
 use crate::{E3ContextSnapshot, E3Meta, E3RouterSnapshot};
 

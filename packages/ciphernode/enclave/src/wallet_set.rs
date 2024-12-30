@@ -1,7 +1,7 @@
 use anyhow::Result;
 use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Password};
-use enclave_node::wallet_set::{self, validate_private_key};
+use enclave_core::wallet_set::{self, validate_private_key};
 
 pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<()> {
     let input = if let Some(private_key) = private_key {

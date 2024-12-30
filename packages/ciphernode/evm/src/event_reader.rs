@@ -9,9 +9,7 @@ use alloy::rpc::types::Filter;
 use alloy::transports::{BoxTransport, Transport};
 use anyhow::{anyhow, Result};
 use data::{AutoPersist, Persistable, Repository};
-use enclave_core::{
-    get_tag, BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe,
-};
+use events::{get_tag, BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;

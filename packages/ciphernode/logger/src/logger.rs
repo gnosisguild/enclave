@@ -1,5 +1,5 @@
 use actix::{Actor, Addr, Context, Handler};
-use enclave_core::{EnclaveEvent, EventBus, Subscribe};
+use events::{EnclaveEvent, EventBus, Subscribe};
 use tracing::{error, info};
 
 pub struct SimpleLogger {

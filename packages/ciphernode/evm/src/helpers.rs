@@ -24,8 +24,8 @@ use alloy::{
 };
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
-use cipher::Cipher;
 use config::{RpcAuth, RPC};
+use crypto::Cipher;
 use data::Repository;
 use std::{env, marker::PhantomData, sync::Arc};
 use zeroize::Zeroizing;

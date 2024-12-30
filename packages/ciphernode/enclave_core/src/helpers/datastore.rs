@@ -5,7 +5,7 @@ use anyhow::Result;
 use config::AppConfig;
 use data::{DataStore, InMemStore, SledStore};
 use data::{Repositories, RepositoriesFactory};
-use enclave_core::EventBus;
+use events::EventBus;
 
 pub fn get_sled_store(bus: &Addr<EventBus>, db_file: &PathBuf) -> Result<DataStore> {
     Ok((&SledStore::new(bus, db_file)?).into())

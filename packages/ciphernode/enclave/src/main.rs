@@ -1,6 +1,6 @@
 use clap::Parser;
 use cli::Cli;
-use enclave_core::set_tag;
+use events::set_tag;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 

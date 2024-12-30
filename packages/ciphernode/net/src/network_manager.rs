@@ -6,9 +6,9 @@ use crate::NetworkPeer;
 /// This Actor should be responsible for
 use actix::prelude::*;
 use anyhow::{bail, Result};
-use cipher::Cipher;
+use crypto::Cipher;
 use data::Repository;
-use enclave_core::{EnclaveEvent, EventBus, EventId, Subscribe};
+use events::{EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
 use std::sync::Arc;

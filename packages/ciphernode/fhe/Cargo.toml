@@ -10,7 +10,7 @@ async-trait = { workspace = true }
 bincode = { workspace = true }
 config = { workspace = true }
 data = { path = "../data" }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 fhe_rs = { workspace = true }

@@ -12,7 +12,7 @@ use alloy::{
 };
 use anyhow::Result;
 use data::Repository;
-use enclave_core::{EnclaveEvent, EventBus};
+use events::{EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 
 sol!(
@@ -22,9 +22,9 @@ sol!(
     "../../evm/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json"
 );
 
-impl From<ICiphernodeRegistry::CiphernodeAdded> for enclave_core::CiphernodeAdded {
+impl From<ICiphernodeRegistry::CiphernodeAdded> for events::CiphernodeAdded {
     fn from(value: ICiphernodeRegistry::CiphernodeAdded) -> Self {
-        enclave_core::CiphernodeAdded {
+        events::CiphernodeAdded {
             address: value.node.to_string(),
             // TODO: limit index and numNodes to uint32 at the solidity level
             index: value
@@ -41,14 +41,14 @@ impl From<ICiphernodeRegistry::CiphernodeAdded> for enclave_core::CiphernodeAdde
 
 impl From<ICiphernodeRegistry::CiphernodeAdded> for EnclaveEvent {
     fn from(value: ICiphernodeRegistry::CiphernodeAdded) -> Self {
-        let payload: enclave_core::CiphernodeAdded = value.into();
+        let payload: events::CiphernodeAdded = value.into();
         EnclaveEvent::from(payload)
     }
 }
 
-impl From<ICiphernodeRegistry::CiphernodeRemoved> for enclave_core::CiphernodeRemoved {
+impl From<ICiphernodeRegistry::CiphernodeRemoved> for events::CiphernodeRemoved {
     fn from(value: ICiphernodeRegistry::CiphernodeRemoved) -> Self {
-        enclave_core::CiphernodeRemoved {
+        events::CiphernodeRemoved {
             address: value.node.to_string(),
             index: value
                 .index
@@ -64,7 +64,7 @@ impl From<ICiphernodeRegistry::CiphernodeRemoved> for enclave_core::CiphernodeRe
 
 impl From<ICiphernodeRegistry::CiphernodeRemoved> for EnclaveEvent {
     fn from(value: ICiphernodeRegistry::CiphernodeRemoved) -> Self {
-        let payload: enclave_core::CiphernodeRemoved = value.into();
+        let payload: events::CiphernodeRemoved = value.into();
         EnclaveEvent::from(payload)
     }
 }
