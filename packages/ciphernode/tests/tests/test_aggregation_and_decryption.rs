@@ -1,5 +1,5 @@
 use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
-use cipher::Cipher;
+use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
 use e3_request::E3Router;

@@ -90,7 +90,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b169f7a6d4742236a0a00c541b845991d0ac43e546831af1249753ab4c3aa3a0"
 dependencies = [
  "cfg-if",
- "cipher 0.4.4",
+ "cipher",
  "cpufeatures",
 ]
 
@@ -102,7 +102,7 @@ checksum = "831010a0f742e1209b3bcea8fab6a8e149051ba6099432c8cb2cc117dec3ead1"
 dependencies = [
  "aead",
  "aes",
- "cipher 0.4.4",
+ "cipher",
  "ctr",
  "ghash",
  "subtle",
@@ -1610,20 +1610,6 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cipher"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "argon2",
- "async-trait",
- "config",
- "rand",
- "tokio",
- "zeroize",
-]
-
-[[package]]
-name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
@@ -1828,6 +1814,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "crypto"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "argon2",
+ "async-trait",
+ "config",
+ "rand",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "crypto-bigint"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1856,7 +1856,7 @@ version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0369ee1ad671834580515889b80f2ea915f23b8be8d0daa4bbaf2ac5c7590835"
 dependencies = [
- "cipher 0.4.4",
+ "cipher",
 ]
 
 [[package]]
@@ -2193,10 +2193,10 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "anyhow",
- "cipher 0.1.0",
  "clap",
  "compile-time",
  "config",
+ "crypto",
  "dialoguer",
  "enclave_core",
  "events",
@@ -2220,9 +2220,9 @@ dependencies = [
  "anyhow",
  "bfv",
  "bincode",
- "cipher 0.1.0",
  "clap",
  "config",
+ "crypto",
  "data",
  "dirs",
  "e3_request",
@@ -2350,8 +2350,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
- "cipher 0.1.0",
  "config",
+ "crypto",
  "data",
  "enclave_core",
  "events",
@@ -3504,8 +3504,8 @@ dependencies = [
  "actix",
  "anyhow",
  "async-trait",
- "cipher 0.1.0",
  "config",
+ "crypto",
  "data",
  "e3_request",
  "events",
@@ -4164,8 +4164,8 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-trait",
- "cipher 0.1.0",
  "config",
+ "crypto",
  "data",
  "events",
  "futures",
@@ -6054,8 +6054,8 @@ dependencies = [
  "base64",
  "bfv",
  "bincode",
- "cipher 0.1.0",
  "clap",
+ "crypto",
  "data",
  "e3_request",
  "events",

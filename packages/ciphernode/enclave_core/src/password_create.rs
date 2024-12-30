@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
-use cipher::{FilePasswordManager, PasswordManager};
 use config::AppConfig;
+use crypto::{FilePasswordManager, PasswordManager};
 use zeroize::Zeroizing;
 
 pub async fn preflight(config: &AppConfig, overwrite: bool) -> Result<()> {

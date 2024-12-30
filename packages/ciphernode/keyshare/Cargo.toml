@@ -9,7 +9,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 config = { workspace = true }
 data = { path = "../data" }
-cipher = { path = "../cipher" }
+crypto = { workspace = true }
 events = { workspace = true }
 fhe = { path = "../fhe" }
 e3_request = { workspace = true }

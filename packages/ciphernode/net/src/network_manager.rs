@@ -6,7 +6,7 @@ use crate::NetworkPeer;
 /// This Actor should be responsible for
 use actix::prelude::*;
 use anyhow::{bail, Result};
-use cipher::Cipher;
+use crypto::Cipher;
 use data::Repository;
 use events::{EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;

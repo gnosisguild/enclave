@@ -8,7 +8,7 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 [dependencies]
 actix = { workspace = true }
 anyhow = { workspace = true }
-cipher = { path = "../cipher" }
+crypto = { workspace = true }
 clap = { workspace = true }
 compile-time = { workspace = true }
 config = { path = "../config" }

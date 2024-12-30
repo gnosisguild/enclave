@@ -10,7 +10,7 @@ alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
-cipher = { path = "../cipher" }
+crypto = { workspace = true }
 config = { path = "../config" }
 data = { path = "../data" }
 events = { workspace = true }

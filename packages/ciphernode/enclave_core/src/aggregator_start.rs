@@ -1,8 +1,8 @@
 use actix::{Actor, Addr};
 use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use anyhow::Result;
-use cipher::Cipher;
 use config::AppConfig;
+use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
 use events::EventBus;

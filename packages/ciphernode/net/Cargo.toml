@@ -11,7 +11,7 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 async-std = { workspace = true, features = ["attributes"] }
 async-trait = { workspace = true }
 futures = { workspace = true }
-cipher = { workspace = true }
+crypto = { workspace = true }
 config = { workspace = true }
 data = { workspace = true }
 libp2p = { workspace = true, features = [

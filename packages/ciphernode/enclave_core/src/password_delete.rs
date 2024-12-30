@@ -1,6 +1,6 @@
 use anyhow::*;
-use cipher::{FilePasswordManager, PasswordManager};
 use config::AppConfig;
+use crypto::{FilePasswordManager, PasswordManager};
 use zeroize::Zeroizing;
 
 pub async fn get_current_password(config: &AppConfig) -> Result<Zeroizing<String>> {

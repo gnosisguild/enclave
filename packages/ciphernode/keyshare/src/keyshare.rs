@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
-use cipher::Cipher;
+use crypto::Cipher;
 use data::Persistable;
 use events::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,

@@ -1,8 +1,8 @@
 use actix::Actor;
 use alloy::{hex::FromHex, primitives::FixedBytes, signers::local::PrivateKeySigner};
 use anyhow::{anyhow, Result};
-use cipher::Cipher;
 use config::AppConfig;
+use crypto::Cipher;
 use events::{EventBus, GetErrors};
 use evm::EthPrivateKeyRepositoryFactory;
 

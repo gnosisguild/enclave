@@ -16,7 +16,7 @@ bfv = { path = "../bfv" }
 bincode = { workspace = true }
 config = { path = "../config" }
 clap = { workspace = true }
-cipher = { path = "../cipher" }
+crypto = { workspace = true }
 data = { path = "../data" }
 dirs = { workspace = true }
 events = { workspace = true }

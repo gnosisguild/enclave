@@ -11,7 +11,7 @@ events = { workspace = true }
 evm = { path = "../evm" }
 logger = { path = "../logger" }
 fhe = { path = "../fhe" }
-cipher = { path = "../cipher" }
+crypto = { workspace = true }
 data = { path = "../data" }
 keyshare = { path = "../keyshare" }
 aggregator = { path = "../aggregator" }

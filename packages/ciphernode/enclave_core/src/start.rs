@@ -1,8 +1,8 @@
 use actix::{Actor, Addr};
 use alloy::primitives::Address;
 use anyhow::Result;
-use cipher::Cipher;
 use config::AppConfig;
+use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
 use events::{get_tag, EventBus};
