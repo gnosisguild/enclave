@@ -26,7 +26,7 @@ pub use keyshare_created::*;
 pub use plaintext_aggregated::*;
 pub use publickey_aggregated::*;
 pub use shutdown::*;
-use test_event::TestEvent;
+pub use test_event::*;
 
 use crate::{E3id, EventId};
 use actix::Message;
@@ -36,6 +36,7 @@ use std::{
     hash::Hash,
 };
 
+/// Macro to help define From traits for EnclaveEvent
 macro_rules! impl_from_event {
     ($($variant:ident),*) => {
         $(
