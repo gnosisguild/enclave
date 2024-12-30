@@ -36,6 +36,21 @@ use std::{
     hash::Hash,
 };
 
+macro_rules! impl_from_event {
+    ($($variant:ident),*) => {
+        $(
+            impl From<$variant> for EnclaveEvent {
+                fn from(data: $variant) -> Self {
+                    EnclaveEvent::$variant {
+                        id: EventId::hash(data.clone()),
+                        data: data.clone(),
+                    }
+                }
+            }
+        )*
+    };
+}
+
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub enum EnclaveEvent {
@@ -178,122 +193,21 @@ impl EnclaveEvent {
     }
 }
 
-impl From<KeyshareCreated> for EnclaveEvent {
-    fn from(data: KeyshareCreated) -> Self {
-        EnclaveEvent::KeyshareCreated {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<E3Requested> for EnclaveEvent {
-    fn from(data: E3Requested) -> Self {
-        EnclaveEvent::E3Requested {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<PublicKeyAggregated> for EnclaveEvent {
-    fn from(data: PublicKeyAggregated) -> Self {
-        EnclaveEvent::PublicKeyAggregated {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<CiphertextOutputPublished> for EnclaveEvent {
-    fn from(data: CiphertextOutputPublished) -> Self {
-        EnclaveEvent::CiphertextOutputPublished {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<DecryptionshareCreated> for EnclaveEvent {
-    fn from(data: DecryptionshareCreated) -> Self {
-        EnclaveEvent::DecryptionshareCreated {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<PlaintextAggregated> for EnclaveEvent {
-    fn from(data: PlaintextAggregated) -> Self {
-        EnclaveEvent::PlaintextAggregated {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<E3RequestComplete> for EnclaveEvent {
-    fn from(data: E3RequestComplete) -> Self {
-        EnclaveEvent::E3RequestComplete {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<CiphernodeSelected> for EnclaveEvent {
-    fn from(data: CiphernodeSelected) -> Self {
-        EnclaveEvent::CiphernodeSelected {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<CiphernodeAdded> for EnclaveEvent {
-    fn from(data: CiphernodeAdded) -> Self {
-        EnclaveEvent::CiphernodeAdded {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<CiphernodeRemoved> for EnclaveEvent {
-    fn from(data: CiphernodeRemoved) -> Self {
-        EnclaveEvent::CiphernodeRemoved {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<EnclaveError> for EnclaveEvent {
-    fn from(data: EnclaveError) -> Self {
-        EnclaveEvent::EnclaveError {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<Shutdown> for EnclaveEvent {
-    fn from(data: Shutdown) -> Self {
-        EnclaveEvent::Shutdown {
-            id: EventId::hash(data.clone()),
-            data: data.clone(),
-        }
-    }
-}
-
-impl From<TestEvent> for EnclaveEvent {
-    fn from(value: TestEvent) -> Self {
-        EnclaveEvent::TestEvent {
-            id: EventId::hash(value.clone()),
-            data: value.clone(),
-        }
-    }
-}
+impl_from_event!(
+    KeyshareCreated,
+    E3Requested,
+    PublicKeyAggregated,
+    CiphertextOutputPublished,
+    DecryptionshareCreated,
+    PlaintextAggregated,
+    E3RequestComplete,
+    CiphernodeSelected,
+    CiphernodeAdded,
+    CiphernodeRemoved,
+    EnclaveError,
+    Shutdown,
+    TestEvent
+);
 
 impl FromError for EnclaveEvent {
     type Error = anyhow::Error;
