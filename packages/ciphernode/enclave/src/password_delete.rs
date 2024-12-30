@@ -1,10 +1,9 @@
-use anyhow::*;
-use cipher::{FilePasswordManager, PasswordManager};
+use crate::helpers::prompt_password::prompt_password;
+use anyhow::Result;
 use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Confirm};
+use enclave_node::password_delete;
 use zeroize::Zeroize;
-
-use super::prompt_password;
 
 pub enum DeleteMode {
     Delete,
@@ -22,38 +21,36 @@ impl DeleteMode {
 
 pub async fn prompt_delete(config: &AppConfig, delete_mode: DeleteMode) -> Result<bool> {
     let mode = delete_mode.to_string();
-    let proceed = Confirm::with_theme(&ColorfulTheme::default())
+
+    if !Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt(format!(
             "Are you sure you want to {mode} the key? This action cannot be undone."
         ))
         .default(false)
-        .interact()?;
-
-    if proceed {
-        let key_file = config.key_file();
-        let mut pm = FilePasswordManager::new(key_file);
-        if !pm.is_set() {
-            println!("Password is not set. Nothing to do.");
-            return Ok(false);
-        }
-        let mut pw_str = prompt_password("Please enter the current password")?;
-        let mut cur_pw = pm.get_key().await?;
-
-        if pw_str != String::from_utf8_lossy(&cur_pw) {
-            // Clean up sensitive data
-            pw_str.zeroize();
-            cur_pw.zeroize();
-            return Err(anyhow::anyhow!("Incorrect password"));
-        }
-        pm.delete_key().await?;
-    } else {
+        .interact()?
+    {
         return Ok(false);
     }
+
+    let Ok(mut cur_pw) = password_delete::get_current_password(config).await else {
+        println!("Password is not set. Nothing to do.");
+        return Ok(false);
+    };
+
+    let mut pw_str = prompt_password("Please enter the current password")?;
+    if pw_str != *cur_pw {
+        // Clean up sensitive data
+        pw_str.zeroize();
+        cur_pw.zeroize();
+        return Err(anyhow::anyhow!("Incorrect password"));
+    }
+
     Ok(true)
 }
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     if prompt_delete(config, DeleteMode::Delete).await? {
+        password_delete::execute(config).await?;
         println!("Key successfully deleted.");
     } else {
         println!("Operation cancelled.");

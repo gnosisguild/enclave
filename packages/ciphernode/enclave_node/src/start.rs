@@ -1,4 +1,3 @@
-use crate::setup_datastore;
 use actix::{Actor, Addr};
 use alloy::primitives::Address;
 use anyhow::Result;
@@ -24,8 +23,10 @@ use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 use tracing::instrument;
 
+use crate::helpers::datastore::setup_datastore;
+
 #[instrument(name="app", skip_all,fields(id = get_tag()))]
-pub async fn setup_ciphernode(
+pub async fn execute(
     config: AppConfig,
     address: Address,
 ) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {

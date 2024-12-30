@@ -1,7 +1,8 @@
-mod set;
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
+
+use crate::wallet_set;
 
 #[derive(Subcommand, Debug)]
 pub enum WalletCommands {
@@ -24,7 +25,7 @@ fn ensure_hex(s: &str) -> Result<String> {
 
 pub async fn execute(command: WalletCommands, config: AppConfig) -> Result<()> {
     match command {
-        WalletCommands::Set { private_key } => set::execute(&config, private_key).await?,
+        WalletCommands::Set { private_key } => wallet_set::execute(&config, private_key).await?,
     };
 
     Ok(())

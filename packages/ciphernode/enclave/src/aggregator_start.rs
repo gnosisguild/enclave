@@ -1,7 +1,7 @@
 use anyhow::*;
 use config::AppConfig;
 use enclave_core::get_tag;
-use enclave_node::{listen_for_shutdown, setup_aggregator};
+use enclave_node::{aggregator_start, listen_for_shutdown};
 use tracing::{info, instrument};
 
 use crate::owo;
@@ -15,7 +15,7 @@ pub async fn execute(
     owo();
 
     let (bus, handle, peer_id) =
-        setup_aggregator(config, pubkey_write_path, plaintext_write_path).await?;
+        aggregator_start::execute(config, pubkey_write_path, plaintext_write_path).await?;
 
     info!("LAUNCHING AGGREGATOR {}", peer_id);
     tokio::spawn(listen_for_shutdown(bus.into(), handle));

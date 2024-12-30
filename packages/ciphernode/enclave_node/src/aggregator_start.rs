@@ -1,4 +1,3 @@
-use crate::setup_datastore;
 use actix::{Actor, Addr};
 use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
 use anyhow::Result;
@@ -23,7 +22,9 @@ use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
 
-pub async fn setup_aggregator(
+use crate::helpers::datastore::setup_datastore;
+
+pub async fn execute(
     config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,

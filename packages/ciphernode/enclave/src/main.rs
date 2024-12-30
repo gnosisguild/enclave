@@ -1,13 +1,25 @@
-use anyhow::Result;
 use clap::Parser;
-use commands::{aggregator, init, net, password, start, wallet, Commands};
-use config::load_config;
-use enclave_core::{get_tag, set_tag};
-use tracing::{info, instrument};
+use cli::Cli;
+use enclave_core::set_tag;
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-pub mod commands;
-mod compile_id;
+mod aggregator;
+mod aggregator_start;
+mod cli;
+pub mod helpers;
+mod init;
+pub mod net;
+mod net_generate;
+mod net_purge;
+mod net_set;
+mod password;
+mod password_create;
+mod password_delete;
+mod password_overwrite;
+mod start;
+mod wallet;
+mod wallet_set;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
@@ -29,78 +41,13 @@ pub fn owo() {
     println!("\n\n\n\n");
 }
 
-#[derive(Parser, Debug)]
-#[command(name = "enclave")]
-#[command(about = "A CLI for interacting with Enclave the open-source protocol for Encrypted Execution Environments (E3)", long_about = None)]
-pub struct Cli {
-    /// Path to config file
-    #[arg(long, global = true)]
-    config: Option<String>,
-
-    #[command(subcommand)]
-    command: Commands,
-
-    #[arg(short, long, global = true)]
-    tag: Option<String>,
-}
-
-impl Cli {
-    #[instrument(skip(self),fields(id = get_tag()))]
-    pub async fn execute(self) -> Result<()> {
-        let config_path = self.config.as_deref();
-        let config = load_config(config_path)?;
-
-        match self.command {
-            Commands::Start => start::execute(config).await?,
-            Commands::Init {
-                rpc_url,
-                eth_address,
-                password,
-                skip_eth,
-                net_keypair,
-                generate_net_keypair,
-            } => {
-                init::execute(
-                    rpc_url,
-                    eth_address,
-                    password,
-                    skip_eth,
-                    net_keypair,
-                    generate_net_keypair,
-                )
-                .await?
-            }
-            Commands::Password { command } => password::execute(command, &config).await?,
-            Commands::Aggregator { command } => aggregator::execute(command, config).await?,
-            Commands::Wallet { command } => wallet::execute(command, config).await?,
-            Commands::Net { command } => net::execute(command, &config).await?,
-        }
-
-        Ok(())
-    }
-
-    pub fn get_tag(&self) -> String {
-        if let Some(tag) = self.tag.clone() {
-            tag
-        } else {
-            "default".to_string()
-        }
-    }
-}
-
 #[actix::main]
 pub async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
-        // .with_env_filter("error")
-        // .with_env_filter("[app{id=cn1}]=info")
-        // .with_env_filter("[app{id=cn2}]=info,libp2p_mdns::behaviour=error")
-        // .with_env_filter("[app{id=cn3}]=info")
-        // .with_env_filter("[app{id=cn4}]=info")
-        // .with_env_filter("[app{id=ag}]=info")
         .init();
 
-    info!("COMPILATION ID: '{}'", compile_id::generate_id());
+    info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
 
     let cli = Cli::parse();
 

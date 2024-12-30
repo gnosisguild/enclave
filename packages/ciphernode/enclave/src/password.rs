@@ -1,11 +1,8 @@
-mod create;
-mod delete;
-mod helpers;
-mod overwrite;
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
-use helpers::*;
+
+use crate::{password_create, password_delete, password_overwrite};
 
 #[derive(Subcommand, Debug)]
 pub enum PasswordCommands {
@@ -35,9 +32,11 @@ pub async fn execute(command: PasswordCommands, config: &AppConfig) -> Result<()
         PasswordCommands::Create {
             password,
             overwrite,
-        } => create::execute(&config, password, overwrite).await?,
-        PasswordCommands::Delete => delete::execute(&config).await?,
-        PasswordCommands::Overwrite { password } => overwrite::execute(&config, password).await?,
+        } => password_create::execute(&config, password, overwrite).await?,
+        PasswordCommands::Delete => password_delete::execute(&config).await?,
+        PasswordCommands::Overwrite { password } => {
+            password_overwrite::execute(&config, password).await?
+        }
     };
 
     Ok(())

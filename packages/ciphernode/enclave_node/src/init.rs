@@ -1,12 +1,8 @@
-use crate::commands::{
-    net,
-    password::{self, PasswordCommands},
-};
 use alloy::primitives::Address;
 use anyhow::{anyhow, bail, Result};
 use config::load_config;
+use config::AppConfig;
 use config::RPC;
-use dialoguer::{theme::ColorfulTheme, Input};
 use enclave_core::get_tag;
 use std::fs;
 use tracing::instrument;
@@ -23,12 +19,12 @@ fn get_contract_info(name: &str) -> Result<&ContractInfo> {
         .ok_or(anyhow!("Could not get contract info"))?)
 }
 
-fn validate_rpc_url(url: &String) -> Result<()> {
+pub fn validate_rpc_url(url: &String) -> Result<()> {
     RPC::from_url(url)?;
     Ok(())
 }
 
-fn validate_eth_address(address: &String) -> Result<()> {
+pub fn validate_eth_address(address: &String) -> Result<()> {
     match Address::parse_checksummed(address, None) {
         Ok(_) => Ok(()),
         Err(e) => bail!("Invalid Ethereum address: {}", e),
@@ -36,47 +32,7 @@ fn validate_eth_address(address: &String) -> Result<()> {
 }
 
 #[instrument(name = "app", skip_all, fields(id = get_tag()))]
-pub async fn execute(
-    rpc_url: Option<String>,
-    eth_address: Option<String>,
-    password: Option<String>,
-    skip_eth: bool,
-    net_keypair: Option<String>,
-    generate_net_keypair: bool,
-) -> Result<()> {
-    let rpc_url = match rpc_url {
-        Some(url) => {
-            validate_rpc_url(&url)?;
-            url
-        }
-        None => Input::<String>::new()
-            .with_prompt("Enter WebSocket devnet RPC URL")
-            .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
-            .validate_with(validate_rpc_url)
-            .interact_text()?,
-    };
-
-    let eth_address: Option<String> = match eth_address {
-        Some(address) => {
-            validate_eth_address(&address)?;
-            Some(address)
-        }
-        None => {
-            if skip_eth {
-                None
-            } else {
-                Input::with_theme(&ColorfulTheme::default())
-                    .with_prompt("Enter your Ethereum address (press Enter to skip)")
-                    .allow_empty(true)
-                    .validate_with(validate_eth_address)
-                    .interact()
-                    .ok()
-                    .map(|s| if s.is_empty() { None } else { Some(s) })
-                    .flatten()
-            }
-        }
-    };
-
+pub async fn execute(rpc_url: String, eth_address: Option<String>) -> Result<AppConfig> {
     let config_dir = dirs::home_dir()
         .ok_or_else(|| anyhow!("Could not determine home directory"))?
         .join(".config")
@@ -121,31 +77,7 @@ chains:
     // Load with default location
     let config = load_config(Some(&config_path.display().to_string()))?;
 
-    password::execute(
-        PasswordCommands::Create {
-            password,
-            overwrite: true,
-        },
-        &config,
-    )
-    .await?;
-
-    if generate_net_keypair {
-        net::execute(net::NetCommands::GenerateKey, &config).await?;
-    } else {
-        net::execute(
-            net::NetCommands::SetKey {
-                net_keypair: net_keypair,
-            },
-            &config,
-        )
-        .await?;
-    }
-
-    println!("Enclave configuration successfully created!");
-    println!("You can start your node using `enclave start`");
-
-    Ok(())
+    Ok(config)
 }
 
 #[cfg(test)]

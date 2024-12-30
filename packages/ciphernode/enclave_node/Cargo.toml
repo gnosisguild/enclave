@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = ": coordinates the encryption and decryption of enclave computations"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+build = "build.rs"
 
 [dependencies]
 actix = { workspace = true }
@@ -19,12 +18,15 @@ config = { path = "../config" }
 clap = { workspace = true }
 cipher = { path = "../cipher" }
 data = { path = "../data" }
+dirs = { workspace = true }
 enclave-core = { path = "../core" }
 evm = { path = "../evm" }
 fhe = { path = "../fhe" }
 keyshare = { path = "../keyshare" }
 logger = { path = "../logger" }
+libp2p = { workspace = true }
 net = { path = "../net" }
+phf = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 e3_request = { workspace = true }
@@ -33,3 +35,7 @@ sortition = { path = "../sortition" }
 test-helpers = { path = "../test_helpers" }
 tokio = { workspace = true }
 tracing = { workspace = true }
+zeroize = { workspace = true }
+
+[build-dependencies]
+serde_json = { workspace = true }
