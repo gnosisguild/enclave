@@ -7,7 +7,7 @@ use crate::{aggregator::AggregatorCommands, start};
 use anyhow::Result;
 use clap::{command, Parser, Subcommand};
 use config::load_config;
-use enclave_core::get_tag;
+use events::get_tag;
 use tracing::instrument;
 
 #[derive(Parser, Debug)]

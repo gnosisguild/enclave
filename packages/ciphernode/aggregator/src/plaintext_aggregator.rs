@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use anyhow::Result;
 use data::Persistable;
-use enclave_core::{
+use events::{
     DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
     Seed,
 };

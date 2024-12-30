@@ -2,7 +2,7 @@ use crate::{E3Context, E3ContextSnapshot, E3Feature, MetaRepositoryFactory, Type
 use anyhow::*;
 use async_trait::async_trait;
 use data::RepositoriesFactory;
-use enclave_core::{E3Requested, EnclaveEvent, Seed};
+use events::{E3Requested, EnclaveEvent, Seed};
 
 pub const META_KEY: TypedKey<E3Meta> = TypedKey::new("meta");
 

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use config::AppConfig;
-use runtime::net_generate;
+use enclave_core::net_generate;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     let peer_id = net_generate::execute(config).await?;

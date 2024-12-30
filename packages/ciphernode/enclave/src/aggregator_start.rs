@@ -1,7 +1,7 @@
 use anyhow::*;
 use config::AppConfig;
-use enclave_core::get_tag;
-use runtime::{aggregator_start, listen_for_shutdown};
+use enclave_core::{aggregator_start, listen_for_shutdown};
+use events::get_tag;
 use tracing::{info, instrument};
 
 use crate::owo;

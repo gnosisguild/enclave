@@ -7,7 +7,7 @@ use alloy::transports::BoxTransport;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use data::Repository;
-use enclave_core::{EnclaveEvent, EventBus};
+use events::{EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 
 sol!(
@@ -18,9 +18,9 @@ sol!(
 
 struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 
-impl From<E3RequestedWithChainId> for enclave_core::E3Requested {
+impl From<E3RequestedWithChainId> for events::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
-        enclave_core::E3Requested {
+        events::E3Requested {
             params: value.0.e3.e3ProgramParams.to_vec(),
             threshold_m: value.0.e3.threshold[0] as usize,
             seed: value.0.e3.seed.into(),
@@ -32,14 +32,14 @@ impl From<E3RequestedWithChainId> for enclave_core::E3Requested {
 
 impl From<E3RequestedWithChainId> for EnclaveEvent {
     fn from(value: E3RequestedWithChainId) -> Self {
-        let payload: enclave_core::E3Requested = value.into();
+        let payload: events::E3Requested = value.into();
         EnclaveEvent::from(payload)
     }
 }
 
-impl From<IEnclave::CiphertextOutputPublished> for enclave_core::CiphertextOutputPublished {
+impl From<IEnclave::CiphertextOutputPublished> for events::CiphertextOutputPublished {
     fn from(value: IEnclave::CiphertextOutputPublished) -> Self {
-        enclave_core::CiphertextOutputPublished {
+        events::CiphertextOutputPublished {
             e3_id: value.e3Id.to_string().into(),
             ciphertext_output: value.ciphertextOutput.to_vec(),
         }
@@ -48,7 +48,7 @@ impl From<IEnclave::CiphertextOutputPublished> for enclave_core::CiphertextOutpu
 
 impl From<IEnclave::CiphertextOutputPublished> for EnclaveEvent {
     fn from(value: IEnclave::CiphertextOutputPublished) -> Self {
-        let payload: enclave_core::CiphertextOutputPublished = value.into();
+        let payload: events::CiphertextOutputPublished = value.into();
         EnclaveEvent::from(payload)
     }
 }

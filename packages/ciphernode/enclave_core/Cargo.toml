@@ -1,5 +1,5 @@
 [package]
-name = "runtime"
+name = "enclave_core"
 version = "0.1.0"
 edition = "2021"
 description = ": coordinates the encryption and decryption of enclave computations"
@@ -19,7 +19,7 @@ clap = { workspace = true }
 cipher = { path = "../cipher" }
 data = { path = "../data" }
 dirs = { workspace = true }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 evm = { path = "../evm" }
 fhe = { path = "../fhe" }
 keyshare = { path = "../keyshare" }

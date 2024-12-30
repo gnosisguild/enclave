@@ -13,8 +13,8 @@ clap = { workspace = true }
 compile-time = { workspace = true }
 config = { path = "../config" }
 dialoguer = "0.11.0"
-enclave-core = { path = "../core" }
-runtime = { workspace = true }
+events = { workspace = true }
+enclave_core = { workspace = true }
 hex = { workspace = true }
 petname = "2.0.2"
 rand = { workspace = true }

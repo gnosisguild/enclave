@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::{Get, Insert, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
-use enclave_core::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
+use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
 use sled::Db;
 use tracing::{error, info};
 

@@ -41,7 +41,7 @@ RUN cargo build --release
 # Runtime stage
 FROM debian:stable-slim
 
-# Install runtime dependencies
+# Install enclave_core dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends iptables dnsutils iputils-ping ca-certificates jq && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

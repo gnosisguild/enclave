@@ -2,7 +2,7 @@ use actix::Actor;
 use anyhow::{anyhow, Result};
 use cipher::Cipher;
 use config::AppConfig;
-use enclave_core::{EventBus, GetErrors};
+use events::{EventBus, GetErrors};
 use libp2p::{identity::Keypair, PeerId};
 use net::NetRepositoryFactory;
 use zeroize::Zeroize;

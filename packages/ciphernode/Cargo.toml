@@ -1,8 +1,8 @@
 [workspace]
 members = [
-  "core",
+  "events",
   "enclave",
-  "runtime",
+  "enclave_core",
   "net",
   "bfv",
   "data",
@@ -41,8 +41,8 @@ compile-time = "0.2.0"
 config = { path = "./config" }
 dirs = "5.0.1"
 data = { path = "./data" }
-enclave-core = { path = "./core" }
-runtime = { path = "./runtime" }
+events = { path = "./events" }
+enclave_core = { path = "./enclave_core" }
 evm = { path = "./evm" }
 shellexpand = "3.1.0"
 figment = { version = "0.10.19", features = ["yaml", "test"] }

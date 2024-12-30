@@ -11,7 +11,7 @@ figment = { workspace = true }
 alloy = { workspace = true }
 shellexpand = { workspace = true }
 url = { workspace = true }
-enclave-core = { workspace = true }
+events = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

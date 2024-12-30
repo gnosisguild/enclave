@@ -3,7 +3,7 @@ use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::{anyhow, Result};
 use data::{AutoPersist, Persistable, Repository};
-use enclave_core::{
+use events::{
     get_tag, BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent,
     EventBus, Seed, Subscribe,
 };

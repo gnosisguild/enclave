@@ -5,7 +5,7 @@ use cipher::Cipher;
 use config::AppConfig;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
-use enclave_core::{get_tag, EventBus};
+use events::{get_tag, EventBus};
 use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,

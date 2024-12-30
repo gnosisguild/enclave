@@ -10,7 +10,7 @@ async-trait = { workspace = true }
 config = { workspace = true }
 data = { path = "../data" }
 cipher = { path = "../cipher" }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 fhe = { path = "../fhe" }
 e3_request = { workspace = true }
 serde = { workspace = true }

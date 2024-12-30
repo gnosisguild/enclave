@@ -3,7 +3,7 @@ use alloy::primitives::hex;
 use anyhow::{anyhow, Result};
 use cipher::Cipher;
 use config::AppConfig;
-use enclave_core::{EventBus, GetErrors};
+use events::{EventBus, GetErrors};
 use libp2p::identity::Keypair;
 use net::NetRepositoryFactory;
 

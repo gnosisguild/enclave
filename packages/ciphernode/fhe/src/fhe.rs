@@ -2,7 +2,7 @@ use super::set_up_crp;
 use anyhow::*;
 use async_trait::async_trait;
 use data::{FromSnapshotWithParams, Snapshot};
-use enclave_core::{OrderedSet, Seed};
+use events::{OrderedSet, Seed};
 use fhe_rs::{
     bfv::{
         BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,

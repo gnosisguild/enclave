@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 actix = { workspace = true }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 data = { path = "../data" }
 anyhow = { workspace = true }
 serde = { workspace = true }

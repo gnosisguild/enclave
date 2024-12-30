@@ -3,7 +3,7 @@ use alloy::{hex::FromHex, primitives::FixedBytes, signers::local::PrivateKeySign
 use anyhow::{anyhow, Result};
 use cipher::Cipher;
 use config::AppConfig;
-use enclave_core::{EventBus, GetErrors};
+use events::{EventBus, GetErrors};
 use evm::EthPrivateKeyRepositoryFactory;
 
 use crate::datastore::get_repositories;

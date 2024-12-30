@@ -13,7 +13,7 @@ base64 = { workspace = true }
 cipher = { path = "../cipher" }
 config = { path = "../config" }
 data = { path = "../data" }
-enclave-core = { path = "../core" }
+events = { workspace = true }
 futures-util = { workspace = true }
 sortition = { path = "../sortition" }
 serde = { workspace = true }
@@ -23,5 +23,5 @@ url = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
-runtime = { workspace = true }
+enclave_core = { workspace = true }
 

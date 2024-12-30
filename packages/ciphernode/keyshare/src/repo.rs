@@ -1,6 +1,6 @@
 use config::StoreKeys;
 use data::{Repositories, Repository};
-use enclave_core::E3id;
+use events::E3id;
 
 pub trait KeyshareRepositoryFactory {
     fn keyshare(&self, e3_id: &E3id) -> Repository<Vec<u8>>;

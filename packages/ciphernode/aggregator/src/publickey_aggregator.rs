@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use anyhow::Result;
 use data::Persistable;
-use enclave_core::{
+use events::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
 use fhe::{Fhe, GetAggregatePublicKey};

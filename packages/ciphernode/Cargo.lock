@@ -119,7 +119,7 @@ dependencies = [
  "config",
  "data",
  "e3_request",
- "enclave-core",
+ "events",
  "fhe 0.1.0",
  "serde",
  "sortition",
@@ -1708,7 +1708,7 @@ dependencies = [
  "alloy",
  "anyhow",
  "dirs",
- "enclave-core",
+ "events",
  "figment",
  "serde",
  "shellexpand",
@@ -1908,7 +1908,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "enclave-core",
+ "events",
  "serde",
  "sled",
  "tracing",
@@ -2118,7 +2118,7 @@ dependencies = [
  "bincode",
  "config",
  "data",
- "enclave-core",
+ "events",
  "serde",
  "tracing",
 ]
@@ -2198,11 +2198,11 @@ dependencies = [
  "compile-time",
  "config",
  "dialoguer",
- "enclave-core",
+ "enclave_core",
+ "events",
  "hex",
  "petname",
  "rand",
- "runtime",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2210,20 +2210,39 @@ dependencies = [
 ]
 
 [[package]]
-name = "enclave-core"
+name = "enclave_core"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "aggregator",
  "alloy",
  "alloy-primitives 0.6.4",
- "alloy-sol-types 0.6.4",
  "anyhow",
+ "bfv",
  "bincode",
- "bs58",
- "futures-util",
- "lazy_static",
+ "cipher 0.1.0",
+ "clap",
+ "config",
+ "data",
+ "dirs",
+ "e3_request",
+ "events",
+ "evm",
+ "fhe 0.1.0",
+ "keyshare",
+ "libp2p",
+ "logger",
+ "net",
+ "phf",
+ "rand",
+ "rand_chacha",
  "serde",
- "sha2",
+ "serde_json",
+ "sortition",
+ "test-helpers",
+ "tokio",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -2305,6 +2324,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "events"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "alloy",
+ "alloy-primitives 0.6.4",
+ "alloy-sol-types 0.6.4",
+ "anyhow",
+ "bincode",
+ "bs58",
+ "futures-util",
+ "lazy_static",
+ "serde",
+ "sha2",
+]
+
+[[package]]
 name = "evm"
 version = "0.1.0"
 dependencies = [
@@ -2317,9 +2353,9 @@ dependencies = [
  "cipher 0.1.0",
  "config",
  "data",
- "enclave-core",
+ "enclave_core",
+ "events",
  "futures-util",
- "runtime",
  "serde",
  "sortition",
  "tokio",
@@ -2398,7 +2434,7 @@ dependencies = [
  "config",
  "data",
  "e3_request",
- "enclave-core",
+ "events",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
  "fhe-util",
@@ -3472,7 +3508,7 @@ dependencies = [
  "config",
  "data",
  "e3_request",
- "enclave-core",
+ "events",
  "fhe 0.1.0",
  "serde",
  "tracing",
@@ -3944,7 +3980,7 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "base64",
- "enclave-core",
+ "events",
  "tracing",
 ]
 
@@ -4131,7 +4167,7 @@ dependencies = [
  "cipher 0.1.0",
  "config",
  "data",
- "enclave-core",
+ "events",
  "futures",
  "libp2p",
  "tokio",
@@ -5326,42 +5362,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
 
 [[package]]
-name = "runtime"
-version = "0.1.0"
-dependencies = [
- "actix",
- "aggregator",
- "alloy",
- "alloy-primitives 0.6.4",
- "anyhow",
- "bfv",
- "bincode",
- "cipher 0.1.0",
- "clap",
- "config",
- "data",
- "dirs",
- "e3_request",
- "enclave-core",
- "evm",
- "fhe 0.1.0",
- "keyshare",
- "libp2p",
- "logger",
- "net",
- "phf",
- "rand",
- "rand_chacha",
- "serde",
- "serde_json",
- "sortition",
- "test-helpers",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
 name = "rustc-demangle"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5838,7 +5838,7 @@ dependencies = [
  "async-trait",
  "config",
  "data",
- "enclave-core",
+ "events",
  "num",
  "rand",
  "serde",
@@ -6032,7 +6032,7 @@ dependencies = [
  "actix",
  "bincode",
  "clap",
- "enclave-core",
+ "events",
  "fhe 0.1.0",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
@@ -6058,7 +6058,7 @@ dependencies = [
  "clap",
  "data",
  "e3_request",
- "enclave-core",
+ "events",
  "evm",
  "fhe 0.1.0",
  "fhe 0.1.0-beta.7",
