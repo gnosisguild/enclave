@@ -1,77 +1,40 @@
+mod ciphernode_added;
+mod ciphernode_removed;
+mod ciphernode_selected;
+mod ciphertext_output_published;
+mod decryptionshare_created;
+mod die;
+mod e3_request_complete;
+mod e3_requested;
+mod enclave_error;
+mod keyshare_created;
+mod plaintext_aggregated;
+mod publickey_aggregated;
+mod shutdown;
+mod test_event;
+
+pub use ciphernode_added::*;
+pub use ciphernode_removed::*;
+pub use ciphernode_selected::*;
+pub use ciphertext_output_published::*;
+pub use decryptionshare_created::*;
+pub use die::*;
+pub use e3_request_complete::*;
+pub use e3_requested::*;
+pub use enclave_error::*;
+pub use keyshare_created::*;
+pub use plaintext_aggregated::*;
+pub use publickey_aggregated::*;
+pub use shutdown::*;
+use test_event::TestEvent;
+
+use crate::{E3id, EventId};
 use actix::Message;
-use alloy::{
-    hex,
-    primitives::{Uint, U256},
-};
-use alloy_primitives::ruint::ParseError;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::{
-    fmt::{self, Display},
-    hash::{DefaultHasher, Hash, Hasher},
+    fmt::{self},
+    hash::Hash,
 };
-
-use crate::OrderedSet;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct E3id(pub String);
-impl fmt::Display for E3id {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl E3id {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-}
-
-impl From<u32> for E3id {
-    fn from(value: u32) -> Self {
-        E3id::new(value.to_string())
-    }
-}
-
-impl From<String> for E3id {
-    fn from(value: String) -> Self {
-        E3id::new(value)
-    }
-}
-
-impl From<&str> for E3id {
-    fn from(value: &str) -> Self {
-        E3id::new(value)
-    }
-}
-
-impl TryFrom<E3id> for U256 {
-    type Error = ParseError;
-    fn try_from(value: E3id) -> Result<Self, Self::Error> {
-        U256::from_str_radix(&value.0, 10)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct EventId(pub [u8; 32]);
-
-impl EventId {
-    pub fn hash<T: Hash>(value: T) -> Self {
-        let mut hasher = Sha256::new();
-        let mut std_hasher = DefaultHasher::new();
-        value.hash(&mut std_hasher);
-        hasher.update(std_hasher.finish().to_le_bytes());
-        let result = hasher.finalize();
-        EventId(result.into())
-    }
-}
-
-impl fmt::Display for EventId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let base58_string = bs58::encode(&self.0).into_string();
-        write!(f, "evt:{}", &base58_string[0..8])
-    }
-}
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
@@ -215,12 +178,6 @@ impl EnclaveEvent {
     }
 }
 
-pub trait FromError {
-    type Error;
-    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self;
-}
-
-// TODO: These From traits should be handled by a macro
 impl From<KeyshareCreated> for EnclaveEvent {
     fn from(data: KeyshareCreated) -> Self {
         EnclaveEvent::KeyshareCreated {
@@ -349,273 +306,6 @@ impl FromError for EnclaveEvent {
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{}({})", self.event_type(), self.get_data()))
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "anyhow::Result<()>")]
-pub struct KeyshareCreated {
-    pub pubkey: Vec<u8>,
-    pub e3_id: E3id,
-    pub node: String,
-}
-
-impl Display for KeyshareCreated {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "e3_id: {}, node: {}", self.e3_id, self.node,)
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "anyhow::Result<()>")]
-pub struct DecryptionshareCreated {
-    pub decryption_share: Vec<u8>,
-    pub e3_id: E3id,
-    pub node: String,
-}
-
-impl Display for DecryptionshareCreated {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "e3_id: {}, node: {}", self.e3_id, self.node,)
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct PublicKeyAggregated {
-    pub pubkey: Vec<u8>,
-    pub e3_id: E3id,
-    pub nodes: OrderedSet<String>,
-    pub src_chain_id: u64,
-}
-
-impl Display for PublicKeyAggregated {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "e3_id: {}, src_chain_id: {}, nodes: <omitted>, pubkey: <omitted>",
-            self.e3_id, self.src_chain_id,
-        )
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct E3Requested {
-    pub e3_id: E3id,
-    pub threshold_m: usize,
-    pub seed: Seed,
-    pub params: Vec<u8>,
-    pub src_chain_id: u64,
-}
-
-impl Display for E3Requested {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "e3_id: {}, threshold_m: {}, src_chain_id: {}, seed: {}, params: <omitted>",
-            self.e3_id, self.threshold_m, self.src_chain_id, self.seed
-        )
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct CiphernodeSelected {
-    pub e3_id: E3id,
-    pub threshold_m: usize,
-}
-
-impl Display for CiphernodeSelected {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "e3_id: {}, threshold_m: {}",
-            self.e3_id, self.threshold_m,
-        )
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct CiphertextOutputPublished {
-    pub e3_id: E3id,
-    pub ciphertext_output: Vec<u8>,
-}
-
-impl Display for CiphertextOutputPublished {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "e3_id: {}", self.e3_id,)
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct PlaintextAggregated {
-    pub e3_id: E3id,
-    pub decrypted_output: Vec<u8>,
-    pub src_chain_id: u64,
-}
-
-impl Display for PlaintextAggregated {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "e3_id: {}, src_chain_id: {}",
-            self.e3_id, self.src_chain_id
-        )
-    }
-}
-
-/// E3RequestComplete event is a local only event
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct E3RequestComplete {
-    pub e3_id: E3id,
-}
-
-impl Display for E3RequestComplete {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "e3_id: {}", self.e3_id)
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct CiphernodeAdded {
-    pub address: String,
-    pub index: usize,
-    pub num_nodes: usize,
-}
-
-impl Display for CiphernodeAdded {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "address: {}, index: {}, num_nodes: {}",
-            self.address, self.index, self.num_nodes
-        )
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct CiphernodeRemoved {
-    pub address: String,
-    pub index: usize,
-    pub num_nodes: usize,
-}
-
-impl Display for CiphernodeRemoved {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "address: {}, index: {}, num_nodes: {}",
-            self.address, self.index, self.num_nodes
-        )
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct EnclaveError {
-    pub err_type: EnclaveErrorType,
-    pub message: String,
-}
-
-impl Display for EnclaveError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct Die;
-impl Display for Die {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Die",)
-    }
-}
-
-/// Represents a shutdown event triggered by SIG TERM
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct Shutdown;
-impl Display for Shutdown {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Shutdown",)
-    }
-}
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
-pub struct TestEvent {
-    pub msg: String,
-    pub entropy: u64,
-}
-
-#[cfg(test)]
-impl Display for TestEvent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "TestEvent(msg: {})", self.msg)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Seed(pub [u8; 32]);
-impl From<Seed> for u64 {
-    fn from(value: Seed) -> Self {
-        u64::from_le_bytes(value.0[..8].try_into().unwrap())
-    }
-}
-
-impl From<Seed> for [u8; 32] {
-    fn from(value: Seed) -> Self {
-        value.0
-    }
-}
-
-impl From<Uint<256, 4>> for Seed {
-    fn from(value: Uint<256, 4>) -> Self {
-        Seed(value.to_le_bytes())
-    }
-}
-
-impl Display for Seed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Seed(0x{})", hex::encode(self.0))
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum EnclaveErrorType {
-    Evm,
-    KeyGeneration,
-    PublickeyAggregation,
-    IO,
-    PlaintextAggregation,
-    Decryption,
-    Sortition,
-    Data,
-}
-
-impl EnclaveError {
-    pub fn new(err_type: EnclaveErrorType, message: &str) -> Self {
-        Self {
-            err_type,
-            message: message.to_string(),
-        }
-    }
-}
-
-impl FromError for EnclaveError {
-    type Error = anyhow::Error;
-    fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
-        Self {
-            err_type,
-            message: error.to_string(),
-        }
     }
 }
 

@@ -1,9 +1,9 @@
 use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-use crate::{EnclaveError, EnclaveErrorType};
+use crate::{EnclaveError, EnclaveErrorType, EventId};
 
-use super::events::{EnclaveEvent, EventId, FromError};
+use super::enclave_event::{EnclaveEvent, FromError};
 
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
