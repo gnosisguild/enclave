@@ -1,25 +1,27 @@
 [workspace]
 members = [
-  "events",
+  "aggregator",
+  "config",
+  "crypto",
+  "data",
+  "e3_request",
   "enclave",
   "enclave_core",
-  "net",
-  "data",
+  "events",
   "evm",
   "fhe",
-  "e3_request",
   "keyshare",
-  "aggregator",
-  "test_helpers",
   "logger",
+  "net",
+  "sortition",
+  "test_helpers",
   "tests",
-  "crypto",
-  "config",
 ]
 
 [workspace.dependencies]
 actix = "0.13.5"
 aes-gcm = "0.10.3"
+aggregator = { path = "./aggregator" }
 alloy = { version = "0.5.2", features = ["full", "node-bindings"] }
 alloy-primitives = { version = "0.6", default-features = false, features = [
   "rlp",
@@ -40,20 +42,24 @@ compile-time = "0.2.0"
 config = { path = "./config" }
 dirs = "5.0.1"
 data = { path = "./data" }
+dialoguer = "0.11.0"
 events = { path = "./events" }
 enclave_core = { path = "./enclave_core" }
 evm = { path = "./evm" }
-shellexpand = "3.1.0"
-figment = { version = "0.10.19", features = ["yaml", "test"] }
+fhe = { path = "./fhe" }
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+figment = { version = "0.10.19", features = ["yaml", "test"] }
 futures = "0.3.30"
 futures-util = "0.3"
 hex = "0.4.3"
+keyshare = { path = "./keyshare" }
 lazy_static = "1.5.0"
+logger = { path = "./logger" }
 num = "0.4.3"
 net = { path = "./net" }
+petname = "2.0.2"
 phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
@@ -62,6 +68,9 @@ serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.133" }
 sled = "0.34.7"
 sha2 = "0.10.8"
+shellexpand = "3.1.0"
+sortition = { path = "./sortition" }
+test-helpers = { path = "./test_helpers" }
 tempfile = "3.14.0"
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"

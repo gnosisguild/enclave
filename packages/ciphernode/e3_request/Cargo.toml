@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 actix = { workspace = true }
 events = { workspace = true }
-data = { path = "../data" }
+data = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 config = { workspace = true }
