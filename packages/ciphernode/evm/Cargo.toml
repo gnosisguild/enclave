@@ -23,5 +23,5 @@ url = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
-enclave_node = { path = "../enclave_node" }
+runtime = { workspace = true }
 

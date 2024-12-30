@@ -1,6 +1,6 @@
 use anyhow::*;
 use config::AppConfig;
-use enclave_node::net_purge;
+use runtime::net_purge;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     net_purge::execute(config).await?;

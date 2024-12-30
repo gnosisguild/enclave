@@ -2199,10 +2199,10 @@ dependencies = [
  "config",
  "dialoguer",
  "enclave-core",
- "enclave_node",
  "hex",
  "petname",
  "rand",
+ "runtime",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2224,42 +2224,6 @@ dependencies = [
  "lazy_static",
  "serde",
  "sha2",
-]
-
-[[package]]
-name = "enclave_node"
-version = "0.1.0"
-dependencies = [
- "actix",
- "aggregator",
- "alloy",
- "alloy-primitives 0.6.4",
- "anyhow",
- "bfv",
- "bincode",
- "cipher 0.1.0",
- "clap",
- "config",
- "data",
- "dirs",
- "e3_request",
- "enclave-core",
- "evm",
- "fhe 0.1.0",
- "keyshare",
- "libp2p",
- "logger",
- "net",
- "phf",
- "rand",
- "rand_chacha",
- "serde",
- "serde_json",
- "sortition",
- "test-helpers",
- "tokio",
- "tracing",
- "zeroize",
 ]
 
 [[package]]
@@ -2354,8 +2318,8 @@ dependencies = [
  "config",
  "data",
  "enclave-core",
- "enclave_node",
  "futures-util",
+ "runtime",
  "serde",
  "sortition",
  "tokio",
@@ -5360,6 +5324,42 @@ name = "ruint-macro"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48fd7bd8a6377e15ad9d42a8ec25371b94ddc67abe7c8b9127bec79bebaaae18"
+
+[[package]]
+name = "runtime"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "aggregator",
+ "alloy",
+ "alloy-primitives 0.6.4",
+ "anyhow",
+ "bfv",
+ "bincode",
+ "cipher 0.1.0",
+ "clap",
+ "config",
+ "data",
+ "dirs",
+ "e3_request",
+ "enclave-core",
+ "evm",
+ "fhe 0.1.0",
+ "keyshare",
+ "libp2p",
+ "logger",
+ "net",
+ "phf",
+ "rand",
+ "rand_chacha",
+ "serde",
+ "serde_json",
+ "sortition",
+ "test-helpers",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
 
 [[package]]
 name = "rustc-demangle"

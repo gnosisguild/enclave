@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use config::AppConfig;
-use enclave_node::password_create;
+use runtime::password_create;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::helpers::prompt_password::prompt_password;

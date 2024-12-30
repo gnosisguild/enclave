@@ -2,7 +2,7 @@
 members = [
   "core",
   "enclave",
-  "enclave_node",
+  "runtime",
   "net",
   "bfv",
   "data",
@@ -42,7 +42,7 @@ config = { path = "./config" }
 dirs = "5.0.1"
 data = { path = "./data" }
 enclave-core = { path = "./core" }
-enclave_node = { path = "./enclave_node" }
+runtime = { path = "./runtime" }
 evm = { path = "./evm" }
 shellexpand = "3.1.0"
 figment = { version = "0.10.19", features = ["yaml", "test"] }
