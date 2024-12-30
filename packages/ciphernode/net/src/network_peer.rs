@@ -1,8 +1,9 @@
+use actix::prelude::*;
 use anyhow::Result;
+use futures::{FutureExt, StreamExt};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
-    futures::StreamExt,
-    gossipsub,
+    gossipsub::{self, IdentTopic, MessageId},
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
     kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
@@ -10,15 +11,36 @@ use libp2p::{
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour, SwarmEvent},
     Swarm,
 };
-use std::hash::{Hash, Hasher};
-use std::sync::Arc;
-use std::{hash::DefaultHasher, io::Error, time::Duration};
-use tokio::{select, sync::broadcast, sync::mpsc};
-use tracing::{debug, info, trace, warn};
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    io::Error,
+    sync::Arc,
+    time::Duration,
+};
+use tracing::{debug, error, info, trace, warn};
 
-use crate::dialer::dial_peers;
-use crate::events::NetworkPeerCommand;
-use crate::events::NetworkPeerEvent;
+use crate::{
+    dialer::{DialPeers, DialerActor, SetNetworkPeer},
+    events::{NetworkPeerCommand, NetworkPeerEvent},
+    network_manager::NetworkManager,
+};
+
+// Actor Messages
+#[derive(Message)]
+#[rtype(result = "Result<()>")]
+pub struct StartListening(pub Option<u16>);
+
+#[derive(Message)]
+#[rtype(result = "Result<()>")]
+pub struct SetNetworkManager(pub Addr<NetworkManager>);
+
+#[derive(Message)]
+#[rtype(result = "Result<()>")]
+pub struct SubscribeTopic(pub String);
+
+#[derive(Message)]
+#[rtype(result = "Result<()>")]
+pub struct AddPeers(pub Vec<String>);
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -29,135 +51,254 @@ pub struct NodeBehaviour {
     identify: IdentifyBehaviour,
 }
 
-/// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
-/// with it using channels.
 pub struct NetworkPeer {
-    /// The Libp2p Swarm instance
     swarm: Swarm<NodeBehaviour>,
-    /// A list of peers to automatically dial
     peers: Vec<String>,
-    /// The UDP port that the peer listens to over QUIC
-    udp_port: Option<u16>,
-    /// The gossipsub topic that the peer should listen on
-    topic: gossipsub::IdentTopic,
-    /// Broadcast channel to report NetworkPeerEvents to listeners
-    event_tx: broadcast::Sender<NetworkPeerEvent>,
-    /// Transmission channel to send NetworkPeerCommands to the NetworkPeer
-    cmd_tx: mpsc::Sender<NetworkPeerCommand>,
-    /// Local receiver to process NetworkPeerCommands from
-    cmd_rx: mpsc::Receiver<NetworkPeerCommand>,
+    mgr: Option<Addr<NetworkManager>>,
+    dialer: Option<Addr<DialerActor>>,
 }
 
 impl NetworkPeer {
-    pub fn new(
-        id: &Keypair,
-        peers: Vec<String>,
-        udp_port: Option<u16>,
-        topic: &str,
-        enable_mdns: bool,
-    ) -> Result<Self> {
-        let (event_tx, _) = broadcast::channel(100); // TODO : tune this param
-        let (cmd_tx, cmd_rx) = mpsc::channel(100); // TODO : tune this param
-
+    pub fn new(id: &Keypair, initial_peers: Vec<String>, enable_mdns: bool) -> Self {
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
+            .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))
+            .unwrap()
             .build();
 
-        // TODO: Use topics to manage network traffic instead of just using a single topic
-        let topic = gossipsub::IdentTopic::new(topic);
-
-        Ok(Self {
+        Self {
             swarm,
-            peers,
-            udp_port,
-            topic,
-            event_tx,
-            cmd_tx,
-            cmd_rx,
-        })
+            peers: initial_peers,
+            mgr: None,
+            dialer: None,
+        }
     }
 
-    pub fn rx(&mut self) -> broadcast::Receiver<NetworkPeerEvent> {
-        self.event_tx.subscribe()
+    pub fn setup(id: &Keypair, initial_peers: Vec<String>, enable_mdns: bool) -> Addr<Self> {
+        let peer = Self::new(id, initial_peers, enable_mdns).start();
+        peer
     }
 
-    pub fn tx(&self) -> mpsc::Sender<NetworkPeerCommand> {
-        self.cmd_tx.clone()
+    fn handle_swarm_event(&mut self, event: SwarmEvent<NodeBehaviourEvent>) -> Result<()> {
+        if let Some(mgr) = &mut self.mgr {
+            match event {
+                SwarmEvent::ConnectionEstablished {
+                    peer_id,
+                    endpoint,
+                    connection_id,
+                    ..
+                } => {
+                    info!("Connected to {peer_id}");
+                    let remote_addr = endpoint.get_remote_address().clone();
+                    self.swarm
+                        .behaviour_mut()
+                        .kademlia
+                        .add_address(&peer_id, remote_addr.clone());
+
+                    info!("Added address to kademlia {}", remote_addr);
+                    self.swarm
+                        .behaviour_mut()
+                        .gossipsub
+                        .add_explicit_peer(&peer_id);
+                    info!("Added peer to gossipsub {}", remote_addr);
+                    mgr.do_send(NetworkPeerEvent::ConnectionEstablished { connection_id });
+                }
+
+                SwarmEvent::OutgoingConnectionError {
+                    peer_id,
+                    error,
+                    connection_id,
+                } => {
+                    info!("Failed to dial {peer_id:?}: {error}");
+                    if let Some(dialer) = &mut self.dialer {
+                        dialer.do_send(NetworkPeerEvent::OutgoingConnectionError {
+                            connection_id,
+                            error: Arc::new(error),
+                        });
+                    }
+                }
+
+                SwarmEvent::IncomingConnectionError { error, .. } => {
+                    warn!("{:#}", anyhow::Error::from(error))
+                }
+
+                SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
+                    debug!("Kademlia event: {:?}", e);
+                }
+
+                SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
+                    for (peer_id, _multiaddr) in list {
+                        trace!("mDNS discovered a new peer: {peer_id}");
+                        self.swarm
+                            .behaviour_mut()
+                            .gossipsub
+                            .add_explicit_peer(&peer_id);
+                    }
+                }
+
+                SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
+                    for (peer_id, _multiaddr) in list {
+                        trace!("mDNS discover peer has expired: {peer_id}");
+                        self.swarm
+                            .behaviour_mut()
+                            .gossipsub
+                            .remove_explicit_peer(&peer_id);
+                    }
+                }
+
+                SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(
+                    gossipsub::Event::Message {
+                        propagation_source: peer_id,
+                        message_id: id,
+                        message,
+                    },
+                )) => {
+                    trace!("Got message with id: {id} from peer: {peer_id}",);
+                    mgr.do_send(NetworkPeerEvent::GossipData(message.data));
+                }
+
+                SwarmEvent::NewListenAddr { address, .. } => {
+                    info!("Local node is listening on {address}");
+                }
+                _ => {}
+            };
+        }
+        Ok(())
     }
+}
 
-    pub async fn start(&mut self) -> Result<()> {
-        let event_tx = self.event_tx.clone();
-        let cmd_tx = self.cmd_tx.clone();
-        let cmd_rx = &mut self.cmd_rx;
+impl Actor for NetworkPeer {
+    type Context = Context<Self>;
 
-        // Subscribe to topic
-        self.swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&self.topic)?;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        // Setup stream handling for swarm events
+        ctx.add_stream(Box::pin(futures::stream::unfold(
+            &mut self.swarm,
+            |swarm| async move { Some((swarm.select_next_some().await, swarm)) },
+        )));
 
-        // Listen on the quic port
-        let addr = match self.udp_port {
+        if let Some(dialer) = &mut self.dialer {
+            dialer.send(SetNetworkPeer(ctx.address()));
+            if !self.peers.is_empty() {
+                dialer.do_send(DialPeers(self.peers.clone()));
+            }
+        }
+    }
+}
+
+impl StreamHandler<SwarmEvent<NodeBehaviourEvent>> for NetworkPeer {
+    fn handle(&mut self, event: SwarmEvent<NodeBehaviourEvent>, _: &mut Self::Context) {
+        if let Err(e) = self.handle_swarm_event(event) {
+            error!("Error handling swarm event: {}", e);
+        }
+    }
+}
+
+impl Handler<SetNetworkManager> for NetworkPeer {
+    type Result = Result<()>;
+
+    fn handle(&mut self, msg: SetNetworkManager, _: &mut Self::Context) -> Self::Result {
+        self.mgr = Some(msg.0);
+        Ok(())
+    }
+}
+
+impl Handler<StartListening> for NetworkPeer {
+    type Result = Result<()>;
+
+    fn handle(&mut self, msg: StartListening, _: &mut Self::Context) -> Self::Result {
+        let addr = match msg.0 {
             Some(port) => format!("/ip4/0.0.0.0/udp/{}/quic-v1", port),
             None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
         };
 
         info!("Requesting node.listen_on('{}')", addr);
         self.swarm.listen_on(addr.parse()?)?;
+        Ok(())
+    }
+}
 
-        info!("Peers to dial: {:?}", self.peers);
-        tokio::spawn({
-            let event_tx = event_tx.clone();
-            let peers = self.peers.clone();
-            async move {
-                dial_peers(&cmd_tx, &event_tx, &peers).await?;
+impl Handler<SubscribeTopic> for NetworkPeer {
+    type Result = Result<()>;
 
-                return anyhow::Ok(());
-            }
-        });
+    fn handle(&mut self, msg: SubscribeTopic, _: &mut Self::Context) -> Self::Result {
+        self.swarm
+            .behaviour_mut()
+            .gossipsub
+            .subscribe(&IdentTopic::new(msg.0))?;
+        Ok(())
+    }
+}
 
-        loop {
-            select! {
-                 // Process commands
-                Some(command) = cmd_rx.recv() => {
-                    match command {
-                        NetworkPeerCommand::GossipPublish { data, topic, correlation_id } => {
-                            let gossipsub_behaviour = &mut self.swarm.behaviour_mut().gossipsub;
-                            match gossipsub_behaviour
-                                .publish(gossipsub::IdentTopic::new(topic), data) {
-                                Ok(message_id) => {
-                                    event_tx.send(NetworkPeerEvent::GossipPublished { correlation_id, message_id })?;
-                                },
-                                Err(e) => {
-                                    warn!(error=?e, "Could not publish to swarm. Retrying...");
-                                    event_tx.send(NetworkPeerEvent::GossipPublishError { correlation_id, error: Arc::new(e) })?;
-                                }
-                            }
-                        },
-                        NetworkPeerCommand::Dial(multi) => {
-                            info!("DIAL: {:?}", multi);
-                            match self.swarm.dial(multi) {
-                                Ok(v) => info!("Dial returned {:?}", v),
-                                Err(error) => {
-                                    info!("Dialing error! {}", error);
-                                    event_tx.send(NetworkPeerEvent::DialError { error: error.into() })?;
-                                }
-                            }
+impl Handler<AddPeers> for NetworkPeer {
+    type Result = Result<()>;
+
+    fn handle(&mut self, msg: AddPeers, _: &mut Self::Context) -> Self::Result {
+        // Store new peers
+        self.peers.extend(msg.0.clone());
+
+        // Attempt to dial them immediately
+        if let Some(dialer) = &mut self.dialer {
+            dialer.do_send(DialPeers(msg.0));
+        }
+        Ok(())
+    }
+}
+
+impl Handler<NetworkPeerCommand> for NetworkPeer {
+    type Result = ();
+
+    fn handle(&mut self, msg: NetworkPeerCommand, _: &mut Self::Context) {
+        match msg {
+            NetworkPeerCommand::Dial(opts) => {
+                info!("DIAL: {:?}", opts);
+                let conn_id = opts.connection_id();
+                match self.swarm.dial(opts) {
+                    Ok(v) => {
+                        info!("Dial returned {:?}", v);
+                    }
+                    Err(error) => {
+                        info!("Dialing error! {}", error);
+                        if let Some(dialer) = &mut self.dialer {
+                            dialer.do_send(NetworkPeerEvent::DialError {
+                                error: Arc::new(error),
+                                connection_id: conn_id,
+                            });
                         }
                     }
                 }
-                // Process events
-                event = self.swarm.select_next_some() =>  {
-                    process_swarm_event(&mut self.swarm, &event_tx, event).await?
+            }
+            NetworkPeerCommand::GossipPublish {
+                topic,
+                data,
+                correlation_id,
+            } => {
+                let gossipsub = &mut self.swarm.behaviour_mut().gossipsub;
+                if let Some(mgr) = &mut self.mgr {
+                    match gossipsub.publish(IdentTopic::new(topic), data) {
+                        Ok(message_id) => {
+                            mgr.do_send(NetworkPeerEvent::GossipPublished {
+                                correlation_id: correlation_id,
+                                message_id,
+                            });
+                        }
+                        Err(e) => {
+                            warn!(error=?e, "Could not publish to swarm");
+                            if let Some(mgr) = &mut self.mgr {
+                                mgr.do_send(NetworkPeerEvent::GossipPublishError {
+                                    correlation_id: correlation_id,
+                                    error: Arc::new(e),
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-/// Create the libp2p behaviour
 fn create_mdns_kad_behaviour(
     enable_mdns: bool,
     key: &Keypair,
@@ -171,7 +312,7 @@ fn create_mdns_kad_behaviour(
     let message_id_fn = |message: &gossipsub::Message| {
         let mut s = DefaultHasher::new();
         message.data.hash(&mut s);
-        gossipsub::MessageId::from(s.finish().to_string())
+        MessageId::from(s.finish().to_string())
     };
 
     let gossipsub_config = gossipsub::ConfigBuilder::default()
@@ -205,83 +346,4 @@ fn create_mdns_kad_behaviour(
         connection_limits,
         identify: identify_config,
     })
-}
-
-/// Process all swarm events
-async fn process_swarm_event(
-    swarm: &mut Swarm<NodeBehaviour>,
-    event_tx: &broadcast::Sender<NetworkPeerEvent>,
-    event: SwarmEvent<NodeBehaviourEvent>,
-) -> Result<()> {
-    match event {
-        SwarmEvent::ConnectionEstablished {
-            peer_id,
-            endpoint,
-            connection_id,
-            ..
-        } => {
-            info!("Connected to {peer_id}");
-            let remote_addr = endpoint.get_remote_address().clone();
-            swarm
-                .behaviour_mut()
-                .kademlia
-                .add_address(&peer_id, remote_addr.clone());
-
-            info!("Added address to kademlia {}", remote_addr);
-            swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-            info!("Added peer to gossipsub {}", remote_addr);
-            event_tx.send(NetworkPeerEvent::ConnectionEstablished { connection_id })?;
-        }
-
-        SwarmEvent::OutgoingConnectionError {
-            peer_id,
-            error,
-            connection_id,
-        } => {
-            info!("Failed to dial {peer_id:?}: {error}");
-            event_tx.send(NetworkPeerEvent::OutgoingConnectionError {
-                connection_id,
-                error: Arc::new(error),
-            })?;
-        }
-
-        SwarmEvent::IncomingConnectionError { error, .. } => {
-            warn!("{:#}", anyhow::Error::from(error))
-        }
-
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
-            debug!("Kademlia event: {:?}", e);
-        }
-
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-            for (peer_id, _multiaddr) in list {
-                trace!("mDNS discovered a new peer: {peer_id}");
-                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-            }
-        }
-
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-            for (peer_id, _multiaddr) in list {
-                trace!("mDNS discover peer has expired: {peer_id}");
-                swarm
-                    .behaviour_mut()
-                    .gossipsub
-                    .remove_explicit_peer(&peer_id);
-            }
-        }
-
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-            propagation_source: peer_id,
-            message_id: id,
-            message,
-        })) => {
-            trace!("Got message with id: {id} from peer: {peer_id}",);
-            event_tx.send(NetworkPeerEvent::GossipData(message.data))?;
-        }
-        SwarmEvent::NewListenAddr { address, .. } => {
-            warn!("Local node is listening on {address}");
-        }
-        _ => {}
-    };
-    Ok(())
 }
