@@ -1,20 +1,8 @@
 name: "INTEGRATION"
-
 env:
   HARDHAT_VAR_MNEMONIC: "test test test test test test test test test test test junk"
   HARDHAT_VAR_INFURA_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
   PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-  # Uncomment the following lines to set your configuration variables using
-  # GitHub secrets (https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions)
-  #
-  # HARDHAT_VAR_MNEMONIC: ${{ secrets.Mnemonic }}
-  # HARDHAT_VAR_INFURA_API_KEY: ${{ secrets.InfuraApiKey }}
-  # HARDHAT_VAR_ARBISCAN_API_KEY: ${{ secrets.ArbiscanApiKey }}
-  # HARDHAT_VAR_BSCSCAN_API_KEY: ${{ secrets.BscscanApiKey }}
-  # HARDHAT_VAR_ETHERSCAN_API_KEY: ${{ secrets.EtherscanApiKey }}
-  # HARDHAT_VAR_OPTIMISM_API_KEY: ${{ secrets.OptimismApiKey }}
-  # HARDHAT_VAR_POLYGONSCAN_API_KEY: ${{ secrets.PolygonscanApiKey }}
-  # HARDHAT_VAR_SNOWTRACE_API_KEY: ${{ secrets.SnowtraceApiKey }}
 
 on:
   workflow_dispatch:
@@ -24,17 +12,17 @@ on:
       - main
 
 jobs:
-  ci:
+  prebuild:
     runs-on: "ubuntu-latest"
     steps:
       - name: "Check out the repo"
         uses: "actions/checkout@v4"
-
+      
       - name: "Setup node"
         uses: actions/setup-node@v2
         with:
           node-version: 20
-
+      
       - name: Install Rust 1.81.0
         uses: actions-rs/toolchain@v1
         with:
@@ -46,10 +34,10 @@ jobs:
         with:
           path: "**/node_modules"
           key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
-
+      
       - name: "Install the dependencies"
         run: "yarn install"
-
+      
       - name: "Lint the code"
         run: "yarn lint"
 
@@ -61,10 +49,66 @@ jobs:
       - name: "Compile the contracts and generate the TypeChain bindings"
         run: "yarn typechain"
 
-      - name: "Test the contracts and generate the coverage report"
-        run: "yarn test:integration"
+      - name: "Run prebuild"
+        run: "yarn test:integration prebuild"
+      
+      - name: "Upload build artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            packages/ciphernode/target/debug/enclave
+            packages/ciphernode/target/debug/fake_encrypt
+            packages/ciphernode/target/debug/pack_e3_params
 
+  test:
+    needs: prebuild
+    runs-on: "ubuntu-latest"
+    strategy:
+      matrix:
+        test-suite: [base, persist, net]
+      fail-fast: false
+    
+    steps:
+      - name: "Check out the repo"
+        uses: "actions/checkout@v4"
+      
+      - name: "Setup node"
+        uses: actions/setup-node@v2
+        with:
+          node-version: 20
+      
+      - name: Install Rust 1.81.0
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.81.0
+          override: true
+      
+      - name: Cache node modules
+        uses: actions/cache@v2
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+      
+      - name: "Install the dependencies"
+        run: "yarn install"
+      
+      - name: "Download build artifacts"
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+          path: packages/ciphernode/target/debug/
+      
+      - name: "Set executable permissions"
+        run: |
+          chmod +x packages/ciphernode/target/debug/enclave
+          chmod +x packages/ciphernode/target/debug/fake_encrypt
+          chmod +x packages/ciphernode/target/debug/pack_e3_params
+      
+      - name: "Run ${{ matrix.test-suite }} tests"
+        run: "yarn test:integration ${{ matrix.test-suite }} --no-prebuild"
+      
       - name: "Add test summary"
         run: |
-          echo "## Test results" >> $GITHUB_STEP_SUMMARY
+          echo "## Test results for ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY

@@ -4,6 +4,10 @@ set -eu  # Exit immediately if a command exits with a non-zero status
 
 THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+if [[ "$*" != *"--no-prebuild"* ]]; then
+    "$THIS_DIR/lib/prebuild.sh"
+fi
+
 if [ $# -eq 0 ]; then 
   "$THIS_DIR/persist.sh"
   "$THIS_DIR/base.sh"
