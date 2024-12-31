@@ -1,6 +1,5 @@
 use clap::Parser;
 use cli::Cli;
-use events::set_tag;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -50,11 +49,6 @@ pub async fn main() {
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
 
     let cli = Cli::parse();
-
-    // Set the tag for all future traces
-    if let Err(err) = set_tag(cli.get_tag()) {
-        eprintln!("{}", err);
-    }
 
     // Execute the cli
     if let Err(err) = cli.execute().await {

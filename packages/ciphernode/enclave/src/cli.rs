@@ -7,7 +7,6 @@ use crate::{aggregator::AggregatorCommands, start};
 use anyhow::Result;
 use clap::{command, Parser, Subcommand};
 use config::load_config;
-use events::get_tag;
 use tracing::instrument;
 
 #[derive(Parser, Debug)]
@@ -26,7 +25,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    #[instrument(skip(self),fields(id = get_tag()))]
+    #[instrument(skip(self))]
     pub async fn execute(self) -> Result<()> {
         let config_path = self.config.as_deref();
         let config = load_config(config_path)?;

@@ -5,7 +5,7 @@ use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
-use events::{get_tag, EventBus};
+use events::EventBus;
 use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
@@ -25,7 +25,7 @@ use tracing::instrument;
 
 use crate::helpers::datastore::setup_datastore;
 
-#[instrument(name="app", skip_all,fields(id = get_tag()))]
+#[instrument(name = "app", skip_all)]
 pub async fn execute(
     config: AppConfig,
     address: Address,

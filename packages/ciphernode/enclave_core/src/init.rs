@@ -3,7 +3,6 @@ use anyhow::{anyhow, bail, Result};
 use config::load_config;
 use config::AppConfig;
 use config::RPC;
-use events::get_tag;
 use std::fs;
 use tracing::instrument;
 
@@ -31,7 +30,7 @@ pub fn validate_eth_address(address: &String) -> Result<()> {
     }
 }
 
-#[instrument(name = "app", skip_all, fields(id = get_tag()))]
+#[instrument(name = "app", skip_all)]
 pub async fn execute(rpc_url: String, eth_address: Option<String>) -> Result<AppConfig> {
     let config_dir = dirs::home_dir()
         .ok_or_else(|| anyhow!("Could not determine home directory"))?

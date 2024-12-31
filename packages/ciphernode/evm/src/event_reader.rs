@@ -9,7 +9,7 @@ use alloy::rpc::types::Filter;
 use alloy::transports::{BoxTransport, Transport};
 use anyhow::{anyhow, Result};
 use data::{AutoPersist, Persistable, Repository};
-use events::{get_tag, BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
+use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;
@@ -34,8 +34,6 @@ impl EnclaveEvmEvent {
 }
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
-
-pub type EventReader = EvmEventReader<ReadonlyProvider>;
 
 pub struct EvmEventReaderParams<P, T>
 where
@@ -151,7 +149,6 @@ where
 
         let contract_address = self.contract_address;
         let start_block = self.start_block;
-        let tag = get_tag();
         ctx.spawn(
             async move {
                 stream_from_evm(
@@ -162,7 +159,6 @@ where
                     shutdown,
                     start_block,
                     &bus,
-                    &tag,
                 )
                 .await
             }
@@ -171,7 +167,7 @@ where
     }
 }
 
-#[instrument(name = "evm_event_reader", skip_all, fields(id=id))]
+#[instrument(name = "evm_event_reader", skip_all)]
 async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     provider: WithChainId<P, T>,
     contract_address: &Address,
@@ -180,7 +176,6 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
     bus: &Addr<EventBus>,
-    id: &str,
 ) {
     let chain_id = provider.get_chain_id();
     let provider = provider.get_provider();
@@ -270,7 +265,7 @@ where
 {
     type Result = ();
 
-    #[instrument(name="evm_event_reader", skip_all, fields(id = get_tag()))]
+    #[instrument(name = "evm_event_reader", skip_all)]
     fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
         match self.state.try_mutate(|mut state| {
             let event_id = wrapped.get_id();
