@@ -1,7 +1,7 @@
 use crate::{
     correlation_id::CorrelationId,
     events::{NetworkPeerCommand, NetworkPeerEvent},
-    network_peer::{SetNetworkManager, NetworkPeer, SubscribeTopic, StartListening},
+    network_peer::{NetworkPeer, SetNetworkManager, SubscribeTopic},
 };
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -74,13 +74,20 @@ impl NetworkManager {
         // Create peer from keypair
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let peer = NetworkPeer::setup(&keypair, peers, enable_mdns);
-        peer.send(StartListening(Some(quic_port)));
-        peer.send(SubscribeTopic(topic.to_string()));
+        let peer = NetworkPeer::setup(&keypair, peers, Some(quic_port), enable_mdns);
+
+        match peer.send(SubscribeTopic(topic.to_string())).await {
+            Ok(_) => (),
+            Err(e) => bail!("Error subscribing to topic: {}", e),
+        }
 
         // Setup and start network manager
         let p2p_addr = NetworkManager::setup(bus, peer.clone(), topic);
-        peer.send(SetNetworkManager(p2p_addr.clone()));
+
+        match peer.send(SetNetworkManager(p2p_addr.clone())).await {
+            Ok(_) => (),
+            Err(e) => bail!("Error setting network manager: {}", e),
+        }
 
         Ok((p2p_addr, keypair.public().to_peer_id().to_string()))
     }
@@ -128,7 +135,7 @@ impl Handler<EnclaveEvent> for NetworkManager {
 
             match evt.to_bytes() {
                 Ok(data) => {
-                    peer.send(NetworkPeerCommand::GossipPublish {
+                    peer.do_send(NetworkPeerCommand::GossipPublish {
                         topic,
                         data,
                         correlation_id: CorrelationId::new(),
