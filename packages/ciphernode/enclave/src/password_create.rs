@@ -42,6 +42,7 @@ fn get_zeroizing_pw_vec(input: Option<String>) -> Result<Zeroizing<Vec<u8>>> {
 }
 
 pub async fn execute(config: &AppConfig, input: Option<String>, overwrite: bool) -> Result<()> {
+    println!("Setting password...");
     password_create::preflight(config, overwrite).await?;
 
     let pw = get_zeroizing_pw_vec(input)?;

@@ -38,6 +38,7 @@ NETWORK_PRIVATE_KEY_2="0x21a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85f
 NETWORK_PRIVATE_KEY_3="0x31a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 NETWORK_PRIVATE_KEY_4="0x41a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 
+ENCLAVE_BIN=./packages/ciphernode/target/debug/enclave
 
 # Function to clean up background processes
 cleanup() {
@@ -87,24 +88,28 @@ waiton-files() {
 set_password() {
   local name="$1"
   local password="$2"
-  yarn enclave password create \
+  $ENCLAVE_BIN password create \
     --config "$SCRIPT_DIR/lib/$name/config.yaml" \
     --password "$password"
 }
 
 launch_ciphernode() {
-    local name="$1"
-    heading "Launch ciphernode $name"
-    yarn enclave start \
-      --tag "$name" \
-      --config "$SCRIPT_DIR/lib/$name/config.yaml" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+   local name="$1"
+   local log_file="${SCRIPT_DIR}/logs/${name}.log"
+   local log_dir="$(dirname "$log_file")"
+   heading "Launch ciphernode $name"
+   # Make sure the logs directory exists
+   mkdir -p "$log_dir"
+   $ENCLAVE_BIN start -v \
+     --tag "$name" \
+     --config "$SCRIPT_DIR/lib/$name/config.yaml" 2>&1 | tee "$log_file" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 set_private_key() {
   local name="$1"
   local private_key="$2"
 
-  yarn enclave wallet set \
+  $ENCLAVE_BIN wallet set \
     --config "$SCRIPT_DIR/lib/$name/config.yaml" \
     --private-key "$private_key"
 }
@@ -113,22 +118,25 @@ set_network_private_key() {
   local name="$1"
   local private_key="$2"
 
-  yarn enclave net set-key \
+  $ENCLAVE_BIN net set-key \
     --config "$SCRIPT_DIR/lib/$name/config.yaml" \
     --net-keypair "$private_key"
 }
 
 launch_aggregator() {
-    local name="$1"
-    heading "Launch aggregator $name"
-
-    yarn enclave aggregator start \
-      --tag "$name" \
-      --config "$SCRIPT_DIR/lib/$name/config.yaml" \
-      --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
-      --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
-
-    ps aux | grep aggregator
+   local name="$1"
+   local suffix="${2:-}"  # Optional suffix with empty default
+   local log_name="${name}${suffix:+_$suffix}"  # Add suffix with underscore if provided
+   local log_file="${SCRIPT_DIR}/logs/${log_name}.log"
+   local log_dir="$(dirname "$log_file")"
+   heading "Launch aggregator $name"
+   # Make sure the logs directory exists
+   mkdir -p "$log_dir"
+   $ENCLAVE_BIN aggregator start -v \
+     --tag "$name" \
+     --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+     --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
+     --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" 2>&1 | tee "$log_file" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 kill_proc() {

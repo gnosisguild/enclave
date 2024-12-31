@@ -2,10 +2,9 @@ use crate::owo;
 use anyhow::{anyhow, Result};
 use config::AppConfig;
 use enclave_core::{listen_for_shutdown, start};
-use events::get_tag;
 use tracing::{info, instrument};
 
-#[instrument(name="app", skip_all,fields(id = get_tag()))]
+#[instrument(name = "app", skip_all)]
 pub async fn execute(config: AppConfig) -> Result<()> {
     owo();
     let Some(address) = config.address() else {

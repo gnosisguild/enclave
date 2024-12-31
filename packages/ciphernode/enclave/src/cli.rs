@@ -5,10 +5,9 @@ use crate::wallet::WalletCommands;
 use crate::{aggregator, init, password, wallet};
 use crate::{aggregator::AggregatorCommands, start};
 use anyhow::Result;
-use clap::{command, Parser, Subcommand};
+use clap::{command, ArgAction, Parser, Subcommand};
 use config::load_config;
-use events::get_tag;
-use tracing::instrument;
+use tracing::{instrument, Level};
 
 #[derive(Parser, Debug)]
 #[command(name = "enclave")]
@@ -21,12 +20,48 @@ pub struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    #[arg(short, long, global = true)]
-    tag: Option<String>,
+    /// Indicate error levels by adding additional `-v` arguments. Eg. `enclave -vvv` will give you
+    /// trace level output
+    #[arg(
+        short,
+        long,
+        action = ArgAction::Count,
+        global = true
+    )]
+    pub verbose: u8,
+
+    /// Silence all output. This argument cannot be used alongside `-v`
+    #[arg(
+        short,
+        long,
+        action = ArgAction::SetTrue,
+        conflicts_with = "verbose",
+        global = true
+    )]
+    quiet: bool,
+
+    // NOTE: The --tag argument is being left here deliberately so that we can target the aggregator in our tests
+    // to be killed. We may wish to extend it later to other logging.
+    /// Tag is not currently used but may be used in the future.
+    #[arg(long, global = true)]
+    pub tag: Option<String>,
 }
 
 impl Cli {
-    #[instrument(skip(self),fields(id = get_tag()))]
+    pub fn log_level(&self) -> Level {
+        if self.quiet {
+            Level::ERROR
+        } else {
+            match self.verbose {
+                0 => Level::WARN,  //
+                1 => Level::INFO,  // -v
+                2 => Level::DEBUG, // -vv
+                _ => Level::TRACE, // -vvv
+            }
+        }
+    }
+
+    #[instrument(skip(self))]
     pub async fn execute(self) -> Result<()> {
         let config_path = self.config.as_deref();
         let config = load_config(config_path)?;
@@ -58,14 +93,6 @@ impl Cli {
         }
 
         Ok(())
-    }
-
-    pub fn get_tag(&self) -> String {
-        if let Some(tag) = self.tag.clone() {
-            tag
-        } else {
-            "default".to_string()
-        }
     }
 }
 

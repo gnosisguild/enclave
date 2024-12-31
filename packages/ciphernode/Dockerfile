@@ -80,7 +80,6 @@ COPY --from=ciphernode-builder --chmod=755 --chown=ciphernode:ciphernode /build/
 # Environment variables for configuration
 ENV CONFIG_DIR=/home/ciphernode/.config/enclave
 ENV DATA_DIR=/home/ciphernode/.local/share/enclave
-ENV RUST_LOG=info
 
 # Add entrypoint script
 ENTRYPOINT ["ciphernode-entrypoint.sh"]
