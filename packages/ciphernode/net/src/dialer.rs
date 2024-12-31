@@ -58,11 +58,12 @@ pub struct DialerActor {
 }
 
 impl DialerActor {
-    pub fn new() -> Self {
+    pub fn new() -> Addr<Self> {
         Self {
             network_peer: None,
             pending_connections: HashMap::new(),
         }
+        .start()
     }
 
     fn attempt_dial(
@@ -76,7 +77,13 @@ impl DialerActor {
 
         match addr.parse::<Multiaddr>() {
             Ok(multi) => {
-                let resolved_multiaddr = self.get_resolved_multiaddr(&multi).unwrap();
+                let resolved_multiaddr = match self.get_resolved_multiaddr(&multi) {
+                    Ok(addr) => addr,
+                    Err(e) => {
+                        warn!("Error resolving multiaddr {}: {}", addr, e);
+                        return None;
+                    }
+                };
                 let opts: DialOpts = resolved_multiaddr.into();
                 let connection_id = opts.connection_id();
 
