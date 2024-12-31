@@ -1,6 +1,12 @@
+use crate::{
+    dialer::{DialPeers, DialerActor, SetNetworkPeer},
+    events::{NetworkPeerCommand, NetworkPeerEvent},
+    network_manager::NetworkManager,
+};
 use actix::prelude::*;
 use anyhow::Result;
-use futures::{FutureExt, StreamExt};
+use dev::AsyncContext;
+use futures::task::noop_waker_ref;
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     gossipsub::{self, IdentTopic, MessageId},
@@ -14,22 +20,14 @@ use libp2p::{
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     io::Error,
+    pin::Pin,
     sync::Arc,
+    task::{Context as TaskContext, Poll},
     time::Duration,
 };
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{
-    dialer::{DialPeers, DialerActor, SetNetworkPeer},
-    events::{NetworkPeerCommand, NetworkPeerEvent},
-    network_manager::NetworkManager,
-};
-
 // Actor Messages
-#[derive(Message)]
-#[rtype(result = "Result<()>")]
-pub struct StartListening(pub Option<u16>);
-
 #[derive(Message)]
 #[rtype(result = "Result<()>")]
 pub struct SetNetworkManager(pub Addr<NetworkManager>);
@@ -54,12 +52,18 @@ pub struct NodeBehaviour {
 pub struct NetworkPeer {
     swarm: Swarm<NodeBehaviour>,
     peers: Vec<String>,
+    quic_port: Option<u16>,
     mgr: Option<Addr<NetworkManager>>,
     dialer: Option<Addr<DialerActor>>,
 }
 
 impl NetworkPeer {
-    pub fn new(id: &Keypair, initial_peers: Vec<String>, enable_mdns: bool) -> Self {
+    pub fn new(
+        id: &Keypair,
+        initial_peers: Vec<String>,
+        quic_port: Option<u16>,
+        enable_mdns: bool,
+    ) -> Self {
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
@@ -67,17 +71,50 @@ impl NetworkPeer {
             .unwrap()
             .build();
 
+        let dialer = DialerActor::new();
+
         Self {
             swarm,
             peers: initial_peers,
+            quic_port,
             mgr: None,
-            dialer: None,
+            dialer: Some(dialer),
         }
     }
 
-    pub fn setup(id: &Keypair, initial_peers: Vec<String>, enable_mdns: bool) -> Addr<Self> {
-        let peer = Self::new(id, initial_peers, enable_mdns).start();
+    pub fn setup(
+        id: &Keypair,
+        initial_peers: Vec<String>,
+        quic_port: Option<u16>,
+        enable_mdns: bool,
+    ) -> Addr<Self> {
+        let peer = Self::new(id, initial_peers, quic_port, enable_mdns).start();
         peer
+    }
+
+    fn begin_swarm_polling(&mut self, ctx: &mut Context<Self>) {
+        ctx.run_interval(Duration::from_millis(50), |actor, _ctx| {
+            let mut pinned = Pin::new(&mut actor.swarm);
+            let waker = noop_waker_ref();
+            let mut async_ctx = TaskContext::from_waker(waker);
+            let mut events = Vec::new();
+            loop {
+                match pinned.as_mut().poll_next(&mut async_ctx) {
+                    Poll::Ready(Some(event)) => events.push(event),
+                    Poll::Ready(None) => {
+                        break;
+                    }
+                    Poll::Pending => {
+                        break;
+                    }
+                }
+            }
+            for evt in events {
+                if let Err(e) = actor.handle_swarm_event(evt) {
+                    error!("Error handling swarm event: {}", e);
+                }
+            }
+        });
     }
 
     fn handle_swarm_event(&mut self, event: SwarmEvent<NodeBehaviourEvent>) -> Result<()> {
@@ -103,6 +140,9 @@ impl NetworkPeer {
                         .add_explicit_peer(&peer_id);
                     info!("Added peer to gossipsub {}", remote_addr);
                     mgr.do_send(NetworkPeerEvent::ConnectionEstablished { connection_id });
+                    if let Some(dialer) = &mut self.dialer {
+                        dialer.do_send(NetworkPeerEvent::ConnectionEstablished { connection_id });
+                    }
                 }
 
                 SwarmEvent::OutgoingConnectionError {
@@ -172,25 +212,41 @@ impl Actor for NetworkPeer {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        // Setup stream handling for swarm events
-        ctx.add_stream(Box::pin(futures::stream::unfold(
-            &mut self.swarm,
-            |swarm| async move { Some((swarm.select_next_some().await, swarm)) },
-        )));
+        let addr = match self.quic_port {
+            Some(port) => format!("/ip4/0.0.0.0/udp/{}/quic-v1", port),
+            None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
+        };
 
-        if let Some(dialer) = &mut self.dialer {
-            dialer.send(SetNetworkPeer(ctx.address()));
-            if !self.peers.is_empty() {
-                dialer.do_send(DialPeers(self.peers.clone()));
+        info!("Requesting node.listen_on('{}') ", addr);
+        match self.swarm.listen_on(addr.parse().unwrap()) {
+            Ok(i) => {
+                info!("Started Listening with ID {}", i);
+            }
+            Err(e) => {
+                error!("Error listening on {}: {}", addr, e);
+                return;
             }
         }
-    }
-}
 
-impl StreamHandler<SwarmEvent<NodeBehaviourEvent>> for NetworkPeer {
-    fn handle(&mut self, event: SwarmEvent<NodeBehaviourEvent>, _: &mut Self::Context) {
-        if let Err(e) = self.handle_swarm_event(event) {
-            error!("Error handling swarm event: {}", e);
+        if let Some(dialer) = &mut self.dialer {
+            let dialer_clone = dialer.clone();
+            let peers = self.peers.clone();
+            let address = ctx.address();
+
+            ctx.spawn(
+                async move {
+                    if let Err(e) = dialer_clone.send(SetNetworkPeer(address)).await {
+                        error!("Error setting network peer: {}", e);
+                        return;
+                    }
+                    if !peers.is_empty() {
+                        dialer_clone.do_send(DialPeers(peers));
+                    }
+                }
+                .into_actor(self),
+            );
+
+            self.begin_swarm_polling(ctx);
         }
     }
 }
@@ -200,21 +256,6 @@ impl Handler<SetNetworkManager> for NetworkPeer {
 
     fn handle(&mut self, msg: SetNetworkManager, _: &mut Self::Context) -> Self::Result {
         self.mgr = Some(msg.0);
-        Ok(())
-    }
-}
-
-impl Handler<StartListening> for NetworkPeer {
-    type Result = Result<()>;
-
-    fn handle(&mut self, msg: StartListening, _: &mut Self::Context) -> Self::Result {
-        let addr = match msg.0 {
-            Some(port) => format!("/ip4/0.0.0.0/udp/{}/quic-v1", port),
-            None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
-        };
-
-        info!("Requesting node.listen_on('{}')", addr);
-        self.swarm.listen_on(addr.parse()?)?;
         Ok(())
     }
 }
