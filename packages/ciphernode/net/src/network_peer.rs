@@ -30,7 +30,11 @@ use tracing::{debug, error, info, trace, warn};
 // Actor Messages
 #[derive(Message)]
 #[rtype(result = "Result<()>")]
-pub struct SetNetworkManager(pub Addr<NetworkManager>);
+pub struct SetNetworkManager(pub Recipient<NetworkPeerEvent>);
+
+#[derive(Message)]
+#[rtype(result = "Result<()>")]
+pub struct StartNetwork;
 
 #[derive(Message)]
 #[rtype(result = "Result<()>")]
@@ -53,8 +57,8 @@ pub struct NetworkPeer {
     swarm: Swarm<NodeBehaviour>,
     peers: Vec<String>,
     quic_port: Option<u16>,
-    mgr: Option<Addr<NetworkManager>>,
     dialer: Option<Addr<DialerActor>>,
+    mgr: Option<Recipient<NetworkPeerEvent>>,
 }
 
 impl NetworkPeer {
@@ -194,7 +198,7 @@ impl NetworkPeer {
                         message,
                     },
                 )) => {
-                    trace!("Got message with id: {id} from peer: {peer_id}",);
+                    info!("Got message with id: {id} from peer: {peer_id}",);
                     mgr.do_send(NetworkPeerEvent::GossipData(message.data));
                 }
 
@@ -210,8 +214,12 @@ impl NetworkPeer {
 
 impl Actor for NetworkPeer {
     type Context = Context<Self>;
+}
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+impl Handler<StartNetwork> for NetworkPeer {
+    type Result = Result<()>;
+
+    fn handle(&mut self, _: StartNetwork, ctx: &mut Self::Context) -> Self::Result {
         let addr = match self.quic_port {
             Some(port) => format!("/ip4/0.0.0.0/udp/{}/quic-v1", port),
             None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
@@ -224,7 +232,7 @@ impl Actor for NetworkPeer {
             }
             Err(e) => {
                 error!("Error listening on {}: {}", addr, e);
-                return;
+                return Err(anyhow::anyhow!("Error listening on {}: {}", addr, e));
             }
         }
 
@@ -248,6 +256,7 @@ impl Actor for NetworkPeer {
 
             self.begin_swarm_polling(ctx);
         }
+        Ok(())
     }
 }
 
@@ -293,11 +302,11 @@ impl Handler<NetworkPeerCommand> for NetworkPeer {
     fn handle(&mut self, msg: NetworkPeerCommand, _: &mut Self::Context) {
         match msg {
             NetworkPeerCommand::Dial(opts) => {
-                info!("DIAL: {:?}", opts);
                 let conn_id = opts.connection_id();
+                info!("Dialing {:?}", conn_id);
                 match self.swarm.dial(opts) {
-                    Ok(v) => {
-                        info!("Dial returned {:?}", v);
+                    Ok(_) => {
+                        info!("Successfully dialed {:?}", conn_id);
                     }
                     Err(error) => {
                         info!("Dialing error! {}", error);

@@ -1,7 +1,7 @@
 use crate::{
     correlation_id::CorrelationId,
     events::{NetworkPeerCommand, NetworkPeerEvent},
-    network_peer::{NetworkPeer, SetNetworkManager, SubscribeTopic},
+    network_peer::{NetworkPeer, SetNetworkManager, SubscribeTopic, StartNetwork},
 };
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -75,6 +75,10 @@ impl NetworkManager {
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
         let peer = NetworkPeer::setup(&keypair, peers, Some(quic_port), enable_mdns);
+        match peer.send(StartNetwork).await {
+            Ok(_) => (),
+            Err(e) => bail!("Error starting network: {}", e),
+        }
 
         match peer.send(SubscribeTopic(topic.to_string())).await {
             Ok(_) => (),
@@ -83,8 +87,8 @@ impl NetworkManager {
 
         // Setup and start network manager
         let p2p_addr = NetworkManager::setup(bus, peer.clone(), topic);
-
-        match peer.send(SetNetworkManager(p2p_addr.clone())).await {
+        let event_recipient = p2p_addr.clone().recipient::<NetworkPeerEvent>();
+        match peer.send(SetNetworkManager(event_recipient)).await {
             Ok(_) => (),
             Err(e) => bail!("Error setting network manager: {}", e),
         }

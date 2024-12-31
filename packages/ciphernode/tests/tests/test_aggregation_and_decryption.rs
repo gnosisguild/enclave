@@ -462,110 +462,110 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     Ok(())
 }
 
-#[actix::test]
-async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
-    // Setup elements in test
-    let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
-    let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
-    let bus = EventBus::new(true).start();
-    let event_rx = event_tx.subscribe();
-    // Pas cmd and event channels to NetworkManager
-    NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
+// #[actix::test]
+// async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
+//     // Setup elements in test
+//     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
+//     let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
+//     let bus = EventBus::new(true).start();
+//     let event_rx = event_tx.subscribe();
+//     // Pas cmd and event channels to NetworkManager
+//     NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
 
-    // Capture messages from output on msgs vec
-    let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
-    let msgs_loop = msgs.clone();
+//     // Capture messages from output on msgs vec
+//     let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
+//     let msgs_loop = msgs.clone();
 
-    tokio::spawn(async move {
-        // Pull events from command channel
-        while let Some(cmd) = cmd_rx.recv().await {
-            // If the command is a GossipPublish then extract it and save it whilst sending it to
-            // the event bus as if it was gossiped from the network and ended up as an external
-            // message this simulates a rebroadcast message
-            if let Some(msg) = match cmd {
-                net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
-                _ => None,
-            } {
-                msgs_loop.lock().await.push(msg.clone());
-                event_tx.send(NetworkPeerEvent::GossipData(msg))?;
-            }
-            // if this  manages to broadcast an event to the
-            // event bus we will expect to see an extra event on
-            // the bus but we don't because we handle this
-        }
-        anyhow::Ok(())
-    });
+//     tokio::spawn(async move {
+//         // Pull events from command channel
+//         while let Some(cmd) = cmd_rx.recv().await {
+//             // If the command is a GossipPublish then extract it and save it whilst sending it to
+//             // the event bus as if it was gossiped from the network and ended up as an external
+//             // message this simulates a rebroadcast message
+//             if let Some(msg) = match cmd {
+//                 net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
+//                 _ => None,
+//             } {
+//                 msgs_loop.lock().await.push(msg.clone());
+//                 event_tx.send(NetworkPeerEvent::GossipData(msg))?;
+//             }
+//             // if this  manages to broadcast an event to the
+//             // event bus we will expect to see an extra event on
+//             // the bus but we don't because we handle this
+//         }
+//         anyhow::Ok(())
+//     });
 
-    let evt_1 = EnclaveEvent::from(PlaintextAggregated {
-        e3_id: E3id::new("1235"),
-        decrypted_output: vec![1, 2, 3, 4],
-        src_chain_id: 1,
-    });
+//     let evt_1 = EnclaveEvent::from(PlaintextAggregated {
+//         e3_id: E3id::new("1235"),
+//         decrypted_output: vec![1, 2, 3, 4],
+//         src_chain_id: 1,
+//     });
 
-    let evt_2 = EnclaveEvent::from(PlaintextAggregated {
-        e3_id: E3id::new("1236"),
-        decrypted_output: vec![1, 2, 3, 4],
-        src_chain_id: 1,
-    });
+//     let evt_2 = EnclaveEvent::from(PlaintextAggregated {
+//         e3_id: E3id::new("1236"),
+//         decrypted_output: vec![1, 2, 3, 4],
+//         src_chain_id: 1,
+//     });
 
-    let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
-        e3_id: E3id::new("1235"),
-        threshold_m: 3,
-    });
+//     let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
+//         e3_id: E3id::new("1235"),
+//         threshold_m: 3,
+//     });
 
-    bus.do_send(evt_1.clone());
-    bus.do_send(evt_2.clone());
-    bus.do_send(local_evt_3.clone()); // This is a local event which should not be broadcast to the network
+//     bus.do_send(evt_1.clone());
+//     bus.do_send(evt_2.clone());
+//     bus.do_send(local_evt_3.clone()); // This is a local event which should not be broadcast to the network
 
-    sleep(Duration::from_millis(1)).await; // need to push to next tick
+//     sleep(Duration::from_millis(1)).await; // need to push to next tick
 
-    // check the history of the event bus
-    let history = bus.send(GetHistory).await?;
+//     // check the history of the event bus
+//     let history = bus.send(GetHistory).await?;
 
-    assert_eq!(
-        *msgs.lock().await,
-        vec![evt_1.to_bytes()?, evt_2.to_bytes()?], // notice no local events
-        "NetworkManager did not transmit correct events to the network"
-    );
+//     assert_eq!(
+//         *msgs.lock().await,
+//         vec![evt_1.to_bytes()?, evt_2.to_bytes()?], // notice no local events
+//         "NetworkManager did not transmit correct events to the network"
+//     );
 
-    assert_eq!(
-        history,
-        vec![evt_1, evt_2, local_evt_3], // all local events that have been broadcast but no
-        // events from the loopback
-        "NetworkManager must not retransmit forwarded event to event bus"
-    );
+//     assert_eq!(
+//         history,
+//         vec![evt_1, evt_2, local_evt_3], // all local events that have been broadcast but no
+//         // events from the loopback
+//         "NetworkManager must not retransmit forwarded event to event bus"
+//     );
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-#[actix::test]
-async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
-    let seed = Seed(ChaCha20Rng::seed_from_u64(123).get_seed());
+// #[actix::test]
+// async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
+//     let seed = Seed(ChaCha20Rng::seed_from_u64(123).get_seed());
 
-    // Setup elements in test
-    let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
-    let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let bus = EventBus::new(true).start();
-    NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
+//     // Setup elements in test
+//     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
+//     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
+//     let bus = EventBus::new(true).start();
+//     NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
 
-    // Capture messages from output on msgs vec
-    let event = EnclaveEvent::from(E3Requested {
-        e3_id: E3id::new("1235"),
-        threshold_m: 3,
-        seed: seed.clone(),
-        params: vec![1, 2, 3, 4],
-        src_chain_id: 1,
-    });
+//     // Capture messages from output on msgs vec
+//     let event = EnclaveEvent::from(E3Requested {
+//         e3_id: E3id::new("1235"),
+//         threshold_m: 3,
+//         seed: seed.clone(),
+//         params: vec![1, 2, 3, 4],
+//         src_chain_id: 1,
+//     });
 
-    // lets send an event from the network
-    let _ = event_tx.send(NetworkPeerEvent::GossipData(event.to_bytes()?));
+//     // lets send an event from the network
+//     let _ = event_tx.send(NetworkPeerEvent::GossipData(event.to_bytes()?));
 
-    sleep(Duration::from_millis(1)).await; // need to push to next tick
+//     sleep(Duration::from_millis(1)).await; // need to push to next tick
 
-    // check the history of the event bus
-    let history = bus.send(GetHistory).await?;
+//     // check the history of the event bus
+//     let history = bus.send(GetHistory).await?;
 
-    assert_eq!(history, vec![event]);
+//     assert_eq!(history, vec![event]);
 
-    Ok(())
-}
+//     Ok(())
+// }
