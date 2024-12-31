@@ -7,7 +7,6 @@ use crate::{aggregator::AggregatorCommands, start};
 use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::load_config;
-use tracing::level_filters::LevelFilter;
 use tracing::{instrument, Level};
 
 #[derive(Parser, Debug)]
@@ -21,23 +20,29 @@ pub struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// User -v to indicate error
+    /// Indicate error levels by adding additional `-v` arguments. Eg. `enclave -vvv` will give you
+    /// trace level output
     #[arg(
         short,
         long,
         action = ArgAction::Count,
-        help = "More output per occurrence"
     )]
     pub verbose: u8,
 
+    /// Silence all output
     #[arg(
         short,
         long,
         action = ArgAction::SetTrue,
-        help = "Silence all output",
         conflicts_with = "verbose"
     )]
     quiet: bool,
+
+    // NOTE: The --tag argument is being left here deliberately so that we can target the aggregator in our tests
+    // to be killed. We may wish to extend it later to other logging.
+    /// Tag is not currently used but may be used in the future.
+    #[arg(long, global = true)]
+    pub tag: Option<String>,
 }
 
 impl Cli {
@@ -46,9 +51,9 @@ impl Cli {
             Level::ERROR
         } else {
             match self.verbose {
-                0 => Level::INFO, // Default is INFO
-                1 => Level::DEBUG,
-                _ => Level::TRACE,
+                0 => Level::INFO,  // Default is INFO
+                1 => Level::DEBUG, // -v
+                _ => Level::TRACE, // -vv
             }
         }
     }
