@@ -94,11 +94,15 @@ set_password() {
 }
 
 launch_ciphernode() {
-    local name="$1"
-    heading "Launch ciphernode $name"
-    $ENCLAVE_BIN start -v \
-      --tag "$name" \
-      --config "$SCRIPT_DIR/lib/$name/config.yaml" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+   local name="$1"
+   local log_file="${SCRIPT_DIR}/logs/${name}.log"
+   local log_dir="$(dirname "$log_file")"
+   heading "Launch ciphernode $name"
+   # Make sure the logs directory exists
+   mkdir -p "$log_dir"
+   $ENCLAVE_BIN start -v \
+     --tag "$name" \
+     --config "$SCRIPT_DIR/lib/$name/config.yaml" 2>&1 | tee "$log_file" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 set_private_key() {
@@ -120,16 +124,19 @@ set_network_private_key() {
 }
 
 launch_aggregator() {
-    local name="$1"
-    heading "Launch aggregator $name"
-
-    $ENCLAVE_BIN aggregator start -v \
-      --tag "$name" \
-      --config "$SCRIPT_DIR/lib/$name/config.yaml" \
-      --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
-      --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
-
-    ps aux | grep aggregator
+   local name="$1"
+   local suffix="${2:-}"  # Optional suffix with empty default
+   local log_name="${name}${suffix:+_$suffix}"  # Add suffix with underscore if provided
+   local log_file="${SCRIPT_DIR}/logs/${log_name}.log"
+   local log_dir="$(dirname "$log_file")"
+   heading "Launch aggregator $name"
+   # Make sure the logs directory exists
+   mkdir -p "$log_dir"
+   $ENCLAVE_BIN aggregator start -v \
+     --tag "$name" \
+     --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+     --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
+     --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" 2>&1 | tee "$log_file" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 kill_proc() {
