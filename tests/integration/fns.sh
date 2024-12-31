@@ -56,6 +56,10 @@ heading() {
     echo ""
 }
 
+strip_ansi() {
+    sed 's/\x1b\[[0-9;]*m//g'
+}
+
 waiton() {
     local file_path="$1"
     until [ -f "$file_path" ]; do
@@ -102,7 +106,7 @@ launch_ciphernode() {
    mkdir -p "$log_dir"
    $ENCLAVE_BIN start -v \
      --tag "$name" \
-     --config "$SCRIPT_DIR/lib/$name/config.yaml" 2>&1 | tee "$log_file" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+     --config "$SCRIPT_DIR/lib/$name/config.yaml" 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 set_private_key() {
@@ -136,7 +140,7 @@ launch_aggregator() {
      --tag "$name" \
      --config "$SCRIPT_DIR/lib/$name/config.yaml" \
      --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
-     --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" 2>&1 | tee "$log_file" & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+     --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 kill_proc() {
