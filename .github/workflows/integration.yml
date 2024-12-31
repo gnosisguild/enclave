@@ -12,6 +12,25 @@ on:
       - main
 
 jobs:
+  test-net:
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Check out the repo"
+        uses: "actions/checkout@v4"
+      
+      - name: "Setup node"
+        uses: actions/setup-node@v2
+        with:
+          node-version: 20
+      
+      - name: "Run network tests"
+        run: "yarn test:integration net --no-prebuild"
+      
+      - name: "Add test summary"
+        run: |
+          echo "## Network test results" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+
   prebuild:
     runs-on: "ubuntu-latest"
     steps:
@@ -66,7 +85,7 @@ jobs:
     runs-on: "ubuntu-latest"
     strategy:
       matrix:
-        test-suite: [base, persist, net]
+        test-suite: [base, persist]
       fail-fast: false
     
     steps:
