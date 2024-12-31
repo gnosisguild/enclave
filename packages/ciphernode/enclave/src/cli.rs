@@ -5,9 +5,10 @@ use crate::wallet::WalletCommands;
 use crate::{aggregator, init, password, wallet};
 use crate::{aggregator::AggregatorCommands, start};
 use anyhow::Result;
-use clap::{command, Parser, Subcommand};
+use clap::{command, ArgAction, Parser, Subcommand};
 use config::load_config;
-use tracing::instrument;
+use tracing::level_filters::LevelFilter;
+use tracing::{instrument, Level};
 
 #[derive(Parser, Debug)]
 #[command(name = "enclave")]
@@ -20,11 +21,38 @@ pub struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    #[arg(short, long, global = true)]
-    tag: Option<String>,
+    /// User -v to indicate error
+    #[arg(
+        short,
+        long,
+        action = ArgAction::Count,
+        help = "More output per occurrence"
+    )]
+    pub verbose: u8,
+
+    #[arg(
+        short,
+        long,
+        action = ArgAction::SetTrue,
+        help = "Silence all output",
+        conflicts_with = "verbose"
+    )]
+    quiet: bool,
 }
 
 impl Cli {
+    pub fn log_level(&self) -> Level {
+        if self.quiet {
+            Level::ERROR
+        } else {
+            match self.verbose {
+                0 => Level::INFO, // Default is INFO
+                1 => Level::DEBUG,
+                _ => Level::TRACE,
+            }
+        }
+    }
+
     #[instrument(skip(self))]
     pub async fn execute(self) -> Result<()> {
         let config_path = self.config.as_deref();
@@ -57,14 +85,6 @@ impl Cli {
         }
 
         Ok(())
-    }
-
-    pub fn get_tag(&self) -> String {
-        if let Some(tag) = self.tag.clone() {
-            tag
-        } else {
-            "default".to_string()
-        }
     }
 }
 

@@ -1,6 +1,6 @@
 use clap::Parser;
 use cli::Cli;
-use tracing::info;
+use tracing::{info, Level};
 use tracing_subscriber::EnvFilter;
 
 mod aggregator;
@@ -42,13 +42,12 @@ pub fn owo() {
 
 #[actix::main]
 pub async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .init();
-
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
 
     let cli = Cli::parse();
+    tracing_subscriber::fmt()
+        .with_max_level(cli.log_level())
+        .init();
 
     // Execute the cli
     if let Err(err) = cli.execute().await {
