@@ -26,15 +26,17 @@ pub struct Cli {
         short,
         long,
         action = ArgAction::Count,
+        global = true
     )]
     pub verbose: u8,
 
-    /// Silence all output
+    /// Silence all output. This argument cannot be used alongside `-v`
     #[arg(
         short,
         long,
         action = ArgAction::SetTrue,
-        conflicts_with = "verbose"
+        conflicts_with = "verbose",
+        global = true
     )]
     quiet: bool,
 
@@ -51,9 +53,10 @@ impl Cli {
             Level::ERROR
         } else {
             match self.verbose {
-                0 => Level::INFO,  // Default is INFO
-                1 => Level::DEBUG, // -v
-                _ => Level::TRACE, // -vv
+                0 => Level::WARN,  //
+                1 => Level::INFO,  // -v
+                2 => Level::DEBUG, // -vv
+                _ => Level::TRACE, // -vvv
             }
         }
     }

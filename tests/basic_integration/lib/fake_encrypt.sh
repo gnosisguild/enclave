@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-cd packages/ciphernode && RUSTFLAGS="-A warnings" cargo run --bin fake_encrypt -- "$@" 
+./packages/ciphernode/target/debug/fake_encrypt "$@"
