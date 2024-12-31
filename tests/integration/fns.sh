@@ -169,6 +169,5 @@ metallica
 trap 'cleanup $?' ERR INT TERM
 
 $SCRIPT_DIR/lib/clean_folders.sh "$SCRIPT_DIR"
-$SCRIPT_DIR/lib/prebuild.sh
 
 
