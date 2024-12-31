@@ -20,7 +20,6 @@ use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
-use tokio::task::JoinHandle;
 
 use crate::helpers::datastore::setup_datastore;
 
@@ -28,7 +27,7 @@ pub async fn execute(
     config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
-) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
+) -> Result<(Addr<EventBus>, String)> {
     let bus = EventBus::new(true).start();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(&config, &bus)?;
@@ -79,7 +78,7 @@ pub async fn execute(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = NetworkManager::setup_with_peer(
+    let (_, peer_id) = NetworkManager::setup_with_peer(
         bus.clone(),
         config.peers(),
         &cipher,
@@ -99,5 +98,5 @@ pub async fn execute(
 
     SimpleLogger::attach("AGG", bus.clone());
 
-    Ok((bus, join_handle, peer_id))
+    Ok((bus, peer_id))
 }
