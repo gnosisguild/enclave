@@ -28,6 +28,7 @@ COPY ./packages/ciphernode/data/Cargo.toml ./data/Cargo.toml
 COPY ./packages/ciphernode/e3_request/Cargo.toml ./e3_request/Cargo.toml
 COPY ./packages/ciphernode/enclave/Cargo.toml ./enclave/Cargo.toml
 COPY ./packages/ciphernode/enclave_core/Cargo.toml ./enclave_core/Cargo.toml
+COPY ./packages/ciphernode/enclave_core/build.rs ./enclave_core/build.rs
 COPY ./packages/ciphernode/events/Cargo.toml ./events/Cargo.toml
 COPY ./packages/ciphernode/evm/Cargo.toml ./evm/Cargo.toml
 COPY ./packages/ciphernode/fhe/Cargo.toml ./fhe/Cargo.toml
@@ -35,6 +36,8 @@ COPY ./packages/ciphernode/keyshare/Cargo.toml ./keyshare/Cargo.toml
 COPY ./packages/ciphernode/logger/Cargo.toml ./logger/Cargo.toml
 COPY ./packages/ciphernode/net/Cargo.toml ./net/Cargo.toml
 COPY ./packages/ciphernode/sortition/Cargo.toml ./sortition/Cargo.toml
+COPY ./packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
+COPY ./packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
 
 # Build all dependencies and add them to the build cache
 RUN mkdir -p src && \
