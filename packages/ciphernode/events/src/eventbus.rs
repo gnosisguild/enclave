@@ -20,7 +20,7 @@ pub trait ErrorEvent: Event {
     type ErrorType;
 
     fn as_error(&self) -> Option<&Self::Error>;
-    fn from_error(err_type: Self::ErrorType, error: Self::Error) -> Self;
+    fn from_error(err_type: Self::ErrorType, error: anyhow::Error) -> Self;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -210,17 +210,17 @@ impl<E: Event> Handler<E> for EventBus<E> {
 
 /// Trait to send errors directly to the bus
 pub trait BusError<E: ErrorEvent> {
-    fn err(&self, err_type: E::ErrorType, err: E::Error);
+    fn err(&self, err_type: E::ErrorType, err: anyhow::Error);
 }
 
 impl<E: ErrorEvent> BusError<E> for Addr<EventBus<E>> {
-    fn err(&self, err_type: E::ErrorType, err: E::Error) {
+    fn err(&self, err_type: E::ErrorType, err: anyhow::Error) {
         self.do_send(E::from_error(err_type, err))
     }
 }
 
 impl<E: ErrorEvent> BusError<E> for Recipient<E> {
-    fn err(&self, err_type: E::ErrorType, err: E::Error) {
+    fn err(&self, err_type: E::ErrorType, err: anyhow::Error) {
         self.do_send(E::from_error(err_type, err))
     }
 }
