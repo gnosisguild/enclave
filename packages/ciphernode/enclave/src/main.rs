@@ -1,7 +1,6 @@
 use clap::Parser;
 use cli::Cli;
-use tracing::{info, Level};
-use tracing_subscriber::EnvFilter;
+use tracing::info;
 
 mod aggregator;
 mod aggregator_start;

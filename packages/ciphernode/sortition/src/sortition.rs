@@ -87,12 +87,12 @@ pub struct GetNodes;
 
 pub struct Sortition {
     list: Persistable<SortitionModule>,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
 }
 
 #[derive(Debug)]
 pub struct SortitionParams {
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     list: Persistable<SortitionModule>,
 }
 
@@ -106,7 +106,7 @@ impl Sortition {
 
     #[instrument(name = "sortition", skip_all)]
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         store: Repository<SortitionModule>,
     ) -> Result<Addr<Sortition>> {
         let list = store.load_or_default(SortitionModule::default()).await?;
