@@ -22,12 +22,12 @@ sol!(
 pub struct EnclaveSolWriter {
     provider: WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
     contract_address: Address,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
 }
 
 impl EnclaveSolWriter {
     pub fn new(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: Address,
     ) -> Result<Self> {
@@ -39,7 +39,7 @@ impl EnclaveSolWriter {
     }
 
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter>> {

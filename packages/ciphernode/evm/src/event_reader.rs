@@ -44,7 +44,7 @@ where
     extractor: ExtractorFn<EnclaveEvent>,
     contract_address: Address,
     start_block: Option<u64>,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     state: Persistable<EvmEventReaderState>,
 }
 
@@ -74,7 +74,7 @@ where
     /// The block that processing should start from
     start_block: Option<u64>,
     /// Event bus for error propagation
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     /// The auto persistable state of the event reader
     state: Persistable<EvmEventReaderState>,
 }
@@ -103,7 +103,7 @@ where
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &str,
         start_block: Option<u64>,
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         repository: &Repository<EvmEventReaderState>,
     ) -> Result<Addr<Self>> {
         let sync_state = repository
@@ -175,7 +175,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
-    bus: &Addr<EventBus>,
+    bus: &Addr<EventBus<EnclaveEvent>>,
 ) {
     let chain_id = provider.get_chain_id();
     let provider = provider.get_provider();
