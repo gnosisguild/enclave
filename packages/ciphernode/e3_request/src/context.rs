@@ -22,16 +22,12 @@ fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
 
 /// Context that is set to each event hook. Hooks can use this context to gather dependencies if
 /// they need to instantiate struct instances or actors.
-// TODO: remove Addr<T> imports as we need to be able to move the features out of the hooks file
-// without circular deps
-// TODO: remove Arc<Fhe> import as we need to be able to move the Fhe feature out of the hooks
-// file without circular deps
 pub struct E3Context {
     /// The E3Request's ID
     pub e3_id: E3id,
     /// A way to store EnclaveEvent recipients on the context
     pub recipients: HashMap<String, Option<Recipient<EnclaveEvent>>>, // NOTE: can be a None value
-    /// A way to store a feature's dependencies on the context
+    /// A way to store a extension's dependencies on the context
     pub dependencies: HetrogenousMap,
     /// A Repository for storing this context's data snapshot
     pub repository: Repository<E3ContextSnapshot>,
@@ -53,7 +49,7 @@ impl E3ContextSnapshot {
 pub struct E3ContextParams {
     pub repository: Repository<E3ContextSnapshot>,
     pub e3_id: E3id,
-    pub features: Arc<Vec<Box<dyn E3Extension>>>,
+    pub extensions: Arc<Vec<Box<dyn E3Extension>>>,
 }
 
 impl E3Context {
@@ -157,8 +153,8 @@ impl FromSnapshotWithParams for E3Context {
             dependencies: HetrogenousMap::new(),
         };
 
-        for feature in params.features.iter() {
-            feature.hydrate(&mut ctx, &snapshot).await?;
+        for extension in params.extensions.iter() {
+            extension.hydrate(&mut ctx, &snapshot).await?;
         }
 
         Ok(ctx)

@@ -1,4 +1,4 @@
-use aggregator::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
+use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
@@ -9,8 +9,9 @@ use events::{
     KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
     Shutdown,
 };
-use fhe::{setup_crp_params, FheExtension, ParamsWithCrp, SharedRng};
-use keyshare::KeyshareExtension;
+use fhe::ext::FheExtension;
+use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use keyshare::ext::KeyshareExtension;
 use logger::SimpleLogger;
 use net::{events::NetworkPeerEvent, NetworkManager};
 use sortition::SortitionRepositoryFactory;
