@@ -6,7 +6,7 @@ use crypto::Cipher;
 use data::{AutoPersist, RepositoriesFactory};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension};
 use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
-use fhe::FHE_KEY;
+use fhe::ext::FHE_KEY;
 use std::sync::Arc;
 
 pub struct KeyshareExtension {

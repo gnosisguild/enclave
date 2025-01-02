@@ -10,8 +10,8 @@ use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
 };
-use fhe::FheExtension;
-use keyshare::KeyshareExtension;
+use fhe::ext::FheExtension;
+use keyshare::ext::KeyshareExtension;
 use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;

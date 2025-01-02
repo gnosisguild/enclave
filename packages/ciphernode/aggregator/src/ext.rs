@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use data::{AutoPersist, RepositoriesFactory};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
-use fhe::FHE_KEY;
+use fhe::ext::FHE_KEY;
 use sortition::Sortition;
 
 pub struct PlaintextAggregatorExtension {

@@ -1,5 +1,5 @@
 use actix::{Actor, Addr};
-use aggregator::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
+use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use anyhow::Result;
 use config::AppConfig;
 use crypto::Cipher;
@@ -11,7 +11,7 @@ use evm::{
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
-use fhe::FheExtension;
+use fhe::ext::FheExtension;
 use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
