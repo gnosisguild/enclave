@@ -6,7 +6,7 @@ use events::{CiphernodeSelected, E3Requested, EnclaveEvent, EventBus, Shutdown, 
 use tracing::info;
 
 pub struct CiphernodeSelector {
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
     address: String,
 }
@@ -16,7 +16,7 @@ impl Actor for CiphernodeSelector {
 }
 
 impl CiphernodeSelector {
-    pub fn new(bus: &Addr<EventBus>, sortition: &Addr<Sortition>, address: &str) -> Self {
+    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>, address: &str) -> Self {
         Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -24,7 +24,11 @@ impl CiphernodeSelector {
         }
     }
 
-    pub fn attach(bus: &Addr<EventBus>, sortition: &Addr<Sortition>, address: &str) -> Addr<Self> {
+    pub fn attach(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        sortition: &Addr<Sortition>,
+        address: &str,
+    ) -> Addr<Self> {
         let addr = CiphernodeSelector::new(bus, sortition, address).start();
 
         bus.do_send(Subscribe::new("E3Requested", addr.clone().recipient()));
