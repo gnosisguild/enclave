@@ -4,18 +4,18 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use crypto::Cipher;
 use data::{AutoPersist, RepositoriesFactory};
-use e3_request::{E3Context, E3ContextSnapshot, E3Feature};
+use e3_request::{E3Context, E3ContextSnapshot, E3Extension};
 use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::FHE_KEY;
 use std::sync::Arc;
 
-pub struct KeyshareFeature {
+pub struct KeyshareExtension {
     bus: Addr<EventBus>,
     address: String,
     cipher: Arc<Cipher>,
 }
 
-impl KeyshareFeature {
+impl KeyshareExtension {
     pub fn create(bus: &Addr<EventBus>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
@@ -29,7 +29,7 @@ const ERROR_KEYSHARE_FHE_MISSING: &str =
     "Could not create Keyshare because the fhe instance it depends on was not set on the context.";
 
 #[async_trait]
-impl E3Feature for KeyshareFeature {
+impl E3Extension for KeyshareExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // if this is NOT a CiphernodeSelected event then ignore
         let EnclaveEvent::CiphernodeSelected { data, .. } = evt else {

@@ -1,4 +1,4 @@
-use crate::{E3Context, E3ContextSnapshot, E3Feature, MetaRepositoryFactory, TypedKey};
+use crate::{E3Context, E3ContextSnapshot, E3Extension, MetaRepositoryFactory, TypedKey};
 use anyhow::*;
 use async_trait::async_trait;
 use data::RepositoriesFactory;
@@ -13,16 +13,16 @@ pub struct E3Meta {
     pub src_chain_id: u64,
 }
 
-pub struct E3MetaFeature;
+pub struct E3MetaExtension;
 
-impl E3MetaFeature {
+impl E3MetaExtension {
     pub fn create() -> Box<Self> {
         Box::new(Self {})
     }
 }
 
 #[async_trait]
-impl E3Feature for E3MetaFeature {
+impl E3Extension for E3MetaExtension {
     fn on_event(&self, ctx: &mut crate::E3Context, event: &EnclaveEvent) {
         let EnclaveEvent::E3Requested { data, .. } = event else {
             return;

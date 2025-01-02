@@ -1,4 +1,4 @@
-use crate::{E3Feature, EventBuffer, HetrogenousMap, TypedKey};
+use crate::{E3Extension, EventBuffer, HetrogenousMap, TypedKey};
 use actix::Recipient;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -53,7 +53,7 @@ impl E3ContextSnapshot {
 pub struct E3ContextParams {
     pub repository: Repository<E3ContextSnapshot>,
     pub e3_id: E3id,
-    pub features: Arc<Vec<Box<dyn E3Feature>>>,
+    pub features: Arc<Vec<Box<dyn E3Extension>>>,
 }
 
 impl E3Context {

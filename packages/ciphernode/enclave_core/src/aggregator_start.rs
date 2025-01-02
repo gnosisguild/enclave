@@ -1,5 +1,5 @@
 use actix::{Actor, Addr};
-use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
+use aggregator::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use anyhow::Result;
 use config::AppConfig;
 use crypto::Cipher;
@@ -11,7 +11,7 @@ use evm::{
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
-use fhe::FheFeature;
+use fhe::FheExtension;
 use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
@@ -73,9 +73,9 @@ pub async fn execute(
     }
 
     E3Router::builder(&bus, store)
-        .add_feature(FheFeature::create(&bus, &rng))
-        .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
-        .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))
+        .with(FheExtension::create(&bus, &rng))
+        .with(PublicKeyAggregatorExtension::create(&bus, &sortition))
+        .with(PlaintextAggregatorExtension::create(&bus, &sortition))
         .build()
         .await?;
 

@@ -2,7 +2,7 @@ use crate::ContextRepositoryFactory;
 use crate::E3Context;
 use crate::E3ContextParams;
 use crate::E3ContextSnapshot;
-use crate::E3MetaFeature;
+use crate::E3MetaExtension;
 use crate::RouterRepositoryFactory;
 use actix::AsyncContext;
 use actix::{Actor, Addr, Context, Handler};
@@ -42,17 +42,17 @@ impl EventBuffer {
     }
 }
 
-/// Format of a Feature that can be passed to E3Router. E3Features listen for EnclaveEvents
+/// Format of a Extension that can be passed to E3Router. E3Extensions listen for EnclaveEvents
 /// that are braoadcast to know when to instantiate themselves. They define the events they respond
 /// to using the `on_event` handler. Within this handler they will typically use the request's
 /// context to construct a version of their requisite actors and save their addresses to the
 /// context using the `set_event_recipient` method on the context. Event recipients once set will
-/// then have all their events streamed to them from their buffer. Features can also reconstruct
+/// then have all their events streamed to them from their buffer. Extensions can also reconstruct
 /// Actors based on their persisted state using the context snapshot and relevant repositories.
-/// Generally Features can ask the context to see if a dependency has already been set to know if
-/// it has everything it needs to construct the Feature
+/// Generally Extensions can ask the context to see if a dependency has already been set to know if
+/// it has everything it needs to construct the Extension
 #[async_trait]
-pub trait E3Feature: Send + Sync + 'static {
+pub trait E3Extension: Send + Sync + 'static {
     /// This function is triggered when an EnclaveEvent is sent to the router. Use this to
     /// initialize the receiver using `ctx.set_event_receiver(my_address.into())`. Typically this
     /// means filtering for specific e3_id enabled events that give rise to actors that have to
@@ -74,7 +74,7 @@ pub struct E3Router {
     /// A list of completed requests
     completed: HashSet<E3id>,
     /// The features this instance of the router is configured to listen for
-    features: Arc<Vec<Box<dyn E3Feature>>>,
+    features: Arc<Vec<Box<dyn E3Extension>>>,
     /// A buffer for events to send to the
     buffer: EventBuffer,
     bus: Addr<EventBus>,
@@ -82,7 +82,7 @@ pub struct E3Router {
 }
 
 pub struct E3RouterParams {
-    features: Arc<Vec<Box<dyn E3Feature>>>,
+    features: Arc<Vec<Box<dyn E3Extension>>>,
     bus: Addr<EventBus>,
     store: Repository<E3RouterSnapshot>,
 }
@@ -97,7 +97,7 @@ impl E3Router {
         };
 
         // Everything needs the committe meta factory so adding it here by default
-        builder.add_feature(E3MetaFeature::create())
+        builder.with(E3MetaExtension::create())
     }
 
     pub fn from_params(params: E3RouterParams) -> Self {
@@ -254,12 +254,12 @@ impl FromSnapshotWithParams for E3Router {
 /// Builder for E3Router
 pub struct E3RouterBuilder {
     pub bus: Addr<EventBus>,
-    pub features: Vec<Box<dyn E3Feature>>,
+    pub features: Vec<Box<dyn E3Extension>>,
     pub store: Repository<E3RouterSnapshot>,
 }
 
 impl E3RouterBuilder {
-    pub fn add_feature(mut self, listener: Box<dyn E3Feature>) -> Self {
+    pub fn with(mut self, listener: Box<dyn E3Extension>) -> Self {
         self.features.push(listener);
         self
     }
