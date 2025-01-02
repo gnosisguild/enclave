@@ -165,8 +165,8 @@ impl ErrorEvent for EnclaveEvent {
         }
     }
 
-    fn from_error(err_type: Self::ErrorType, error: Self::Error) -> Self {
-        EnclaveEvent::from(EnclaveError::new(err_type, error.message.as_str()))
+    fn from_error(err_type: Self::ErrorType, error: anyhow::Error) -> Self {
+        EnclaveEvent::from(EnclaveError::new(err_type, error.to_string().as_str()))
     }
 }
 
