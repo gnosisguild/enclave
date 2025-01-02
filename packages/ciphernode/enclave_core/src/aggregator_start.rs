@@ -29,10 +29,11 @@ pub async fn execute(
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
 ) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig{
+    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
         capture_history: true,
-        deduplicate: true
-    }).start();
+        deduplicate: true,
+    })
+    .start();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();

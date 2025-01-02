@@ -5,9 +5,9 @@ use data::{DataStore, InMemStore};
 use e3_request::E3Router;
 use events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory,
-    KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
-    Shutdown, EventBusConfig
+    E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig, GetErrors,
+    GetHistory, KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated,
+    ResetHistory, Seed, Shutdown,
 };
 use fhe::ext::FheExtension;
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};

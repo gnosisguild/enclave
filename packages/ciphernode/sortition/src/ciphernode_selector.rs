@@ -16,7 +16,11 @@ impl Actor for CiphernodeSelector {
 }
 
 impl CiphernodeSelector {
-    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>, address: &str) -> Self {
+    pub fn new(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        sortition: &Addr<Sortition>,
+        address: &str,
+    ) -> Self {
         Self {
             bus: bus.clone(),
             sortition: sortition.clone(),

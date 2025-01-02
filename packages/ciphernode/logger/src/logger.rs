@@ -1,7 +1,7 @@
 use actix::{Actor, Addr, Context, Handler};
-use events::{EnclaveEvent, EventBus, Subscribe, Event};
-use tracing::{error, info};
+use events::{EnclaveEvent, Event, EventBus, Subscribe};
 use std::marker::PhantomData;
+use tracing::{error, info};
 
 pub trait EventLogging: Event {
     fn log(&self, logger_name: &str);
@@ -34,7 +34,7 @@ impl<E: EventLogging> Actor for SimpleLogger<E> {
 
 impl<E: EventLogging> Handler<E> for SimpleLogger<E> {
     type Result = ();
-    
+
     fn handle(&mut self, msg: E, _: &mut Self::Context) -> Self::Result {
         msg.log(&self.name);
     }
