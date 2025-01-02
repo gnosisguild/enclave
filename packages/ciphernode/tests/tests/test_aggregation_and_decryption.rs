@@ -1,22 +1,24 @@
-use cipher::Cipher;
+use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
+use crypto::Cipher;
+use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
-use enclave_core::{
+use e3_request::E3Router;
+use events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory,
     KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
     Shutdown,
 };
+use fhe::ext::FheExtension;
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use keyshare::ext::KeyshareExtension;
 use logger::SimpleLogger;
-use net::{correlation_id::CorrelationId, events::NetworkPeerEvent, NetworkManager};
-use router::{
-    CiphernodeSelector, E3RequestRouter, FheFeature, KeyshareFeature, PlaintextAggregatorFeature,
-    PublicKeyAggregatorFeature, RepositoriesFactory,
-};
-use sortition::Sortition;
+use net::{events::NetworkPeerEvent, NetworkManager};
+use sortition::SortitionRepositoryFactory;
+use sortition::{CiphernodeSelector, Sortition};
 
 use actix::prelude::*;
-use alloy::{primitives::Address, signers::k256::sha2::digest::Reset};
+use alloy::primitives::Address;
 use anyhow::*;
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
@@ -26,7 +28,7 @@ use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::{env, path::Path, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 use tokio::{sync::mpsc, time::sleep};
 
@@ -35,7 +37,7 @@ type LocalCiphernodeTuple = (
     String, // Address
     Addr<InMemStore>,
     Addr<Sortition>,
-    Addr<E3RequestRouter>,
+    Addr<E3Router>,
     Addr<SimpleLogger>,
 );
 
@@ -55,11 +57,11 @@ async fn setup_local_ciphernode(
     let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     CiphernodeSelector::attach(&bus, &sortition, addr);
 
-    let router = E3RequestRouter::builder(&bus, store)
-        .add_feature(FheFeature::create(&bus, &rng))
-        .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
-        .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))
-        .add_feature(KeyshareFeature::create(&bus, addr, &cipher))
+    let router = E3Router::builder(&bus, store)
+        .with(FheExtension::create(&bus, &rng))
+        .with(PublicKeyAggregatorExtension::create(&bus, &sortition))
+        .with(PlaintextAggregatorExtension::create(&bus, &sortition))
+        .with(KeyshareExtension::create(&bus, addr, &cipher))
         .build()
         .await?;
 
@@ -456,7 +458,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
         _ => None,
     });
-
     assert_eq!(actual, Some(expected));
 
     Ok(())

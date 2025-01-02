@@ -8,7 +8,7 @@ use actix::Addr;
 use alloy::transports::BoxTransport;
 use anyhow::Result;
 use data::Repository;
-use enclave_core::EventBus;
+use events::EventBus;
 
 pub struct EnclaveSol;
 impl EnclaveSol {

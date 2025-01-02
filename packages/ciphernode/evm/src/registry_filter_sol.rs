@@ -6,7 +6,7 @@ use alloy::{
     sol,
 };
 use anyhow::Result;
-use enclave_core::{
+use events::{
     BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
     Shutdown, Subscribe,
 };

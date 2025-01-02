@@ -1,22 +1,19 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
-use cipher::Cipher;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
-use enclave_core::{
+use crypto::Cipher;
+use data::Persistable;
+use events::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
     E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
 use fhe::{DecryptCiphertext, Fhe};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::warn;
 
 pub struct Keyshare {
     fhe: Arc<Fhe>,
-    store: Repository<KeyshareState>,
     bus: Addr<EventBus>,
-    secret: Option<Vec<u8>>,
+    secret: Persistable<Vec<u8>>,
     address: String,
     cipher: Arc<Cipher>,
 }
@@ -27,15 +24,10 @@ impl Actor for Keyshare {
 
 pub struct KeyshareParams {
     pub bus: Addr<EventBus>,
-    pub store: Repository<KeyshareState>,
+    pub secret: Persistable<Vec<u8>>,
     pub fhe: Arc<Fhe>,
     pub address: String,
     pub cipher: Arc<Cipher>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct KeyshareState {
-    secret: Option<Vec<u8>>,
 }
 
 impl Keyshare {
@@ -43,8 +35,7 @@ impl Keyshare {
         Self {
             bus: params.bus,
             fhe: params.fhe,
-            store: params.store,
-            secret: None,
+            secret: params.secret,
             address: params.address,
             cipher: params.cipher,
         }
@@ -53,7 +44,7 @@ impl Keyshare {
     fn set_secret(&mut self, mut data: Vec<u8>) -> Result<()> {
         let encrypted = self.cipher.encrypt_data(&mut data)?;
 
-        self.secret = Some(encrypted);
+        self.secret.set(encrypted);
 
         Ok(())
     }
@@ -61,8 +52,8 @@ impl Keyshare {
     fn get_secret(&self) -> Result<Vec<u8>> {
         let encrypted = self
             .secret
-            .as_ref()
-            .ok_or(anyhow!("No secret share available on Keyshare"))?;
+            .get()
+            .ok_or(anyhow!("State was not stored on keyshare"))?;
 
         let decrypted = self.cipher.decrypt_data(&encrypted)?;
 
@@ -70,38 +61,7 @@ impl Keyshare {
     }
 
     fn clear_secret(&mut self) {
-        self.secret = None;
-    }
-}
-
-impl Snapshot for Keyshare {
-    type Snapshot = KeyshareState;
-
-    fn snapshot(&self) -> Self::Snapshot {
-        KeyshareState {
-            secret: self.secret.clone(),
-        }
-    }
-}
-
-impl Checkpoint for Keyshare {
-    fn repository(&self) -> &Repository<KeyshareState> {
-        &self.store
-    }
-}
-
-#[async_trait]
-impl FromSnapshotWithParams for Keyshare {
-    type Params = KeyshareParams;
-    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
-        Ok(Self {
-            bus: params.bus,
-            fhe: params.fhe,
-            store: params.store,
-            secret: snapshot.secret,
-            address: params.address,
-            cipher: params.cipher,
-        })
+        self.secret.clear();
     }
 }
 
@@ -148,9 +108,6 @@ impl Handler<CiphernodeSelected> for Keyshare {
             e3_id,
             node: self.address.clone(),
         }));
-
-        // Write the snapshot to the store
-        self.checkpoint()
     }
 }
 
@@ -198,7 +155,6 @@ impl Handler<E3RequestComplete> for Keyshare {
     type Result = ();
     fn handle(&mut self, _: E3RequestComplete, ctx: &mut Self::Context) -> Self::Result {
         self.clear_secret();
-        self.checkpoint();
         ctx.notify(Die);
     }
 }

@@ -1,8 +1,7 @@
 use actix::prelude::*;
 use anyhow::Result;
-use async_trait::async_trait;
-use data::{Checkpoint, FromSnapshotWithParams, Repository, Snapshot};
-use enclave_core::{
+use data::Persistable;
+use events::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
 use fhe::{Fhe, GetAggregatePublicKey};
@@ -53,17 +52,15 @@ struct NotifyNetwork {
 pub struct PublicKeyAggregator {
     fhe: Arc<Fhe>,
     bus: Addr<EventBus>,
-    store: Repository<PublicKeyAggregatorState>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
-    state: PublicKeyAggregatorState,
+    state: Persistable<PublicKeyAggregatorState>,
     src_chain_id: u64,
 }
 
 pub struct PublicKeyAggregatorParams {
     pub fhe: Arc<Fhe>,
     pub bus: Addr<EventBus>,
-    pub store: Repository<PublicKeyAggregatorState>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub src_chain_id: u64,
@@ -76,11 +73,13 @@ pub struct PublicKeyAggregatorParams {
 /// It is expected to change this mechanism as we work through adversarial scenarios and write tests
 /// for them.
 impl PublicKeyAggregator {
-    pub fn new(params: PublicKeyAggregatorParams, state: PublicKeyAggregatorState) -> Self {
+    pub fn new(
+        params: PublicKeyAggregatorParams,
+        state: Persistable<PublicKeyAggregatorState>,
+    ) -> Self {
         PublicKeyAggregator {
             fhe: params.fhe,
             bus: params.bus,
-            store: params.store,
             sortition: params.sortition,
             e3_id: params.e3_id,
             src_chain_id: params.src_chain_id,
@@ -88,35 +87,39 @@ impl PublicKeyAggregator {
         }
     }
 
-    pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<PublicKeyAggregatorState> {
-        let PublicKeyAggregatorState::Collecting {
-            threshold_m,
-            keyshares,
-            ..
-        } = &mut self.state
-        else {
-            return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
-        };
-        keyshares.insert(keyshare);
-        if keyshares.len() == *threshold_m {
-            return Ok(PublicKeyAggregatorState::Computing {
-                keyshares: keyshares.clone(),
-            });
-        }
+    pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<()> {
+        self.state.try_mutate(|mut state| {
+            let PublicKeyAggregatorState::Collecting {
+                threshold_m,
+                keyshares,
+                ..
+            } = &mut state
+            else {
+                return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
+            };
+            keyshares.insert(keyshare);
+            if keyshares.len() == *threshold_m {
+                return Ok(PublicKeyAggregatorState::Computing {
+                    keyshares: keyshares.clone(),
+                });
+            }
 
-        Ok(self.state.clone())
+            Ok(state)
+        })
     }
 
-    pub fn set_pubkey(&mut self, pubkey: Vec<u8>) -> Result<PublicKeyAggregatorState> {
-        let PublicKeyAggregatorState::Computing { keyshares } = &mut self.state else {
-            return Ok(self.state.clone());
-        };
+    pub fn set_pubkey(&mut self, pubkey: Vec<u8>) -> Result<()> {
+        self.state.try_mutate(|mut state| {
+            let PublicKeyAggregatorState::Computing { keyshares } = &mut state else {
+                return Ok(state);
+            };
 
-        let keyshares = keyshares.to_owned();
+            let keyshares = keyshares.to_owned();
 
-        Ok(PublicKeyAggregatorState::Complete {
-            public_key: pubkey,
-            keyshares,
+            Ok(PublicKeyAggregatorState::Complete {
+                public_key: pubkey,
+                keyshares,
+            })
         })
     }
 }
@@ -140,9 +143,9 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
 
     fn handle(&mut self, event: KeyshareCreated, _: &mut Self::Context) -> Self::Result {
-        let PublicKeyAggregatorState::Collecting {
+        let Some(PublicKeyAggregatorState::Collecting {
             threshold_m, seed, ..
-        } = self.state.clone()
+        }) = self.state.get()
         else {
             error!(state=?self.state, "Aggregator has been closed for collecting keyshares.");
             return Box::pin(fut::ready(Ok(())));
@@ -176,11 +179,12 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
                     }
 
                     // add the keyshare and
-                    act.state = act.add_keyshare(pubkey)?;
-                    act.checkpoint();
+                    act.add_keyshare(pubkey)?;
 
                     // Check the state and if it has changed to the computing
-                    if let PublicKeyAggregatorState::Computing { keyshares } = &act.state {
+                    if let Some(PublicKeyAggregatorState::Computing { keyshares }) =
+                        &act.state.get()
+                    {
                         ctx.notify(ComputeAggregate {
                             keyshares: keyshares.clone(),
                             e3_id,
@@ -202,8 +206,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
         })?;
 
         // Update the local state
-        self.state = self.set_pubkey(pubkey.clone())?;
-        self.checkpoint();
+        self.set_pubkey(pubkey.clone())?;
 
         ctx.notify(NotifyNetwork {
             pubkey,
@@ -240,28 +243,5 @@ impl Handler<Die> for PublicKeyAggregator {
     type Result = ();
     fn handle(&mut self, _: Die, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop()
-    }
-}
-
-impl Snapshot for PublicKeyAggregator {
-    type Snapshot = PublicKeyAggregatorState;
-
-    fn snapshot(&self) -> Self::Snapshot {
-        self.state.clone()
-    }
-}
-
-#[async_trait]
-impl FromSnapshotWithParams for PublicKeyAggregator {
-    type Params = PublicKeyAggregatorParams;
-
-    async fn from_snapshot(params: Self::Params, snapshot: Self::Snapshot) -> Result<Self> {
-        Ok(PublicKeyAggregator::new(params, snapshot))
-    }
-}
-
-impl Checkpoint for PublicKeyAggregator {
-    fn repository(&self) -> &Repository<PublicKeyAggregatorState> {
-        &self.store
     }
 }

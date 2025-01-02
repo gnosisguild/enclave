@@ -37,7 +37,7 @@ sequenceDiagram
     autonumber
     participant EVM as EVM
     participant CS as CiphernodeSelector
-    participant E3 as E3RequestRouter
+    participant E3 as E3Router
     participant KS as Keyshare
     participant PKA as PublicKeyAggregator
     participant S as Sortition
@@ -63,7 +63,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant EVM as EVM
-    participant E3 as E3RequestRouter
+    participant E3 as E3Router
     participant KS as Keyshare
     participant PTA as PlaintextAggregator
     participant S as Sortition
@@ -83,33 +83,27 @@ sequenceDiagram
 
 # Debugging
 
-You can debug using the `RUST_LOG` environment var to alter what output is produced by the node
+You can debug using the `-vvv` cli arguments to alter what output is produced by the node
 
 
 ```
-RUST_LOG=info enclave start
+# Show INFO logging
+enclave start
 ```
 
-if you supply a tag as an argument you can filter for that tag
-
 ```
-RUST_LOG="[sortition{id=cn1}]" enclave start --tag cn1
-```
-
-This helps filter noise during tests where you might have multiple instances running and you need to see the output of a specific one.
-
-In order to add tracing to a method or function it is recommended to use the `instrument` macro.
-
-```rust
-impl Sorition {
-    // ...
-    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
-    pub async fn attach(
-        bus: &Addr<EventBus>,
-        store: Repository<SortitionModule>,
-    ) -> Result<Addr<Sortition>> {
-      // ...
-    }
-}
+# Show DEBUG logging
+enclave start -v
 ```
 
+```
+# Show TRACE logging
+enclave start -vv
+```
+
+if you want to remove all output aside from errors you can use the `--quiet` argument.
+
+
+```
+enclave --quiet
+```

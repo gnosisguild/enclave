@@ -2,7 +2,7 @@ use super::set_up_crp;
 use anyhow::*;
 use async_trait::async_trait;
 use data::{FromSnapshotWithParams, Snapshot};
-use enclave_core::{OrderedSet, Seed};
+use events::{OrderedSet, Seed};
 use fhe_rs::{
     bfv::{
         BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
@@ -127,11 +127,11 @@ impl Fhe {
 
 impl Snapshot for Fhe {
     type Snapshot = FheSnapshot;
-    fn snapshot(&self) -> Self::Snapshot {
-        FheSnapshot {
+    fn snapshot(&self) -> Result<Self::Snapshot> {
+        Ok(FheSnapshot {
             crp: self.crp.to_bytes(),
             params: self.params.to_bytes(),
-        }
+        })
     }
 }
 

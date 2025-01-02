@@ -90,7 +90,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b169f7a6d4742236a0a00c541b845991d0ac43e546831af1249753ab4c3aa3a0"
 dependencies = [
  "cfg-if",
- "cipher 0.4.4",
+ "cipher",
  "cpufeatures",
 ]
 
@@ -102,7 +102,7 @@ checksum = "831010a0f742e1209b3bcea8fab6a8e149051ba6099432c8cb2cc117dec3ead1"
 dependencies = [
  "aead",
  "aes",
- "cipher 0.4.4",
+ "cipher",
  "ctr",
  "ghash",
  "subtle",
@@ -116,8 +116,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "config",
  "data",
- "enclave-core",
+ "e3_request",
+ "events",
  "fhe 0.1.0",
  "serde",
  "sortition",
@@ -1430,17 +1432,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
-name = "bfv"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "fhe 0.1.0-beta.7",
- "fhe-traits",
- "fhe-util",
- "rand",
-]
-
-[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1608,20 +1599,6 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cipher"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "argon2",
- "async-trait",
- "config",
- "rand",
- "tokio",
- "zeroize",
-]
-
-[[package]]
-name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
@@ -1706,6 +1683,7 @@ dependencies = [
  "alloy",
  "anyhow",
  "dirs",
+ "events",
  "figment",
  "serde",
  "shellexpand",
@@ -1825,6 +1803,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "crypto"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "argon2",
+ "async-trait",
+ "config",
+ "rand",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "crypto-bigint"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1853,7 +1845,7 @@ version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0369ee1ad671834580515889b80f2ea915f23b8be8d0daa4bbaf2ac5c7590835"
 dependencies = [
- "cipher 0.4.4",
+ "cipher",
 ]
 
 [[package]]
@@ -1905,7 +1897,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "enclave-core",
+ "events",
  "serde",
  "sled",
  "tracing",
@@ -2106,6 +2098,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "e3_request"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "config",
+ "data",
+ "events",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "ecdsa"
 version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2174,26 +2181,17 @@ name = "enclave"
 version = "0.1.0"
 dependencies = [
  "actix",
- "alloy",
  "anyhow",
- "cipher 0.1.0",
  "clap",
  "compile-time",
  "config",
- "data",
+ "crypto",
  "dialoguer",
- "dirs",
- "enclave-core",
- "enclave_node",
+ "enclave_core",
+ "events",
  "hex",
- "libp2p",
- "once_cell",
  "petname",
- "phf",
  "rand",
- "router",
- "serde",
- "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2201,24 +2199,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "enclave-core"
-version = "0.1.0"
-dependencies = [
- "actix",
- "alloy",
- "alloy-primitives 0.6.4",
- "alloy-sol-types 0.6.4",
- "anyhow",
- "bincode",
- "bs58",
- "futures-util",
- "lazy_static",
- "serde",
- "sha2",
-]
-
-[[package]]
-name = "enclave_node"
+name = "enclave_core"
 version = "0.1.0"
 dependencies = [
  "actix",
@@ -2226,26 +2207,30 @@ dependencies = [
  "alloy",
  "alloy-primitives 0.6.4",
  "anyhow",
- "bfv",
  "bincode",
- "cipher 0.1.0",
  "clap",
  "config",
+ "crypto",
  "data",
- "enclave-core",
+ "dirs",
+ "e3_request",
+ "events",
  "evm",
  "fhe 0.1.0",
  "keyshare",
+ "libp2p",
  "logger",
  "net",
+ "phf",
  "rand",
  "rand_chacha",
- "router",
  "serde",
+ "serde_json",
  "sortition",
  "test-helpers",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -2327,6 +2312,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "events"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "alloy",
+ "alloy-primitives 0.6.4",
+ "alloy-sol-types 0.6.4",
+ "anyhow",
+ "bincode",
+ "bs58",
+ "futures-util",
+ "lazy_static",
+ "serde",
+ "sha2",
+]
+
+[[package]]
 name = "evm"
 version = "0.1.0"
 dependencies = [
@@ -2336,11 +2338,11 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
- "cipher 0.1.0",
  "config",
+ "crypto",
  "data",
- "enclave-core",
- "enclave_node",
+ "enclave_core",
+ "events",
  "futures-util",
  "serde",
  "sortition",
@@ -2413,11 +2415,14 @@ dependencies = [
 name = "fhe"
 version = "0.1.0"
 dependencies = [
+ "actix",
  "anyhow",
  "async-trait",
  "bincode",
+ "config",
  "data",
- "enclave-core",
+ "e3_request",
+ "events",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
  "fhe-util",
@@ -3487,9 +3492,11 @@ dependencies = [
  "actix",
  "anyhow",
  "async-trait",
- "cipher 0.1.0",
+ "config",
+ "crypto",
  "data",
- "enclave-core",
+ "e3_request",
+ "events",
  "fhe 0.1.0",
  "serde",
  "tracing",
@@ -3961,7 +3968,7 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "base64",
- "enclave-core",
+ "events",
  "tracing",
 ]
 
@@ -4145,9 +4152,10 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-trait",
- "cipher 0.1.0",
+ "config",
+ "crypto",
  "data",
- "enclave-core",
+ "events",
  "futures",
  "libp2p",
  "tokio",
@@ -5296,26 +5304,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "router"
-version = "0.1.0"
-dependencies = [
- "actix",
- "aggregator",
- "anyhow",
- "async-trait",
- "bincode",
- "cipher 0.1.0",
- "data",
- "enclave-core",
- "evm",
- "fhe 0.1.0",
- "keyshare",
- "serde",
- "sortition",
- "tracing",
-]
-
-[[package]]
 name = "rtnetlink"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5836,8 +5824,9 @@ dependencies = [
  "alloy",
  "anyhow",
  "async-trait",
+ "config",
  "data",
- "enclave-core",
+ "events",
  "num",
  "rand",
  "serde",
@@ -6031,7 +6020,7 @@ dependencies = [
  "actix",
  "bincode",
  "clap",
- "enclave-core",
+ "events",
  "fhe 0.1.0",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
@@ -6051,12 +6040,12 @@ dependencies = [
  "anyhow",
  "async-std",
  "base64",
- "bfv",
  "bincode",
- "cipher 0.1.0",
  "clap",
+ "crypto",
  "data",
- "enclave-core",
+ "e3_request",
+ "events",
  "evm",
  "fhe 0.1.0",
  "fhe 0.1.0-beta.7",
@@ -6067,7 +6056,6 @@ dependencies = [
  "net",
  "rand",
  "rand_chacha",
- "router",
  "sortition",
  "test-helpers",
  "tokio",

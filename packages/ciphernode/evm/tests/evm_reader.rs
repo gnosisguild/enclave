@@ -8,8 +8,8 @@ use alloy::{
 };
 use anyhow::Result;
 use data::Repository;
-use enclave_core::{EnclaveEvent, EventBus, GetHistory, Shutdown, TestEvent};
-use enclave_node::get_in_mem_store;
+use enclave_core::datastore::get_in_mem_store;
+use events::{EnclaveEvent, EventBus, GetHistory, Shutdown, TestEvent};
 use evm::{helpers::WithChainId, EvmEventReader};
 use std::time::Duration;
 use tokio::time::sleep;
