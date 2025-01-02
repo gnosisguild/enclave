@@ -42,7 +42,7 @@ impl EventBuffer {
     }
 }
 
-/// Format of a Extension that can be passed to E3Router. E3Extensions listen for EnclaveEvents
+/// Format of an Extension that can be passed to E3Router. E3Extensions listen for EnclaveEvents
 /// that are braoadcast to know when to instantiate themselves. They define the events they respond
 /// to using the `on_event` handler. Within this handler they will typically use the request's
 /// context to construct a version of their requisite actors and save their addresses to the
