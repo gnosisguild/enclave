@@ -5,7 +5,7 @@ use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
-use events::EventBus;
+use events::{EnclaveEvent, EventBus, EventBusConfig};
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
@@ -28,8 +28,12 @@ pub async fn execute(
     config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
-) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
-    let bus = EventBus::new(true).start();
+) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
+    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: true,
+    })
+    .start();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
@@ -97,7 +101,7 @@ pub async fn execute(
         PlaintextWriter::attach(path, bus.clone());
     }
 
-    SimpleLogger::attach("AGG", bus.clone());
+    SimpleLogger::<EnclaveEvent>::attach("AGG", bus.clone());
 
     Ok((bus, join_handle, peer_id))
 }

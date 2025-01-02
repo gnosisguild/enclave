@@ -1,38 +1,52 @@
 use actix::{Actor, Addr, Context, Handler};
-use events::{EnclaveEvent, EventBus, Subscribe};
+use events::{EnclaveEvent, Event, EventBus, Subscribe};
+use std::marker::PhantomData;
 use tracing::{error, info};
 
-pub struct SimpleLogger {
-    name: String,
+pub trait EventLogging: Event {
+    fn log(&self, logger_name: &str);
 }
 
-impl SimpleLogger {
-    pub fn attach(name: &str, bus: Addr<EventBus>) -> Addr<Self> {
+pub struct SimpleLogger<E: EventLogging> {
+    name: String,
+    _p: PhantomData<E>,
+}
+
+impl<E: EventLogging> SimpleLogger<E> {
+    pub fn attach(name: &str, bus: Addr<EventBus<E>>) -> Addr<Self> {
         let addr = Self {
             name: name.to_owned(),
+            _p: PhantomData,
         }
         .start();
-        bus.do_send(Subscribe {
-            listener: addr.clone().recipient(),
-            event_type: "*".to_string(),
-        });
+        bus.do_send(Subscribe::<E>::new(
+            "*".to_string(),
+            addr.clone().recipient(),
+        ));
         info!(node=%name, "READY!");
         addr
     }
 }
 
-impl Actor for SimpleLogger {
+impl<E: EventLogging> Actor for SimpleLogger<E> {
     type Context = Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for SimpleLogger {
+impl<E: EventLogging> Handler<E> for SimpleLogger<E> {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
-        match msg {
-            EnclaveEvent::EnclaveError { .. } => error!(event=%msg, "ERROR!"),
-            _ => match msg.get_e3_id() {
-                Some(e3_id) => info!(me=self.name, evt=%msg, e3_id=%e3_id, "Event Broadcasted"),
-                None => info!(me=self.name, evt=%msg, "Event Broadcasted"),
+
+    fn handle(&mut self, msg: E, _: &mut Self::Context) -> Self::Result {
+        msg.log(&self.name);
+    }
+}
+
+impl EventLogging for EnclaveEvent {
+    fn log(&self, logger_name: &str) {
+        match self {
+            EnclaveEvent::EnclaveError { .. } => error!(event=%self, "ERROR!"),
+            _ => match self.get_e3_id() {
+                Some(e3_id) => info!(me=logger_name, evt=%self, e3_id=%e3_id, "Event Broadcasted"),
+                None => info!(me=logger_name, evt=%self, "Event Broadcasted"),
             },
         };
     }

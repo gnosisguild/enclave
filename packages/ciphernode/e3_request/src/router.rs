@@ -96,19 +96,19 @@ pub struct E3Router {
     /// A buffer for events to send to the
     buffer: EventBuffer,
     /// The EventBus
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     /// A repository for storing snapshots
     store: Repository<E3RouterSnapshot>,
 }
 
 pub struct E3RouterParams {
     extensions: Arc<Vec<Box<dyn E3Extension>>>,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     store: Repository<E3RouterSnapshot>,
 }
 
 impl E3Router {
-    pub fn builder(bus: &Addr<EventBus>, store: DataStore) -> E3RouterBuilder {
+    pub fn builder(bus: &Addr<EventBus<EnclaveEvent>>, store: DataStore) -> E3RouterBuilder {
         let repositories = store.repositories();
         let builder = E3RouterBuilder {
             bus: bus.clone(),
@@ -273,7 +273,7 @@ impl FromSnapshotWithParams for E3Router {
 
 /// Builder for E3Router
 pub struct E3RouterBuilder {
-    pub bus: Addr<EventBus>,
+    pub bus: Addr<EventBus<EnclaveEvent>>,
     pub extensions: Vec<Box<dyn E3Extension>>,
     pub store: Repository<E3RouterSnapshot>,
 }

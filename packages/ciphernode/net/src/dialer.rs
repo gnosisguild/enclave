@@ -9,7 +9,7 @@ use libp2p::{
 use std::net::ToSocketAddrs;
 use tokio::select;
 use tokio::sync::{broadcast, mpsc};
-use tokio::time::{sleep, timeout, Duration};
+use tokio::time::{sleep, Duration};
 use tracing::error;
 use tracing::info;
 

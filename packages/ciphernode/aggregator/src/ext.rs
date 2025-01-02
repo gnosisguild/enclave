@@ -13,11 +13,11 @@ use fhe::ext::FHE_KEY;
 use sortition::Sortition;
 
 pub struct PlaintextAggregatorExtension {
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
 }
 impl PlaintextAggregatorExtension {
-    pub fn create(bus: &Addr<EventBus>, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -131,12 +131,12 @@ impl E3Extension for PlaintextAggregatorExtension {
 }
 
 pub struct PublicKeyAggregatorExtension {
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
 }
 
 impl PublicKeyAggregatorExtension {
-    pub fn create(bus: &Addr<EventBus>, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),

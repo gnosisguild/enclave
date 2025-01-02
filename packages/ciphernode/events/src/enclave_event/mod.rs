@@ -28,7 +28,7 @@ pub use publickey_aggregated::*;
 pub use shutdown::*;
 pub use test_event::*;
 
-use crate::{E3id, EventId};
+use crate::{E3id, ErrorEvent, Event, EventId};
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -138,6 +138,34 @@ impl EnclaveEvent {
             EnclaveEvent::Shutdown { .. } => true,
             _ => false,
         }
+    }
+}
+
+impl Event for EnclaveEvent {
+    type Id = EventId;
+
+    fn event_type(&self) -> String {
+        let s = format!("{:?}", self);
+        extract_enclave_event_name(&s).to_string()
+    }
+
+    fn event_id(&self) -> Self::Id {
+        self.get_id()
+    }
+}
+
+impl ErrorEvent for EnclaveEvent {
+    type Error = EnclaveError;
+    type ErrorType = EnclaveErrorType;
+    fn as_error(&self) -> Option<&Self::Error> {
+        match self {
+            EnclaveEvent::EnclaveError { data, .. } => Some(data),
+            _ => None,
+        }
+    }
+
+    fn from_error(err_type: Self::ErrorType, error: anyhow::Error) -> Self {
+        EnclaveEvent::from(EnclaveError::new(err_type, error.to_string().as_str()))
     }
 }
 

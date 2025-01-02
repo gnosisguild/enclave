@@ -102,7 +102,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<Enclave
 pub struct CiphernodeRegistrySolReader;
 impl CiphernodeRegistrySolReader {
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
@@ -128,7 +128,7 @@ impl CiphernodeRegistrySolReader {
 pub struct CiphernodeRegistrySol;
 impl CiphernodeRegistrySol {
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,

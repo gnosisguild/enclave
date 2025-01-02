@@ -10,13 +10,17 @@ use fhe::ext::FHE_KEY;
 use std::sync::Arc;
 
 pub struct KeyshareExtension {
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     address: String,
     cipher: Arc<Cipher>,
 }
 
 impl KeyshareExtension {
-    pub fn create(bus: &Addr<EventBus>, address: &str, cipher: &Arc<Cipher>) -> Box<Self> {
+    pub fn create(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        address: &str,
+        cipher: &Arc<Cipher>,
+    ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             address: address.to_owned(),
