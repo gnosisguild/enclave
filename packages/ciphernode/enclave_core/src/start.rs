@@ -5,7 +5,7 @@ use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
-use events::EventBus;
+use events::{EnclaveEvent, EventBus, EventBusConfig};
 use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
@@ -29,9 +29,13 @@ use crate::helpers::datastore::setup_datastore;
 pub async fn execute(
     config: AppConfig,
     address: Address,
-) -> Result<(Addr<EventBus>, JoinHandle<Result<()>>, String)> {
+) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
-    let bus = EventBus::new(true).start();
+    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: true,
+    })
+    .start();
     let cipher = Arc::new(Cipher::from_config(&config).await?);
     let store = setup_datastore(&config, &bus)?;
 
@@ -87,7 +91,7 @@ pub async fn execute(
     .await?;
 
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
-    SimpleLogger::attach(&nm, bus.clone());
+    SimpleLogger::<EnclaveEvent>::attach(&nm, bus.clone());
 
     Ok((bus, join_handle, peer_id))
 }
