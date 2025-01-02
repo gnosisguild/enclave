@@ -27,7 +27,7 @@ pub struct E3Context {
     pub e3_id: E3id,
     /// A way to store EnclaveEvent recipients on the context
     pub recipients: HashMap<String, Option<Recipient<EnclaveEvent>>>, // NOTE: can be a None value
-    /// A way to store a extension's dependencies on the context
+    /// A way to store an extension's dependencies on the context
     pub dependencies: HetrogenousMap,
     /// A Repository for storing this context's data snapshot
     pub repository: Repository<E3ContextSnapshot>,
