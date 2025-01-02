@@ -7,7 +7,7 @@ use events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, GetErrors, GetHistory,
     KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
-    Shutdown,
+    Shutdown, EventBusConfig
 };
 use fhe::ext::FheExtension;
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
@@ -38,11 +38,11 @@ type LocalCiphernodeTuple = (
     Addr<InMemStore>,
     Addr<Sortition>,
     Addr<E3Router>,
-    Addr<SimpleLogger>,
+    Addr<SimpleLogger<EnclaveEvent>>,
 );
 
 async fn setup_local_ciphernode(
-    bus: &Addr<EventBus>,
+    bus: &Addr<EventBus<EnclaveEvent>>,
     rng: &SharedRng,
     logging: bool,
     addr: &str,
@@ -65,7 +65,7 @@ async fn setup_local_ciphernode(
         .build()
         .await?;
 
-    let logger = SimpleLogger::attach(addr, bus.clone());
+    let logger = SimpleLogger::<EnclaveEvent>::attach(addr, bus.clone());
     Ok((addr.to_owned(), data_actor, sortition, router, logger))
 }
 
@@ -128,12 +128,12 @@ fn create_crp_bytes_params(
 
 /// Test helper to add addresses to the committee by creating events on the event bus
 struct AddToCommittee {
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     count: usize,
 }
 
 impl AddToCommittee {
-    fn new(bus: &Addr<EventBus>) -> Self {
+    fn new(bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
         Self {
             bus: bus.clone(),
             count: 0,
@@ -155,7 +155,7 @@ impl AddToCommittee {
 }
 
 async fn create_local_ciphernodes(
-    bus: &Addr<EventBus>,
+    bus: &Addr<EventBus<EnclaveEvent>>,
     rng: &SharedRng,
     count: u32,
     cipher: &Arc<Cipher>,
@@ -189,7 +189,10 @@ fn pad_end(input: &[u64], pad: u64, total: usize) -> Vec<u64> {
     cop
 }
 
-async fn add_ciphernodes(bus: &Addr<EventBus>, addrs: &Vec<String>) -> Result<Vec<EnclaveEvent>> {
+async fn add_ciphernodes(
+    bus: &Addr<EventBus<EnclaveEvent>>,
+    addrs: &Vec<String>,
+) -> Result<Vec<EnclaveEvent>> {
     let mut committee = AddToCommittee::new(&bus);
     let mut evts: Vec<EnclaveEvent> = vec![];
 
@@ -256,14 +259,18 @@ fn to_decryptionshare_events(
 }
 
 fn get_common_setup() -> Result<(
-    Addr<EventBus>,
+    Addr<EventBus<EnclaveEvent>>,
     SharedRng,
     Seed,
     Arc<BfvParameters>,
     CommonRandomPoly,
     E3id,
 )> {
-    let bus = EventBus::new(true).start();
+    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: true,
+    })
+    .start();
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
     let (crp_bytes, params) = create_crp_bytes_params(&[0x3FFFFFFF000001], 2048, 1032193, &seed);
@@ -330,7 +337,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         }),
     ]);
 
-    let history = bus.send(GetHistory).await?;
+    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
     assert_eq!(history.len(), 9);
     assert_eq!(history, expected_history);
     bus.send(ResetHistory).await?;
@@ -373,7 +380,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         }),
     ]);
 
-    let history = bus.send(GetHistory).await?;
+    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
     assert_eq!(history.len(), 6);
     assert_eq!(history, expected_history);
 
@@ -404,8 +411,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     )
     .await?;
 
-    let history = bus.send(GetHistory).await?;
-    let errors = bus.send(GetErrors).await?;
+    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    let errors = bus.send(GetErrors::<EnclaveEvent>::new()).await?;
 
     println!("{:?}", errors);
 
@@ -452,7 +459,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     )
     .await?;
 
-    let history = bus.send(GetHistory).await?;
+    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
 
     let actual = history.iter().find_map(|evt| match evt {
         EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
@@ -468,7 +475,11 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
-    let bus = EventBus::new(true).start();
+    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: true,
+    })
+    .start();
     let event_rx = event_tx.subscribe();
     // Pas cmd and event channels to NetworkManager
     NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
@@ -521,7 +532,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     sleep(Duration::from_millis(1)).await; // need to push to next tick
 
     // check the history of the event bus
-    let history = bus.send(GetHistory).await?;
+    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
 
     assert_eq!(
         *msgs.lock().await,
@@ -546,7 +557,11 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let bus = EventBus::new(true).start();
+    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: true,
+    })
+    .start();
     NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
 
     // Capture messages from output on msgs vec
@@ -564,7 +579,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     sleep(Duration::from_millis(1)).await; // need to push to next tick
 
     // check the history of the event bus
-    let history = bus.send(GetHistory).await?;
+    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
 
     assert_eq!(history, vec![event]);
 
