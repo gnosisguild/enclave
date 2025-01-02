@@ -1,4 +1,4 @@
-use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
+use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
@@ -9,8 +9,9 @@ use events::{
     KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, ResetHistory, Seed,
     Shutdown,
 };
-use fhe::{setup_crp_params, FheFeature, ParamsWithCrp, SharedRng};
-use keyshare::KeyshareFeature;
+use fhe::ext::FheExtension;
+use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use keyshare::ext::KeyshareExtension;
 use logger::SimpleLogger;
 use net::{events::NetworkPeerEvent, NetworkManager};
 use sortition::SortitionRepositoryFactory;
@@ -57,10 +58,10 @@ async fn setup_local_ciphernode(
     CiphernodeSelector::attach(&bus, &sortition, addr);
 
     let router = E3Router::builder(&bus, store)
-        .add_feature(FheFeature::create(&bus, &rng))
-        .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
-        .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))
-        .add_feature(KeyshareFeature::create(&bus, addr, &cipher))
+        .with(FheExtension::create(&bus, &rng))
+        .with(PublicKeyAggregatorExtension::create(&bus, &sortition))
+        .with(PlaintextAggregatorExtension::create(&bus, &sortition))
+        .with(KeyshareExtension::create(&bus, addr, &cipher))
         .build()
         .await?;
 

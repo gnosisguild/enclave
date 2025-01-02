@@ -10,8 +10,8 @@ use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
 };
-use fhe::FheFeature;
-use keyshare::KeyshareFeature;
+use fhe::ext::FheExtension;
+use keyshare::ext::KeyshareExtension;
 use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
@@ -67,8 +67,12 @@ pub async fn execute(
     }
 
     E3Router::builder(&bus, store.clone())
-        .add_feature(FheFeature::create(&bus, &rng))
-        .add_feature(KeyshareFeature::create(&bus, &address.to_string(), &cipher))
+        .with(FheExtension::create(&bus, &rng))
+        .with(KeyshareExtension::create(
+            &bus,
+            &address.to_string(),
+            &cipher,
+        ))
         .build()
         .await?;
 

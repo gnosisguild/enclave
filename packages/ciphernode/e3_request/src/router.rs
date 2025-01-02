@@ -2,7 +2,7 @@ use crate::ContextRepositoryFactory;
 use crate::E3Context;
 use crate::E3ContextParams;
 use crate::E3ContextSnapshot;
-use crate::E3MetaFeature;
+use crate::E3MetaExtension;
 use crate::RouterRepositoryFactory;
 use actix::AsyncContext;
 use actix::{Actor, Addr, Context, Handler};
@@ -23,7 +23,9 @@ use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
 use tracing::error;
 
-/// Helper class to buffer events for downstream instances incase events arrive in the wrong order
+/// Buffers events for downstream instances to handle out-of-order event delivery.
+/// Events are stored in a HashMap keyed by string identifiers until they are ready
+/// to be processed.
 #[derive(Default)]
 pub struct EventBuffer {
     buffer: HashMap<String, Vec<EnclaveEvent>>,
@@ -42,17 +44,26 @@ impl EventBuffer {
     }
 }
 
-/// Format of a Feature that can be passed to E3Router. E3Features listen for EnclaveEvents
-/// that are braoadcast to know when to instantiate themselves. They define the events they respond
-/// to using the `on_event` handler. Within this handler they will typically use the request's
-/// context to construct a version of their requisite actors and save their addresses to the
-/// context using the `set_event_recipient` method on the context. Event recipients once set will
-/// then have all their events streamed to them from their buffer. Features can also reconstruct
-/// Actors based on their persisted state using the context snapshot and relevant repositories.
-/// Generally Features can ask the context to see if a dependency has already been set to know if
-/// it has everything it needs to construct the Feature
+/// An Extension interface for the E3Router system that listens and responds to EnclaveEvents.
+///
+/// # Responsibilities
+/// - Listens for broadcast EnclaveEvents
+/// - Instantiates appropriate actors based on received events
+/// - Manages actor state persistence and reconstruction
+/// - Handles event streaming to registered recipients
+///
+/// # Usage
+/// Extensions implement the `on_event` handler to define which events they respond to.
+/// When an event is received, the extension typically:
+/// 1. Uses the request's context to construct required actors
+/// 2. Saves actor addresses to the context using `set_event_recipient`
+/// 3. Manages event streaming from buffers to registered recipients
+///
+/// Extensions can also reconstruct actors from persisted state using context
+/// snapshots and repositories. They can check for dependencies in the context
+/// before constructing new extensions.
 #[async_trait]
-pub trait E3Feature: Send + Sync + 'static {
+pub trait E3Extension: Send + Sync + 'static {
     /// This function is triggered when an EnclaveEvent is sent to the router. Use this to
     /// initialize the receiver using `ctx.set_event_receiver(my_address.into())`. Typically this
     /// means filtering for specific e3_id enabled events that give rise to actors that have to
@@ -63,26 +74,35 @@ pub trait E3Feature: Send + Sync + 'static {
     async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()>;
 }
 
-/// E3Router will register features that receive an E3_id specific context. After features
-/// have run e3_id specific messages are forwarded to all instances on the context as they come in.
-/// This enables features to lazily register instances that have the correct dependencies available
-/// per e3_id request.
-// TODO: setup so that we have to place features within correct order of dependencies
+/// Routes E3_id-specific contexts to registered extensions and manages message forwarding.
+///
+/// # Core Functions
+/// - Maintains contexts for each E3 request
+/// - Lazily registers extension instances with appropriate dependencies per E3_id
+/// - Forwards incoming messages to registered instances
+/// - Manages request lifecycle and completion
+///
+/// Extensions receive an E3_id-specific context and can handle specific
+/// message types. The router ensures proper message delivery and context management
+/// throughout the request lifecycle.
+// TODO: setup so that we have to place extensions within correct order of dependencies
 pub struct E3Router {
     /// The context for every E3 request
     contexts: HashMap<E3id, E3Context>,
     /// A list of completed requests
     completed: HashSet<E3id>,
-    /// The features this instance of the router is configured to listen for
-    features: Arc<Vec<Box<dyn E3Feature>>>,
+    /// The extensions this instance of the router is configured to listen for
+    extensions: Arc<Vec<Box<dyn E3Extension>>>,
     /// A buffer for events to send to the
     buffer: EventBuffer,
+    /// The EventBus
     bus: Addr<EventBus>,
+    /// A repository for storing snapshots
     store: Repository<E3RouterSnapshot>,
 }
 
 pub struct E3RouterParams {
-    features: Arc<Vec<Box<dyn E3Feature>>>,
+    extensions: Arc<Vec<Box<dyn E3Extension>>>,
     bus: Addr<EventBus>,
     store: Repository<E3RouterSnapshot>,
 }
@@ -92,17 +112,17 @@ impl E3Router {
         let repositories = store.repositories();
         let builder = E3RouterBuilder {
             bus: bus.clone(),
-            features: vec![],
+            extensions: vec![],
             store: repositories.router(),
         };
 
         // Everything needs the committe meta factory so adding it here by default
-        builder.add_feature(E3MetaFeature::create())
+        builder.with(E3MetaExtension::create())
     }
 
     pub fn from_params(params: E3RouterParams) -> Self {
         Self {
-            features: params.features,
+            extensions: params.extensions,
             bus: params.bus.clone(),
             store: params.store.clone(),
             completed: HashSet::new(),
@@ -143,12 +163,12 @@ impl Handler<EnclaveEvent> for E3Router {
             E3Context::from_params(E3ContextParams {
                 e3_id: e3_id.clone(),
                 repository: repositories.context(&e3_id),
-                features: self.features.clone(),
+                extensions: self.extensions.clone(),
             })
         });
 
-        for feature in self.features.iter() {
-            feature.on_event(context, &msg);
+        for extension in self.extensions.iter() {
+            extension.on_event(context, &msg);
         }
 
         context.forward_message(&msg, &mut self.buffer);
@@ -232,7 +252,7 @@ impl FromSnapshotWithParams for E3Router {
                     E3ContextParams {
                         repository: repositories.context(&e3_id),
                         e3_id: e3_id.clone(),
-                        features: params.features.clone(),
+                        extensions: params.extensions.clone(),
                     },
                     ctx_snapshot,
                 )
@@ -243,7 +263,7 @@ impl FromSnapshotWithParams for E3Router {
         Ok(E3Router {
             contexts,
             completed: snapshot.completed,
-            features: params.features.into(),
+            extensions: params.extensions.into(),
             buffer: EventBuffer::default(),
             bus: params.bus,
             store: repositories.router(),
@@ -254,13 +274,13 @@ impl FromSnapshotWithParams for E3Router {
 /// Builder for E3Router
 pub struct E3RouterBuilder {
     pub bus: Addr<EventBus>,
-    pub features: Vec<Box<dyn E3Feature>>,
+    pub extensions: Vec<Box<dyn E3Extension>>,
     pub store: Repository<E3RouterSnapshot>,
 }
 
 impl E3RouterBuilder {
-    pub fn add_feature(mut self, listener: Box<dyn E3Feature>) -> Self {
-        self.features.push(listener);
+    pub fn with(mut self, listener: Box<dyn E3Extension>) -> Self {
+        self.extensions.push(listener);
         self
     }
 
@@ -269,7 +289,7 @@ impl E3RouterBuilder {
         let router_repo = repositories.router();
         let snapshot: Option<E3RouterSnapshot> = router_repo.read().await?;
         let params = E3RouterParams {
-            features: self.features.into(),
+            extensions: self.extensions.into(),
             bus: self.bus.clone(),
 
             store: router_repo,

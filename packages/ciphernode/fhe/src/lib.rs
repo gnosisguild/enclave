@@ -1,9 +1,8 @@
-mod feature;
+pub mod ext;
 mod fhe;
 mod repo;
 mod utils;
 
-pub use feature::*;
 pub use fhe::*;
 pub use repo::*;
 pub use utils::*;
