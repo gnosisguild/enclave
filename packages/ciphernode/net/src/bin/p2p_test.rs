@@ -11,6 +11,7 @@ use std::{collections::HashSet, env, process};
 use tokio::sync::mpsc;
 use tokio::time::{sleep, timeout};
 use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing::info;
 
 // So this is a simple test to test our networking configuration
 // Here we ensure we can send a gossipsub message to all connected nodes
@@ -28,6 +29,7 @@ async fn main() -> Result<()> {
 
     let name = env::args().nth(2).expect("need name argument");
     info!("{} starting up", name);
+    let topic = "test-topic";
 
     // Same environment variables as your old test
     let udp_port = env::var("QUIC_PORT")

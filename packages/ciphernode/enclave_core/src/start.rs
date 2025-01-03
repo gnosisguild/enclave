@@ -21,7 +21,7 @@ use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
 use tracing::instrument;
-
+use tokio::task::JoinHandle;
 use crate::helpers::datastore::setup_datastore;
 
 #[instrument(name = "app", skip_all)]
@@ -79,7 +79,7 @@ pub async fn execute(
         .build()
         .await?;
 
-    let (_, peer_id) = NetworkManager::setup_with_peer(
+    let (_, handle, peer_id) = NetworkManager::setup_with_peer(
         bus.clone(),
         config.peers(),
         &cipher,
@@ -92,5 +92,5 @@ pub async fn execute(
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
     SimpleLogger::<EnclaveEvent>::attach(&nm, bus.clone());
 
-    Ok((bus, peer_id))
+    Ok((bus, handle, peer_id))
 }

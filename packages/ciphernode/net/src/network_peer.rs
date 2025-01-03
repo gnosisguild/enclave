@@ -1,10 +1,10 @@
 use actix::prelude::*;
 use anyhow::Result;
-use async_std::net;
 use events::EventBus;
+use futures::StreamExt;
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
-    gossipsub::{self, IdentTopic, MessageId},
+    gossipsub::{self, MessageId},
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
     kad::{store::MemoryStore, Behaviour as KademliaBehaviour},

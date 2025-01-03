@@ -11,10 +11,10 @@ pub async fn execute(config: AppConfig) -> Result<()> {
         return Err(anyhow!("You must provide an address"));
     };
 
-    let (bus, peer_id) = start::execute(config, address).await?;
+    let (bus, handle, peer_id) = start::execute(config, address).await?;
     info!("LAUNCHING CIPHERNODE: ({}/{})", address, peer_id);
 
-    tokio::spawn(listen_for_shutdown(bus.into()));
+    tokio::spawn(listen_for_shutdown(bus.into(), handle));
 
     std::future::pending::<()>().await;
 

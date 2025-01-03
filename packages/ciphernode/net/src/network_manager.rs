@@ -120,7 +120,7 @@ impl NetworkManager {
 
         let p2p_addr = NetworkManager::setup(bus, net_bus, tx, &topic.to_string());
 
-        Ok((p2p_addr, keypair.public().to_peer_id().to_string()))
+        Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
 
@@ -148,7 +148,7 @@ impl Handler<EnclaveEvent> for NetworkManager {
         let sent_events = self.sent_events.clone();
         let evt = event.clone();
         let topic = self.topic.clone();
-        let peer = self.peer.clone();
+        let tx = self.tx.clone();
         Box::pin(async move {
             let id: EventId = evt.clone().into();
 
@@ -166,7 +166,7 @@ impl Handler<EnclaveEvent> for NetworkManager {
 
             match evt.to_bytes() {
                 Ok(data) => {
-                    peer.do_send(NetworkPeerCommand::GossipPublish {
+                    tx.send(NetworkPeerCommand::GossipPublish {
                         topic,
                         data,
                         correlation_id: CorrelationId::new(),

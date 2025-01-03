@@ -13,11 +13,11 @@ pub async fn execute(
 ) -> Result<()> {
     owo();
 
-    let (bus, peer_id) =
+    let (bus, handle, peer_id) =
         aggregator_start::execute(config, pubkey_write_path, plaintext_write_path).await?;
 
     info!("LAUNCHING AGGREGATOR {}", peer_id);
-    tokio::spawn(listen_for_shutdown(bus.into()));
+    tokio::spawn(listen_for_shutdown(bus.into(), handle));
 
     std::future::pending::<()>().await;
 
