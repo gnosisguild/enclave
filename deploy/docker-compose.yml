@@ -9,7 +9,6 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      RUST_LOG: "info"
       AGGREGATOR: "false"
       ADDRESS: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
       QUIC_PORT: 9091
@@ -29,7 +28,6 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      RUST_LOG: "info"
       AGGREGATOR: "false"
       ADDRESS: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0" 
       QUIC_PORT: 9092
@@ -49,7 +47,6 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      RUST_LOG: "info"
       AGGREGATOR: "false"
       ADDRESS: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
       QUIC_PORT: 9093
@@ -71,7 +68,6 @@ services:
         target: secrets.json
     env_file: .env
     environment:
-      RUST_LOG: "info"
       AGGREGATOR: "true"
       ADDRESS: "0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199"
       QUIC_PORT: 9094

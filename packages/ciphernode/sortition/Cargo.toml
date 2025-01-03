@@ -14,7 +14,7 @@ alloy = { workspace = true, features = ["full"] }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 config = { workspace = true }
-data = { path = "../data" }
+data = { workspace = true }
 events = { workspace = true }
 num = { workspace = true }
 rand = { workspace = true }

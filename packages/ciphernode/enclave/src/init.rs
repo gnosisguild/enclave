@@ -1,7 +1,6 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
 use enclave_core::init;
-use events::get_tag;
 use tracing::instrument;
 
 use crate::net;
@@ -9,7 +8,7 @@ use crate::net::NetCommands;
 use crate::password;
 use crate::password::PasswordCommands;
 
-#[instrument(name = "app", skip_all, fields(id = get_tag()))]
+#[instrument(name = "app", skip_all)]
 pub async fn execute(
     rpc_url: Option<String>,
     eth_address: Option<String>,

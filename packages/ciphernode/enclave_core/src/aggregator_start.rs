@@ -1,17 +1,17 @@
 use actix::{Actor, Addr};
-use aggregator::{PlaintextAggregatorFeature, PublicKeyAggregatorFeature};
+use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use anyhow::Result;
 use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
-use events::EventBus;
+use events::{EnclaveEvent, EventBus, EventBusConfig};
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
-use fhe::FheFeature;
+use fhe::ext::FheExtension;
 use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
@@ -27,8 +27,12 @@ pub async fn execute(
     config: AppConfig,
     pubkey_write_path: Option<&str>,
     plaintext_write_path: Option<&str>,
-) -> Result<(Addr<EventBus>, String)> {
-    let bus = EventBus::new(true).start();
+) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
+    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: true,
+    })
+    .start();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(&config, &bus)?;
     let repositories = store.repositories();
@@ -72,9 +76,9 @@ pub async fn execute(
     }
 
     E3Router::builder(&bus, store)
-        .add_feature(FheFeature::create(&bus, &rng))
-        .add_feature(PublicKeyAggregatorFeature::create(&bus, &sortition))
-        .add_feature(PlaintextAggregatorFeature::create(&bus, &sortition))
+        .with(FheExtension::create(&bus, &rng))
+        .with(PublicKeyAggregatorExtension::create(&bus, &sortition))
+        .with(PlaintextAggregatorExtension::create(&bus, &sortition))
         .build()
         .await?;
 
@@ -96,7 +100,7 @@ pub async fn execute(
         PlaintextWriter::attach(path, bus.clone());
     }
 
-    SimpleLogger::attach("AGG", bus.clone());
+    SimpleLogger::<EnclaveEvent>::attach("AGG", bus.clone());
 
     Ok((bus, peer_id))
 }

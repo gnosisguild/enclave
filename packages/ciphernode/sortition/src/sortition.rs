@@ -4,8 +4,8 @@ use alloy::primitives::Address;
 use anyhow::{anyhow, Result};
 use data::{AutoPersist, Persistable, Repository};
 use events::{
-    get_tag, BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent,
-    EventBus, Seed, Subscribe,
+    BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
+    Subscribe,
 };
 use std::collections::HashSet;
 use tracing::{info, instrument};
@@ -87,12 +87,12 @@ pub struct GetNodes;
 
 pub struct Sortition {
     list: Persistable<SortitionModule>,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
 }
 
 #[derive(Debug)]
 pub struct SortitionParams {
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     list: Persistable<SortitionModule>,
 }
 
@@ -104,9 +104,9 @@ impl Sortition {
         }
     }
 
-    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
+    #[instrument(name = "sortition", skip_all)]
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         store: Repository<SortitionModule>,
     ) -> Result<Addr<Sortition>> {
         let list = store.load_or_default(SortitionModule::default()).await?;
@@ -142,7 +142,7 @@ impl Handler<EnclaveEvent> for Sortition {
 impl Handler<CiphernodeAdded> for Sortition {
     type Result = ();
 
-    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
+    #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
         info!("Adding node: {}", msg.address);
         match self.list.try_mutate(|mut list| {
@@ -158,7 +158,7 @@ impl Handler<CiphernodeAdded> for Sortition {
 impl Handler<CiphernodeRemoved> for Sortition {
     type Result = ();
 
-    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
+    #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
         info!("Removing node: {}", msg.address);
         match self.list.try_mutate(|mut list| {
@@ -174,7 +174,7 @@ impl Handler<CiphernodeRemoved> for Sortition {
 impl Handler<GetHasNode> for Sortition {
     type Result = bool;
 
-    #[instrument(name="sortition", skip_all, fields(id = get_tag()))]
+    #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
         self.list
             .try_with(|list| list.contains(msg.seed, msg.size, msg.address))

@@ -4,18 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-net = { path = "../net" }
-sortition = { path = "../sortition" }
+net = { workspace = true }
+sortition = { workspace = true }
 events = { workspace = true }
-evm = { path = "../evm" }
-logger = { path = "../logger" }
-fhe = { path = "../fhe" }
+evm = { workspace = true }
+logger = { workspace = true }
+fhe = { workspace = true }
 crypto = { workspace = true }
-data = { path = "../data" }
-keyshare = { path = "../keyshare" }
-aggregator = { path = "../aggregator" }
+data = { workspace = true }
+keyshare = { workspace = true }
+aggregator = { workspace = true }
 e3_request = { workspace = true }
-test-helpers = { path = "../test_helpers" }
+test-helpers = { workspace = true }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }

@@ -21,12 +21,12 @@ sol!(
 pub struct RegistryFilterSolWriter {
     provider: WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
     contract_address: Address,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
 }
 
 impl RegistryFilterSolWriter {
     pub async fn new(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: Address,
     ) -> Result<Self> {
@@ -38,7 +38,7 @@ impl RegistryFilterSolWriter {
     }
 
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: &str,
     ) -> Result<Addr<RegistryFilterSolWriter>> {
@@ -127,7 +127,7 @@ pub async fn publish_committee(
 pub struct RegistryFilterSol;
 impl RegistryFilterSol {
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: &str,
     ) -> Result<()> {

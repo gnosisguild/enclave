@@ -85,7 +85,7 @@ pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,

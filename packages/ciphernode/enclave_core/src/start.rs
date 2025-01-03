@@ -5,13 +5,13 @@ use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
-use events::{get_tag, EventBus};
+use events::{EnclaveEvent, EventBus, EventBusConfig};
 use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
 };
-use fhe::FheFeature;
-use keyshare::KeyshareFeature;
+use fhe::ext::FheExtension;
+use keyshare::ext::KeyshareExtension;
 use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
@@ -24,13 +24,17 @@ use tracing::instrument;
 
 use crate::helpers::datastore::setup_datastore;
 
-#[instrument(name="app", skip_all,fields(id = get_tag()))]
+#[instrument(name = "app", skip_all)]
 pub async fn execute(
     config: AppConfig,
     address: Address,
-) -> Result<(Addr<EventBus>, String)> {
+) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
-    let bus = EventBus::new(true).start();
+    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: true,
+    })
+    .start();
     let cipher = Arc::new(Cipher::from_config(&config).await?);
     let store = setup_datastore(&config, &bus)?;
 
@@ -66,8 +70,12 @@ pub async fn execute(
     }
 
     E3Router::builder(&bus, store.clone())
-        .add_feature(FheFeature::create(&bus, &rng))
-        .add_feature(KeyshareFeature::create(&bus, &address.to_string(), &cipher))
+        .with(FheExtension::create(&bus, &rng))
+        .with(KeyshareExtension::create(
+            &bus,
+            &address.to_string(),
+            &cipher,
+        ))
         .build()
         .await?;
 
@@ -82,7 +90,7 @@ pub async fn execute(
     .await?;
 
     let nm = format!("CIPHER({})", &address.to_string()[0..5]);
-    SimpleLogger::attach(&nm, bus.clone());
+    SimpleLogger::<EnclaveEvent>::attach(&nm, bus.clone());
 
     Ok((bus, peer_id))
 }

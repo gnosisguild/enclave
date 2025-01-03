@@ -6,159 +6,147 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
     Multiaddr,
 };
-use std::{
-    collections::HashMap,
-    net::ToSocketAddrs,
-    sync::Arc,
-    time::Duration,
+use std::net::ToSocketAddrs;
+use tokio::select;
+use tokio::sync::{broadcast, mpsc};
+use tokio::time::{sleep, Duration};
+use tracing::error;
+use tracing::info;
+
+use crate::{
+    events::{NetworkPeerCommand, NetworkPeerEvent},
+    retry::{retry_with_backoff, to_retry, RetryError, BACKOFF_DELAY, BACKOFF_MAX_RETRIES},
 };
-use tracing::{info, warn};
 
-const BACKOFF_DELAY: u64 = 500;
-const BACKOFF_MAX_RETRIES: u32 = 10;
-const CONNECTION_TIMEOUT: u64 = 60;
-
-#[derive(Message)]
-#[rtype(result = "Result<()>")]
-pub struct DialPeer(pub String);
-
-#[derive(Message)]
-#[rtype(result = "Result<()>")]
-pub struct DialPeers(pub Vec<String>);
-
-#[derive(Message)]
-#[rtype(result = "Result<()>")]
-pub struct SetNetworkPeer(pub Addr<NetworkPeer>);
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct ConnectionResult {
-    pub connection_id: ConnectionId,
-    pub result: Result<(), Arc<DialError>>,
+/// Dial a single Multiaddr with retries and return an error should those retries not work
+async fn dial_multiaddr(
+    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
+    event_tx: &broadcast::Sender<NetworkPeerEvent>,
+    multiaddr_str: &str,
+) -> Result<()> {
+    let multiaddr = &multiaddr_str.parse()?;
+    info!("Now dialing in to {}", multiaddr);
+    retry_with_backoff(
+        || attempt_connection(cmd_tx, event_tx, multiaddr),
+        BACKOFF_MAX_RETRIES,
+        BACKOFF_DELAY,
+    )
+    .await?;
+    Ok(())
 }
 
-#[derive(Clone)]
-struct PendingConnection {
-    addr: String,
-    attempt: u32,
-    delay_ms: u64,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-struct RetryDial {
-    addr: String,
-    attempt: u32,
-    delay_ms: u64,
-}
-#[derive(Clone)]
-pub struct DialerActor {
-    network_peer: Option<Addr<NetworkPeer>>,
-    pending_connections: HashMap<ConnectionId, PendingConnection>,
-}
-
-impl DialerActor {
-    pub fn new() -> Addr<Self> {
-        Self {
-            network_peer: None,
-            pending_connections: HashMap::new(),
-        }
-        .start()
+fn trace_error(r: Result<()>) {
+    if let Err(err) = r {
+        error!("{}", err);
     }
+}
 
-    fn attempt_dial(
-        &mut self,
-        addr: String,
-        attempt: u32,
-        delay_ms: u64,
-        _ctx: &mut Context<Self>,
-    ) -> Option<ConnectionId> {
-        info!("Attempt {}/{} for {}", attempt, BACKOFF_MAX_RETRIES, addr);
+/// Initiates connections to multiple network peers
+///
+/// # Arguments
+/// * `cmd_tx` - Sender for network peer commands
+/// * `event_tx` - Broadcast sender for peer events
+/// * `peers` - List of peer addresses to connect to
+pub async fn dial_peers(
+    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
+    event_tx: &broadcast::Sender<NetworkPeerEvent>,
+    peers: &Vec<String>,
+) -> Result<()> {
+    let futures: Vec<_> = peers
+        .iter()
+        .map(|addr| dial_multiaddr(cmd_tx, event_tx, addr))
+        .collect();
+    let results = join_all(futures).await;
+    results.into_iter().for_each(trace_error);
+    Ok(())
+}
 
-        match addr.parse::<Multiaddr>() {
-            Ok(multi) => {
-                let resolved_multiaddr = match self.get_resolved_multiaddr(&multi) {
-                    Ok(addr) => addr,
-                    Err(e) => {
-                        warn!("Error resolving multiaddr {}: {}", addr, e);
-                        return None;
+/// Attempt a connection with retrys to a multiaddr return an error if the connection could not be resolved after the retries.
+async fn attempt_connection(
+    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
+    event_tx: &broadcast::Sender<NetworkPeerEvent>,
+    multiaddr: &Multiaddr,
+) -> Result<(), RetryError> {
+    let mut event_rx = event_tx.subscribe();
+    let multi = get_resolved_multiaddr(multiaddr).map_err(to_retry)?;
+    let opts: DialOpts = multi.clone().into();
+    let dial_connection = opts.connection_id();
+    info!("Dialing: '{}' with connection '{}'", multi, dial_connection);
+    cmd_tx
+        .send(NetworkPeerCommand::Dial(opts))
+        .await
+        .map_err(to_retry)?;
+    wait_for_connection(&mut event_rx, dial_connection).await
+}
+
+/// Wait for results of a retry based on a given correlation id and return the correct variant of
+/// RetryError depending on the result from the downstream event
+async fn wait_for_connection(
+    event_rx: &mut broadcast::Receiver<NetworkPeerEvent>,
+    dial_connection: ConnectionId,
+) -> Result<(), RetryError> {
+    loop {
+        // Create a timeout future that can be reset
+        select! {
+            result = event_rx.recv() => {
+                match result.map_err(to_retry)? {
+                    NetworkPeerEvent::ConnectionEstablished { connection_id } => {
+                        if connection_id == dial_connection {
+                            info!("Connection Established");
+                            return Ok(());
+                        }
                     }
-                };
-                let opts: DialOpts = resolved_multiaddr.into();
-                let connection_id = opts.connection_id();
-
-                if let Some(network_peer) = &self.network_peer {
-                    match network_peer.try_send(NetworkPeerCommand::Dial(opts)) {
-                        Ok(_) => {
-                            info!("Dialing {} with connection {}", addr, connection_id);
-                            self.pending_connections.insert(
-                                connection_id,
-                                PendingConnection {
-                                    addr,
-                                    attempt,
-                                    delay_ms,
-                                },
+                    NetworkPeerEvent::DialError { error } => {
+                        info!("DialError!");
+                        return match error.as_ref() {
+                            // If we are dialing ourself then we should just fail
+                            DialError::NoAddresses { .. } => {
+                                info!("DialError received. Returning RetryError::Failure");
+                                Err(RetryError::Failure(error.clone().into()))
+                            }
+                            // Try again otherwise
+                            _ => Err(RetryError::Retry(error.clone().into())),
+                        };
+                    }
+                    NetworkPeerEvent::OutgoingConnectionError {
+                        connection_id,
+                        error,
+                    } => {
+                        info!("OutgoingConnectionError!");
+                        if connection_id == dial_connection {
+                            info!(
+                                "Connection {} failed because of error {}. Retrying...",
+                                connection_id, error
                             );
-                            Some(connection_id)
-                        }
-                        Err(e) => {
-                            warn!("Failed to initiate dial: {}", e);
-                            None
+                            return match error.as_ref() {
+                                // If we are dialing ourself then we should just fail
+                                DialError::NoAddresses { .. } => {
+                                    Err(RetryError::Failure(error.clone().into()))
+                                }
+                                // Try again otherwise
+                                _ => Err(RetryError::Retry(error.clone().into())),
+                            };
                         }
                     }
-                } else {
-                    warn!("No network peer set for dialing {}", addr);
-                    None
+                    _ => (),
                 }
             }
-            Err(e) => {
-                warn!("Invalid multiaddr {}: {}", addr, e);
-                None
+            _ = sleep(Duration::from_secs(60)) => {
+                info!("Connection attempt timed out after 60 seconds of no events");
+                return Err(RetryError::Retry(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Connection attempt timed out",
+                ).into()));
             }
         }
     }
+}
 
-    fn schedule_retry(&self, addr: String, attempt: u32, delay_ms: u64, ctx: &mut Context<Self>) {
-        if attempt < BACKOFF_MAX_RETRIES {
-            ctx.address().do_send(RetryDial {
-                addr,
-                attempt: attempt + 1,
-                delay_ms: delay_ms * 2,
-            });
-        } else {
-            warn!("Max retries reached for {}", addr);
-        }
-    }
-
-    // -----------------------------
-    // DNS resolution logic
-    // -----------------------------
-
-    fn get_resolved_multiaddr(&self, value: &Multiaddr) -> Result<Multiaddr> {
-        if let Some(domain) = self.extract_dns_host(value) {
-            let ip = self.resolve_ipv4(&domain)?;
-            self.dns_to_ip_addr(value, &ip)
-        } else {
-            Ok(value.clone())
-        }
-    }
-
-    fn extract_dns_host(&self, addr: &Multiaddr) -> Option<String> {
-        for proto in addr.iter() {
-            match proto {
-                Protocol::Dns4(hostname) | Protocol::Dns6(hostname) => {
-                    return Some(hostname.to_string())
-                }
-                _ => continue,
-            }
-        }
-        None
-    }
-
-    fn dns_to_ip_addr(&self, original: &Multiaddr, ip_str: &str) -> Result<Multiaddr> {
-        let ip = ip_str.parse()?;
-        let mut new_addr = Multiaddr::empty();
-        let mut skip_next = false;
+/// Convert a Multiaddr to use a specific ip address with the ip4 or ip6 protocol
+fn dns_to_ip_addr(original: &Multiaddr, ip_str: &str) -> Result<Multiaddr> {
+    let ip = ip_str.parse()?;
+    let mut new_addr = Multiaddr::empty();
+    let mut skip_next = false;
 
         for proto in original.iter() {
             if skip_next {

@@ -68,7 +68,7 @@ kill_proc ag
 sleep 2
 
 # relaunch the aggregator
-launch_aggregator ag
+launch_aggregator ag relaunch
 
 sleep 2
 

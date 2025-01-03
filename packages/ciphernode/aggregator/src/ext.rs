@@ -7,17 +7,17 @@ use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{AutoPersist, RepositoriesFactory};
-use e3_request::{E3Context, E3ContextSnapshot, E3Feature, META_KEY};
+use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
-use fhe::FHE_KEY;
+use fhe::ext::FHE_KEY;
 use sortition::Sortition;
 
-pub struct PlaintextAggregatorFeature {
-    bus: Addr<EventBus>,
+pub struct PlaintextAggregatorExtension {
+    bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
 }
-impl PlaintextAggregatorFeature {
-    pub fn create(bus: &Addr<EventBus>, sortition: &Addr<Sortition>) -> Box<Self> {
+impl PlaintextAggregatorExtension {
+    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -29,7 +29,7 @@ const ERROR_PLAINTEXT_FHE_MISSING:&str = "Could not create PlaintextAggregator b
 const ERROR_PLAINTEXT_META_MISSING:&str = "Could not create PlaintextAggregator because the meta instance it depends on was not set on the context.";
 
 #[async_trait]
-impl E3Feature for PlaintextAggregatorFeature {
+impl E3Extension for PlaintextAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Save plaintext aggregator
         let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
@@ -130,13 +130,13 @@ impl E3Feature for PlaintextAggregatorFeature {
     }
 }
 
-pub struct PublicKeyAggregatorFeature {
-    bus: Addr<EventBus>,
+pub struct PublicKeyAggregatorExtension {
+    bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
 }
 
-impl PublicKeyAggregatorFeature {
-    pub fn create(bus: &Addr<EventBus>, sortition: &Addr<Sortition>) -> Box<Self> {
+impl PublicKeyAggregatorExtension {
+    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
@@ -148,7 +148,7 @@ const ERROR_PUBKEY_FHE_MISSING:&str = "Could not create PublicKeyAggregator beca
 const ERROR_PUBKEY_META_MISSING:&str = "Could not create PublicKeyAggregator because the meta instance it depends on was not set on the context.";
 
 #[async_trait]
-impl E3Feature for PublicKeyAggregatorFeature {
+impl E3Extension for PublicKeyAggregatorExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Saving the publickey aggregator with deps on E3Requested
         let EnclaveEvent::E3Requested { data, .. } = evt else {

@@ -8,12 +8,12 @@ use actix::Addr;
 use alloy::transports::BoxTransport;
 use anyhow::Result;
 use data::Repository;
-use events::EventBus;
+use events::{EnclaveEvent, EventBus};
 
 pub struct EnclaveSol;
 impl EnclaveSol {
     pub async fn attach(
-        bus: &Addr<EventBus>,
+        bus: &Addr<EventBus<EnclaveEvent>>,
         read_provider: &WithChainId<ReadonlyProvider, BoxTransport>,
         write_provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
         contract_address: &str,

@@ -8,10 +8,10 @@ actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 config = { workspace = true }
-data = { path = "../data" }
+data = { workspace = true }
 crypto = { workspace = true }
 events = { workspace = true }
-fhe = { path = "../fhe" }
+fhe = { workspace = true }
 e3_request = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

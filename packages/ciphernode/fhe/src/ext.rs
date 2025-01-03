@@ -3,20 +3,20 @@ use actix::Addr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
-use e3_request::{E3Context, E3ContextSnapshot, E3Feature, TypedKey};
+use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey};
 use events::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use std::sync::Arc;
 
 pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
 
 /// TODO: move these to each package with access on MyStruct::launcher()
-pub struct FheFeature {
+pub struct FheExtension {
     rng: SharedRng,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
 }
 
-impl FheFeature {
-    pub fn create(bus: &Addr<EventBus>, rng: &SharedRng) -> Box<Self> {
+impl FheExtension {
+    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, rng: &SharedRng) -> Box<Self> {
         Box::new(Self {
             rng: rng.clone(),
             bus: bus.clone(),
@@ -27,7 +27,7 @@ impl FheFeature {
 const ERROR_FHE_FAILED_TO_DECODE: &str = "Failed to decode encoded FHE params";
 
 #[async_trait]
-impl E3Feature for FheFeature {
+impl E3Extension for FheExtension {
     fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
         // Saving the fhe on Committee Requested
         let EnclaveEvent::E3Requested { data, .. } = evt else {

@@ -48,7 +48,7 @@ struct ComputeAggregate {
 
 pub struct PlaintextAggregator {
     fhe: Arc<Fhe>,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<PlaintextAggregatorState>,
@@ -57,7 +57,7 @@ pub struct PlaintextAggregator {
 
 pub struct PlaintextAggregatorParams {
     pub fhe: Arc<Fhe>,
-    pub bus: Addr<EventBus>,
+    pub bus: Addr<EventBus<EnclaveEvent>>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
     pub src_chain_id: u64,

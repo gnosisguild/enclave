@@ -18,8 +18,8 @@ use tracing::{error, info, instrument, trace};
 /// NetworkManager Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetworkPeer for propagation over the p2p network
 pub struct NetworkManager {
-    bus: Addr<EventBus>,
-    peer: Addr<NetworkPeer>,
+    bus: Addr<EventBus<EnclaveEvent>>,
+    tx: mpsc::Sender<NetworkPeerCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
 }
@@ -30,7 +30,11 @@ impl Actor for NetworkManager {
 
 impl NetworkManager {
     /// Create a new NetworkManager actor
-    pub fn new(bus: Addr<EventBus>, peer: Addr<NetworkPeer>, topic: &str) -> Self {
+    pub fn new(
+        bus: Addr<EventBus<EnclaveEvent>>,
+        tx: mpsc::Sender<NetworkPeerCommand>,
+        topic: &str,
+    ) -> Self {
         Self {
             bus,
             peer,
@@ -39,8 +43,13 @@ impl NetworkManager {
         }
     }
 
-    pub fn setup(bus: Addr<EventBus>, peer: Addr<NetworkPeer>, topic: &str) -> Addr<Self> {
-        let addr = NetworkManager::new(bus.clone(), peer.clone(), topic).start();
+    pub fn setup(
+        bus: Addr<EventBus<EnclaveEvent>>,
+        tx: mpsc::Sender<NetworkPeerCommand>,
+        mut rx: broadcast::Receiver<NetworkPeerEvent>,
+        topic: &str,
+    ) -> Addr<Self> {
+        let addr = NetworkManager::new(bus.clone(), tx, topic).start();
 
         // Listen on all events
         bus.do_send(Subscribe {
@@ -54,7 +63,7 @@ impl NetworkManager {
     /// Spawn a Libp2p peer and hook it up to this actor
     #[instrument(name = "libp2p", skip_all)]
     pub async fn setup_with_peer(
-        bus: Addr<EventBus>,
+        bus: Addr<EventBus<EnclaveEvent>>,
         peers: Vec<String>,
         cipher: &Arc<Cipher>,
         quic_port: u16,

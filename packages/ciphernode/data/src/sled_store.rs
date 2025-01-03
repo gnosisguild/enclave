@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use crate::{Get, Insert, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
-use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe};
+use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventBusConfig, Subscribe};
 use sled::Db;
 use tracing::{error, info};
 
 pub struct SledStore {
     db: Option<SledDb>,
-    bus: Addr<EventBus>,
+    bus: Addr<EventBus<EnclaveEvent>>,
 }
 
 impl Actor for SledStore {
@@ -17,7 +17,7 @@ impl Actor for SledStore {
 }
 
 impl SledStore {
-    pub fn new(bus: &Addr<EventBus>, path: &PathBuf) -> Result<Addr<Self>> {
+    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, path: &PathBuf) -> Result<Addr<Self>> {
         info!("Starting SledStore");
         let db = SledDb::new(path)?;
 
@@ -35,7 +35,11 @@ impl SledStore {
     pub fn from_db(db: SledDb) -> Result<Self> {
         Ok(Self {
             db: Some(db),
-            bus: EventBus::new(false).start(),
+            bus: EventBus::<EnclaveEvent>::new(EventBusConfig {
+                capture_history: false,
+                deduplicate: true,
+            })
+            .start(),
         })
     }
 }
