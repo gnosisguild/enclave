@@ -93,14 +93,14 @@ async fn main() -> Result<()> {
     .into_iter()
     .filter(|n| *n != name)
     .collect();
+
     println!("{} waiting for messages from: {:?}", name, expected);
 
     // Then wait to receive from others with a timeout
     let mut received = HashSet::new();
     let receive_result = timeout(Duration::from_secs(10), async {
-        let history = net_bus.send(GetHistory::<NetworkPeerEvent>::new()).await?;
-        println!("{} history: {:?}", name, history);
         while received != expected {
+            let history = net_bus.send(GetHistory::<NetworkPeerEvent>::new()).await?;
             for event in history.clone() {
                 match event {
                     NetworkPeerEvent::GossipData(msg) => {
@@ -114,6 +114,7 @@ async fn main() -> Result<()> {
                     _ => (),
                 }
             }
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
         Ok::<(), anyhow::Error>(())
     })

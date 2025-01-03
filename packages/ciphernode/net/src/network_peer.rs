@@ -92,7 +92,6 @@ impl NetworkPeer {
                 }
             }
             NetworkPeerCommand::Dial(multi) => {
-                info!("DIAL: {:?}", multi);
                 let connection_id = multi.connection_id();
                 match self.swarm.dial(multi) {
                     Ok(v) => {
