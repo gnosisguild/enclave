@@ -1,10 +1,10 @@
 use actix::prelude::*;
 use anyhow::Result;
 use events::EventBus;
-use futures::StreamExt;
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
-    gossipsub::{self, MessageId},
+    futures::StreamExt,
+    gossipsub,
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
     kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
@@ -46,8 +46,7 @@ impl NetworkPeer {
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))
-            .unwrap()
+            .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
             .build();
 
         Ok(Self { swarm, net_bus, cmd_rx })
@@ -139,7 +138,7 @@ fn create_mdns_kad_behaviour(
     let message_id_fn = |message: &gossipsub::Message| {
         let mut s = DefaultHasher::new();
         message.data.hash(&mut s);
-        MessageId::from(s.finish().to_string())
+        gossipsub::MessageId::from(s.finish().to_string())
     };
 
     let gossipsub_config = gossipsub::ConfigBuilder::default()

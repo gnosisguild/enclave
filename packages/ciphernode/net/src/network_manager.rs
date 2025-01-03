@@ -146,9 +146,9 @@ impl Handler<EnclaveEvent> for NetworkManager {
     type Result = ResponseFuture<()>;
     fn handle(&mut self, event: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let sent_events = self.sent_events.clone();
+        let tx = self.tx.clone();
         let evt = event.clone();
         let topic = self.topic.clone();
-        let tx = self.tx.clone();
         Box::pin(async move {
             let id: EventId = evt.clone().into();
 
@@ -166,11 +166,16 @@ impl Handler<EnclaveEvent> for NetworkManager {
 
             match evt.to_bytes() {
                 Ok(data) => {
-                    tx.send(NetworkPeerCommand::GossipPublish {
-                        topic,
-                        data,
-                        correlation_id: CorrelationId::new(),
-                    });
+                    if let Err(e) = tx
+                        .send(NetworkPeerCommand::GossipPublish {
+                            topic,
+                            data,
+                            correlation_id: CorrelationId::new(),
+                        })
+                        .await
+                    {
+                        error!(error=?e, "Error sending bytes to libp2p");
+                    };
                 }
                 Err(error) => {
                     error!(error=?error, "Could not convert event to bytes for serialization!")
