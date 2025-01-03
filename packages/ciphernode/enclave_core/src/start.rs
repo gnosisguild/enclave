@@ -1,3 +1,4 @@
+use crate::helpers::datastore::setup_datastore;
 use actix::{Actor, Addr};
 use alloy::primitives::Address;
 use anyhow::Result;
@@ -20,9 +21,8 @@ use sortition::CiphernodeSelector;
 use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
-use tracing::instrument;
 use tokio::task::JoinHandle;
-use crate::helpers::datastore::setup_datastore;
+use tracing::instrument;
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(

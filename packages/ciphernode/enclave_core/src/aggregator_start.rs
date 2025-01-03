@@ -1,3 +1,4 @@
+use crate::helpers::datastore::setup_datastore;
 use actix::{Actor, Addr};
 use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use anyhow::Result;
@@ -21,7 +22,6 @@ use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
-use crate::helpers::datastore::setup_datastore;
 
 pub async fn execute(
     config: AppConfig,

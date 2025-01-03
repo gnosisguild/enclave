@@ -6,7 +6,7 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 
-use events::{Event, Subscribe, EventId};
+use events::{Event, EventId, Subscribe};
 
 use crate::correlation_id::CorrelationId;
 
@@ -39,7 +39,10 @@ pub enum NetworkPeerEvent {
         message_id: MessageId,
     },
     /// There was an error Dialing a peer
-    DialError { connection_id: ConnectionId, error: Arc<DialError> },
+    DialError {
+        connection_id: ConnectionId,
+        error: Arc<DialError>,
+    },
     /// A connection was established to a peer
     ConnectionEstablished { connection_id: ConnectionId },
     /// There was an error creating a connection
@@ -48,7 +51,6 @@ pub enum NetworkPeerEvent {
         error: Arc<DialError>,
     },
 }
-
 
 impl NetworkPeerEvent {
     pub fn event_type(&self) -> String {

@@ -11,7 +11,6 @@ use std::{collections::HashSet, env, process};
 use tokio::sync::mpsc;
 use tokio::time::{sleep, timeout};
 use tracing_subscriber::{prelude::*, EnvFilter};
-use tracing::info;
 
 // So this is a simple test to test our networking configuration
 // Here we ensure we can send a gossipsub message to all connected nodes
@@ -26,24 +25,24 @@ async fn main() -> Result<()> {
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .with(tracing_subscriber::fmt::layer())
         .init();
-
-    let name = env::args().nth(2).expect("need name argument");
-    info!("{} starting up", name);
+    let name = env::args().nth(2).expect("need name");
     let topic = "test-topic";
+    println!("{} starting up", name);
 
-    // Same environment variables as your old test
     let udp_port = env::var("QUIC_PORT")
         .ok()
         .and_then(|p| p.parse::<u16>().ok());
-    let dial_to = env::var("DIAL_TO").ok();
-    let enable_mdns = env::var("ENABLE_MDNS")
-        .unwrap_or_else(|_| "false".to_string())
-        .parse::<bool>()?;
 
-    let mut peers = vec![];
-    if let Some(dial_str) = dial_to {
-        peers.push(dial_str);
-    }
+    let dial_to = env::var("DIAL_TO")
+        .ok()
+        .and_then(|p| p.parse::<String>().ok());
+
+    let enable_mdns = env::var("ENABLE_MDNS")
+        .unwrap_or("false".to_string())
+        .parse::<bool>()
+        .unwrap();
+
+    let peers: Vec<String> = dial_to.iter().cloned().collect();
 
     let id = libp2p::identity::Keypair::generate_ed25519();
     let (tx, rx) = mpsc::channel(100);

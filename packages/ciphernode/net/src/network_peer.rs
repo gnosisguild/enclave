@@ -49,11 +49,16 @@ impl NetworkPeer {
             .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
             .build();
 
-        Ok(Self { swarm, net_bus, cmd_rx })
+        Ok(Self {
+            swarm,
+            net_bus,
+            cmd_rx,
+        })
     }
 
     pub fn listen_on(&mut self, port: u16) -> Result<()> {
-        self.swarm.listen_on(format!("/ip4/0.0.0.0/udp/{}/quic-v1", port).parse()?)?;
+        self.swarm
+            .listen_on(format!("/ip4/0.0.0.0/udp/{}/quic-v1", port).parse()?)?;
         Ok(())
     }
 
@@ -62,10 +67,7 @@ impl NetworkPeer {
         Ok(())
     }
 
-    fn process_command(
-        &mut self,
-        command: NetworkPeerCommand,
-    ) {
+    fn process_command(&mut self, command: NetworkPeerCommand) {
         match command {
             NetworkPeerCommand::GossipPublish {
                 data,

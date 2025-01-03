@@ -101,8 +101,7 @@ impl NetworkManager {
 
         // Create Channel for Dialer
         let (tx, rx) = mpsc::channel(100);
-        let mut swarm_manager = match NetworkPeer::new(&keypair, enable_mdns, net_bus.clone(), rx)
-        {
+        let mut swarm_manager = match NetworkPeer::new(&keypair, enable_mdns, net_bus.clone(), rx) {
             Ok(swarm_manager) => swarm_manager,
             Err(e) => {
                 warn!("Failed to create NetworkPeer: {:?}", e);
