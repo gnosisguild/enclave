@@ -1,9 +1,14 @@
+use actix::prelude::*;
 use anyhow::Result;
+use events::{EventBus, EventBusConfig, GetHistory};
+use libp2p::gossipsub;
 use net::correlation_id::CorrelationId;
 use net::events::{NetworkPeerCommand, NetworkPeerEvent};
+use net::DialerActor;
 use net::NetworkPeer;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
+use tokio::sync::mpsc;
 use tokio::time::{sleep, timeout};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -14,7 +19,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 // We have a docker test harness that runs the nodes and blocks things like mdns ports to ensure
 // that basic discovery is working
 
-#[tokio::main]
+#[actix::main]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
@@ -40,25 +45,35 @@ async fn main() -> Result<()> {
     let peers: Vec<String> = dial_to.iter().cloned().collect();
 
     let id = libp2p::identity::Keypair::generate_ed25519();
-    let mut peer = NetworkPeer::new(&id, peers, udp_port, "test-topic", enable_mdns)?;
+    let (tx, rx) = mpsc::channel(100);
 
-    // Extract input and outputs
-    let tx = peer.tx();
-    let mut rx = peer.rx();
+    let net_bus = EventBus::<NetworkPeerEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: false,
+    })
+    .start();
 
-    let router_task = tokio::spawn({
-        let name = name.clone();
-        async move {
-            println!("{} starting router task", name);
-            if let Err(e) = peer.start().await {
-                println!("{} router task failed: {}", name, e);
-            }
-            println!("{} router task finished", name);
+    let mut peer = NetworkPeer::new(&id, enable_mdns, net_bus.clone(), rx)?;
+    let topic_id = gossipsub::IdentTopic::new(topic);
+    peer.subscribe(&topic_id)?;
+    peer.listen_on(udp_port.unwrap_or(0))?;
+
+    let name_clone = name.clone();
+    let swarm_handle = tokio::spawn(async move {
+        println!("{} starting swarm", name_clone);
+        if let Err(e) = peer.start().await {
+            println!("{} swarm failed: {}", name_clone, e);
         }
+        println!("{} swarm finished", name_clone);
     });
 
     // Give network time to initialize
     sleep(Duration::from_secs(3)).await;
+
+    // Set up dialer for peers
+    for peer in peers {
+        DialerActor::dial_peer(peer, net_bus.clone(), tx.clone());
+    }
 
     // Send our message first
     println!("{} sending message", name);
@@ -82,21 +97,22 @@ async fn main() -> Result<()> {
 
     // Then wait to receive from others with a timeout
     let mut received = HashSet::new();
-
-    // Wrap the message receiving loop in a timeout
     let receive_result = timeout(Duration::from_secs(10), async {
+        let history = net_bus.send(GetHistory::<NetworkPeerEvent>::new()).await?;
+        println!("{} history: {:?}", name, history);
         while received != expected {
-            match rx.recv().await? {
-                NetworkPeerEvent::GossipData(msg) => match String::from_utf8(msg) {
-                    Ok(msg) => {
-                        if !received.contains(&msg) {
-                            println!("{} received '{}'", name, msg);
-                            received.insert(msg);
-                        }
+            for event in history.clone() {
+                match event {
+                    NetworkPeerEvent::GossipData(msg) => {
+                        println!(
+                            "{} received '{}'",
+                            name,
+                            String::from_utf8(msg.clone()).unwrap()
+                        );
+                        received.insert(String::from_utf8(msg).unwrap());
                     }
-                    Err(e) => println!("{} received invalid UTF8: {}", name, e),
-                },
-                _ => (),
+                    _ => (),
+                }
             }
         }
         Ok::<(), anyhow::Error>(())
@@ -121,8 +137,8 @@ async fn main() -> Result<()> {
     }
 
     // Make sure router task is still running
-    if router_task.is_finished() {
-        println!("{} warning: router task finished early", name);
+    if swarm_handle.is_finished() {
+        println!("{} warning: swarm task finished early", name);
     }
 
     // Give some time for final message propagation

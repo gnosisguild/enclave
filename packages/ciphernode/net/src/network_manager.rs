@@ -1,26 +1,27 @@
 use crate::correlation_id::CorrelationId;
-use crate::events::NetworkPeerCommand;
-use crate::events::NetworkPeerEvent;
-use crate::NetworkPeer;
+use crate::dialer::DialerActor;
+use crate::events::{NetworkPeerCommand, NetworkPeerEvent};
+use crate::network_peer::NetworkPeer;
+
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
 use anyhow::{bail, Result};
 use crypto::Cipher;
 use data::Repository;
+use events::EventBusConfig;
 use events::{EnclaveEvent, EventBus, EventId, Subscribe};
-use libp2p::identity::ed25519;
+use libp2p::{gossipsub, identity::ed25519};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::select;
-use tokio::sync::broadcast;
 use tokio::sync::mpsc;
-use tracing::{error, info, instrument, trace};
+use tracing::{error, info, instrument, trace, warn};
 
 /// NetworkManager Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetworkPeer for propagation over the p2p network
 pub struct NetworkManager {
     bus: Addr<EventBus<EnclaveEvent>>,
+    net_bus: Addr<EventBus<NetworkPeerEvent>>,
     tx: mpsc::Sender<NetworkPeerCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
@@ -30,20 +31,17 @@ impl Actor for NetworkManager {
     type Context = Context<Self>;
 }
 
-/// Libp2pEvent is used to send data to the NetworkPeer from the NetworkManager
-#[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "anyhow::Result<()>")]
-struct LibP2pEvent(pub Vec<u8>);
-
 impl NetworkManager {
     /// Create a new NetworkManager actor
     pub fn new(
         bus: Addr<EventBus<EnclaveEvent>>,
+        net_bus: Addr<EventBus<NetworkPeerEvent>>,
         tx: mpsc::Sender<NetworkPeerCommand>,
         topic: &str,
     ) -> Self {
         Self {
             bus,
+            net_bus,
             tx,
             sent_events: HashSet::new(),
             topic: topic.to_string(),
@@ -52,11 +50,11 @@ impl NetworkManager {
 
     pub fn setup(
         bus: Addr<EventBus<EnclaveEvent>>,
+        net_bus: Addr<EventBus<NetworkPeerEvent>>,
         tx: mpsc::Sender<NetworkPeerCommand>,
-        mut rx: broadcast::Receiver<NetworkPeerEvent>,
         topic: &str,
     ) -> Addr<Self> {
-        let addr = NetworkManager::new(bus.clone(), tx, topic).start();
+        let addr = NetworkManager::new(bus.clone(), net_bus.clone(), tx, topic).start();
 
         // Listen on all events
         bus.do_send(Subscribe {
@@ -64,22 +62,9 @@ impl NetworkManager {
             listener: addr.clone().recipient(),
         });
 
-        tokio::spawn({
-            let addr = addr.clone();
-            async move {
-                loop {
-                    select! {
-                        Ok(event) = rx.recv() => {
-                            match event {
-                                NetworkPeerEvent::GossipData(data) => {
-                                    addr.do_send(LibP2pEvent(data))
-                                },
-                                _ => ()
-                            }
-                        }
-                    }
-                }
-            }
+        net_bus.do_send(Subscribe {
+            event_type: String::from("*"),
+            listener: addr.clone().recipient(),
         });
 
         addr
@@ -95,6 +80,11 @@ impl NetworkManager {
         enable_mdns: bool,
         repository: Repository<Vec<u8>>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
+        let net_bus = EventBus::<NetworkPeerEvent>::new(EventBusConfig {
+            capture_history: true,
+            deduplicate: false,
+        })
+        .start();
         let topic = "tmp-enclave-gossip-topic";
         // Get existing keypair or generate a new one
         let mut bytes = match repository.read().await? {
@@ -108,29 +98,47 @@ impl NetworkManager {
         // Create peer from keypair
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let mut peer = NetworkPeer::new(&keypair, peers, Some(quic_port), topic, enable_mdns)?;
 
-        // Setup and start network manager
-        let rx = peer.rx();
-        let p2p_addr = NetworkManager::setup(bus, peer.tx(), rx, topic);
-        let handle = tokio::spawn(async move { Ok(peer.start().await?) });
+        // Create Channel for Dialer
+        let (tx, rx) = mpsc::channel(100);
+        let mut swarm_manager = match NetworkPeer::new(&keypair, enable_mdns, net_bus.clone(), rx)
+        {
+            Ok(swarm_manager) => swarm_manager,
+            Err(e) => {
+                warn!("Failed to create NetworkPeer: {:?}", e);
+                return Err(e);
+            }
+        };
+        let topic = gossipsub::IdentTopic::new(topic);
+        swarm_manager.subscribe(&topic)?;
+        swarm_manager.listen_on(quic_port)?;
+
+        let handle = tokio::spawn(async move { Ok(swarm_manager.start().await?) });
+        for peer in peers {
+            DialerActor::dial_peer(peer, net_bus.clone(), tx.clone());
+        }
+
+        let p2p_addr = NetworkManager::setup(bus, net_bus, tx, &topic.to_string());
 
         Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
 
-impl Handler<LibP2pEvent> for NetworkManager {
-    type Result = anyhow::Result<()>;
-    fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
-        let LibP2pEvent(bytes) = msg;
-        match EnclaveEvent::from_bytes(&bytes) {
-            Ok(event) => {
-                self.bus.do_send(event.clone());
-                self.sent_events.insert(event.into());
-            }
-            Err(err) => error!(error=?err, "Could not create EnclaveEvent from Libp2p Bytes!"),
+impl Handler<NetworkPeerEvent> for NetworkManager {
+    type Result = ();
+    fn handle(&mut self, msg: NetworkPeerEvent, _: &mut Self::Context) -> Self::Result {
+        match msg {
+            NetworkPeerEvent::GossipData(data) => match EnclaveEvent::from_bytes(&data) {
+                Ok(event) => {
+                    self.bus.do_send(event.clone());
+                    self.sent_events.insert(event.into());
+                }
+                Err(err) => {
+                    error!(error=?err, "Could not create EnclaveEvent from GossipData Bytes!")
+                }
+            },
+            _ => (),
         }
-        Ok(())
     }
 }
 

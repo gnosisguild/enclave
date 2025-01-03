@@ -6,6 +6,8 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 
+use events::{Event, Subscribe, EventId};
+
 use crate::correlation_id::CorrelationId;
 
 /// NetworkPeer Commands are sent to the network peer over a mspc channel
@@ -20,7 +22,7 @@ pub enum NetworkPeerCommand {
 
 /// NetworkPeerEvents are broadcast over a broadcast channel to whom ever wishes to listen
 #[derive(Message, Clone, Debug)]
-#[rtype(result = "anyhow::Result<()>")]
+#[rtype(result = "()")]
 pub enum NetworkPeerEvent {
     /// Bytes have been broadcast over the network
     GossipData(Vec<u8>),
@@ -35,7 +37,7 @@ pub enum NetworkPeerEvent {
         message_id: MessageId,
     },
     /// There was an error Dialing a peer
-    DialError { error: Arc<DialError> },
+    DialError { connection_id: ConnectionId, error: Arc<DialError> },
     /// A connection was established to a peer
     ConnectionEstablished { connection_id: ConnectionId },
     /// There was an error creating a connection
@@ -43,4 +45,35 @@ pub enum NetworkPeerEvent {
         connection_id: ConnectionId,
         error: Arc<DialError>,
     },
+}
+
+
+impl NetworkPeerEvent {
+    pub fn event_type(&self) -> String {
+        let s = format!("{:?}", self);
+        extract_event_name(&s).to_string()
+    }
+}
+
+impl Event for NetworkPeerEvent {
+    type Id = String;
+
+    fn event_type(&self) -> String {
+        let s = format!("{:?}", self);
+        extract_event_name(&s).to_string()
+    }
+
+    fn event_id(&self) -> Self::Id {
+        "network_peer_event".to_string()
+    }
+}
+
+fn extract_event_name(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    for (i, &item) in bytes.iter().enumerate() {
+        if item == b' ' || item == b'(' {
+            return &s[..i];
+        }
+    }
+    s
 }
