@@ -8,6 +8,8 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = { workspace = true }
+actix = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 async-trait = { workspace = true }
 futures = { workspace = true }
@@ -29,6 +31,4 @@ tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 events = { workspace = true }
-anyhow = { workspace = true }
-actix = { workspace = true }
 zeroize = { workspace = true }

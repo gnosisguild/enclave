@@ -474,15 +474,18 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
-    let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
         capture_history: true,
         deduplicate: true,
     })
     .start();
-    let event_rx = event_tx.subscribe();
+    let net_bus = EventBus::<NetworkPeerEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: false,
+    })
+    .start();
     // Pas cmd and event channels to NetworkManager
-    NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
+    NetworkManager::setup(bus.clone(), net_bus.clone(), cmd_tx.clone(), "my-topic");
 
     // Capture messages from output on msgs vec
     let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
@@ -499,7 +502,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
                 _ => None,
             } {
                 msgs_loop.lock().await.push(msg.clone());
-                event_tx.send(NetworkPeerEvent::GossipData(msg))?;
+                net_bus.do_send(NetworkPeerEvent::GossipData(msg));
             }
             // if this  manages to broadcast an event to the
             // event bus we will expect to see an extra event on
@@ -556,13 +559,17 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
-    let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
         capture_history: true,
         deduplicate: true,
     })
     .start();
-    NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
+    let net_bus = EventBus::<NetworkPeerEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: false,
+    })
+    .start();
+    NetworkManager::setup(bus.clone(), net_bus.clone(), cmd_tx.clone(), "mytopic");
 
     // Capture messages from output on msgs vec
     let event = EnclaveEvent::from(E3Requested {
@@ -574,7 +581,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     });
 
     // lets send an event from the network
-    let _ = event_tx.send(NetworkPeerEvent::GossipData(event.to_bytes()?));
+    net_bus.do_send(NetworkPeerEvent::GossipData(event.to_bytes()?));
 
     sleep(Duration::from_millis(1)).await; // need to push to next tick
 
