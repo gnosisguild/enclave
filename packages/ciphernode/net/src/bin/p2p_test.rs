@@ -1,114 +1,23 @@
 use actix::prelude::*;
 use anyhow::Result;
-use libp2p::identity::Keypair;
-use std::{collections::HashSet, env, process, time::Instant};
-use std::time::Duration;
-use tracing::{error, info};
-use tracing_subscriber::{prelude::*, EnvFilter};
-
+use events::{EventBus, EventBusConfig, GetHistory};
+use libp2p::gossipsub;
 use net::correlation_id::CorrelationId;
 use net::events::{NetworkPeerCommand, NetworkPeerEvent};
-use net::{ NetworkPeer, SetNetworkManager, SubscribeTopic};
+use net::DialerActor;
+use net::NetworkPeer;
+use std::time::Duration;
+use std::{collections::HashSet, env, process};
+use tokio::sync::mpsc;
+use tokio::time::{sleep, timeout};
+use tracing_subscriber::{prelude::*, EnvFilter};
 
-struct TestManager {
-    name: String,
-    expected: HashSet<String>,
-    received: HashSet<String>,
-    start_time: Instant,
-    timeout_secs: u64,
-}
-
-impl TestManager {
-    fn new(name: &str, expected: HashSet<String>, timeout_secs: u64) -> Self {
-        Self {
-            name: name.to_string(),
-            expected,
-            received: HashSet::new(),
-            start_time: Instant::now(),
-            timeout_secs,
-        }
-    }
-}
-
-impl Actor for TestManager {
-    type Context = Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        info!("TestManager for '{}' started", self.name);
-
-        ctx.run_interval(Duration::from_millis(100), |act, _ctx| {
-            if act.received == act.expected {
-                info!(
-                    "{} received all expected messages: {:?}",
-                    act.name, act.received
-                );
-                System::current().stop();
-                return;
-            }
-
-            if Instant::now().duration_since(act.start_time).as_secs() > act.timeout_secs {
-                error!(
-                    "{} timed out. Received only {:?}, but still expected {:?}",
-                    act.name, act.received, act.expected
-                );
-                process::exit(1);
-            }
-        });
-    }
-}
-
-impl Handler<NetworkPeerEvent> for TestManager {
-    type Result = ();
-
-    fn handle(&mut self, event: NetworkPeerEvent, _ctx: &mut Self::Context) -> Self::Result {
-        match event {
-            NetworkPeerEvent::GossipData(bytes) => {
-                info!("{} received data", self.name);
-                match String::from_utf8(bytes) {
-                    Ok(peer_name) => {
-                        if !self.received.contains(&peer_name) {
-                            info!("{} received '{}'", self.name, peer_name);
-                            self.received.insert(peer_name);
-                        }
-                    }
-                    Err(e) => {
-                        error!("{} received invalid UTF8: {}", self.name, e);
-                    }
-                }
-            }
-            NetworkPeerEvent::GossipPublished { correlation_id, message_id } => {
-                info!(
-                    "{} successfully published message with ID {:?} and correlation ID {:?}",
-                    self.name, message_id, correlation_id
-                );
-            }
-            NetworkPeerEvent::GossipPublishError { error, .. } => {
-                error!("{} received GossipPublishError: {:?}", self.name, error);
-                process::exit(1);
-            }
-            NetworkPeerEvent::ConnectionEstablished { connection_id } => {
-                info!("{}: connection established (id={})", self.name, connection_id);
-            }
-            NetworkPeerEvent::DialError { error, connection_id } => {
-                info!(
-                    "{}: dial error on connection {}: {}",
-                    self.name, connection_id, error
-                );
-            }
-            NetworkPeerEvent::OutgoingConnectionError {
-                connection_id,
-                error,
-                ..
-            } => {
-                error!(
-                    "{}: outgoing connection error on {}: {}",
-                    self.name, connection_id, error
-                );
-            }
-        }
-    }
-}
-
+// So this is a simple test to test our networking configuration
+// Here we ensure we can send a gossipsub message to all connected nodes
+// Each node is assigned a name alice, bob or charlie and expects to receive the other two
+// names via gossipsub or the node will exit with an error code
+// We have a docker test harness that runs the nodes and blocks things like mdns ports to ensure
+// that basic discovery is working
 
 #[actix::main]
 async fn main() -> Result<()> {
@@ -134,28 +43,105 @@ async fn main() -> Result<()> {
         peers.push(dial_str);
     }
 
-    let topic = "test-topic";
-    let id = Keypair::generate_ed25519();
-    let peer_addr = NetworkPeer::setup(&id, peers.clone(), udp_port, enable_mdns);
+    let id = libp2p::identity::Keypair::generate_ed25519();
+    let (tx, rx) = mpsc::channel(100);
 
-    let mut all_nodes = vec!["alice", "bob", "charlie"];
-    all_nodes.retain(|n| *n != name);
-    let expected: HashSet<String> = all_nodes.iter().map(|s| s.to_string()).collect();
-    let test_manager = TestManager::new(&name, expected, 10).start();
+    let net_bus = EventBus::<NetworkPeerEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: false,
+    })
+    .start();
 
-    peer_addr
-        .send(SetNetworkManager(test_manager.recipient()))
-        .await??;
+    let mut peer = NetworkPeer::new(&id, enable_mdns, net_bus.clone(), rx)?;
+    let topic_id = gossipsub::IdentTopic::new(topic);
+    peer.subscribe(&topic_id)?;
+    peer.listen_on(udp_port.unwrap_or(0))?;
 
-    peer_addr
-        .send(SubscribeTopic(topic.to_string()))
-        .await??;
+    let name_clone = name.clone();
+    let swarm_handle = tokio::spawn(async move {
+        println!("{} starting swarm", name_clone);
+        if let Err(e) = peer.start().await {
+            println!("{} swarm failed: {}", name_clone, e);
+        }
+        println!("{} swarm finished", name_clone);
+    });
 
-    peer_addr.do_send(NetworkPeerCommand::GossipPublish {
+    // Give network time to initialize
+    sleep(Duration::from_secs(3)).await;
+
+    // Set up dialer for peers
+    for peer in peers {
+        DialerActor::dial_peer(peer, net_bus.clone(), tx.clone());
+    }
+
+    // Send our message first
+    println!("{} sending message", name);
+    tx.send(NetworkPeerCommand::GossipPublish {
         correlation_id: CorrelationId::new(),
         topic: topic.to_string(),
         data: name.as_bytes().to_vec(),
-    });
+    })
+    .await?;
+    println!("{} message sent", name);
 
+    let expected: HashSet<String> = vec![
+        "alice".to_string(),
+        "bob".to_string(),
+        "charlie".to_string(),
+    ]
+    .into_iter()
+    .filter(|n| *n != name)
+    .collect();
+    println!("{} waiting for messages from: {:?}", name, expected);
+
+    // Then wait to receive from others with a timeout
+    let mut received = HashSet::new();
+    let receive_result = timeout(Duration::from_secs(10), async {
+        let history = net_bus.send(GetHistory::<NetworkPeerEvent>::new()).await?;
+        println!("{} history: {:?}", name, history);
+        while received != expected {
+            for event in history.clone() {
+                match event {
+                    NetworkPeerEvent::GossipData(msg) => {
+                        println!(
+                            "{} received '{}'",
+                            name,
+                            String::from_utf8(msg.clone()).unwrap()
+                        );
+                        received.insert(String::from_utf8(msg).unwrap());
+                    }
+                    _ => (),
+                }
+            }
+        }
+        Ok::<(), anyhow::Error>(())
+    })
+    .await;
+
+    match receive_result {
+        Ok(Ok(())) => {
+            println!("{} received all expected messages", name);
+        }
+        Ok(Err(e)) => {
+            println!("{} error while receiving messages: {}", name, e);
+            process::exit(1);
+        }
+        Err(_) => {
+            println!(
+                "{} timeout waiting for messages. Received only: {:?}",
+                name, received
+            );
+            process::exit(1);
+        }
+    }
+
+    // Make sure router task is still running
+    if swarm_handle.is_finished() {
+        println!("{} warning: swarm task finished early", name);
+    }
+
+    // Give some time for final message propagation
+    sleep(Duration::from_secs(1)).await;
+    println!("{} finished successfully", name);
     Ok(())
 }

@@ -1,152 +1,146 @@
-use crate::{events::{NetworkPeerCommand, NetworkPeerEvent}, NetworkPeer};
+use crate::events::{NetworkPeerCommand, NetworkPeerEvent};
 use actix::prelude::*;
 use anyhow::{Context as AnyhowContext, Result};
+use events::{EventBus, Subscribe};
 use libp2p::{
     multiaddr::Protocol,
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
     Multiaddr,
 };
-use std::net::ToSocketAddrs;
-use tokio::select;
-use tokio::sync::{broadcast, mpsc};
-use tokio::time::{sleep, Duration};
-use tracing::error;
-use tracing::info;
+use std::{collections::HashMap, net::ToSocketAddrs, sync::Arc, time::Duration};
+use tokio::sync::mpsc;
+use tracing::{info, warn};
 
-use crate::{
-    events::{NetworkPeerCommand, NetworkPeerEvent},
-    retry::{retry_with_backoff, to_retry, RetryError, BACKOFF_DELAY, BACKOFF_MAX_RETRIES},
-};
+const BACKOFF_DELAY: u64 = 500;
+const BACKOFF_MAX_RETRIES: u32 = 10;
+const CONNECTION_TIMEOUT: u64 = 60;
 
-/// Dial a single Multiaddr with retries and return an error should those retries not work
-async fn dial_multiaddr(
-    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
-    event_tx: &broadcast::Sender<NetworkPeerEvent>,
-    multiaddr_str: &str,
-) -> Result<()> {
-    let multiaddr = &multiaddr_str.parse()?;
-    info!("Now dialing in to {}", multiaddr);
-    retry_with_backoff(
-        || attempt_connection(cmd_tx, event_tx, multiaddr),
-        BACKOFF_MAX_RETRIES,
-        BACKOFF_DELAY,
-    )
-    .await?;
-    Ok(())
+#[derive(Message)]
+#[rtype(result = "Result<()>")]
+pub struct DialPeer(pub String);
+
+#[derive(Clone)]
+struct PendingConnection {
+    addr: String,
+    attempt: u32,
+    delay_ms: u64,
 }
 
-fn trace_error(r: Result<()>) {
-    if let Err(err) = r {
-        error!("{}", err);
+#[derive(Clone)]
+pub struct DialerActor {
+    net_bus: Addr<EventBus<NetworkPeerEvent>>,
+    tx: mpsc::Sender<NetworkPeerCommand>,
+    pending_connection: HashMap<ConnectionId, PendingConnection>,
+}
+
+impl DialerActor {
+    pub fn new(
+        net_bus: Addr<EventBus<NetworkPeerEvent>>,
+        tx: mpsc::Sender<NetworkPeerCommand>,
+    ) -> Addr<Self> {
+        let addr = Self {
+            net_bus: net_bus.clone(),
+            tx,
+            pending_connection: HashMap::new(),
+        }
+        .start();
+
+        // Listen on all events
+        net_bus.do_send(Subscribe {
+            event_type: String::from("*"),
+            listener: addr.clone().recipient(),
+        });
+
+        addr
     }
-}
 
-/// Initiates connections to multiple network peers
-///
-/// # Arguments
-/// * `cmd_tx` - Sender for network peer commands
-/// * `event_tx` - Broadcast sender for peer events
-/// * `peers` - List of peer addresses to connect to
-pub async fn dial_peers(
-    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
-    event_tx: &broadcast::Sender<NetworkPeerEvent>,
-    peers: &Vec<String>,
-) -> Result<()> {
-    let futures: Vec<_> = peers
-        .iter()
-        .map(|addr| dial_multiaddr(cmd_tx, event_tx, addr))
-        .collect();
-    let results = join_all(futures).await;
-    results.into_iter().for_each(trace_error);
-    Ok(())
-}
+    pub fn dial_peer(
+        addr: String,
+        net_bus: Addr<EventBus<NetworkPeerEvent>>,
+        tx: mpsc::Sender<NetworkPeerCommand>,
+    ) {
+        let dialer = Self::new(net_bus, tx);
+        dialer.do_send(DialPeer(addr));
+    }
 
-/// Attempt a connection with retrys to a multiaddr return an error if the connection could not be resolved after the retries.
-async fn attempt_connection(
-    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
-    event_tx: &broadcast::Sender<NetworkPeerEvent>,
-    multiaddr: &Multiaddr,
-) -> Result<(), RetryError> {
-    let mut event_rx = event_tx.subscribe();
-    let multi = get_resolved_multiaddr(multiaddr).map_err(to_retry)?;
-    let opts: DialOpts = multi.clone().into();
-    let dial_connection = opts.connection_id();
-    info!("Dialing: '{}' with connection '{}'", multi, dial_connection);
-    cmd_tx
-        .send(NetworkPeerCommand::Dial(opts))
-        .await
-        .map_err(to_retry)?;
-    wait_for_connection(&mut event_rx, dial_connection).await
-}
+    async fn attempt_dial(
+        &mut self,
+        addr: String,
+        attempt: u32,
+        delay_ms: u64,
+    ) -> Option<ConnectionId> {
+        info!("Attempt {}/{} for {}", attempt, BACKOFF_MAX_RETRIES, addr);
+        if attempt > 1 {
+            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+        }
 
-/// Wait for results of a retry based on a given correlation id and return the correct variant of
-/// RetryError depending on the result from the downstream event
-async fn wait_for_connection(
-    event_rx: &mut broadcast::Receiver<NetworkPeerEvent>,
-    dial_connection: ConnectionId,
-) -> Result<(), RetryError> {
-    loop {
-        // Create a timeout future that can be reset
-        select! {
-            result = event_rx.recv() => {
-                match result.map_err(to_retry)? {
-                    NetworkPeerEvent::ConnectionEstablished { connection_id } => {
-                        if connection_id == dial_connection {
-                            info!("Connection Established");
-                            return Ok(());
-                        }
+        match addr.parse::<Multiaddr>() {
+            Ok(multi) => {
+                let resolved_multiaddr = match self.get_resolved_multiaddr(&multi) {
+                    Ok(addr) => addr,
+                    Err(e) => {
+                        warn!("Error resolving multiaddr {}: {}", addr, e);
+                        return None;
                     }
-                    NetworkPeerEvent::DialError { error } => {
-                        info!("DialError!");
-                        return match error.as_ref() {
-                            // If we are dialing ourself then we should just fail
-                            DialError::NoAddresses { .. } => {
-                                info!("DialError received. Returning RetryError::Failure");
-                                Err(RetryError::Failure(error.clone().into()))
-                            }
-                            // Try again otherwise
-                            _ => Err(RetryError::Retry(error.clone().into())),
-                        };
+                };
+                let opts: DialOpts = resolved_multiaddr.into();
+                let connection_id = opts.connection_id();
+
+                match self.tx.send(NetworkPeerCommand::Dial(opts)).await {
+                    Ok(_) => {
+                        info!("Dialing {} with connection {}", addr, connection_id);
+                        self.pending_connection.insert(
+                            connection_id,
+                            PendingConnection {
+                                addr,
+                                attempt,
+                                delay_ms,
+                            },
+                        );
+                        Some(connection_id)
                     }
-                    NetworkPeerEvent::OutgoingConnectionError {
-                        connection_id,
-                        error,
-                    } => {
-                        info!("OutgoingConnectionError!");
-                        if connection_id == dial_connection {
-                            info!(
-                                "Connection {} failed because of error {}. Retrying...",
-                                connection_id, error
-                            );
-                            return match error.as_ref() {
-                                // If we are dialing ourself then we should just fail
-                                DialError::NoAddresses { .. } => {
-                                    Err(RetryError::Failure(error.clone().into()))
-                                }
-                                // Try again otherwise
-                                _ => Err(RetryError::Retry(error.clone().into())),
-                            };
-                        }
+                    Err(e) => {
+                        warn!("Failed to initiate dial: {}", e);
+                        None
                     }
-                    _ => (),
                 }
             }
-            _ = sleep(Duration::from_secs(60)) => {
-                info!("Connection attempt timed out after 60 seconds of no events");
-                return Err(RetryError::Retry(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    "Connection attempt timed out",
-                ).into()));
+            Err(e) => {
+                warn!("Invalid multiaddr {}: {}", addr, e);
+                None
             }
         }
     }
-}
 
-/// Convert a Multiaddr to use a specific ip address with the ip4 or ip6 protocol
-fn dns_to_ip_addr(original: &Multiaddr, ip_str: &str) -> Result<Multiaddr> {
-    let ip = ip_str.parse()?;
-    let mut new_addr = Multiaddr::empty();
-    let mut skip_next = false;
+    // -----------------------------
+    // DNS resolution logic
+    // -----------------------------
+
+    fn get_resolved_multiaddr(&self, value: &Multiaddr) -> Result<Multiaddr> {
+        if let Some(domain) = self.extract_dns_host(value) {
+            let ip = self.resolve_ipv4(&domain)?;
+            self.dns_to_ip_addr(value, &ip)
+        } else {
+            Ok(value.clone())
+        }
+    }
+
+    fn extract_dns_host(&self, addr: &Multiaddr) -> Option<String> {
+        for proto in addr.iter() {
+            match proto {
+                Protocol::Dns4(hostname) | Protocol::Dns6(hostname) => {
+                    return Some(hostname.to_string())
+                }
+                _ => continue,
+            }
+        }
+        None
+    }
+
+    fn dns_to_ip_addr(&self, original: &Multiaddr, ip_str: &str) -> Result<Multiaddr> {
+        let ip = ip_str.parse()?;
+        let mut new_addr = Multiaddr::empty();
+        let mut skip_next = false;
 
         for proto in original.iter() {
             if skip_next {
@@ -179,33 +173,40 @@ impl Actor for DialerActor {
     type Context = Context<Self>;
 }
 
-impl Handler<SetNetworkPeer> for DialerActor {
-    type Result = Result<()>;
-
-    fn handle(&mut self, msg: SetNetworkPeer, _: &mut Context<Self>) -> Self::Result {
-        self.network_peer = Some(msg.0);
-        Ok(())
-    }
-}
-
 impl Handler<NetworkPeerEvent> for DialerActor {
     type Result = ();
 
     fn handle(&mut self, msg: NetworkPeerEvent, ctx: &mut Context<Self>) {
+        let mut dialer = self.clone();
         match msg {
             NetworkPeerEvent::ConnectionEstablished { connection_id } => {
-                if let Some(conn) = self.pending_connections.remove(&connection_id) {
+                if let Some(conn) = self.pending_connection.remove(&connection_id) {
                     info!("Connection Established for {}", conn.addr);
                 }
             }
             NetworkPeerEvent::DialError {
-                error,
                 connection_id,
+                error,
             } => {
-                if let Some(conn) = self.pending_connections.remove(&connection_id) {
+                if let Some(conn) = self.pending_connection.remove(&connection_id) {
                     warn!("DialError for {}: {}", conn.addr, error);
                     if !matches!(error.as_ref(), DialError::NoAddresses { .. }) {
-                        self.schedule_retry(conn.addr, conn.attempt, conn.delay_ms, ctx);
+                        if conn.attempt < BACKOFF_MAX_RETRIES {
+                            ctx.spawn(
+                                async move {
+                                    dialer
+                                        .attempt_dial(
+                                            conn.addr,
+                                            conn.attempt + 1,
+                                            conn.delay_ms * 2,
+                                        )
+                                        .await;
+                                }
+                                .into_actor(self),
+                            );
+                        } else {
+                            warn!("Permanent failure for {}: {}", conn.addr, error);
+                        }
                     } else {
                         warn!("Permanent failure for {}: {}", conn.addr, error);
                     }
@@ -215,10 +216,25 @@ impl Handler<NetworkPeerEvent> for DialerActor {
                 connection_id,
                 error,
             } => {
-                if let Some(conn) = self.pending_connections.remove(&connection_id) {
+                if let Some(conn) = self.pending_connection.remove(&connection_id) {
                     warn!("OutgoingConnectionError for {}: {}", conn.addr, error);
                     if !matches!(error.as_ref(), DialError::NoAddresses { .. }) {
-                        self.schedule_retry(conn.addr, conn.attempt, conn.delay_ms, ctx);
+                        if conn.attempt < BACKOFF_MAX_RETRIES {
+                            ctx.spawn(
+                                async move {
+                                    dialer
+                                        .attempt_dial(
+                                            conn.addr,
+                                            conn.attempt + 1,
+                                            conn.delay_ms * 2,
+                                        )
+                                        .await;
+                                }
+                                .into_actor(self),
+                            );
+                        } else {
+                            warn!("Permanent failure for {}: {}", conn.addr, error);
+                        }
                     } else {
                         warn!("Permanent failure for {}: {}", conn.addr, error);
                     }
@@ -229,47 +245,17 @@ impl Handler<NetworkPeerEvent> for DialerActor {
     }
 }
 
-impl Handler<DialPeers> for DialerActor {
+impl Handler<DialPeer> for DialerActor {
     type Result = Result<()>;
 
-    fn handle(&mut self, msg: DialPeers, ctx: &mut Context<Self>) -> Self::Result {
-        for addr in msg.0 {
-            ctx.address().do_send(RetryDial {
-                addr,
-                attempt: 1,
-                delay_ms: BACKOFF_DELAY,
-            });
-        }
+    fn handle(&mut self, msg: DialPeer, ctx: &mut Context<Self>) -> Self::Result {
+        let mut dialer = self.clone();
+        ctx.spawn(
+            async move {
+                dialer.attempt_dial(msg.0, 1, BACKOFF_DELAY).await;
+            }
+            .into_actor(self),
+        );
         Ok(())
-    }
-}
-
-impl Handler<RetryDial> for DialerActor {
-    type Result = ResponseActFuture<Self, ()>;
-
-    fn handle(&mut self, msg: RetryDial, _: &mut Context<Self>) -> Self::Result {
-        let RetryDial {
-            addr,
-            attempt,
-            delay_ms,
-        } = msg;
-
-        let future = async move {
-            if attempt > 1 {
-                actix::clock::sleep(Duration::from_millis(delay_ms)).await;
-            }
-        }
-        .into_actor(self);
-
-        Box::pin(future.map(move |_, actor, ctx| {
-            if let Some(connection_id) = actor.attempt_dial(addr.clone(), attempt, delay_ms, ctx) {
-                ctx.run_later(Duration::from_secs(CONNECTION_TIMEOUT), move |act, ctx| {
-                    if let Some(conn) = act.pending_connections.remove(&connection_id) {
-                        warn!("Connection attempt timed out for {}", conn.addr);
-                        act.schedule_retry(conn.addr, conn.attempt, conn.delay_ms, ctx);
-                    }
-                });
-            }
-        }))
     }
 }

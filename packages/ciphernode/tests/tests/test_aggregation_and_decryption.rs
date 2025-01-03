@@ -474,39 +474,42 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
-    let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
         capture_history: true,
         deduplicate: true,
     })
     .start();
-    let event_rx = event_tx.subscribe();
+    let net_bus = EventBus::<NetworkPeerEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: false,
+    })
+    .start();
     // Pas cmd and event channels to NetworkManager
-    NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
+    NetworkManager::setup(bus.clone(), net_bus.clone(), cmd_tx.clone(), "my-topic");
 
 //     // Capture messages from output on msgs vec
 //     let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
 //     let msgs_loop = msgs.clone();
 
-//     tokio::spawn(async move {
-//         // Pull events from command channel
-//         while let Some(cmd) = cmd_rx.recv().await {
-//             // If the command is a GossipPublish then extract it and save it whilst sending it to
-//             // the event bus as if it was gossiped from the network and ended up as an external
-//             // message this simulates a rebroadcast message
-//             if let Some(msg) = match cmd {
-//                 net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
-//                 _ => None,
-//             } {
-//                 msgs_loop.lock().await.push(msg.clone());
-//                 event_tx.send(NetworkPeerEvent::GossipData(msg))?;
-//             }
-//             // if this  manages to broadcast an event to the
-//             // event bus we will expect to see an extra event on
-//             // the bus but we don't because we handle this
-//         }
-//         anyhow::Ok(())
-//     });
+    tokio::spawn(async move {
+        // Pull events from command channel
+        while let Some(cmd) = cmd_rx.recv().await {
+            // If the command is a GossipPublish then extract it and save it whilst sending it to
+            // the event bus as if it was gossiped from the network and ended up as an external
+            // message this simulates a rebroadcast message
+            if let Some(msg) = match cmd {
+                net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
+                _ => None,
+            } {
+                msgs_loop.lock().await.push(msg.clone());
+                net_bus.do_send(NetworkPeerEvent::GossipData(msg));
+            }
+            // if this  manages to broadcast an event to the
+            // event bus we will expect to see an extra event on
+            // the bus but we don't because we handle this
+        }
+        anyhow::Ok(())
+    });
 
 //     let evt_1 = EnclaveEvent::from(PlaintextAggregated {
 //         e3_id: E3id::new("1235"),
@@ -556,13 +559,17 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
-    let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
         capture_history: true,
         deduplicate: true,
     })
     .start();
-    NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
+    let net_bus = EventBus::<NetworkPeerEvent>::new(EventBusConfig {
+        capture_history: true,
+        deduplicate: false,
+    })
+    .start();
+    NetworkManager::setup(bus.clone(), net_bus.clone(), cmd_tx.clone(), "mytopic");
 
 //     // Capture messages from output on msgs vec
 //     let event = EnclaveEvent::from(E3Requested {
@@ -573,8 +580,8 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 //         src_chain_id: 1,
 //     });
 
-//     // lets send an event from the network
-//     let _ = event_tx.send(NetworkPeerEvent::GossipData(event.to_bytes()?));
+    // lets send an event from the network
+    net_bus.do_send(NetworkPeerEvent::GossipData(event.to_bytes()?));
 
 //     sleep(Duration::from_millis(1)).await; // need to push to next tick
 
