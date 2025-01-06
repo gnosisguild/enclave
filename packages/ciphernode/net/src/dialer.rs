@@ -167,6 +167,32 @@ impl Dialer {
             .context("no IPv4 addresses found")?;
         Ok(addr.ip().to_string())
     }
+
+    fn handle_connection_error(
+        &mut self,
+        conn: PendingConnection,
+        error: Arc<DialError>,
+        ctx: &mut Context<Self>,
+    ) {
+        warn!("Connection error for {}: {}", conn.addr, error);
+        if !matches!(error.as_ref(), DialError::NoAddresses { .. }) {
+            if conn.attempt < BACKOFF_MAX_RETRIES {
+                let mut dialer = self.clone();
+                ctx.spawn(
+                    async move {
+                        dialer
+                            .attempt_dial(conn.addr, conn.attempt + 1, conn.delay_ms * 2)
+                            .await;
+                    }
+                    .into_actor(self),
+                );
+            } else {
+                warn!("Permanent failure for {}: {}", conn.addr, error);
+            }
+        } else {
+            warn!("Permanent failure for {}: {}", conn.addr, error);
+        }
+    }
 }
 
 impl Actor for Dialer {
@@ -177,7 +203,6 @@ impl Handler<NetworkPeerEvent> for Dialer {
     type Result = ();
 
     fn handle(&mut self, msg: NetworkPeerEvent, ctx: &mut Context<Self>) {
-        let mut dialer = self.clone();
         match msg {
             NetworkPeerEvent::ConnectionEstablished { connection_id } => {
                 if let Some(conn) = self.pending_connection.remove(&connection_id) {
@@ -189,27 +214,7 @@ impl Handler<NetworkPeerEvent> for Dialer {
                 error,
             } => {
                 if let Some(conn) = self.pending_connection.remove(&connection_id) {
-                    warn!("DialError for {}: {}", conn.addr, error);
-                    if !matches!(error.as_ref(), DialError::NoAddresses { .. }) {
-                        if conn.attempt < BACKOFF_MAX_RETRIES {
-                            ctx.spawn(
-                                async move {
-                                    dialer
-                                        .attempt_dial(
-                                            conn.addr,
-                                            conn.attempt + 1,
-                                            conn.delay_ms * 2,
-                                        )
-                                        .await;
-                                }
-                                .into_actor(self),
-                            );
-                        } else {
-                            warn!("Permanent failure for {}: {}", conn.addr, error);
-                        }
-                    } else {
-                        warn!("Permanent failure for {}: {}", conn.addr, error);
-                    }
+                    self.handle_connection_error(conn, error, ctx);
                 }
             }
             NetworkPeerEvent::OutgoingConnectionError {
@@ -217,27 +222,7 @@ impl Handler<NetworkPeerEvent> for Dialer {
                 error,
             } => {
                 if let Some(conn) = self.pending_connection.remove(&connection_id) {
-                    warn!("OutgoingConnectionError for {}: {}", conn.addr, error);
-                    if !matches!(error.as_ref(), DialError::NoAddresses { .. }) {
-                        if conn.attempt < BACKOFF_MAX_RETRIES {
-                            ctx.spawn(
-                                async move {
-                                    dialer
-                                        .attempt_dial(
-                                            conn.addr,
-                                            conn.attempt + 1,
-                                            conn.delay_ms * 2,
-                                        )
-                                        .await;
-                                }
-                                .into_actor(self),
-                            );
-                        } else {
-                            warn!("Permanent failure for {}: {}", conn.addr, error);
-                        }
-                    } else {
-                        warn!("Permanent failure for {}: {}", conn.addr, error);
-                    }
+                    self.handle_connection_error(conn, error, ctx);
                 }
             }
             _ => {}
