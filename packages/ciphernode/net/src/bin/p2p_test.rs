@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
     peer.listen_on(udp_port.unwrap_or(0))?;
 
     let name_clone = name.clone();
-    let swarm_handle = tokio::spawn(async move {
+    let swarm_handle = actix::spawn(async move {
         println!("{} starting swarm", name_clone);
         if let Err(e) = peer.start().await {
             println!("{} swarm failed: {}", name_clone, e);
