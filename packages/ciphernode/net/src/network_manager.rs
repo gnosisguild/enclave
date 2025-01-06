@@ -1,5 +1,5 @@
 use crate::correlation_id::CorrelationId;
-use crate::dialer::DialerActor;
+use crate::dialer::Dialer;
 use crate::events::{NetworkPeerCommand, NetworkPeerEvent};
 use crate::network_peer::NetworkPeer;
 
@@ -114,7 +114,7 @@ impl NetworkManager {
 
         let handle = tokio::spawn(async move { Ok(swarm_manager.start().await?) });
         for peer in peers {
-            DialerActor::dial_peer(peer, net_bus.clone(), tx.clone());
+            Dialer::dial_peer(peer, net_bus.clone(), tx.clone());
         }
 
         let p2p_addr = NetworkManager::setup(bus, net_bus, tx, &topic.to_string());

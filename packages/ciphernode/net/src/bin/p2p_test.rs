@@ -4,7 +4,7 @@ use events::{EventBus, EventBusConfig, GetHistory};
 use libp2p::gossipsub;
 use net::correlation_id::CorrelationId;
 use net::events::{NetworkPeerCommand, NetworkPeerEvent};
-use net::DialerActor;
+use net::Dialer;
 use net::NetworkPeer;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
 
     // Set up dialer for peers
     for peer in peers {
-        DialerActor::dial_peer(peer, net_bus.clone(), tx.clone());
+        Dialer::dial_peer(peer, net_bus.clone(), tx.clone());
     }
 
     // Send our message first

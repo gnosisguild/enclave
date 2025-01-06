@@ -27,13 +27,13 @@ struct PendingConnection {
 }
 
 #[derive(Clone)]
-pub struct DialerActor {
+pub struct Dialer {
     net_bus: Addr<EventBus<NetworkPeerEvent>>,
     tx: mpsc::Sender<NetworkPeerCommand>,
     pending_connection: HashMap<ConnectionId, PendingConnection>,
 }
 
-impl DialerActor {
+impl Dialer {
     pub fn new(
         net_bus: Addr<EventBus<NetworkPeerEvent>>,
         tx: mpsc::Sender<NetworkPeerCommand>,
@@ -169,11 +169,11 @@ impl DialerActor {
     }
 }
 
-impl Actor for DialerActor {
+impl Actor for Dialer {
     type Context = Context<Self>;
 }
 
-impl Handler<NetworkPeerEvent> for DialerActor {
+impl Handler<NetworkPeerEvent> for Dialer {
     type Result = ();
 
     fn handle(&mut self, msg: NetworkPeerEvent, ctx: &mut Context<Self>) {
@@ -245,7 +245,7 @@ impl Handler<NetworkPeerEvent> for DialerActor {
     }
 }
 
-impl Handler<DialPeer> for DialerActor {
+impl Handler<DialPeer> for Dialer {
     type Result = Result<()>;
 
     fn handle(&mut self, msg: DialPeer, ctx: &mut Context<Self>) -> Self::Result {
