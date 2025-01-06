@@ -139,14 +139,18 @@ impl EnclaveEvent {
             _ => false,
         }
     }
+
+    pub fn event_type(&self) -> String {
+        let s = format!("{:?}", self);
+        extract_enclave_event_name(&s).to_string()
+    }
 }
 
 impl Event for EnclaveEvent {
     type Id = EventId;
 
     fn event_type(&self) -> String {
-        let s = format!("{:?}", self);
-        extract_enclave_event_name(&s).to_string()
+        self.event_type()
     }
 
     fn event_id(&self) -> Self::Id {
@@ -260,11 +264,4 @@ fn extract_enclave_event_name(s: &str) -> &str {
         }
     }
     s
-}
-
-impl EnclaveEvent {
-    pub fn event_type(&self) -> String {
-        let s = format!("{:?}", self);
-        extract_enclave_event_name(&s).to_string()
-    }
 }

@@ -1,3 +1,4 @@
+use crate::helpers::datastore::setup_datastore;
 use actix::{Actor, Addr};
 use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use anyhow::Result;
@@ -21,8 +22,6 @@ use sortition::SortitionRepositoryFactory;
 use std::sync::{Arc, Mutex};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
-
-use crate::helpers::datastore::setup_datastore;
 
 pub async fn execute(
     config: AppConfig,
@@ -83,7 +82,7 @@ pub async fn execute(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = NetworkManager::setup_with_peer(
+    let (_, handle, peer_id) = NetworkManager::setup_with_peer(
         bus.clone(),
         config.peers(),
         &cipher,
@@ -103,5 +102,5 @@ pub async fn execute(
 
     SimpleLogger::<EnclaveEvent>::attach("AGG", bus.clone());
 
-    Ok((bus, join_handle, peer_id))
+    Ok((bus, handle, peer_id))
 }
