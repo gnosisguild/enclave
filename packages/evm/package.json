@@ -46,10 +46,12 @@
     "solhint": "^5.0.3",
     "solhint-plugin-prettier": "^0.1.0",
     "solidity-coverage": "^0.8.5",
+    "solidity-docgen": "^0.6.0-beta.36",
     "ts-generator": "^0.1.1",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitepress": "^1.6.3"
   },
   "files": [
     "contracts"
@@ -88,7 +90,8 @@
     "test": "hardhat test",
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
     "prerelease": "yarn clean && yarn compile && yarn typechain",
-    "release": "yarn publish --non-interactive"
+    "release": "yarn publish --non-interactive",
+    "docs:dev": "yarn hardhat docgen && yarn vitepress dev docs"
   },
   "dependencies": {}
 }
