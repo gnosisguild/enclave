@@ -11,6 +11,8 @@ node_modules
 types
 deployments
 
+**/excubiae
+
 # files
 *.env
 *.log
