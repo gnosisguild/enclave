@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 //  Copyright (C) 2024 Privacy & Scaling Explorations
 //  Auto-generated from https://github.com/privacy-scaling-explorations/excubiae.git@96a3312455417dc1b2e0d87066661fdf8f490fac
-pragma solidity ^0.8.20;
+pragma solidity >=0.8.27;
 
 import {IBaseChecker} from "./interfaces/IBaseChecker.sol";
 import {Checker} from "./Checker.sol";
