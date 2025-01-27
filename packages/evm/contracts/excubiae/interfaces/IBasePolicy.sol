@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Auto-generated from https://github.com/privacy-scaling-explorations/excubiae.git@96a3312455417dc1b2e0d87066661fdf8f490fac
+//  Copyright (C) 2024 Privacy & Scaling Explorations
+//  Auto-generated from https://github.com/privacy-scaling-explorations/excubiae.git@96a3312455417dc1b2e0d87066661fdf8f490fac
 pragma solidity ^0.8.20;
 
 import {IPolicy} from "./IPolicy.sol";
