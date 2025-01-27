@@ -34,17 +34,15 @@ cleanup() {
 set -e
 trap cleanup EXIT
 
-echo "Creating temporary directory..."
-mkdir -p "$TEMP_DIR"
 
-echo "Cloning repository (sparse checkout)..."
+echo "Cloning repository..."
+mkdir -p "$TEMP_DIR"
 git clone --depth 1 --branch "${BRANCH_NAME}" "${REPO_URL}" "${TEMP_DIR}"
 
 COMMIT_HASH=$(cd "${TEMP_DIR}" && git rev-parse HEAD)
 
-mkdir -p "$DESTINATION_FOLDER"
-
 echo "Copying $SOURCE_FOLDER to $DESTINATION_FOLDER"
+mkdir -p "$DESTINATION_FOLDER"
 if [ -d "$SOURCE_FOLDER" ]; then
   # Copy everything
   rsync -av --exclude 'test/' "${SOURCE_FOLDER}/" "$DESTINATION_FOLDER"
