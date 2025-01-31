@@ -3,9 +3,9 @@
 //  Auto-generated from https://github.com/privacy-scaling-explorations/excubiae.git@96a3312455417dc1b2e0d87066661fdf8f490fac
 pragma solidity >=0.8.27;
 
-import {IBasePolicy} from "./interfaces/IBasePolicy.sol";
-import {Policy} from "./Policy.sol";
-import {BaseChecker} from "./BaseChecker.sol";
+import { IBasePolicy } from "./interfaces/IBasePolicy.sol";
+import { Policy } from "./Policy.sol";
+import { BaseChecker } from "./BaseChecker.sol";
 
 /// @title BasePolicy
 /// @notice Abstract base contract for implementing specific policy checks.
@@ -37,7 +37,10 @@ abstract contract BasePolicy is Policy, IBasePolicy {
     /// @custom:throws AlreadyEnforced if check was previously enforced.
     /// @custom:throws UnsuccessfulCheck if the check fails.
     /// @custom:emits Enforced when check succeeds.
-    function enforce(address subject, bytes[] calldata evidence) external override onlyTarget {
+    function enforce(
+        address subject,
+        bytes[] calldata evidence
+    ) external override onlyTarget {
         _enforce(subject, evidence);
     }
 
