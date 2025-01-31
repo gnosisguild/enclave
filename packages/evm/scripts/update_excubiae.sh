@@ -24,7 +24,7 @@ export REPO_URL="https://github.com/privacy-scaling-explorations/excubiae.git"
 export BRANCH_NAME="main"
 export TEMP_DIR="/tmp/repo-$(date +%s)"
 export SOURCE_FOLDER="${TEMP_DIR}/packages/contracts/contracts/src"
-export DESTINATION_FOLDER="${PWD}/contracts/excubiae"
+export DESTINATION_FOLDER="${PWD}/contracts/excubiae/core"
 
 cleanup() {
     echo "Cleaning up temporary directory..."
@@ -33,7 +33,6 @@ cleanup() {
 
 set -e
 trap cleanup EXIT
-
 
 echo "Cloning repository..."
 mkdir -p "$TEMP_DIR"

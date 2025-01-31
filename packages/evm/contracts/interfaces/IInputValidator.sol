@@ -9,5 +9,5 @@ interface IInputValidator {
     function validate(
         address sender,
         bytes memory params
-    ) external returns (bytes memory input, bool success);
+    ) external view returns (bytes memory input, bool success);
 }

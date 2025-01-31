@@ -10,11 +10,13 @@ import { ethers } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
+import { deployInputValidatorPolicyFixture } from "./fixtures/InputValidatorPolicy.fixture";
 import { deployCiphernodeRegistryFixture } from "./fixtures/MockCiphernodeRegistry.fixture";
 import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fixture";
 import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
 import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
+import { deployInputValidatorCheckerFixture } from "./fixtures/MockInputValidatorChecker.fixture";
 import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
@@ -1308,5 +1310,52 @@ describe("Enclave", function () {
         .to.emit(enclave, "PlaintextOutputPublished")
         .withArgs(e3Id, data);
     });
+  });
+});
+
+describe("InputValidatorPolicy", function () {
+  async function setup() {
+    const [owner, notTheOwner] = await ethers.getSigners();
+
+    const inputValidator = await deployInputValidatorFixture();
+    const inputValidatorChecker = await deployInputValidatorCheckerFixture(
+      await inputValidator.getAddress(),
+    );
+    const inputValidatorPolicy = await deployInputValidatorPolicyFixture(
+      await inputValidatorChecker.getAddress(),
+    );
+
+    return {
+      owner,
+      notTheOwner,
+      mocks: {
+        inputValidator,
+        inputValidatorChecker,
+      },
+      inputValidatorPolicy,
+    };
+  }
+
+  it("should validate inputs using the input validator", async function () {
+    const { notTheOwner, inputValidatorPolicy, owner } =
+      await loadFixture(setup);
+    await inputValidatorPolicy.connect(owner).setTarget(owner);
+    const shouldPass = "0x1234"; // length 2 = pass
+    const contract = inputValidatorPolicy.connect(owner);
+    await contract.connect(owner).enforce(notTheOwner, [shouldPass]);
+    await expect(
+      contract.connect(owner).enforce(notTheOwner, [shouldPass]),
+    ).to.be.revertedWithCustomError(inputValidatorPolicy, "AlreadyEnforced");
+  });
+
+  it("should fail with error if the checker fails", async function () {
+    const { notTheOwner, inputValidatorPolicy, owner } =
+      await loadFixture(setup);
+    await inputValidatorPolicy.connect(owner).setTarget(owner);
+    const shouldFail = "0x123456"; // length 3 = fail
+    const contract = inputValidatorPolicy.connect(owner);
+    await expect(
+      contract.enforce(notTheOwner, [shouldFail]),
+    ).to.be.revertedWithCustomError(contract, "UnsuccessfulCheck");
   });
 });
