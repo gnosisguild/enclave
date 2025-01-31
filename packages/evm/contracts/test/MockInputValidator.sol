@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { IInputValidator } from "../interfaces/IInputValidator.sol";
-
-contract MockInputValidator is IInputValidator {
+contract MockInputValidator {
     function validate(
         address,
         bytes memory params
