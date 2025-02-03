@@ -15,7 +15,6 @@ import { deployCiphernodeRegistryFixture } from "./fixtures/MockCiphernodeRegist
 import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fixture";
 import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
-import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
 import { deployInputValidatorCheckerFixture } from "./fixtures/MockInputValidatorChecker.fixture";
 import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
@@ -39,16 +38,12 @@ const proof = "0x1337";
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
 async function deployInputValidatorContracts() {
-  const inputValidator = await deployInputValidatorFixture();
-  const inputValidatorChecker = await deployInputValidatorCheckerFixture(
-    await inputValidator.getAddress(),
-  );
+  const inputValidatorChecker = await deployInputValidatorCheckerFixture();
   const inputValidatorPolicy = await deployInputValidatorPolicyFixture(
     await inputValidatorChecker.getAddress(),
   );
 
   return {
-    inputValidator,
     inputValidatorChecker,
     inputValidatorPolicy,
   };
@@ -63,8 +58,7 @@ describe("Enclave", function () {
     const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
 
-    const { inputValidatorPolicy, inputValidator } =
-      await deployInputValidatorContracts();
+    const { inputValidatorPolicy } = await deployInputValidatorContracts();
 
     const e3Program = await deployE3ProgramFixture(
       await inputValidatorPolicy.getAddress(),
@@ -95,7 +89,6 @@ describe("Enclave", function () {
         e3Program,
         decryptionVerifier,
         computeProvider,
-        inputValidator,
         inputValidatorPolicy,
         registry,
       },

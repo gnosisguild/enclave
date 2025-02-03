@@ -90,12 +90,13 @@ task(
 
     let e3Params = taskArguments.e3Params;
     if (!e3Params) {
-      const MockInputValidator =
-        await hre.deployments.get("MockInputValidator");
-      if (!MockInputValidator) {
-        throw new Error("MockInputValidator not deployed");
+      const MockInputValidatorChecker = await hre.deployments.get(
+        "MockInputValidatorChecker",
+      );
+      if (!MockInputValidatorChecker) {
+        throw new Error("MockInputValidatorChecker not deployed");
       }
-      e3Params = hre.ethers.zeroPadValue(MockInputValidator.address, 32);
+      e3Params = hre.ethers.zeroPadValue(MockInputValidatorChecker.address, 32);
     }
 
     let computeParams = taskArguments.computeParams;
