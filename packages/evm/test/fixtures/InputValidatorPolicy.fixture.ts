@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
 
-import { InputValidatorPolicy__factory } from "../../types/factories/contracts/InputValidatorPolicy__factory";
+import { InputValidatorPolicy__factory } from "../../types/factories/contracts/excubiae/InputValidatorPolicy__factory";
 
 export async function deployInputValidatorPolicyFixture(checker: string) {
   const deployment = await (
