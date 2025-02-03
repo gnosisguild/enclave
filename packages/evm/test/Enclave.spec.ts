@@ -958,7 +958,7 @@ describe("Enclave", function () {
       );
     });
 
-    // Skipping for now as fixing this would mean implementing an AdvancedPolicy in excubiae
+    // XXX: Skipping for now as fixing this would mean implementing an AdvancedPolicy in excubiae
     it.skip("adds inputHash to merkle tree", async function () {
       const { enclave, request } = await loadFixture(setup);
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
