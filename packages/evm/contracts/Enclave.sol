@@ -72,7 +72,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error CiphertextOutputNotPublished(uint256 e3Id);
     error PaymentRequired(uint256 value);
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
+
+    // Excubiae Errors
+    error ZeroAddress();
     error UnsuccessfulCheck();
+    error TargetNotSet();
+    error TargetOnly();
+    error TargetAlreadySet();
+    error AlreadyEnforced();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
