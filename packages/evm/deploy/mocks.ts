@@ -19,7 +19,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const mockInputValidatorChecker = await deploy("MockInputValidatorChecker", {
     from: deployer,
-    args: [],
+    args: [[]],
     log: true,
   });
 
