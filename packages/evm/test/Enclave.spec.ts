@@ -70,7 +70,7 @@ describe("Enclave", function () {
       await poseidon.getAddress(),
     );
 
-    // Ensure we set the target of the calling contract
+    // Ensure we set the target to be the calling contract
     await inputValidatorPolicy.connect(owner).setTarget(enclave);
 
     await enclave.setDecryptionVerifier(
