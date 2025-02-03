@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { IE3Program, BasePolicy } from "../interfaces/IE3Program.sol";
+import { IE3Program, IBasePolicy } from "../interfaces/IE3Program.sol";
 
 contract MockE3Program is IE3Program {
     error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
 
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
-    BasePolicy private storageInputValidator;
+    IBasePolicy private storageInputValidator;
 
-    constructor(BasePolicy _inputValidator) {
+    constructor(IBasePolicy _inputValidator) {
         storageInputValidator = _inputValidator;
     }
 
-    function setInputValidator(BasePolicy _inputValidator) external {
+    function setInputValidator(IBasePolicy _inputValidator) external {
         storageInputValidator = _inputValidator;
     }
 
@@ -26,7 +26,7 @@ contract MockE3Program is IE3Program {
     )
         external
         view
-        returns (bytes32 encryptionSchemeId, BasePolicy inputValidator)
+        returns (bytes32 encryptionSchemeId, IBasePolicy inputValidator)
     {
         require(
             computeProviderParams.length == 32,

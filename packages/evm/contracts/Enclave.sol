@@ -3,7 +3,7 @@ pragma solidity >=0.8.27;
 
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
-import { BasePolicy } from "./excubiae/core/BasePolicy.sol";
+import { IBasePolicy } from "./excubiae/core/interfaces/IBasePolicy.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -62,7 +62,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-    error InvalidComputationRequest(BasePolicy inputValidator);
+    error InvalidComputationRequest(IBasePolicy inputValidator);
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
@@ -149,7 +149,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        (bytes32 encryptionSchemeId, BasePolicy inputValidator) = e3Program
+        (bytes32 encryptionSchemeId, IBasePolicy inputValidator) = e3Program
             .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
