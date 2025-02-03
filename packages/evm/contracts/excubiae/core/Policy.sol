@@ -3,8 +3,8 @@
 //  Auto-generated from https://github.com/privacy-scaling-explorations/excubiae.git@96a3312455417dc1b2e0d87066661fdf8f490fac
 pragma solidity >=0.8.27;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IPolicy} from "./interfaces/IPolicy.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IPolicy } from "./interfaces/IPolicy.sol";
 
 /// @title Policy
 /// @notice Implements a base policy contract that protects access to a target contract

@@ -64,7 +64,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputationRequest(BasePolicy inputValidator);
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
-    error InvalidInput();
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
     error InvalidStartWindow();
@@ -73,6 +72,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error CiphertextOutputNotPublished(uint256 e3Id);
     error PaymentRequired(uint256 value);
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
+    error UnsuccessfulCheck();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -223,15 +223,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         bytes[] memory payload = new bytes[](1);
         payload[0] = data;
+
         e3.inputValidator.enforce(msg.sender, payload);
-        success = e3.inputValidator.enforced(address(this), msg.sender);
-        require(success, InvalidInput());
         uint256 inputHash = PoseidonT3.hash(
             [uint256(keccak256(data)), inputCounts[e3Id]]
         );
 
         inputCounts[e3Id]++;
         inputs[e3Id]._insert(inputHash);
+        success = true;
 
         emit InputPublished(e3Id, data, inputHash, inputCounts[e3Id] - 1);
     }
