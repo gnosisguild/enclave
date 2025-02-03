@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { IBasePolicy } from "../excubiae/core/interfaces/IBasePolicy.sol";
+import {
+    IAdvancedPolicy
+} from "../excubiae/core/interfaces/IAdvancedPolicy.sol";
 import { IE3Program } from "./IE3Program.sol";
 import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 
@@ -29,7 +31,7 @@ struct E3 {
     bytes32 encryptionSchemeId;
     IE3Program e3Program;
     bytes e3ProgramParams;
-    IBasePolicy inputValidator;
+    IAdvancedPolicy inputValidator;
     IDecryptionVerifier decryptionVerifier;
     bytes32 committeePublicKey;
     bytes32 ciphertextOutput;
