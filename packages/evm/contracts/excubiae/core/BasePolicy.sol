@@ -52,10 +52,8 @@ abstract contract BasePolicy is Policy, IBasePolicy {
     /// @custom:throws UnsuccessfulCheck if BASE_CHECKER.check returns false.
     function _enforce(address subject, bytes[] memory evidence) internal {
         bool checked = BASE_CHECKER.check(subject, evidence);
-
         if (enforced[msg.sender][subject]) revert AlreadyEnforced();
         if (!checked) revert UnsuccessfulCheck();
-
         enforced[msg.sender][subject] = checked;
 
         emit Enforced(subject, target, evidence);

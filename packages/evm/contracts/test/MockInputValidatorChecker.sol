@@ -2,7 +2,6 @@
 pragma solidity >=0.8.27;
 
 import { BaseChecker } from "../excubiae/core/BaseChecker.sol";
-import { IInputValidator } from "../interfaces/IInputValidator.sol";
 
 /// @title MockInputValidatorChecker.
 /// @notice Enclave Input Validator
@@ -20,10 +19,14 @@ contract MockInputValidatorChecker is BaseChecker {
         bytes[] calldata evidence
     ) internal view override returns (bool) {
         super._check(subject, evidence);
-        IInputValidator _verifier = IInputValidator(_getVerifierAtIndex(0));
-        bytes memory input;
         bool success;
-        (input, success) = _verifier.validate(subject, evidence[0]);
+
+        if (evidence[0].length == 3) {
+            success = false;
+        } else {
+            success = true;
+        }
+
         return success;
     }
 }

@@ -17,15 +17,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  const mockInputValidator = await deploy("MockInputValidator", {
+  const mockInputValidatorChecker = await deploy("MockInputValidatorChecker", {
     from: deployer,
-    args: [],
+    args: [[]],
+    log: true,
+  });
+
+  const inputValidatorPolicy = await deploy("InputValidatorPolicy", {
+    from: deployer,
+    args: [mockInputValidatorChecker.address],
     log: true,
   });
 
   await deploy("MockE3Program", {
     from: deployer,
-    args: [mockInputValidator.address],
+    args: [inputValidatorPolicy.address],
     log: true,
   });
 
@@ -35,6 +41,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     "Enclave",
     enclaveDeployment.address,
   );
+
+  const inputValidatorPolicyContract = await hre.ethers.getContractAt(
+    "InputValidatorPolicy",
+    inputValidatorPolicy.address,
+  );
+
+  // NOTE: We must ensure that the target has been set for the policy so that the enclave contract is allowed to call the policy
+  await inputValidatorPolicyContract.setTarget(enclaveDeployment.address);
 
   const encryptionSchemeId = hre.ethers.keccak256(
     hre.ethers.toUtf8Bytes("fhe.rs:BFV"),

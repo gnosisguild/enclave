@@ -65,3 +65,13 @@ EOF
 
 echo "Operation completed successfully"
 
+```
+cleanup() {
+    echo "Cleaning up temporary directory..."
+    rm -rf "$TEMP_DIR"
+}
+
+set -e
+trap cleanup EXIT
+
+```

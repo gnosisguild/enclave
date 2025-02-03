@@ -3,7 +3,7 @@ pragma solidity >=0.8.27;
 
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
-import { IInputValidator } from "./interfaces/IInputValidator.sol";
+import { BasePolicy } from "./excubiae/core/BasePolicy.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -62,9 +62,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-    error InvalidComputationRequest(IInputValidator inputValidator);
+    error InvalidComputationRequest(BasePolicy inputValidator);
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
-    error InvalidInput();
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
     error InvalidStartWindow();
@@ -73,6 +72,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error CiphertextOutputNotPublished(uint256 e3Id);
     error PaymentRequired(uint256 value);
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
+    error UnsuccessfulCheck();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -142,7 +142,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        (bytes32 encryptionSchemeId, IInputValidator inputValidator) = e3Program
+        (bytes32 encryptionSchemeId, BasePolicy inputValidator) = e3Program
             .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
@@ -221,17 +221,19 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3.expiration > block.timestamp,
             InputDeadlinePassed(e3Id, e3.expiration)
         );
-        bytes memory input;
-        (input, success) = e3.inputValidator.validate(msg.sender, data);
-        require(success, InvalidInput());
+        bytes[] memory payload = new bytes[](1);
+        payload[0] = data;
+
+        e3.inputValidator.enforce(msg.sender, payload);
         uint256 inputHash = PoseidonT3.hash(
-            [uint256(keccak256(input)), inputCounts[e3Id]]
+            [uint256(keccak256(data)), inputCounts[e3Id]]
         );
 
         inputCounts[e3Id]++;
         inputs[e3Id]._insert(inputHash);
+        success = true;
 
-        emit InputPublished(e3Id, input, inputHash, inputCounts[e3Id] - 1);
+        emit InputPublished(e3Id, data, inputHash, inputCounts[e3Id] - 1);
     }
 
     function publishCiphertextOutput(
