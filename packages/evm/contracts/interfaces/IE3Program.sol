@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { BasePolicy } from "../excubiae/core/BasePolicy.sol";
+import { IBasePolicy } from "../excubiae/core/interfaces/IBasePolicy.sol";
 
 interface IE3Program {
     /// @notice This function should be called by the Enclave contract to validate the computation parameters.
@@ -16,7 +16,7 @@ interface IE3Program {
         uint256 seed,
         bytes calldata e3ProgramParams,
         bytes calldata computeProviderParams
-    ) external returns (bytes32 encryptionSchemeId, BasePolicy inputValidator);
+    ) external returns (bytes32 encryptionSchemeId, IBasePolicy inputValidator);
 
     /// @notice This function should be called by the Enclave contract to verify the decrypted output of an E3.
     /// @param e3Id ID of the E3.
