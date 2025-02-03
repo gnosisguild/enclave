@@ -3,8 +3,6 @@ pragma solidity >=0.8.27;
 
 import { BaseChecker } from "../excubiae/core/BaseChecker.sol";
 
-import "hardhat/console.sol";
-
 /// @title MockInputValidatorChecker.
 /// @notice Enclave Input Validator
 /// @dev Extends BaseChecker for input verification.
@@ -20,7 +18,6 @@ contract MockInputValidatorChecker is BaseChecker {
         address subject,
         bytes[] calldata evidence
     ) internal view override returns (bool) {
-        console.log("_check");
         super._check(subject, evidence);
         bool success;
 
