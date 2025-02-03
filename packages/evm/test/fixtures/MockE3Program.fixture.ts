@@ -1,6 +1,5 @@
 import { ethers } from "hardhat";
 
-import { InputValidatorPolicy__factory } from "../../types/factories/contracts/InputValidatorPolicy__factory";
 import { MockE3Program__factory } from "../../types/factories/contracts/test/MockE3Program__factory";
 
 export async function deployE3ProgramFixture(inputValidatorAddress: string) {
