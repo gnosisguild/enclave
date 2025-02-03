@@ -6,6 +6,5 @@ export async function deployE3ProgramFixture(inputValidatorAddress: string) {
   const deployment = await (
     await ethers.getContractFactory("MockE3Program")
   ).deploy(inputValidatorAddress);
-  const deploymentAddress = await deployment.getAddress();
-  return MockE3Program__factory.connect(deploymentAddress);
+  return MockE3Program__factory.connect(await deployment.getAddress());
 }
