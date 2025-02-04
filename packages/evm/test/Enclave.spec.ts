@@ -37,10 +37,22 @@ const proof = "0x1337";
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
-async function deployInputValidatorContracts() {
+type SetupConfig = {
+  inputLimit: number;
+};
+
+function defaultSetupConfig(config: Partial<SetupConfig> = {}): SetupConfig {
+  return {
+    inputLimit: 0,
+    ...config,
+  };
+}
+
+async function deployInputValidatorContracts(config = defaultSetupConfig()) {
   const inputValidatorChecker = await deployInputValidatorCheckerFixture();
   const inputValidatorPolicy = await deployInputValidatorPolicyFixture(
     await inputValidatorChecker.getAddress(),
+    config.inputLimit,
   );
 
   return {
@@ -50,7 +62,7 @@ async function deployInputValidatorContracts() {
 }
 
 describe("Enclave", function () {
-  async function setup() {
+  async function setup(config = defaultSetupConfig()) {
     const [owner, notTheOwner] = await ethers.getSigners();
 
     const poseidon = await PoseidonT3Fixture();
@@ -58,7 +70,8 @@ describe("Enclave", function () {
     const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
 
-    const { inputValidatorPolicy } = await deployInputValidatorContracts();
+    const { inputValidatorPolicy } =
+      await deployInputValidatorContracts(config);
 
     const e3Program = await deployE3ProgramFixture(
       await inputValidatorPolicy.getAddress(),
@@ -935,6 +948,56 @@ describe("Enclave", function () {
       await expect(
         enclave.publishInput(0, ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
+    });
+    it("allow multiple input rounds when inputLimit is 0 (default)", async function () {
+      const fixtureSetup = () => setup(defaultSetupConfig({ inputLimit: 0 }));
+
+      const { enclave, request } = await loadFixture(fixtureSetup);
+      const inputData = "0x12345678";
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.startTime,
+        request.duration,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProviderParams,
+        { value: 10 },
+      );
+
+      await enclave.activate(0, ethers.ZeroHash);
+
+      // Call once
+      await enclave.publishInput(0, inputData);
+      await expect(
+        enclave.publishInput(0, inputData),
+      ).not.to.be.revertedWithCustomError(enclave, "MainCalledTooManyTimes");
+    });
+    it("it reverts when attempting to publish input twice in the same round when inputLimit is 1", async function () {
+      const fixtureSetup = () => setup(defaultSetupConfig({ inputLimit: 1 }));
+
+      const { enclave, request } = await loadFixture(fixtureSetup);
+      const inputData = "0x12345678";
+
+      await enclave.request(
+        request.filter,
+        request.threshold,
+        request.startTime,
+        request.duration,
+        request.e3Program,
+        request.e3ProgramParams,
+        request.computeProviderParams,
+        { value: 10 },
+      );
+
+      await enclave.activate(0, ethers.ZeroHash);
+
+      // Call once
+      await enclave.publishInput(0, inputData);
+      await expect(
+        enclave.publishInput(0, inputData),
+      ).to.be.revertedWithCustomError(enclave, "MainCalledTooManyTimes");
     });
     it("returns true if input is published successfully", async function () {
       const { enclave, request } = await loadFixture(setup);
