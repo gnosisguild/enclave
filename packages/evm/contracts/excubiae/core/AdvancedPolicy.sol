@@ -3,9 +3,10 @@
 //  Auto-generated from https://github.com/privacy-scaling-explorations/excubiae.git@96a3312455417dc1b2e0d87066661fdf8f490fac
 pragma solidity >=0.8.27;
 
-import {Policy} from "./Policy.sol";
-import {IAdvancedPolicy, Check} from "./interfaces/IAdvancedPolicy.sol";
-import {AdvancedChecker, CheckStatus} from "./AdvancedChecker.sol";
+import { Policy } from "./Policy.sol";
+import { IAdvancedPolicy, Check } from "./interfaces/IAdvancedPolicy.sol";
+import { AdvancedChecker, CheckStatus } from "./AdvancedChecker.sol";
+import "hardhat/console.sol";
 
 /// @title AdvancedPolicy.
 /// @notice Implements advanced policy checks with pre, main, and post validation stages.
@@ -33,7 +34,12 @@ abstract contract AdvancedPolicy is IAdvancedPolicy, Policy {
     /// @param _skipPre Skip pre-condition validation.
     /// @param _skipPost Skip post-condition validation.
     /// @param _allowMultipleMain Allow multiple main validations.
-    constructor(AdvancedChecker _advancedChecker, bool _skipPre, bool _skipPost, bool _allowMultipleMain) {
+    constructor(
+        AdvancedChecker _advancedChecker,
+        bool _skipPre,
+        bool _skipPost,
+        bool _allowMultipleMain
+    ) {
         ADVANCED_CHECKER = _advancedChecker;
         SKIP_PRE = _skipPre;
         SKIP_POST = _skipPost;
@@ -45,7 +51,11 @@ abstract contract AdvancedPolicy is IAdvancedPolicy, Policy {
     /// @param subject Address to validate.
     /// @param evidence Validation data.
     /// @param checkType Type of check (PRE, MAIN, POST).
-    function enforce(address subject, bytes[] calldata evidence, Check checkType) external override onlyTarget {
+    function enforce(
+        address subject,
+        bytes[] calldata evidence,
+        Check checkType
+    ) external override onlyTarget {
         _enforce(subject, evidence, checkType);
     }
 
@@ -61,8 +71,13 @@ abstract contract AdvancedPolicy is IAdvancedPolicy, Policy {
     /// @custom:throws PreCheckNotEnforced If PRE check is required but not done.
     /// @custom:throws MainCheckNotEnforced If MAIN check is required but not done.
     /// @custom:throws MainCheckAlreadyEnforced If multiple MAIN checks not allowed.
-    function _enforce(address subject, bytes[] calldata evidence, Check checkType) internal {
+    function _enforce(
+        address subject,
+        bytes[] calldata evidence,
+        Check checkType
+    ) internal {
         if (!ADVANCED_CHECKER.check(subject, evidence, checkType)) {
+            console.log("_enforce()");
             revert UnsuccessfulCheck();
         }
 

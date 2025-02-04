@@ -83,6 +83,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error TargetOnly();
     error TargetAlreadySet();
     error AlreadyEnforced();
+    error MainCheckAlreadyEnforced();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
