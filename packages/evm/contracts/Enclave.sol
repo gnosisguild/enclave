@@ -7,10 +7,7 @@ import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import {
     IAdvancedPolicy
 } from "./excubiae/core/interfaces/IAdvancedPolicy.sol";
-import {
-    Check,
-    CheckStatus
-} from "./excubiae/core/interfaces/IAdvancedChecker.sol";
+import { Check } from "./excubiae/core/interfaces/IAdvancedChecker.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable

@@ -3,7 +3,6 @@ pragma solidity >=0.8.27;
 
 import { IEnclavePolicy } from "../interfaces/IEnclavePolicy.sol";
 import { AdvancedPolicy } from "./core/AdvancedPolicy.sol";
-import { IAdvancedPolicy } from "./core/interfaces/IAdvancedPolicy.sol";
 import { AdvancedChecker } from "./core/AdvancedChecker.sol";
 import { CheckStatus, Check } from "./core/AdvancedChecker.sol";
 
