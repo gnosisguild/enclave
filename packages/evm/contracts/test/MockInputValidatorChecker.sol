@@ -2,7 +2,6 @@
 pragma solidity >=0.8.27;
 
 import { AdvancedChecker } from "../excubiae/core/AdvancedChecker.sol";
-import { Check } from "../excubiae/core/interfaces/IAdvancedChecker.sol";
 
 /// @title MockInputValidatorChecker.
 /// @notice Enclave Input Validator
