@@ -2,11 +2,15 @@
 pragma solidity >=0.8.27;
 
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
+import { IEnclavePolicy } from "./interfaces/IEnclavePolicy.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import {
     IAdvancedPolicy
 } from "./excubiae/core/interfaces/IAdvancedPolicy.sol";
-import { Check } from "./excubiae/core/interfaces/IAdvancedChecker.sol";
+import {
+    Check,
+    CheckStatus
+} from "./excubiae/core/interfaces/IAdvancedChecker.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -84,6 +88,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error TargetAlreadySet();
     error AlreadyEnforced();
     error MainCheckAlreadyEnforced();
+    error MainCalledTooManyTimes();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -153,7 +158,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        (bytes32 encryptionSchemeId, IAdvancedPolicy inputValidator) = e3Program
+        (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator) = e3Program
             .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
@@ -235,7 +240,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes[] memory payload = new bytes[](1);
         payload[0] = data;
 
-        e3.inputValidator.enforce(msg.sender, payload, Check.MAIN);
+        e3.inputValidator.enforceWithLimit(msg.sender, payload, Check.MAIN);
         uint256 inputHash = PoseidonT3.hash(
             [uint256(keccak256(data)), inputCounts[e3Id]]
         );

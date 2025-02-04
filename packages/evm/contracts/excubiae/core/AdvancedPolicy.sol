@@ -6,7 +6,6 @@ pragma solidity >=0.8.27;
 import { Policy } from "./Policy.sol";
 import { IAdvancedPolicy, Check } from "./interfaces/IAdvancedPolicy.sol";
 import { AdvancedChecker, CheckStatus } from "./AdvancedChecker.sol";
-import "hardhat/console.sol";
 
 /// @title AdvancedPolicy.
 /// @notice Implements advanced policy checks with pre, main, and post validation stages.
@@ -77,12 +76,10 @@ abstract contract AdvancedPolicy is IAdvancedPolicy, Policy {
         Check checkType
     ) internal {
         if (!ADVANCED_CHECKER.check(subject, evidence, checkType)) {
-            console.log("_enforce()");
             revert UnsuccessfulCheck();
         }
 
         CheckStatus storage status = enforced[msg.sender][subject];
-
         // Handle PRE check.
         if (checkType == Check.PRE) {
             if (SKIP_PRE) revert CannotPreCheckWhenSkipped();
