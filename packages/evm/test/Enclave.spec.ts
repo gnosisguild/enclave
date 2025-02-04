@@ -958,8 +958,7 @@ describe("Enclave", function () {
       );
     });
 
-    // XXX: Skipping for now as fixing this would mean implementing an AdvancedPolicy in excubiae
-    it.skip("adds inputHash to merkle tree", async function () {
+    it("adds inputHash to merkle tree", async function () {
       const { enclave, request } = await loadFixture(setup);
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
 
@@ -1332,20 +1331,6 @@ describe("Enclave", function () {
 });
 
 describe("InputValidatorPolicy", function () {
-  it("should validate inputs using the input validator", async function () {
-    const [owner, notTheOwner] = await ethers.getSigners();
-    const { inputValidatorPolicy } = await loadFixture(
-      deployInputValidatorContracts,
-    );
-    await inputValidatorPolicy.connect(owner).setTarget(owner);
-    const shouldPass = "0x1234"; // length 2 = pass
-    const contract = inputValidatorPolicy.connect(owner);
-    await contract.connect(owner).enforce(notTheOwner, [shouldPass]);
-    await expect(
-      contract.connect(owner).enforce(notTheOwner, [shouldPass]),
-    ).to.be.revertedWithCustomError(inputValidatorPolicy, "AlreadyEnforced");
-  });
-
   it("should fail with error if the checker fails", async function () {
     const [owner, notTheOwner] = await ethers.getSigners();
 
@@ -1356,7 +1341,7 @@ describe("InputValidatorPolicy", function () {
     const shouldFail = "0x123456"; // length 3 = fail
     const contract = inputValidatorPolicy.connect(owner);
     await expect(
-      contract.enforce(notTheOwner, [shouldFail]),
+      contract.enforce(notTheOwner, [shouldFail], 1),
     ).to.be.revertedWithCustomError(contract, "UnsuccessfulCheck");
   });
 });
