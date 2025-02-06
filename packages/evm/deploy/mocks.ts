@@ -5,6 +5,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
+  const grecoVerifier = await deploy("GrecoVerifier", {
+    from: deployer,
+    args: [],
+    log: true,
+  });
+  console.log(`GrecoVerifier contract: `, grecoVerifier.address);
+
   await deploy("MockComputeProvider", {
     from: deployer,
     args: [],
@@ -19,7 +26,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const mockInputValidator = await deploy("MockInputValidator", {
     from: deployer,
-    args: [],
+    args: [grecoVerifier.address],
     log: true,
   });
 
