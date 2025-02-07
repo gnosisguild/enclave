@@ -43,6 +43,12 @@ task(
     types.int,
   )
   .addOptionalParam(
+    "inputLimit",
+    "The maximum number of times that a provider may publish input per e3 request (default: 1)",
+    1,
+    types.int,
+  )
+  .addOptionalParam(
     "e3Address",
     "address of the E3 program",
     undefined,
@@ -126,6 +132,7 @@ task(
       [taskArguments.thresholdQuorum, taskArguments.thresholdTotal],
       [taskArguments.windowStart, taskArguments.windowEnd],
       taskArguments.duration,
+      taskArguments.inputLimit,
       e3Address,
       e3Params,
       computeParams,
