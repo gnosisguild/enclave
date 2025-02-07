@@ -1034,8 +1034,7 @@ describe("Enclave", function () {
         enclave.publishInput(0, inputData),
       ).to.be.revertedWithCustomError(enclave, "MainCalledTooManyTimes");
     });
-    // XXX: skipping because of failure
-    it.skip("it allows publishing input to different requests", async function () {
+    it("it allows publishing input to different requests", async function () {
       const fixtureSetup = () => setup(defaultSetupConfig({ inputLimit: 1 }));
 
       const { enclave, request } = await loadFixture(fixtureSetup);
@@ -1072,7 +1071,6 @@ describe("Enclave", function () {
         1,
         "0x0000000000000000000000000000000000000000000000000000000000000001",
       );
-      // XXX: the following FAILS. This is because we need to choose a different target per e3Id - ultimately this will mean deploying a separate proxy contract per e3Id
       await enclave.publishInput(1, inputData);
     });
     it("returns true if input is published successfully", async function () {
