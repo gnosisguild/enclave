@@ -19,7 +19,6 @@ import {
     LeanIMTData,
     PoseidonT3
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
-import "hardhat/console.sol";
 
 contract Enclave is IEnclave, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
@@ -163,7 +162,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
         (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator) = e3Program
-            .validate(e3Id, seed, inputLimit, e3ProgramParams, computeProviderParams);
+            .validate(
+                e3Id,
+                seed,
+                inputLimit,
+                e3ProgramParams,
+                computeProviderParams
+            );
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
         ];

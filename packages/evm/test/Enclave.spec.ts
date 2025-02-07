@@ -231,7 +231,7 @@ describe("Enclave", function () {
         .withArgs(1);
     });
     it("returns correct E3 details", async function () {
-      const { enclave, mocks, request } = await loadFixture(setup);
+      const { enclave, request } = await loadFixture(setup);
       const tx = await enclave.request(
         request.filter,
         request.threshold,
@@ -626,9 +626,9 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
     });
     it("instantiates a new E3", async function () {
-      const { enclave, mocks, request } = await loadFixture(setup);
+      const { enclave, request } = await loadFixture(setup);
 
-      let tx = await enclave.request(
+      const tx = await enclave.request(
         request.filter,
         request.threshold,
         request.startTime,

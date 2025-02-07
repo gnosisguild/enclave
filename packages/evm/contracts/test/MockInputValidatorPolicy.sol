@@ -12,7 +12,6 @@ import {
     CheckStatus,
     Check
 } from "@excubiae/contracts/src/core/interfaces/IAdvancedChecker.sol";
-import "hardhat/console.sol";
 
 /// @title BaseERC721Policy.
 /// @notice Policy enforcer for Enclave Input validation.
@@ -20,7 +19,7 @@ import "hardhat/console.sol";
 contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
     error MainCalledTooManyTimes();
 
-    uint8 public INPUT_LIMIT;
+    uint8 public inputLimit;
 
     /// @notice Initializes the contract with appended bytes data for configuration.
     /// @dev Decodes AdvancedChecker address and sets the owner.
@@ -37,7 +36,7 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
         SKIP_PRE = true;
         SKIP_POST = true;
         ALLOW_MULTIPLE_MAIN = true;
-        INPUT_LIMIT = inputLimit;
+        inputLimit = inputLimit;
     }
 
     function enforceWithLimit(
@@ -46,7 +45,7 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
         Check checkType
     ) external onlyTarget {
         CheckStatus memory status = enforced[subject];
-        if (INPUT_LIMIT > 0 && status.main == INPUT_LIMIT) {
+        if (inputLimit > 0 && status.main == inputLimit) {
             revert MainCalledTooManyTimes();
         }
 

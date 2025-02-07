@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity >=0.8.27;
 
 import { MockInputValidatorPolicy } from "./MockInputValidatorPolicy.sol";
 import { IEnclavePolicyFactory } from "../interfaces/IEnclavePolicyFactory.sol";
 import { Factory } from "@excubiae/contracts/src/core/proxy/Factory.sol";
-import "hardhat/console.sol";
 
 /// @title AdvancedERC721PolicyFactory
 /// @notice Factory for deploying minimal proxy instances of AdvancedERC721Policy.
