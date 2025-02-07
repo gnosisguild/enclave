@@ -88,9 +88,9 @@ describe("Enclave", function () {
     );
 
     // TODO: is this too restrictive?
-    await inputValidatorPolicyFactory.transferOwnership(
-      await e3Program.getAddress(),
-    );
+    await inputValidatorPolicyFactory
+      .connect(owner)
+      .transferOwnership(await e3Program.getAddress());
 
     const enclave = await deployEnclaveFixture(
       owner.address,
