@@ -6,6 +6,8 @@ import { IEnclavePolicyFactory } from "../interfaces/IEnclavePolicyFactory.sol";
 
 contract MockE3Program is IE3Program {
     error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
+    error InvalidChecker();
+    error InvalidPolicyFactory();
 
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
@@ -13,6 +15,13 @@ contract MockE3Program is IE3Program {
     address private immutable ENCLAVE_CHECKER;
 
     constructor(IEnclavePolicyFactory _policyFactory, address _enclaveChecker) {
+        if (_enclaveChecker == address(0)) {
+            revert InvalidChecker();
+        }
+
+        if (address(_policyFactory) == address(0)) {
+            revert InvalidPolicyFactory();
+        }
         POLICY_FACTORY = _policyFactory;
         ENCLAVE_CHECKER = _enclaveChecker;
     }
