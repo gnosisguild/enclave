@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { AdvancedChecker } from "../excubiae/core/AdvancedChecker.sol";
+import {
+    AdvancedChecker
+} from "@excubiae/contracts/src/core/checker/AdvancedChecker.sol";
 
 /// @title MockInputValidatorChecker.
 /// @notice Enclave Input Validator
 /// @dev Extends BaseChecker for input verification.
 contract MockInputValidatorChecker is AdvancedChecker {
-    /// @param _verifiers Array of addresses for existing verification contracts.
-    constructor(address[] memory _verifiers) AdvancedChecker(_verifiers) {}
-
     /// @notice Validates input
     /// @param subject Address to check.
     /// @param evidence mock proof

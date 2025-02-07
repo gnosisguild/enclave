@@ -6,8 +6,10 @@ import { IEnclavePolicy } from "./interfaces/IEnclavePolicy.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import {
     IAdvancedPolicy
-} from "./excubiae/core/interfaces/IAdvancedPolicy.sol";
-import { Check } from "./excubiae/core/interfaces/IAdvancedChecker.sol";
+} from "@excubiae/contracts/src/core/interfaces/IAdvancedPolicy.sol";
+import {
+    Check
+} from "@excubiae/contracts/src/core/interfaces/IAdvancedChecker.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -17,6 +19,7 @@ import {
     LeanIMTData,
     PoseidonT3
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
+import "hardhat/console.sol";
 
 contract Enclave is IEnclave, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
@@ -87,6 +90,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error MainCheckAlreadyEnforced();
     error MainCalledTooManyTimes();
 
+    // Excubiae Events
+    event CloneDeployed(address indexed clone);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Initialization                       //
@@ -127,6 +133,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint32[2] calldata threshold,
         uint256[2] calldata startWindow,
         uint256 duration,
+        uint8 inputLimit,
         IE3Program e3Program,
         bytes memory e3ProgramParams,
         bytes memory computeProviderParams
@@ -156,7 +163,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
         (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator) = e3Program
-            .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
+            .validate(e3Id, seed, inputLimit, e3ProgramParams, computeProviderParams);
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
         ];

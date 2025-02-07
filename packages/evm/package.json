@@ -91,5 +91,7 @@
     "prerelease": "yarn clean && yarn compile && yarn typechain",
     "release": "yarn publish --non-interactive"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@excubiae/contracts": "^0.2.0"
+  }
 }

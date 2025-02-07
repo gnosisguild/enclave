@@ -533,6 +533,14 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
+"@excubiae/contracts@^0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@excubiae/contracts/-/contracts-0.2.0.tgz#a1075a95b81aaf2880dfb76968c0d0429a0365e9"
+  integrity sha512-+qf+0MZsN50TLOXVw9+nVRNXIsbqj/2Ww+ieesA5Fa+eAibmrM0NWi6cOETs8DZ81sCYEmrsZDNP/sB/qEerwg==
+  dependencies:
+    "@openzeppelin/contracts" "^5.0.2"
+    solady "^0.0.298"
+
 "@fastify/busboy@^2.0.0":
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/@fastify/busboy/-/busboy-2.1.1.tgz#b9da6a878a371829a0502c9b6c1c143ef6663f4d"
@@ -4322,6 +4330,11 @@ slice-ansi@^4.0.0:
     ansi-styles "^4.0.0"
     astral-regex "^2.0.0"
     is-fullwidth-code-point "^3.0.0"
+
+solady@^0.0.298:
+  version "0.0.298"
+  resolved "https://registry.yarnpkg.com/solady/-/solady-0.0.298.tgz#039b37aee091ed7d408a2c1da2107b0e83d74ae9"
+  integrity sha512-wHdtoSAyEsAJwHiG1amQ2IxhZk8XxL/YaYF8hf0yT51E5tWwWAohgEDmFwM8RT6Qt6XSsJBC2//kwIoCz/hFQQ==
 
 solc@0.8.26:
   version "0.8.26"

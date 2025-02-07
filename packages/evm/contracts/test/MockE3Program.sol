@@ -2,30 +2,30 @@
 pragma solidity >=0.8.27;
 
 import { IE3Program, IEnclavePolicy } from "../interfaces/IE3Program.sol";
+import { IEnclavePolicyFactory } from "../interfaces/IEnclavePolicyFactory.sol";
+import { IEnclaveChecker } from "../interfaces/IEnclaveChecker.sol";
 
 contract MockE3Program is IE3Program {
     error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
 
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
-    IEnclavePolicy private storageInputValidator;
+    IEnclavePolicyFactory private immutable policyFactory;
+    address private immutable enclaveChecker;
 
-    constructor(IEnclavePolicy _inputValidator) {
-        storageInputValidator = _inputValidator;
-    }
-
-    function setInputValidator(IEnclavePolicy _inputValidator) external {
-        storageInputValidator = _inputValidator;
+    constructor(IEnclavePolicyFactory _policyFactory, address _enclaveChecker) {
+        policyFactory = _policyFactory;
+        enclaveChecker = _enclaveChecker;
     }
 
     function validate(
         uint256,
         uint256,
+        uint8 inputLimit,
         bytes memory e3ProgramParams,
         bytes memory computeProviderParams
     )
         external
-        view
         returns (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator)
     {
         require(
@@ -33,7 +33,10 @@ contract MockE3Program is IE3Program {
             invalidParams(e3ProgramParams, computeProviderParams)
         );
 
-        inputValidator = storageInputValidator;
+        inputValidator = IEnclavePolicy(
+            policyFactory.deploy(enclaveChecker, inputLimit)
+        );
+        inputValidator.setTarget(msg.sender);
         encryptionSchemeId = ENCRYPTION_SCHEME_ID;
     }
 
