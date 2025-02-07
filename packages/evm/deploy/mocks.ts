@@ -23,17 +23,38 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  const inputValidatorPolicy = await deploy("InputValidatorPolicy", {
+  const inputValidatorPolicyFactory = await deploy(
+    "MockInputValidatorPolicyFactory",
+    {
+      from: deployer,
+      args: [],
+      log: true,
+    },
+  );
+
+  const policyFactory = await hre.ethers.getContractAt(
+    "MockInputValidatorPolicyFactory",
+    inputValidatorPolicyFactory.address,
+  );
+
+  const mockE3Deployment = await deploy("MockE3Program", {
     from: deployer,
-    args: [mockInputValidatorChecker.address],
+    args: [
+      inputValidatorPolicyFactory.address,
+      mockInputValidatorChecker.address,
+    ],
     log: true,
   });
 
-  await deploy("MockE3Program", {
-    from: deployer,
-    args: [inputValidatorPolicy.address],
-    log: true,
-  });
+  try {
+    const tx = await policyFactory.transferOwnership(mockE3Deployment.address);
+    await tx.wait();
+    console.log(
+      `Successfully transferred ownership of policy factory to E3Program contract`,
+    );
+  } catch (err) {
+    console.error("Error setting owner address for policyFactory");
+  }
 
   // Set up MockDecryptionVerifier in Enclave contract
   const enclaveDeployment = await hre.deployments.get("Enclave");
@@ -41,14 +62,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     "Enclave",
     enclaveDeployment.address,
   );
-
-  const inputValidatorPolicyContract = await hre.ethers.getContractAt(
-    "InputValidatorPolicy",
-    inputValidatorPolicy.address,
-  );
-
-  // NOTE: We must ensure that the target has been set for the policy so that the enclave contract is allowed to call the policy
-  await inputValidatorPolicyContract.setTarget(enclaveDeployment.address);
 
   const encryptionSchemeId = hre.ethers.keccak256(
     hre.ethers.toUtf8Bytes("fhe.rs:BFV"),

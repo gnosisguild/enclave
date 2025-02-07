@@ -9,7 +9,6 @@ import { ContractTransactionResponse, EventLog, ZeroHash } from "ethers";
 import { ethers } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
-import { MockE3Program__factory } from "../types";
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
 import { deployCiphernodeRegistryFixture } from "./fixtures/MockCiphernodeRegistry.fixture";
 import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fixture";
@@ -86,6 +85,11 @@ describe("Enclave", function () {
     const e3Program = await deployE3ProgramFixture(
       await inputValidatorPolicyFactory.getAddress(),
       await inputValidatorChecker.getAddress(),
+    );
+
+    // TODO: is this too restrictive?
+    await inputValidatorPolicyFactory.transferOwnership(
+      await e3Program.getAddress(),
     );
 
     const enclave = await deployEnclaveFixture(
