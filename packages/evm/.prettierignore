@@ -11,8 +11,6 @@ node_modules
 types
 deployments
 
-**/excubiae/core
-
 # files
 *.env
 *.log
