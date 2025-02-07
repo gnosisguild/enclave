@@ -3,8 +3,10 @@ pragma solidity >=0.8.27;
 
 import {
     IAdvancedPolicy
-} from "../excubiae/core/interfaces/IAdvancedPolicy.sol";
-import { Check } from "../excubiae/core/AdvancedChecker.sol";
+} from "@excubiae/contracts/src/core/interfaces/IAdvancedPolicy.sol";
+import {
+    Check
+} from "@excubiae/contracts/src/core/checker/AdvancedChecker.sol";
 
 /// @title IEnclavePolicy.
 /// @notice Extends IPolicy with multi-phase validation capabilities.

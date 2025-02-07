@@ -5,7 +5,7 @@ import { MockInputValidatorChecker__factory } from "../../types/factories/contra
 export async function deployInputValidatorCheckerFixture() {
   const deployment = await (
     await ethers.getContractFactory("MockInputValidatorChecker")
-  ).deploy([]);
+  ).deploy();
   return MockInputValidatorChecker__factory.connect(
     await deployment.getAddress(),
   );
