@@ -25,18 +25,17 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
     /// @dev Decodes AdvancedChecker address and sets the owner.
     function _initialize() internal virtual override {
         bytes memory data = _getAppendedBytes();
-        (address sender, address advCheckerAddr, uint8 inputLimit) = abi.decode(
+        (address sender, address advCheckerAddr, uint8 _inputLimit) = abi.decode(
             data,
             (address, address, uint8)
         );
-
         _transferOwnership(sender);
 
         ADVANCED_CHECKER = AdvancedChecker(advCheckerAddr);
         SKIP_PRE = true;
         SKIP_POST = true;
         ALLOW_MULTIPLE_MAIN = true;
-        inputLimit = inputLimit;
+        inputLimit = _inputLimit;
     }
 
     function enforceWithLimit(

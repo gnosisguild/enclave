@@ -1013,7 +1013,6 @@ describe("Enclave", function () {
 
       const { enclave, request } = await loadFixture(fixtureSetup);
       const inputData = "0x12345678";
-
       await enclave.request(
         request.filter,
         request.threshold,
