@@ -1,5 +1,4 @@
 name: EVM Version release
-#
 on:
   release:
     types: [created]

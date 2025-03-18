@@ -1,5 +1,4 @@
 name: Build and Deploy Ciphernode
-#
 on:
   push:
     branches:
