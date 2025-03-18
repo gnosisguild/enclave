@@ -1,5 +1,3 @@
-# TRIGGER
-
 name: "INTEGRATION"
 env:
   HARDHAT_VAR_MNEMONIC: "test test test test test test test test test test test junk"
