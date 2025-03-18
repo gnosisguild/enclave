@@ -30,7 +30,7 @@ jobs:
 
         # We need to setup node in order to compile the hardhat contracts to get the artifacts
       - name: "Setup node"
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 20
 
