@@ -31,7 +31,6 @@ set_network_private_key cn3 "$NETWORK_PRIVATE_KEY_3"
 set_network_private_key cn4 "$NETWORK_PRIVATE_KEY_4"
 set_network_private_key ag "$NETWORK_PRIVATE_KEY_AG"
 
-
 # Launch 4 ciphernodes
 launch_ciphernode cn1
 launch_ciphernode cn2
