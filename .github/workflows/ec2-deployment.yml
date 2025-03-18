@@ -1,20 +1,20 @@
 name: Build and Deploy Ciphernode
-
+#
 on:
   push:
     branches:
       - release
       - main
     paths:
-      - 'packages/ciphernode/**'
-      - 'packages/evm/contracts/**'
+      - "packages/ciphernode/**"
+      - "packages/evm/contracts/**"
   pull_request:
     branches:
       - release
       - main
     paths:
-      - 'packages/ciphernode/**'
-      - 'packages/evm/contracts/**'
+      - "packages/ciphernode/**"
+      - "packages/evm/contracts/**"
 
 env:
   DOCKERFILE_PATH: packages/ciphernode/Dockerfile
@@ -32,7 +32,7 @@ jobs:
       image_tag: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Generate version tag
         id: version
         run: echo "version=$(date +'%Y%m%d')-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
@@ -42,7 +42,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}  
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build image
         env:
@@ -63,10 +63,10 @@ jobs:
     name: Deploy to Production
     needs: build
     runs-on: ubuntu-latest
-    environment: 
+    environment:
       name: production
     if: github.ref == 'refs/heads/release'
-    
+
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.2.0
@@ -78,7 +78,7 @@ jobs:
             IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
             echo "Deploying version: $IMAGE_TAG"
             docker pull $IMAGE_NAME:$IMAGE_TAG
-            
+
             cd /home/ec2-user/enclave
             git pull
 
