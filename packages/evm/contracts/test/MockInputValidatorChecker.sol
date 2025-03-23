@@ -20,12 +20,11 @@ contract MockInputValidatorChecker is AdvancedChecker {
         super._checkMain(subject, evidence);
         bool success;
 
-        if (evidence[0].length == 3) {
+        if (evidence.length == 3) {
             success = false;
         } else {
             success = true;
         }
-
         return success;
     }
 }

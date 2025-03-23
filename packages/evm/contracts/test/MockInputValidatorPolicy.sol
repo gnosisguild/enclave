@@ -42,6 +42,7 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
         }
 
         super._enforce(subject, evidence, checkType);
+        enforced[subject]++;
     }
 
     /// @notice Returns policy identifier.
