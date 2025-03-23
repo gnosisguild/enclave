@@ -6,10 +6,8 @@ import { IEnclavePolicy } from "./interfaces/IEnclavePolicy.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import {
     IAdvancedPolicy
-} from "@excubiae/contracts/src/core/interfaces/IAdvancedPolicy.sol";
-import {
-    Check
-} from "@excubiae/contracts/src/core/interfaces/IAdvancedChecker.sol";
+} from "@excubiae/contracts/interfaces/IAdvancedPolicy.sol";
+import { Check } from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -246,10 +244,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3.expiration > block.timestamp,
             InputDeadlinePassed(e3Id, e3.expiration)
         );
-        bytes[] memory payload = new bytes[](1);
-        payload[0] = data;
 
-        e3.inputValidator.enforceWithLimit(msg.sender, payload, Check.MAIN);
+        e3.inputValidator.enforceWithLimit(msg.sender, data, Check.MAIN);
         uint256 inputHash = PoseidonT3.hash(
             [uint256(keccak256(data)), inputCounts[e3Id]]
         );

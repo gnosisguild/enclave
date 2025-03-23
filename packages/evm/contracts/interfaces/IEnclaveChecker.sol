@@ -5,7 +5,7 @@ pragma solidity >=0.8.27;
 
 import {
     IAdvancedChecker
-} from "@excubiae/contracts/src/core/interfaces/IAdvancedChecker.sol";
+} from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
 
 /// @title IEnclaveChecker.
 /// @notice Extends IAdvancedChecker

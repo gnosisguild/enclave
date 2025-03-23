@@ -2,16 +2,11 @@
 pragma solidity >=0.8.27;
 
 import { IEnclavePolicy } from "../interfaces/IEnclavePolicy.sol";
-import {
-    AdvancedPolicy
-} from "@excubiae/contracts/src/core/policy/AdvancedPolicy.sol";
+import { AdvancedPolicy } from "@excubiae/contracts/policy/AdvancedPolicy.sol";
 import {
     AdvancedChecker
-} from "@excubiae/contracts/src/core/checker/AdvancedChecker.sol";
-import {
-    CheckStatus,
-    Check
-} from "@excubiae/contracts/src/core/interfaces/IAdvancedChecker.sol";
+} from "@excubiae/contracts/checker/AdvancedChecker.sol";
+import { Check } from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
 
 /// @title BaseERC721Policy.
 /// @notice Policy enforcer for Enclave Input validation.
@@ -20,6 +15,7 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
     error MainCalledTooManyTimes();
 
     uint8 public inputLimit;
+    mapping(address subject => uint8 count) public enforced;
 
     /// @notice Initializes the contract with appended bytes data for configuration.
     /// @dev Decodes AdvancedChecker address and sets the owner.
@@ -32,21 +28,21 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
         ADVANCED_CHECKER = AdvancedChecker(advCheckerAddr);
         SKIP_PRE = true;
         SKIP_POST = true;
-        ALLOW_MULTIPLE_MAIN = true;
         inputLimit = _inputLimit;
     }
 
     function enforceWithLimit(
         address subject,
-        bytes[] calldata evidence,
+        bytes calldata evidence,
         Check checkType
     ) external onlyTarget {
-        CheckStatus memory status = enforced[subject];
-        if (inputLimit > 0 && status.main == inputLimit) {
+        uint256 status = enforced[subject];
+        if (inputLimit > 0 && status == inputLimit) {
             revert MainCalledTooManyTimes();
         }
 
         super._enforce(subject, evidence, checkType);
+        enforced[subject]++;
     }
 
     /// @notice Returns policy identifier.
