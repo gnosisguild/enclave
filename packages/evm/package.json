@@ -92,6 +92,6 @@
     "release": "yarn publish --non-interactive"
   },
   "dependencies": {
-    "@excubiae/contracts": "^0.2.0"
+    "@excubiae/contracts": "^0.4.0"
   }
 }

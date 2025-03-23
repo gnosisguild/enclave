@@ -3,7 +3,7 @@ pragma solidity >=0.8.27;
 
 import {
     AdvancedChecker
-} from "@excubiae/contracts/src/core/checker/AdvancedChecker.sol";
+} from "@excubiae/contracts/checker/AdvancedChecker.sol";
 
 /// @title MockInputValidatorChecker.
 /// @notice Enclave Input Validator
@@ -15,7 +15,7 @@ contract MockInputValidatorChecker is AdvancedChecker {
     /// @return True if proof is valid
     function _checkMain(
         address subject,
-        bytes[] calldata evidence
+        bytes calldata evidence
     ) internal view override returns (bool) {
         super._checkMain(subject, evidence);
         bool success;

@@ -533,13 +533,14 @@
     "@ethersproject/properties" "^5.7.0"
     "@ethersproject/strings" "^5.7.0"
 
-"@excubiae/contracts@^0.2.0":
-  version "0.2.0"
-  resolved "https://registry.yarnpkg.com/@excubiae/contracts/-/contracts-0.2.0.tgz#a1075a95b81aaf2880dfb76968c0d0429a0365e9"
-  integrity sha512-+qf+0MZsN50TLOXVw9+nVRNXIsbqj/2Ww+ieesA5Fa+eAibmrM0NWi6cOETs8DZ81sCYEmrsZDNP/sB/qEerwg==
+"@excubiae/contracts@^0.4.0":
+  version "0.4.0"
+  resolved "https://registry.yarnpkg.com/@excubiae/contracts/-/contracts-0.4.0.tgz#6d77d49cf6944a056c40d08b62df4bc2546e95dc"
+  integrity sha512-jrR+IpelmoRW9adg6Dq+KlPMJfBr0dWPKjjuAIeZae883twnfk5+MWHGBBxFL7Rykx7URuQHpMvhYYamExL3Ow==
   dependencies:
-    "@openzeppelin/contracts" "^5.0.2"
-    solady "^0.0.298"
+    "@openzeppelin/contracts" "^5.2.0"
+    "@semaphore-protocol/contracts" "^4.9.0"
+    solady "0.1.4"
 
 "@fastify/busboy@^2.0.0":
   version "2.1.1"
@@ -887,6 +888,11 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.0.2.tgz#b1d03075e49290d06570b2fd42154d76c2a5d210"
   integrity sha512-ytPc6eLGcHHnapAZ9S+5qsdomhjo6QBHTDRRBFfTxXIpsicMhVPouPgmUPebZZZGX7vt9USA+Z+0M0dSVtSUEA==
 
+"@openzeppelin/contracts@^5.2.0":
+  version "5.2.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.2.0.tgz#bd020694218202b811b0ea3eec07277814c658da"
+  integrity sha512-bxjNie5z89W1Ea0NZLZluFh8PrFNn9DH8DQlujEok2yjsOlraUPKID5p1Wk3qdNbf6XkQ1Os2RvfiHrrXLHWKA==
+
 "@pkgjs/parseargs@^0.11.0":
   version "0.11.0"
   resolved "https://registry.yarnpkg.com/@pkgjs/parseargs/-/parseargs-0.11.0.tgz#a77ea742fab25775145434eb1d2328cf5013ac33"
@@ -973,6 +979,13 @@
   dependencies:
     "@noble/hashes" "~1.3.2"
     "@scure/base" "~1.1.4"
+
+"@semaphore-protocol/contracts@^4.9.0":
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/@semaphore-protocol/contracts/-/contracts-4.9.1.tgz#c17f7aafde8535134d968a80595e04d3364805aa"
+  integrity sha512-CYdQECQBRzwZGYVYRha7DXwnkDW+kdzecQm19OOzJ+Rz01/hykXcLmi6GdK6lrzNpxWkPh0flITZn/hoIU2Wlw==
+  dependencies:
+    "@zk-kit/lean-imt.sol" "2.0.0"
 
 "@sentry/core@5.30.0":
   version "5.30.0"
@@ -4331,10 +4344,10 @@ slice-ansi@^4.0.0:
     astral-regex "^2.0.0"
     is-fullwidth-code-point "^3.0.0"
 
-solady@^0.0.298:
-  version "0.0.298"
-  resolved "https://registry.yarnpkg.com/solady/-/solady-0.0.298.tgz#039b37aee091ed7d408a2c1da2107b0e83d74ae9"
-  integrity sha512-wHdtoSAyEsAJwHiG1amQ2IxhZk8XxL/YaYF8hf0yT51E5tWwWAohgEDmFwM8RT6Qt6XSsJBC2//kwIoCz/hFQQ==
+solady@0.1.4:
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/solady/-/solady-0.1.4.tgz#1f589be95789f356f44d49f1304baeeca6cf5549"
+  integrity sha512-BQKpX9Ezdp6WpUcT3H7cWdZKH31Ih7yZiUOQ6SUYzJ6gYjCB0KXPg77bS+pzmeQEtdMNK56gjlaqtn6ptFPSXQ==
 
 solc@0.8.26:
   version "0.8.26"

@@ -3,7 +3,7 @@ pragma solidity >=0.8.27;
 
 import { MockInputValidatorPolicy } from "./MockInputValidatorPolicy.sol";
 import { IEnclavePolicyFactory } from "../interfaces/IEnclavePolicyFactory.sol";
-import { Factory } from "@excubiae/contracts/src/core/proxy/Factory.sol";
+import { Factory } from "@excubiae/contracts/proxy/Factory.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title AdvancedERC721PolicyFactory
