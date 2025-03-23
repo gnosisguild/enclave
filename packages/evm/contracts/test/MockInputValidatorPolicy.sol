@@ -6,10 +6,7 @@ import { AdvancedPolicy } from "@excubiae/contracts/policy/AdvancedPolicy.sol";
 import {
     AdvancedChecker
 } from "@excubiae/contracts/checker/AdvancedChecker.sol";
-import {
-    CheckStatus,
-    Check
-} from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
+import { Check } from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
 
 /// @title BaseERC721Policy.
 /// @notice Policy enforcer for Enclave Input validation.
@@ -18,7 +15,7 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
     error MainCalledTooManyTimes();
 
     uint8 public inputLimit;
-    mapping(address => uint8) enforced;
+    mapping(address subject => uint8 count) public enforced;
 
     /// @notice Initializes the contract with appended bytes data for configuration.
     /// @dev Decodes AdvancedChecker address and sets the owner.
