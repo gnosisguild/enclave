@@ -9,6 +9,4 @@ import {
 
 /// @title IEnclaveChecker.
 /// @notice Extends IAdvancedChecker
-interface IEnclaveChecker is IAdvancedChecker {
-
-}
+interface IEnclaveChecker is IAdvancedChecker {}
