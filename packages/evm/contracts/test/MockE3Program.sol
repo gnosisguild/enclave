@@ -9,7 +9,7 @@ contract MockE3Program is IE3Program {
     error InvalidChecker();
     error InvalidPolicyFactory();
 
-    address constant DO_NOT_OVERRIDE =
+    address private constant DO_NOT_OVERRIDE =
         0x9999999999999999999999999999999999999999;
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
@@ -32,7 +32,7 @@ contract MockE3Program is IE3Program {
     }
 
     // NOTE: This function is for testing only
-    function test_overrideInputValidator(address _inputValidator) external {
+    function testOverrideInputValidator(address _inputValidator) external {
         overrideInputValidator = _inputValidator;
     }
 

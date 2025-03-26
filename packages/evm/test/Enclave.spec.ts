@@ -599,7 +599,7 @@ describe("Enclave", function () {
       const { enclave, mocks, owner, request } = await loadFixture(setup);
       await mocks.e3Program
         .connect(owner)
-        .test_overrideInputValidator(ethers.ZeroAddress);
+        .testOverrideInputValidator(ethers.ZeroAddress);
       await expect(
         enclave.request(
           request.filter,
