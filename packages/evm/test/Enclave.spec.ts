@@ -87,7 +87,7 @@ describe("Enclave", function () {
       await inputValidatorChecker.getAddress(),
     );
 
-    // TODO: is this too restrictive?
+    // TODO: is it too restrictive to ensure that the e3Program owns the inputValidator policy factory like this?
     await inputValidatorPolicyFactory
       .connect(owner)
       .transferOwnership(await e3Program.getAddress());
@@ -594,25 +594,27 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
         .withArgs(encryptionSchemeId);
     });
-    // XXX: work out a different way to test this
-    // it("reverts if given E3 Program does not return input validator address", async function () {
-    //   const { enclave, mocks, owner, request } = await loadFixture(setup);
-    //   await mocks.e3Program
-    //     .connect(owner)
-    //     .setInputValidator(ethers.ZeroAddress);
-    //   await expect(
-    //     enclave.request(
-    //       request.filter,
-    //       request.threshold,
-    //       request.startTime,
-    //       request.duration,request.inputLimit,
-    //       request.e3Program,
-    //       request.e3ProgramParams,
-    //       request.computeProviderParams,
-    //       { value: 10 },
-    //     ),
-    //   ).to.be.revertedWithCustomError(enclave, "InvalidComputationRequest");
-    // });
+
+    it("reverts if given E3 Program does not return input validator address", async function () {
+      const { enclave, mocks, owner, request } = await loadFixture(setup);
+      await mocks.e3Program
+        .connect(owner)
+        .test_overrideInputValidator(ethers.ZeroAddress);
+      await expect(
+        enclave.request(
+          request.filter,
+          request.threshold,
+          request.startTime,
+          request.duration,
+          request.inputLimit,
+          request.e3Program,
+          request.e3ProgramParams,
+          request.computeProviderParams,
+          { value: 10 },
+        ),
+      ).to.be.revertedWithCustomError(enclave, "InvalidComputationRequest");
+    });
+
     it("reverts if committee selection fails", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(

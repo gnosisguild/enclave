@@ -78,13 +78,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
 
     // Excubiae Errors
-    error ZeroAddress();
     error UnsuccessfulCheck();
-    error TargetNotSet();
-    error TargetOnly();
-    error TargetAlreadySet();
-    error AlreadyEnforced();
-    error MainCheckAlreadyEnforced();
     error MainCalledTooManyTimes();
 
     // Excubiae Events
