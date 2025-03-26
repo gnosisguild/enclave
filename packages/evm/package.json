@@ -85,7 +85,6 @@
     "prettier:write": "prettier --write \"**/*.{js,json,md,sol,ts,yml}\"",
     "task:deployLock": "hardhat task:deployLock",
     "task:withdraw": "hardhat task:withdraw",
-    "update:excubiae": "./scripts/update_excubiae.sh",
     "test": "hardhat test",
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
     "prerelease": "yarn clean && yarn compile && yarn typechain",
