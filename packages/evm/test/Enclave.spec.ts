@@ -87,7 +87,7 @@ describe("Enclave", function () {
       await inputValidatorChecker.getAddress(),
     );
 
-    // TODO: is this too restrictive?
+    // TODO: is it too restrictive to ensure that the e3Program owns the inputValidator policy factory like this?
     await inputValidatorPolicyFactory
       .connect(owner)
       .transferOwnership(await e3Program.getAddress());
