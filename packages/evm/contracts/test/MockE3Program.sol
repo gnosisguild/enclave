@@ -9,10 +9,15 @@ contract MockE3Program is IE3Program {
     error InvalidChecker();
     error InvalidPolicyFactory();
 
+    address constant DO_NOT_OVERRIDE =
+        0x9999999999999999999999999999999999999999;
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
     IEnclavePolicyFactory private immutable POLICY_FACTORY;
     address private immutable ENCLAVE_CHECKER;
+
+    // NOTE: this is primarily for testing
+    address private overrideInputValidator = DO_NOT_OVERRIDE;
 
     constructor(IEnclavePolicyFactory _policyFactory, address _enclaveChecker) {
         if (_enclaveChecker == address(0)) {
@@ -24,6 +29,11 @@ contract MockE3Program is IE3Program {
         }
         POLICY_FACTORY = _policyFactory;
         ENCLAVE_CHECKER = _enclaveChecker;
+    }
+
+    // NOTE: This function is for testing only
+    function test_overrideInputValidator(address _inputValidator) external {
+        overrideInputValidator = _inputValidator;
     }
 
     function validate(
@@ -41,10 +51,15 @@ contract MockE3Program is IE3Program {
             invalidParams(e3ProgramParams, computeProviderParams)
         );
 
-        inputValidator = IEnclavePolicy(
-            POLICY_FACTORY.deploy(ENCLAVE_CHECKER, inputLimit)
-        );
-        inputValidator.setTarget(msg.sender);
+        if (overrideInputValidator == DO_NOT_OVERRIDE) {
+            inputValidator = IEnclavePolicy(
+                POLICY_FACTORY.deploy(ENCLAVE_CHECKER, inputLimit)
+            );
+            inputValidator.setTarget(msg.sender);
+        } else {
+            inputValidator = IEnclavePolicy(overrideInputValidator);
+        }
+
         encryptionSchemeId = ENCRYPTION_SCHEME_ID;
     }
 
