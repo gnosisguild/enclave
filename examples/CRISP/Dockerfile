@@ -39,7 +39,6 @@ RUN curl -L https://risczero.com/install | bash
 RUN rzup install
 
 RUN npm install -g corepack
-ENV RISC0_USE_DOCKER=1
 
 # Create a working directory
 WORKDIR /app
