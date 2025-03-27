@@ -1,0 +1,7 @@
+services:
+  enclave-dev:
+    build: .
+    volumes:
+      - .:/app
+    entrypoint:
+      - ""
