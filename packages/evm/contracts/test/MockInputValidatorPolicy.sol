@@ -31,11 +31,11 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
         inputLimit = _inputLimit;
     }
 
-    function enforceWithLimit(
+    function _enforce(
         address subject,
         bytes calldata evidence,
         Check checkType
-    ) external onlyTarget {
+    ) internal override(AdvancedPolicy) onlyTarget {
         uint256 status = enforced[subject];
         if (inputLimit > 0 && status == inputLimit) {
             revert MainCalledTooManyTimes();

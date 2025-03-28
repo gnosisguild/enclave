@@ -9,9 +9,5 @@ import { Check } from "@excubiae/contracts/checker/AdvancedChecker.sol";
 /// @title IEnclavePolicy.
 /// @notice Extends IPolicy with multi-phase validation capabilities.
 interface IEnclavePolicy is IAdvancedPolicy {
-    function enforceWithLimit(
-        address subject,
-        bytes calldata evidence,
-        Check checkType
-    ) external;
+
 }
