@@ -43,6 +43,12 @@ task(
     types.int,
   )
   .addOptionalParam(
+    "inputLimit",
+    "The maximum number of times that a provider may publish input per e3 request (default: 1)",
+    1,
+    types.int,
+  )
+  .addOptionalParam(
     "e3Address",
     "address of the E3 program",
     undefined,
@@ -90,12 +96,13 @@ task(
 
     let e3Params = taskArguments.e3Params;
     if (!e3Params) {
-      const MockInputValidator =
-        await hre.deployments.get("MockInputValidator");
-      if (!MockInputValidator) {
-        throw new Error("MockInputValidator not deployed");
+      const MockInputValidatorChecker = await hre.deployments.get(
+        "MockInputValidatorChecker",
+      );
+      if (!MockInputValidatorChecker) {
+        throw new Error("MockInputValidatorChecker not deployed");
       }
-      e3Params = hre.ethers.zeroPadValue(MockInputValidator.address, 32);
+      e3Params = hre.ethers.zeroPadValue(MockInputValidatorChecker.address, 32);
     }
 
     let computeParams = taskArguments.computeParams;
@@ -125,6 +132,7 @@ task(
       [taskArguments.thresholdQuorum, taskArguments.thresholdTotal],
       [taskArguments.windowStart, taskArguments.windowEnd],
       taskArguments.duration,
+      taskArguments.inputLimit,
       e3Address,
       e3Params,
       computeParams,
