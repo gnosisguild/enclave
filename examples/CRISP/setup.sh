@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-(cd client && yarn)
-(cd risc0 && RISC0_SKIP_BUILD=1 cargo check)
-(cd server && RISC0_SKIP_BUILD=1 cargo check)
-(cd web-rust && cargo check)
+# This script is designed to setup and install all dependencies within the system
+
+set -e
+
+docker compose build
+docker compose up -d # ensure our container is running in order to have dev persistence and caching 
+docker compose exec enclave-dev ./scripts/setup.sh
