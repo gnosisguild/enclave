@@ -25,7 +25,7 @@ cat << EOF > "$CONFIG_FILE"
 config_dir: . 
 data_dir: .
 address: "$NODE_ADDRESS"
-quic_port: $quic_port
+quic_port: $QUIC_PORT
 enable_mdns: true
 chains:
   - name: "$ENVIRONMENT"
