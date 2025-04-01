@@ -4,6 +4,6 @@
 
 set -e
 
-docker compose build
+# docker compose build
 docker compose up -d # ensure our container is running in order to have dev persistence and caching 
 docker compose exec enclave-dev ./scripts/setup.sh

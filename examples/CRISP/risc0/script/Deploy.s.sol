@@ -45,7 +45,6 @@ contract CRISPRisc0Deploy is Script {
     IEnclave enclave;
     IInputValidator inputValidator;
 
-
     function run() external {
         // Read and log the chainID
         uint256 chainId = block.chainid;
@@ -89,7 +88,11 @@ contract CRISPRisc0Deploy is Script {
 
             address inputValidatorAddress = stdToml.readAddress(
                 config,
-                string.concat(".profile.", configProfile, ".inputValidatorAddress")
+                string.concat(
+                    ".profile.",
+                    configProfile,
+                    ".inputValidatorAddress"
+                )
             );
             inputValidator = IInputValidator(inputValidatorAddress);
         }

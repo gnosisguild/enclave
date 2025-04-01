@@ -2,8 +2,9 @@
 
 set -e
 
-concurrently -k \
-  --names "ANVIL" \
-  --prefix-colors "blue" \
-  "anvil"
+concurrently \
+  --names "ANVIL,DEPLOY" \
+  --prefix-colors "blue,green" \
+  "anvil" \
+  "./scripts/evm_deploy.sh && ./scripts/risc0_deploy.sh"
  
