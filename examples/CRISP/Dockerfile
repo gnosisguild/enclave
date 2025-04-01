@@ -38,7 +38,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 
 # RISC0
 RUN curl -L https://risczero.com/install | bash
-RUN rzup install 
+RUN rzup install rust 1.81.0 # set this to the desired risc0 rust toolchain.
+RUN rzup install cpp 2024.1.5 # only required if the guest uses any C++ code or rust crates that bind to C++ code.
+RUN rzup install r0vm 1.2.0 # should be the same version as cargo-risczero and risc0-zkvm crate
+RUN rzup install cargo-risczero 1.2.0 # should be the same version as cargo-risczero and risc0-zkvm crate
 
 # Foundry
 RUN curl -L https://foundry.paradigm.xyz | bash
