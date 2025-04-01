@@ -1,9 +1,9 @@
-[submodule "lib/risc0-ethereum"]
-	path = lib/risc0-ethereum
+[submodule "examples/CRISP/risc0/lib/risc0-ethereum"]
+	path = examples/CRISP/risc0/lib/risc0-ethereum
 	url = https://github.com/risc0/risc0-ethereum
-[submodule "lib/openzeppelin-contracts"]
-	path = lib/openzeppelin-contracts
+[submodule "examples/CRISP/risc0/lib/openzeppelin-contracts"]
+	path = examples/CRISP/risc0/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "lib/forge-std"]
-	path = lib/forge-std
+[submodule "examples/CRISP/risc0/lib/forge-std"]
+	path = examples/CRISP/risc0/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
