@@ -1,6 +1,6 @@
 #!/bin/bash
 export RUST_LOG=info
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR=/tmp/enclave-nodes
 
 # Environment variables
 ENVIRONMENT="hardhat"
@@ -62,19 +62,19 @@ run_ciphernode() {
     local log_file=$3
 
     # Set password
-    yarn enclave password create \
+    enclave password create \
         --config "$config_file" \
         --password "We are the music makers and we are the dreamers of the dreams."
 
     # Generate a new key
-    yarn enclave net generate-key --config "$config_file"
+    enclave net generate-key --config "$config_file"
 
     # Launch ciphernode
     if [ -n "$log_file" ]; then
-        yarn enclave start --config "$config_file" > "$log_file" 2>&1 &
+        enclave start --config "$config_file" > "$log_file" 2>&1 &
         echo "Started ciphernode $name (PID: $!) - Logging to $log_file"
     else
-        yarn enclave start --config "$config_file" &
+        enclave start --config "$config_file" &
         echo "Started ciphernode $name (PID: $!)"
     fi
 }
