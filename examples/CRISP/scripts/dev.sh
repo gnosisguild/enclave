@@ -7,4 +7,5 @@ concurrently \
   --prefix-colors "blue,green" \
   "anvil" \
   "./scripts/evm_deploy.sh && ./scripts/risc0_deploy.sh"
- 
+
+
