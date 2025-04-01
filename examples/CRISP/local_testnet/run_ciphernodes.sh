@@ -105,7 +105,7 @@ done
 
 # If logging to files, tail the logs
 if $log_to_file; then
-    tail -f enclave_data/*/ciphernode-*.log
+    tail -f $SCRIPT_DIR/enclave_data/*/ciphernode-*.log
 else
     # Wait for all background processes
     wait

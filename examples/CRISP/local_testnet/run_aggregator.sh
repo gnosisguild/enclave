@@ -13,7 +13,7 @@ PASSWORD="We are the music makers and we are the dreamers of the dreams."
 QUIC_PORT=9204
 
 # Setup directories
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR=/tmp/enclave-nodes
 DATA_DIR="$SCRIPT_DIR/enclave_data/aggregator"
 LOG_FILE="$DATA_DIR/aggregator.log"
 
@@ -40,16 +40,16 @@ EOF
 trap 'echo "Stopping background processes..."; kill -- -$$' SIGINT
 
 # Set password
-yarn enclave password create --config "$CONFIG_FILE" --password "$PASSWORD"
+enclave password create --config "$CONFIG_FILE" --password "$PASSWORD"
 
 # Set network key
-yarn enclave net generate-key --config "$CONFIG_FILE"
+enclave net generate-key --config "$CONFIG_FILE"
 
 # Set private key for the wallet
-yarn enclave wallet set --config "$CONFIG_FILE" --private-key "$PRIVATE_KEY"
+enclave wallet set --config "$CONFIG_FILE" --private-key "$PRIVATE_KEY"
 
 # Run the aggregator in the background
-yarn enclave aggregator start --config "$CONFIG_FILE" &
+enclave aggregator start --config "$CONFIG_FILE" &
 
 # Wait for all background processes to finish
 wait
