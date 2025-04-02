@@ -24,7 +24,7 @@ jobs:
           node-version: 20
 
       - name: pnpm-setup
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
 
       - name: "Run network tests"
         run: "pnpm test:integration net --no-prebuild"
