@@ -8,7 +8,7 @@
     "url": "https://github.com/gnosisguild"
   },
   "dependencies": {
-    "@gnosis-guild/enclave": "^0.0.3"
+    "@gnosis-guild/enclave": "*"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
