@@ -91,6 +91,7 @@
     "release": "pnpm publish --non-interactive"
   },
   "dependencies": {
-    "@excubiae/contracts": "^0.4.0"
+    "@excubiae/contracts": "^0.4.0",
+    "solady": "^0.1.13"
   }
 }

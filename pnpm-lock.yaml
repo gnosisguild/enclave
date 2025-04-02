@@ -195,6 +195,9 @@ importers:
       '@excubiae/contracts':
         specifier: ^0.4.0
         version: 0.4.0
+      solady:
+        specifier: ^0.1.13
+        version: 0.1.13
     devDependencies:
       '@nomicfoundation/hardhat-chai-matchers':
         specifier: ^2.0.2
@@ -4911,6 +4914,9 @@ packages:
 
   snake-case@3.0.4:
     resolution: {integrity: sha512-LAOh4z89bGQvl9pFfNF8V146i7o7/CqFPbqzYgP+yYzDIDeS9HaNFtXABamRW+AQzEVODcvE79ljJ+8a9YSdMg==}
+
+  solady@0.1.13:
+    resolution: {integrity: sha512-AA/VFTwxihDxk/LE2oN5xBiwE1vQtvmqOl55EDH2RwMuqLmUH1aOEMoGLCO0jyPMBZ3qnvXKfg2oRKy6s7V/zg==}
 
   solady@0.1.4:
     resolution: {integrity: sha512-BQKpX9Ezdp6WpUcT3H7cWdZKH31Ih7yZiUOQ6SUYzJ6gYjCB0KXPg77bS+pzmeQEtdMNK56gjlaqtn6ptFPSXQ==}
@@ -11148,6 +11154,8 @@ snapshots:
     dependencies:
       dot-case: 3.0.4
       tslib: 2.8.1
+
+  solady@0.1.13: {}
 
   solady@0.1.4: {}
 
