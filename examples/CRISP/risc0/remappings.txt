@@ -2,3 +2,4 @@ forge-std/=lib/forge-std/src/
 openzeppelin/=lib/openzeppelin-contracts/
 risc0/=lib/risc0-ethereum/contracts/src/
 @gnosis-guild/enclave=node_modules/@gnosis-guild/enclave
+@excubiae/contracts=node_modules/@excubiae/contracts

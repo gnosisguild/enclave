@@ -8,6 +8,7 @@
     "url": "https://github.com/gnosisguild"
   },
   "dependencies": {
+    "@excubiae/contracts": "^0.4.0",
     "@gnosis-guild/enclave": "workspace:*"
   },
   "devDependencies": {

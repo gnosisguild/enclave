@@ -122,6 +122,9 @@ importers:
 
   examples/CRISP/risc0:
     dependencies:
+      '@excubiae/contracts':
+        specifier: ^0.4.0
+        version: 0.4.0
       '@gnosis-guild/enclave':
         specifier: workspace:*
         version: link:../../../packages/evm

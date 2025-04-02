@@ -4,7 +4,7 @@ pragma solidity >=0.8.27;
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {ImageID} from "./ImageID.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IE3Program, IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
+import {IE3Program, IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 
 contract CRISPRisc0 is IE3Program, Ownable {
@@ -15,7 +15,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
     // State variables
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
-    IInputValidator public inputValidator;
+    IEnclavePolicy public policy;
 
     // Mappings
     mapping(address => bool) public authorizedContracts;
@@ -32,39 +32,30 @@ contract CRISPRisc0 is IE3Program, Ownable {
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     /// @param _enclave The enclave address
-    /// @param _inputValidator The input validator address
+    /// @param _policy The enclave policy address
     /// @param _verifier The RISC Zero verifier address
     constructor(
         IEnclave _enclave,
-        IInputValidator _inputValidator,
+        IEnclavePolicy _policy,
         IRiscZeroVerifier _verifier
     ) Ownable(msg.sender) {
-        initialize(_enclave, _inputValidator, _verifier);
+        initialize(_enclave, _policy, _verifier);
     }
 
     /// @notice Initialize the contract components
     /// @param _enclave The enclave address
-    /// @param _inputValidator The input validator address
+    /// @param _policy The enclave policy address
     /// @param _verifier The RISC Zero verifier address
     function initialize(
         IEnclave _enclave,
-        IInputValidator _inputValidator,
+        IEnclavePolicy _policy,
         IRiscZeroVerifier _verifier
     ) public {
         require(address(enclave) == address(0), EnclaveAddressZero());
         enclave = _enclave;
-        inputValidator = _inputValidator;
+        policy = _policy;
         verifier = _verifier;
         authorizedContracts[address(_enclave)] = true;
-    }
-
-    /// @notice Set a new input validator
-    /// @param _inputValidator The new input validator address
-    function setInputValidator(
-        IInputValidator _inputValidator
-    ) external onlyOwner {
-        inputValidator = _inputValidator;
-        emit InputValidatorUpdated(address(_inputValidator));
     }
 
     /// @notice Get the params hash for an E3 program
@@ -80,9 +71,10 @@ contract CRISPRisc0 is IE3Program, Ownable {
     function validate(
         uint256 e3Id,
         uint256,
+        uint8 inputLimit,
         bytes calldata e3ProgramParams,
         bytes calldata
-    ) external override returns (bytes32, IInputValidator) {
+    ) external returns (bytes32, IEnclavePolicy) {
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
@@ -91,7 +83,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
 
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
-        return (ENCRYPTION_SCHEME_ID, inputValidator);
+        return (ENCRYPTION_SCHEME_ID, policy);
     }
 
     /// @notice Verify the proof
