@@ -16,6 +16,8 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 20
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v2
       - run: pnpm install
       - run: pnpm evm:release
         env:
