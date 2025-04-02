@@ -45,6 +45,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
       - name: Install Rust 1.81.0
         uses: actions-rs/toolchain@v1
         with:
@@ -99,6 +102,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20
+
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
 
       - name: Install Rust 1.81.0
         uses: actions-rs/toolchain@v1
