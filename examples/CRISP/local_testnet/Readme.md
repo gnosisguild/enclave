@@ -21,7 +21,7 @@ CRISP/packages
 
 Before getting started, make sure you have the following tools installed:
 
-- **Rust** 
+- **Rust**
 - **RISC Zero toolchain**
 - **Foundry** and **Anvil** (for local testnet)
 - **Node.js** (for client-side dependencies)
@@ -33,9 +33,9 @@ Before getting started, make sure you have the following tools installed:
 
 You can install Node following the official [documentation](https://nodejs.org/en) or using a Node Version Manager (e.g., [nvm](https://github.com/nvm-sh/nvm)).
 
-### Install Yarn
+### Install Pnpm
 
-You can install Yarn following the official [documentation](https://yarnpkg.com/getting-started/install).
+You can install Pnpm following the official [documentation](https://pnpm.io/installation).
 
 ### Install Rust and Foundry
 
@@ -88,13 +88,13 @@ To set up the CRISP dApp in your local environment, follow these steps:
 3. Install dependencies:
 
    ```sh
-   yarn install
+   pnpm install
    ```
 
 4. Start the development server:
 
    ```sh
-   yarn dev
+   pnpm dev
    ```
 
 ## Setting Up the CRISP Server
@@ -126,7 +126,7 @@ Keep Anvil running in the terminal, and open a new terminal for the next steps.
 3. Install dependencies:
 
    ```sh
-   yarn install
+   pnpm install
    ```
 
 4. Delete any previous local deployment (if any):
@@ -138,7 +138,7 @@ Keep Anvil running in the terminal, and open a new terminal for the next steps.
 5. Deploy the contracts on the local testnet:
 
    ```sh
-   yarn deploy:mocks --network localhost
+   pnpm deploy:mocks --network localhost
    ```
 
 After deployment, you will see the addresses for the following contracts:
@@ -151,7 +151,7 @@ After deployment, you will see the addresses for the following contracts:
 - Mock Decryption Verifier
 - Mock Compute Provider
 
-Note down the first four addresses as they will be needed to configure `risc0`, `local_testnet` and the `server`. 
+Note down the first four addresses as they will be needed to configure `risc0`, `local_testnet` and the `server`.
 
 ### Step 3: Deploy the RISC Zero Contracts
 
@@ -159,25 +159,26 @@ Note down the first four addresses as they will be needed to configure `risc0`, 
 
 ---
 
-__Faster Proving w/ Bonsai__
+**Faster Proving w/ Bonsai**
 
 The following steps are optional. You can config [Bonsai](https://dev.risczero.com/api/generating-proofs/remote-proving) for faster proving.
 
 - Set up environment variables by creating a `.cargo` directory and `config.toml` file:
 
-   ```sh
-   mkdir .cargo && cd .cargo && touch config.toml
-   ```
+  ```sh
+  mkdir .cargo && cd .cargo && touch config.toml
+  ```
 
 - Add the following configuration to `config.toml`:
 
-   > **_Note:_** _This requires having access to a Bonsai API Key. To request an API key [complete the form here](https://bonsai.xyz/apply)._
+  > **_Note:_** _This requires having access to a Bonsai API Key. To request an API key [complete the form here](https://bonsai.xyz/apply)._
 
-   ```toml
-   [env]
-   BONSAI_API_KEY="your_api_key"
-   BONSAI_API_URL="your_api_url"
-   ```
+  ```toml
+  [env]
+  BONSAI_API_KEY="your_api_key"
+  BONSAI_API_URL="your_api_url"
+  ```
+
 ---
 
 2. In the `risc0/script` directory, update the `config.toml` with the deployed contract addresses. The following configuration is based on default deployment addresses using local Anvil node:
@@ -217,7 +218,7 @@ WS_RPC_URL=ws://127.0.0.1:8545
 CHAIN_ID=31337
 
 # Cron-job API key to trigger new rounds
-CRON_API_KEY=1234567890 
+CRON_API_KEY=1234567890
 
 # Based on Default Anvil Deployments (Only for testing)
 ENCLAVE_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
@@ -240,7 +241,7 @@ E3_COMPUTE_PROVIDER_BATCH_SIZE=4 # Must be a power of 2
 
 Please make sure that your scripts are run from the `enclave` root directory - this is mandatory to set the environment variables correctly. Depending on your operating system, you may need to give additional execution permissions to each script (using `sudo chmod +x script_name.sh`). The following commands assume that `enclave' and `CRISP' share the same parent folder.
 
-Navigate to the root of the `enclave` repository. To run 3 Ciphernodes, use the provided `run_ciphernodes.sh` script. 
+Navigate to the root of the `enclave` repository. To run 3 Ciphernodes, use the provided `run_ciphernodes.sh` script.
 
 ```sh
 ./../CRISP/packages/local_testnet/run_ciphernodes.sh

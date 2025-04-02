@@ -3,4 +3,4 @@
 wait-on tcp:8545 && \
   (cd /tmp/enclave/packages/evm && \
     rm -rf deployments/localhost && \
-    yarn deploy:mocks --network hardhat)
+    pnpm deploy:mocks --network hardhat)

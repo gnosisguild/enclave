@@ -69,29 +69,28 @@
     "access": "public"
   },
   "scripts": {
-    "clean": "rimraf ./artifacts ./cache ./coverage ./types ./coverage.json && yarn typechain",
+    "clean": "rimraf ./artifacts ./cache ./coverage ./types ./coverage.json && pnpm typechain",
     "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
-    "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && yarn typechain",
+    "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
     "deploy:mocks": "hardhat deploy --tags enclave,mocks",
     "ciphernode:add": "hardhat ciphernode:add",
     "ciphernode:remove": "hardhat ciphernode:remove",
     "committee:new": "hardhat committee:new",
-    "lint": "yarn lint:sol && yarn lint:ts && yarn prettier:check",
+    "lint": "pnpm lint:sol && pnpm lint:ts && pnpm prettier:check",
     "lint:sol": "solhint --max-warnings 0 \"contracts/**/*.sol\"",
     "lint:ts": "eslint --ignore-path ./.eslintignore --ext .js,.ts .",
-    "postcompile": "yarn typechain",
+    "postcompile": "pnpm typechain",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yml}\"",
     "prettier:write": "prettier --write \"**/*.{js,json,md,sol,ts,yml}\"",
     "task:deployLock": "hardhat task:deployLock",
     "task:withdraw": "hardhat task:withdraw",
     "test": "hardhat test",
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
-    "prerelease": "yarn clean && yarn compile && yarn typechain",
-    "release": "yarn publish --non-interactive"
+    "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
+    "release": "pnpm publish --non-interactive"
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0"
-  },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  }
 }

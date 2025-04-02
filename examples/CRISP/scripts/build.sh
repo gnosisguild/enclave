@@ -2,8 +2,8 @@
 
 set -e
 
-(cd evm && yarn compile)
+(cd evm && pnpm compile)
 (cd web-rust && cargo build)
 (cd risc0 && cargo build)
 (cd server && cargo build)
-(cd client && yarn build)
+(cd client && pnpm build)
