@@ -60,7 +60,9 @@ contract CRISPRisc0 is IE3Program, Ownable {
 
     /// @notice Set a new input validator
     /// @param _inputValidator The new input validator address
-    function setInputValidator(IInputValidator _inputValidator) external onlyOwner {
+    function setInputValidator(
+        IInputValidator _inputValidator
+    ) external onlyOwner {
         inputValidator = _inputValidator;
         emit InputValidatorUpdated(address(_inputValidator));
     }
@@ -81,7 +83,10 @@ contract CRISPRisc0 is IE3Program, Ownable {
         bytes calldata e3ProgramParams,
         bytes calldata
     ) external override returns (bytes32, IInputValidator) {
-        require(authorizedContracts[msg.sender] || msg.sender == owner(), CallerNotAuthorized());
+        require(
+            authorizedContracts[msg.sender] || msg.sender == owner(),
+            CallerNotAuthorized()
+        );
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
 
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
@@ -114,7 +119,11 @@ contract CRISPRisc0 is IE3Program, Ownable {
     /// @param journal The journal to encode into
     /// @param startIndex The start index in the journal
     /// @param hashVal The hash value to encode
-    function encodeLengthPrefixAndHash(bytes memory journal, uint256 startIndex, bytes32 hashVal) internal pure {
+    function encodeLengthPrefixAndHash(
+        bytes memory journal,
+        uint256 startIndex,
+        bytes32 hashVal
+    ) internal pure {
         journal[startIndex] = 0x20;
         startIndex += 4;
         for (uint256 i = 0; i < 32; i++) {
@@ -122,3 +131,4 @@ contract CRISPRisc0 is IE3Program, Ownable {
         }
     }
 }
+
