@@ -2,4 +2,4 @@
 
 set -e
 
-cd /tmp/enclave && /app/local_testnet/add_ciphernodes.sh
+cd /app && /app/examples/CRISP/local_testnet/add_ciphernodes.sh

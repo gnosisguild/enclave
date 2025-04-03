@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
+    "solady": "^0.1.13",
     "@gnosis-guild/enclave": "workspace:*"
   },
   "devDependencies": {

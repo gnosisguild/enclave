@@ -3,12 +3,11 @@ services:
     build:
       context: .
       args:
-        # Pass host user's UID and GID to ensure file ownership matches
         USER_UID: ${USER_UID:-1000}
         USER_GID: ${USER_GID:-1000}
         USERNAME: devuser
     volumes:
-      - .:/app
+      - ../..:/app
     entrypoint:
       - ""
     ports:
