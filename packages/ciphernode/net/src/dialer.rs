@@ -97,7 +97,7 @@ async fn wait_for_connection(
                         }
                     }
                     NetworkPeerEvent::DialError { error } => {
-                        error!("DialError!");
+                        info!("DialError!");
                         return match error.as_ref() {
                             // If we are dialing ourself then we should just fail
                             DialError::NoAddresses { .. } => {
@@ -112,7 +112,7 @@ async fn wait_for_connection(
                         connection_id,
                         error,
                     } => {
-                        error!("OutgoingConnectionError!");
+                        info!("OutgoingConnectionError!");
                         if connection_id == dial_connection {
                             info!(
                                 "Connection {} failed because of error {}. Retrying...",
@@ -132,7 +132,7 @@ async fn wait_for_connection(
                 }
             }
             _ = sleep(Duration::from_secs(60)) => {
-                error!("Connection attempt timed out after 60 seconds of no events");
+                info!("Connection attempt timed out after 60 seconds of no events");
                 return Err(RetryError::Retry(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
                     "Connection attempt timed out",

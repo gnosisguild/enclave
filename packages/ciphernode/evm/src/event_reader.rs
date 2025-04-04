@@ -219,9 +219,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                                 trace!("Received log from EVM");
                                 let Some(event) = extractor(log.data(), log.topic0(), chain_id)
                                 else {
-                                    // NOTE: some events are not important or don't match the
-                                    // events we are interested in
-                                    trace!("Failed to extract log from EVM.");
+                                    warn!("Failed to extract log from EVM.");
                                     continue;
                                 };
                                 info!("Extracted Evm Event: {}", event);

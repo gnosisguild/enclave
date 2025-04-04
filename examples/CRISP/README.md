@@ -16,7 +16,7 @@
 ./dev.sh
 ```
 
-## Client
+Then you should be able view the client here:
 
 ```
 http://localhost:3000

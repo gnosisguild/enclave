@@ -14,7 +14,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::{hash::DefaultHasher, io::Error, time::Duration};
 use tokio::{select, sync::broadcast, sync::mpsc};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::dialer::dial_peers;
 use crate::events::NetworkPeerCommand;
@@ -23,7 +23,7 @@ use crate::events::NetworkPeerEvent;
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
     gossipsub: gossipsub::Behaviour,
-    kademlia: Toggle<KademliaBehaviour<MemoryStore>>,
+    kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
     mdns: Toggle<mdns::tokio::Behaviour>,
     identify: IdentifyBehaviour,
@@ -195,18 +195,12 @@ fn create_mdns_kad_behaviour(
         Toggle::from(None)
     };
 
-    let kademlia = if enable_mdns {
-        Toggle::from(None)
-    } else {
-        Toggle::from(Some(KademliaBehaviour::new(
-            key.public().to_peer_id(),
-            MemoryStore::new(key.public().to_peer_id()),
-        )))
-    };
-
     Ok(NodeBehaviour {
         gossipsub,
-        kademlia,
+        kademlia: KademliaBehaviour::new(
+            key.public().to_peer_id(),
+            MemoryStore::new(key.public().to_peer_id()),
+        ),
         mdns,
         connection_limits,
         identify: identify_config,
@@ -226,14 +220,12 @@ async fn process_swarm_event(
             connection_id,
             ..
         } => {
-            info!("--===============================================--");
-            info!("   ConnectionEstablished: Connected to {peer_id}");
-            info!("--===============================================--");
+            info!("Connected to {peer_id}");
             let remote_addr = endpoint.get_remote_address().clone();
-
-            if let Some(kad) = swarm.behaviour_mut().kademlia.as_mut() {
-                kad.add_address(&peer_id, remote_addr.clone());
-            }
+            swarm
+                .behaviour_mut()
+                .kademlia
+                .add_address(&peer_id, remote_addr.clone());
 
             info!("Added address to kademlia {}", remote_addr);
             swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
@@ -262,16 +254,15 @@ async fn process_swarm_event(
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-            warn!("NEW PEERS! {}", list.len());
             for (peer_id, _multiaddr) in list {
-                info!("mDNS discovered a new peer: {peer_id}");
+                trace!("mDNS discovered a new peer: {peer_id}");
                 swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
             }
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
             for (peer_id, _multiaddr) in list {
-                info!("mDNS discover peer has expired: {peer_id}");
+                trace!("mDNS discover peer has expired: {peer_id}");
                 swarm
                     .behaviour_mut()
                     .gossipsub
@@ -284,11 +275,11 @@ async fn process_swarm_event(
             message_id: id,
             message,
         })) => {
-            info!("Got message with id: {id} from peer: {peer_id}",);
+            trace!("Got message with id: {id} from peer: {peer_id}",);
             event_tx.send(NetworkPeerEvent::GossipData(message.data))?;
         }
         SwarmEvent::NewListenAddr { address, .. } => {
-            info!("Local node is listening on {address}");
+            warn!("Local node is listening on {address}");
         }
         _ => {}
     };
