@@ -12,5 +12,7 @@ services:
       - ""
     ports:
       - "8545:8545"
+      - "3000:3000"
+      - "4000:4000"
     # Keep container running in the background
     command: tail -f /dev/null
