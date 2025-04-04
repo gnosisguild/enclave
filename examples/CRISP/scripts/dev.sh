@@ -30,5 +30,5 @@ concurrently \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
   "anvil" \
-  "./scripts/evm_deploy.sh && ./scripts/risc0_deploy.sh && concurrently -kr \"./scripts/dev_cipher.sh\"  \"./scripts/dev_agg.sh\"  \"sleep 3 && ./scripts/dev_add.sh\""
+  "./scripts/evm_deploy.sh && ./scripts/risc0_deploy.sh && ./scripts/dev_after_deploy.sh"
 

@@ -15,5 +15,7 @@ echo "risc0"
 (cd risc0 && cargo build)
 echo "server"
 (cd server && [[ ! -f .env ]] && cp .env.example .env; cargo check)
+echo "client"
+(cd client && [[ ! -f .env ]] && cp .env.example .env)
 echo "web-rust"
 (cd web-rust && cargo check)
