@@ -1,0 +1,280 @@
+name: GitHub Projects Automation
+
+on:
+  issues:
+    types: [edited, labeled, unlabeled]
+  project_card:
+    types: [moved]
+
+jobs:
+  automate-projects:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      repository-projects: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+
+      - name: Install GitHub CLI and dependencies
+        run: |
+          npm install @octokit/rest
+          npm install @actions/github
+          npm install @actions/core
+          npm install graphql
+
+      - name: Run Projects Automation
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const octokit = github.rest;
+            const { graphql } = require('graphql');
+            const core = require('@actions/core');
+
+            async function getProjectDetails() {
+              // Get the repository owner and name
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+              
+              // Get all projects in the repository
+              const { data: projects } = await octokit.projects.listForRepo({
+                owner,
+                repo,
+              });
+              
+              // Find the Project (adjust the name as needed)
+              const project = projects.find(p => p.name.includes('Enclave'));
+              
+              if (!project) {
+                core.warning('Project not found');
+                return null;
+              }
+              
+              return { owner, repo, project };
+            }
+
+            async function getIssueRelationships(issueNumber) {
+              // Get the repository owner and name
+              const owner = context.repo.owner;
+              const repo = context.repo.repo;
+              
+              try {
+                // Get issue details to find sub-issues using body content
+                // This assumes sub-issues are linked in the body with a specific format
+                const { data: issue } = await octokit.issues.get({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                });
+                
+                // Parse the body to find sub-issues
+                // This looks for patterns like "- [ ] #123" or "Subtask: #123" or similar patterns
+                const subIssueRegex = /#(\d+)/g;
+                const subIssueMatches = [...issue.body.matchAll(subIssueRegex)];
+                const subIssueNumbers = subIssueMatches.map(match => parseInt(match[1]));
+                
+                // Filter out any duplicates
+                const uniqueSubIssueNumbers = [...new Set(subIssueNumbers)];
+                
+                return {
+                  parent: issue,
+                  subIssues: uniqueSubIssueNumbers
+                };
+              } catch (error) {
+                core.warning(`Error fetching issue relationships: ${error.message}`);
+                return { parent: null, subIssues: [] };
+              }
+            }
+
+            // 1. When an issue is added to a milestone, add all sub-issues to the milestone
+            async function syncMilestones(issueNumber, milestoneNumber) {
+              const { owner, repo } = context.repo;
+              const { subIssues } = await getIssueRelationships(issueNumber);
+              
+              for (const subIssueNumber of subIssues) {
+                try {
+                  await octokit.issues.update({
+                    owner,
+                    repo,
+                    issue_number: subIssueNumber,
+                    milestone: milestoneNumber
+                  });
+                  console.log(`Updated milestone for sub-issue #${subIssueNumber}`);
+                } catch (error) {
+                  core.warning(`Error updating milestone for sub-issue #${subIssueNumber}: ${error.message}`);
+                }
+              }
+            }
+
+            // 2. When an issue has its priority changed, change priority for all sub-issues
+            async function syncPriority(issueNumber, priorityLabel) {
+              const { owner, repo } = context.repo;
+              const { subIssues } = await getIssueRelationships(issueNumber);
+              
+              // Get all existing priority labels on the parent issue
+              const { data: parentIssue } = await octokit.issues.get({
+                owner,
+                repo,
+                issue_number: issueNumber
+              });
+              
+              const priorityLabels = parentIssue.labels
+                .filter(label => label.name.toLowerCase().includes('priority'))
+                .map(label => label.name);
+                
+              if (priorityLabels.length === 0) {
+                console.log('No priority labels found on the parent issue');
+                return;
+              }
+              
+              for (const subIssueNumber of subIssues) {
+                try {
+                  // Get current labels for the sub-issue
+                  const { data: subIssue } = await octokit.issues.get({
+                    owner,
+                    repo,
+                    issue_number: subIssueNumber
+                  });
+                  
+                  // Remove any existing priority labels
+                  const nonPriorityLabels = subIssue.labels
+                    .filter(label => !label.name.toLowerCase().includes('priority'))
+                    .map(label => label.name);
+                  
+                  // Add the new priority labels
+                  const newLabels = [...nonPriorityLabels, ...priorityLabels];
+                  
+                  // Update the sub-issue with the new labels
+                  await octokit.issues.update({
+                    owner,
+                    repo,
+                    issue_number: subIssueNumber,
+                    labels: newLabels
+                  });
+                  
+                  console.log(`Updated priority for sub-issue #${subIssueNumber}`);
+                } catch (error) {
+                  core.warning(`Error updating priority for sub-issue #${subIssueNumber}: ${error.message}`);
+                }
+              }
+            }
+
+            // 3. When all sub-issues are "Done", set parent issue to "Done"
+            async function checkAndUpdateParentStatus(issueNumber) {
+              const { owner, repo } = context.repo;
+              const { parent, subIssues } = await getIssueRelationships(issueNumber);
+              
+              // If this is a sub-issue, find its potential parent issues
+              // This would require a more complex implementation with a database or consistent naming convention
+              // For now, we'll use a simplified approach
+              
+              if (subIssues.length === 0) {
+                // This might be a sub-issue, so we need to search for potential parents
+                // Implementation depends on how you track parent-child relationships
+                return;
+              }
+              
+              // Check status of all sub-issues
+              let allDone = true;
+              
+              for (const subIssueNumber of subIssues) {
+                try {
+                  // Get the sub-issue to check its status
+                  const { data: subIssue } = await octokit.issues.get({
+                    owner,
+                    repo,
+                    issue_number: subIssueNumber
+                  });
+                  
+                  // A sub-issue is considered "Done" when it is closed
+                  const isDone = subIssue.state === 'closed';
+                  
+                  if (!isDone) {
+                    allDone = false;
+                    break;
+                  }
+                } catch (error) {
+                  core.warning(`Error checking status for sub-issue #${subIssueNumber}: ${error.message}`);
+                  allDone = false;
+                  break;
+                }
+              }
+              
+              // If all sub-issues are done, update the parent issue
+              if (allDone && subIssues.length > 0) {
+                try {
+                  // Update the parent issue to "Done" by closing it
+                  await octokit.issues.update({
+                    owner,
+                    repo,
+                    issue_number: issueNumber,
+                    state: 'closed'
+                  });
+                  
+                  console.log(`Updated parent issue #${issueNumber} to Done`);
+                } catch (error) {
+                  core.warning(`Error updating parent issue #${issueNumber}: ${error.message}`);
+                }
+              }
+            }
+
+            // Main execution logic
+            async function main() {
+              if (context.eventName === 'issues') {
+                const issueNumber = context.payload.issue.number;
+                
+                // Check if milestone was changed
+                if (context.payload.action === 'edited' && context.payload.changes.milestone) {
+                  const milestoneNumber = context.payload.issue.milestone ? context.payload.issue.milestone.number : null;
+                  await syncMilestones(issueNumber, milestoneNumber);
+                }
+                
+                // Check if labels were changed (potential priority change)
+                if (['labeled', 'unlabeled'].includes(context.payload.action)) {
+                  const label = context.payload.label.name;
+                  if (label.toLowerCase().includes('priority')) {
+                    await syncPriority(issueNumber, label);
+                  }
+                }
+                
+                // Check if an issue was closed or labeled as "Done"
+                if (context.payload.action === 'closed' || 
+                    (context.payload.action === 'labeled' && context.payload.label.name.toLowerCase() === 'done')) {
+                  await checkAndUpdateParentStatus(issueNumber);
+                }
+              }
+              
+              // Add Project card moved event handling for GitHub Projects 2
+              if (context.eventName === 'project_card' && context.payload.action === 'moved') {
+                // Extract the issue number from the card
+                const issueUrl = context.payload.project_card.content_url;
+                const issueMatch = issueUrl.match(/\/issues\/(\d+)$/);
+                
+                if (issueMatch) {
+                  const issueNumber = parseInt(issueMatch[1]);
+                  
+                  // Check if the card was moved to a "Done" column
+                  const columnId = context.payload.project_card.column_id;
+                  const { data: column } = await octokit.projects.getColumn({
+                    column_id: columnId
+                  });
+                  
+                  if (column.name.toLowerCase().includes('done')) {
+                    await checkAndUpdateParentStatus(issueNumber);
+                  }
+                }
+              }
+            }
+
+            // Run the main function
+            main().catch(error => {
+              core.setFailed(`Workflow failed: ${error.message}`);
+            });
