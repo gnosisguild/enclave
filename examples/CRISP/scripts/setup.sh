@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -euxo pipefail
 
 # This is all stuff that has to happen after the source code is mounted 
 # TOOD: perhaps we can try and move more of this to the dockerfile build process

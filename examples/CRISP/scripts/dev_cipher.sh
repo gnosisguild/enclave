@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
+set -euxo pipefail
 
 ./local_testnet/run_ciphernodes.sh
