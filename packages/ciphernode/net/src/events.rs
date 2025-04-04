@@ -9,6 +9,7 @@ use libp2p::{
 use crate::correlation_id::CorrelationId;
 
 /// NetworkPeer Commands are sent to the network peer over a mspc channel
+#[derive(Debug)]
 pub enum NetworkPeerCommand {
     GossipPublish {
         topic: String,
