@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-set -euxo pipefail
+set -euo pipefail
 
 # This is all stuff that has to happen after the source code is mounted 
 # TOOD: perhaps we can try and move more of this to the dockerfile build process
 # Eg. copy package.json and Cargo.toml and then try to build out dependencies however this is relatively complex
+(cd /app && git submodule update)
 (cd /app && find . -name "node_modules" -type d -prune -exec rm -rf {} + && pnpm install)
 echo "evm"
 (cd /app/packages/evm && pnpm compile)

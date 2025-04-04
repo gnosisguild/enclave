@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euxo pipefail
+set -euo pipefail
 
 wait-on tcp:8545 && \
   (cd /app/packages/evm && \

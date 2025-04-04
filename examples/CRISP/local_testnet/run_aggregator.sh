@@ -27,6 +27,10 @@ data_dir: .
 address: "$NODE_ADDRESS"
 quic_port: $QUIC_PORT
 enable_mdns: true
+peers:
+  - "/ip4/127.0.0.1/udp/9201/quic-v1"
+  - "/ip4/127.0.0.1/udp/9202/quic-v1"
+  - "/ip4/127.0.0.1/udp/9203/quic-v1"
 chains:
   - name: "$ENVIRONMENT"
     rpc_url: "$RPC_URL"

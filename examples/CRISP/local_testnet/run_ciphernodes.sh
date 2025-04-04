@@ -37,13 +37,26 @@ create_config() {
     local address
     address=$(get_address "$name")
     local config_file="$SCRIPT_DIR/enclave_data/$name/config.yaml"
-
+    
+    # Start writing the config file with the standard parts
     cat << EOF > "$config_file"
 config_dir: .
 data_dir: .
 address: "$address"
 quic_port: $quic_port
 enable_mdns: true
+peers:
+EOF
+    
+    # Add each peer, skipping the one that matches our own quic_port
+    for port in 9201 9202 9203 9204; do
+        if [ "$port" -ne "$quic_port" ]; then
+            echo "  - \"/ip4/127.0.0.1/udp/$port/quic-v1\"" >> "$config_file"
+        fi
+    done
+    
+    # Add the chains section
+    cat << EOF >> "$config_file"
 chains:
   - name: "$ENVIRONMENT"
     rpc_url: "$RPC_URL"
