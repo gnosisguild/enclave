@@ -2,7 +2,11 @@ FROM node:22 AS evm-builder
 
 WORKDIR /build/packages/evm
 COPY ./packages/evm ./
-RUN yarn install && yarn compile
+
+RUN npm install -g corepack
+RUN corepack enable
+
+RUN pnpm install && pnpm compile
 
 # Build stage
 FROM rust:1.81 AS ciphernode-builder

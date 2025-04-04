@@ -23,8 +23,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
       - name: "Run network tests"
-        run: "yarn test:integration net --no-prebuild"
+        run: "pnpm test:integration net --no-prebuild"
 
       - name: "Add test summary"
         run: |
@@ -42,6 +45,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
       - name: Install Rust 1.81.0
         uses: actions-rs/toolchain@v1
         with:
@@ -52,13 +58,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: "**/node_modules"
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm.lock') }}
 
       - name: "Install the dependencies"
-        run: "yarn install"
+        run: "pnpm install"
 
       - name: "Lint the code"
-        run: "yarn lint"
+        run: "pnpm lint"
 
       - name: "Add lint summary"
         run: |
@@ -66,10 +72,10 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
       - name: "Compile the contracts and generate the TypeChain bindings"
-        run: "yarn typechain"
+        run: "pnpm typechain"
 
       - name: "Run prebuild"
-        run: "yarn test:integration prebuild"
+        run: "pnpm test:integration prebuild"
 
       - name: "Upload build artifacts"
         uses: actions/upload-artifact@v4
@@ -97,6 +103,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
       - name: Install Rust 1.81.0
         uses: actions-rs/toolchain@v1
         with:
@@ -107,10 +116,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: "**/node_modules"
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
 
       - name: "Install the dependencies"
-        run: "yarn install"
+        run: "pnpm install"
 
       - name: "Download build artifacts"
         uses: actions/download-artifact@v4
@@ -125,7 +134,7 @@ jobs:
           chmod +x packages/ciphernode/target/debug/pack_e3_params
 
       - name: "Run ${{ matrix.test-suite }} tests"
-        run: "yarn test:integration ${{ matrix.test-suite }} --no-prebuild"
+        run: "pnpm test:integration ${{ matrix.test-suite }} --no-prebuild"
 
       - name: "Add test summary"
         run: |

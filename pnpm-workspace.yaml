@@ -1,0 +1,4 @@
+packages:
+  - packages/evm
+  - examples/CRISP/risc0
+  - examples/CRISP/client

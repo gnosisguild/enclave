@@ -16,8 +16,10 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 20
-      - run: yarn
-      - run: yarn evm:release
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+      - run: pnpm install
+      - run: pnpm evm:release
         env:
           NPM_AUTH_TOKEN: ${{secrets.PUBLISH_NPM_TOKEN}}
           YARN_REGISTRY: https://registry.npmjs.org/
