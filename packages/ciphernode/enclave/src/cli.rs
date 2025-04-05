@@ -1,3 +1,4 @@
+use crate::helpers::telemetry::setup_tracing;
 use crate::net;
 use crate::net::NetCommands;
 use crate::password::PasswordCommands;
@@ -61,10 +62,10 @@ impl Cli {
         }
     }
 
-    #[instrument(skip(self))]
     pub async fn execute(self) -> Result<()> {
         let config_path = self.config.as_deref();
         let config = load_config(config_path)?;
+        setup_tracing(&config, self.log_level())?;
 
         match self.command {
             Commands::Start => start::execute(config).await?,

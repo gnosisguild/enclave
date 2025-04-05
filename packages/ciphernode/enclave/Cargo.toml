@@ -22,4 +22,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true } 
 zeroize = { workspace = true }
+opentelemetry = "0.29.1"
+opentelemetry-jaeger = "0.22.0"
+tracing-opentelemetry = "0.30.0"
 
