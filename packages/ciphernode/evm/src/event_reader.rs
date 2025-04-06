@@ -209,6 +209,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     info!("subscribing to live events");
     match provider.subscribe_logs(&current_filter).await {
         Ok(subscription) => {
+            let id = subscription.local_id().clone();
             let mut stream = subscription.into_stream();
             loop {
                 select! {
@@ -231,6 +232,10 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                     }
                     _ = &mut shutdown => {
                         info!("Received shutdown signal, stopping EVM stream");
+                        match provider.unsubscribe(id).await {
+                            Ok(_) => info!("Provider unsubscribed successfully"),
+                            Err(err) => error!("Error shutting down: {}", err)
+                        }
                         break;
                     }
                 }
@@ -240,7 +245,8 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
             bus.err(EnclaveErrorType::Evm, anyhow!("{}", e));
         }
     };
-    info!("Exiting stream loop");
+
+    warn!("Exiting stream loop");
 }
 
 impl<P, T> Handler<EnclaveEvent> for EvmEventReader<P, T>
@@ -254,6 +260,7 @@ where
     fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::Shutdown { .. } = msg {
             if let Some(shutdown) = self.shutdown_tx.take() {
+                warn!("Sending shutdown signal to oneshot");
                 let _ = shutdown.send(());
             }
         }
