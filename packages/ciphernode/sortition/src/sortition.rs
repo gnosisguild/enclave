@@ -104,7 +104,7 @@ impl Sortition {
         }
     }
 
-    #[instrument(name = "sortition", skip_all)]
+    #[instrument(name = "sortition::attach", skip_all)]
     pub async fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
         store: Repository<SortitionModule>,
@@ -130,6 +130,7 @@ impl Actor for Sortition {
 
 impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
+
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             EnclaveEvent::CiphernodeAdded { data, .. } => ctx.notify(data.clone()),
@@ -142,7 +143,7 @@ impl Handler<EnclaveEvent> for Sortition {
 impl Handler<CiphernodeAdded> for Sortition {
     type Result = ();
 
-    #[instrument(name = "sortition", skip_all)]
+    #[instrument(name = "sortition::CiphernodeAdded", skip_all)]
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
         info!("Adding node: {}", msg.address);
         match self.list.try_mutate(|mut list| {
@@ -158,7 +159,7 @@ impl Handler<CiphernodeAdded> for Sortition {
 impl Handler<CiphernodeRemoved> for Sortition {
     type Result = ();
 
-    #[instrument(name = "sortition", skip_all)]
+    #[instrument(name = "sortition::CiphernodeRemoved", skip_all)]
     fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
         info!("Removing node: {}", msg.address);
         match self.list.try_mutate(|mut list| {
@@ -174,7 +175,7 @@ impl Handler<CiphernodeRemoved> for Sortition {
 impl Handler<GetHasNode> for Sortition {
     type Result = bool;
 
-    #[instrument(name = "sortition", skip_all)]
+    #[instrument(name = "sortition::GetHasNode", skip_all)]
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
         self.list
             .try_with(|list| list.contains(msg.seed, msg.size, msg.address))

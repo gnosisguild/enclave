@@ -167,7 +167,7 @@ where
     }
 }
 
-#[instrument(name = "evm_event_reader", skip_all)]
+#[instrument(name = "evm_event_reader::stream_from_evm", skip(provider))]
 async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     provider: WithChainId<P, T>,
     contract_address: &Address,
@@ -249,7 +249,9 @@ where
     T: Transport + Clone + Unpin,
 {
     type Result = ();
-    fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
+
+    #[instrument(name = "evm_event_reader::EnclaveEvent", skip(self, _ctx), fields(?msg))]
+    fn handle(&mut self, msg: EnclaveEvent, _ctx: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::Shutdown { .. } = msg {
             if let Some(shutdown) = self.shutdown_tx.take() {
                 let _ = shutdown.send(());
@@ -265,8 +267,12 @@ where
 {
     type Result = ();
 
-    #[instrument(name = "evm_event_reader", skip_all)]
-    fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
+    #[instrument(
+        name = "evm_event_reader::EnclaveEvmEvent",
+        skip(self, _ctx),
+        fields(?wrapped)
+    )]
+    fn handle(&mut self, wrapped: EnclaveEvmEvent, _ctx: &mut Self::Context) -> Self::Result {
         match self.state.try_mutate(|mut state| {
             let event_id = wrapped.get_id();
             info!("Processing event: {}", event_id);

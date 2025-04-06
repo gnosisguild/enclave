@@ -8,7 +8,7 @@ use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use data::Repository;
 use events::{EnclaveEvent, EventBus};
-use tracing::{error, info, trace};
+use tracing::{error, info, instrument, trace};
 
 sol!(
     #[sol(rpc)]
@@ -53,6 +53,7 @@ impl From<IEnclave::CiphertextOutputPublished> for EnclaveEvent {
     }
 }
 
+#[instrument(name = "enclave_sol_reader::extractor")]
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&IEnclave::E3Requested::SIGNATURE_HASH) => {
@@ -73,7 +74,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
         _topic => {
             trace!(
                 topic=?_topic,
-                "Unknown event was received by Enclave.sol parser buut was ignored"
+                "Unknown event was received by Enclave.sol parser but was ignored"
             );
             return None;
         }

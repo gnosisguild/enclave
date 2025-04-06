@@ -13,7 +13,7 @@ use alloy::{
 use anyhow::Result;
 use data::Repository;
 use events::{EnclaveEvent, EventBus};
-use tracing::{error, info, trace};
+use tracing::{error, info, instrument, trace};
 
 sol!(
     #[sol(rpc)]
@@ -69,6 +69,7 @@ impl From<ICiphernodeRegistry::CiphernodeRemoved> for EnclaveEvent {
     }
 }
 
+#[instrument(name = "ciphernode_registry::extractor")]
 pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {

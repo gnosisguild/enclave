@@ -104,7 +104,7 @@ launch_ciphernode() {
    heading "Launch ciphernode $name"
    # Make sure the logs directory exists
    mkdir -p "$log_dir"
-   $ENCLAVE_BIN start -v \
+   OTEL_SERVICE_NAME=$name $ENCLAVE_BIN start -v \
      --tag "$name" \
      --config "$SCRIPT_DIR/lib/$name/config.yaml" 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
