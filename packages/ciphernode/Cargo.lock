@@ -1694,9 +1694,12 @@ dependencies = [
  "dirs",
  "events",
  "figment",
+ "petname",
+ "rand 0.8.5",
  "serde",
  "shellexpand",
  "tempfile",
+ "tracing",
  "url",
 ]
 
@@ -6663,6 +6666,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "time",
  "tracing",
  "tracing-core",
  "tracing-log",

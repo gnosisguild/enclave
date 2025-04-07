@@ -7,15 +7,15 @@ use crate::{aggregator, init, password, wallet};
 use crate::{aggregator::AggregatorCommands, start};
 use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
-use config::load_config;
-use tracing::{instrument, Level};
+use config::{load_config_from_overrides, AppConfig, CliOverrides};
+use tracing::Level;
 
 #[derive(Parser, Debug)]
 #[command(name = "enclave")]
 #[command(about = "A CLI for interacting with Enclave the open-source protocol for Encrypted Execution Environments (E3)", long_about = None)]
 pub struct Cli {
     /// Path to config file
-    #[arg(long, global = true)]
+    #[arg(short, long, global = true)]
     config: Option<String>,
 
     #[command(subcommand)]
@@ -41,11 +41,13 @@ pub struct Cli {
     )]
     quiet: bool,
 
-    // NOTE: The --tag argument is being left here deliberately so that we can target the aggregator in our tests
-    // to be killed. We may wish to extend it later to other logging.
-    /// Tag is not currently used but may be used in the future.
+    /// The node name (used for logs and open telemetry)
     #[arg(long, global = true)]
-    pub tag: Option<String>,
+    pub name: Option<String>,
+
+    /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
+    #[arg(long = "otel", global = true)]
+    pub otel: Option<std::net::SocketAddr>,
 }
 
 impl Cli {
@@ -63,10 +65,9 @@ impl Cli {
     }
 
     pub async fn execute(self) -> Result<()> {
-        let config_path = self.config.as_deref();
-        let config = load_config(config_path)?;
-        let log_level = self.log_level();
-        setup_tracing(&config, log_level)?;
+        let config = self.load_config()?;
+        setup_tracing(&config, self.log_level())?;
+
         match self.command {
             Commands::Start => start::execute(config).await?,
             Commands::Init {
@@ -94,6 +95,14 @@ impl Cli {
         }
 
         Ok(())
+    }
+
+    fn load_config(&self) -> Result<AppConfig> {
+        load_config_from_overrides(CliOverrides {
+            config: self.config.clone(),
+            name: self.name.clone(),
+            otel: self.otel,
+        })
     }
 }
 
@@ -126,6 +135,7 @@ pub enum Commands {
         command: NetCommands,
     },
 
+    /// Initialize your ciphernode by setting up a configuration
     Init {
         /// An rpc url for enclave to connect to
         #[arg(long = "rpc-url")]

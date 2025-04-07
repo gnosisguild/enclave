@@ -105,7 +105,6 @@ launch_ciphernode() {
    # Make sure the logs directory exists
    mkdir -p "$log_dir"
    $ENCLAVE_BIN start -v \
-     --tag "$name" \
      --config "$SCRIPT_DIR/lib/$name/config.yaml" 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
@@ -137,7 +136,6 @@ launch_aggregator() {
    # Make sure the logs directory exists
    mkdir -p "$log_dir"
    $ENCLAVE_BIN aggregator start -v \
-     --tag "$name" \
      --config "$SCRIPT_DIR/lib/$name/config.yaml" \
      --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
      --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
@@ -152,7 +150,7 @@ kill_proc() {
 
 metallica() {
   pkill -9 -f "target/debug/enclave" || true
-  pkill -9 -f "hardhat node" || true
+  pkill -9 -f "hardhat" || true
 }
 
 launch_evm() {

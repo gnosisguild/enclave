@@ -7,6 +7,7 @@ use figment::{
     providers::{Format, Serialized, Yaml},
     Figment,
 };
+use generate_id::generate_id;
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -14,6 +15,7 @@ use std::{
 };
 use url::Url;
 
+use crate::generate_id;
 use crate::yaml::load_yaml_with_env;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
@@ -163,6 +165,10 @@ pub struct AppConfig {
     quic_port: u16,
     /// Whether to enable mDNS discovery
     enable_mdns: bool,
+    /// The node name (used for logs and open telemetry)
+    name: Option<String>,
+    /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
+    otel: Option<std::net::SocketAddr>,
 }
 
 impl Default for AppConfig {
@@ -175,11 +181,12 @@ impl Default for AppConfig {
             data_dir: OsDirs::data_dir(),     // ~/.config/enclave
             config_file: PathBuf::from("config.yaml"), // ~/.config/enclave/config.yaml
             cwd: env::current_dir().unwrap_or_default(),
-            peers: vec![], // NOTE: This should remain empty and we should look at config
-            // generation via ipns fetch for the latest nodes
+            peers: vec![], // NOTE: After launch this should be empty and we should look at config generation via ipns fetch for the latest nodes
             address: None,
             quic_port: 9091,
             enable_mdns: false,
+            name: Some(generate_id()),
+            otel: None,
         }
     }
 }
@@ -263,10 +270,27 @@ impl AppConfig {
     pub fn enable_mdns(&self) -> bool {
         self.enable_mdns
     }
+
+    pub fn otel(&self) -> Option<std::net::SocketAddr> {
+        self.otel
+    }
+
+    pub fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+}
+
+/// Override props from the global cli
+#[derive(Default, Serialize, Deserialize)]
+pub struct CliOverrides {
+    pub config: Option<String>,
+    pub name: Option<String>,
+    pub otel: Option<std::net::SocketAddr>,
 }
 
 /// Load the config at the config_file or the default location if not provided
-pub fn load_config(config_file: Option<&str>) -> Result<AppConfig> {
+pub fn load_config_from_overrides(cli_overrides: CliOverrides) -> Result<AppConfig> {
+    let config_file = cli_overrides.config.clone();
     let mut defaults = AppConfig::default();
     if let Some(file) = config_file {
         defaults.config_file = file.into();
@@ -276,9 +300,16 @@ pub fn load_config(config_file: Option<&str>) -> Result<AppConfig> {
 
     let config = Figment::from(Serialized::defaults(&defaults))
         .merge(Yaml::string(&with_envs))
+        .merge(Serialized::defaults(cli_overrides))
         .extract()?;
 
     Ok(config)
+}
+
+pub fn load_config(config_file: Option<String>) -> Result<AppConfig> {
+    let mut overrides = CliOverrides::default();
+    overrides.config = config_file.clone();
+    load_config_from_overrides(overrides)
 }
 
 // Utility to normalize paths
