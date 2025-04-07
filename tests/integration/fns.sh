@@ -43,9 +43,7 @@ ENCLAVE_BIN=./packages/ciphernode/target/debug/enclave
 # Function to clean up background processes
 cleanup() {
     echo "Cleaning up processes..."
-    jobs -p
-    echo "Killing now..."
-    kill $(jobs -p) 2>/dev/null
+    kill -9 $(jobs -p) 2>/dev/null
     exit ${1:-1}
 }
 
@@ -165,6 +163,7 @@ launch_evm() {
   fi
 }
 
+# ensure we dont have left over processes up from the last run
 metallica
 
 # Set up trap to catch errors and interrupts
