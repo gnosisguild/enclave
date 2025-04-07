@@ -59,6 +59,10 @@ lazy_static = "1.5.0"
 logger = { path = "./logger" }
 num = "0.4.3"
 net = { path = "./net" }
+opentelemetry = { version = "0.29.1" }
+opentelemetry-otlp = { version = "0.29.0", features = ["grpc-tonic"] }
+opentelemetry_sdk = "0.29.0"
+opentelemetry-stdout = "0.29.0"
 petname = "2.0.2"
 phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
@@ -74,6 +78,7 @@ test-helpers = { path = "./test_helpers" }
 tempfile = "3.14.0"
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"
+tracing-opentelemetry = "0.30.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.4"
 libp2p = { version = "0.54.1", features = [
