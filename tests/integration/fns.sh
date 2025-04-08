@@ -102,10 +102,17 @@ launch_ciphernode() {
    local log_file="${SCRIPT_DIR}/logs/${name}.log"
    local log_dir="$(dirname "$log_file")"
    heading "Launch ciphernode $name"
-   # Make sure the logs directory exists
    mkdir -p "$log_dir"
+
+   # convert OTEL env var to args
+   local extra_args=""
+   if [[ -n "${OTEL+x}" ]] && [[ -n "$OTEL" ]]; then
+      extra_args="--otel=${OTEL}"
+   fi
+
    $ENCLAVE_BIN start -v \
-     --config "$SCRIPT_DIR/lib/$name/config.yaml" 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+     --name "$name" \
+     --config "$SCRIPT_DIR/lib/$name/config.yaml" $extra_args 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 set_private_key() {
@@ -133,12 +140,19 @@ launch_aggregator() {
    local log_file="${SCRIPT_DIR}/logs/${log_name}.log"
    local log_dir="$(dirname "$log_file")"
    heading "Launch aggregator $name"
-   # Make sure the logs directory exists
    mkdir -p "$log_dir"
+
+   # convert OTEL env var to args
+   local extra_args=""
+   if [[ -n "${OTEL+x}" ]] && [[ -n "$OTEL" ]]; then
+      extra_args="--otel=${OTEL}"
+   fi
+
    $ENCLAVE_BIN aggregator start -v \
+     --name "$name" \
      --config "$SCRIPT_DIR/lib/$name/config.yaml" \
      --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
-     --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+     --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" $extra_args 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 kill_proc() {
