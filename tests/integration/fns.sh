@@ -157,7 +157,7 @@ launch_aggregator() {
 
 kill_proc() {
   local name=$1
-  local pid=$(ps aux | grep 'enclave' | grep "\--tag $name" | awk '{ print $2 }')
+  local pid=$(ps aux | grep 'enclave' | grep "\--name $name" | awk '{ print $2 }')
   echo "Killing $pid"
   kill $pid
 }
