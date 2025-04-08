@@ -181,7 +181,7 @@ impl Default for AppConfig {
             data_dir: OsDirs::data_dir(),     // ~/.config/enclave
             config_file: PathBuf::from("config.yaml"), // ~/.config/enclave/config.yaml
             cwd: env::current_dir().unwrap_or_default(),
-            peers: vec![], // NOTE: After launch this should be empty and we should look at config generation via ipns fetch for the latest nodes
+            peers: vec![], // NOTE: After we release for decentralization purposes we should populate this during enclave init via ipns
             address: None,
             quic_port: 9091,
             enable_mdns: false,
