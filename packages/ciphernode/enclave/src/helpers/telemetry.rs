@@ -14,19 +14,9 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
 
     match maybe_otel_endpoint {
         Some(endpoint) => {
-            let parsed_endpoint = format!(
-                // Add http protocol
-                "http://{}",
-                // ensure we are using localhost instead of 127.0.0.1
-                // socket address needs to use a specific IP
-                // we might be able to get around this by just passing in a free string but we
-                // loose input validation
-                endpoint.to_string().replace("127.0.0.1", "localhost")
-            );
-
             let otlp_exporter = opentelemetry_otlp::SpanExporter::builder()
                 .with_tonic()
-                .with_endpoint(parsed_endpoint)
+                .with_endpoint(endpoint)
                 .with_protocol(Protocol::Grpc)
                 .build()?;
 

@@ -113,11 +113,11 @@ The node can be run with open telemetry by passing in the `--otel` arg.
 We can run a Jaeger instance using docker:
 
 ```
-docker run  --name jaeger -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
+docker run -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
 ```
 
 ```
-enclave start -v --otel 127.0.0.1:4317
+enclave start -v --otel http://localhost:4317
 ```
 
 Now you can visit your Jaeger instance at http://localhost:16686 to view the logs from your node.
@@ -127,7 +127,7 @@ Now you can visit your Jaeger instance at http://localhost:16686 to view the log
 To view logs locally from your tests set the `OTEL` env var when calling your tests:
 
 ```
-OTEL=127.0.0.1:4317 yarn test:integration base
+OTEL="http://localhost:4317" yarn test:integration base
 ```
 
 Then head to http://localhost:16686 to see the results
