@@ -3,7 +3,7 @@ pragma solidity >=0.8.27;
 
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {ImageID} from "./ImageID.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable} from "openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program, IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 

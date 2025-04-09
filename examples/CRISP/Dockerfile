@@ -50,8 +50,8 @@ ENV PATH="/home/${USERNAME}/.risc0/bin:${PATH}"
 RUN curl -L https://risczero.com/install | bash
 RUN rzup install rust 1.81.0 
 RUN rzup install cpp 2024.1.5 
-RUN rzup install r0vm 1.2.0
-RUN rzup install cargo-risczero 1.2.0
+RUN rzup install r0vm 2.0.0
+RUN rzup install cargo-risczero 2.0.0
 
 WORKDIR /app/examples/CRISP
 
