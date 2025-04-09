@@ -168,7 +168,7 @@ pub struct AppConfig {
     /// The node name (used for logs and open telemetry)
     name: Option<String>,
     /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
-    otel: Option<std::net::SocketAddr>,
+    otel: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -271,8 +271,8 @@ impl AppConfig {
         self.enable_mdns
     }
 
-    pub fn otel(&self) -> Option<std::net::SocketAddr> {
-        self.otel
+    pub fn otel(&self) -> Option<String> {
+        self.otel.clone()
     }
 
     pub fn name(&self) -> Option<String> {
@@ -285,7 +285,7 @@ impl AppConfig {
 pub struct CliOverrides {
     pub config: Option<String>,
     pub name: Option<String>,
-    pub otel: Option<std::net::SocketAddr>,
+    pub otel: Option<String>,
 }
 
 /// Load the config at the config_file or the default location if not provided

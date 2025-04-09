@@ -7,6 +7,7 @@ use crate::{aggregator, init, password, wallet};
 use crate::{aggregator::AggregatorCommands, start};
 use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
+use config::validation::ValidUrl;
 use config::{load_config_from_overrides, AppConfig, CliOverrides};
 use tracing::Level;
 
@@ -45,9 +46,9 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub name: Option<String>,
 
-    /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
+    /// Set the Open Telemetry collector grpc endpoint. Eg. http://localhost:4317
     #[arg(long = "otel", global = true)]
-    pub otel: Option<std::net::SocketAddr>,
+    pub otel: Option<ValidUrl>,
 }
 
 impl Cli {
@@ -101,7 +102,7 @@ impl Cli {
         load_config_from_overrides(CliOverrides {
             config: self.config.clone(),
             name: self.name.clone(),
-            otel: self.otel,
+            otel: self.otel.clone().map(Into::into),
         })
     }
 }
