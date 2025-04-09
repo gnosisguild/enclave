@@ -1,5 +1,6 @@
 services:
   enclave-dev:
+    platform: linux/amd64
     build:
       context: .
       args:
