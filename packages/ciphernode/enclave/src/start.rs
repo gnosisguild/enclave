@@ -18,5 +18,10 @@ pub async fn execute(config: AppConfig) -> Result<()> {
 
     std::future::pending::<()>().await;
 
+    // TODO: The following never runs after graceful shutdown but should this should be
+    // investigated. Expect it has to do with Websocket connections not being correctly terminated
+    // within alloy.
+    info!("Process has shutdown!");
+
     Ok(())
 }

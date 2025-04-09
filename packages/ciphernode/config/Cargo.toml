@@ -4,14 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-dirs = { workspace = true }
-anyhow = { workspace = true }
-serde = { workspace = true }
-figment = { workspace = true }
 alloy = { workspace = true }
-shellexpand = { workspace = true }
-url = { workspace = true }
+anyhow = { workspace = true }
+dirs = { workspace = true }
 events = { workspace = true }
+figment = { workspace = true }
+petname = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+shellexpand = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

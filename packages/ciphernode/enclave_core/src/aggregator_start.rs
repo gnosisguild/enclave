@@ -101,7 +101,7 @@ pub async fn execute(
         PlaintextWriter::attach(path, bus.clone());
     }
 
-    SimpleLogger::<EnclaveEvent>::attach("AGG", bus.clone());
+    SimpleLogger::<EnclaveEvent>::attach(&config.name().unwrap_or("AG".to_string()), bus.clone());
 
     Ok((bus, join_handle, peer_id))
 }

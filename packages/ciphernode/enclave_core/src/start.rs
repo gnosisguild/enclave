@@ -44,6 +44,8 @@ pub async fn execute(
     let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     CiphernodeSelector::attach(&bus, &sortition, &address.to_string());
 
+    // TODO: gather an async handle from the event readers that closes when they shutdown and
+    // join it with the network manager joinhandle below
     for chain in config
         .chains()
         .iter()
@@ -90,8 +92,10 @@ pub async fn execute(
     )
     .await?;
 
-    let nm = format!("CIPHER({})", &address.to_string()[0..5]);
-    SimpleLogger::<EnclaveEvent>::attach(&nm, bus.clone());
+    SimpleLogger::<EnclaveEvent>::attach(
+        &config.name().unwrap_or(address.to_string()),
+        bus.clone(),
+    );
 
     Ok((bus, join_handle, peer_id))
 }
