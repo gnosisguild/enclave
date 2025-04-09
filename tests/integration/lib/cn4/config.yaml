@@ -3,6 +3,11 @@ data_dir: .
 address: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
 quic_port: 9094
 enable_mdns: true
+peers:
+  - "/ip4/127.0.0.1/udp/9091/quic-v1"
+  - "/ip4/127.0.0.1/udp/9092/quic-v1"
+  - "/ip4/127.0.0.1/udp/9093/quic-v1"
+  - "/ip4/127.0.0.1/udp/9095/quic-v1"
 chains:
   - name: "hardhat"
     rpc_url: "ws://localhost:8545"
