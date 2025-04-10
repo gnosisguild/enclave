@@ -157,9 +157,9 @@ metallica() {
 
 launch_evm() {
   if [ ! -z "${SILENT_EVM:-}" ]; then
-    yarn evm:node &> /dev/null &
+    pnpm evm:node &> /dev/null &
   else
-    yarn evm:node &
+    pnpm evm:node &
   fi
 }
 

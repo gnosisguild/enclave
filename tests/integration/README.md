@@ -5,17 +5,17 @@ You can run these tests like so:
 Run all tests:
 
 ```
-yarn test:integration
+pnpm test:integration
 ```
 
 Run an individual test:
 
 ```
-yarn test:integration <test-name>
+pnpm test:integration <test-name>
 ```
 
 Eg.
 
 ```
-yarn test:integration net
+pnpm test:integration net
 ```

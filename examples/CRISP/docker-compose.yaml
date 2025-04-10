@@ -1,0 +1,19 @@
+services:
+  enclave-dev:
+    platform: linux/amd64
+    build:
+      context: .
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+        USERNAME: devuser
+    volumes:
+      - ../..:/app
+    entrypoint:
+      - ""
+    ports:
+      - "8545:8545"
+      - "3000:3000"
+      - "4000:4000"
+    # Keep container running in the background
+    command: tail -f /dev/null

@@ -33,17 +33,20 @@ jobs:
         with:
           node-version: 20
 
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
       - name: Cache node modules
         uses: actions/cache@v4
         with:
           path: "**/node_modules"
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
 
       - name: "Install the dependencies"
-        run: "yarn install"
+        run: "pnpm install"
 
       - name: "Lint the code"
-        run: "yarn lint"
+        run: "pnpm lint"
 
       - name: "Add lint summary"
         run: |
@@ -51,10 +54,10 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
       - name: "Compile the contracts and generate the TypeChain bindings"
-        run: "yarn typechain"
+        run: "pnpm typechain"
 
       - name: "Test the contracts and generate the coverage report"
-        run: "yarn coverage"
+        run: "pnpm coverage"
 
       - name: "Add test summary"
         run: |
