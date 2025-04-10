@@ -104,7 +104,7 @@ impl EnclaveContract {
             e3_program,
             e3_params,
             compute_provider_params,
-        );
+        ).value(U256::from(1));
         let receipt = builder.send().await.unwrap().get_receipt().await.unwrap();
         Ok(receipt)
     }
