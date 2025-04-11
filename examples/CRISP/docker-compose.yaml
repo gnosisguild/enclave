@@ -9,11 +9,22 @@ services:
         USERNAME: devuser
     volumes:
       - ../..:/app
+      - cargo-bin:/home/devuser/.cargo/bin
+      - cargo-registry:/home/devuser/.cargo/registry
+      - server-target:/app/server/target
     entrypoint:
       - ""
     ports:
       - "8545:8545"
       - "3000:3000"
       - "4000:4000"
-    # Keep container running in the background
-    command: tail -f /dev/null
+    command: >
+      /bin/bash -c "
+      sudo chown -R devuser:devuser /home/devuser/.cargo &&
+      tail -f /dev/null
+      "
+
+volumes:
+  cargo-bin:
+  cargo-registry:
+  server-target:

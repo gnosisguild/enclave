@@ -10,7 +10,7 @@ set -euo pipefail
 echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"
-(cd /app/packages/ciphernode && cargo build && cargo install --path ./enclave)
+(cd /app/packages/ciphernode && cargo build && cargo install --path ./enclave --force)
 echo "risc0"
 (cd risc0 && cargo build)
 echo "server"

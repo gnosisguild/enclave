@@ -3,8 +3,9 @@ pragma solidity >=0.8.27;
 
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {ImageID} from "./ImageID.sol";
-import {Ownable} from "openzeppelin/contracts/access/Ownable.sol";
-import {IE3Program, IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
+import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 
 contract CRISPRisc0 is IE3Program, Ownable {
@@ -123,4 +124,3 @@ contract CRISPRisc0 is IE3Program, Ownable {
         }
     }
 }
-

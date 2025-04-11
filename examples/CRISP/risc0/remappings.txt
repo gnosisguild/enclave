@@ -1,5 +1,7 @@
 forge-std/=lib/risc0-ethereum/lib/forge-std/src/
+@openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/
 openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/
 risc0/=lib/risc0-ethereum/contracts/src/
 @gnosis-guild/enclave=node_modules/@gnosis-guild/enclave
 @excubiae/contracts=node_modules/@excubiae/contracts
+solady/=node_modules/solady
