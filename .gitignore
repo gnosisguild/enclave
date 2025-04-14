@@ -1,6 +1,6 @@
 #  evm
 node_modules
-
+.pnpm-store
 
 # ciphernode
 target
