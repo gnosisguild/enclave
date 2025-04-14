@@ -178,7 +178,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     bus: &Addr<EventBus<EnclaveEvent>>,
 ) {
     let chain_id = provider.get_chain_id();
-    let mut provider = provider.get_provider();
+    let provider = provider.get_provider();
 
     let historical_filter = Filter::new()
         .address(contract_address.clone())
