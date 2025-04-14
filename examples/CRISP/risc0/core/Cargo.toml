@@ -1,0 +1,9 @@
+[package]
+name = "voting-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fhe = { workspace = true }
+fhe-traits = { workspace = true }
+compute-provider = { workspace = true }

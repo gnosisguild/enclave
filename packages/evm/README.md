@@ -5,7 +5,7 @@
 To install, run
 
 ```
-yarn add @gnosis-guild/enclave
+pnpm add @gnosis-guild/enclave
 ```
 
 If writing a new E3 program, you can import the necessary interfaces by writing
@@ -26,7 +26,7 @@ contract MockE3Program is IE3Program {...}
 ## To deploy
 
 ```
-yarn deploy --network [network]
+pnpm deploy --network [network]
 ```
 
 This will add the deployment information to the `./deployments` directory.
@@ -39,30 +39,30 @@ deploying.
 To add a ciphernode to the registry, run
 
 ```
-yarn ciphernode:add --network [network] --ciphernode-address [address]
+pnpm ciphernode:add --network [network] --ciphernode-address [address]
 ```
 
 To request a new committee, run
 
 ```
-yarn run hardhat committee:new --network [network] \
+pnpm run hardhat committee:new --network [network] \
 ```
 
 To publish the public key of a committee, run
 
 ```
-yarn run hardhat --network [network] committee:publish --e3-id [e3-id] --nodes [node address],
+pnpm run hardhat --network [network] committee:publish --e3-id [e3-id] --nodes [node address],
 [node address] --public-key [publickey] \
 ```
 
 To activate an E3, run
 
 ```
-yarn run hardhat --network [network] e3:activate --e3-id [e3-id] \
+pnpm run hardhat --network [network] e3:activate --e3-id [e3-id] \
 ```
 
 To publish an input for an active E3, run
 
 ```
-yarn run hardhat --network [network] e3:publishInput --e3-id [e3-id] --data [input data]
+pnpm run hardhat --network [network] e3:publishInput --e3-id [e3-id] --data [input data]
 ```

@@ -1,7 +1,7 @@
 {
   "name": "@gnosis-guild/enclave",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "license": "LGPL-3.0-only",
   "author": {
     "name": "gnosisguild",
@@ -69,28 +69,30 @@
     "access": "public"
   },
   "scripts": {
-    "clean": "rimraf ./artifacts ./cache ./coverage ./types ./coverage.json && yarn typechain",
+    "clean": "rimraf ./artifacts ./cache ./coverage ./types ./coverage.json && pnpm typechain",
     "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
-    "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && yarn typechain",
+    "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
     "deploy:mocks": "hardhat deploy --tags enclave,mocks",
     "ciphernode:add": "hardhat ciphernode:add",
     "ciphernode:remove": "hardhat ciphernode:remove",
     "committee:new": "hardhat committee:new",
-    "lint": "yarn lint:sol && yarn lint:ts && yarn prettier:check",
+    "lint": "pnpm lint:sol && pnpm lint:ts && pnpm prettier:check",
     "lint:sol": "solhint --max-warnings 0 \"contracts/**/*.sol\"",
     "lint:ts": "eslint --ignore-path ./.eslintignore --ext .js,.ts .",
-    "postcompile": "yarn typechain",
+    "postcompile": "pnpm typechain",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yml}\"",
     "prettier:write": "prettier --write \"**/*.{js,json,md,sol,ts,yml}\"",
     "task:deployLock": "hardhat task:deployLock",
     "task:withdraw": "hardhat task:withdraw",
     "test": "hardhat test",
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
-    "prerelease": "yarn clean && yarn compile && yarn typechain",
-    "release": "yarn publish --non-interactive"
+    "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
+    "release": "pnpm publish --non-interactive"
   },
   "dependencies": {
-    "@excubiae/contracts": "^0.4.0"
-  }
+    "@excubiae/contracts": "^0.4.0",
+    "solady": "^0.1.13"
+  },
+  "packageManager": "pnpm@9.1.2+sha512.127dc83b9ea10c32be65d22a8efb4a65fb952e8fefbdfded39bdc3c97efc32d31b48b00420df2c1187ace28c921c902f0cb5a134a4d032b8b5295cbfa2c681e2"
 }

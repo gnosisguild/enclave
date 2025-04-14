@@ -34,20 +34,23 @@ jobs:
         with:
           node-version: 20
 
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
       - name: Cache node modules
         uses: actions/cache@v4
         with:
           path: "**/node_modules"
-          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: "Install the dependencies"
-        run: "yarn install"
+        run: "pnpm install"
 
       - name: "Compile the contracts and generate the TypeChain bindings"
-        run: "yarn typechain"
+        run: "pnpm typechain"
 
         # Now we can check rust formatting and run tests
       - name: Checking code format
         run: cd ./packages/ciphernode && cargo fmt -- --check
 
       - name: Run tests
-        run: "yarn ciphernode:test"
+        run: "pnpm ciphernode:test"

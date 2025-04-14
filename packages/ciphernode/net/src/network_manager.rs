@@ -67,16 +67,10 @@ impl NetworkManager {
         tokio::spawn({
             let addr = addr.clone();
             async move {
-                loop {
-                    select! {
-                        Ok(event) = rx.recv() => {
-                            match event {
-                                NetworkPeerEvent::GossipData(data) => {
-                                    addr.do_send(LibP2pEvent(data))
-                                },
-                                _ => ()
-                            }
-                        }
+                while let Ok(event) = rx.recv().await {
+                    match event {
+                        NetworkPeerEvent::GossipData(data) => addr.do_send(LibP2pEvent(data)),
+                        _ => (),
                     }
                 }
             }
