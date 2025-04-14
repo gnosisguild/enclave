@@ -24,6 +24,7 @@ import {ControlID} from "risc0/groth16/ControlID.sol";
 
 import {CRISPRisc0} from "../contracts/CRISPRisc0.sol";
 import {CRISPPolicy} from "../contracts/CRISPPolicy.sol";
+import {CRISPChecker} from "../contracts/CRISPChecker.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
 import {IEnclaveChecker} from "@gnosis-guild/enclave/contracts/interfaces/IEnclaveChecker.sol";
@@ -45,7 +46,6 @@ contract CRISPRisc0Deploy is Script {
 
     IRiscZeroVerifier verifier;
     IEnclave enclave;
-    IEnclaveChecker checker;
 
     function run() external {
         // Read and log the chainID
@@ -87,16 +87,6 @@ contract CRISPRisc0Deploy is Script {
             );
 
             enclave = IEnclave(enclaveAddress);
-
-            address inputValidatorAddress = stdToml.readAddress(
-                config,
-                string.concat(
-                    ".profile.",
-                    configProfile,
-                    ".inputValidatorAddress"
-                )
-            );
-            checker = IEnclaveChecker(inputValidatorAddress);
         }
 
         if (address(verifier) == address(0)) {
@@ -155,7 +145,10 @@ contract CRISPRisc0Deploy is Script {
     function deployCrispRisc0() private {
         console2.log("Enclave Address: ", address(enclave));
         console2.log("Verifier Address: ", address(verifier));
-        console2.log("Checker Address: ", address(checker));
+
+        console2.log("Deploying CRISPChecker");
+        CRISPChecker checker = new CRISPChecker();
+        console2.log("Deployed CRISPChecker to", address(checker));
 
         console2.log("Deploying CRISPPolicy");
         CRISPPolicy policy = new CRISPPolicy(
