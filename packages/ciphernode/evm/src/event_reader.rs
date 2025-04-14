@@ -1,4 +1,4 @@
-use crate::helpers::{ReadonlyProvider, WithChainId};
+use crate::helpers::WithChainId;
 use actix::prelude::*;
 use actix::{Addr, Recipient};
 use alloy::eips::BlockNumberOrTag;
@@ -178,7 +178,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     bus: &Addr<EventBus<EnclaveEvent>>,
 ) {
     let chain_id = provider.get_chain_id();
-    let provider = provider.get_provider();
+    let mut provider = provider.get_provider();
 
     let historical_filter = Filter::new()
         .address(contract_address.clone())
@@ -209,6 +209,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     info!("subscribing to live events");
     match provider.subscribe_logs(&current_filter).await {
         Ok(subscription) => {
+            let id: B256 = subscription.local_id().clone();
             let mut stream = subscription.into_stream();
             loop {
                 select! {
@@ -231,6 +232,14 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                     }
                     _ = &mut shutdown => {
                         info!("Received shutdown signal, stopping EVM stream");
+                        match provider.unsubscribe(id).await {
+                            Ok(_) => {
+                                info!("Unsubscribed successfully from EVM event stream");
+                            },
+                            Err(err) => {
+                                error!("Cannot unsubscribe from EVM event stream: {}", err);
+                            }
+                        };
                         break;
                     }
                 }

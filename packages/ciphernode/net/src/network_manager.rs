@@ -12,7 +12,6 @@ use events::{EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tracing::{error, info, instrument, trace};
