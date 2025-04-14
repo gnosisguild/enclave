@@ -151,7 +151,8 @@ kill_proc() {
   kill $pid
 }
 
-metallica() {
+metalica() {
+  # kill_em_all
   pkill -9 -f "target/debug/enclave" || true
   pkill -9 -f "hardhat node" || true
 }
@@ -164,7 +165,13 @@ launch_evm() {
   fi
 }
 
-metallica
+gracefull_shutdown() {
+  pkill -15 -f "target/debug/enclave" || true
+  sleep 5
+  metalica
+}
+
+metalica
 
 # Set up trap to catch errors and interrupts
 trap 'cleanup $?' ERR INT TERM

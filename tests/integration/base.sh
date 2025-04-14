@@ -113,7 +113,5 @@ echo -e "\033[32m
                             ██                                
                                                               \033[0m"
 
-pkill -15 -f "target/debug/enclave" || true
-sleep 5
-pkill -9 -f "hardhat" || true
+gracefull_shutdown
 
