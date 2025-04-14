@@ -43,8 +43,7 @@ ENCLAVE_BIN=./packages/ciphernode/target/debug/enclave
 # Function to clean up background processes
 cleanup() {
     echo "Cleaning up processes..."
-    jobs -p
-    [ -n "$(jobs -p)" ] && kill -9 $(jobs -p) 2>/dev/null || true
+    jobs -p | xargs -r kill -9 2>/dev/null || true
     exit ${1:-1}
 }
 
