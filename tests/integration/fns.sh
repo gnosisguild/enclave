@@ -150,10 +150,9 @@ kill_proc() {
   kill $pid
 }
 
-metalica() {
-  # kill_em_all
+kill_em_all() {
   pkill -9 -f "target/debug/enclave" || true
-  pkill -9 -f "hardhat node" || true
+  pkill -9 -f "hardhat" || true
 }
 
 launch_evm() {
@@ -164,13 +163,22 @@ launch_evm() {
   fi
 }
 
-gracefull_shutdown() {
-  pkill -15 -f "target/debug/enclave" || true
-  sleep 5
-  metalica
+ensure_process_count_equals() {
+  local process_name="$1"
+  local expected_count="$2"
+  local actual_count=$(ps aux | grep "$process_name" | grep -v "grep" | grep -v $$ | wc -l)
+  [ "$actual_count" -eq "$expected_count" ]
+  return $?
 }
 
-metalica
+gracefull_shutdown() {
+  pkill -15 -f "target/debug/enclave" || true
+  sleep 10
+  ensure_process_count_equals "target/debug/enclave" 0 || return 1
+  kill_em_all
+}
+
+kill_em_all
 
 # Set up trap to catch errors and interrupts
 trap 'cleanup $?' ERR INT TERM
