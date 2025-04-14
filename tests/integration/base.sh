@@ -18,28 +18,29 @@ done
 
 # Set the password for all ciphernodes
 set_password cn1 "$CIPHERNODE_SECRET"
-set_password cn2 "$CIPHERNODE_SECRET"
-set_password cn3 "$CIPHERNODE_SECRET"
-set_password cn4 "$CIPHERNODE_SECRET"
-set_password ag "$CIPHERNODE_SECRET"
-set_private_key ag "$PRIVATE_KEY"
+# set_password cn2 "$CIPHERNODE_SECRET"
+# set_password cn3 "$CIPHERNODE_SECRET"
+# set_password cn4 "$CIPHERNODE_SECRET"
+# set_password ag "$CIPHERNODE_SECRET"
+# set_private_key ag "$PRIVATE_KEY"
 
 # Set the network private key for all ciphernodes
 set_network_private_key cn1 "$NETWORK_PRIVATE_KEY_1"
-set_network_private_key cn2 "$NETWORK_PRIVATE_KEY_2"
-set_network_private_key cn3 "$NETWORK_PRIVATE_KEY_3"
-set_network_private_key cn4 "$NETWORK_PRIVATE_KEY_4"
-set_network_private_key ag "$NETWORK_PRIVATE_KEY_AG"
+# set_network_private_key cn2 "$NETWORK_PRIVATE_KEY_2"
+# set_network_private_key cn3 "$NETWORK_PRIVATE_KEY_3"
+# set_network_private_key cn4 "$NETWORK_PRIVATE_KEY_4"
+# set_network_private_key ag "$NETWORK_PRIVATE_KEY_AG"
 
 # Launch 4 ciphernodes
 launch_ciphernode cn1
-launch_ciphernode cn2
-launch_ciphernode cn3
-launch_ciphernode cn4
-launch_aggregator ag
+# launch_ciphernode cn2
+# launch_ciphernode cn3
+# launch_ciphernode cn4
+# launch_aggregator ag
 
 # Add sleep temporarily for debugging
 sleep infinity
+cleanup 1
 exit 1
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
