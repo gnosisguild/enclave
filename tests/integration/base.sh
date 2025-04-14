@@ -40,7 +40,7 @@ launch_aggregator ag
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 
-sleep 20
+sleep 4
 
 heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
 pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
@@ -58,8 +58,7 @@ heading "Request Committee"
 
 ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
 
-
-sleep 20
+sleep 4
 
 pnpm committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
 
@@ -115,9 +114,6 @@ echo -e "\033[32m
                                                               \033[0m"
 
 pkill -15 -f "target/debug/enclave" || true
-pkill -15 -f "target/debug/aggregator" || true
-
-sleep 4
-
-cleanup 0
+sleep 5
+pkill -9 -f "hardhat" || true
 
