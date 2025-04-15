@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-./local_testnet/run_ciphernodes.sh
+./scripts/local_dev/run_ciphernodes.sh

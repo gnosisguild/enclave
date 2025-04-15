@@ -4,4 +4,4 @@ set -euo pipefail
 
 sleep 3
 
-(cd ./server && cargo run --bin server)
+(cd ./apps/server && cargo run --bin server)

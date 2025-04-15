@@ -21,6 +21,7 @@ services:
     command: >
       /bin/bash -c "
       sudo chown -R devuser:devuser /home/devuser/.cargo &&
+      sudo chown -R devuser:devuser /app/examples/CRISP/apps/server &&
       tail -f /dev/null
       "
 

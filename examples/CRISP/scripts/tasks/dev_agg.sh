@@ -2,4 +2,4 @@
 
 set -euo pipefail
 
-./local_testnet/run_aggregator.sh
+./scripts/local_dev/run_aggregator.sh

@@ -5,4 +5,4 @@ set -euo pipefail
 # wait until nodes are up
 sleep 3
 
-cd /app && /app/examples/CRISP/local_testnet/add_ciphernodes.sh
+./scripts/local_dev/add_ciphernodes.sh
