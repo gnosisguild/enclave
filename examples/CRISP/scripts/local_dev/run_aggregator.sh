@@ -12,8 +12,8 @@ CONFIG_FILE="$DATA_DIR/config.yaml"
 cat << EOF > "$CONFIG_FILE"
 config_dir: . 
 data_dir: .
-address: "$AGGREGATOR_ADDRESS" # Use AGGREGATOR_ADDRESS from config.sh
-quic_port: $AGGREGATOR_QUIC_PORT # Use AGGREGATOR_QUIC_PORT from config.sh
+address: "$AGGREGATOR_ADDRESS"
+quic_port: $AGGREGATOR_QUIC_PORT
 enable_mdns: true
 peers:
 EOF

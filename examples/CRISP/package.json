@@ -1,8 +1,8 @@
 {
-  "name": "crisp-risc0",
+  "name": "crisp",
   "version": "0.0.0",
-  "description": "Risc0 implementation of CRISP",
-  "repository": "https://github.com/gnosisguild/CRISP",
+  "description": "CRISP - Coercion-Resistant Impartial Selection Protocol",
+  "repository": "https://github.com/gnosisguild/enclave",
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
