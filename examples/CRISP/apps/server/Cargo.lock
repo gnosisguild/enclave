@@ -2688,7 +2688,7 @@ dependencies = [
  "sled",
  "thiserror 1.0.64",
  "tokio",
- "voting-risc0",
+ "voting-host",
  "wasm-bindgen",
 ]
 
@@ -8018,7 +8018,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "voting-risc0"
+name = "voting-host"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives 0.8.25",

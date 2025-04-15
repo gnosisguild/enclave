@@ -23,7 +23,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::time::{sleep_until, Instant};
-use voting_risc0::run_compute;
+use voting_host::run_compute;
 
 /// Type alias for results with a boxed error.
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;

@@ -16,7 +16,7 @@ use log::info;
 use std::error::Error;
 use std::time::{UNIX_EPOCH, Duration, SystemTime};
 use tokio::time::{sleep_until, Instant};
-use voting_risc0::run_compute;
+use voting_host::run_compute;
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 

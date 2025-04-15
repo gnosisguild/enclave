@@ -1,5 +1,5 @@
 [package]
-name = "voting-risc0"
+name = "voting-host"
 version = { workspace = true }
 edition = { workspace = true }
 
