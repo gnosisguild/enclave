@@ -166,7 +166,7 @@ launch_evm() {
 ensure_process_count_equals() {
   local process_name="$1"
   local expected_count="$2"
-  local actual_count=$(ps aux | grep "$process_name" | grep -v "grep" | grep -v $$ | wc -l)
+  local actual_count=$(pgrep -f "$process_name" | wc -l)
   [ "$actual_count" -eq "$expected_count" ]
   return $?
 }
