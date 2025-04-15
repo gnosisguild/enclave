@@ -9,7 +9,11 @@
   },
   "scripts": {
     "hardhat": "hardhat",
-    "compile": "forge compile"
+    "compile": "forge compile",
+    "docker:setup": "bash scripts/setup.sh",
+    "docker:build": "bash scripts/build.sh",
+    "docker:dev": "bash scripts/dev.sh",
+    "docker:clean": "bash scripts/clean.sh"
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
