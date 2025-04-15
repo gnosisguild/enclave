@@ -120,10 +120,6 @@ echo -e "\033[32m
                             ██                                
                                                               \033[0m"
 
-pkill -15 -f "target/debug/enclave" || true
-pkill -15 -f "target/debug/aggregator" || true
 
-sleep 4
-
-cleanup 0
+gracefull_shutdown
 

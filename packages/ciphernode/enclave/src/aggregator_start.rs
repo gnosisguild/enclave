@@ -17,9 +17,6 @@ pub async fn execute(
         aggregator_start::execute(config, pubkey_write_path, plaintext_write_path).await?;
 
     info!("LAUNCHING AGGREGATOR {}", peer_id);
-    tokio::spawn(listen_for_shutdown(bus.into(), handle));
-
-    std::future::pending::<()>().await;
-
+    tokio::spawn(listen_for_shutdown(bus.into(), handle)).await?;
     Ok(())
 }
