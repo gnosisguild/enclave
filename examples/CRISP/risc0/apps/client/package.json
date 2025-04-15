@@ -10,9 +10,7 @@
   "homepage": "https://github.com/gnosisguild/CRISP",
   "scripts": {
     "dev": "vite --no-open --host",
-    "build:wasm": "cd wasm-src && wasm-pack build --target web --release --out-dir ../libs/wasm/pkg",
-    "build:client": "tsc && vite build",
-    "build": "pnpm run build:wasm && pnpm run build:client",
+    "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "predeploy": "pnpm run build",
