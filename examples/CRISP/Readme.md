@@ -13,7 +13,7 @@ CRISP
 │   │   ├── public - Static files
 │   │   ├── src - React components and source code
 │   │   └── [configuration files and README]
-│   ├── risc0
+│   ├── program
 │   │   ├── core - Core logic for the RISC Zero zkVM
 │   │   ├── host - Host logic for the RISC Zero zkVM
 │   │   ├── methods - Guest programs to run on the RISC Zero zkVM
