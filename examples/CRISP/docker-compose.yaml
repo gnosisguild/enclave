@@ -11,7 +11,7 @@ services:
       - ../..:/app
       - cargo-bin:/home/devuser/.cargo/bin
       - cargo-registry:/home/devuser/.cargo/registry
-      - server-target:/app/server/target
+      - server-target:/app/examples/CRISP/apps/server/target
     entrypoint:
       - ""
     ports:
@@ -21,6 +21,7 @@ services:
     command: >
       /bin/bash -c "
       sudo chown -R devuser:devuser /home/devuser/.cargo &&
+      sudo chown -R devuser:devuser /app/examples/CRISP/apps/server &&
       tail -f /dev/null
       "
 
