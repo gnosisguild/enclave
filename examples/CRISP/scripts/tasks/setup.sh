@@ -12,10 +12,10 @@ echo "evm"
 echo "ciphernode"
 (cd /app/packages/ciphernode && cargo build && cargo install --path ./enclave --force)
 echo "risc0"
-(cd ./apps/risc0 && cargo build)
+(cd ./apps/program && cargo build)
 echo "server"
 (cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo check)
 echo "client"
 (cd ./apps/client && [[ ! -f .env ]] && cp .env.example .env)
-echo "crisp-wasm-src"
-(cd ./apps/wasm-src && cargo check)
+echo "crisp-wasm-crypto"
+(cd ./apps/wasm-crypto && cargo check)

@@ -3,7 +3,7 @@
 set -e
 
 (cd evm && pnpm compile)
-(cd ./apps/wasm-src && cargo build)
-(cd ./apps/risc0 && cargo build)
+(cd ./apps/wasm-crypto && cargo build)
+(cd ./apps/program && cargo build)
 (cd ./apps/server && cargo build)
 (cd ./apps/client && pnpm build)
