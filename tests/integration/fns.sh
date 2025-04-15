@@ -178,6 +178,7 @@ gracefull_shutdown() {
   kill_em_all
 }
 
+# Run this at the start of every test to ensure we start with a clean slate
 kill_em_all
 
 # Set up trap to catch errors and interrupts
