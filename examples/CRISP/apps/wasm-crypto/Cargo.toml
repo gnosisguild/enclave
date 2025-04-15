@@ -1,5 +1,5 @@
 [package]
-name = "crisp-wasm-src"
+name = "crisp-wasm-crypto"
 version = "0.1.0"
 edition = "2021"
 repository = "https://github.com/gnosisguild/enclave"

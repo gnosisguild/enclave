@@ -3,6 +3,7 @@
 Welcome to the CRISP project! This document provides a comprehensive guide to setting up and deploying the application both locally. Follow the steps carefully to ensure that all dependencies, services, and components are properly configured.
 
 ## Project Structure
+
 ```
 CRISP
 ├── Dockerfile - Dockerfile for a local development environment
@@ -20,7 +21,7 @@ CRISP
 │   │   ├── src
 │   │   │   ├── cli - CLI for interacting with the CRISP server
 │   │   │   └── server - Server for interacting with the enclave contracts and the client
-│   └── wasm-src
+│   └── wasm-crypto
 ├── contracts - Contracts for the CRISP protocol
 ├── deploy - Deployment scripts
 ├── docker-compose.yaml
@@ -106,13 +107,13 @@ To set up the CRISP dApp in your local environment, follow these steps:
    cd CRISP/apps/client
    ```
 
-3. Install dependencies:
+2. Install dependencies:
 
    ```sh
    pnpm install
    ```
 
-4. Start the development server:
+3. Start the development server:
 
    ```sh
    pnpm dev
