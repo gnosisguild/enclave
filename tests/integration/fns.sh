@@ -43,7 +43,7 @@ ENCLAVE_BIN=./packages/ciphernode/target/debug/enclave
 # Function to clean up background processes
 cleanup() {
     echo "Cleaning up processes..."
-    kill $(jobs -p) 2>/dev/null
+    jobs -p | xargs -r kill -9 2>/dev/null || true
     exit ${1:-1}
 }
 
@@ -150,9 +150,9 @@ kill_proc() {
   kill $pid
 }
 
-metallica() {
+kill_em_all() {
   pkill -9 -f "target/debug/enclave" || true
-  pkill -9 -f "hardhat node" || true
+  pkill -9 -f "hardhat" || true
 }
 
 launch_evm() {
@@ -163,7 +163,23 @@ launch_evm() {
   fi
 }
 
-metallica
+ensure_process_count_equals() {
+  local process_name="$1"
+  local expected_count="$2"
+  local actual_count=$(pgrep -f "$process_name" | wc -l)
+  [ "$actual_count" -eq "$expected_count" ]
+  return $?
+}
+
+gracefull_shutdown() {
+  pkill -15 -f "target/debug/enclave" || true
+  sleep 10
+  ensure_process_count_equals "target/debug/enclave" 0 || return 1
+  kill_em_all
+}
+
+# Run this at the start of every test to ensure we start with a clean slate
+kill_em_all
 
 # Set up trap to catch errors and interrupts
 trap 'cleanup $?' ERR INT TERM
