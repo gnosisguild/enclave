@@ -1,0 +1,20 @@
+[package]
+name = "risc0-forge-ffi"
+description = "A tool to integrate forge-ffi with the risc0-zkVM."
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+
+[dependencies]
+alloy = { workspace = true }
+anyhow = { workspace = true }
+clap = { version = "4.5", features = ["derive", "env"] }
+hex = { version = "0.4" }
+libc = "0.2.159"
+risc0-ethereum-contracts = { workspace = true }
+risc0-zkvm = { workspace = true, default-features = true }
+
+[dev-dependencies]
+ffi-guests = { path = "./guests" }
