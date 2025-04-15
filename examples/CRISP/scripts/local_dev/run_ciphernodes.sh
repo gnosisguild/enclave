@@ -1,5 +1,5 @@
 #!/bin/bash
-source ./config.sh
+source ./scripts/local_dev/config.sh
 export RUST_LOG=info
 
 # Map names to addresses and ports defined in config.sh

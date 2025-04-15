@@ -3,18 +3,45 @@
 Welcome to the CRISP project! This document provides a comprehensive guide to setting up and deploying the application both locally. Follow the steps carefully to ensure that all dependencies, services, and components are properly configured.
 
 ## Project Structure
-
 ```
-CRISP/packages
-├── /client/
-│   ├── /libs/wasm/pkg/ - WebAssembly library package
-│   ├── /public/ - Static files
-│   ├── /src/ - React components and source code
-│   └── [configuration files and README]
-├── /local_testnet/ - Scripts to setup and run ciphernodes
-├── /risc0/ - RISC Zero zkVM and Verifier contracts
-├── /server/ - Rust server-side logic and a Command Line Interface to interact with CRISP E3 rounds
-└── /web-rust/ - Rust to WebAssembly logic
+CRISP
+├── Dockerfile - Dockerfile for a local development environment
+├── apps
+│   ├── client
+│   │   ├── libs/wasm/pkg - WebAssembly library package
+│   │   ├── public - Static files
+│   │   ├── src - React components and source code
+│   │   └── [configuration files and README]
+│   ├── risc0
+│   │   ├── core - Core logic for the RISC Zero zkVM
+│   │   ├── host - Host logic for the RISC Zero zkVM
+│   │   ├── methods - Guest programs to run on the RISC Zero zkVM
+│   ├── server
+│   │   ├── src
+│   │   │   ├── cli - CLI for interacting with the CRISP server
+│   │   │   └── server - Server for interacting with the enclave contracts and the client
+│   └── wasm-src
+├── contracts - Contracts for the CRISP protocol
+├── deploy - Deployment scripts
+├── docker-compose.yaml
+└── scripts
+    ├── local_dev - Scripts for local development
+    └── tasks - Scripts for tasks to be run inside the docker container
+```
+
+## Docker Development
+
+To start the development environment, run the following command:
+
+```sh
+pnpm dev:setup
+pnpm dev:start
+```
+
+To stop the development environment, run the following command:
+
+```sh
+pnpm dev:stop
 ```
 
 ## Prerequisites
@@ -73,16 +100,10 @@ At this point, you should have all the tools required to develop and deploy an a
 
 To set up the CRISP dApp in your local environment, follow these steps:
 
-1. Clone the repository:
+1. Navigate to the `client` directory:
 
    ```sh
-   git clone https://github.com/gnosisguild/CRISP.git
-   ```
-
-2. Navigate to the `client` directory:
-
-   ```sh
-   cd CRISP/packages/client
+   cd CRISP/apps/client
    ```
 
 3. Install dependencies:
@@ -221,10 +242,10 @@ CHAIN_ID=31337
 CRON_API_KEY=1234567890
 
 # Based on Default Anvil Deployments (Only for testing)
-ENCLAVE_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-CIPHERNODE_REGISTRY_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
-NAIVE_REGISTRY_FILTER_ADDRESS=0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
-E3_PROGRAM_ADDRESS=0x610178dA211FEF7D417bC0e6FeD39F05609AD788 # CRISPRisc0 Contract Address
+ENCLAVE_ADDRESS="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+CIPHERNODE_REGISTRY_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+NAIVE_REGISTRY_FILTER_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPRisc0 Contract Address
 
 # E3 Config
 E3_WINDOW_SIZE=600

@@ -1,5 +1,5 @@
 #!/bin/bash
-source ./config.sh
+source ./scripts/local_dev/config.sh
 export RUST_LOG=info
 
 DATA_DIR="$SCRIPT_DIR/enclave_data/aggregator"

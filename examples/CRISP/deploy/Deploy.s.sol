@@ -42,7 +42,7 @@ import {IEnclaveChecker} from "@gnosis-guild/enclave/contracts/interfaces/IEncla
 /// https://book.getfoundry.sh/reference/forge/forge-script
 contract CRISPRisc0Deploy is Script {
     // Path to deployment config file, relative to the project root.
-    string constant CONFIG_FILE = "script/config.toml";
+    string constant CONFIG_FILE = "deploy/config.toml";
 
     IRiscZeroVerifier verifier;
     IEnclave enclave;

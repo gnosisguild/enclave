@@ -3,8 +3,8 @@
 set -euo pipefail
 
 concurrently -r \
-  "./scripts/dev_cipher.sh" \
-  "./scripts/dev_agg.sh" \
-  "./scripts/dev_add.sh" \
-  "./scripts/dev_server.sh" \
-  "./scripts/dev_client.sh"
+  "./scripts/tasks/dev_cipher.sh" \
+  "./scripts/tasks/dev_agg.sh" \
+  "./scripts/tasks/dev_add.sh" \
+  "./scripts/tasks/dev_server.sh" \
+  "./scripts/tasks/dev_client.sh"
