@@ -6425,7 +6425,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "voting-risc0"
+name = "voting-host"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",

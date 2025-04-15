@@ -15,7 +15,7 @@ echo "risc0"
 (cd ./apps/program && cargo build)
 echo "server"
 (cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo check)
-echo "client"
-(cd ./apps/client && [[ ! -f .env ]] && cp .env.example .env)
 echo "crisp-wasm-crypto"
 (cd ./apps/wasm-crypto && cargo check)
+echo "client"
+(cd ./apps/client && if [[ ! -f .env ]]; then cp .env.example .env; fi)
