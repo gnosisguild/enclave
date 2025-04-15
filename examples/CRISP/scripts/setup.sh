@@ -4,6 +4,6 @@
 
 set -euxo pipefail
 
-docker compose build
-docker compose up -d # ensure our container is running in order to have dev persistence and caching 
-docker compose exec enclave-dev ./scripts/setup.sh
+docker compose -f ../docker-compose.yaml build 
+docker compose -f ../docker-compose.yaml up -d # ensure our container is running in order to have dev persistence and caching 
+docker compose -f ../docker-compose.yaml exec enclave-dev ./tasks/setup.sh
