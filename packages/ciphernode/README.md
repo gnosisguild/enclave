@@ -113,7 +113,7 @@ The node can be run with open telemetry by passing in the `--otel` arg.
 We can run a Jaeger instance using docker:
 
 ```
-docker run -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
+docker run -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/jaeger:latest
 ```
 
 ```
