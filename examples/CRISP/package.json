@@ -1,0 +1,46 @@
+{
+  "name": "crisp",
+  "version": "0.0.0",
+  "description": "CRISP - Coercion-Resistant Impartial Selection Protocol",
+  "repository": "https://github.com/gnosisguild/enclave",
+  "author": {
+    "name": "gnosisguild",
+    "url": "https://github.com/gnosisguild"
+  },
+  "scripts": {
+    "hardhat": "hardhat",
+    "compile": "forge compile",
+    "dev:setup": "bash scripts/setup.sh",
+    "dev:build": "bash scripts/build.sh",
+    "dev:up": "bash scripts/dev.sh",
+    "dev:down": "bash scripts/clean.sh"
+  },
+  "dependencies": {
+    "@excubiae/contracts": "^0.4.0",
+    "solady": "^0.1.13",
+    "@gnosis-guild/enclave": "workspace:*"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-foundry": "^1.1.2",
+    "@nomicfoundation/hardhat-ignition": "^0.15.5",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.0",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@nomicfoundation/ignition-core": "^0.15.5",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "hardhat": "^2.22.10",
+    "hardhat-deploy": "^0.12.4",
+    "hardhat-gas-reporter": "^1.0.8",
+    "poseidon-solidity": "^0.0.5",
+    "solidity-coverage": "^0.8.1",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.0",
+    "typescript": "^5.5.4"
+  }
+}

@@ -14,14 +14,6 @@ pub async fn execute(config: AppConfig) -> Result<()> {
     let (bus, handle, peer_id) = start::execute(config, address).await?;
     info!("LAUNCHING CIPHERNODE: ({}/{})", address, peer_id);
 
-    tokio::spawn(listen_for_shutdown(bus.into(), handle));
-
-    std::future::pending::<()>().await;
-
-    // TODO: The following never runs after graceful shutdown but should this should be
-    // investigated. Expect it has to do with Websocket connections not being correctly terminated
-    // within alloy.
-    info!("Process has shutdown!");
-
+    tokio::spawn(listen_for_shutdown(bus.into(), handle)).await?;
     Ok(())
 }
