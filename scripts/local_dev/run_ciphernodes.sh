@@ -1,41 +1,62 @@
 #!/bin/bash
+source ./config.sh
 export RUST_LOG=info
-SCRIPT_DIR=/tmp/enclave-nodes
+# SCRIPT_DIR=/tmp/enclave-nodes # Sourced from config.sh
 
-# Environment variables
-ENVIRONMENT="hardhat"
-RPC_URL="ws://localhost:8545"
-ENCLAVE_CONTRACT="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-REGISTRY_CONTRACT="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-FILTER_REGISTRY_CONTRACT="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-QUIC_PORT=9201
+# Environment variables - Sourced from config.sh
+# ENVIRONMENT="hardhat"
+# RPC_URL="ws://localhost:8545"
+# ENCLAVE_CONTRACT="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+# REGISTRY_CONTRACT="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+# FILTER_REGISTRY_CONTRACT="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+# PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+# QUIC_PORT=9201 # Initial port is now CIPHERNODE_QUIC_PORT_1
 
-# Ciphernode addresses
-CIPHERNODE_NAMES=("cn1" "cn2" "cn3")
-CIPHERNODE_ADDRESSES=("0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
-                      "0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
-                      "0x2546BcD3c84621e976D8185a91A922aE77ECEc30")
+# Ciphernode addresses and names - Sourced from config.sh
+# CIPHERNODE_NAMES=("cn1" "cn2" "cn3")
+# CIPHERNODE_ADDRESSES=("0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+#                       "0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
+#                       "0x2546BcD3c84621e976D8185a91A922aE77ECEc30")
+
+# Map names to addresses and ports defined in config.sh
+declare -A CIPHERNODE_INFO
+CIPHERNODE_INFO["cn1",address]="$CIPHERNODE_ADDRESS_1"
+CIPHERNODE_INFO["cn1",port]="$CIPHERNODE_QUIC_PORT_1"
+CIPHERNODE_INFO["cn2",address]="$CIPHERNODE_ADDRESS_2"
+CIPHERNODE_INFO["cn2",port]="$CIPHERNODE_QUIC_PORT_2"
+CIPHERNODE_INFO["cn3",address]="$CIPHERNODE_ADDRESS_3"
+CIPHERNODE_INFO["cn3",port]="$CIPHERNODE_QUIC_PORT_3"
+
 
 # Function to get the address for a ciphernode
 get_address() {
     local name="$1"
-    for i in "${!CIPHERNODE_NAMES[@]}"; do
-        if [ "${CIPHERNODE_NAMES[$i]}" = "$name" ]; then
-            echo "${CIPHERNODE_ADDRESSES[$i]}"
-            return
-        fi
-    done
-    echo "Unknown node: $name" >&2
-    exit 1
+    if [[ -v CIPHERNODE_INFO[$name,address] ]]; then
+        echo "${CIPHERNODE_INFO[$name,address]}"
+    else
+        echo "Unknown node: $name" >&2
+        exit 1
+    fi
+}
+
+# Function to get the QUIC port for a ciphernode
+get_port() {
+    local name="$1"
+    if [[ -v CIPHERNODE_INFO[$name,port] ]]; then
+        echo "${CIPHERNODE_INFO[$name,port]}"
+    else
+        echo "Unknown node: $name" >&2
+        exit 1
+    fi
 }
 
 # Function to create config for a ciphernode
 create_config() {
     local name=$1
-    local quic_port=$2
+    local quic_port
+    quic_port=$(get_port "$name") # Get port from map
     local address
-    address=$(get_address "$name")
+    address=$(get_address "$name") # Get address from map
     local config_file="$SCRIPT_DIR/enclave_data/$name/config.yaml"
     
     # Start writing the config file with the standard parts
@@ -48,14 +69,14 @@ enable_mdns: true
 peers:
 EOF
     
-    # Add each peer, skipping the one that matches our own quic_port
-    for port in 9201 9202 9203 9204; do
+    # Add each peer from ALL_QUIC_PORTS (defined in config.sh), skipping self
+    for port in "${ALL_QUIC_PORTS[@]}"; do
         if [ "$port" -ne "$quic_port" ]; then
             echo "  - \"/ip4/127.0.0.1/udp/$port/quic-v1\"" >> "$config_file"
         fi
     done
     
-    # Add the chains section
+    # Add the chains section (variables sourced from config.sh)
     cat << EOF >> "$config_file"
 chains:
   - name: "$ENVIRONMENT"
@@ -74,10 +95,10 @@ run_ciphernode() {
     local config_file=$2
     local log_file=$3
 
-    # Set password
+    # Set password (sourced from config.sh)
     enclave password create \
         --config "$config_file" \
-        --password "We are the music makers and we are the dreamers of the dreams."
+        --password "$PASSWORD"
 
     # Generate a new key
     enclave net generate-key --config "$config_file"
@@ -102,12 +123,11 @@ else
     log_to_file=false
 fi
 
-# Launch all ciphernodes
+# Launch all ciphernodes using names from config.sh
 for name in "${CIPHERNODE_NAMES[@]}"; do
     DATA_DIR="$SCRIPT_DIR/enclave_data/$name"
     mkdir -p "$DATA_DIR"
-    config_file=$(create_config "$name" "$QUIC_PORT")
-    QUIC_PORT=$((QUIC_PORT + 1))
+    config_file=$(create_config "$name") # Removed quic_port increment
     echo "Created config file for $name: $config_file"
     if $log_to_file; then
         run_ciphernode "$name" "$config_file" "$DATA_DIR/ciphernode-$name.log"
