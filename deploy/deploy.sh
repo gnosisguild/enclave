@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 TIMESTAMP=$(date +%s)
-RUN_FILE="./scripts/docker_swarm/tmp.docker-compose.${TIMESTAMP}.yml"
-TEMPLATE_FILE="./scripts/docker_swarm/docker-compose.yml"
+RUN_FILE="./deploy/tmp.docker-compose.${TIMESTAMP}.yml"
+TEMPLATE_FILE="./deploy/docker-compose.yml"
 
 wait_ready() {
     local STACK_NAME="$1"
@@ -50,4 +50,4 @@ docker stack rm $STACK_NAME
 wait_removed $STACK_NAME
 docker stack deploy -c $RUN_FILE $STACK_NAME
 wait_ready $STACK_NAME
-rm ./scripts/docker_swarm/tmp.*.*
+rm ./deploy/tmp.*.*

@@ -1,22 +1,6 @@
 #!/bin/bash
 source ./config.sh
 export RUST_LOG=info
-# SCRIPT_DIR=/tmp/enclave-nodes # Sourced from config.sh
-
-# Environment variables - Sourced from config.sh
-# ENVIRONMENT="hardhat"
-# RPC_URL="ws://localhost:8545"
-# ENCLAVE_CONTRACT="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-# REGISTRY_CONTRACT="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-# FILTER_REGISTRY_CONTRACT="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-# PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-# QUIC_PORT=9201 # Initial port is now CIPHERNODE_QUIC_PORT_1
-
-# Ciphernode addresses and names - Sourced from config.sh
-# CIPHERNODE_NAMES=("cn1" "cn2" "cn3")
-# CIPHERNODE_ADDRESSES=("0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
-#                       "0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
-#                       "0x2546BcD3c84621e976D8185a91A922aE77ECEc30")
 
 # Map names to addresses and ports defined in config.sh
 declare -A CIPHERNODE_INFO

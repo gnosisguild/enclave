@@ -69,7 +69,7 @@ cd enclave/
 Build the app
 
 ```
-./scripts/docker_swarm/build.sh
+./deploy/build.sh
 ```
 
 # Setup `.env` vars
@@ -77,7 +77,7 @@ Build the app
 Copy the `.env.example` file to `.env`
 
 ```
-cp ./scripts/docker_swarm/.env.example ./scripts/docker_swarm/.env
+cp ./deploy/.env.example ./deploy/.env
 ```
 
 Alter the variables to reflect the correct values required for the stack:
@@ -101,7 +101,7 @@ To deploy with swarm we need to set up the secrets file for our cluster.
 
 ## Run
 ```bash
-./scripts/docker_swarm/copy-secrets.sh
+./deploy/copy-secrets.sh
 ```
 
 ## What it does
@@ -124,7 +124,7 @@ Remember to modify any highlighted files before use with unique secrets.
 To deploy 
 
 ```
-./scripts/docker_swarm/deploy.sh enclave ghcr.io/gnosisguild/ciphernode:latest
+./deploy/deploy.sh enclave ghcr.io/gnosisguild/ciphernode:latest
 ```
 
 This will deploy the following services:
