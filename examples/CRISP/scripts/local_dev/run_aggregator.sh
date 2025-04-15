@@ -31,6 +31,10 @@ cat << EOF >> "$CONFIG_FILE"
 chains:
   - name: "$ENVIRONMENT"
     rpc_url: "$RPC_URL"
+    contracts:
+      enclave: "$ENCLAVE_CONTRACT"
+      ciphernode_registry: "$REGISTRY_CONTRACT"
+      filter_registry: "$FILTER_REGISTRY_CONTRACT"
 EOF
 
 # Trap SIGINT (Ctrl + C) to stop all background jobs
