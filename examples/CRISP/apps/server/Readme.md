@@ -66,7 +66,6 @@ Follow the prompts to initialize new E3 rounds, activate rounds, participate in 
 
 The server exposes several RESTful API endpoints:
 
-- `POST /auth/login`: Authenticate a user login
 - `GET /rounds/current`: Get the current round information
 - `POST /rounds/public-key`: Get the public key for a specific round
 - `POST /rounds/ciphertext`: Get the ciphertext for a specific round

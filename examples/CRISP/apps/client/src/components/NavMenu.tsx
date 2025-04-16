@@ -1,12 +1,11 @@
 // NavMenu.tsx
 import React, { useEffect, useRef, useState } from 'react'
-import LogoutIcon from '@/assets/icons/logout.svg'
 import { useNavigate } from 'react-router-dom'
-import { useVoteManagementContext } from '@/context/voteManagement'
+import { List } from '@phosphor-icons/react'
 //Icons
-import { CaretRight, CalendarCheck, CheckFat, Notebook } from '@phosphor-icons/react'
+import { CalendarCheck, CheckFat, Notebook } from '@phosphor-icons/react'
 
-interface NavMenuProps {}
+interface NavMenuProps { }
 
 const NAV_MENU_OPTIONS = [
   {
@@ -28,7 +27,6 @@ const NAV_MENU_OPTIONS = [
 
 const NavMenu: React.FC<NavMenuProps> = () => {
   const navigate = useNavigate()
-  const { user, logout } = useVoteManagementContext()
   const menuRef = useRef<HTMLDivElement>(null)
   const [isOpen, setIsOpen] = useState<boolean>(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -64,29 +62,20 @@ const NavMenu: React.FC<NavMenuProps> = () => {
     return setIsOpen(!isOpen)
   }
 
-  const handleLogout = () => {
-    navigate('/')
-    logout()
-    return setIsOpen(!isOpen)
-  }
-
-  return user ? (
-    <div className='relative'>
+  return (
+    <div className='relative md:hidden'>
       <button
         ref={buttonRef}
         onClick={toggleMenu}
-        className='flex items-center justify-between space-x-1 rounded-lg border-2 bg-white/60 px-2 py-1 duration-300 ease-in-out hover:bg-white'
+        className='flex items-center justify-between space-x-1 rounded-[12px] bg-white/70 px-2 py-2 duration-300 ease-in-out hover:bg-white'
       >
-        <img src={user.pfpUrl} className='h-[20px] w-[20px] rounded-full' />
-        <p className='text-xs font-bold'>@{user.username}</p>
-        <CaretRight className={isOpen ? '-rotate-90 transition-transform duration-200' : ''} />
+        <List size={24} />
       </button>
 
       <div
         ref={menuRef}
-        className={`absolute right-0 mt-4 w-40 transform rounded-lg border-2 border-slate-600/10 bg-white p-4  shadow-md ${
-          isOpen ? 'scale-100' : 'scale-0'
-        }`}
+        className={`absolute right-0 mt-4 w-40 transform rounded-[12px] bg-white/70 p-4 
+          ${isOpen ? 'scale-100' : 'scale-0'}`}
       >
         <div className='space-y-2'>
           {NAV_MENU_OPTIONS.map(({ name, path, icon }) => (
@@ -95,16 +84,10 @@ const NavMenu: React.FC<NavMenuProps> = () => {
               <p className='block rounded-md text-sm font-semibold '>{name}</p>
             </div>
           ))}
-          <div className='border-t-2'>
-            <div className='mt-2 flex cursor-pointer space-x-2 rounded  p-1 hover:bg-gray-100' onClick={handleLogout}>
-              <img src={LogoutIcon} />
-              <p className='block rounded-md text-sm font-semibold '>Logout</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
-  ) : null
+  )
 }
 
 export default NavMenu
