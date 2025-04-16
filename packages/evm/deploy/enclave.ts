@@ -40,17 +40,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const polynomial_degree = ethers.toBigInt(2048);
   const plaintext_modulus = ethers.toBigInt(1032193);
   const moduli = [ethers.toBigInt("4503599626321921")];
-  
+
   // Encode just the struct (NOT the function selector)
   const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
-      ["uint256", "uint256", "uint256[]"],
-      [
-          polynomial_degree,
-          plaintext_modulus,
-          moduli
-      ]
+    ["uint256", "uint256", "uint256[]"],
+    [polynomial_degree, plaintext_modulus, moduli],
   );
-  
+
   const enclave = await deploy("Enclave", {
     from: deployer,
     args: [deployer, addressOne, THIRTY_DAYS_IN_SECONDS, [encoded]],

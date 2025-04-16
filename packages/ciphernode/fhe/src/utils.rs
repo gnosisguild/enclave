@@ -1,3 +1,6 @@
+use super::SharedRng;
+use alloy::dyn_abi::{DynSolType, DynSolValue};
+use alloy::primitives::U256;
 use anyhow::{Context, Result};
 use fhe_rs::{
     bfv::{BfvParameters, BfvParametersBuilder},
@@ -5,11 +8,6 @@ use fhe_rs::{
 };
 use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
-use alloy::primitives::{U256};
-use alloy::{
-    dyn_abi::{DynSolValue, DynSolType}
-};
-use super::SharedRng;
 
 pub struct ParamsWithCrp {
     pub moduli: Vec<u64>,
@@ -52,26 +50,27 @@ pub fn setup_bfv_params(
 pub fn encode_bfv_params(moduli: Vec<u64>, degree: u64, plaintext_modulus: u64) -> Vec<u8> {
     let degree_value = U256::from(degree);
     let plaintext_value = U256::from(plaintext_modulus);
-    let moduli_values = moduli.iter()
-        .map(|&m| U256::from(m))
-        .collect::<Vec<_>>();
-    
+    let moduli_values = moduli.iter().map(|&m| U256::from(m)).collect::<Vec<_>>();
+
     let params_tuple = DynSolValue::Tuple(vec![
         DynSolValue::Uint(degree_value, 256),
         DynSolValue::Uint(plaintext_value, 256),
         DynSolValue::Array(
-            moduli_values.iter().map(|m| DynSolValue::Uint(*m, 256)).collect() 
+            moduli_values
+                .iter()
+                .map(|m| DynSolValue::Uint(*m, 256))
+                .collect(),
         ),
     ]);
-    
+
     params_tuple.abi_encode_params()
 }
 
 pub fn decode_bfv_params(bytes: &[u8]) -> DynSolValue {
     let params_type = DynSolType::Tuple(vec![
         DynSolType::Uint(256),
-        DynSolType::Uint(256), 
-        DynSolType::Array(Box::new(DynSolType::Uint(256)))
+        DynSolType::Uint(256),
+        DynSolType::Array(Box::new(DynSolType::Uint(256))),
     ]);
 
     return params_type.abi_decode_params(&bytes).unwrap();
@@ -85,8 +84,8 @@ pub fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPol
 mod tests {
     use super::*;
     use alloy::dyn_abi::DynSolValue;
-    use alloy::primitives::U256;
     use alloy::hex;
+    use alloy::primitives::U256;
 
     #[test]
     fn test_encode_decode_basic() {
@@ -95,23 +94,23 @@ mod tests {
         let plaintext_modulus = 65537u64;
         let encoded = encode_bfv_params(moduli.clone(), degree, plaintext_modulus);
         let decoded = decode_bfv_params(&encoded);
-        
+
         if let DynSolValue::Tuple(values) = decoded {
             if let DynSolValue::Uint(decoded_degree, _) = &values[0] {
                 assert_eq!(decoded_degree, &U256::from(degree));
             } else {
                 panic!("Expected Uint for degree");
             }
-            
+
             if let DynSolValue::Uint(decoded_plaintext, _) = &values[1] {
                 assert_eq!(decoded_plaintext, &U256::from(plaintext_modulus));
             } else {
                 panic!("Expected Uint for plaintext modulus");
             }
-            
+
             if let DynSolValue::Array(decoded_moduli) = &values[2] {
                 assert_eq!(decoded_moduli.len(), moduli.len());
-                
+
                 if let DynSolValue::Uint(decoded_modulus, _) = &decoded_moduli[0] {
                     assert_eq!(decoded_modulus, &U256::from(moduli[0]));
                 } else {
