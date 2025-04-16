@@ -1,7 +1,4 @@
 use alloy::primitives::Address;
-use anyhow::anyhow;
-use anyhow::bail;
-use anyhow::Context;
 use anyhow::Result;
 use figment::{
     providers::{Format, Serialized, Yaml},
@@ -13,133 +10,10 @@ use std::{
     env,
     path::{Path, PathBuf},
 };
-use url::Url;
 
+use crate::chain_config::ChainConfig;
 use crate::generate_id;
 use crate::yaml::load_yaml_with_env;
-
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(untagged)]
-pub enum Contract {
-    Full {
-        address: String,
-        deploy_block: Option<u64>,
-    },
-    AddressOnly(String),
-}
-
-#[derive(Clone)]
-pub enum RPC {
-    Http(String),
-    Https(String),
-    Ws(String),
-    Wss(String),
-}
-
-impl RPC {
-    pub fn from_url(url: &str) -> Result<Self> {
-        let parsed = Url::parse(url).context("Invalid URL format")?;
-        match parsed.scheme() {
-            "http" => Ok(RPC::Http(url.to_string())),
-            "https" => Ok(RPC::Https(url.to_string())),
-            "ws" => Ok(RPC::Ws(url.to_string())),
-            "wss" => Ok(RPC::Wss(url.to_string())),
-            _ => bail!("Invalid protocol. Expected: http://, https://, ws://, wss://"),
-        }
-    }
-
-    pub fn as_http_url(&self) -> Result<String> {
-        match self {
-            RPC::Http(url) | RPC::Https(url) => Ok(url.clone()),
-            RPC::Ws(url) | RPC::Wss(url) => {
-                let mut parsed =
-                    Url::parse(url).context(format!("Failed to parse URL: {}", url))?;
-                parsed
-                    .set_scheme(if self.is_secure() { "https" } else { "http" })
-                    .map_err(|_| anyhow!("http(s) are valid schemes"))?;
-                Ok(parsed.to_string())
-            }
-        }
-    }
-
-    pub fn as_ws_url(&self) -> Result<String> {
-        match self {
-            RPC::Ws(url) | RPC::Wss(url) => Ok(url.clone()),
-            RPC::Http(url) | RPC::Https(url) => {
-                let mut parsed =
-                    Url::parse(url).context(format!("Failed to parse URL: {}", url))?;
-                parsed
-                    .set_scheme(if self.is_secure() { "wss" } else { "ws" })
-                    .map_err(|_| anyhow!("ws(s) are valid schemes"))?;
-                Ok(parsed.to_string())
-            }
-        }
-    }
-
-    pub fn is_websocket(&self) -> bool {
-        matches!(self, RPC::Ws(_) | RPC::Wss(_))
-    }
-
-    pub fn is_secure(&self) -> bool {
-        matches!(self, RPC::Https(_) | RPC::Wss(_))
-    }
-}
-
-impl Contract {
-    pub fn address(&self) -> &String {
-        use Contract::*;
-        match self {
-            Full { address, .. } => address,
-            AddressOnly(v) => v,
-        }
-    }
-
-    pub fn deploy_block(&self) -> Option<u64> {
-        use Contract::*;
-        match self {
-            Full { deploy_block, .. } => deploy_block.clone(),
-            AddressOnly(_) => None,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ContractAddresses {
-    pub enclave: Contract,
-    pub ciphernode_registry: Contract,
-    pub filter_registry: Contract,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-#[serde(tag = "type", content = "credentials")]
-pub enum RpcAuth {
-    None,
-    Basic { username: String, password: String },
-    Bearer(String),
-}
-
-impl Default for RpcAuth {
-    fn default() -> Self {
-        RpcAuth::None
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ChainConfig {
-    pub enabled: Option<bool>,
-    pub name: String,
-    rpc_url: String, // We may need multiple per chain for redundancy at a later point
-    #[serde(default)]
-    pub rpc_auth: RpcAuth,
-    pub contracts: ContractAddresses,
-}
-
-impl ChainConfig {
-    pub fn rpc_url(&self) -> Result<RPC> {
-        Ok(RPC::from_url(&self.rpc_url)
-            .map_err(|e| anyhow!("Failed to parse RPC URL for chain {}: {}", self.name, e))?)
-    }
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppConfig {
@@ -383,6 +257,8 @@ impl OsDirs {
 
 #[cfg(test)]
 mod tests {
+    use crate::rpc::RpcAuth;
+
     use super::*;
     use figment::Jail;
 
