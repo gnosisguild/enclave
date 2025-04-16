@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "0x{}",
+        "{}",
         hex::encode(&encode_bfv_params(
             args.moduli,
             args.degree,
