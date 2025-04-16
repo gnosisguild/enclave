@@ -48,6 +48,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
         public decryptionVerifiers;
 
+    // @todo
+    mapping(bytes => bool) public encSchemeParams;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //
@@ -56,6 +59,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     error CommitteeSelectionFailed();
     error E3ProgramNotAllowed(IE3Program e3Program);
+    error E3ProgramParamsNotAllowed(bytes e3ProgramParams);
     error E3AlreadyActivated(uint256 e3Id);
     error E3Expired();
     error E3NotActivated(uint256 e3Id);
@@ -92,24 +96,29 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
+    /// @param _supportedParams A set of supported params @todo
     constructor(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
-        uint256 _maxDuration
+        uint256 _maxDuration,
+        bytes[] memory _supportedParams
     ) {
-        initialize(_owner, _ciphernodeRegistry, _maxDuration);
+        initialize(_owner, _ciphernodeRegistry, _maxDuration, _supportedParams);
     }
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
+    /// @param _supportedParams A set of supported params @todo
     function initialize(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
-        uint256 _maxDuration
+        uint256 _maxDuration,
+        bytes[] memory _supportedParams
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
+        setSupportedParams(_supportedParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -147,6 +156,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidDuration(duration)
         );
         require(e3Programs[e3Program], E3ProgramNotAllowed(e3Program));
+        //@todo
+        require(!encSchemeParams[e3ProgramParams], E3ProgramParamsNotAllowed(e3ProgramParams));
 
         // TODO: should IDs be incremental or produced deterministically?
         e3Id = nexte3Id;
@@ -329,6 +340,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         ciphernodeRegistry = _ciphernodeRegistry;
         success = true;
         emit CiphernodeRegistrySet(address(_ciphernodeRegistry));
+    }
+
+    function setSupportedParams(
+        bytes[] memory _supportedParams
+    ) public onlyOwner returns (bool success) {
+    
+        uint256 length = _supportedParams.length;
+        for (uint256 i; i < length;) {
+            encSchemeParams[_supportedParams[i]] = true;
+            unchecked { ++i; }
+        }
+        success = true;
+        //@todo event
+        // emit MaxDurationSet(_maxDuration);
     }
 
     function enableE3Program(

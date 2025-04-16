@@ -5,6 +5,12 @@ use reqwest::Client;
 use log::info;
 
 use alloy::primitives::{Address, Bytes, U256};
+use alloy_sol_types::{sol, SolType, SolValue};
+use alloy::{
+    dyn_abi::{DynSolValue, DynSolType}
+};
+
+use hex;
 use crisp::server::blockchain::relayer::EnclaveContract;
 use fhe::bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey, Ciphertext};
 use fhe_traits::{DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter, Serialize as FheSerialize};
@@ -40,6 +46,13 @@ struct CTRequest {
 
 pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Starting new CRISP round!");
+    let e3_params = generate_bfv_parameters()?;    
+    let encoded = encode_bfv_params(
+        e3_params.moduli().to_vec(),
+        e3_params.degree() as u64,
+        e3_params.plaintext()
+    );
+
     let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;
 
@@ -63,7 +76,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
     let start_window: [U256; 2] = [U256::from(Utc::now().timestamp()), U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64)];
     let duration: U256 = U256::from(CONFIG.e3_duration);
     let input_limit: u8 = CONFIG.e3_input_limit;
-    let e3_params = Bytes::from(generate_bfv_parameters()?.to_bytes());
+    let e3_params = encoded.clone().into();
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.to_string(),
         parallel: CONFIG.e3_compute_provider_parallel,
@@ -172,6 +185,24 @@ fn generate_bfv_parameters() -> Result<std::sync::Arc<BfvParameters>, Box<dyn st
         .set_plaintext_modulus(1032193)
         .set_moduli(&[0xffffffff00001])
         .build_arc()?)
+}
+
+pub fn encode_bfv_params(moduli: Vec<u64>, degree: u64, plaintext_modulus: u64) -> Vec<u8> {
+    let degree_value = U256::from(degree);
+    let plaintext_value = U256::from(plaintext_modulus);
+    let moduli_values = moduli.iter()
+        .map(|&m| U256::from(m))
+        .collect::<Vec<_>>();
+    
+    let params_tuple = DynSolValue::Tuple(vec![
+        DynSolValue::Uint(degree_value, 256),  
+        DynSolValue::Uint(plaintext_value, 256),  
+        DynSolValue::Array(
+            moduli_values.iter().map(|m| DynSolValue::Uint(*m, 256)).collect() 
+        ),
+    ]);
+    
+    params_tuple.abi_encode_params()
 }
 
 fn generate_keys(params: &std::sync::Arc<BfvParameters>) -> (SecretKey, PublicKey) {

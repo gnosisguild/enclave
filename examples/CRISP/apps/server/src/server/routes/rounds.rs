@@ -4,6 +4,7 @@ use alloy::primitives::{Address, U256, Bytes};
 use chrono::Utc;
 use fhe_traits::Serialize;
 use crate::server::utils::generate_bfv_parameters;
+use crate::server::utils::encode_bfv_params;
 use crate::server::blockchain::relayer::EnclaveContract;
 use crate::server::config::CONFIG;
 use crate::server::models::{CTRequest, CurrentRound, AppState, PKRequest, CronRequestE3, JsonResponse, ComputeProviderParams};
@@ -139,9 +140,14 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         }
         Err(e) => error!("Error checking E3 Program enabled: {:?}", e),
     }
-
     info!("Generating parameters...");
-    let params = generate_bfv_parameters().unwrap().to_bytes();
+    let params = generate_bfv_parameters()?;
+    
+    let encoded = encode_bfv_params(
+        params.moduli().to_vec(),
+        params.degree() as u64,
+        params.plaintext()
+    );
 
     info!("Requesting E3...");
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
@@ -149,7 +155,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
     let start_window: [U256; 2] = [U256::from(Utc::now().timestamp()), U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64)];
     let duration: U256 = U256::from(CONFIG.e3_duration);
     let input_limit: u8 = CONFIG.e3_input_limit;
-    let e3_params = Bytes::from(params);
+    let e3_params = encoded.clone().into();
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.clone(),
         parallel: CONFIG.e3_compute_provider_parallel,
