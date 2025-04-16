@@ -74,7 +74,7 @@ chains:
     fs::write(config_path.clone(), config_content)?;
 
     // Load with default location
-    let config = load_config(Some(&config_path.display().to_string()))?;
+    let config = load_config(Some(config_path.display().to_string()))?;
 
     Ok(config)
 }

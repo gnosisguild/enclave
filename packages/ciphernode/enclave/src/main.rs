@@ -43,13 +43,8 @@ pub fn owo() {
 pub async fn main() {
     info!("COMPILATION ID: '{}'", helpers::compile_id::generate_id());
 
-    let cli = Cli::parse();
-    tracing_subscriber::fmt()
-        .with_max_level(cli.log_level())
-        .init();
-
     // Execute the cli
-    if let Err(err) = cli.execute().await {
+    if let Err(err) = Cli::parse().execute().await {
         eprintln!("{}", err);
         std::process::exit(1);
     }

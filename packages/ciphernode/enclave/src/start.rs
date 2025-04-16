@@ -13,6 +13,7 @@ pub async fn execute(config: AppConfig) -> Result<()> {
 
     let (bus, handle, peer_id) = start::execute(config, address).await?;
     info!("LAUNCHING CIPHERNODE: ({}/{})", address, peer_id);
+
     tokio::spawn(listen_for_shutdown(bus.into(), handle)).await?;
     Ok(())
 }

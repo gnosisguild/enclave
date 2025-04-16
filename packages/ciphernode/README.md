@@ -85,7 +85,6 @@ sequenceDiagram
 
 You can debug using the `-vvv` cli arguments to alter what output is produced by the node
 
-
 ```
 # Show INFO logging
 enclave start
@@ -103,7 +102,32 @@ enclave start -vv
 
 if you want to remove all output aside from errors you can use the `--quiet` argument.
 
-
 ```
 enclave --quiet
 ```
+
+## Open telemetry
+
+The node can be run with open telemetry by passing in the `--otel` arg.
+
+We can run a Jaeger instance using docker:
+
+```
+docker run -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/jaeger:latest
+```
+
+```
+enclave start -v --otel http://localhost:4317
+```
+
+Now you can visit your Jaeger instance at http://localhost:16686 to view the logs from your node.
+
+### Jaeger with tests
+
+To view logs locally from your tests set the `OTEL` env var when calling your tests:
+
+```
+OTEL="http://localhost:4317" yarn test:integration base
+```
+
+Then head to http://localhost:16686 to see the results
