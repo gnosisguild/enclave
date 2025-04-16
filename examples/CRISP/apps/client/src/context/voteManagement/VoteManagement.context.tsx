@@ -2,23 +2,26 @@ import { createGenericContext } from '@/utils/create-generic-context'
 import { VoteManagementContextType, VoteManagementProviderProps } from '@/context/voteManagement'
 import { useWebAssemblyHook } from '@/hooks/wasm/useWebAssembly'
 import { useEffect, useState } from 'react'
-import useLocalStorage from '@/hooks/generic/useLocalStorage'
+import { useAccount } from 'wagmi'
 import { VoteStateLite, VotingRound } from '@/model/vote.model'
 import { useEnclaveServer } from '@/hooks/enclave/useEnclaveServer'
 import { convertPollData, convertTimestampToDate } from '@/utils/methods'
 import { Poll, PollResult } from '@/model/poll.model'
 import { generatePoll } from '@/utils/generate-random-poll'
 import { handleGenericError } from '@/utils/handle-generic-error'
-import { StatusAPIResponse } from '@farcaster/auth-client'
 
 const [useVoteManagementContext, VoteManagementContextProvider] = createGenericContext<VoteManagementContextType>()
 
 const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   /**
+   * Wagmi Account State
+   **/
+  const { address, isConnected } = useAccount()
+
+  /**
    * Voting Management States
    **/
-  const [farcasterAuth, setFarcasterUser] = useLocalStorage<StatusAPIResponse | null>('farcasterAuth', null)
-  const [user, setUser] = useState<StatusAPIResponse | null>(farcasterAuth)
+  const [user, setUser] = useState<{ address: string } | null>(null)
   const [roundState, setRoundState] = useState<VoteStateLite | null>(null)
   const [votingRound, setVotingRound] = useState<VotingRound | null>(null)
   const [roundEndDate, setRoundEndDate] = useState<Date | null>(null)
@@ -36,7 +39,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     isLoading: enclaveLoading,
     getRoundStateLite: getRoundStateLiteRequest,
     getWebResultByRound,
-    getToken,
     getWebResult,
     getCurrentRound,
     broadcastVote,
@@ -59,7 +61,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
 
   const logout = () => {
     setUser(null)
-    setFarcasterUser(null)
   }
 
   const getRoundStateLite = async (roundCount: number) => {
@@ -100,6 +101,15 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     setIsLoading(false)
   }, [wasmLoading, enclaveLoading])
 
+  // Update user state when wallet connection changes
+  useEffect(() => {
+    if (isConnected && address) {
+      setUser({ address })
+    } else {
+      setUser(null)
+    }
+  }, [isConnected, address, setUser])
+
   return (
     <VoteManagementContextProvider
       value={{
@@ -114,7 +124,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
         pollResult,
         setPollResult,
         getWebResultByRound,
-        getToken,
         setTxUrl,
         existNewRound,
         getWebResult,

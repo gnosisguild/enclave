@@ -5,25 +5,18 @@ import './globals.css'
 import { HashRouter } from 'react-router-dom'
 import { VoteManagementProvider } from '@/context/voteManagement/index.ts'
 import { NotificationAlertProvider } from './context/NotificationAlert/NotificationAlert.context.tsx'
-import '@farcaster/auth-kit/styles.css'
-import { AuthKitProvider } from '@farcaster/auth-kit'
-
-const config = {
-  relay: 'https://relay.farcaster.xyz',
-  domain: window.location.host,
-  siweUri: window.location.href,
-}
+import { Web3Provider } from '@/providers/Web3Provider'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.Fragment>
     <HashRouter>
-      <AuthKitProvider config={config}>
+      <Web3Provider>
         <NotificationAlertProvider>
           <VoteManagementProvider>
             <App />
           </VoteManagementProvider>
         </NotificationAlertProvider>
-      </AuthKitProvider>
+      </Web3Provider>
     </HashRouter>
   </React.Fragment>,
 )

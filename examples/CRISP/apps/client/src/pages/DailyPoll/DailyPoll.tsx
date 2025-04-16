@@ -40,42 +40,55 @@ const DailyPoll: React.FC = () => {
   const handleVoteBroadcast = useCallback(
     async (voteEncrypted: Uint8Array) => {
       if (!user || !votingRound) throw new Error('User or voting round not available')
-      return broadcastVote({
+      console.log('user', user, 'votingRound', votingRound)
+      const res = await broadcastVote({
         round_id: votingRound.round_id,
         enc_vote_bytes: Array.from(voteEncrypted),
-        postId: user.fid?.toString() ?? '',
+        address: user.address ?? '',
       })
+      console.log('res', res)
+      return res
     },
     [broadcastVote, user, votingRound],
   )
   const handleVoted = async (vote: Poll | null) => {
     if (!vote || !votingRound) return
     setVoteCasting(true)
-    
+
     try {
       const voteEncrypted = await handleVoteEncryption(vote)
+      console.log('voteEncrypted', voteEncrypted)
       const broadcastVoteResponse = voteEncrypted && (await handleVoteBroadcast(voteEncrypted))
 
       await getRoundStateLite(votingRound.round_id)
 
+      console.log('broadcastVoteResponse', broadcastVoteResponse)
       if (broadcastVoteResponse) {
-        if (broadcastVoteResponse.response === 'Vote Successful') {
-          const url = `https://sepolia.etherscan.io/tx/${broadcastVoteResponse.tx_hash}`
-          setTxUrl(url)
-          showToast({
-            type: 'success',
-            message: 'Successfully voted',
-            linkUrl: url,
-          })
-          navigate(`/result/${votingRound.round_id}/confirmation`)
-          return
-        }
-
-        if (broadcastVoteResponse.response === 'User Has Already Voted') {
-          showToast({
-            type: 'danger',
-            message: broadcastVoteResponse.response,
-          })
+        switch (broadcastVoteResponse.status) {
+          case 'success': {
+            const url = `https://sepolia.etherscan.io/tx/${broadcastVoteResponse.tx_hash}`;
+            setTxUrl(url);
+            showToast({
+              type: 'success',
+              message: broadcastVoteResponse.message || 'Successfully voted',
+              linkUrl: url,
+            });
+            navigate(`/result/${votingRound.round_id}/confirmation`);
+            break;
+          }
+          case 'user_already_voted':
+            showToast({
+              type: 'danger',
+              message: broadcastVoteResponse.message || 'User has already voted',
+            });
+            break;
+          case 'failed_broadcast':
+          default:
+            showToast({
+              type: 'danger',
+              message: broadcastVoteResponse.message || 'Error broadcasting the vote',
+            });
+            break;
         }
       } else {
         showToast({ type: 'danger', message: 'Error broadcasting the vote' })

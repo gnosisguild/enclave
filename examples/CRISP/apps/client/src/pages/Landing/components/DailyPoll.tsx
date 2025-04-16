@@ -1,16 +1,13 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Poll } from '@/model/poll.model'
 import Card from '@/components/Cards/Card'
-import Modal from '@/components/Modal'
 import CircularTiles from '@/components/CircularTiles'
 
 import { useVoteManagementContext } from '@/context/voteManagement'
 import LoadingAnimation from '@/components/LoadingAnimation'
 import { hasPollEnded } from '@/utils/methods'
 import CountdownTimer from '@/components/CountdownTime'
-import { useSignIn } from '@farcaster/auth-kit'
-
-import FarcasterModal from '@/components/FarcasterModal'
+import { useModal } from 'connectkit'
 
 type DailyPollSectionProps = {
   onVoted?: (vote: Poll) => void
@@ -20,28 +17,11 @@ type DailyPollSectionProps = {
 }
 
 const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, voteCasting, endTime }) => {
-  const { url, connect, signIn, data, error } = useSignIn({
-    timeout: 300000,
-    interval: 2000,
-  })
   const { user, pollOptions, setPollOptions, roundState } = useVoteManagementContext()
   const isEnded = roundState ? hasPollEnded(roundState?.duration, roundState?.start_time) : false
-  const status = roundState?.status
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
-  const [modalOpen, setModalOpen] = useState(false)
-
-  const openModal = () => setModalOpen(true)
-  const closeModal = () => {
-    setModalOpen(false)
-  }
-
-  useEffect(() => {
-    const fetch = async () => {
-      await connect()
-    }
-    fetch()
-  }, [])
+  const { setOpen } = useModal()
 
   const handleChecked = (selectedId: number) => {
     const updatedOptions = pollOptions.map((option) => ({
@@ -55,8 +35,8 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, v
 
   const castVote = () => {
     if (!user) {
-      signIn()
-      return openModal()
+      setOpen(true)
+      return;
     }
     if (pollSelected && onVoted) {
       onVoted(pollSelected)
@@ -67,7 +47,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, v
 
   return (
     <>
-      <div className='relative flex w-full flex-1 items-center justify-center px-6 py-12'>
+      <div className='relative flex w-full flex-1 items-center justify-center px-6 pb-12 pt-20 md:py-12'>
         <div className='absolute bottom-0 right-0 grid w-full grid-cols-2 gap-2 max-md:opacity-50 md:w-[70vh]'>
           <CircularTiles count={4} />
         </div>
@@ -118,7 +98,7 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, v
               {noPollSelected && !isEnded && <div className='text-center text-sm leading-none text-slate-500'>Select your favorite</div>}
               <button
                 className={`button-outlined button-max ${noPollSelected ? 'button-disabled' : ''}`}
-                disabled={noPollSelected || loading || status !== 'Active' || isEnded}
+                disabled={noPollSelected || loading || !roundState || isEnded}
                 onClick={castVote}
               >
                 cast vote
@@ -127,9 +107,6 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, v
           )}
         </div>
       </div>
-      <Modal show={modalOpen} onClose={closeModal} className='max-w-96 py-12'>
-        <FarcasterModal url={url} data={data} error={error} onClose={closeModal} />
-      </Modal>
     </>
   )
 }

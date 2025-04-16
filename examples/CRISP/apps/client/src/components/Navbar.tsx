@@ -2,7 +2,7 @@ import React from 'react'
 import Logo from '@/assets/icons/logo.svg'
 import { Link } from 'react-router-dom'
 import NavMenu from '@/components/NavMenu'
-import { useVoteManagementContext } from '@/context/voteManagement'
+import { ConnectKitButton } from 'connectkit'
 
 const PAGES = [
   {
@@ -16,7 +16,6 @@ const PAGES = [
 ]
 
 const Navbar: React.FC = () => {
-  const { user } = useVoteManagementContext()
   return (
     <nav className='absolute left-0 top-0 z-10 w-screen px-6 lg:px-9'>
       <div className='mx-auto max-w-screen-xl'>
@@ -28,7 +27,7 @@ const Navbar: React.FC = () => {
             <img src={Logo} alt='CRISP Logo' className='h-6 cursor-pointer duration-300 ease-in-out hover:opacity-70 md:h-8' />
           </Link>
 
-          <div className='flex items-center gap-8'>
+          <div className='flex items-center gap-2 md:gap-8'>
             {PAGES.map(({ label, path }) => (
               <Link
                 key={label}
@@ -38,14 +37,7 @@ const Navbar: React.FC = () => {
                 {label}
               </Link>
             ))}
-            {!user && (
-              <Link
-                to={PAGES[1].path}
-                className='hover:text-twilight-blue-600 cursor-pointer font-bold text-slate-600 duration-300 ease-in-out hover:opacity-70 md:hidden'
-              >
-                {PAGES[1].label}
-              </Link>
-            )}
+            <ConnectKitButton />
             <NavMenu />
           </div>
         </div>

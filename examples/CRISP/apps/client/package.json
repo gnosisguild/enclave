@@ -19,21 +19,22 @@
   "dependencies": {
     "@emotion/babel-plugin": "^11.11.0",
     "@emotion/react": "^11.11.4",
-    "@farcaster/auth-client": "^0.1.1",
-    "@farcaster/auth-kit": "^0.3.1",
     "@phosphor-icons/react": "^2.1.4",
     "@svgr/rollup": "^8.1.0",
+    "@tanstack/react-query": "^5.74.3",
     "axios": "^1.6.8",
+    "connectkit": "^1.9.0",
     "ethers": "^6.12.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
     "react-router-dom": "^6.22.3",
     "react-syntax-highlighter": "^15.5.0",
-    "viem": "^2.17.0",
+    "viem": "^2.27.0",
     "vite-plugin-node-polyfills": "^0.22.0",
     "vite-plugin-top-level-await": "^1.4.1",
-    "vite-tsconfig-paths": "^4.3.2"
+    "vite-tsconfig-paths": "^4.3.2",
+    "wagmi": "^2.14.16"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.12",
