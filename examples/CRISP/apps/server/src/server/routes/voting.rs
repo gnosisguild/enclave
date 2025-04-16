@@ -6,7 +6,7 @@ use crate::server::{
     config::CONFIG,
     database::{get_e3, GLOBAL_DB},
     blockchain::relayer::EnclaveContract,
-    models::{EncryptedVote, JsonResponseTxHash, E3},
+    models::{EncryptedVote, VoteResponseStatus, VoteResponse, E3},
 };
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
@@ -42,11 +42,12 @@ async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Respon
     // Broadcast vote to blockchain
     let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await.unwrap();
     match contract.publish_input(e3_id, sol_vote).await {
-        Ok(hash) => HttpResponse::Ok().json(JsonResponseTxHash {
-            response: "Vote Successful".to_string(),
-            tx_hash: hash.transaction_hash.to_string(),
+        Ok(hash) => HttpResponse::Ok().json(VoteResponse {
+            status: VoteResponseStatus::Success,
+            tx_hash: Some(hash.transaction_hash.to_string()),
+            message: Some("Vote Successful".to_string()),
         }),
-        Err(e) => handle_vote_error(e, &mut state_data, &key, &vote.postId).await,
+        Err(e) => handle_vote_error(e, &mut state_data, &key, &vote.address).await,
     }
 }
 
@@ -62,14 +63,15 @@ async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Respon
 async fn validate_and_update_vote_status(vote: &EncryptedVote) -> Result<(E3, String), HttpResponse> {
     let (mut state_data, key) = get_e3(vote.round_id).await.unwrap();
     
-    if state_data.has_voted.contains(&vote.postId) {
-        return Err(HttpResponse::BadRequest().json(JsonResponseTxHash {
-            response: "User Has Already Voted".to_string(),
-            tx_hash: "".to_string(),
+    if state_data.has_voted.contains(&vote.address) {
+        return Err(HttpResponse::Ok().json(VoteResponse {
+            status: VoteResponseStatus::UserAlreadyVoted,
+            tx_hash: None,
+            message: Some("User Has Already Voted".to_string()),
         }));
     }
     
-    state_data.has_voted.push(vote.postId.clone());
+    state_data.has_voted.push(vote.address.clone());
     GLOBAL_DB.insert(&key, &state_data).await.unwrap();
     
     Ok((state_data, key.to_string()))
@@ -82,15 +84,19 @@ async fn validate_and_update_vote_status(vote: &EncryptedVote) -> Result<(E3, St
 /// * `e` - The error that occurred
 /// * `state_data` - The state data to be rolled back
 /// * `key` - The key for the state data
-/// * `post_id` - The post ID for the vote
-async fn handle_vote_error(e: Error, state_data: &mut E3, key: &str, post_id: &str) -> HttpResponse {
+/// * `address` - The address for the vote
+async fn handle_vote_error(e: Error, state_data: &mut E3, key: &str, address: &str) -> HttpResponse {
     info!("Error while sending vote transaction: {:?}", e);
 
     // Rollback the vote
-    if let Some(pos) = state_data.has_voted.iter().position(|x| x == post_id) {
+    if let Some(pos) = state_data.has_voted.iter().position(|x| x == address) {
         state_data.has_voted.remove(pos);
         GLOBAL_DB.insert(key, state_data).await.unwrap();
     }
 
-    HttpResponse::InternalServerError().body("Failed to broadcast vote")
+    HttpResponse::Ok().json(VoteResponse {
+        status: VoteResponseStatus::FailedBroadcast,
+        tx_hash: None,
+        message: Some("Failed to broadcast vote".to_string()),
+    })
 }

@@ -12,9 +12,18 @@ pub struct JsonResponse {
 
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct JsonResponseTxHash {
-    pub response: String,
-    pub tx_hash: String,
+#[serde(rename_all = "snake_case")]
+pub enum VoteResponseStatus {
+    Success,
+    UserAlreadyVoted,
+    FailedBroadcast,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VoteResponse {
+    pub status: VoteResponseStatus,
+    pub tx_hash: Option<String>,
+    pub message: Option<String>,
 }
 
 
@@ -40,11 +49,10 @@ pub struct CTRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-#[allow(non_snake_case)]
 pub struct EncryptedVote {
     pub round_id: u64,
     pub enc_vote_bytes: Vec<u8>,
-    pub postId: String,
+    pub address: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -52,23 +60,6 @@ pub struct GetRoundRequest {
     pub round_id: u64,
 }
 
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct AuthenticationDB {
-    pub jwt_tokens: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[allow(non_snake_case)]
-pub struct AuthenticationLogin {
-    pub postId: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct AuthenticationResponse {
-    pub response: String,
-    pub jwt_token: String,
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ComputeProviderParams {
