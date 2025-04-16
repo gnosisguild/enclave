@@ -108,7 +108,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     } else {
       setUser(null)
     }
-  }, [isConnected, address, setUser])
+  }, [isConnected, address])
 
   return (
     <VoteManagementContextProvider

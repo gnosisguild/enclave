@@ -40,14 +40,11 @@ const DailyPoll: React.FC = () => {
   const handleVoteBroadcast = useCallback(
     async (voteEncrypted: Uint8Array) => {
       if (!user || !votingRound) throw new Error('User or voting round not available')
-      console.log('user', user, 'votingRound', votingRound)
-      const res = await broadcastVote({
+      return broadcastVote({
         round_id: votingRound.round_id,
         enc_vote_bytes: Array.from(voteEncrypted),
         address: user.address ?? '',
       })
-      console.log('res', res)
-      return res
     },
     [broadcastVote, user, votingRound],
   )
