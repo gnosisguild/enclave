@@ -82,6 +82,10 @@ interface IEnclave {
     /// @param e3Program The address of the E3 Program.
     event E3ProgramDisabled(IE3Program e3Program);
 
+    /// @notice This event MUST be emitted any time the encryption parameters are updated.
+    /// @param supportedParameters The array of encoded encryption parameters.
+    event EncryptionParametersUpdated(bytes[] supportedParameters);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Core Entrypoints                      //

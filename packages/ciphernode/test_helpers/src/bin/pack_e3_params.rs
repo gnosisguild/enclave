@@ -1,5 +1,6 @@
 use clap::{command, Parser};
-use fhe::encode_bfv_params;
+use fhe::encode_bfv_parameters;
+use hex;
 use std::{error::Error, num::ParseIntError, process};
 
 fn parse_hex(arg: &str) -> Result<u64, ParseIntError> {
@@ -28,11 +29,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     }
 
-    let encoded = encode_bfv_params(args.moduli, args.degree, args.plaintext_modulus);
-
-    for byte in encoded {
-        print!("{:02x}", byte);
-    }
+    println!(
+        "{}",
+        hex::encode(&encode_bfv_parameters(
+            args.degree,
+            args.plaintext_modulus,
+            args.moduli
+        ))
+    );
 
     Ok(())
 }

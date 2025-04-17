@@ -14,3 +14,4 @@ fhe-traits = { workspace = true }
 rand_chacha = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
+hex = { workspace = true }
