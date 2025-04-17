@@ -89,7 +89,7 @@ waiton-files() {
   done
 }
 
-set_password() {
+enclave_password_create() {
   local name="$1"
   local password="$2"
   $ENCLAVE_BIN password create \
@@ -98,7 +98,7 @@ set_password() {
     --password "$password"
 }
 
-launch_ciphernode() {
+enclave_start() {
    local name="$1"
    heading "Launch ciphernode $name"
 
@@ -113,7 +113,7 @@ launch_ciphernode() {
      --config "$SCRIPT_DIR/enclave.config.yaml" $extra_args & 
 }
 
-set_private_key() {
+enclave_wallet_set() {
   local name="$1"
   local private_key="$2"
 
@@ -123,7 +123,7 @@ set_private_key() {
     --private-key "$private_key"
 }
 
-set_network_private_key() {
+enclave_net_set_key() {
   local name="$1"
   local private_key="$2"
 
