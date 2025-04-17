@@ -304,7 +304,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         e3_id: e3_id.clone(),
         threshold_m: 3,
         seed: seed.clone(),
-        params: hex::encode(encoded_params.clone()).into(),
+        params: encoded_params.clone(),
         src_chain_id: 1,
     });
 
@@ -417,7 +417,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             seed: seed.clone(),
-            params: hex::encode(encoded_params.clone()).into(),
+            params: encoded_params.clone(),
             src_chain_id: 1,
         })
         .clone(),
