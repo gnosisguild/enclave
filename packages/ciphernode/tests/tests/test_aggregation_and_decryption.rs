@@ -10,7 +10,7 @@ use events::{
     ResetHistory, Seed, Shutdown,
 };
 use fhe::ext::FheExtension;
-use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use fhe::{encode_bfv_parameters, setup_crp_params, ParamsWithCrp, SharedRng};
 use keyshare::ext::KeyshareExtension;
 use logger::SimpleLogger;
 use net::{events::NetworkPeerEvent, NetworkManager};
@@ -25,6 +25,7 @@ use fhe_rs::{
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
 use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
+use hex;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -293,11 +294,17 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .map(|tup| tup.0.to_owned())
         .collect();
     let add_events = add_ciphernodes(&bus, &eth_addrs).await?;
+    let encoded_params = encode_bfv_parameters(
+        params.degree() as u64,
+        params.plaintext(),
+        params.moduli().to_vec(),
+    );
+
     let e3_request_event = EnclaveEvent::from(E3Requested {
         e3_id: e3_id.clone(),
         threshold_m: 3,
         seed: seed.clone(),
-        params: params.to_bytes(),
+        params: hex::encode(encoded_params.clone()).into(),
         src_chain_id: 1,
     });
 
@@ -394,6 +401,12 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     let eth_addrs = create_random_eth_addrs(2);
 
+    let encoded_params = encode_bfv_parameters(
+        params.degree() as u64,
+        params.plaintext(),
+        params.moduli().to_vec(),
+    );
+
     let cn1 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[0], None, &cipher).await?;
     let cn2 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[1], None, &cipher).await?;
     add_ciphernodes(&bus, &eth_addrs).await?;
@@ -404,7 +417,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             seed: seed.clone(),
-            params: params.to_bytes(),
+            params: hex::encode(encoded_params.clone()).into(),
             src_chain_id: 1,
         })
         .clone(),
