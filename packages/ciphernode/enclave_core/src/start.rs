@@ -27,7 +27,7 @@ use crate::helpers::datastore::setup_datastore;
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(
-    config: AppConfig,
+    config: &AppConfig,
     address: Address,
 ) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
@@ -92,10 +92,7 @@ pub async fn execute(
     )
     .await?;
 
-    SimpleLogger::<EnclaveEvent>::attach(
-        &config.name().unwrap_or(address.to_string()),
-        bus.clone(),
-    );
+    SimpleLogger::<EnclaveEvent>::attach(&config.name(), bus.clone());
 
     Ok((bus, join_handle, peer_id))
 }

@@ -36,7 +36,7 @@ launch_ciphernode cn1
 launch_ciphernode cn2
 launch_ciphernode cn3
 launch_ciphernode cn4
-launch_aggregator ag
+launch_ciphernode ag
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 

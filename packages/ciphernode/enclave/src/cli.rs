@@ -2,9 +2,9 @@ use crate::helpers::telemetry::setup_tracing;
 use crate::net;
 use crate::net::NetCommands;
 use crate::password::PasswordCommands;
+use crate::start;
 use crate::wallet::WalletCommands;
-use crate::{aggregator, init, password, wallet};
-use crate::{aggregator::AggregatorCommands, start};
+use crate::{init, password, wallet};
 use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
@@ -90,7 +90,6 @@ impl Cli {
                 .await?
             }
             Commands::Password { command } => password::execute(command, &config).await?,
-            Commands::Aggregator { command } => aggregator::execute(command, config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
         }
@@ -98,12 +97,19 @@ impl Cli {
         Ok(())
     }
 
-    fn load_config(&self) -> Result<AppConfig> {
-        load_config_from_overrides(CliOverrides {
-            config: self.config.clone(),
-            name: self.name.clone(),
-            otel: self.otel.clone().map(Into::into),
-        })
+    pub fn load_config(&self) -> Result<AppConfig> {
+        load_config_from_overrides(
+            &self.name(),
+            CliOverrides {
+                config: self.config.clone(),
+                otel: self.otel.clone().map(Into::into),
+            },
+        )
+    }
+
+    pub fn name(&self) -> String {
+        // If no name is provided assume we are working with the default node
+        self.name.clone().unwrap_or("default".to_string())
     }
 }
 
@@ -111,12 +117,6 @@ impl Cli {
 pub enum Commands {
     /// Start the application
     Start,
-
-    /// Aggregator node management commands
-    Aggregator {
-        #[command(subcommand)]
-        command: AggregatorCommands,
-    },
 
     /// Password management commands
     Password {

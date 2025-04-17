@@ -1697,6 +1697,7 @@ dependencies = [
  "petname",
  "rand 0.8.5",
  "serde",
+ "serde_yaml",
  "shellexpand",
  "tempfile",
  "tracing",

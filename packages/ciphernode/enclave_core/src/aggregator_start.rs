@@ -18,16 +18,19 @@ use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
 use sortition::Sortition;
 use sortition::SortitionRepositoryFactory;
-use std::sync::{Arc, Mutex};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
 
 use crate::helpers::datastore::setup_datastore;
 
 pub async fn execute(
-    config: AppConfig,
-    pubkey_write_path: Option<&str>,
-    plaintext_write_path: Option<&str>,
+    config: &AppConfig,
+    pubkey_write_path: &PathBuf,
+    plaintext_write_path: &PathBuf,
 ) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
         capture_history: true,
@@ -35,10 +38,10 @@ pub async fn execute(
     })
     .start();
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
-    let store = setup_datastore(&config, &bus)?;
+    let store = setup_datastore(config, &bus)?;
     let repositories = store.repositories();
     let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
-    let cipher = Arc::new(Cipher::from_config(&config).await?);
+    let cipher = Arc::new(Cipher::from_config(config).await?);
     let signer = get_signer_from_repository(repositories.eth_private_key(), &cipher).await?;
 
     for chain in config
@@ -93,15 +96,10 @@ pub async fn execute(
     )
     .await?;
 
-    if let Some(path) = pubkey_write_path {
-        PublicKeyWriter::attach(path, bus.clone());
-    }
+    PublicKeyWriter::attach(pubkey_write_path, bus.clone());
+    PlaintextWriter::attach(plaintext_write_path, bus.clone());
 
-    if let Some(path) = plaintext_write_path {
-        PlaintextWriter::attach(path, bus.clone());
-    }
-
-    SimpleLogger::<EnclaveEvent>::attach(&config.name().unwrap_or("AG".to_string()), bus.clone());
+    SimpleLogger::<EnclaveEvent>::attach(&config.name(), bus.clone());
 
     Ok((bus, join_handle, peer_id))
 }

@@ -2,8 +2,6 @@ use clap::Parser;
 use cli::Cli;
 use tracing::info;
 
-mod aggregator;
-mod aggregator_start;
 mod cli;
 pub mod helpers;
 mod init;
