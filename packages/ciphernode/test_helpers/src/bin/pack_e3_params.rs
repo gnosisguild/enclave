@@ -1,5 +1,5 @@
 use clap::{command, Parser};
-use fhe::encode_bfv_params;
+use fhe::encode_bfv_parameters;
 use hex;
 use std::{error::Error, num::ParseIntError, process};
 
@@ -31,10 +31,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!(
         "{}",
-        hex::encode(&encode_bfv_params(
-            args.moduli,
+        hex::encode(&encode_bfv_parameters(
             args.degree,
-            args.plaintext_modulus
+            args.plaintext_modulus,
+            args.moduli
         ))
     );
 

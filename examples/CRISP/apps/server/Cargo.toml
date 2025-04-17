@@ -68,3 +68,4 @@ log = "0.4.22"
 # Configuration
 config = "0.14.0"
 dotenvy = "0.15.7"
+anyhow = "1.0.98"

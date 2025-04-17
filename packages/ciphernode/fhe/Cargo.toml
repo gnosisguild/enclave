@@ -19,3 +19,4 @@ rand = { workspace = true }
 rand_chacha = { workspace = true }
 e3_request = { workspace = true }
 serde = { workspace = true }
+hex = { workspace = true }

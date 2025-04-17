@@ -1486,9 +1486,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.83"
+version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25bdb32cbbdce2b519a9cd7df3a678443100e265d5e25ca763b7572a5104f5f3"
+checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
 name = "ark-bn254"
@@ -2664,6 +2664,7 @@ dependencies = [
  "alloy 0.2.1",
  "alloy-primitives 0.6.4",
  "alloy-sol-types 0.6.4",
+ "anyhow",
  "bincode",
  "chrono",
  "compute-provider",
