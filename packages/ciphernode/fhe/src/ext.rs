@@ -42,7 +42,7 @@ impl E3Extension for FheExtension {
             ..
         } = data.clone();
 
-        let params_bytes = hex::decode(params).unwrap();
+        let params_bytes: Vec<u8> = params.iter().map(|&x| x as u8).collect();
 
         let Ok(fhe_inner) = Fhe::from_encoded(&params_bytes, seed, self.rng.clone()) else {
             self.bus.err(
