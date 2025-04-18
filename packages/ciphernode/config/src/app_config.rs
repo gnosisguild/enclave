@@ -1,5 +1,5 @@
 use alloy::primitives::Address;
-use anyhow::anyhow;
+use anyhow::bail;
 use anyhow::Result;
 use figment::{
     providers::{Format, Serialized, Yaml},
@@ -116,8 +116,8 @@ impl Default for NodeDefinition {
 pub struct AppConfig {
     /// The name of the node
     name: String,
-    /// The input node config from the config file
-    node_def: NodeDefinition,
+    /// All the node definitions in the unscoped config
+    nodes: HashMap<String, NodeDefinition>,
     /// The chains config
     chains: Vec<ChainConfig>,
     /// The base folder for enclave configuration defaults to `~/.config/enclave` on linux
@@ -133,12 +133,29 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    pub fn try_from(name: &str, config: UnscopedAppConfig) -> Result<Self> {
+        if !config.nodes.contains_key(name) {
+            bail!("Could not find node definition for node '{}'. Did you forget to include it in your configuration?", name);
+        }
+
+        Ok(AppConfig {
+            name: name.to_owned(),
+            nodes: config.nodes,
+            chains: config.chains,
+            config_file: config.config_file,
+            config_dir: config.config_dir,
+            data_dir: config.data_dir,
+            cwd: config.cwd,
+            otel: config.otel,
+        })
+    }
+
     pub fn key_file(&self) -> PathBuf {
-        ensure_full_path(&self.profile_config_dir(), &self.node_def.key_file)
+        ensure_full_path(&self.profile_config_dir(), &self.node_def().key_file)
     }
 
     pub fn db_file(&self) -> PathBuf {
-        ensure_full_path(&self.profile_data_dir(), &self.node_def.db_file)
+        ensure_full_path(&self.profile_data_dir(), &self.node_def().db_file)
     }
 
     pub fn data_dir(&self) -> PathBuf {
@@ -146,6 +163,15 @@ impl AppConfig {
             &self.config_file,
             &self.data_dir,
             &OsDirs::data_dir(),
+        ))
+    }
+
+    fn node_def(&self) -> &NodeDefinition {
+        // NOTE: on creation an invariant we have is that our node name is an extant key in our
+        // nodes datastructure so expect here is ok and we dont have to clone the NodeDefinition
+        self.nodes.get(&self.name).expect(&format!(
+            "Could not find node definition for node '{}'.",
+            &self.name
         ))
     }
 
@@ -170,11 +196,11 @@ impl AppConfig {
     }
 
     pub fn peers(&self) -> Vec<String> {
-        self.node_def.peers.clone()
+        self.node_def().peers.clone()
     }
 
     pub fn quic_port(&self) -> u16 {
-        self.node_def.quic_port
+        self.node_def().quic_port
     }
 
     pub fn enable_mdns(&self) -> bool {
@@ -198,11 +224,11 @@ impl AppConfig {
     }
 
     pub fn address(&self) -> Option<Address> {
-        self.node_def.address.clone()
+        self.node_def().address.clone()
     }
 
     pub fn role(&self) -> NodeRole {
-        match self.node_def.role.clone() {
+        match self.node_def().role.clone() {
             NodeRole::Aggregator {
                 pubkey_write_path,
                 plaintext_write_path,
@@ -256,32 +282,9 @@ impl Default for UnscopedAppConfig {
 
 impl UnscopedAppConfig {
     pub fn into_scoped(self, name: &str) -> Result<AppConfig> {
-        let mut nodes = self.nodes;
-        let chains = self.chains;
-        let config_dir = self.config_dir;
-        let data_dir = self.data_dir;
-        let config_file = self.config_file;
-        let cwd = self.cwd;
-        let otel = self.otel;
-
-        // Creating a AppConfig consumes the config and is a destructive act so removing here
-        // is fine
-        let node_def =
-            nodes
-            .remove(name)
-            .ok_or_else(|| anyhow!("Could not find node definition for node '{}'. Did you forget to include it in your configuration?", name))?;
-
-        Ok(AppConfig {
-            name: name.to_owned(),
-            node_def,
-            chains,
-            config_file,
-            config_dir,
-            data_dir,
-            cwd,
-            otel,
-        })
+        Ok(AppConfig::try_from(name, self)?)
     }
+
     pub fn config_dir(&self) -> PathBuf {
         normalize_path(resolve_base_dir(
             &self.config_file,
