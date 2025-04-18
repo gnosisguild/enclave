@@ -173,7 +173,8 @@ ensure_process_count_equals() {
 
 gracefull_shutdown() {
   enclave_swarm_down
-  # pkill -15 -f "target/debug/enclave" || true
+  sleep 10
+  pkill -15 -f "target/debug/enclave" || true
   sleep 10
   ensure_process_count_equals "target/debug/enclave" 0 || return 1
   kill_em_all
