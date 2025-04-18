@@ -6,6 +6,7 @@ use figment::{
     Figment,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::{collections::HashMap, env, path::PathBuf};
 
 use crate::chain_config::ChainConfig;
@@ -124,6 +125,8 @@ pub struct AppConfig {
     config_dir: PathBuf,
     /// Config file name
     config_file: PathBuf,
+    /// Non config peers probably from the CLI
+    peers: Vec<String>,
     /// Used for testing if required
     cwd: PathBuf,
     /// The data dir for enclave defaults to `~/.local/share/enclave`
@@ -133,7 +136,7 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub fn try_from(name: &str, config: UnscopedAppConfig) -> Result<Self> {
+    pub fn try_from_unscoped(name: &str, config: UnscopedAppConfig) -> Result<Self> {
         if !config.nodes.contains_key(name) {
             bail!("Could not find node definition for node '{}'. Did you forget to include it in your configuration?", name);
         }
@@ -144,10 +147,15 @@ impl AppConfig {
             chains: config.chains,
             config_file: config.config_file,
             config_dir: config.config_dir,
+            peers: vec![],
             data_dir: config.data_dir,
             cwd: config.cwd,
             otel: config.otel,
         })
+    }
+
+    pub fn add_peers(&mut self, peers: Vec<String>) {
+        self.peers = combine_unique(&self.peers, &peers)
     }
 
     pub fn key_file(&self) -> PathBuf {
@@ -196,7 +204,9 @@ impl AppConfig {
     }
 
     pub fn peers(&self) -> Vec<String> {
-        self.node_def().peers.clone()
+        let config_peers = self.node_def().peers.clone();
+        let cli_peers = self.peers.clone();
+        combine_unique(&config_peers, &cli_peers)
     }
 
     pub fn quic_port(&self) -> u16 {
@@ -282,7 +292,7 @@ impl Default for UnscopedAppConfig {
 
 impl UnscopedAppConfig {
     pub fn into_scoped(self, name: &str) -> Result<AppConfig> {
-        Ok(AppConfig::try_from(name, self)?)
+        Ok(AppConfig::try_from_unscoped(name, self)?)
     }
 
     pub fn config_dir(&self) -> PathBuf {
@@ -340,6 +350,12 @@ impl OsDirs {
         // TODO: handle unwrap error case
         dirs::data_local_dir().unwrap().join("enclave")
     }
+}
+
+fn combine_unique<T: Eq + std::hash::Hash + Clone>(a: &[T], b: &[T]) -> Vec<T> {
+    let mut combined_set: HashSet<_> = a.iter().cloned().collect();
+    combined_set.extend(b.iter().cloned());
+    combined_set.into_iter().collect()
 }
 
 #[cfg(test)]

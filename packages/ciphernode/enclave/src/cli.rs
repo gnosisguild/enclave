@@ -71,7 +71,7 @@ impl Cli {
         setup_tracing(&config, self.log_level())?;
 
         match self.command {
-            Commands::Start => start::execute(config).await?,
+            Commands::Start { peers } => start::execute(config, peers).await?,
             Commands::Init {
                 rpc_url,
                 eth_address,
@@ -118,7 +118,16 @@ impl Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Start the application
-    Start,
+    Start {
+        #[arg(
+            long = "peer",
+            action = clap::ArgAction::Append,
+            value_name = "PEER",
+            help = "Sets a peer URL",
+            default_value = "",
+        )]
+        peers: Vec<String>,
+    },
 
     /// Password management commands
     Password {
