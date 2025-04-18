@@ -6,6 +6,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::process::{Child, ChildStderr, ChildStdout, Command};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 use tracing::instrument;
 
 /// All the parameters of a command
@@ -119,7 +120,7 @@ async fn spawn_process(program: String, args: Vec<String>) -> Result<Child> {
 }
 
 /// Forward stdout from child process to parent's stdout
-async fn forward_stdout(id: String, stdout: ChildStdout) {
+fn forward_stdout(id: String, stdout: ChildStdout) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut reader = tokio::io::BufReader::new(stdout);
         let mut buffer = Vec::new();
@@ -131,13 +132,13 @@ async fn forward_stdout(id: String, stdout: ChildStdout) {
                 break;
             }
 
-            print!("[{}:stdout] {}", id, String::from_utf8_lossy(&buffer));
+            print!("[{}] {}", id, String::from_utf8_lossy(&buffer));
         }
-    });
+    })
 }
 
 /// Forward stderr from child process to parent's stderr
-async fn forward_stderr(id: String, stderr: ChildStderr) {
+fn forward_stderr(id: String, stderr: ChildStderr) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut reader = tokio::io::BufReader::new(stderr);
         let mut buffer = Vec::new();
@@ -149,16 +150,17 @@ async fn forward_stderr(id: String, stderr: ChildStderr) {
                 break;
             }
 
-            eprint!("[{}:stderr] {}", id, String::from_utf8_lossy(&buffer));
+            eprint!("[{}] {}", id, String::from_utf8_lossy(&buffer));
         }
-    });
+    })
 }
 
 /// Run commands as child processes and set up output forwarding
 async fn run_commands(
     commands: HashMap<String, CommandParams>,
-) -> Result<Arc<Mutex<HashMap<String, Child>>>> {
+) -> Result<(Arc<Mutex<HashMap<String, Child>>>, Vec<JoinHandle<()>>)> {
     let processes = Arc::new(Mutex::new(HashMap::new()));
+    let mut handles = vec![];
 
     for (id, (program, args)) in commands {
         // Spawn the process
@@ -166,11 +168,11 @@ async fn run_commands(
 
         // Set up output forwarding
         if let Some(stdout) = child.stdout.take() {
-            forward_stdout(id.clone(), stdout).await;
+            handles.push(forward_stdout(id.clone(), stdout));
         }
 
         if let Some(stderr) = child.stderr.take() {
-            forward_stderr(id.clone(), stderr).await;
+            handles.push(forward_stderr(id.clone(), stderr));
         }
 
         // Store the process
@@ -178,37 +180,47 @@ async fn run_commands(
         processes_guard.insert(id, child);
     }
 
-    Ok(processes)
+    Ok((processes, handles))
 }
 
 /// Terminate all child processes
 async fn terminate_processes(processes: Arc<Mutex<HashMap<String, Child>>>) {
     let mut processes_guard = processes.lock().await;
-
+    println!("SWARM starting to terminate processes");
+    println!("SWARM PROCESSES: {:?}", processes_guard.keys());
     for (id, child) in processes_guard.iter_mut() {
-        println!("Terminating process: {}", id);
-
         if let Err(e) = child.kill().await {
-            eprintln!("Failed to kill process {}: {}", id, e);
+            eprintln!("SWARM Failed to kill process {}: {}", id, e);
         }
+        println!("SWARM Terminating process: {}...", id);
+        let _ = child.wait().await;
+        println!("SWARM Process {} terminated.", id);
     }
 
-    println!("All processes terminated, exiting");
-    std::process::exit(0);
+    println!("SWARM All processes terminated, exiting");
 }
 
 /// Set up signal handlers for graceful shutdown
-async fn setup_signal_handlers(processes: Arc<Mutex<HashMap<String, Child>>>) {
-    // Set up SIGTERM handler
+fn setup_signal_handlers(
+    processes: Arc<Mutex<HashMap<String, Child>>>,
+    handles: Vec<JoinHandle<()>>,
+) -> JoinHandle<()> {
     let processes_term = processes.clone();
     tokio::spawn(async move {
         let mut sigterm =
-            signal(SignalKind::terminate()).expect("Failed to set up SIGTERM handler");
-
+            signal(SignalKind::terminate()).expect("SWARM Failed to set up SIGTERM handler");
         sigterm.recv().await;
-        println!("Received SIGTERM, shutting down...");
+
+        // Abort our stdout forwarding
+        for handle in handles {
+            handle.abort();
+        }
+
+        println!("SWARM Received SIGTERM, shutting down all processes...");
         terminate_processes(processes_term).await;
-    });
+        println!("SWARM exiting spawn after terminating all processes...");
+        std::process::exit(0);
+    })
 }
 
 #[instrument(skip_all)]
@@ -227,12 +239,15 @@ pub async fn execute(
         maybe_config_string,
     )?;
 
-    let processes = run_commands(cmds).await?;
+    let (processes, handles) = run_commands(cmds).await?;
 
-    setup_signal_handlers(processes.clone()).await;
+    setup_signal_handlers(processes.clone(), handles);
 
     tokio::signal::ctrl_c().await?;
-    terminate_processes(processes).await;
 
+    println!("SWARM: Received Ctrl+C shutting down...");
+
+    terminate_processes(processes).await;
+    println!("SWARM: Shutdown from Ctrl+C");
     Ok(())
 }

@@ -113,6 +113,17 @@ enclave_start() {
      --config "$SCRIPT_DIR/enclave.config.yaml" $extra_args & 
 }
 
+enclave_swarm_up() {
+   $ENCLAVE_BIN swarm up -v \
+     --config "$SCRIPT_DIR/enclave.config.yaml" & 
+}
+
+enclave_swarm_down() {
+  echo "killing swarm command"
+  ps aux | grep swarm
+  pkill -15 -f swarm || true
+}
+
 enclave_wallet_set() {
   local name="$1"
   local private_key="$2"
@@ -162,8 +173,9 @@ ensure_process_count_equals() {
 }
 
 gracefull_shutdown() {
-  pkill -15 -f "target/debug/enclave" || true
-  sleep 10
+  enclave_swarm_down
+  # pkill -15 -f "target/debug/enclave" || true
+  sleep 60
   ensure_process_count_equals "target/debug/enclave" 0 || return 1
   kill_em_all
 }
