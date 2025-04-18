@@ -120,7 +120,6 @@ enclave_swarm_up() {
 
 enclave_swarm_down() {
   echo "killing swarm command"
-  ps aux | grep swarm
   pkill -15 -f swarm || true
 }
 
@@ -175,7 +174,7 @@ ensure_process_count_equals() {
 gracefull_shutdown() {
   enclave_swarm_down
   # pkill -15 -f "target/debug/enclave" || true
-  sleep 60
+  sleep 10
   ensure_process_count_equals "target/debug/enclave" 0 || return 1
   kill_em_all
 }
