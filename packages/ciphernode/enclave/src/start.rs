@@ -4,9 +4,10 @@ use config::{AppConfig, NodeRole};
 use enclave_core::{aggregator_start, listen_for_shutdown, start};
 use tracing::{info, instrument};
 
-#[instrument(name = "app", skip_all)]
+#[instrument(skip_all)]
 pub async fn execute(config: AppConfig) -> Result<()> {
     owo();
+
     let Some(address) = config.address() else {
         return Err(anyhow!("You must provide an address"));
     };
@@ -18,6 +19,7 @@ pub async fn execute(config: AppConfig) -> Result<()> {
         } => aggregator_start::execute(&config, &pubkey_write_path, &plaintext_write_path).await?,
         NodeRole::Ciphernode => start::execute(&config, address).await?,
     };
+
     info!(
         "LAUNCHING CIPHERNODE: ({}/{}/{})",
         config.name(),
@@ -26,5 +28,6 @@ pub async fn execute(config: AppConfig) -> Result<()> {
     );
 
     tokio::spawn(listen_for_shutdown(bus.into(), handle)).await?;
+
     Ok(())
 }

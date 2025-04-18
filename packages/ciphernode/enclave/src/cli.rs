@@ -1,10 +1,11 @@
 use crate::helpers::telemetry::setup_tracing;
-use crate::net;
 use crate::net::NetCommands;
 use crate::password::PasswordCommands;
 use crate::start;
+use crate::swarm::SwarmCommands;
 use crate::wallet::WalletCommands;
 use crate::{init, password, wallet};
+use crate::{net, swarm};
 use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
@@ -89,6 +90,7 @@ impl Cli {
                 )
                 .await?
             }
+            Commands::Swarm { command } => swarm::execute(command, &config).await?,
             Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
@@ -161,5 +163,11 @@ pub enum Commands {
         /// Generate a new network keypair
         #[arg(long = "generate-net-keypair")]
         generate_net_keypair: bool,
+    },
+
+    /// Manage multiple node processes together as a set
+    Swarm {
+        #[command(subcommand)]
+        command: SwarmCommands,
     },
 }
