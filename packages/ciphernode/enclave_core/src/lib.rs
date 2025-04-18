@@ -7,6 +7,7 @@ pub mod net_set;
 pub mod password_create;
 pub mod password_delete;
 pub mod start;
+pub mod swarm_up;
 pub mod wallet_set;
 
 pub use helpers::*;

@@ -76,24 +76,24 @@ impl Default for NodeRole {
 #[serde(deny_unknown_fields)]
 pub struct NodeDefinition {
     /// Ethereum Address for the node
-    address: Option<Address>,
+    pub address: Option<Address>,
     /// A list of libp2p multiaddrs to dial to as peers when joining the network
-    peers: Vec<String>,
+    pub peers: Vec<String>,
     /// The port to use for the quic listener
-    quic_port: u16,
+    pub quic_port: u16,
     /// Whether to enable mDNS discovery
-    enable_mdns: bool,
+    pub enable_mdns: bool,
     /// The name for the database
-    db_file: PathBuf,
+    pub db_file: PathBuf,
     /// The name for the keyfile
-    key_file: PathBuf,
+    pub key_file: PathBuf,
     /// The data dir for enclave defaults to `~/.local/share/enclave/{name}`
-    data_dir: PathBuf,
+    pub data_dir: PathBuf,
     /// Override the base folder for enclave configuration defaults to `~/.config/enclave/{name}` on linux
-    config_dir: PathBuf,
+    pub config_dir: PathBuf,
     /// The node role eg. "ciphernode" or "aggregator"
     #[serde(default)]
-    role: NodeRole,
+    pub role: NodeRole,
 }
 
 impl Default for NodeDefinition {
@@ -237,12 +237,18 @@ impl AppConfig {
         self.node_def().address.clone()
     }
 
+    pub fn nodes(&self) -> &HashMap<String, NodeDefinition> {
+        &self.nodes
+    }
+
     pub fn role(&self) -> NodeRole {
         match self.node_def().role.clone() {
             NodeRole::Aggregator {
                 pubkey_write_path,
                 plaintext_write_path,
             } => NodeRole::Aggregator {
+                // Normalize paths so that these paths are based on the config dir if they are
+                // relative
                 pubkey_write_path: normalize_path(relative_to(
                     base_dir(self.config_file()),
                     pubkey_write_path,
@@ -319,6 +325,7 @@ pub struct CliOverrides {
 pub fn load_config_from_overrides(name: &str, cli_overrides: CliOverrides) -> Result<AppConfig> {
     let config_file = cli_overrides.config.clone();
     let mut defaults = UnscopedAppConfig::default();
+
     if let Some(file) = config_file {
         defaults.config_file = file.into();
     }
@@ -352,7 +359,8 @@ impl OsDirs {
     }
 }
 
-fn combine_unique<T: Eq + std::hash::Hash + Clone>(a: &[T], b: &[T]) -> Vec<T> {
+// TODO: Put this in a universal utils lib
+pub fn combine_unique<T: Eq + std::hash::Hash + Clone>(a: &[T], b: &[T]) -> Vec<T> {
     let mut combined_set: HashSet<_> = a.iter().cloned().collect();
     combined_set.extend(b.iter().cloned());
     combined_set.into_iter().collect()
