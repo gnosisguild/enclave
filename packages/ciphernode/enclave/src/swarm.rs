@@ -18,6 +18,16 @@ pub enum SwarmCommands {
 
     /// Shutdown all nodes
     Down,
+
+    Daemon {
+        /// Detached mode: Run nodes in the background
+        #[arg(short, long)]
+        detatch: bool,
+
+        /// Exclude nodes by name
+        #[arg(short, long, value_delimiter = ',')]
+        exclude: Vec<String>,
+    },
 }
 
 pub async fn execute(
@@ -31,6 +41,9 @@ pub async fn execute(
             swarm_up::execute(config, detatch, exclude, verbose, config_string).await?
         }
         SwarmCommands::Down => (),
+        SwarmCommands::Daemon { detatch, exclude } => {
+            swarm_up::execute(config, detatch, exclude, verbose, config_string).await?
+        }
     };
 
     Ok(())

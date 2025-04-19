@@ -1,7 +1,7 @@
 use crate::owo;
 use anyhow::{anyhow, Result};
 use config::{AppConfig, NodeRole};
-use enclave_core::{aggregator_start, listen_for_shutdown, start};
+use enclave_core::{aggregator_start, helpers::listen_for_shutdown, start};
 use tracing::{info, instrument};
 
 #[instrument(skip_all)]

@@ -7,7 +7,7 @@ use events::{EnclaveEvent, EventBus, EventBusConfig, GetErrors};
 use libp2p::identity::Keypair;
 use net::NetRepositoryFactory;
 
-use crate::datastore::get_repositories;
+use crate::helpers::datastore::get_repositories;
 
 fn create_keypair(input: &String) -> Result<Keypair> {
     hex::check(&input)?;

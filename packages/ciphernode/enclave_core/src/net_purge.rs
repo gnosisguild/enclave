@@ -1,4 +1,4 @@
-use crate::datastore::get_repositories;
+use crate::helpers::datastore::get_repositories;
 use actix::Actor;
 use anyhow::*;
 use config::AppConfig;

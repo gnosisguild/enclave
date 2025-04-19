@@ -6,7 +6,7 @@ use crypto::Cipher;
 use events::{EnclaveEvent, EventBus, EventBusConfig, GetErrors};
 use evm::EthPrivateKeyRepositoryFactory;
 
-use crate::datastore::get_repositories;
+use crate::helpers::datastore::get_repositories;
 
 pub fn validate_private_key(input: &String) -> Result<()> {
     let bytes =

@@ -1,6 +1,6 @@
 use anyhow::*;
 use config::AppConfig;
-use enclave_core::{swarm_daemon, swarm_up};
+use enclave_core::swarm_daemon;
 
 pub async fn execute(
     config: &AppConfig,
