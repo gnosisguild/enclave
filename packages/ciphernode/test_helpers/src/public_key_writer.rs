@@ -1,14 +1,16 @@
+use std::path::PathBuf;
+
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
 use events::{EnclaveEvent, EventBus, Subscribe};
 use tracing::info;
 
 pub struct PublicKeyWriter {
-    path: String,
+    path: PathBuf,
 }
 
 impl PublicKeyWriter {
-    pub fn attach(path: &str, bus: Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
+    pub fn attach(path: &PathBuf, bus: Addr<EventBus<EnclaveEvent>>) -> Addr<Self> {
         let addr = Self {
             path: path.to_owned(),
         }
@@ -29,7 +31,7 @@ impl Handler<EnclaveEvent> for PublicKeyWriter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::PublicKeyAggregated { data, .. } = msg.clone() {
-            info!(path = &self.path, "Writing Pubkey To Path");
+            info!(path = ?&self.path, "Writing Pubkey To Path");
             write_file_with_dirs(&self.path, &data.pubkey).unwrap();
         }
     }

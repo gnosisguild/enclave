@@ -4,13 +4,7 @@ clean_folders() {
 
     # Delete output artifacts
     rm -rf "$SCRIPT_DIR/output/"*
-    rm -rf "/tmp/enclave.*.pid"
-
-    # Delete enclave artifacts
-    for name in cn1 cn2 cn3 cn4 ag; do
-        # List all files and directories except config.yaml, then delete them
-        find "$SCRIPT_DIR/lib/$name" -mindepth 1 ! -regex '.*/config\.yaml$' ! -regex '.*/.gitignore$' -exec rm -rf {} +
-    done
+    rm -rf "$SCRIPT_DIR/.enclave/"
 }
 
 clean_folders $1

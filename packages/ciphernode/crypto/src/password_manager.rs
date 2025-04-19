@@ -130,6 +130,11 @@ impl PasswordManager for FilePasswordManager {
             bail!("Password must contain data!")
         }
 
+        // Ensure parent directories exist
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).context("Failed to create parent directories")?;
+        }
+
         // Check if file exists
         if path.exists() {
             bail!("Keyfile already exists. Refusing to overwrite.")

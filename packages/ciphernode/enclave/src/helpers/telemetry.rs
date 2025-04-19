@@ -20,9 +20,7 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
                 .with_protocol(Protocol::Grpc)
                 .build()?;
 
-            let resource = Resource::builder()
-                .with_service_name(name.unwrap_or("default-name".to_string()))
-                .build();
+            let resource = Resource::builder().with_service_name(name).build();
 
             let provider = SdkTracerProvider::builder()
                 .with_batch_exporter(otlp_exporter)

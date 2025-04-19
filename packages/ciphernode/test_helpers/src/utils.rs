@@ -1,9 +1,10 @@
-use std::{fs, io::Write, path::Path};
+use std::{fs, io::Write, path::PathBuf};
 
 use tracing::{error, trace};
-pub fn write_file_with_dirs(path: &str, content: &[u8]) -> std::io::Result<()> {
-    let abs_path = if Path::new(path).is_absolute() {
-        Path::new(path).to_path_buf()
+
+pub fn write_file_with_dirs(path: &PathBuf, content: &[u8]) -> std::io::Result<()> {
+    let abs_path = if path.is_absolute() {
+        path.clone()
     } else {
         let cwd = std::env::current_dir()?;
         cwd.join(path)
@@ -12,7 +13,7 @@ pub fn write_file_with_dirs(path: &str, content: &[u8]) -> std::io::Result<()> {
     match abs_path.to_str() {
         Some(s) => trace!(path = s, "Writing to path"),
         None => error!(path=?abs_path, "Cannot parse path"),
-    }
+    };
 
     // Ensure the directory structure exists
     if let Some(parent) = abs_path.parent() {

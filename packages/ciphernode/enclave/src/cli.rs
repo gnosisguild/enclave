@@ -1,10 +1,11 @@
 use crate::helpers::telemetry::setup_tracing;
-use crate::net;
 use crate::net::NetCommands;
 use crate::password::PasswordCommands;
+use crate::start;
+use crate::swarm::SwarmCommands;
 use crate::wallet::WalletCommands;
-use crate::{aggregator, init, password, wallet};
-use crate::{aggregator::AggregatorCommands, start};
+use crate::{init, password, wallet};
+use crate::{net, swarm};
 use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
@@ -70,7 +71,7 @@ impl Cli {
         setup_tracing(&config, self.log_level())?;
 
         match self.command {
-            Commands::Start => start::execute(config).await?,
+            Commands::Start { peers } => start::execute(config, peers).await?,
             Commands::Init {
                 rpc_url,
                 eth_address,
@@ -89,8 +90,10 @@ impl Cli {
                 )
                 .await?
             }
+            Commands::Swarm { command } => {
+                swarm::execute(command, &config, self.verbose, self.config).await?
+            }
             Commands::Password { command } => password::execute(command, &config).await?,
-            Commands::Aggregator { command } => aggregator::execute(command, config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
         }
@@ -98,24 +101,34 @@ impl Cli {
         Ok(())
     }
 
-    fn load_config(&self) -> Result<AppConfig> {
-        load_config_from_overrides(CliOverrides {
-            config: self.config.clone(),
-            name: self.name.clone(),
-            otel: self.otel.clone().map(Into::into),
-        })
+    pub fn load_config(&self) -> Result<AppConfig> {
+        load_config_from_overrides(
+            &self.name(),
+            CliOverrides {
+                config: self.config.clone(),
+                otel: self.otel.clone().map(Into::into),
+            },
+        )
+    }
+
+    pub fn name(&self) -> String {
+        // If no name is provided assume we are working with the default node
+        self.name.clone().unwrap_or("default".to_string())
     }
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Start the application
-    Start,
-
-    /// Aggregator node management commands
-    Aggregator {
-        #[command(subcommand)]
-        command: AggregatorCommands,
+    Start {
+        #[arg(
+            long = "peer",
+            action = clap::ArgAction::Append,
+            value_name = "PEER",
+            help = "Sets a peer URL",
+            default_value = "",
+        )]
+        peers: Vec<String>,
     },
 
     /// Password management commands
@@ -161,5 +174,11 @@ pub enum Commands {
         /// Generate a new network keypair
         #[arg(long = "generate-net-keypair")]
         generate_net_keypair: bool,
+    },
+
+    /// Manage multiple node processes together as a set
+    Swarm {
+        #[command(subcommand)]
+        command: SwarmCommands,
     },
 }

@@ -2,8 +2,6 @@ use clap::Parser;
 use cli::Cli;
 use tracing::info;
 
-mod aggregator;
-mod aggregator_start;
 mod cli;
 pub mod helpers;
 mod init;
@@ -16,6 +14,9 @@ mod password_create;
 mod password_delete;
 mod password_overwrite;
 mod start;
+mod swarm;
+mod swarm_down;
+mod swarm_up;
 mod wallet;
 mod wallet_set;
 

@@ -7,7 +7,7 @@ use libp2p::{identity::Keypair, PeerId};
 use net::NetRepositoryFactory;
 use zeroize::Zeroize;
 
-use crate::datastore::get_repositories;
+use crate::helpers::datastore::get_repositories;
 
 pub async fn execute(config: &AppConfig) -> Result<PeerId> {
     let kp = Keypair::generate_ed25519();

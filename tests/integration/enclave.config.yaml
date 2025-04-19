@@ -1,0 +1,55 @@
+config_dir: ./.enclave/config
+data_dir: ./.enclave/data
+chains:
+  - name: "hardhat"
+    rpc_url: "ws://localhost:8545"
+    contracts:
+      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      ciphernode_registry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+
+nodes:
+  cn1:
+    address: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
+    quic_port: 9091
+    peers:
+      - "/ip4/127.0.0.1/udp/9092/quic-v1"
+      - "/ip4/127.0.0.1/udp/9093/quic-v1"
+      - "/ip4/127.0.0.1/udp/9094/quic-v1"
+      - "/ip4/127.0.0.1/udp/9095/quic-v1"
+  cn2:
+    address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+    quic_port: 9092
+    peers:
+      - "/ip4/127.0.0.1/udp/9091/quic-v1"
+      - "/ip4/127.0.0.1/udp/9093/quic-v1"
+      - "/ip4/127.0.0.1/udp/9094/quic-v1"
+      - "/ip4/127.0.0.1/udp/9095/quic-v1"
+  cn3:
+    address: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
+    quic_port: 9093
+    peers:
+      - "/ip4/127.0.0.1/udp/9091/quic-v1"
+      - "/ip4/127.0.0.1/udp/9092/quic-v1"
+      - "/ip4/127.0.0.1/udp/9094/quic-v1"
+      - "/ip4/127.0.0.1/udp/9095/quic-v1"
+  cn4:
+    address: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+    quic_port: 9094
+    peers:
+      - "/ip4/127.0.0.1/udp/9091/quic-v1"
+      - "/ip4/127.0.0.1/udp/9092/quic-v1"
+      - "/ip4/127.0.0.1/udp/9093/quic-v1"
+      - "/ip4/127.0.0.1/udp/9095/quic-v1"
+  ag:
+    address: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+    quic_port: 9095
+    peers:
+      - "/ip4/127.0.0.1/udp/9091/quic-v1"
+      - "/ip4/127.0.0.1/udp/9092/quic-v1"
+      - "/ip4/127.0.0.1/udp/9093/quic-v1"
+      - "/ip4/127.0.0.1/udp/9094/quic-v1"
+    role:
+      type: aggregator
+      pubkey_write_path: "./output/pubkey.bin"
+      plaintext_write_path: "./output/plaintext.txt"

@@ -89,20 +89,18 @@ waiton-files() {
   done
 }
 
-set_password() {
+enclave_password_create() {
   local name="$1"
   local password="$2"
   $ENCLAVE_BIN password create \
-    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --name $name \
+    --config "$SCRIPT_DIR/enclave.config.yaml" \
     --password "$password"
 }
 
-launch_ciphernode() {
+enclave_start() {
    local name="$1"
-   local log_file="${SCRIPT_DIR}/logs/${name}.log"
-   local log_dir="$(dirname "$log_file")"
    heading "Launch ciphernode $name"
-   mkdir -p "$log_dir"
 
    # convert OTEL env var to args
    local extra_args=""
@@ -112,47 +110,36 @@ launch_ciphernode() {
 
    $ENCLAVE_BIN start -v \
      --name "$name" \
-     --config "$SCRIPT_DIR/lib/$name/config.yaml" $extra_args 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+     --config "$SCRIPT_DIR/enclave.config.yaml" $extra_args & 
 }
 
-set_private_key() {
+enclave_swarm_up() {
+   $ENCLAVE_BIN swarm up -v \
+     --config "$SCRIPT_DIR/enclave.config.yaml" & 
+}
+
+enclave_swarm_down() {
+  $ENCLAVE_BIN swarm down  
+}
+
+enclave_wallet_set() {
   local name="$1"
   local private_key="$2"
 
   $ENCLAVE_BIN wallet set \
-    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --name $name \
+    --config "$SCRIPT_DIR/enclave.config.yaml" \
     --private-key "$private_key"
 }
 
-set_network_private_key() {
+enclave_net_set_key() {
   local name="$1"
   local private_key="$2"
 
   $ENCLAVE_BIN net set-key \
-    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --name $name \
+    --config "$SCRIPT_DIR/enclave.config.yaml" \
     --net-keypair "$private_key"
-}
-
-launch_aggregator() {
-   local name="$1"
-   local suffix="${2:-}"  # Optional suffix with empty default
-   local log_name="${name}${suffix:+_$suffix}"  # Add suffix with underscore if provided
-   local log_file="${SCRIPT_DIR}/logs/${log_name}.log"
-   local log_dir="$(dirname "$log_file")"
-   heading "Launch aggregator $name"
-   mkdir -p "$log_dir"
-
-   # convert OTEL env var to args
-   local extra_args=""
-   if [[ -n "${OTEL+x}" ]] && [[ -n "$OTEL" ]]; then
-      extra_args="--otel=${OTEL}"
-   fi
-
-   $ENCLAVE_BIN aggregator start -v \
-     --name "$name" \
-     --config "$SCRIPT_DIR/lib/$name/config.yaml" \
-     --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
-     --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" $extra_args 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
 }
 
 kill_proc() {
@@ -184,7 +171,7 @@ ensure_process_count_equals() {
 }
 
 gracefull_shutdown() {
-  pkill -15 -f "target/debug/enclave" || true
+  enclave_swarm_down
   sleep 10
   ensure_process_count_equals "target/debug/enclave" 0 || return 1
   kill_em_all
