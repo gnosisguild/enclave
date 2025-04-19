@@ -360,10 +360,12 @@ impl OsDirs {
 }
 
 // TODO: Put this in a universal utils lib
-pub fn combine_unique<T: Eq + std::hash::Hash + Clone>(a: &[T], b: &[T]) -> Vec<T> {
+pub fn combine_unique<T: Eq + std::hash::Hash + Clone + Ord>(a: &[T], b: &[T]) -> Vec<T> {
     let mut combined_set: HashSet<_> = a.iter().cloned().collect();
     combined_set.extend(b.iter().cloned());
-    combined_set.into_iter().collect()
+    let mut result: Vec<_> = combined_set.into_iter().collect();
+    result.sort();
+    result
 }
 
 #[cfg(test)]
