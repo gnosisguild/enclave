@@ -119,8 +119,7 @@ enclave_swarm_up() {
 }
 
 enclave_swarm_down() {
-  echo "killing swarm command"
-  pkill -15 -f swarm || true
+  $ENCLAVE_BIN swarm down  
 }
 
 enclave_wallet_set() {
@@ -173,8 +172,6 @@ ensure_process_count_equals() {
 
 gracefull_shutdown() {
   enclave_swarm_down
-  sleep 10
-  pkill -15 -f "target/debug/enclave" || true
   sleep 10
   ensure_process_count_equals "target/debug/enclave" 0 || return 1
   kill_em_all

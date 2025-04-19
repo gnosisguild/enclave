@@ -1,4 +1,4 @@
-use crate::swarm_up;
+use crate::{swarm_down, swarm_up};
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
@@ -40,7 +40,7 @@ pub async fn execute(
         SwarmCommands::Up { detatch, exclude } => {
             swarm_up::execute(config, detatch, exclude, verbose, config_string).await?
         }
-        SwarmCommands::Down => (),
+        SwarmCommands::Down => swarm_down::execute().await?,
         SwarmCommands::Daemon { detatch, exclude } => {
             swarm_up::execute(config, detatch, exclude, verbose, config_string).await?
         }

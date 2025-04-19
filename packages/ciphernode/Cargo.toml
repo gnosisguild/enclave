@@ -68,6 +68,7 @@ petname = "2.0.2"
 phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
+reqwest = "0.12.15"
 e3_request = { path = "./e3_request" }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = { version = "1.0.133" }
