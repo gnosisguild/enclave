@@ -12,6 +12,7 @@ pub mod swarm_down;
 pub mod swarm_ps;
 pub mod swarm_restart;
 pub mod swarm_start;
+pub mod swarm_status;
 pub mod swarm_stop;
 pub mod swarm_up;
 pub mod wallet_set;

@@ -3,7 +3,7 @@ use reqwest::Client;
 use std::env;
 use tracing::{error, warn};
 
-use crate::helpers::termtable::print_table;
+use crate::helpers::{swarm::ProcessStatus, termtable::print_table};
 
 use super::swarm::{spawn_process, Action, Query, SERVER_ADDRESS};
 
@@ -50,6 +50,15 @@ pub async fn stop(id: &str) -> Result<()> {
 
 pub async fn restart(id: &str) -> Result<()> {
     send_action(&Action::Restart { id: id.to_owned() }).await?;
+    Ok(())
+}
+
+pub async fn status(id: &str) -> Result<()> {
+    if let Ok(Query::Status { status }) = get_status().await {
+        let state = status.processes.get(id).unwrap_or(&ProcessStatus::Stopped);
+        println!("{:?}", state);
+    };
+
     Ok(())
 }
 

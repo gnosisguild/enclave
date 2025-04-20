@@ -19,6 +19,7 @@ mod swarm_down;
 mod swarm_ps;
 mod swarm_restart;
 mod swarm_start;
+mod swarm_status;
 mod swarm_stop;
 mod swarm_up;
 mod wallet;
