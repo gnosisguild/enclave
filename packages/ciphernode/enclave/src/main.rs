@@ -15,6 +15,7 @@ mod password_delete;
 mod password_overwrite;
 mod start;
 mod swarm;
+mod swarm_daemon;
 mod swarm_down;
 mod swarm_ps;
 mod swarm_restart;

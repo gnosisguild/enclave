@@ -6,7 +6,7 @@ use config::{combine_unique, AppConfig, NodeDefinition};
 use std::sync::Arc;
 use std::{collections::HashMap, env};
 use tokio::sync::Mutex;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 /// Metadata used to workout launch charachteristics for swarm mode
 #[derive(Clone, Debug)]
@@ -106,7 +106,6 @@ fn extract_commands(
 #[instrument(skip_all)]
 pub async fn execute(
     config: &AppConfig,
-    _detatch: bool, // TBI
     exclude: Vec<String>,
     verbose: u8,
     maybe_config_string: Option<String>,
@@ -125,7 +124,9 @@ pub async fn execute(
 
     let manager = process_manager.clone();
 
-    server(manager).await?;
+    if let Err(e) = server(manager.clone()).await {
+        error!("Signal server error: {}", e);
+    }
 
     tokio::signal::ctrl_c().await?;
 

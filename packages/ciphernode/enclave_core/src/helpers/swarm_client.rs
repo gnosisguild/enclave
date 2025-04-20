@@ -1,7 +1,7 @@
 use anyhow::Result;
 use reqwest::Client;
 use std::env;
-use tracing::{error, warn};
+use tracing::{error, trace, warn};
 
 use crate::helpers::{swarm::ProcessStatus, termtable::print_table};
 
@@ -24,12 +24,14 @@ pub async fn send_action(action: &Action) -> Result<Query> {
         .json(action)
         .send()
         .await?;
-    println!("swarm client received response: {:?}", htres);
     let res = htres.json::<Query>().await?;
 
+    trace!("{:?}", res);
+
     if let Query::Failure { message } = res.clone() {
-        error!("FAILURE:{}", message);
+        error!("{}", message);
     }
+
     Ok(res)
 }
 

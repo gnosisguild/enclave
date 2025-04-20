@@ -1,4 +1,7 @@
-use crate::{swarm_down, swarm_ps, swarm_restart, swarm_start, swarm_status, swarm_stop, swarm_up};
+use crate::{
+    swarm_daemon, swarm_down, swarm_ps, swarm_restart, swarm_start, swarm_status, swarm_stop,
+    swarm_up,
+};
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
@@ -20,10 +23,6 @@ pub enum SwarmCommands {
     Down,
 
     Daemon {
-        /// Detached mode: Run nodes in the background
-        #[arg(short, long)]
-        detatch: bool,
-
         /// Exclude nodes by name
         #[arg(short, long, value_delimiter = ',')]
         exclude: Vec<String>,
@@ -73,8 +72,8 @@ pub async fn execute(
         }
         SwarmCommands::Down => swarm_down::execute().await?,
         SwarmCommands::Ps => swarm_ps::execute().await?,
-        SwarmCommands::Daemon { detatch, exclude } => {
-            swarm_up::execute(config, detatch, exclude, verbose, config_string).await?
+        SwarmCommands::Daemon { exclude } => {
+            swarm_daemon::execute(config, exclude, verbose, config_string).await?
         }
         SwarmCommands::Start { id } => swarm_start::execute(&id).await?,
         SwarmCommands::Status { id } => swarm_status::execute(&id).await?,

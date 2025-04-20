@@ -67,6 +67,7 @@ pub async fn server(manager: Arc<Mutex<ProcessManager>>) -> Result<()> {
             .route("/command", web::post().to(handle_command))
             .route("/status", web::get().to(status))
     })
+    .workers(1)
     .bind(SERVER_ADDRESS)?
     .run()
     .await?;
