@@ -40,8 +40,14 @@ pub async fn start(id: &str) -> Result<()> {
     send_action(&Action::Start { id: id.to_owned() }).await?;
     Ok(())
 }
+
 pub async fn stop(id: &str) -> Result<()> {
     send_action(&Action::Stop { id: id.to_owned() }).await?;
+    Ok(())
+}
+
+pub async fn restart(id: &str) -> Result<()> {
+    send_action(&Action::Restart { id: id.to_owned() }).await?;
     Ok(())
 }
 
