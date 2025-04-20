@@ -42,10 +42,10 @@ pub enum Action {
     Terminate,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type", content = "data")]
 pub enum Query {
     Success,
-    Failure,
+    Failure { message: String },
     Status,
 }

@@ -33,11 +33,6 @@ enclave_net_set_key ag "$NETWORK_PRIVATE_KEY_AG"
 
 # Launch 4 ciphernodes
 enclave_swarm_up
-# enclave_start cn1
-# enclave_start cn2
-# enclave_start cn3
-# enclave_start cn4
-# enclave_start ag
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 

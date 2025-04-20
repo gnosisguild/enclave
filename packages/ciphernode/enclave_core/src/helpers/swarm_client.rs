@@ -1,6 +1,7 @@
 use anyhow::*;
 use reqwest::Client;
 use std::env;
+use tracing::error;
 
 use super::swarm::{spawn_process, Action, Query, SERVER_ADDRESS};
 
@@ -21,14 +22,26 @@ pub async fn send_action(action: &Action) -> Result<Query> {
         .json(action)
         .send()
         .await?;
+    println!("swarm client received response: {:?}", htres);
+    let res = htres.json::<Query>().await?;
 
-    let res: Query = htres.json::<Query>().await?;
-
+    if let Query::Failure { message } = res.clone() {
+        error!("FAILURE:{}", message);
+    }
     Ok(res)
 }
 
 pub async fn terminate() -> Result<()> {
     send_action(&Action::Terminate).await?;
+    Ok(())
+}
+
+pub async fn start(id: &str) -> Result<()> {
+    send_action(&Action::Start { id: id.to_owned() }).await?;
+    Ok(())
+}
+pub async fn stop(id: &str) -> Result<()> {
+    send_action(&Action::Stop { id: id.to_owned() }).await?;
     Ok(())
 }
 

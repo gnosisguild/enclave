@@ -142,6 +142,20 @@ enclave_net_set_key() {
     --net-keypair "$private_key"
 }
 
+enclave_swarm_stop() {
+  local name="$1"
+
+  $ENCLAVE_BIN swarm stop $name -v \
+    --config "$SCRIPT_DIR/enclave.config.yaml"
+}
+
+enclave_swarm_start() {
+  local name="$1"
+
+  $ENCLAVE_BIN swarm start $name -v \
+    --config "$SCRIPT_DIR/enclave.config.yaml"
+}
+
 kill_proc() {
   local name=$1
   local pid=$(ps aux | grep 'enclave' | grep "\--name $name" | awk '{ print $2 }')
@@ -172,7 +186,8 @@ ensure_process_count_equals() {
 
 gracefull_shutdown() {
   enclave_swarm_down
-  sleep 10
+  echo "waiting 5 seconds for processes to shutdown"
+  sleep 5
   ensure_process_count_equals "target/debug/enclave" 0 || return 1
   kill_em_all
 }

@@ -9,7 +9,7 @@ use tokio::{
     process::{ChildStderr, ChildStdout},
     task::JoinHandle,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use super::swarm::{spawn_process, CommandMap, ProcessMap, ProcessRecord};
 
@@ -99,12 +99,13 @@ async fn start(id: &str, commands: &CommandMap, processes: &ProcessMap) -> Resul
 
 /// Start a process
 async fn stop(id: &str, processes: &ProcessMap) -> Result<()> {
+    warn!("stopping {}...", id);
     let mut processes_lock = processes.lock().await;
     if !processes_lock.contains_key(id) {
         info!("Cannot stop process that isn't running {}", id);
         return Ok(());
     };
-    if let Some(mut process_record) = processes_lock.get_mut(id) {
+    if let Some(mut process_record) = processes_lock.remove(id) {
         terminate_process_record(id, &mut process_record).await;
     }
     Ok(())
@@ -112,6 +113,7 @@ async fn stop(id: &str, processes: &ProcessMap) -> Result<()> {
 
 /// Terminate a process
 async fn terminate_process_record(id: &str, process_record: &mut ProcessRecord) {
+    info!("Terminating {}", id);
     let (child, handlers) = process_record;
     for handler in handlers.drain(..) {
         // drop all stdout/in handlers

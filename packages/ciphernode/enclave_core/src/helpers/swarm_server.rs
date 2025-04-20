@@ -2,6 +2,7 @@ use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use anyhow::*;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::info;
 
 use crate::helpers::swarm::{Action, Query};
 
@@ -16,6 +17,7 @@ pub async fn handle_command(
         cmd: Action,
         manager: web::Data<Arc<Mutex<ProcessManager>>>,
     ) -> Result<()> {
+        info!("RECEIVED COMMAND! {:?}", cmd);
         match cmd {
             Action::Start { id } => {
                 manager.lock().await.start(&id).await?;
@@ -42,7 +44,10 @@ pub async fn handle_command(
 
     match process_cmd(cmd, manager).await {
         std::result::Result::Ok(_) => HttpResponse::Ok().json(Query::Success),
-        std::result::Result::Err(_) => HttpResponse::InternalServerError().finish(),
+        // Maybe we should make this an error response code?
+        std::result::Result::Err(err) => HttpResponse::Ok().json(Query::Failure {
+            message: err.to_string(),
+        }),
     }
 }
 

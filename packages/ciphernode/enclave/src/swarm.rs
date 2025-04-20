@@ -1,4 +1,4 @@
-use crate::{swarm_down, swarm_up};
+use crate::{swarm_down, swarm_start, swarm_stop, swarm_up};
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
@@ -28,6 +28,18 @@ pub enum SwarmCommands {
         #[arg(short, long, value_delimiter = ',')]
         exclude: Vec<String>,
     },
+
+    Start {
+        /// The id of the node you wish to start
+        #[arg(index = 1)]
+        id: String,
+    },
+
+    Stop {
+        /// The id of the node you wish to start
+        #[arg(index = 1)]
+        id: String,
+    },
 }
 
 pub async fn execute(
@@ -44,6 +56,8 @@ pub async fn execute(
         SwarmCommands::Daemon { detatch, exclude } => {
             swarm_up::execute(config, detatch, exclude, verbose, config_string).await?
         }
+        SwarmCommands::Start { id } => swarm_start::execute(&id).await?,
+        SwarmCommands::Stop { id } => swarm_stop::execute(&id).await?,
     };
 
     Ok(())

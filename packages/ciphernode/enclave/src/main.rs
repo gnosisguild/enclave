@@ -16,6 +16,8 @@ mod password_overwrite;
 mod start;
 mod swarm;
 mod swarm_down;
+mod swarm_start;
+mod swarm_stop;
 mod swarm_up;
 mod wallet;
 mod wallet_set;
