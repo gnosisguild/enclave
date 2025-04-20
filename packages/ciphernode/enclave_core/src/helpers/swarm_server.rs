@@ -1,12 +1,15 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use anyhow::*;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::helpers::swarm::{Action, Query};
 
-use super::{swarm::SERVER_ADDRESS, swarm_process_manager::ProcessManager};
+use super::{
+    swarm::{SwarmStatus, SERVER_ADDRESS},
+    swarm_process_manager::ProcessManager,
+};
 
 pub async fn handle_command(
     manager: web::Data<Arc<Mutex<ProcessManager>>>,
@@ -51,8 +54,10 @@ pub async fn handle_command(
     }
 }
 
-pub async fn status() -> impl Responder {
-    HttpResponse::Ok().json(Query::Status)
+pub async fn status(manager: web::Data<Arc<Mutex<ProcessManager>>>) -> impl Responder {
+    HttpResponse::Ok().json(Query::Status {
+        status: manager.lock().await.list().await,
+    })
 }
 
 pub async fn server(manager: Arc<Mutex<ProcessManager>>) -> Result<()> {

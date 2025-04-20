@@ -9,6 +9,7 @@ pub mod password_delete;
 pub mod start;
 pub mod swarm_daemon;
 pub mod swarm_down;
+pub mod swarm_ps;
 pub mod swarm_restart;
 pub mod swarm_start;
 pub mod swarm_stop;

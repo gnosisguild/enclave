@@ -8,6 +8,8 @@ use tokio::{
     task::JoinHandle,
 };
 
+use super::swarm_process_manager::ProcessManager;
+
 pub const SERVER_ADDRESS: &str = "127.0.0.1:13415";
 
 /// All the parameters of a command
@@ -47,5 +49,17 @@ pub enum Action {
 pub enum Query {
     Success,
     Failure { message: String },
-    Status,
+    Status { status: SwarmStatus },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ProcessStatus {
+    Started,
+    Stopped,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SwarmStatus {
+    pub processes: HashMap<String, ProcessStatus>,
 }

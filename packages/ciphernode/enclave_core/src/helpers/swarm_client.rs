@@ -1,7 +1,9 @@
-use anyhow::*;
+use anyhow::Result;
 use reqwest::Client;
 use std::env;
-use tracing::error;
+use tracing::{error, warn};
+
+use crate::helpers::termtable::print_table;
 
 use super::swarm::{spawn_process, Action, Query, SERVER_ADDRESS};
 
@@ -51,8 +53,24 @@ pub async fn restart(id: &str) -> Result<()> {
     Ok(())
 }
 
+pub async fn ps() -> Result<()> {
+    let rows: Vec<Vec<String>> = if let Ok(Query::Status { status }) = get_status().await {
+        status
+            .processes
+            .iter()
+            .map(|(k, v)| vec![k.to_string(), format!("{:?}", v)])
+            .collect()
+    } else {
+        vec![]
+    };
+
+    print_table(&vec!["PROCESS", "STATUS"], &rows);
+
+    Ok(())
+}
+
 pub async fn is_ready() -> Result<bool> {
-    let Query::Status = get_status().await? else {
+    let Ok(Query::Status { status: _ }) = get_status().await else {
         return Ok(false);
     };
 

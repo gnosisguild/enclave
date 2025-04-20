@@ -11,7 +11,9 @@ use tokio::{
 };
 use tracing::{error, info, warn};
 
-use super::swarm::{spawn_process, CommandMap, ProcessMap, ProcessRecord};
+use super::swarm::{
+    spawn_process, CommandMap, ProcessMap, ProcessRecord, ProcessStatus, SwarmStatus,
+};
 
 /// Forward stdout from child process to parent's stdout
 fn forward_stdout(id: &str, stdout: ChildStdout) -> JoinHandle<()> {
@@ -209,6 +211,25 @@ impl ProcessManager {
 
     pub async fn terminate(&self) {
         terminate_processes_and_exit(&self.processes).await;
+    }
+
+    pub async fn status(&self, id: &str) -> ProcessStatus {
+        let processes = self.processes.lock().await;
+        if processes.contains_key(id) {
+            ProcessStatus::Started
+        } else {
+            ProcessStatus::Stopped
+        }
+    }
+
+    pub async fn list(&self) -> SwarmStatus {
+        let mut processes = HashMap::new();
+
+        for id in self.commands.keys() {
+            processes.insert(id.to_string(), self.status(id).await);
+        }
+
+        SwarmStatus { processes }
     }
 }
 
