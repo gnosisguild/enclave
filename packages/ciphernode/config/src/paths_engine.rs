@@ -1,6 +1,6 @@
 use path_clean::clean;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PathsEngine {
@@ -25,6 +25,8 @@ pub struct PathsEngine {
     default_data_dir: PathBuf,
     /// Input from the OS as to where the default config dir is
     default_config_dir: PathBuf,
+    /// A reference to the cwd
+    cwd: PathBuf,
 }
 
 pub const DEFAULT_CONFIG_NAME: &str = "enclave.config.yaml";
@@ -38,6 +40,7 @@ pub const DEFAULT_DB_NAME: &str = "db";
 impl PathsEngine {
     pub fn new(
         name: &str,
+        cwd: &PathBuf,
         default_data_dir: &PathBuf,
         default_config_dir: &PathBuf,
         config_dir_override: Option<&PathBuf>,
@@ -48,6 +51,7 @@ impl PathsEngine {
     ) -> Self {
         Self {
             name: name.to_owned(),
+            cwd: PathBuf::from(cwd),
             default_data_dir: PathBuf::from(default_data_dir),
             default_config_dir: PathBuf::from(default_config_dir),
             config_dir_override: config_dir_override.map(PathBuf::from),
@@ -94,6 +98,20 @@ impl PathsEngine {
         }
 
         clean(self.get_data_dir().join(&self.name).join(DEFAULT_DB_NAME))
+    }
+
+    pub fn relative_to_config(&self, path: &PathBuf) -> PathBuf {
+        if path.is_absolute() {
+            return PathBuf::from(path);
+        }
+
+        let config_file = self.config_file();
+
+        // Most of the time the config_file will be in a folder
+        // In case it is not use the cwd
+        let relative_from = config_file.parent().unwrap_or(&self.cwd);
+
+        clean(PathBuf::from(relative_from).join(path))
     }
 
     fn get_config_dir(&self) -> PathBuf {
@@ -144,6 +162,7 @@ mod test {
 
     struct PathsInput {
         name: &'static str,
+        cwd: &'static str,
         default_data_dir: &'static str,
         default_config_dir: &'static str,
         config_dir_override: Option<&'static str>,
@@ -172,9 +191,11 @@ mod test {
             let data_dir_override = test_case.input.data_dir_override.map(PathBuf::from);
             let db_file = test_case.input.db_file_override.map(PathBuf::from);
             let key_file = test_case.input.key_file_override.map(PathBuf::from);
+            let cwd = PathBuf::from(test_case.input.cwd);
 
             let paths = PathsEngine::new(
                 test_case.input.name,
+                &cwd,
                 &default_data_dir,
                 &default_config_dir,
                 config_dir.as_ref(),
@@ -212,6 +233,7 @@ mod test {
                 name: "Defaults",
                 input: PathsInput {
                     name: "default",
+                    cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave",
                     default_config_dir: "/home/user/.config/enclave",
                     config_dir_override: None,
@@ -230,6 +252,7 @@ mod test {
                 name: "Config file found",
                 input: PathsInput {
                     name: "default",
+                    cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
                     config_dir_override: None,
@@ -248,6 +271,7 @@ mod test {
                 name: "Data dir override",
                 input: PathsInput {
                     name: "default",
+                    cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
                     config_dir_override: None,
@@ -266,6 +290,7 @@ mod test {
                 name: "Config dir override",
                 input: PathsInput {
                     name: "default",
+                    cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
                     config_dir_override: Some("/confy/stuff"),
@@ -283,6 +308,7 @@ mod test {
             TestCase {
                 name: "Key file override absolute",
                 input: PathsInput {
+                    cwd: "/no/matter",
                     name: "default",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
@@ -301,6 +327,7 @@ mod test {
             TestCase {
                 name: "Key file override relative",
                 input: PathsInput {
+                    cwd: "/no/matter",
                     name: "default",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
@@ -319,6 +346,7 @@ mod test {
             TestCase {
                 name: "Data file override absolute",
                 input: PathsInput {
+                    cwd: "/no/matter",
                     name: "default",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
@@ -338,6 +366,7 @@ mod test {
                 name: "Data file override relative",
                 input: PathsInput {
                     name: "default",
+                    cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
                     config_dir_override: Some("/confy/stuff"),

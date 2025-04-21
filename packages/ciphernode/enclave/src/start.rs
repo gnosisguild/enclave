@@ -20,7 +20,7 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
         NodeRole::Aggregator {
             pubkey_write_path,
             plaintext_write_path,
-        } => aggregator_start::execute(&config, &pubkey_write_path, &plaintext_write_path).await?,
+        } => aggregator_start::execute(&config, pubkey_write_path, plaintext_write_path).await?,
 
         // Launch in ciphernode configuration
         NodeRole::Ciphernode => start::execute(&config, address).await?,

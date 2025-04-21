@@ -26,8 +26,8 @@ use crate::yaml::load_yaml_with_env;
 pub enum NodeRole {
     /// Aggregator role
     Aggregator {
-        pubkey_write_path: PathBuf,
-        plaintext_write_path: PathBuf,
+        pubkey_write_path: Option<PathBuf>,
+        plaintext_write_path: Option<PathBuf>,
     },
     /// Ciphernode role
     Ciphernode,
@@ -104,12 +104,14 @@ impl AppConfig {
         config: UnscopedAppConfig,
         default_data_dir: &PathBuf,
         default_config_dir: &PathBuf,
+        cwd: &PathBuf,
     ) -> Result<Self> {
         let Some(node) = config.nodes.get(name) else {
             bail!("Could not find node definition for node '{}'. Did you forget to include it in your configuration?", name);
         };
         let paths = PathsEngine::new(
             name,
+            cwd,
             default_data_dir,
             default_config_dir,
             config.config_dir.as_ref(),
@@ -201,14 +203,12 @@ impl AppConfig {
             } => NodeRole::Aggregator {
                 // Normalize paths so that these paths are based on the config dir if they are
                 // relative
-                pubkey_write_path: normalize_path(relative_to(
-                    base_dir(self.config_file()),
-                    pubkey_write_path,
-                )),
-                plaintext_write_path: normalize_path(relative_to(
-                    base_dir(self.config_file()),
-                    plaintext_write_path,
-                )),
+                pubkey_write_path: pubkey_write_path
+                    .as_ref()
+                    .map(|p| self.paths.relative_to_config(p)),
+                plaintext_write_path: plaintext_write_path
+                    .as_ref()
+                    .map(|p| self.paths.relative_to_config(p)),
             },
             NodeRole::Ciphernode => NodeRole::Ciphernode,
         }
@@ -253,6 +253,7 @@ impl UnscopedAppConfig {
             self,
             &OsDirs::data_dir(),
             &OsDirs::config_dir(),
+            &env::current_dir()?,
         )?)
     }
     pub fn into_scoped_with_defaults(
@@ -260,12 +261,14 @@ impl UnscopedAppConfig {
         name: &str,
         default_data_dir: &PathBuf,
         default_config_dir: &PathBuf,
+        cwd: &PathBuf,
     ) -> Result<AppConfig> {
         Ok(AppConfig::try_from_unscoped(
             name,
             self,
             default_data_dir,
             default_config_dir,
+            cwd,
         )?)
     }
 }
@@ -397,6 +400,7 @@ nodes:
                     "default",
                     &PathBuf::from("/default/data"),
                     &PathBuf::from("/default/config"),
+                    &PathBuf::from("/my/cwd"),
                 )
                 .unwrap();
             assert_eq!(
@@ -418,6 +422,7 @@ nodes:
                     "ag",
                     &PathBuf::from("/default/data"),
                     &PathBuf::from("/default/config"),
+                    &PathBuf::from("/my/cwd"),
                 )
                 .unwrap();
             let chain = config.chains().first().unwrap();
@@ -438,8 +443,10 @@ nodes:
             assert_eq!(
                 config.role(),
                 NodeRole::Aggregator {
-                    pubkey_write_path: PathBuf::from("/default/config/output/pubkey.bin"),
-                    plaintext_write_path: PathBuf::from("/default/config/output/plaintext.txt")
+                    pubkey_write_path: Some(PathBuf::from("/default/config/output/pubkey.bin")),
+                    plaintext_write_path: Some(PathBuf::from(
+                        "/default/config/output/plaintext.txt"
+                    ))
                 }
             );
         };

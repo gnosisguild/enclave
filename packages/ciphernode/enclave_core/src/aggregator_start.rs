@@ -29,8 +29,8 @@ use crate::helpers::datastore::setup_datastore;
 
 pub async fn execute(
     config: &AppConfig,
-    pubkey_write_path: &PathBuf,
-    plaintext_write_path: &PathBuf,
+    pubkey_write_path: Option<PathBuf>,
+    plaintext_write_path: Option<PathBuf>,
 ) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
         capture_history: true,
@@ -96,8 +96,13 @@ pub async fn execute(
     )
     .await?;
 
-    PublicKeyWriter::attach(pubkey_write_path, bus.clone());
-    PlaintextWriter::attach(plaintext_write_path, bus.clone());
+    if let Some(path) = pubkey_write_path {
+        PublicKeyWriter::attach(&path, bus.clone());
+    }
+
+    if let Some(path) = plaintext_write_path {
+        PlaintextWriter::attach(&path, bus.clone());
+    }
 
     SimpleLogger::<EnclaveEvent>::attach(&config.name(), bus.clone());
 

@@ -1,11 +1,13 @@
-address: "${ADDRESS}"
-quic_port: ${QUIC_PORT}
-enable_mdns: false
-peers:
-  - "/dns4/cn1/udp/9091/quic-v1"
-  - "/dns4/cn1/udp/9092/quic-v1"
-  - "/dns4/cn1/udp/9093/quic-v1"
-  - "/dns4/cn1/udp/9094/quic-v1"
+nodes:
+  deafult:
+    address: "${ADDRESS}"
+    quic_port: ${QUIC_PORT}
+    enable_mdns: false
+    peers:
+      - "/dns4/cn1/udp/9091/quic-v1"
+      - "/dns4/cn1/udp/9092/quic-v1"
+      - "/dns4/cn1/udp/9093/quic-v1"
+      - "/dns4/cn1/udp/9094/quic-v1"
 chains:
   - name: "sepolia"
     rpc_url: "${RPC_URL}"
