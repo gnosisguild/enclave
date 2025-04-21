@@ -7,8 +7,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PLAINTEXT="1234,567890"
 ID=$(date +%s)
 
-if [[ "$ROOT_DIR" != "$(pwd)" ]]; then 
-  echo "This script must be run from the root"
+if [[ "$SCRIPT_DIR" != "$(pwd)" ]]; then 
+  echo "This script must be run from the test folder"
   exit 1
 fi
 
@@ -38,7 +38,7 @@ NETWORK_PRIVATE_KEY_2="0x21a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85f
 NETWORK_PRIVATE_KEY_3="0x31a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 NETWORK_PRIVATE_KEY_4="0x41a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 
-ENCLAVE_BIN=./packages/ciphernode/target/debug/enclave
+ENCLAVE_BIN=$ROOT_DIR/packages/ciphernode/target/debug/enclave
 
 # Function to clean up background processes
 cleanup() {

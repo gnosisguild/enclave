@@ -32,13 +32,13 @@ pub fn validate_eth_address(address: &String) -> Result<()> {
 
 #[instrument(name = "app", skip_all)]
 pub async fn execute(rpc_url: String, eth_address: Option<String>) -> Result<AppConfig> {
-    let config_dir = dirs::home_dir()
+    let config_dir = dirs::config_dir()
         .ok_or_else(|| anyhow!("Could not determine home directory"))?
-        .join(".config")
         .join("enclave");
+
     fs::create_dir_all(&config_dir)?;
 
-    let config_path = config_dir.join("config.yaml");
+    let config_path = config_dir.join("enclave.config.yaml");
 
     let config_content = format!(
         r#"---
@@ -74,7 +74,7 @@ chains:
     fs::write(config_path.clone(), config_content)?;
 
     // Load with default location
-    let config = load_config("default", Some(config_path.display().to_string()))?;
+    let config = load_config("default", Some(config_path.display().to_string()), None)?;
 
     Ok(config)
 }

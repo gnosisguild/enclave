@@ -1,5 +1,8 @@
 use path_clean::clean;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PathsEngine {
     name: String,
     /// Config dir override. This allows us to set specific config_dir location in the config file
@@ -23,16 +26,17 @@ pub struct PathsEngine {
     /// Input from the OS as to where the default config dir is
     default_config_dir: PathBuf,
 }
-const DEFAULT_CONFIG_NAME: &str = "enclave.config.yaml";
-const DEFAULT_KEY_NAME: &str = "key";
-const DEFAULT_DB_NAME: &str = "db";
+
+pub const DEFAULT_CONFIG_NAME: &str = "enclave.config.yaml";
+pub const DEFAULT_KEY_NAME: &str = "key";
+pub const DEFAULT_DB_NAME: &str = "db";
 
 // Find the config file is specified anywhere upstream from cwd and if found then locate the
 // data and config folders under .enclave/data and .enclave/config relative to the location of
 // the config file. Otherwise locate config in the default app configuration folder and data in
 // the default app data folder.
 impl PathsEngine {
-    fn new(
+    pub fn new(
         name: &str,
         default_data_dir: &PathBuf,
         default_config_dir: &PathBuf,
@@ -128,8 +132,6 @@ impl PathsEngine {
 #[cfg(test)]
 mod test {
     use std::path::PathBuf;
-
-    use path_clean::clean;
 
     use super::PathsEngine;
 

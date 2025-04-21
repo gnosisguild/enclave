@@ -9,7 +9,7 @@ use crate::{net, swarm};
 use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
-use config::{load_config_from_overrides, AppConfig, CliOverrides};
+use config::{load_config_from_overrides, AppConfig};
 use tracing::Level;
 
 #[derive(Parser, Debug)]
@@ -102,13 +102,16 @@ impl Cli {
     }
 
     pub fn load_config(&self) -> Result<AppConfig> {
-        load_config_from_overrides(
+        let config = load_config_from_overrides(
             &self.name(),
-            CliOverrides {
-                config: self.config.clone(),
-                otel: self.otel.clone().map(Into::into),
-            },
-        )
+            self.config.clone(),
+            self.otel.clone().map(Into::into),
+        )?;
+        // println!("config cli:{:?}", self.config.clone());
+        // println!("config_file: {:?}", config.config_file());
+        // println!("db_file: {:?}", config.db_file());
+        // println!("key_file: {:?}", config.key_file());
+        Ok(config)
     }
 
     pub fn name(&self) -> String {
