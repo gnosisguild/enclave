@@ -64,6 +64,7 @@ opentelemetry = { version = "0.29.1" }
 opentelemetry-otlp = { version = "0.29.0", features = ["grpc-tonic"] }
 opentelemetry_sdk = "0.29.0"
 opentelemetry-stdout = "0.29.0"
+path-clean = "1.0.1"
 petname = "2.0.2"
 phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"

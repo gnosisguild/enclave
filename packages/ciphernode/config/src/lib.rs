@@ -2,6 +2,7 @@ mod app_config;
 pub mod chain_config;
 pub mod contract;
 pub mod normalize_path;
+mod paths;
 pub mod rpc;
 mod store_keys;
 pub mod validation;
