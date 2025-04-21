@@ -117,8 +117,6 @@ impl AppConfig {
             Some(&node.db_file),
             Some(&node.key_file),
         );
-        // println!("{:#?}", node);
-        // println!("{:#?}", paths);
         Ok(AppConfig {
             name: name.to_owned(),
             nodes: config.nodes,
@@ -277,43 +275,33 @@ struct CliOverrides {
 }
 
 /// Load the config at the config_file or the default location if not provided
-pub fn load_config_from_overrides(
+pub fn load_config(
     name: &str,
     found_config_file: Option<String>,
     otel: Option<String>,
 ) -> Result<AppConfig> {
-    let default_config_dir = OsDirs::config_dir();
-    let default_filename = DEFAULT_CONFIG_NAME;
     let found_config_file = found_config_file.map(PathBuf::from);
 
-    let defaults = UnscopedAppConfig::default();
-    let mut overrides = CliOverrides {
-        otel: otel.clone(),
-        found_config_file: found_config_file.clone(),
-    };
-    overrides.otel = otel;
-    let cwd = env::current_dir()?;
-
-    let resolved_config = resolve_config_path(
-        find_in_parent,
-        cwd,
-        default_config_dir,
-        default_filename,
-        found_config_file,
+    let resolved_config_path = resolve_config_path(
+        find_in_parent,            // finding strategy
+        env::current_dir()?,       // cwd
+        OsDirs::config_dir(),      // default config folder
+        DEFAULT_CONFIG_NAME,       // hardcoded now to enclave.config.yaml
+        found_config_file.clone(), // config file we have found to exist
     );
 
-    let with_envs = load_yaml_with_env(&resolved_config)?;
+    let loaded_yaml = load_yaml_with_env(&resolved_config_path)?;
 
-    let config: UnscopedAppConfig = Figment::from(Serialized::defaults(&defaults))
-        .merge(Yaml::string(&with_envs))
-        .merge(Serialized::defaults(&overrides))
-        .extract()?;
+    let config: UnscopedAppConfig =
+        Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
+            .merge(Yaml::string(&loaded_yaml))
+            .merge(Serialized::defaults(&CliOverrides {
+                otel,
+                found_config_file,
+            }))
+            .extract()?;
 
     Ok(config.into_scoped(name)?)
-}
-
-pub fn load_config(name: &str, config: Option<String>, otel: Option<String>) -> Result<AppConfig> {
-    load_config_from_overrides(name, config, otel)
 }
 
 pub struct OsDirs;
