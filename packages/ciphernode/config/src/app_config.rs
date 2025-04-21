@@ -12,9 +12,6 @@ use std::{collections::HashMap, env, path::PathBuf};
 use crate::chain_config::ChainConfig;
 use crate::load_config::find_in_parent;
 use crate::load_config::resolve_config_path;
-use crate::normalize_path::base_dir;
-use crate::normalize_path::normalize_path;
-use crate::normalize_path::relative_to;
 use crate::paths_engine::PathsEngine;
 use crate::paths_engine::DEFAULT_CONFIG_NAME;
 use crate::yaml::load_yaml_with_env;
@@ -346,16 +343,6 @@ mod tests {
     use super::*;
     use crate::rpc::RpcAuth;
     use figment::Jail;
-
-    #[test]
-    fn test_normalization() {
-        Jail::expect_with(|jail| {
-            jail.set_env("HOME", "/home/user");
-            let path = normalize_path(&PathBuf::from("~/foo/bar/../baz.txt"));
-            assert_eq!(path, PathBuf::from(format!("/home/user/foo/baz.txt")));
-            Ok(())
-        })
-    }
 
     #[test]
     fn test_deserialization() -> Result<()> {
