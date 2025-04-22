@@ -12,6 +12,7 @@ contract MockE3Program is IE3Program {
     address private constant DO_NOT_OVERRIDE =
         0x9999999999999999999999999999999999999999;
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
+    uint8 public constant INPUT_LIMIT = 100;
 
     IEnclavePolicyFactory private immutable POLICY_FACTORY;
     address private immutable ENCLAVE_CHECKER;
@@ -39,7 +40,6 @@ contract MockE3Program is IE3Program {
     function validate(
         uint256,
         uint256,
-        uint8 inputLimit,
         bytes memory e3ProgramParams,
         bytes memory computeProviderParams
     )
@@ -53,7 +53,7 @@ contract MockE3Program is IE3Program {
 
         if (overrideInputValidator == DO_NOT_OVERRIDE) {
             inputValidator = IEnclavePolicy(
-                POLICY_FACTORY.deploy(ENCLAVE_CHECKER, inputLimit)
+                POLICY_FACTORY.deploy(ENCLAVE_CHECKER, INPUT_LIMIT)
             );
             inputValidator.setTarget(msg.sender);
         } else {
