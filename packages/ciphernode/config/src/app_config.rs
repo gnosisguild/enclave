@@ -8,6 +8,8 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::{collections::HashMap, env, path::PathBuf};
+use tracing::info;
+use tracing::instrument;
 
 use crate::chain_config::ChainConfig;
 use crate::load_config::find_in_parent;
@@ -275,6 +277,7 @@ struct CliOverrides {
 }
 
 /// Load the config at the config_file or the default location if not provided
+#[instrument(skip_all)]
 pub fn load_config(
     name: &str,
     found_config_file: Option<String>,
@@ -290,6 +293,7 @@ pub fn load_config(
         found_config_file.clone(), // config file we have found to exist
     );
 
+    info!("RESOLVED CONFIG: {:?}", resolved_config_path);
     let loaded_yaml = load_yaml_with_env(&resolved_config_path)?;
 
     let config: UnscopedAppConfig =

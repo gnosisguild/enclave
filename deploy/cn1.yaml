@@ -1,5 +1,5 @@
 nodes:
-  deafult:
+  default:
     address: "${ADDRESS}"
     quic_port: ${QUIC_PORT}
     enable_mdns: false
