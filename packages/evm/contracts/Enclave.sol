@@ -153,12 +153,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
         (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator) = e3Program
-            .validate(
-                e3Id,
-                seed,
-                e3ProgramParams,
-                computeProviderParams
-            );
+            .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
         ];
