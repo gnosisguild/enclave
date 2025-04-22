@@ -1,13 +1,11 @@
-use actix::Actor;
 use alloy::primitives::hex;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use config::AppConfig;
 use crypto::Cipher;
-use events::{EnclaveEvent, EventBus, EventBusConfig, GetErrors};
 use libp2p::identity::Keypair;
 use net::NetRepositoryFactory;
 
-use crate::helpers::datastore::get_repositories;
+use crate::helpers::{crypto::generate_random_bytes, repository::get_static_repositories};
 
 fn create_keypair(input: &String) -> Result<Keypair> {
     hex::check(&input)?;
@@ -25,18 +23,22 @@ pub async fn execute(config: &AppConfig, value: String) -> Result<()> {
     let cipher = Cipher::from_config(config).await?;
     let encrypted = cipher.encrypt_data(&mut secret)?;
 
-    // TODO: Tighten this up by removing external use of bus as it is confusing
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
-        capture_history: true,
-        deduplicate: true,
-    })
-    .start();
-    let repositories = get_repositories(&config, &bus)?;
-    repositories.libp2p_keypair().write(&encrypted);
+    println!("before before");
+    let repositories = get_static_repositories(&config)?;
+    repositories.libp2p_keypair().write_sync(&encrypted).await?;
 
-    if let Some(error) = bus.send(GetErrors::<EnclaveEvent>::new()).await?.first() {
-        return Err(anyhow!(error.clone()));
+    println!("data written");
+    Ok(())
+}
+
+pub async fn autonet(config: &AppConfig) -> Result<()> {
+    let private_key = generate_random_bytes(32);
+    let hex_string = format!("0x{}", hex::encode(private_key));
+    let repositories = get_static_repositories(&config)?;
+    println!("autonet trying to check for data...");
+    if !repositories.libp2p_keypair().has().await {
+        println!("data does not exist! writing...");
+        execute(config, hex_string).await?
     }
-
     Ok(())
 }

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{Get, Insert, Remove};
+use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventBusConfig, Subscribe};
@@ -18,8 +18,10 @@ impl Actor for SledStore {
 
 impl SledStore {
     pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, path: &PathBuf) -> Result<Addr<Self>> {
+        println!("START  SLED");
         info!("Starting SledStore");
         let db = SledDb::new(path)?;
+        println!("FATER  SLED");
 
         let store = Self {
             db: Some(db),
@@ -54,6 +56,17 @@ impl Handler<Insert> for SledStore {
                 _ => (),
             }
         }
+    }
+}
+
+impl Handler<InsertSync> for SledStore {
+    type Result = Result<()>;
+    fn handle(&mut self, event: InsertSync, _: &mut Self::Context) -> Self::Result {
+        if let Some(ref mut db) = &mut self.db {
+            db.insert_sync(event)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -115,6 +128,14 @@ impl SledDb {
     }
 
     pub fn insert(&mut self, msg: Insert) -> Result<()> {
+        self.db
+            .insert(msg.key(), msg.value().to_vec())
+            .context("Could not insert data into db")?;
+
+        Ok(())
+    }
+
+    pub fn insert_sync(&mut self, msg: InsertSync) -> Result<()> {
         self.db
             .insert(msg.key(), msg.value().to_vec())
             .context("Could not insert data into db")?;

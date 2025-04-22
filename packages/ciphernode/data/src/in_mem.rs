@@ -1,7 +1,7 @@
+use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, Context, Handler, Message};
+use anyhow::Result;
 use std::collections::BTreeMap;
-
-use crate::{Get, Insert, Remove};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Vec<DataOp>")]
@@ -36,7 +36,6 @@ impl InMemStore {
 impl Handler<Insert> for InMemStore {
     type Result = ();
     fn handle(&mut self, event: Insert, _: &mut Self::Context) {
-        // insert data into sled
         self.db.insert(event.key().to_vec(), event.value().to_vec());
 
         if self.capture {
@@ -45,10 +44,18 @@ impl Handler<Insert> for InMemStore {
     }
 }
 
+impl Handler<InsertSync> for InMemStore {
+    type Result = Result<()>;
+    fn handle(&mut self, event: InsertSync, _: &mut Self::Context) -> Self::Result {
+        self.db.insert(event.key().to_vec(), event.value().to_vec());
+
+        Ok(())
+    }
+}
+
 impl Handler<Remove> for InMemStore {
     type Result = ();
     fn handle(&mut self, event: Remove, _: &mut Self::Context) {
-        // insert data into sled
         self.db.remove(&event.key().to_vec());
 
         if self.capture {

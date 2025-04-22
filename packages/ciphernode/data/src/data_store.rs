@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{InMemStore, IntoKey, SledStore};
 use actix::{Addr, Message, Recipient};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -10,6 +10,23 @@ use tracing::error;
 #[rtype(result = "()")]
 pub struct Insert(pub Vec<u8>, pub Vec<u8>);
 impl Insert {
+    pub fn new<K: IntoKey>(key: K, value: Vec<u8>) -> Self {
+        Self(key.into_key(), value)
+    }
+
+    pub fn key(&self) -> &Vec<u8> {
+        &self.0
+    }
+
+    pub fn value(&self) -> &Vec<u8> {
+        &self.1
+    }
+}
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
+#[rtype(result = "Result<()>")]
+pub struct InsertSync(pub Vec<u8>, pub Vec<u8>);
+impl InsertSync {
     pub fn new<K: IntoKey>(key: K, value: Vec<u8>) -> Self {
         Self(key.into_key(), value)
     }
@@ -56,6 +73,7 @@ pub struct DataStore {
     scope: Vec<u8>,
     get: Recipient<Get>,
     insert: Recipient<Insert>,
+    insert_sync: Recipient<InsertSync>,
     remove: Recipient<Remove>,
 }
 
@@ -87,6 +105,17 @@ impl DataStore {
         };
         let msg = Insert::new(&self.scope, serialized);
         self.insert.do_send(msg)
+    }
+
+    /// Writes data to the scope location
+    pub async fn write_sync<T: Serialize>(&self, value: T) -> Result<()> {
+        let serialized = bincode::serialize(&value)?;
+        let msg = InsertSync::new(&self.scope, serialized);
+        self.insert_sync
+            .send(msg)
+            .await
+            .context("error sending write sync")??;
+        Ok(())
     }
 
     /// Removes data from the scope location
@@ -128,6 +157,7 @@ impl DataStore {
         Self {
             get: self.get.clone(),
             insert: self.insert.clone(),
+            insert_sync: self.insert_sync.clone(),
             remove: self.remove.clone(),
             scope,
         }
@@ -137,6 +167,7 @@ impl DataStore {
         Self {
             get: self.get.clone(),
             insert: self.insert.clone(),
+            insert_sync: self.insert_sync.clone(),
             remove: self.remove.clone(),
             scope: key.into_key(),
         }
@@ -148,6 +179,7 @@ impl From<&Addr<SledStore>> for DataStore {
         Self {
             get: addr.clone().recipient(),
             insert: addr.clone().recipient(),
+            insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
         }
@@ -159,6 +191,7 @@ impl From<&Addr<InMemStore>> for DataStore {
         Self {
             get: addr.clone().recipient(),
             insert: addr.clone().recipient(),
+            insert_sync: addr.clone().recipient(),
             remove: addr.clone().recipient(),
             scope: vec![],
         }

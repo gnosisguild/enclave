@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, ops::Deref};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::DataStore;
 
@@ -58,7 +58,17 @@ where
         self.store.write(value)
     }
 
+    pub async fn write_sync(&self, value: &T) -> Result<()> {
+        self.store.write_sync(value).await?;
+        Ok(())
+    }
+
     pub fn clear(&self) {
         self.store.write::<Option<T>>(None)
+    }
+
+    pub async fn clear_sync(&self) -> Result<()> {
+        self.store.write_sync::<Option<T>>(None).await?;
+        Ok(())
     }
 }

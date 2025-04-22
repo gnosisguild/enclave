@@ -60,6 +60,12 @@ pub struct NodeDefinition {
     /// The node role eg. "ciphernode" or "aggregator"
     #[serde(default)]
     pub role: NodeRole,
+    /// Automatically generate a password for this node if it does not exist
+    pub autopass: bool,
+    /// Automatically generate a net-key for this node if it does not exist
+    pub autonet: bool,
+    /// Automatically generate a wallet for this node it it does not exist
+    pub autowallet: bool,
 }
 
 impl Default for NodeDefinition {
@@ -74,6 +80,9 @@ impl Default for NodeDefinition {
             config_dir: OsDirs::config_dir(), // ~/.config/enclave
             data_dir: OsDirs::data_dir(),     // ~/.config/enclave
             role: NodeRole::Ciphernode,
+            autopass: false,
+            autonet: false,
+            autowallet: false,
         }
     }
 }
@@ -207,6 +216,18 @@ impl AppConfig {
             },
             NodeRole::Ciphernode => NodeRole::Ciphernode,
         }
+    }
+
+    pub fn autopass(&self) -> bool {
+        self.node_def().autopass
+    }
+
+    pub fn autowallet(&self) -> bool {
+        self.node_def().autowallet
+    }
+
+    pub fn autonet(&self) -> bool {
+        self.node_def().autonet
     }
 }
 

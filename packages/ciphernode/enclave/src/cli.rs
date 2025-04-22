@@ -70,6 +70,22 @@ impl Cli {
         let config = self.load_config()?;
         setup_tracing(&config, self.log_level())?;
 
+        // Ensure autoflags are run
+        println!("AUTOPASS");
+        if config.autopass() {
+            enclave_core::password_create::autopass(&config).await?;
+        }
+
+        println!("net");
+        if config.autonet() {
+            enclave_core::net_set::autonet(&config).await?;
+        }
+
+        println!("WASLLER");
+        if config.autowallet() {
+            enclave_core::wallet_set::autowallet(&config).await?;
+        }
+
         match self.command {
             Commands::Start { peers } => start::execute(config, peers).await?,
             Commands::Init {

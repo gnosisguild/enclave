@@ -21,10 +21,12 @@ dirs = { workspace = true }
 events = { workspace = true }
 evm = { workspace = true }
 fhe = { workspace = true }
+hex = { workspace = true }
 keyshare = { workspace = true }
 logger = { workspace = true }
 libp2p = { workspace = true }
 net = { workspace = true }
+once_cell = { workspace = true }
 phf = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }

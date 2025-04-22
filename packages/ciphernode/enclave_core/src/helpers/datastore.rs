@@ -19,6 +19,7 @@ pub fn setup_datastore(
     config: &AppConfig,
     bus: &Addr<EventBus<EnclaveEvent>>,
 ) -> Result<DataStore> {
+    println!("setup_datastpre");
     let store: DataStore = if !config.use_in_mem_store() {
         get_sled_store(&bus, &config.db_file())?
     } else {

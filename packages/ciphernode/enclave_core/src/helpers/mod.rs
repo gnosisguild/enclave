@@ -1,4 +1,6 @@
+pub mod crypto;
 pub mod datastore;
+pub mod repository;
 pub mod shutdown;
 pub mod swarm;
 pub mod swarm_client;
