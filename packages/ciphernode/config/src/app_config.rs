@@ -277,7 +277,6 @@ struct CliOverrides {
 }
 
 /// Load the config at the config_file or the default location if not provided
-#[instrument(skip_all)]
 pub fn load_config(
     name: &str,
     found_config_file: Option<String>,
@@ -293,7 +292,6 @@ pub fn load_config(
         found_config_file.clone(), // config file we have found to exist
     );
 
-    info!("RESOLVED CONFIG: {:?}", resolved_config_path);
     let loaded_yaml = load_yaml_with_env(&resolved_config_path)?;
 
     let config: UnscopedAppConfig =
@@ -301,7 +299,7 @@ pub fn load_config(
             .merge(Yaml::string(&loaded_yaml))
             .merge(Serialized::defaults(&CliOverrides {
                 otel,
-                found_config_file,
+                found_config_file: Some(resolved_config_path),
             }))
             .extract()?;
 

@@ -10,7 +10,7 @@ use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
 use config::{load_config, AppConfig};
-use tracing::{instrument, Level};
+use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
 #[command(name = "enclave")]
@@ -71,6 +71,7 @@ impl Cli {
         let config = self.load_config()?;
         setup_tracing(&config, self.log_level())?;
 
+        info!("Config loaded from: {:?}", config.config_file());
         match self.command {
             Commands::Start { peers } => start::execute(config, peers).await?,
             Commands::Init {
@@ -102,7 +103,6 @@ impl Cli {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     pub fn load_config(&self) -> Result<AppConfig> {
         let config = load_config(
             &self.name(),
