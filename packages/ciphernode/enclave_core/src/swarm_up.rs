@@ -6,7 +6,7 @@ use tracing::instrument;
 #[instrument(skip_all)]
 pub async fn execute(
     config: &AppConfig,
-    detatch: bool, // TBI
+    detach: bool, // TBI
     exclude: Vec<String>,
     verbose: u8,
     maybe_config_string: Option<String>,
@@ -15,7 +15,7 @@ pub async fn execute(
         bail!("Swarm is already running!");
     }
 
-    if detatch {
+    if detach {
         swarm_client::start_daemon(verbose, &maybe_config_string, &exclude).await?;
         return Ok(());
     }

@@ -12,7 +12,7 @@ pub enum SwarmCommands {
     Up {
         /// Detached mode: Run nodes in the background
         #[arg(short, long)]
-        detatch: bool,
+        detach: bool,
 
         /// Exclude nodes by name
         #[arg(short, long, value_delimiter = ',')]
@@ -67,8 +67,8 @@ pub async fn execute(
     config_string: Option<String>,
 ) -> Result<()> {
     match command {
-        SwarmCommands::Up { detatch, exclude } => {
-            swarm_up::execute(config, detatch, exclude, verbose, config_string).await?
+        SwarmCommands::Up { detach, exclude } => {
+            swarm_up::execute(config, detach, exclude, verbose, config_string).await?
         }
         SwarmCommands::Down => swarm_down::execute().await?,
         SwarmCommands::Ps => swarm_ps::execute().await?,
