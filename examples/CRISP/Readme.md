@@ -26,7 +26,6 @@ CRISP
 ├── deploy - Deployment scripts
 ├── docker-compose.yaml
 └── scripts
-    ├── local_dev - Scripts for local development
     └── tasks - Scripts for tasks to be run inside the docker container
 ```
 
