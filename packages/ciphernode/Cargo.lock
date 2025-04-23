@@ -2141,8 +2141,10 @@ dependencies = [
  "async-trait",
  "bincode",
  "events",
+ "once_cell",
  "serde",
  "sled",
+ "tempfile",
  "tracing",
 ]
 
