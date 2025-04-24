@@ -19,4 +19,4 @@ alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }
-lazy_static = { workspace = true }
+once_cell = { workspace = true }

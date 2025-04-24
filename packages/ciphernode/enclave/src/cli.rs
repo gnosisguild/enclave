@@ -10,6 +10,7 @@ use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
 use config::{load_config, AppConfig};
+use enclave_core::helpers::datastore::close_all_connections;
 use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
@@ -99,6 +100,8 @@ impl Cli {
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
         }
+
+        close_all_connections();
 
         Ok(())
     }

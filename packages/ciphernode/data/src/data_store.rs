@@ -116,14 +116,14 @@ impl DataStore {
     }
 
     /// Writes data syncronously to the scope location
-    pub fn write_sync<T: Serialize>(&self, value: T) -> Result<()> {
+    pub async fn write_sync<T: Serialize>(&self, value: T) -> Result<()> {
         let serialized = bincode::serialize(&value).with_context(|| {
             let str_key = self.get_scope().unwrap_or(Cow::Borrowed("<bad key>"));
             anyhow!("Could not serialize value passed to {}", str_key)
         })?;
 
         let msg = InsertSync::new(&self.scope, serialized);
-        self.insert_sync.try_send(msg)?;
+        self.insert_sync.send(msg).await??;
         Ok(())
     }
 

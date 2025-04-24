@@ -1,7 +1,10 @@
 use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
-use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventBusConfig, Subscribe};
+use events::{
+    get_enclave_event_bus, BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventBusConfig,
+    Subscribe,
+};
 use once_cell::sync::Lazy;
 use sled::Db;
 use std::{
@@ -22,7 +25,7 @@ impl Actor for SledStore {
 
 impl SledStore {
     pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, path: &PathBuf) -> Result<Addr<Self>> {
-        info!("Starting SledStore");
+        info!("Starting SledStore with {:?}", path);
         let db = SledDb::new(PathBuf::from(path))?;
 
         let store = Self {
@@ -39,11 +42,7 @@ impl SledStore {
     pub fn from_db(db: SledDb) -> Result<Self> {
         Ok(Self {
             db: Some(db),
-            bus: EventBus::<EnclaveEvent>::new(EventBusConfig {
-                capture_history: false,
-                deduplicate: true,
-            })
-            .start(),
+            bus: get_enclave_event_bus(),
         })
     }
 }
@@ -136,6 +135,11 @@ fn set_cached_db(path: PathBuf, db: Db) {
     cache_lock.insert(key, db);
 }
 
+fn clear_all_caches() {
+    let mut cache_lock = SLED_CACHE.lock().unwrap();
+    cache_lock.clear();
+}
+
 impl SledDb {
     pub fn new(path: PathBuf) -> Result<Self> {
         let maybe_db = get_cached_db(&path);
@@ -149,8 +153,14 @@ impl SledDb {
                 path.to_string_lossy()
             )
         })?;
+        if !db.was_recovered() {
+            info!("created db at: {:?}", &path);
+        } else {
+            info!("recovered db st: {:?}", &path);
+        }
 
         set_cached_db(path, db.clone());
+
         Ok(Self { db })
     }
 
@@ -178,6 +188,10 @@ impl SledDb {
             .context(format!("Failed to fetch {}", str_key))?;
 
         Ok(res.map(|v| v.to_vec()))
+    }
+
+    pub fn close_all_connections() {
+        clear_all_caches()
     }
 }
 

@@ -5,7 +5,8 @@ use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
-use events::{EnclaveEvent, EventBus, EventBusConfig};
+use events::get_enclave_event_bus;
+use events::{EnclaveEvent, EventBus};
 use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
@@ -31,11 +32,8 @@ pub async fn execute(
     address: Address,
 ) -> Result<(Addr<EventBus<EnclaveEvent>>, JoinHandle<Result<()>>, String)> {
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
-        capture_history: true,
-        deduplicate: true,
-    })
-    .start();
+
+    let bus = get_enclave_event_bus();
     let cipher = Arc::new(Cipher::from_config(&config).await?);
     let store = setup_datastore(&config, &bus)?;
 

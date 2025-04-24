@@ -2606,7 +2606,7 @@ dependencies = [
  "bincode",
  "bs58",
  "futures-util",
- "lazy_static",
+ "once_cell",
  "serde",
  "sha2",
 ]
