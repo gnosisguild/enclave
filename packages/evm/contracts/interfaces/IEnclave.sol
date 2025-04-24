@@ -103,7 +103,6 @@ interface IEnclave {
         uint32[2] calldata threshold,
         uint256[2] calldata startWindow,
         uint256 duration,
-        uint8 inputLimit,
         IE3Program e3Program,
         bytes memory e3ProgramParams,
         bytes memory computeProviderParams

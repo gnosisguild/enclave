@@ -72,7 +72,6 @@ contract CRISPRisc0 is IE3Program, Ownable {
     function validate(
         uint256 e3Id,
         uint256,
-        uint8 inputLimit,
         bytes calldata e3ProgramParams,
         bytes calldata
     ) external returns (bytes32, IEnclavePolicy) {
