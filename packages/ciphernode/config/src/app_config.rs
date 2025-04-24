@@ -71,10 +71,10 @@ impl Default for NodeDefinition {
             address: None,
             quic_port: 9091,
             enable_mdns: false,
-            key_file: PathBuf::from("key"),   // ~/.config/enclave/key
-            db_file: PathBuf::from("db"),     // ~/.config/enclave/db
-            config_dir: OsDirs::config_dir(), // ~/.config/enclave
-            data_dir: OsDirs::data_dir(),     // ~/.config/enclave
+            key_file: PathBuf::from("key"), // ~/.config/enclave/key
+            db_file: PathBuf::from("db"),   // ~/.config/enclave/db
+            config_dir: std::path::PathBuf::new(), // ~/.config/enclave
+            data_dir: std::path::PathBuf::new(), // ~/.config/enclave
             role: NodeRole::Ciphernode,
         }
     }
@@ -108,14 +108,23 @@ impl AppConfig {
         let Some(node) = config.nodes.get(name) else {
             bail!("Could not find node definition for node '{}'. Did you forget to include it in your configuration?", name);
         };
+
+        let config_dir_override = (node.config_dir != std::path::PathBuf::new())
+            .then_some(&node.config_dir)
+            .or_else(|| config.config_dir.as_ref());
+
+        let data_dir_override = (node.data_dir != std::path::PathBuf::new())
+            .then_some(&node.data_dir)
+            .or_else(|| config.data_dir.as_ref());
+
         let paths = PathsEngine::new(
             name,
             cwd,
             default_data_dir,
             default_config_dir,
-            config.config_dir.as_ref(),
             config.found_config_file.as_ref(),
-            config.data_dir.as_ref(),
+            config_dir_override,
+            data_dir_override,
             Some(&node.db_file),
             Some(&node.key_file),
         );
@@ -357,6 +366,7 @@ chains:
       filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 nodes:
   default:
+    config_dir: "/myconfig/override"
     db_file: "./foo"
     quic_port: 1234
 
@@ -388,7 +398,7 @@ nodes:
             );
             assert_eq!(
                 config.key_file(),
-                PathBuf::from("/myconfig/enclave/default/key")
+                PathBuf::from("/myconfig/override/default/key")
             );
             assert_eq!(config.quic_port(), 1234);
             assert!(config.peers().is_empty());
