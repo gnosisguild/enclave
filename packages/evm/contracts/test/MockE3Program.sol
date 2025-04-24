@@ -15,7 +15,7 @@ contract MockE3Program is IE3Program {
 
     IEnclavePolicyFactory private immutable POLICY_FACTORY;
     address private immutable ENCLAVE_CHECKER;
-    uint8 public INPUT_LIMIT;
+    uint8 public inputLimit;
 
     // NOTE: this is primarily for testing
     address private overrideInputValidator = DO_NOT_OVERRIDE;
@@ -34,7 +34,7 @@ contract MockE3Program is IE3Program {
         }
         POLICY_FACTORY = _policyFactory;
         ENCLAVE_CHECKER = _enclaveChecker;
-        INPUT_LIMIT = _inputLimit;
+        inputLimit = _inputLimit;
     }
 
     // NOTE: This function is for testing only
@@ -58,7 +58,7 @@ contract MockE3Program is IE3Program {
 
         if (overrideInputValidator == DO_NOT_OVERRIDE) {
             inputValidator = IEnclavePolicy(
-                POLICY_FACTORY.deploy(ENCLAVE_CHECKER, INPUT_LIMIT)
+                POLICY_FACTORY.deploy(ENCLAVE_CHECKER, inputLimit)
             );
             inputValidator.setTarget(msg.sender);
         } else {
