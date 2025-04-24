@@ -102,6 +102,10 @@ impl AppConfig {
     ) -> Result<Self> {
         let mut config = config;
 
+        if config.nodes.contains_key("_default") {
+            bail!("Cannot use the `_default` node profile name as it is a reserved node name. In order to configure the _default profile use the `node` key in your yaml configuration.");
+        }
+
         // Deliberately clobber default
         config.nodes.insert("_default".to_string(), config.node);
 
