@@ -1,4 +1,4 @@
-use crate::{Get, Insert, Remove};
+use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventBusConfig, Subscribe};
@@ -58,6 +58,18 @@ impl Handler<Insert> for SledStore {
                 _ => (),
             }
         }
+    }
+}
+
+impl Handler<InsertSync> for SledStore {
+    type Result = Result<()>;
+
+    fn handle(&mut self, event: InsertSync, _: &mut Self::Context) -> Self::Result {
+        if let Some(ref mut db) = &mut self.db {
+            db.insert(event.into())
+                .map_err(|e| anyhow::anyhow!("{}", e.to_string()))?
+        }
+        Ok(())
     }
 }
 
