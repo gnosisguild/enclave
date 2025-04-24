@@ -2,7 +2,7 @@ use crate::helpers::telemetry::setup_tracing;
 use crate::net::NetCommands;
 use crate::password::PasswordCommands;
 use crate::start;
-use crate::swarm::SwarmCommands;
+use crate::swarm::NodeCommands;
 use crate::wallet::WalletCommands;
 use crate::{init, password, wallet};
 use crate::{net, swarm};
@@ -92,7 +92,7 @@ impl Cli {
                 )
                 .await?
             }
-            Commands::Swarm { command } => {
+            Commands::Nodes { command } => {
                 swarm::execute(command, &config, self.verbose, self.config).await?
             }
             Commands::Password { command } => password::execute(command, &config).await?,
@@ -177,8 +177,8 @@ pub enum Commands {
     },
 
     /// Manage multiple node processes together as a set
-    Swarm {
+    Nodes {
         #[command(subcommand)]
-        command: SwarmCommands,
+        command: NodeCommands,
     },
 }

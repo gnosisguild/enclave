@@ -7,7 +7,7 @@ use clap::Subcommand;
 use config::AppConfig;
 
 #[derive(Subcommand, Debug)]
-pub enum SwarmCommands {
+pub enum NodeCommands {
     /// Launch all nodes
     Up {
         /// Detached mode: Run nodes in the background
@@ -61,24 +61,24 @@ pub enum SwarmCommands {
 }
 
 pub async fn execute(
-    command: SwarmCommands,
+    command: NodeCommands,
     config: &AppConfig,
     verbose: u8,
     config_string: Option<String>,
 ) -> Result<()> {
     match command {
-        SwarmCommands::Up { detach, exclude } => {
+        NodeCommands::Up { detach, exclude } => {
             swarm_up::execute(config, detach, exclude, verbose, config_string).await?
         }
-        SwarmCommands::Down => swarm_down::execute().await?,
-        SwarmCommands::Ps => swarm_ps::execute().await?,
-        SwarmCommands::Daemon { exclude } => {
+        NodeCommands::Down => swarm_down::execute().await?,
+        NodeCommands::Ps => swarm_ps::execute().await?,
+        NodeCommands::Daemon { exclude } => {
             swarm_daemon::execute(config, exclude, verbose, config_string).await?
         }
-        SwarmCommands::Start { id } => swarm_start::execute(&id).await?,
-        SwarmCommands::Status { id } => swarm_status::execute(&id).await?,
-        SwarmCommands::Stop { id } => swarm_stop::execute(&id).await?,
-        SwarmCommands::Restart { id } => swarm_restart::execute(&id).await?,
+        NodeCommands::Start { id } => swarm_start::execute(&id).await?,
+        NodeCommands::Status { id } => swarm_status::execute(&id).await?,
+        NodeCommands::Stop { id } => swarm_stop::execute(&id).await?,
+        NodeCommands::Restart { id } => swarm_restart::execute(&id).await?,
     };
 
     Ok(())
