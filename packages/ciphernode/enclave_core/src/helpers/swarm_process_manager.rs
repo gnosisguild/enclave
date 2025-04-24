@@ -1,11 +1,13 @@
 use anyhow::*;
 use std::collections::HashMap;
 use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::io::AsyncBufReadExt;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::Mutex;
 use tokio::{
+    io::AsyncWriteExt,
     process::{ChildStderr, ChildStdout},
     task::JoinHandle,
 };
@@ -28,8 +30,12 @@ fn forward_stdout(id: &str, stdout: ChildStdout) -> JoinHandle<()> {
             if n == 0 {
                 break;
             }
-
-            print!("[{}] {}", id, String::from_utf8_lossy(&buffer));
+            if let Err(e) = tokio::io::stdout()
+                .write_all(format!("[{}] {}", id, String::from_utf8_lossy(&buffer)).as_bytes())
+                .await
+            {
+                error!("Failed to write child stdout: {}", e);
+            }
         }
     })
 }
@@ -47,8 +53,12 @@ fn forward_stderr(id: &str, stderr: ChildStderr) -> JoinHandle<()> {
             if n == 0 {
                 break;
             }
-
-            eprint!("[{}] {}", id, String::from_utf8_lossy(&buffer));
+            if let Err(e) = tokio::io::stderr()
+                .write_all(format!("[{}] {}", id, String::from_utf8_lossy(&buffer)).as_bytes())
+                .await
+            {
+                error!("Failed to write child stdout: {}", e);
+            }
         }
     })
 }
@@ -163,14 +173,21 @@ async fn terminate_processes_and_exit(processes: &ProcessMap) {
     });
 }
 
+static SIGNAL_HANDLER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 /// Set up signal handlers for graceful shutdown
+/// This will only be executed once, even if called multiple times
 fn setup_signal_handlers(manager: &ProcessManager) -> JoinHandle<()> {
+    // If signal handler already initialized, return a dummy completed JoinHandle
+    if SIGNAL_HANDLER_INITIALIZED.swap(true, Ordering::SeqCst) {
+        return tokio::spawn(async {});
+    }
+
+    // Set up the actual signal handler
     let manager = manager.clone();
     tokio::spawn(async move {
         let mut sigterm =
             signal(SignalKind::terminate()).expect("SWARM Failed to set up SIGTERM handler");
         sigterm.recv().await;
-
         info!("Received SIGTERM, shutting down all processes...");
         manager.terminate().await
     })

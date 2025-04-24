@@ -127,7 +127,6 @@ pub enum Commands {
             action = clap::ArgAction::Append,
             value_name = "PEER",
             help = "Sets a peer URL",
-            default_value = "",
         )]
         peers: Vec<String>,
     },

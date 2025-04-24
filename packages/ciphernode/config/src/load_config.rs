@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use path_clean::clean;
+
 pub type FindInParent = fn(&PathBuf, &str) -> Option<PathBuf>;
 
 pub fn find_in_parent(path: &PathBuf, filename: &str) -> Option<PathBuf> {
@@ -37,7 +39,7 @@ pub fn resolve_config_path<P: Into<PathBuf>>(
         }
 
         // config is passed in and is relative
-        return cwd.join(cli_file);
+        return clean(cwd.join(cli_file));
     }
 
     // search from cwd
@@ -46,7 +48,7 @@ pub fn resolve_config_path<P: Into<PathBuf>>(
     }
 
     // return default
-    default_config_dir.join(default_filename)
+    clean(default_config_dir.join(default_filename))
 }
 
 #[cfg(test)]

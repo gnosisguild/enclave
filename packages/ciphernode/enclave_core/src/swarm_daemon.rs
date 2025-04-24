@@ -124,11 +124,15 @@ pub async fn execute(
 
     let manager = process_manager.clone();
 
-    if let Err(e) = server(manager.clone()).await {
-        error!("Signal server error: {}", e);
+    tokio::select! {
+        res = server(manager.clone()) => {
+            if let Err(e) = res { error!(%e, "Signal server errored"); }
+        }
+        _ = tokio::signal::ctrl_c() => {
+            info!("SWARM: Received Ctrl+C shutting down...");
+            manager.lock().await.terminate().await;
+        }
     }
-
-    tokio::signal::ctrl_c().await?;
 
     info!("SWARM: Received Ctrl+C shutting down...");
     process_manager.lock().await.terminate().await;
