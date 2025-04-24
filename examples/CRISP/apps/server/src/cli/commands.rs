@@ -62,7 +62,6 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
     let start_window: [U256; 2] = [U256::from(Utc::now().timestamp()), U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64)];
     let duration: U256 = U256::from(CONFIG.e3_duration);
-    let input_limit: u8 = CONFIG.e3_input_limit;
     let e3_params = Bytes::from(generate_bfv_parameters()?.to_bytes());
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.to_string(),
@@ -71,7 +70,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
     };
     let compute_provider_params_bytes = Bytes::from(serde_json::to_vec(&compute_provider_params)?);
 
-    let res = contract.request_e3(filter, threshold, start_window, duration, input_limit, e3_program, e3_params, compute_provider_params_bytes).await?;
+    let res = contract.request_e3(filter, threshold, start_window, duration, e3_program, e3_params, compute_provider_params_bytes).await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);
 
     Ok(())
