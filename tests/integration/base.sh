@@ -32,7 +32,7 @@ enclave_net_set_key cn4 "$NETWORK_PRIVATE_KEY_4"
 enclave_net_set_key ag "$NETWORK_PRIVATE_KEY_AG"
 
 # Launch 4 ciphernodes
-enclave_swarm_up
+enclave_nodes_up
 
 echo "waiting on binaries and utilities..."
 

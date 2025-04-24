@@ -31,28 +31,28 @@ pub enum NodeCommands {
     /// List all process statuses
     Ps,
 
-    /// Start the individual node in the swarm
+    /// Start an individual node in the nodes set
     Start {
         /// The id of the node
         #[arg(index = 1)]
         id: String,
     },
 
-    /// Stop the individual node in the swarm
+    /// Stop the individual node in the nodes set
     Stop {
         /// The id of the node
         #[arg(index = 1)]
         id: String,
     },
 
-    /// Print the status of the individual node in the swarm
+    /// Print the status of the individual node in the nodes set
     Status {
         /// The id of the node
         #[arg(index = 1)]
         id: String,
     },
 
-    /// Stop the individual node in the swarm
+    /// Stop the individual node in the nodes set
     Restart {
         /// The id of the node
         #[arg(index = 1)]

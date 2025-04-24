@@ -79,8 +79,8 @@ fn extract_commands(
 ) -> Result<CommandMap> {
     let mut exclude_list = exclude.clone();
 
-    // Default should not be part of swarm
-    exclude_list.push("default".to_string());
+    // Default should not be part of nodes set
+    exclude_list.push("_default".to_string());
 
     // Filter all the nodes
     let mut filtered: Vec<LaunchCommand> = nodes

@@ -32,7 +32,7 @@ enclave_net_set_key cn4 "$NETWORK_PRIVATE_KEY_4"
 enclave_net_set_key ag "$NETWORK_PRIVATE_KEY_AG"
 
 # Launch 4 ciphernodes
-enclave_swarm_up
+enclave_nodes_up
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 
@@ -59,12 +59,12 @@ PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
 
 
 # kill aggregator
-enclave_swarm_stop ag
+enclave_nodes_stop ag
 
 sleep 2
 
 # relaunch the aggregator
-enclave_swarm_start ag
+enclave_nodes_start ag
 
 sleep 2
 

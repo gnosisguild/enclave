@@ -4,7 +4,7 @@ set -euo pipefail
 
 cleanup() {
   echo "Cleaning up processes..."
-  enclave swarm down
+  enclave nodes down
   sleep 1
 
   pkill -9 -f "anvil" 2>/dev/null || true

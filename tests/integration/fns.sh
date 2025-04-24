@@ -113,13 +113,13 @@ enclave_start() {
      --config "$SCRIPT_DIR/enclave.config.yaml" $extra_args & 
 }
 
-enclave_swarm_up() {
-   $ENCLAVE_BIN swarm up -v \
+enclave_nodes_up() {
+   $ENCLAVE_BIN nodes up -v \
      --config "$SCRIPT_DIR/enclave.config.yaml" & 
 }
 
-enclave_swarm_down() {
-  $ENCLAVE_BIN swarm down  
+enclave_nodes_down() {
+  $ENCLAVE_BIN nodes down  
 }
 
 enclave_wallet_set() {
@@ -142,17 +142,17 @@ enclave_net_set_key() {
     --net-keypair "$private_key"
 }
 
-enclave_swarm_stop() {
+enclave_nodes_stop() {
   local name="$1"
 
-  $ENCLAVE_BIN swarm stop $name -v \
+  $ENCLAVE_BIN nodes stop $name -v \
     --config "$SCRIPT_DIR/enclave.config.yaml"
 }
 
-enclave_swarm_start() {
+enclave_nodes_start() {
   local name="$1"
 
-  $ENCLAVE_BIN swarm start $name -v \
+  $ENCLAVE_BIN nodes start $name -v \
     --config "$SCRIPT_DIR/enclave.config.yaml"
 }
 
@@ -185,7 +185,7 @@ ensure_process_count_equals() {
 }
 
 gracefull_shutdown() {
-  enclave_swarm_down
+  enclave_nodes_down
   echo "waiting 5 seconds for processes to shutdown"
   sleep 5
   ensure_process_count_equals "target/debug/enclave" 0 || return 1

@@ -8,8 +8,6 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::{collections::HashMap, env, path::PathBuf};
-use tracing::info;
-use tracing::instrument;
 
 use crate::chain_config::ChainConfig;
 use crate::load_config::find_in_parent;
@@ -102,10 +100,14 @@ impl AppConfig {
         default_config_dir: &PathBuf,
         cwd: &PathBuf,
     ) -> Result<Self> {
+        let mut config = config;
+
+        // Deliberately clobber default
+        config.nodes.insert("_default".to_string(), config.node);
+
         let Some(node) = config.nodes.get(name) else {
             bail!("Could not find node definition for node '{}'. Did you forget to include it in your configuration?", name);
         };
-
         let config_dir_override = (node.config_dir != std::path::PathBuf::new())
             .then_some(&node.config_dir)
             .or_else(|| config.config_dir.as_ref());
@@ -230,6 +232,9 @@ pub struct UnscopedAppConfig {
     /// The config file as found before initialization this is for testing purposes and you should
     /// not use this in your configurations
     found_config_file: Option<PathBuf>,
+    /// The default node that runs during commands like `enclave start` without supplying the
+    /// `--name` argument.
+    node: NodeDefinition,
     /// The `nodes` key in configuration
     nodes: HashMap<String, NodeDefinition>,
     /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
@@ -242,9 +247,10 @@ impl Default for UnscopedAppConfig {
             chains: vec![],
             config_dir: None,
             data_dir: None,
+            node: NodeDefinition::default(),
             found_config_file: None,
             otel: None,
-            nodes: HashMap::from([("default".to_owned(), NodeDefinition::default())]),
+            nodes: HashMap::new(),
         }
     }
 }
@@ -361,12 +367,13 @@ chains:
         address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
         deploy_block: 1764352873645
       filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-nodes:
-  default:
-    config_dir: "/myconfig/override"
-    db_file: "./foo"
-    quic_port: 1234
 
+node:
+  config_dir: "/myconfig/override"
+  db_file: "./foo"
+  quic_port: 1234
+
+nodes:
   ag:
     quic_port: 1235
     peers:
@@ -383,7 +390,7 @@ nodes:
             let unscoped: UnscopedAppConfig = serde_yaml::from_str(config_str).unwrap();
             let config = unscoped
                 .into_scoped_with_defaults(
-                    "default",
+                    "_default",
                     &PathBuf::from("/default/data"),
                     &PathBuf::from("/default/config"),
                     &PathBuf::from("/my/cwd"),
@@ -391,11 +398,11 @@ nodes:
                 .unwrap();
             assert_eq!(
                 config.db_file(),
-                PathBuf::from("/mydata/enclave/default/foo")
+                PathBuf::from("/mydata/enclave/_default/foo")
             );
             assert_eq!(
                 config.key_file(),
-                PathBuf::from("/myconfig/override/default/key")
+                PathBuf::from("/myconfig/override/_default/key")
             );
             assert_eq!(config.quic_port(), 1234);
             assert!(config.peers().is_empty());
@@ -446,17 +453,17 @@ nodes:
             jail.set_env("HOME", &home);
 
             let config = UnscopedAppConfig::default()
-                .into_scoped("default")
+                .into_scoped("_default")
                 .map_err(|e| e.to_string())?;
 
             assert_eq!(
                 config.key_file(),
-                PathBuf::from(format!("{}/.config/enclave/default/key", home))
+                PathBuf::from(format!("{}/.config/enclave/_default/key", home))
             );
 
             assert_eq!(
                 config.db_file(),
-                PathBuf::from(format!("{}/.local/share/enclave/default/db", home))
+                PathBuf::from(format!("{}/.local/share/enclave/_default/db", home))
             );
 
             assert_eq!(
@@ -499,7 +506,7 @@ chains:
 "#,
             )?;
 
-            let mut config = load_config("default", None, None).map_err(|err| err.to_string())?;
+            let mut config = load_config("_default", None, None).map_err(|err| err.to_string())?;
 
             let mut chain = config.chains().first().unwrap();
 
@@ -540,7 +547,7 @@ chains:
       filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 "#,
             )?;
-            config = load_config("default", None, None).map_err(|err| err.to_string())?;
+            config = load_config("_default", None, None).map_err(|err| err.to_string())?;
             chain = config.chains().first().unwrap();
 
             assert_eq!(chain.rpc_auth, RpcAuth::None);
@@ -563,7 +570,7 @@ chains:
 "#,
             )?;
 
-            config = load_config("default", None, None).map_err(|err| err.to_string())?;
+            config = load_config("_default", None, None).map_err(|err| err.to_string())?;
             chain = config.chains().first().unwrap();
             assert_eq!(chain.rpc_auth, RpcAuth::Bearer("testToken".to_string()));
 
@@ -608,7 +615,7 @@ chains:
 "#,
             )?;
 
-            let config = load_config("default", None, None).map_err(|err| err.to_string())?;
+            let config = load_config("_default", None, None).map_err(|err| err.to_string())?;
             let chain = config.chains().first().unwrap();
 
             // Test that environment variables are properly substituted

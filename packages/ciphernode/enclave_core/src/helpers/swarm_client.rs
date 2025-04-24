@@ -96,7 +96,7 @@ pub async fn start_daemon(
     let enclave_bin = env::current_exe()?.display().to_string();
 
     let mut args = vec![];
-    args.push("swarm".to_string());
+    args.push("nodes".to_string());
     args.push("daemon".to_string());
     if let Some(config_string) = maybe_config_string {
         args.push("--config".to_string());

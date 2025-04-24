@@ -17,4 +17,4 @@ enclave net generate-key --name cn3
 enclave net generate-key --name ag
 enclave wallet set --name ag --private-key "$PRIVATE_KEY" 
 
-enclave swarm up -v
+enclave nodes up -v

@@ -114,7 +114,7 @@ impl Cli {
 
     pub fn name(&self) -> String {
         // If no name is provided assume we are working with the default node
-        self.name.clone().unwrap_or("default".to_string())
+        self.name.clone().unwrap_or("_default".to_string())
     }
 }
 

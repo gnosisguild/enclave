@@ -232,7 +232,7 @@ mod test {
             TestCase {
                 name: "Defaults",
                 input: PathsInput {
-                    name: "default",
+                    name: "_default",
                     cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave",
                     default_config_dir: "/home/user/.config/enclave",
@@ -244,14 +244,14 @@ mod test {
                 },
                 expected: PathsExpected {
                     config_file: "/home/user/.config/enclave/enclave.config.yaml",
-                    key_file: "/home/user/.config/enclave/default/key",
-                    db_file: "/home/user/.local/share/enclave/default/db",
+                    key_file: "/home/user/.config/enclave/_default/key",
+                    db_file: "/home/user/.local/share/enclave/_default/db",
                 },
             },
             TestCase {
                 name: "Config file found",
                 input: PathsInput {
-                    name: "default",
+                    name: "_default",
                     cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
@@ -263,14 +263,14 @@ mod test {
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
-                    key_file: "/foo/.enclave/config/default/key",
-                    db_file: "/foo/.enclave/data/default/db",
+                    key_file: "/foo/.enclave/config/_default/key",
+                    db_file: "/foo/.enclave/data/_default/db",
                 },
             },
             TestCase {
                 name: "Data dir override",
                 input: PathsInput {
-                    name: "default",
+                    name: "_default",
                     cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
@@ -282,14 +282,14 @@ mod test {
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
-                    key_file: "/foo/.enclave/config/default/key",
-                    db_file: "/path/to/data/default/db",
+                    key_file: "/foo/.enclave/config/_default/key",
+                    db_file: "/path/to/data/_default/db",
                 },
             },
             TestCase {
                 name: "Config dir override",
                 input: PathsInput {
-                    name: "default",
+                    name: "_default",
                     cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
@@ -301,15 +301,15 @@ mod test {
                 },
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
-                    key_file: "/confy/stuff/default/key",
-                    db_file: "/path/to/data/default/db",
+                    key_file: "/confy/stuff/_default/key",
+                    db_file: "/path/to/data/_default/db",
                 },
             },
             TestCase {
                 name: "Key file override absolute",
                 input: PathsInput {
                     cwd: "/no/matter",
-                    name: "default",
+                    name: "_default",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
                     config_dir_override: Some("/confy/stuff"),
@@ -321,14 +321,14 @@ mod test {
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/ding/bat/key_file",
-                    db_file: "/path/to/data/default/db",
+                    db_file: "/path/to/data/_default/db",
                 },
             },
             TestCase {
                 name: "Key file override relative",
                 input: PathsInput {
                     cwd: "/no/matter",
-                    name: "default",
+                    name: "_default",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
                     config_dir_override: Some("/confy/stuff"),
@@ -340,14 +340,14 @@ mod test {
                 expected: PathsExpected {
                     config_file: "/foo/some.config.yaml",
                     key_file: "/confy/stuff/bat/key_file",
-                    db_file: "/path/to/data/default/db",
+                    db_file: "/path/to/data/_default/db",
                 },
             },
             TestCase {
                 name: "Data file override absolute",
                 input: PathsInput {
                     cwd: "/no/matter",
-                    name: "default",
+                    name: "_default",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
                     config_dir_override: Some("/confy/stuff"),
@@ -365,7 +365,7 @@ mod test {
             TestCase {
                 name: "Data file override relative",
                 input: PathsInput {
-                    name: "default",
+                    name: "_default",
                     cwd: "/no/matter",
                     default_data_dir: "/home/user/.local/share/enclave/data",
                     default_config_dir: "/home/user/.config/enclave/config",
