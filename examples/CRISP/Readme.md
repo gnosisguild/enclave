@@ -312,6 +312,19 @@ Ensure all services are running correctly and that components are communicating 
 
 We welcome and encourage community contributions to this repository. Please ensure that you read and understand the [Contributor License Agreement (CLA)](https://github.com/gnosisguild/CLA) before submitting any contributions.
 
+### Branch Cleanup Policy
+
+To help keep the repository clean and maintainable, we automatically delete merged branches after **7 days**.  
+You can control this behavior using **PR labels**:
+
+| Label           | Effect                                        |
+|------------------|-----------------------------------------------|
+| `keep-branch`     | ❌ Branch will not be deleted                 |
+| `archive-branch`  | 🏷️ Branch will be **tagged** and then deleted |
+| *no label*        | 🗑️ Branch will be deleted (no tag preserved)  |
+
+> Only apply these labels **before merging** your PR if you want to preserve history or keep the branch alive.
+
 ## Security and Liability
 
 This project is provided **WITHOUT ANY WARRANTY**; without even the implied warranty of **MERCHANTABILITY** or **FITNESS FOR A PARTICULAR PURPOSE**.

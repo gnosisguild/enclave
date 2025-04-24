@@ -37,11 +37,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     inputValidatorPolicyFactory.address,
   );
 
+  const inputLimit = 100;
   const mockE3Deployment = await deploy("MockE3Program", {
     from: deployer,
     args: [
       inputValidatorPolicyFactory.address,
       mockInputValidatorChecker.address,
+      inputLimit,
     ],
     log: true,
   });

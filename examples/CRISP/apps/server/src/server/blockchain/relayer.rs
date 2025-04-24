@@ -40,7 +40,7 @@ sol! {
         mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
         mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
-        function request(address filter, uint32[2] calldata threshold, uint256[2] calldata startWindow, uint256 duration, uint8 inputLimit, address e3Program, bytes memory e3ProgramParams, bytes memory computeProviderParams) external payable returns (uint256 e3Id, E3 memory e3);        
+        function request(address filter, uint32[2] calldata threshold, uint256[2] calldata startWindow, uint256 duration, address e3Program, bytes memory e3ProgramParams, bytes memory computeProviderParams) external payable returns (uint256 e3Id, E3 memory e3);        
         function activate(uint256 e3Id,bytes memory publicKey) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
         function publishInput(uint256 e3Id, bytes memory data) external returns (bool success);
@@ -89,7 +89,6 @@ impl EnclaveContract {
         threshold: [u32; 2],
         start_window: [U256; 2],
         duration: U256,
-        input_limit: u8,
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
@@ -100,7 +99,6 @@ impl EnclaveContract {
             threshold,
             start_window,
             duration,
-            input_limit,
             e3_program,
             e3_params,
             compute_provider_params,
