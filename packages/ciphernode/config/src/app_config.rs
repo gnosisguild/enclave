@@ -309,13 +309,15 @@ pub fn load_config(
 pub struct OsDirs;
 impl OsDirs {
     pub fn config_dir() -> PathBuf {
-        // TODO: handle unwrap error case
-        dirs::config_dir().unwrap().join("enclave")
+        dirs::config_dir()
+            .expect("Enclave may only be run on an OS that can provide a config dir. See https://docs.rs/dirs for more information.")
+            .join("enclave")
     }
 
     pub fn data_dir() -> PathBuf {
-        // TODO: handle unwrap error case
-        dirs::data_local_dir().unwrap().join("enclave")
+        dirs::data_local_dir()
+            .expect("Enclave may only be run on an OS that can provide a data dir. See https://docs.rs/dirs for more information.")
+            .join("enclave")
     }
 }
 
