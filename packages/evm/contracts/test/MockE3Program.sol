@@ -15,11 +15,16 @@ contract MockE3Program is IE3Program {
 
     IEnclavePolicyFactory private immutable POLICY_FACTORY;
     address private immutable ENCLAVE_CHECKER;
+    uint8 public inputLimit;
 
     // NOTE: this is primarily for testing
     address private overrideInputValidator = DO_NOT_OVERRIDE;
 
-    constructor(IEnclavePolicyFactory _policyFactory, address _enclaveChecker) {
+    constructor(
+        IEnclavePolicyFactory _policyFactory,
+        address _enclaveChecker,
+        uint8 _inputLimit
+    ) {
         if (_enclaveChecker == address(0)) {
             revert InvalidChecker();
         }
@@ -29,6 +34,7 @@ contract MockE3Program is IE3Program {
         }
         POLICY_FACTORY = _policyFactory;
         ENCLAVE_CHECKER = _enclaveChecker;
+        inputLimit = _inputLimit;
     }
 
     // NOTE: This function is for testing only
@@ -39,7 +45,6 @@ contract MockE3Program is IE3Program {
     function validate(
         uint256,
         uint256,
-        uint8 inputLimit,
         bytes memory e3ProgramParams,
         bytes memory computeProviderParams
     )
