@@ -49,8 +49,6 @@ pub struct NodeDefinition {
     pub peers: Vec<String>,
     /// The port to use for the quic listener
     pub quic_port: u16,
-    /// Whether to enable mDNS discovery
-    pub enable_mdns: bool,
     /// The name for the database
     pub db_file: PathBuf,
     /// The name for the keyfile
@@ -70,7 +68,6 @@ impl Default for NodeDefinition {
             peers: vec![], // NOTE: We should look at generation via ipns fetch for the latest nodes
             address: None,
             quic_port: 9091,
-            enable_mdns: false,
             key_file: PathBuf::from("key"), // ~/.config/enclave/key
             db_file: PathBuf::from("db"),   // ~/.config/enclave/db
             config_dir: std::path::PathBuf::new(), // ~/.config/enclave
