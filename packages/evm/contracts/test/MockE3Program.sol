@@ -12,15 +12,19 @@ contract MockE3Program is IE3Program {
     address private constant DO_NOT_OVERRIDE =
         0x9999999999999999999999999999999999999999;
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
-    uint8 public constant INPUT_LIMIT = 100;
 
     IEnclavePolicyFactory private immutable POLICY_FACTORY;
     address private immutable ENCLAVE_CHECKER;
+    uint8 public INPUT_LIMIT;
 
     // NOTE: this is primarily for testing
     address private overrideInputValidator = DO_NOT_OVERRIDE;
 
-    constructor(IEnclavePolicyFactory _policyFactory, address _enclaveChecker) {
+    constructor(
+        IEnclavePolicyFactory _policyFactory,
+        address _enclaveChecker,
+        uint8 _inputLimit
+    ) {
         if (_enclaveChecker == address(0)) {
             revert InvalidChecker();
         }
@@ -30,6 +34,7 @@ contract MockE3Program is IE3Program {
         }
         POLICY_FACTORY = _policyFactory;
         ENCLAVE_CHECKER = _enclaveChecker;
+        INPUT_LIMIT = _inputLimit;
     }
 
     // NOTE: This function is for testing only
