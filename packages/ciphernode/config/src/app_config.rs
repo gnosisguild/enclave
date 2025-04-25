@@ -58,6 +58,12 @@ pub struct NodeDefinition {
     /// The node role eg. "ciphernode" or "aggregator"
     #[serde(default)]
     pub role: NodeRole,
+    /// If a net key has not been set autogenerate one on start
+    pub autonetkey: bool,
+    /// If a password has not been set autogenerate one on start
+    pub autopassword: bool,
+    /// If a wallet has not been set autogenerate one on start
+    pub autowallet: bool,
 }
 
 impl Default for NodeDefinition {
@@ -71,6 +77,9 @@ impl Default for NodeDefinition {
             config_dir: std::path::PathBuf::new(), // ~/.config/enclave
             data_dir: std::path::PathBuf::new(), // ~/.config/enclave
             role: NodeRole::Ciphernode,
+            autonetkey: false,
+            autopassword: false,
+            autowallet: false,
         }
     }
 }
@@ -90,6 +99,12 @@ pub struct AppConfig {
     paths: PathsEngine,
     /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
     otel: Option<String>,
+    /// If a net key has not been set autogenerate one on start
+    autonetkey: bool,
+    /// If a password has not been set autogenerate one on start
+    autopassword: bool,
+    /// If a wallet has not been set autogenerate one on start
+    autowallet: bool,
 }
 
 impl AppConfig {
@@ -112,6 +127,9 @@ impl AppConfig {
         let Some(node) = config.nodes.get(name) else {
             bail!("Could not find node definition for node '{}'. Did you forget to include it in your configuration?", name);
         };
+
+        let node = node.clone();
+
         let config_dir_override = (node.config_dir != std::path::PathBuf::new())
             .then_some(&node.config_dir)
             .or_else(|| config.config_dir.as_ref());
@@ -131,6 +149,7 @@ impl AppConfig {
             Some(&node.db_file),
             Some(&node.key_file),
         );
+
         Ok(AppConfig {
             name: name.to_owned(),
             nodes: config.nodes,
@@ -138,17 +157,23 @@ impl AppConfig {
             peers: vec![],
             paths,
             otel: config.otel,
+            autopassword: node.autopassword,
+            autowallet: node.autowallet,
+            autonetkey: node.autonetkey,
         })
     }
 
+    /// Add the given peers to the peers vector
     pub fn add_peers(&mut self, peers: Vec<String>) {
         self.peers = combine_unique(&self.peers, &peers)
     }
 
+    /// Get the key_file
     pub fn key_file(&self) -> PathBuf {
         self.paths.key_file()
     }
 
+    /// Get the database file
     pub fn db_file(&self) -> PathBuf {
         self.paths.db_file()
     }
@@ -162,28 +187,37 @@ impl AppConfig {
         ))
     }
 
+    /// Use the in-memory store
     pub fn use_in_mem_store(&self) -> bool {
+        // Currently hardcoded to true. In the future we can allow this to be set within the
+        // configuration for testing
         false
     }
 
+    /// Get the peers list
     pub fn peers(&self) -> Vec<String> {
         let config_peers = self.node_def().peers.clone();
         let cli_peers = self.peers.clone();
         combine_unique(&config_peers, &cli_peers)
     }
 
+    /// get the quic port
     pub fn quic_port(&self) -> u16 {
         self.node_def().quic_port
     }
 
+    /// Depricated
+    #[deprecated]
     pub fn enable_mdns(&self) -> bool {
         false
     }
 
+    /// Get the config file path
     pub fn config_file(&self) -> PathBuf {
         self.paths.config_file()
     }
 
+    /// Get the chains config
     pub fn chains(&self) -> &Vec<ChainConfig> {
         &self.chains
     }
@@ -192,18 +226,22 @@ impl AppConfig {
         self.name.clone()
     }
 
+    /// Get the open telemetry collector url
     pub fn otel(&self) -> Option<String> {
         self.otel.clone()
     }
 
+    /// Get the node's address
     pub fn address(&self) -> Option<Address> {
         self.node_def().address.clone()
     }
 
+    /// Get a collection containing all the node definitions from the configuration
     pub fn nodes(&self) -> &HashMap<String, NodeDefinition> {
         &self.nodes
     }
 
+    /// Get the node's role and enriched relevant provided configuration
     pub fn role(&self) -> NodeRole {
         match self.node_def().role.clone() {
             NodeRole::Aggregator {
@@ -221,6 +259,21 @@ impl AppConfig {
             },
             NodeRole::Ciphernode => NodeRole::Ciphernode,
         }
+    }
+
+    /// Get the value of autonetkey
+    pub fn autonetkey(&self) -> bool {
+        self.autonetkey
+    }
+
+    /// Get the value of autowallet
+    pub fn autowallet(&self) -> bool {
+        self.autowallet
+    }
+
+    /// Get the value of autopassword
+    pub fn autopassword(&self) -> bool {
+        self.autopassword
     }
 }
 
@@ -260,6 +313,7 @@ impl Default for UnscopedAppConfig {
 }
 
 impl UnscopedAppConfig {
+    /// Convert to a scoped configuration using local OS based default configuration
     pub fn into_scoped(self, name: &str) -> Result<AppConfig> {
         Ok(AppConfig::try_from_unscoped(
             name,
@@ -269,6 +323,8 @@ impl UnscopedAppConfig {
             &env::current_dir()?,
         )?)
     }
+
+    /// Convert to a scoped configuration passing in some injected configuration
     pub fn into_scoped_with_defaults(
         self,
         name: &str,
@@ -286,6 +342,7 @@ impl UnscopedAppConfig {
     }
 }
 
+/// Value struct for passing configuration from the cli to the configuration
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 struct CliOverrides {
     pub otel: Option<String>,
