@@ -6,7 +6,7 @@ use crate::swarm::NodeCommands;
 use crate::wallet::WalletCommands;
 use crate::{init, password, wallet};
 use crate::{net, swarm};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
 use config::{load_config, AppConfig};
@@ -70,7 +70,31 @@ impl Cli {
 
     #[instrument(skip_all)]
     pub async fn execute(self) -> Result<()> {
-        let config = self.load_config()?;
+        let Ok(config) = self.load_config() else {
+            match self.command {
+                Commands::Init {
+                    rpc_url,
+                    eth_address,
+                    password,
+                    skip_eth,
+                    net_keypair,
+                    generate_net_keypair,
+                } => {
+                    init::execute(
+                        rpc_url,
+                        eth_address,
+                        password,
+                        skip_eth,
+                        net_keypair,
+                        generate_net_keypair,
+                    )
+                    .await?
+                }
+                _ => bail!("Cannot run command without a configuration file. Have you created `enclave.config.yaml` in your project?"),
+            };
+            return Ok(());
+        };
+
         setup_tracing(&config, self.log_level())?;
         info!("Config loaded from: {:?}", config.config_file());
 
@@ -88,23 +112,8 @@ impl Cli {
 
         match self.command {
             Commands::Start { peers } => start::execute(config, peers).await?,
-            Commands::Init {
-                rpc_url,
-                eth_address,
-                password,
-                skip_eth,
-                net_keypair,
-                generate_net_keypair,
-            } => {
-                init::execute(
-                    rpc_url,
-                    eth_address,
-                    password,
-                    skip_eth,
-                    net_keypair,
-                    generate_net_keypair,
-                )
-                .await?
+            Commands::Init { .. } => {
+                bail!("Cannot run `enclave init` when a configuration exists.");
             }
             Commands::Nodes { command } => {
                 swarm::execute(command, &config, self.verbose, self.config).await?
