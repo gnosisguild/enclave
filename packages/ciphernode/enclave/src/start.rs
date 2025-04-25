@@ -1,7 +1,10 @@
 use crate::owo;
 use anyhow::{anyhow, Result};
 use config::{AppConfig, NodeRole};
-use enclave_core::{aggregator_start, helpers::listen_for_shutdown, start};
+use enclave_core::{
+    aggregator_start, helpers::listen_for_shutdown, net_generate, password_create, start,
+    wallet_set,
+};
 use tracing::{info, instrument};
 
 #[instrument(skip_all)]
@@ -14,6 +17,18 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
 
     // add cli peers to the config
     config.add_peers(peers);
+
+    if config.autopassword() {
+        password_create::autopassword(&config).await?;
+    }
+
+    if config.autonetkey() {
+        net_generate::autonetkey(&config).await?;
+    }
+
+    if config.autowallet() {
+        wallet_set::autowallet(&config).await?;
+    }
 
     let (bus, handle, peer_id) = match config.role() {
         // Launch in aggregator configuration

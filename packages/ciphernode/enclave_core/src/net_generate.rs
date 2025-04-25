@@ -19,3 +19,11 @@ pub async fn execute(config: &AppConfig) -> Result<PeerId> {
 
     Ok(peer_id)
 }
+
+pub async fn autonetkey(config: &AppConfig) -> Result<()> {
+    let repositories = get_repositories(config)?;
+    if !repositories.libp2p_keypair().has().await {
+        execute(config).await?;
+    }
+    Ok(())
+}

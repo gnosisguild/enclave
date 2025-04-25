@@ -4,7 +4,7 @@ use config::AppConfig;
 use crypto::Cipher;
 use evm::EthPrivateKeyRepositoryFactory;
 
-use crate::helpers::datastore::get_repositories;
+use crate::helpers::{datastore::get_repositories, rand::generate_random_bytes};
 
 pub fn validate_private_key(input: &String) -> Result<()> {
     let bytes =
@@ -22,5 +22,12 @@ pub async fn execute(config: &AppConfig, input: String) -> Result<()> {
         .eth_private_key()
         .write_sync(&encrypted)
         .await?;
+    Ok(())
+}
+
+pub async fn autowallet(config: &AppConfig) -> Result<()> {
+    let bytes = generate_random_bytes(128);
+    let input = hex::encode(&bytes);
+    execute(config, input).await?;
     Ok(())
 }

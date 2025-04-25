@@ -2490,6 +2490,7 @@ dependencies = [
  "events",
  "evm",
  "fhe 0.1.0",
+ "hex",
  "keyshare",
  "libp2p",
  "logger",
