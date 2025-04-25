@@ -18,18 +18,6 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
     // add cli peers to the config
     config.add_peers(peers);
 
-    if config.autopassword() {
-        password_create::autopassword(&config).await?;
-    }
-
-    if config.autonetkey() {
-        net_generate::autonetkey(&config).await?;
-    }
-
-    if config.autowallet() {
-        wallet_set::autowallet(&config).await?;
-    }
-
     let (bus, handle, peer_id) = match config.role() {
         // Launch in aggregator configuration
         NodeRole::Aggregator {
