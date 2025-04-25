@@ -122,17 +122,22 @@ pub struct SledDb {
 pub static SLED_CACHE: Lazy<Arc<Mutex<HashMap<String, Db>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
-fn get_cached_db(path: &PathBuf) -> Option<Db> {
-    let key = path.to_string_lossy().to_string();
-    let cache_lock = SLED_CACHE.lock().unwrap();
-    let maybe_db = cache_lock.get(&key).cloned();
-    maybe_db
+fn canonical_key(path: &PathBuf) -> String {
+    path.canonicalize()
+        .unwrap_or_else(|_| path.clone())
+        .to_string_lossy()
+        .into_owned()
 }
 
-fn set_cached_db(path: PathBuf, db: Db) {
-    let key = path.to_string_lossy().to_string();
-    let mut cache_lock = SLED_CACHE.lock().unwrap();
-    cache_lock.insert(key, db);
+fn get_or_open_db(path: &PathBuf) -> Result<Db> {
+    let key = canonical_key(path);
+    let mut cache = SLED_CACHE.lock().unwrap();
+    if let Some(db) = cache.get(&key) {
+        return Ok(db.clone());
+    }
+    let db = sled::open(path)?;
+    cache.insert(key, db.clone());
+    Ok(db)
 }
 
 fn clear_all_caches() {
@@ -142,12 +147,7 @@ fn clear_all_caches() {
 
 impl SledDb {
     pub fn new(path: PathBuf) -> Result<Self> {
-        let maybe_db = get_cached_db(&path);
-        if let Some(db) = maybe_db {
-            return Ok(Self { db });
-        };
-
-        let db = sled::open(&path).with_context(|| {
+        let db = get_or_open_db(&path).with_context(|| {
             format!(
                 "Could not open database at path '{}'",
                 path.to_string_lossy()
@@ -158,9 +158,6 @@ impl SledDb {
         } else {
             info!("recovered db st: {:?}", &path);
         }
-
-        set_cached_db(path, db.clone());
-
         Ok(Self { db })
     }
 
