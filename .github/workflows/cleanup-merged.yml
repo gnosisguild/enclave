@@ -32,10 +32,9 @@ jobs:
             const ARCHIVE_LABEL  = 'archive-branch';
 
             const cutoff = Date.now() - THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
-            const { repos } = github;
 
             // list all non-protected branches
-            const branches = await github.paginate(repos.listBranches, {
+            const branches = await github.paginate(github.rest.repos.listBranches, {
               owner: context.repo.owner,
               repo:  context.repo.repo,
               protected: false
@@ -48,7 +47,7 @@ jobs:
               if (name.startsWith('archive/')) continue;
 
               /* Find any PR that merged this branch */
-              const prs = await github.repos.listPullRequestsAssociatedWithCommit({
+              const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
                 owner: context.repo.owner,
                 repo:  context.repo.repo,
                 commit_sha: branch.commit.sha
@@ -77,13 +76,13 @@ jobs:
 
                 // create tag only if it doesn't already exist
                 try {
-                  await repos.getRef({
+                  await github.rest.git.getRef({
                     owner: context.repo.owner,
                     repo:  context.repo.repo,
                     ref:   `tags/${tagName}`
                   });
                 } catch {
-                  await repos.createRef({
+                  await github.rest.git.createRef({
                     owner: context.repo.owner,
                     repo:  context.repo.repo,
                     ref:   `refs/tags/${tagName}`,
@@ -94,7 +93,7 @@ jobs:
 
               /* Delete the branch */
               console.log(`🗑️  Deleting ${name}`);
-              await repos.deleteRef({
+              await github.rest.git.deleteRef({
                 owner: context.repo.owner,
                 repo:  context.repo.repo,
                 ref:   `heads/${name}`
