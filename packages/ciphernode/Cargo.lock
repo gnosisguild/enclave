@@ -2141,8 +2141,10 @@ dependencies = [
  "async-trait",
  "bincode",
  "events",
+ "once_cell",
  "serde",
  "sled",
+ "tempfile",
  "tracing",
 ]
 
@@ -2488,6 +2490,7 @@ dependencies = [
  "events",
  "evm",
  "fhe 0.1.0",
+ "hex",
  "keyshare",
  "libp2p",
  "logger",
@@ -2604,7 +2607,7 @@ dependencies = [
  "bincode",
  "bs58",
  "futures-util",
- "lazy_static",
+ "once_cell",
  "serde",
  "sha2",
 ]

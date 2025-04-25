@@ -10,6 +10,8 @@ use anyhow::Result;
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
 use config::{load_config, AppConfig};
+use enclave_core::helpers::datastore::close_all_connections;
+use enclave_core::{net_generate, password_create, wallet_set};
 use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
@@ -70,8 +72,20 @@ impl Cli {
     pub async fn execute(self) -> Result<()> {
         let config = self.load_config()?;
         setup_tracing(&config, self.log_level())?;
-
         info!("Config loaded from: {:?}", config.config_file());
+
+        if config.autopassword() {
+            password_create::autopassword(&config).await?;
+        }
+
+        if config.autonetkey() {
+            net_generate::autonetkey(&config).await?;
+        }
+
+        if config.autowallet() {
+            wallet_set::autowallet(&config).await?;
+        }
+
         match self.command {
             Commands::Start { peers } => start::execute(config, peers).await?,
             Commands::Init {
@@ -99,6 +113,8 @@ impl Cli {
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
         }
+
+        close_all_connections();
 
         Ok(())
     }

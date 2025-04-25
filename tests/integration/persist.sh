@@ -16,22 +16,10 @@ until curl -f -s "http://localhost:8545" > /dev/null; do
   sleep 1
 done
 
-# Set the password for all ciphernodes
-enclave_password_create cn1 "$CIPHERNODE_SECRET"
-enclave_password_create cn2 "$CIPHERNODE_SECRET"
-enclave_password_create cn3 "$CIPHERNODE_SECRET"
-enclave_password_create cn4 "$CIPHERNODE_SECRET"
-enclave_password_create ag "$CIPHERNODE_SECRET"
+# set wallet to ag specifically
 enclave_wallet_set ag "$PRIVATE_KEY"
 
-# Set the network private key for all ciphernodes
-enclave_net_set_key cn1 "$NETWORK_PRIVATE_KEY_1"
-enclave_net_set_key cn2 "$NETWORK_PRIVATE_KEY_2"
-enclave_net_set_key cn3 "$NETWORK_PRIVATE_KEY_3"
-enclave_net_set_key cn4 "$NETWORK_PRIVATE_KEY_4"
-enclave_net_set_key ag "$NETWORK_PRIVATE_KEY_AG"
-
-# Launch 4 ciphernodes
+# start swarm
 enclave_nodes_up
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"

@@ -60,6 +60,7 @@ lazy_static = "1.5.0"
 logger = { path = "./logger" }
 num = "0.4.3"
 net = { path = "./net" }
+once_cell = "1.19.0"
 opentelemetry = { version = "0.29.1" }
 opentelemetry-otlp = { version = "0.29.0", features = ["grpc-tonic"] }
 opentelemetry_sdk = "0.29.0"
