@@ -1,7 +1,7 @@
 use anyhow::*;
-use enclave_core::swarm_down;
+use enclave_core::nodes::down;
 
 pub async fn execute() -> Result<()> {
-    swarm_down::execute().await?;
+    down::execute().await?;
     Ok(())
 }

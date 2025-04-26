@@ -1,11 +1,11 @@
 use anyhow::Result;
 use reqwest::Client;
 use std::env;
-use tracing::{error, trace, warn};
+use tracing::{error, trace};
 
-use crate::helpers::{swarm::ProcessStatus, termtable::print_table};
+use crate::helpers::termtable::print_table;
 
-use super::swarm::{spawn_process, Action, Query, SERVER_ADDRESS};
+use super::nodes::{spawn_process, Action, ProcessStatus, Query, SERVER_ADDRESS};
 
 pub async fn get_status() -> Result<Query> {
     let client = Client::new();

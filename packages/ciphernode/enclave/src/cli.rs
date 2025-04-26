@@ -1,17 +1,16 @@
 use crate::helpers::telemetry::setup_tracing;
+use crate::net;
 use crate::net::NetCommands;
+use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::start;
-use crate::swarm::NodeCommands;
 use crate::wallet::WalletCommands;
 use crate::{init, password, wallet};
-use crate::{net, swarm};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
 use config::{load_config, AppConfig};
 use enclave_core::helpers::datastore::close_all_connections;
-use enclave_core::{net_generate, password_create, wallet_set};
 use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
@@ -99,15 +98,15 @@ impl Cli {
         info!("Config loaded from: {:?}", config.config_file());
 
         if config.autopassword() {
-            password_create::autopassword(&config).await?;
+            enclave_core::password::create::autopassword(&config).await?;
         }
 
         if config.autonetkey() {
-            net_generate::autonetkey(&config).await?;
+            enclave_core::net::generate::autonetkey(&config).await?;
         }
 
         if config.autowallet() {
-            wallet_set::autowallet(&config).await?;
+            enclave_core::wallet::set::autowallet(&config).await?;
         }
 
         match self.command {
@@ -116,7 +115,7 @@ impl Cli {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }
             Commands::Nodes { command } => {
-                swarm::execute(command, &config, self.verbose, self.config).await?
+                nodes::execute(command, &config, self.verbose, self.config).await?
             }
             Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,

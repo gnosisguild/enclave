@@ -1,7 +1,7 @@
 use anyhow::Result;
 use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Password};
-use enclave_core::net_set::{self, validate_keypair_input};
+use enclave_core::net::{self, set::validate_keypair_input};
 
 pub async fn execute(config: &AppConfig, net_keypair: Option<String>) -> Result<()> {
     let input = if let Some(nkp) = net_keypair {
@@ -15,7 +15,7 @@ pub async fn execute(config: &AppConfig, net_keypair: Option<String>) -> Result<
             .to_string()
     };
 
-    net_set::execute(config, input).await?;
+    net::set::execute(config, input).await?;
 
     println!("Network keypair has been successfully stored and encrypted.");
 

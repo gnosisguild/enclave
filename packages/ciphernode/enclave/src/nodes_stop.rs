@@ -1,7 +1,7 @@
 use anyhow::*;
-use enclave_core::swarm_start;
+use enclave_core::nodes::stop;
 
 pub async fn execute(id: &str) -> Result<()> {
-    swarm_start::execute(id).await?;
+    stop::execute(id).await?;
     Ok(())
 }

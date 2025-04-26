@@ -1,14 +1,14 @@
-use crate::helpers::swarm_client;
+use super::client;
 use anyhow::*;
-use tracing::{error, instrument};
+use tracing::instrument;
 
 #[instrument(skip_all)]
 pub async fn execute(id: &str) -> Result<()> {
-    if !swarm_client::is_ready().await? {
+    if !client::is_ready().await? {
         bail!("Swarm client is not ready. Did you forget tocall `enclave` swarm");
     }
 
-    swarm_client::stop(id).await?;
+    client::restart(id).await?;
 
     Ok(())
 }

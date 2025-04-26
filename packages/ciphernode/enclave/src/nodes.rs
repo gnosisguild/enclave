@@ -1,10 +1,11 @@
-use crate::{
-    swarm_daemon, swarm_down, swarm_ps, swarm_restart, swarm_start, swarm_status, swarm_stop,
-    swarm_up,
-};
 use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
+
+use crate::{
+    nodes_daemon, nodes_down, nodes_ps, nodes_restart, nodes_start, nodes_status, nodes_stop,
+    nodes_up,
+};
 
 #[derive(Subcommand, Debug)]
 pub enum NodeCommands {
@@ -68,17 +69,17 @@ pub async fn execute(
 ) -> Result<()> {
     match command {
         NodeCommands::Up { detach, exclude } => {
-            swarm_up::execute(config, detach, exclude, verbose, config_string).await?
+            nodes_up::execute(config, detach, exclude, verbose, config_string).await?
         }
-        NodeCommands::Down => swarm_down::execute().await?,
-        NodeCommands::Ps => swarm_ps::execute().await?,
+        NodeCommands::Down => nodes_down::execute().await?,
+        NodeCommands::Ps => nodes_ps::execute().await?,
         NodeCommands::Daemon { exclude } => {
-            swarm_daemon::execute(config, exclude, verbose, config_string).await?
+            nodes_daemon::execute(config, exclude, verbose, config_string).await?
         }
-        NodeCommands::Start { id } => swarm_start::execute(&id).await?,
-        NodeCommands::Status { id } => swarm_status::execute(&id).await?,
-        NodeCommands::Stop { id } => swarm_stop::execute(&id).await?,
-        NodeCommands::Restart { id } => swarm_restart::execute(&id).await?,
+        NodeCommands::Start { id } => nodes_start::execute(&id).await?,
+        NodeCommands::Status { id } => nodes_status::execute(&id).await?,
+        NodeCommands::Stop { id } => nodes_stop::execute(&id).await?,
+        NodeCommands::Restart { id } => nodes_restart::execute(&id).await?,
     };
 
     Ok(())

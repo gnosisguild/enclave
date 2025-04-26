@@ -1,7 +1,9 @@
-use crate::{helpers::swarm_client, swarm_daemon};
+use crate::nodes::daemon;
 use anyhow::*;
 use config::AppConfig;
 use tracing::instrument;
+
+use super::client;
 
 #[instrument(skip_all)]
 pub async fn execute(
@@ -11,17 +13,17 @@ pub async fn execute(
     verbose: u8,
     maybe_config_string: Option<String>,
 ) -> Result<()> {
-    if swarm_client::is_ready().await? {
+    if client::is_ready().await? {
         bail!("Swarm is already running!");
     }
 
     if detach {
-        swarm_client::start_daemon(verbose, &maybe_config_string, &exclude).await?;
+        client::start_daemon(verbose, &maybe_config_string, &exclude).await?;
         return Ok(());
     }
 
     //  run the swarm_daemon process locally forwarding args
-    swarm_daemon::execute(config, exclude, verbose, maybe_config_string).await?;
+    daemon::execute(config, exclude, verbose, maybe_config_string).await?;
 
     Ok(())
 }

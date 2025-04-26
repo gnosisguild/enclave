@@ -1,7 +1,7 @@
 use anyhow::*;
-use enclave_core::swarm_ps;
+use enclave_core::nodes::ps;
 
 pub async fn execute() -> Result<()> {
-    swarm_ps::execute().await?;
+    ps::execute().await?;
     Ok(())
 }
