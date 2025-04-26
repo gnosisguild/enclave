@@ -26,7 +26,7 @@ pub async fn execute(config: &AppConfig, input: String) -> Result<()> {
 }
 
 pub async fn autowallet(config: &AppConfig) -> Result<()> {
-    let bytes = generate_random_bytes(128);
+    let bytes = generate_random_bytes(32);
     let input = hex::encode(&bytes);
     execute(config, input).await?;
     Ok(())
