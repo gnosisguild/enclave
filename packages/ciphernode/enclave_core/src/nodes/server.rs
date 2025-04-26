@@ -1,14 +1,14 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use anyhow::*;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use crate::helpers::swarm::{Action, Query};
+use crate::nodes::nodes::Query;
 
 use super::{
-    swarm::{SwarmStatus, SERVER_ADDRESS},
-    swarm_process_manager::ProcessManager,
+    nodes::{Action, SERVER_ADDRESS},
+    process_manager::ProcessManager,
 };
 
 pub async fn handle_command(

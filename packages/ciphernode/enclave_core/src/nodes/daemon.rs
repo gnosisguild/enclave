@@ -1,12 +1,14 @@
-use crate::helpers::swarm::{CommandMap, CommandParams};
-use crate::helpers::swarm_process_manager::ProcessManager;
-use crate::helpers::swarm_server::server;
 use anyhow::*;
 use config::{combine_unique, AppConfig, NodeDefinition};
 use std::sync::Arc;
 use std::{collections::HashMap, env};
 use tokio::sync::Mutex;
 use tracing::{error, info, instrument};
+
+use super::process_manager::ProcessManager;
+use super::server::server;
+
+use super::nodes::{CommandMap, CommandParams};
 
 /// Metadata used to workout launch charachteristics for swarm mode
 #[derive(Clone, Debug)]

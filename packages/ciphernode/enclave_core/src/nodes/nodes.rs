@@ -8,8 +8,6 @@ use tokio::{
     task::JoinHandle,
 };
 
-use super::swarm_process_manager::ProcessManager;
-
 pub const SERVER_ADDRESS: &str = "127.0.0.1:13415";
 
 /// All the parameters of a command

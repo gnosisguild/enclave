@@ -1,7 +1,7 @@
 use anyhow::*;
-use enclave_core::swarm_status;
+use enclave_core::nodes::status;
 
 pub async fn execute(id: &str) -> Result<()> {
-    swarm_status::execute(id).await?;
+    status::execute(id).await?;
     Ok(())
 }

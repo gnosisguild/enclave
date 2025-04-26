@@ -1,6 +1,6 @@
 use anyhow::*;
 use config::AppConfig;
-use enclave_core::swarm_daemon;
+use enclave_core::nodes::daemon;
 
 pub async fn execute(
     config: &AppConfig,
@@ -8,5 +8,5 @@ pub async fn execute(
     verbose: u8,
     config_string: Option<String>,
 ) -> Result<()> {
-    swarm_daemon::execute(config, exclude, verbose, config_string).await
+    daemon::execute(config, exclude, verbose, config_string).await
 }
