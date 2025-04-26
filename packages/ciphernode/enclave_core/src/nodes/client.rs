@@ -56,10 +56,11 @@ pub async fn restart(id: &str) -> Result<()> {
 }
 
 pub async fn status(id: &str) -> Result<()> {
-    if let Ok(Query::Status { status }) = get_status().await {
+    let status = get_status().await?;
+    if let Query::Status { status } = status {
         let state = status.processes.get(id).unwrap_or(&ProcessStatus::Stopped);
         println!("{:?}", state);
-    };
+    }
 
     Ok(())
 }
