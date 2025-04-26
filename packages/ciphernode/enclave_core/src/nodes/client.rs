@@ -93,6 +93,11 @@ pub async fn start_daemon(
     maybe_config_string: &Option<String>,
     exclude: &Vec<String>,
 ) -> Result<()> {
+    if is_ready().await? {
+        tracing::warn!("Daemon is already running");
+        return Ok(());
+    }
+
     let enclave_bin = env::current_exe()?.display().to_string();
 
     let mut args = vec![];
@@ -114,6 +119,8 @@ pub async fn start_daemon(
 
     // Start and forget
     spawn_process(&enclave_bin, args).await?;
+
+    tracing::info!("Daemon started successfully");
 
     Ok(())
 }
