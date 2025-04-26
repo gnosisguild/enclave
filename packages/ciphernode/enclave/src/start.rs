@@ -1,10 +1,7 @@
 use crate::owo;
 use anyhow::{anyhow, Result};
 use config::{AppConfig, NodeRole};
-use enclave_core::{
-    aggregator_start, helpers::listen_for_shutdown, net_generate, password_create, start,
-    wallet_set,
-};
+use enclave_core::helpers::listen_for_shutdown;
 use tracing::{info, instrument};
 
 #[instrument(skip_all)]
@@ -23,10 +20,17 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
         NodeRole::Aggregator {
             pubkey_write_path,
             plaintext_write_path,
-        } => aggregator_start::execute(&config, pubkey_write_path, plaintext_write_path).await?,
+        } => {
+            enclave_core::start::aggregator_start::execute(
+                &config,
+                pubkey_write_path,
+                plaintext_write_path,
+            )
+            .await?
+        }
 
         // Launch in ciphernode configuration
-        NodeRole::Ciphernode => start::execute(&config, address).await?,
+        NodeRole::Ciphernode => enclave_core::start::start::execute(&config, address).await?,
     };
 
     info!(

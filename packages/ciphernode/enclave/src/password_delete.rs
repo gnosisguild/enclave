@@ -2,7 +2,6 @@ use crate::helpers::prompt_password::prompt_password;
 use anyhow::Result;
 use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Confirm};
-use enclave_core::password_delete;
 use zeroize::Zeroize;
 
 pub enum DeleteMode {
@@ -32,7 +31,7 @@ pub async fn prompt_delete(config: &AppConfig, delete_mode: DeleteMode) -> Resul
         return Ok(false);
     }
 
-    let Ok(mut cur_pw) = password_delete::get_current_password(config).await else {
+    let Ok(mut cur_pw) = enclave_core::password::delete::get_current_password(config).await else {
         println!("Password is not set. Nothing to do.");
         return Ok(false);
     };
@@ -50,7 +49,7 @@ pub async fn prompt_delete(config: &AppConfig, delete_mode: DeleteMode) -> Resul
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     if prompt_delete(config, DeleteMode::Delete).await? {
-        password_delete::execute(config).await?;
+        enclave_core::password::delete::execute(config).await?;
         println!("Key successfully deleted.");
     } else {
         println!("Operation cancelled.");
