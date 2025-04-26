@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use crate::helpers::telemetry::setup_tracing;
 use crate::net;
 use crate::net::NetCommands;
@@ -69,29 +71,45 @@ impl Cli {
 
     #[instrument(skip_all)]
     pub async fn execute(self) -> Result<()> {
-        let Ok(config) = self.load_config() else {
-            match self.command {
-                Commands::Init {
-                    rpc_url,
-                    eth_address,
-                    password,
-                    skip_eth,
-                    net_keypair,
-                    generate_net_keypair,
-                } => {
-                    init::execute(
+        // Attempt to load the config, but only treat “not found” as
+        // the trigger for the init flow.  All other errors bubble up.
+        let config = match self.load_config() {
+            Ok(cfg) => cfg,
+            // If the file truly doesn’t exist, fall back to init
+            Err(e)
+                if matches!(
+                    e.downcast_ref::<std::io::Error>(),
+                    Some(ioe) if ioe.kind() == std::io::ErrorKind::NotFound
+                ) =>
+            {
+                // Existing init branch
+                match self.command {
+                    Commands::Init {
                         rpc_url,
                         eth_address,
                         password,
                         skip_eth,
                         net_keypair,
                         generate_net_keypair,
-                    )
-                    .await?
-                }
-                _ => bail!("Cannot run command without a configuration file. Have you created `enclave.config.yaml` in your project?"),
-            };
-            return Ok(());
+                    } => {
+                        init::execute(
+                            rpc_url,
+                            eth_address,
+                            password,
+                            skip_eth,
+                            net_keypair,
+                            generate_net_keypair,
+                        )
+                        .await?
+                    }
+                    _ => bail!(
+                        "Configuration file not found. Have you created `enclave.config.yaml` in your project?"
+                    ),
+                };
+                return Ok(());
+            }
+            // Any other error is fatal
+            Err(e) => return Err(e),
         };
 
         setup_tracing(&config, self.log_level())?;

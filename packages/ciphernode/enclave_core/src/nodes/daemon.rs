@@ -136,7 +136,5 @@ pub async fn execute(
         }
     }
 
-    info!("SWARM: Received Ctrl+C shutting down...");
-    process_manager.lock().await.terminate().await;
     Ok(())
 }

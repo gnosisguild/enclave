@@ -1,5 +1,12 @@
+use crate::chain_config::ChainConfig;
+use crate::load_config::find_in_parent;
+use crate::load_config::resolve_config_path;
+use crate::paths_engine::PathsEngine;
+use crate::paths_engine::DEFAULT_CONFIG_NAME;
+use crate::yaml::load_yaml_with_env;
 use alloy::primitives::Address;
 use anyhow::bail;
+use anyhow::Context;
 use anyhow::Result;
 use figment::{
     providers::{Format, Serialized, Yaml},
@@ -8,13 +15,6 @@ use figment::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::{collections::HashMap, env, path::PathBuf};
-
-use crate::chain_config::ChainConfig;
-use crate::load_config::find_in_parent;
-use crate::load_config::resolve_config_path;
-use crate::paths_engine::PathsEngine;
-use crate::paths_engine::DEFAULT_CONFIG_NAME;
-use crate::yaml::load_yaml_with_env;
 
 /// Either "aggregator" or "ciphernode"
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -365,7 +365,8 @@ pub fn load_config(
         found_config_file.clone(), // config file we have found to exist
     );
 
-    let loaded_yaml = load_yaml_with_env(&resolved_config_path)?;
+    let loaded_yaml =
+        load_yaml_with_env(&resolved_config_path).context("Configuration file not found")?;
 
     let config: UnscopedAppConfig =
         Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
@@ -374,9 +375,13 @@ pub fn load_config(
                 otel,
                 found_config_file: Some(resolved_config_path),
             }))
-            .extract()?;
+            .extract()
+            .context("Could not parse configuration")?;
 
-    Ok(config.into_scoped(name)?)
+    Ok(config.into_scoped(name).context(format!(
+        "Could not apply scope '{}' to configuration.",
+        name
+    ))?)
 }
 
 pub struct OsDirs;
@@ -405,6 +410,8 @@ pub fn combine_unique<T: Eq + std::hash::Hash + Clone + Ord>(a: &[T], b: &[T]) -
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use super::*;
     use crate::rpc::RpcAuth;
     use figment::Jail;
@@ -536,6 +543,20 @@ nodes:
 
             Ok(())
         });
+    }
+
+    #[test]
+    fn test_file_not_found() -> Result<()> {
+        let Err(err) = load_config("_default", Some("/nope".to_string()), None) else {
+            bail!("error expected");
+        };
+        let Some(e) = err.downcast_ref::<std::io::Error>() else {
+            bail!("io error expected");
+        };
+
+        assert_eq!(e.kind(), std::io::ErrorKind::NotFound);
+
+        Ok(())
     }
 
     #[test]
