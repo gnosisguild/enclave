@@ -35,11 +35,7 @@ impl SledStore {
     pub fn from_db(db: SledDb) -> Result<Self> {
         Ok(Self {
             db: Some(db),
-            bus: EventBus::<EnclaveEvent>::new(EventBusConfig {
-                capture_history: false,
-                deduplicate: true,
-            })
-            .start(),
+            bus: EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start(),
         })
     }
 }
