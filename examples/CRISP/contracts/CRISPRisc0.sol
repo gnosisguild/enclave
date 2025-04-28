@@ -8,7 +8,6 @@ import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.
 import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
-import {IEnclavePolicyFactory} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicyFactory.sol";
 import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
 
@@ -109,11 +108,11 @@ contract CRISPRisc0 is IE3Program, Ownable {
         groupIds[e3Id] = groupId;
 
         // Deploy a new checker
-        address checker = CHECKER_FACTORY.deploy(address(semaphore), 100);
+        address checker = CHECKER_FACTORY.deploy(address(semaphore), groupId);
 
         // Deploy a new policy
         inputValidator = IEnclavePolicy(
-            POLICY_FACTORY.deploy(address(checker), INPUT_LIMIT)
+            POLICY_FACTORY.deploy(checker, INPUT_LIMIT)
         );
         inputValidator.setTarget(msg.sender);
 

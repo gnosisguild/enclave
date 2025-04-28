@@ -2,16 +2,13 @@
 pragma solidity >=0.8.27;
 
 import { IEnclavePolicy } from "../interfaces/IEnclavePolicy.sol";
-import { AdvancedPolicy } from "@excubiae/contracts/policy/AdvancedPolicy.sol";
-import {
-    AdvancedChecker
-} from "@excubiae/contracts/checker/AdvancedChecker.sol";
-import { Check } from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
+import { BasePolicy } from "@excubiae/contracts/policy/BasePolicy.sol";
+import { BaseChecker } from "@excubiae/contracts/checker/BaseChecker.sol";
 
 /// @title BaseERC721Policy.
 /// @notice Policy enforcer for Enclave Input validation.
 /// @dev Extends BasePolicy with Enclave specific checks.
-contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
+contract MockInputValidatorPolicy is BasePolicy, IEnclavePolicy {
     error MainCalledTooManyTimes();
 
     uint8 public inputLimit;
@@ -21,27 +18,24 @@ contract MockInputValidatorPolicy is AdvancedPolicy, IEnclavePolicy {
     /// @dev Decodes AdvancedChecker address and sets the owner.
     function _initialize() internal virtual override {
         bytes memory data = _getAppendedBytes();
-        (address sender, address advCheckerAddr, uint8 _inputLimit) = abi
+        (address sender, address baseCheckerAddr, uint8 _inputLimit) = abi
             .decode(data, (address, address, uint8));
         _transferOwnership(sender);
 
-        ADVANCED_CHECKER = AdvancedChecker(advCheckerAddr);
-        SKIP_PRE = true;
-        SKIP_POST = true;
+        BASE_CHECKER = BaseChecker(baseCheckerAddr);
         inputLimit = _inputLimit;
     }
 
     function _enforce(
         address subject,
-        bytes calldata evidence,
-        Check checkType
-    ) internal override(AdvancedPolicy) onlyTarget {
+        bytes calldata evidence
+    ) internal override(BasePolicy) onlyTarget {
         uint256 status = enforced[subject];
         if (inputLimit > 0 && status == inputLimit) {
             revert MainCalledTooManyTimes();
         }
 
-        super._enforce(subject, evidence, checkType);
+        super._enforce(subject, evidence);
         enforced[subject]++;
     }
 

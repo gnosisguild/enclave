@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import {AdvancedChecker} from "@excubiae/contracts/checker/AdvancedChecker.sol";
+import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
 
 /// @title CRISPChecker.
 /// @notice Enclave Input Validator
 /// @dev Extends BaseChecker for input verification.
-contract CRISPChecker is AdvancedChecker {
+contract CRISPChecker is BaseChecker {
     /// @notice Address of the Semaphore contract used for proof verification.
     ISemaphore public semaphore;
 
@@ -39,11 +39,11 @@ contract CRISPChecker is AdvancedChecker {
     /// @param subject Address to check.
     /// @param evidence mock proof
     /// @return True if proof is valid
-    function _checkMain(
+    function _check(
         address subject,
         bytes calldata evidence
     ) internal view override returns (bool) {
-        super._checkMain(subject, evidence);
+        super._check(subject, evidence);
 
         ISemaphore.SemaphoreProof memory proof = abi.decode(
             evidence,

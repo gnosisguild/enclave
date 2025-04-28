@@ -26,6 +26,9 @@ importers:
       '@zk-kit/lean-imt.sol':
         specifier: 2.0.0
         version: 2.0.0
+      poseidon-solidity:
+        specifier: ^0.0.5
+        version: 0.0.5
       solady:
         specifier: ^0.1.13
         version: 0.1.13
@@ -78,9 +81,6 @@ importers:
       hardhat-gas-reporter:
         specifier: ^1.0.8
         version: 1.0.10(bufferutil@4.0.9)(hardhat@2.22.19(bufferutil@4.0.9)(ts-node@10.9.2(@swc/core@1.11.16)(@types/node@22.7.5)(typescript@5.8.2))(typescript@5.8.2)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)
-      poseidon-solidity:
-        specifier: ^0.0.5
-        version: 0.0.5
       solidity-coverage:
         specifier: ^0.8.1
         version: 0.8.14(hardhat@2.22.19(bufferutil@4.0.9)(ts-node@10.9.2(@swc/core@1.11.16)(@types/node@22.7.5)(typescript@5.8.2))(typescript@5.8.2)(utf-8-validate@5.0.10))

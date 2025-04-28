@@ -2,14 +2,13 @@
 pragma solidity >=0.8.27;
 
 import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
-import {AdvancedPolicy} from "@excubiae/contracts/policy/AdvancedPolicy.sol";
-import {AdvancedChecker} from "@excubiae/contracts/checker/AdvancedChecker.sol";
-import {Check} from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
+import {BasePolicy} from "@excubiae/contracts/policy/BasePolicy.sol";
+import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
 
 /// @title CRISPPolicy
 /// @notice Policy contract for validating inputs based on Semaphore proofs and usage limits.
-contract CRISPPolicy is AdvancedPolicy, IEnclavePolicy {
+contract CRISPPolicy is BasePolicy, IEnclavePolicy {
     /// Errors
     error MainCalledTooManyTimes();
     error InvalidInitializationAddress();
@@ -24,25 +23,21 @@ contract CRISPPolicy is AdvancedPolicy, IEnclavePolicy {
     /// @dev Decodes AdvancedChecker address and sets the owner.
     function _initialize() internal virtual override {
         bytes memory data = _getAppendedBytes();
-        (address sender, address advCheckerAddr, uint8 _inputLimit) = abi
+        (address sender, address baseCheckerAddr, uint8 _inputLimit) = abi
             .decode(data, (address, address, uint8));
         _transferOwnership(sender);
 
-        ADVANCED_CHECKER = AdvancedChecker(advCheckerAddr);
-        SKIP_PRE = true;
-        SKIP_POST = true;
+        BASE_CHECKER = BaseChecker(baseCheckerAddr);
         inputLimit = _inputLimit;
     }
 
     /// @notice Internal enforcement logic: checks nullifier, input limit, and marks nullifier spent.
     /// @param subject The interacting address.
     /// @param evidence Abi-encoded `ISemaphore.SemaphoreProof`.
-    /// @param checkType For multi-phase policy, this is the phase to enforce.
     function _enforce(
         address subject,
-        bytes calldata evidence,
-        Check checkType
-    ) internal override(AdvancedPolicy) onlyTarget {
+        bytes calldata evidence
+    ) internal override(BasePolicy) onlyTarget {
         ISemaphore.SemaphoreProof memory proof = abi.decode(
             evidence,
             (ISemaphore.SemaphoreProof)
@@ -59,7 +54,7 @@ contract CRISPPolicy is AdvancedPolicy, IEnclavePolicy {
             revert MainCalledTooManyTimes();
         }
 
-        super._enforce(subject, evidence, checkType);
+        super._enforce(subject, evidence);
         enforced[subject]++;
     }
 

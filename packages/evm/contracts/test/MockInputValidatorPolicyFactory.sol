@@ -6,8 +6,8 @@ import { IEnclavePolicyFactory } from "../interfaces/IEnclavePolicyFactory.sol";
 import { Factory } from "@excubiae/contracts/proxy/Factory.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @title AdvancedERC721PolicyFactory
-/// @notice Factory for deploying minimal proxy instances of AdvancedERC721Policy.
+/// @title MockInputValidatorPolicyFactory
+/// @notice Factory for deploying minimal proxy instances of MockInputValidatorPolicy.
 /// @dev Encodes configuration data for multi-phase policy validation.
 contract MockInputValidatorPolicyFactory is
     IEnclavePolicyFactory,

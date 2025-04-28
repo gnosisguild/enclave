@@ -3,10 +3,10 @@ pragma solidity >=0.8.27;
 
 // solhint-disable no-empty-blocks
 
-import {
-    IAdvancedPolicy
-} from "@excubiae/contracts/interfaces/IAdvancedPolicy.sol";
+import { IBasePolicy } from "@excubiae/contracts/interfaces/IBasePolicy.sol";
 
 /// @title IEnclavePolicy.
-/// @notice Extends IPolicy with multi-phase validation capabilities.
-interface IEnclavePolicy is IAdvancedPolicy {}
+/// @notice Extends IPolicy with basic validation and enforcement capabilities.
+interface IEnclavePolicy is IBasePolicy {
+
+}

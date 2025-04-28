@@ -66,7 +66,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-    error InvalidComputationRequest(IAdvancedPolicy inputValidator);
+    error InvalidComputationRequest(IEnclavePolicy inputValidator);
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
@@ -232,7 +232,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InputDeadlinePassed(e3Id, e3.expiration)
         );
 
-        e3.inputValidator.enforce(msg.sender, data, Check.MAIN);
+        e3.inputValidator.enforce(msg.sender, data);
         uint256 inputHash = PoseidonT3.hash(
             [uint256(keccak256(data)), inputCounts[e3Id]]
         );
