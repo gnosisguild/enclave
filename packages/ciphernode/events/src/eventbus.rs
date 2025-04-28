@@ -29,16 +29,12 @@ pub trait ErrorEvent: Event {
 
 /// Configuration for EventBus behavior
 pub struct EventBusConfig {
-    pub capture_history: bool,
     pub deduplicate: bool,
 }
 
 impl Default for EventBusConfig {
     fn default() -> Self {
-        Self {
-            capture_history: true,
-            deduplicate: true,
-        }
+        Self { deduplicate: true }
     }
 }
 
@@ -52,7 +48,6 @@ impl Default for EventBusConfig {
 /// being published.
 pub struct EventBus<E: Event> {
     config: EventBusConfig,
-    history: Vec<E>,
     ids: HashSet<E::Id>,
     listeners: HashMap<String, Vec<Recipient<E>>>,
 }
@@ -67,21 +62,29 @@ impl<E: Event> EventBus<E> {
             config,
             listeners: HashMap::new(),
             ids: HashSet::new(),
-            history: vec![],
         }
     }
 
-    fn add_to_history(&mut self, event: E) {
-        if self.config.capture_history {
-            self.history.push(event.clone());
-        }
-        if self.config.deduplicate {
-            self.ids.insert(event.event_id());
-        }
+    pub fn set_config(&mut self, config: EventBusConfig) {
+        self.config = config;
+    }
+
+    fn track(&mut self, event: E) {
+        self.ids.insert(event.event_id());
     }
 
     fn is_duplicate(&self, event: &E) -> bool {
-        self.config.deduplicate && self.ids.contains(&event.event_id())
+        self.ids.contains(&event.event_id())
+    }
+}
+
+impl<E: Event> Default for EventBus<E> {
+    fn default() -> Self {
+        Self {
+            config: EventBusConfig::default(),
+            listeners: HashMap::new(),
+            ids: HashSet::new(),
+        }
     }
 }
 
@@ -130,7 +133,7 @@ impl<E: Event> GetHistory<E> {
     }
 }
 
-impl<E: Event> Handler<GetHistory<E>> for EventBus<E> {
+impl<E: Event> Handler<GetHistory<E>> for HistoryCollector<E> {
     type Result = Vec<E>;
 
     fn handle(&mut self, _: GetHistory<E>, _: &mut Context<Self>) -> Vec<E> {
@@ -142,7 +145,7 @@ impl<E: Event> Handler<GetHistory<E>> for EventBus<E> {
 #[rtype(result = "()")]
 pub struct ResetHistory;
 
-impl<E: Event> Handler<ResetHistory> for EventBus<E> {
+impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
     type Result = ();
 
     fn handle(&mut self, _: ResetHistory, _: &mut Context<Self>) {
@@ -164,11 +167,11 @@ impl<E: ErrorEvent> GetErrors<E> {
     }
 }
 
-impl<E: ErrorEvent> Handler<GetErrors<E>> for EventBus<E> {
+impl<E: ErrorEvent> Handler<GetErrors<E>> for ErrorCollector<E> {
     type Result = Vec<E::Error>;
 
     fn handle(&mut self, _: GetErrors<E>, _: &mut Context<Self>) -> Vec<E::Error> {
-        self.history
+        self.errors
             .iter()
             .filter_map(|evt| evt.as_error())
             .cloned()
@@ -200,7 +203,7 @@ impl<E: Event> Handler<E> for EventBus<E> {
             }
         }
 
-        self.add_to_history(event);
+        self.track(event);
     }
 }
 
@@ -223,4 +226,77 @@ impl<E: ErrorEvent> BusError<E> for Recipient<E> {
     fn err(&self, err_type: E::ErrorType, err: anyhow::Error) {
         self.do_send(E::from_error(err_type, err))
     }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// History Collector
+//////////////////////////////////////////////////////////////////////////////
+
+/// Actor to subscribe to EventBus to capture all history
+pub struct HistoryCollector<E: Event> {
+    history: Vec<E>,
+}
+
+impl<E: ErrorEvent> HistoryCollector<E> {
+    pub fn new() -> Self {
+        Self {
+            history: Vec::new(),
+        }
+    }
+}
+
+impl<E: Event> Actor for HistoryCollector<E> {
+    type Context = Context<Self>;
+}
+
+impl<E: Event> Handler<E> for HistoryCollector<E> {
+    type Result = E::Result;
+    fn handle(&mut self, msg: E, ctx: &mut Self::Context) -> Self::Result {
+        self.history.push(msg);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Error Collector
+//////////////////////////////////////////////////////////////////////////////
+
+/// Actor to subscribe to EventBus to capture errors
+pub struct ErrorCollector<E: ErrorEvent> {
+    errors: Vec<E>,
+}
+
+impl<E: ErrorEvent> ErrorCollector<E> {
+    pub fn new() -> Self {
+        Self { errors: Vec::new() }
+    }
+}
+
+impl<E: ErrorEvent> Actor for ErrorCollector<E> {
+    type Context = Context<Self>;
+}
+
+impl<E: ErrorEvent> Handler<E> for ErrorCollector<E> {
+    type Result = E::Result;
+    fn handle(&mut self, msg: E, _: &mut Self::Context) -> Self::Result {
+        if let Some(_) = msg.as_error() {
+            self.errors.push(msg);
+        }
+    }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Test Helper Functions
+//////////////////////////////////////////////////////////////////////////////
+
+/// Function to help with testing when we want to maintain a vec of events
+pub fn new_event_bus_with_history<E: Event>() -> (Addr<EventBus<E>>, Addr<HistoryCollector<E>>) {
+    let bus = EventBus::<E>::default().start();
+
+    let history = HistoryCollector {
+        history: Vec::new(),
+    }
+    .start();
+
+    bus.do_send(Subscribe::new("*", history.clone().recipient()));
+    (bus, history)
 }
