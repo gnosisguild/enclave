@@ -7,6 +7,4 @@ import { IBaseChecker } from "@excubiae/contracts/interfaces/IBaseChecker.sol";
 
 /// @title IEnclaveChecker.
 /// @notice Extends IBaseChecker
-interface IEnclaveChecker is IBaseChecker {
-
-}
+interface IEnclaveChecker is IBaseChecker {}

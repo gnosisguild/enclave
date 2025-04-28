@@ -7,6 +7,4 @@ import { IBasePolicy } from "@excubiae/contracts/interfaces/IBasePolicy.sol";
 
 /// @title IEnclavePolicy.
 /// @notice Extends IPolicy with basic validation and enforcement capabilities.
-interface IEnclavePolicy is IBasePolicy {
-
-}
+interface IEnclavePolicy is IBasePolicy {}
