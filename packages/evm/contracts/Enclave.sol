@@ -4,10 +4,6 @@ pragma solidity >=0.8.27;
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { IEnclavePolicy } from "./interfaces/IEnclavePolicy.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
-import {
-    IAdvancedPolicy
-} from "@excubiae/contracts/interfaces/IAdvancedPolicy.sol";
-import { Check } from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
