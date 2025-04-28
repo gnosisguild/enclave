@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Poll } from '@/model/poll.model'
 import Card from '@/components/Cards/Card'
 import CircularTiles from '@/components/CircularTiles'
@@ -8,6 +8,7 @@ import LoadingAnimation from '@/components/LoadingAnimation'
 import { hasPollEnded } from '@/utils/methods'
 import CountdownTimer from '@/components/CountdownTime'
 import { useModal } from 'connectkit'
+import RegistrationModal from '@/components/RegistrationModal'
 
 type DailyPollSectionProps = {
   onVoted?: (vote: Poll) => void
@@ -17,11 +18,22 @@ type DailyPollSectionProps = {
 }
 
 const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, voteCasting, endTime }) => {
-  const { user, pollOptions, setPollOptions, roundState } = useVoteManagementContext()
+  const {
+    user,
+    pollOptions,
+    setPollOptions,
+    roundState,
+    semaphoreIdentity,
+    isRegistering,
+    isRegisteredForCurrentRound,
+    registerIdentityOnContract,
+    broadcastVote,
+  } = useVoteManagementContext()
   const isEnded = roundState ? hasPollEnded(roundState?.duration, roundState?.start_time) : false
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
   const { setOpen } = useModal()
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
 
   const handleChecked = (selectedId: number) => {
     const updatedOptions = pollOptions.map((option) => ({
@@ -38,10 +50,25 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, v
       setOpen(true)
       return;
     }
+    if (!isRegisteredForCurrentRound) {
+      setShowRegistrationModal(true);
+      return;
+    }
     if (pollSelected && onVoted) {
       onVoted(pollSelected)
     }
+    if (pollSelected && user && isRegisteredForCurrentRound) {
+      console.log("Ready to broadcast vote for:", pollSelected, "by user:", user.address);
+    } else {
+      console.log("Cannot cast vote: User not registered or poll not selected.");
+    }
   }
+
+  useEffect(() => {
+    if (isRegisteredForCurrentRound && showRegistrationModal) {
+      setShowRegistrationModal(false);
+    }
+  }, [isRegisteredForCurrentRound, showRegistrationModal]);
 
   const statusClass = !isEnded ? 'lime' : 'red'
 
@@ -98,15 +125,21 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, v
               {noPollSelected && !isEnded && <div className='text-center text-sm leading-none text-slate-500'>Select your favorite</div>}
               <button
                 className={`button-outlined button-max ${noPollSelected ? 'button-disabled' : ''}`}
-                disabled={noPollSelected || loading || !roundState || isEnded}
+                disabled={noPollSelected || loading || !roundState || isEnded || isRegistering}
                 onClick={castVote}
               >
-                cast vote
+                {isRegistering ? 'Registering...' : 'Cast Vote'}
               </button>
             </div>
           )}
         </div>
       </div>
+      <RegistrationModal 
+        isOpen={showRegistrationModal}
+        onClose={() => setShowRegistrationModal(false)}
+        isRegistering={isRegistering}
+        onRegister={registerIdentityOnContract}
+      />
     </>
   )
 }

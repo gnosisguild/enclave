@@ -2,13 +2,17 @@ import { createGenericContext } from '@/utils/create-generic-context'
 import { VoteManagementContextType, VoteManagementProviderProps } from '@/context/voteManagement'
 import { useWebAssemblyHook } from '@/hooks/wasm/useWebAssembly'
 import { useEffect, useState } from 'react'
-import { useAccount } from 'wagmi'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { Identity } from '@semaphore-protocol/core/identity'
+import useLocalStorage from '@/hooks/generic/useLocalStorage'
 import { VoteStateLite, VotingRound } from '@/model/vote.model'
 import { useEnclaveServer } from '@/hooks/enclave/useEnclaveServer'
 import { convertPollData, convertTimestampToDate } from '@/utils/methods'
 import { Poll, PollResult } from '@/model/poll.model'
 import { generatePoll } from '@/utils/generate-random-poll'
 import { handleGenericError } from '@/utils/handle-generic-error'
+import { E3_PROGRAM_ADDRESS, E3_PROGRAM_ABI } from '@/config/contracts'
+import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx'
 
 const [useVoteManagementContext, VoteManagementContextProvider] = createGenericContext<VoteManagementContextType>()
 
@@ -17,10 +21,18 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
    * Wagmi Account State
    **/
   const { address, isConnected } = useAccount()
+  const { data: hash, error: writeError, isPending: isWritePending, writeContract } = useWriteContract();
+
+  /**
+   * Notification Hook
+   **/
+  const { showToast } = useNotificationAlertContext()
 
   /**
    * Voting Management States
    **/
+  const [identityPrivateKey, setIdentityPrivateKey] = useLocalStorage<string | undefined>('semaphoreIdentity', undefined)
+  const [semaphoreIdentity, setSemaphoreIdentity] = useState<Identity | null>(null)
   const [user, setUser] = useState<{ address: string } | null>(null)
   const [roundState, setRoundState] = useState<VoteStateLite | null>(null)
   const [votingRound, setVotingRound] = useState<VotingRound | null>(null)
@@ -30,6 +42,8 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   const [pastPolls, setPastPolls] = useState<PollResult[]>([])
   const [txUrl, setTxUrl] = useState<string | undefined>(undefined)
   const [pollResult, setPollResult] = useState<PollResult | null>(null)
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
+  const [isRegisteredForCurrentRound, setIsRegisteredForCurrentRound] = useState<boolean>(false); // Frontend tracking
 
   /**
    * Voting Management Methods
@@ -74,6 +88,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     }
     if (roundState) {
       setRoundState(roundState)
+      setIsRegisteredForCurrentRound(false); // Reset registration status for new round
       setVotingRound({ round_id: roundState.id, pk_bytes: roundState.committee_public_key })
       setPollOptions(generatePoll({ round_id: roundState.id, emojis: roundState.emojis }))
       setRoundEndDate(convertTimestampToDate(roundState.start_time, roundState.duration))
@@ -101,7 +116,61 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     setIsLoading(false)
   }, [wasmLoading, enclaveLoading])
 
-  // Update user state when wallet connection changes
+  // Function to register identity on the contract
+  const registerIdentityOnContract = async () => {
+    if (!roundState || !semaphoreIdentity || !isConnected) {
+      console.error('Cannot register: Missing round state, identity, or wallet connection.');
+      showToast({ type: 'danger', message: 'Cannot register identity. Ensure wallet is connected and round is active.' });
+      return;
+    }
+
+    const identityCommitment = semaphoreIdentity.commitment;
+    console.log(`Registering commitment: ${identityCommitment} for round: ${roundState.id}`);
+
+    writeContract({
+      address: E3_PROGRAM_ADDRESS,
+      abi: E3_PROGRAM_ABI,
+      functionName: 'registerMember',
+      args: [BigInt(roundState.id), identityCommitment],
+    });
+  };
+
+  // Monitor registration transaction
+  const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmationError } = useWaitForTransactionReceipt({ hash });
+
+  useEffect(() => {
+    setIsRegistering(isWritePending || isConfirming);
+  }, [isWritePending, isConfirming]);
+
+  useEffect(() => {
+    if (isConfirmed) {
+      console.log('Registration successful!', hash);
+      showToast({ type: 'success', message: 'Identity registered successfully!' });
+      setIsRegisteredForCurrentRound(true);
+    }
+    if (writeError || confirmationError) {
+      console.error('Registration failed:', writeError || confirmationError);
+      showToast({ type: 'danger', message: `Registration failed` });
+    }
+  }, [isConfirmed, writeError, confirmationError, hash, showToast]);
+
+  useEffect(() => {
+    if (semaphoreIdentity) {
+      return;
+    }
+
+    let identity: Identity;
+    if (identityPrivateKey) {
+      identity = Identity.import(identityPrivateKey);
+      console.log('Semaphore identity loaded from storage.');
+    } else {
+      identity = new Identity();
+      setIdentityPrivateKey(identity.export());
+      console.log('New Semaphore identity generated and saved.');
+    }
+    setSemaphoreIdentity(identity);
+  }, [identityPrivateKey, setIdentityPrivateKey, semaphoreIdentity]);
+
   useEffect(() => {
     if (isConnected && address) {
       setUser({ address })
@@ -115,7 +184,10 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
       value={{
         isLoading,
         user,
+        semaphoreIdentity,
         votingRound,
+        isRegistering,
+        isRegisteredForCurrentRound,
         roundEndDate,
         pollOptions,
         roundState,
@@ -133,6 +205,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
         setPollOptions,
         initialLoad,
         broadcastVote,
+        registerIdentityOnContract,
         setVotingRound,
         setUser,
         encryptVote,
