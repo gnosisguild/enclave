@@ -20,3 +20,4 @@ alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }
 once_cell = { workspace = true }
+tracing = { workspace = true }

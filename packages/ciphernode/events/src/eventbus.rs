@@ -1,5 +1,6 @@
 use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::marker::PhantomData;
 
@@ -8,7 +9,7 @@ use std::marker::PhantomData;
 //////////////////////////////////////////////////////////////////////////////
 
 /// Trait that must be implemented by events used with EventBus
-pub trait Event: Message<Result = ()> + Clone + Send + Sync + Unpin + 'static {
+pub trait Event: Message<Result = ()> + Clone + Display + Send + Sync + Unpin + 'static {
     type Id: Hash + Eq + Clone + Unpin + Send + Sync;
     fn event_type(&self) -> String;
     fn event_id(&self) -> Self::Id;
@@ -88,6 +89,33 @@ impl<E: Event> Default for EventBus<E> {
     }
 }
 
+impl<E: Event> Handler<E> for EventBus<E> {
+    type Result = ();
+
+    fn handle(&mut self, event: E, _: &mut Context<Self>) {
+        if self.is_duplicate(&event) {
+            return;
+        }
+
+        if let Some(listeners) = self.listeners.get("*") {
+            for listener in listeners {
+                listener.do_send(event.clone())
+            }
+        }
+
+        if let Some(listeners) = self.listeners.get(&event.event_type()) {
+            for listener in listeners {
+                listener.do_send(event.clone())
+            }
+        }
+
+        // TODO: workshop to work out best display format
+        tracing::info!(">>> {}", event);
+
+        self.track(event);
+    }
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // Subscribe Message
 //////////////////////////////////////////////////////////////////////////////
@@ -153,10 +181,6 @@ impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
     }
 }
 
-//////////////////////////////////////////////////////////////////////////////
-// Error Handling
-//////////////////////////////////////////////////////////////////////////////
-
 #[derive(Message)]
 #[rtype(result = "Vec<E::Error>")]
 pub struct GetErrors<E: ErrorEvent>(PhantomData<E>);
@@ -164,46 +188,6 @@ pub struct GetErrors<E: ErrorEvent>(PhantomData<E>);
 impl<E: ErrorEvent> GetErrors<E> {
     pub fn new() -> Self {
         Self(PhantomData)
-    }
-}
-
-impl<E: ErrorEvent> Handler<GetErrors<E>> for ErrorCollector<E> {
-    type Result = Vec<E::Error>;
-
-    fn handle(&mut self, _: GetErrors<E>, _: &mut Context<Self>) -> Vec<E::Error> {
-        self.errors
-            .iter()
-            .filter_map(|evt| evt.as_error())
-            .cloned()
-            .collect()
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// Event Handling
-//////////////////////////////////////////////////////////////////////////////
-
-impl<E: Event> Handler<E> for EventBus<E> {
-    type Result = ();
-
-    fn handle(&mut self, event: E, _: &mut Context<Self>) {
-        if self.is_duplicate(&event) {
-            return;
-        }
-
-        if let Some(listeners) = self.listeners.get("*") {
-            for listener in listeners {
-                listener.do_send(event.clone())
-            }
-        }
-
-        if let Some(listeners) = self.listeners.get(&event.event_type()) {
-            for listener in listeners {
-                listener.do_send(event.clone())
-            }
-        }
-
-        self.track(event);
     }
 }
 
@@ -281,6 +265,18 @@ impl<E: ErrorEvent> Handler<E> for ErrorCollector<E> {
         if let Some(_) = msg.as_error() {
             self.errors.push(msg);
         }
+    }
+}
+
+impl<E: ErrorEvent> Handler<GetErrors<E>> for ErrorCollector<E> {
+    type Result = Vec<E::Error>;
+
+    fn handle(&mut self, _: GetErrors<E>, _: &mut Context<Self>) -> Vec<E::Error> {
+        self.errors
+            .iter()
+            .filter_map(|evt| evt.as_error())
+            .cloned()
+            .collect()
     }
 }
 

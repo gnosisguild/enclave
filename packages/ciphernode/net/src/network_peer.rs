@@ -104,10 +104,10 @@ impl NetworkPeer {
             None => "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
         };
 
-        info!("Requesting node.listen_on('{}')", addr);
+        trace!("Requesting node.listen_on('{}')", addr);
         self.swarm.listen_on(addr.parse()?)?;
 
-        info!("Peers to dial: {:?}", self.peers);
+        trace!("Peers to dial: {:?}", self.peers);
         tokio::spawn({
             let event_tx = event_tx.clone();
             let peers = self.peers.clone();
@@ -137,11 +137,11 @@ impl NetworkPeer {
                             }
                         },
                         NetworkPeerCommand::Dial(multi) => {
-                            info!("DIAL: {:?}", multi);
+                            trace!("DIAL: {:?}", multi);
                             match self.swarm.dial(multi) {
-                                Ok(v) => info!("Dial returned {:?}", v),
+                                Ok(v) => trace!("Dial returned {:?}", v),
                                 Err(error) => {
-                                    info!("Dialing error! {}", error);
+                                    warn!("Dialing error! {}", error);
                                     event_tx.send(NetworkPeerEvent::DialError { error: error.into() })?;
                                 }
                             }
@@ -227,9 +227,9 @@ async fn process_swarm_event(
                 .kademlia
                 .add_address(&peer_id, remote_addr.clone());
 
-            info!("Added address to kademlia {}", remote_addr);
+            trace!("Added address to kademlia {}", remote_addr);
             swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-            info!("Added peer to gossipsub {}", remote_addr);
+            trace!("Added peer to gossipsub {}", remote_addr);
             event_tx.send(NetworkPeerEvent::ConnectionEstablished { connection_id })?;
         }
 
@@ -238,7 +238,7 @@ async fn process_swarm_event(
             error,
             connection_id,
         } => {
-            info!("Failed to dial {peer_id:?}: {error}");
+            warn!("Failed to dial {peer_id:?}: {error}");
             event_tx.send(NetworkPeerEvent::OutgoingConnectionError {
                 connection_id,
                 error: Arc::new(error),
@@ -279,7 +279,7 @@ async fn process_swarm_event(
             event_tx.send(NetworkPeerEvent::GossipData(message.data))?;
         }
         SwarmEvent::NewListenAddr { address, .. } => {
-            warn!("Local node is listening on {address}");
+            trace!("Local node is listening on {address}");
         }
         _ => {}
     };
