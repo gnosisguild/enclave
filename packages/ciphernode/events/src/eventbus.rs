@@ -1,4 +1,7 @@
 use actix::prelude::*;
+use anyhow::anyhow;
+use anyhow::Result;
+use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
@@ -39,6 +42,12 @@ impl Default for EventBusConfig {
     }
 }
 
+fn default_bloomfilter() -> BloomFilter {
+    let num_items = 10000000;
+    let fp_rate = 0.001;
+    BloomFilter::with_rate(fp_rate, num_items)
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // EventBus Implementation
 //////////////////////////////////////////////////////////////////////////////
@@ -49,7 +58,7 @@ impl Default for EventBusConfig {
 /// being published.
 pub struct EventBus<E: Event> {
     config: EventBusConfig,
-    ids: HashSet<E::Id>,
+    ids: BloomFilter,
     listeners: HashMap<String, Vec<Recipient<E>>>,
 }
 
@@ -62,7 +71,7 @@ impl<E: Event> EventBus<E> {
         EventBus {
             config,
             listeners: HashMap::new(),
-            ids: HashSet::new(),
+            ids: default_bloomfilter(),
         }
     }
 
@@ -71,7 +80,7 @@ impl<E: Event> EventBus<E> {
     }
 
     fn track(&mut self, event: E) {
-        self.ids.insert(event.event_id());
+        self.ids.insert(&event.event_id());
     }
 
     fn is_duplicate(&self, event: &E) -> bool {
@@ -84,7 +93,7 @@ impl<E: Event> Default for EventBus<E> {
         Self {
             config: EventBusConfig::default(),
             listeners: HashMap::new(),
-            ids: HashSet::new(),
+            ids: default_bloomfilter(),
         }
     }
 }
