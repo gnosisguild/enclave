@@ -15,10 +15,23 @@ export interface CurrentRound {
   id: number
 }
 
+export type NumericString = string;
+export type PackedGroth16Proof = [NumericString, NumericString, NumericString, NumericString, NumericString, NumericString, NumericString, NumericString];
+
+// Semaphore proof structure as required by the verifier
+export interface SemaphoreProof {
+  merkleTreeDepth: number;
+  merkleTreeRoot: NumericString;
+  message: NumericString;
+  nullifier: NumericString;
+  scope: NumericString;
+  points: PackedGroth16Proof;
+}
 export interface BroadcastVoteRequest {
   round_id: number
   enc_vote_bytes: number[] //bytes
   address: string
+  proof_sem: SemaphoreProof
 }
 
 export type VoteResponseStatus = 'success' | 'user_already_voted' | 'failed_broadcast';
@@ -42,4 +55,20 @@ export interface VoteStateLite {
 
   committee_public_key: number[]
   emojis: [string, string]
+}
+
+
+export interface SemaphoreRegistrationRequest {
+  round_id: number
+  identity_commitment: string
+  group_id: number
+}
+
+export interface SemaphoreRegistrationResponse {
+  response: string
+}
+
+export interface GroupIdResponse {
+  group_id: string;
+  exists: boolean;
 }
