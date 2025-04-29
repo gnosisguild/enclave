@@ -1,4 +1,10 @@
-export const E3_PROGRAM_ADDRESS = '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d';
+const E3_PROGRAM_ADDRESS_FROM_ENV = import.meta.env.VITE_E3_PROGRAM_ADDRESS;
+
+if (!E3_PROGRAM_ADDRESS_FROM_ENV) {
+    throw new Error("VITE_E3_PROGRAM_ADDRESS environment variable is not set.");
+}
+
+export const E3_PROGRAM_ADDRESS = E3_PROGRAM_ADDRESS_FROM_ENV;
 
 export const E3_PROGRAM_ABI = [
     {
