@@ -2,7 +2,14 @@
 
 set -euo pipefail
 
-# wait until nodes are up
-sleep 3
+CN1=$(cat enclave.config.yaml | yq '.nodes.cn1.address')
+CN2=$(cat enclave.config.yaml | yq '.nodes.cn2.address')
+CN3=$(cat enclave.config.yaml | yq '.nodes.cn3.address')
 
-cd /app && /app/examples/CRISP/scripts/local_dev/add_ciphernodes.sh
+cd /app
+
+# Add ciphernodes using variables from config.sh
+pnpm ciphernode:add --ciphernode-address "$CN1" --network "localhost"
+pnpm ciphernode:add --ciphernode-address "$CN2" --network "localhost"
+pnpm ciphernode:add --ciphernode-address "$CN3" --network "localhost"
+

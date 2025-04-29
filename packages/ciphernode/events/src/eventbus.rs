@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 
 /// Trait that must be implemented by events used with EventBus
 pub trait Event: Message<Result = ()> + Clone + Send + Sync + Unpin + 'static {
-    type Id: Hash + Eq + Clone + Unpin;
+    type Id: Hash + Eq + Clone + Unpin + Send + Sync;
     fn event_type(&self) -> String;
     fn event_id(&self) -> Self::Id;
 }

@@ -58,6 +58,10 @@ where
         self.store.write(value)
     }
 
+    pub async fn write_sync(&self, value: &T) -> Result<()> {
+        self.store.write_sync(value).await
+    }
+
     pub fn clear(&self) {
         self.store.write::<Option<T>>(None)
     }

@@ -14,7 +14,7 @@
     "lint": "pnpm evm:lint && pnpm ciphernode:lint",
     "typechain": "pnpm evm:typechain",
     "test": "pnpm evm:test && pnpm ciphernode:test",
-    "test:integration": "./tests/integration/test.sh",
+    "test:integration": "cd ./tests/integration && ./test.sh",
     "coverage": "pnpm evm:coverage",
     "prepare": "husky",
     "enclave": "cd packages/ciphernode && ./scripts/launch.sh",
