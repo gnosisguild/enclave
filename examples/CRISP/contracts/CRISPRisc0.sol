@@ -28,6 +28,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
     mapping(uint256 e3Id => uint256 groupId) public groupIds;
+    // Could Save These in the Policy Contract and add a Pre-Check
     mapping(uint256 groupId => mapping(uint256 identityCommitment => bool))
         public committed;
     mapping(uint256 groupId => uint256[]) public groupCommitments;

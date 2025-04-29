@@ -48,6 +48,9 @@ contract CRISPPolicy is BasePolicy, IEnclavePolicy {
         return vote;
     }
 
+    /// @notice Internal enforcement logic: checks nullifier, input limit, and marks nullifier spent.
+    /// @param subject The interacting address.
+    /// @param evidence Abi-encoded `ISemaphore.SemaphoreProof`.
     function _enforceChecks(address subject, bytes memory evidence) internal {
         ISemaphore.SemaphoreProof memory proof = abi.decode(
             evidence,
