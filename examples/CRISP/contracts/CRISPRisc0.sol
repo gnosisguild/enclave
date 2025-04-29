@@ -28,6 +28,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
     mapping(uint256 e3Id => uint256 groupId) public groupIds;
+    mapping(uint256 => bool) public committed;
     // Events
     event InputValidatorUpdated(address indexed newValidator);
 
@@ -41,6 +42,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
     error InvalidPolicyFactory();
     error InvalidCheckerFactory();
     error GroupDoesNotExist();
+    error AlreadyRegistered();
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     /// @param _enclave The enclave address
@@ -75,10 +77,12 @@ contract CRISPRisc0 is IE3Program, Ownable {
     /// @notice Register a Member to the semaphore group
     /// @param e3Id The E3 program ID
     /// @param identityCommitment The identity commitment
-    function registerMember(uint256 e3Id, uint256 identityCommitment) public {
+    function registerMember(uint256 e3Id, uint256 identityCommitment) external {
+        require(paramsHashes[e3Id] != bytes32(0), GroupDoesNotExist());
         uint256 groupId = groupIds[e3Id];
 
-        require(groupId != 0, GroupDoesNotExist());
+        require(!committed[identityCommitment], AlreadyRegistered());
+        committed[identityCommitment] = true;
 
         semaphore.addMember(groupId, identityCommitment);
     }

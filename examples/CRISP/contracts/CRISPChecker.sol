@@ -53,9 +53,6 @@ contract CRISPChecker is BaseChecker {
         // The proof scope encodes both the subject address and group ID to prevent front-running attacks.
         uint256 _scope = proof.scope;
 
-        // Extract the subject's address (first 20 bytes, 160 bits) from the scope.
-        address _prover = address(uint160(_scope >> 96));
-
         // Extract the group ID (remaining 12 bytes, 96 bits) from the scope.
         uint96 _groupId = uint96(_scope & ((1 << 96) - 1));
 
@@ -63,9 +60,15 @@ contract CRISPChecker is BaseChecker {
             revert InvalidGroup();
         }
 
-        if (_prover != subject) {
-            revert InvalidProver();
-        }
+        /// Uncomment this to check the prover, this checks that the prover is the same as the subject
+        /// This is not needed for the CRISP protocol, since the subject is the relayer
+        /// Extract the subject's address (first 20 bytes, 160 bits) from the scope.
+        // ===============================
+        // address _prover = address(uint160(_scope >> 96));
+        // if (_prover != subject) {
+        //     revert InvalidProver();
+        // }
+        // ===============================
 
         if (!semaphore.verifyProof(_scope, proof)) {
             revert InvalidProof();
