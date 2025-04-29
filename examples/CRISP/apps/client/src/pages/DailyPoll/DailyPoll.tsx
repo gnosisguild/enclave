@@ -1,4 +1,4 @@
-import React, { Fragment, useCallback, useEffect, useState } from 'react'
+import React, { Fragment, useEffect, useState } from 'react'
 import DailyPollSection from '@/pages/Landing/components/DailyPoll'
 import { useVoteManagementContext } from '@/context/voteManagement'
 import { convertTimestampToDate } from '@/utils/methods'

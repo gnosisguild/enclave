@@ -28,7 +28,10 @@ contract CRISPRisc0 is IE3Program, Ownable {
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
     mapping(uint256 e3Id => uint256 groupId) public groupIds;
-    mapping(uint256 => bool) public committed;
+    mapping(uint256 groupId => mapping(uint256 identityCommitment => bool))
+        public committed;
+    mapping(uint256 groupId => uint256[]) public groupCommitments;
+
     // Events
     event InputValidatorUpdated(address indexed newValidator);
 
@@ -81,10 +84,20 @@ contract CRISPRisc0 is IE3Program, Ownable {
         require(paramsHashes[e3Id] != bytes32(0), GroupDoesNotExist());
         uint256 groupId = groupIds[e3Id];
 
-        require(!committed[identityCommitment], AlreadyRegistered());
-        committed[identityCommitment] = true;
+        require(!committed[groupId][identityCommitment], AlreadyRegistered());
+        committed[groupId][identityCommitment] = true;
+        groupCommitments[groupId].push(identityCommitment);
 
         semaphore.addMember(groupId, identityCommitment);
+    }
+
+    /// @notice Get the group commitments
+    /// @param groupId The group ID
+    /// @return The group commitments
+    function getGroupCommitments(
+        uint256 groupId
+    ) public view returns (uint256[] memory) {
+        return groupCommitments[groupId];
     }
 
     /// @notice Get the params hash for an E3 program

@@ -10,7 +10,7 @@ export type VoteManagementContextType = {
   isRegistering: boolean
   isRegisteredForCurrentRound: boolean
   fetchingMembers: boolean
-  currentGroupMembers: string[]
+  currentGroupMembers: bigint[]
   currentSemaphoreGroupId: bigint | null
   votingRound: VotingRound | null
   roundEndDate: Date | null

@@ -54,7 +54,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     groupMembers: currentGroupMembers, 
     isFetchingMembers: fetchingMembers, 
     isRegistering, 
-    isRegistered: isRegisteredForCurrentRound,
+    isCommitted: isRegisteredForCurrentRound,
     registerIdentity: registerIdentityOnContract
   } = useSemaphoreGroupManagement(roundState?.id, semaphoreIdentity);
 
