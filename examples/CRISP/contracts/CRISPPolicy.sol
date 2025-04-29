@@ -31,6 +31,42 @@ contract CRISPPolicy is BasePolicy, IEnclavePolicy {
         inputLimit = _inputLimit;
     }
 
+    /// @notice Validate the input and return the vote.
+    /// @param subject The subject to validate the policy on.
+    /// @param evidence Abi-encoded `ISemaphore.SemaphoreProof`.
+    function validate(
+        address subject,
+        bytes calldata evidence
+    ) external override onlyTarget returns (bytes memory voteBytes) {
+        (bytes memory proofBytes, bytes memory vote) = abi.decode(
+            evidence,
+            (bytes, bytes)
+        );
+
+        _enforceChecks(subject, proofBytes);
+
+        return vote;
+    }
+
+    function _enforceChecks(address subject, bytes memory evidence) internal {
+        ISemaphore.SemaphoreProof memory proof = abi.decode(
+            evidence,
+            (ISemaphore.SemaphoreProof)
+        );
+
+        uint256 n = proof.nullifier;
+        if (spentNullifiers[n]) revert AlreadyEnforced();
+        spentNullifiers[n] = true;
+
+        if (inputLimit > 0 && enforced[subject] == inputLimit)
+            revert MainCalledTooManyTimes();
+
+        if (!BASE_CHECKER.check(subject, evidence)) revert UnsuccessfulCheck();
+        emit Enforced(subject, guarded, evidence);
+
+        enforced[subject]++;
+    }
+
     /// @notice Internal enforcement logic: checks nullifier, input limit, and marks nullifier spent.
     /// @param subject The interacting address.
     /// @param evidence Abi-encoded `ISemaphore.SemaphoreProof`.
@@ -38,24 +74,7 @@ contract CRISPPolicy is BasePolicy, IEnclavePolicy {
         address subject,
         bytes calldata evidence
     ) internal override(BasePolicy) onlyTarget {
-        ISemaphore.SemaphoreProof memory proof = abi.decode(
-            evidence,
-            (ISemaphore.SemaphoreProof)
-        );
-        uint256 _nullifier = proof.nullifier;
-
-        if (spentNullifiers[_nullifier]) {
-            revert AlreadyEnforced();
-        }
-        spentNullifiers[_nullifier] = true;
-
-        uint8 count = enforced[subject];
-        if (inputLimit > 0 && count == inputLimit) {
-            revert MainCalledTooManyTimes();
-        }
-
-        super._enforce(subject, evidence);
-        enforced[subject]++;
+        _enforceChecks(subject, evidence);
     }
 
     /// @notice Returns policy identifier "CRISPPolicy".

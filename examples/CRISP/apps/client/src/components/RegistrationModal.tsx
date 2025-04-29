@@ -1,12 +1,12 @@
 import React from 'react';
-import Modal from '@/components/Modal'; // Assuming you have a generic Modal component
+import Modal from '@/components/Modal';
 
 interface RegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRegister: () => void;
   isRegistering: boolean;
-  explanation?: string; // Optional custom explanation
+  explanation?: string;
 }
 
 const DEFAULT_EXPLANATION = (

@@ -9,6 +9,9 @@ export type VoteManagementContextType = {
   semaphoreIdentity: Identity | null
   isRegistering: boolean
   isRegisteredForCurrentRound: boolean
+  fetchingMembers: boolean
+  currentGroupMembers: string[]
+  currentSemaphoreGroupId: bigint | null
   votingRound: VotingRound | null
   roundEndDate: Date | null
   pollOptions: Poll[]
@@ -31,7 +34,6 @@ export type VoteManagementContextType = {
   getRoundStateLite: (roundCount: number) => Promise<void>
   setPastPolls: React.Dispatch<React.SetStateAction<PollResult[]>>
   getWebResult: () => Promise<PollRequestResult[] | undefined>
-  logout: () => void
 }
 
 export type VoteManagementProviderProps = {

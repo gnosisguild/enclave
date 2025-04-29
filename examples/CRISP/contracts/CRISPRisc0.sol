@@ -72,6 +72,9 @@ contract CRISPRisc0 is IE3Program, Ownable {
         authorizedContracts[address(_enclave)] = true;
     }
 
+    /// @notice Register a Member to the semaphore group
+    /// @param e3Id The E3 program ID
+    /// @param identityCommitment The identity commitment
     function registerMember(uint256 e3Id, uint256 identityCommitment) public {
         uint256 groupId = groupIds[e3Id];
 

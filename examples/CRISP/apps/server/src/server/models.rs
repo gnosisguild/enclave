@@ -53,6 +53,7 @@ pub struct EncryptedVote {
     pub round_id: u64,
     pub enc_vote_bytes: Vec<u8>,
     pub address: String,
+    pub proof_sem: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -26,6 +26,14 @@ contract MockInputValidatorPolicy is BasePolicy, IEnclavePolicy {
         inputLimit = _inputLimit;
     }
 
+    function validate(
+        address subject,
+        bytes calldata evidence
+    ) external override onlyTarget returns (bytes memory vote) {
+        _enforce(subject, evidence);
+        return vote;
+    }
+
     function _enforce(
         address subject,
         bytes calldata evidence
