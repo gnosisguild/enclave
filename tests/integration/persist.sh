@@ -16,27 +16,11 @@ until curl -f -s "http://localhost:8545" > /dev/null; do
   sleep 1
 done
 
-# Set the password for all ciphernodes
-set_password cn1 "$CIPHERNODE_SECRET"
-set_password cn2 "$CIPHERNODE_SECRET"
-set_password cn3 "$CIPHERNODE_SECRET"
-set_password cn4 "$CIPHERNODE_SECRET"
-set_password ag "$CIPHERNODE_SECRET"
-set_private_key ag "$PRIVATE_KEY"
+# set wallet to ag specifically
+enclave_wallet_set ag "$PRIVATE_KEY"
 
-# Set the network private key for all ciphernodes
-set_network_private_key cn1 "$NETWORK_PRIVATE_KEY_1"
-set_network_private_key cn2 "$NETWORK_PRIVATE_KEY_2"
-set_network_private_key cn3 "$NETWORK_PRIVATE_KEY_3"
-set_network_private_key cn4 "$NETWORK_PRIVATE_KEY_4"
-set_network_private_key ag "$NETWORK_PRIVATE_KEY_AG"
-
-# Launch 4 ciphernodes
-launch_ciphernode cn1
-launch_ciphernode cn2
-launch_ciphernode cn3
-launch_ciphernode cn4
-launch_aggregator ag
+# start swarm
+enclave_nodes_up
 
 waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
 
@@ -63,12 +47,12 @@ PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
 
 
 # kill aggregator
-kill_proc ag
+enclave_nodes_stop ag
 
 sleep 2
 
 # relaunch the aggregator
-launch_aggregator ag relaunch
+enclave_nodes_start ag
 
 sleep 2
 

@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use actix::{Actor, Addr};
 use anyhow::Result;
 use config::AppConfig;
-use data::{DataStore, InMemStore, SledStore};
+use data::{DataStore, InMemStore, SledDb, SledStore};
 use data::{Repositories, RepositoriesFactory};
-use events::{EnclaveEvent, EventBus};
+use events::{get_enclave_event_bus, EnclaveEvent, EventBus};
 
 pub fn get_sled_store(bus: &Addr<EventBus<EnclaveEvent>>, db_file: &PathBuf) -> Result<DataStore> {
     Ok((&SledStore::new(bus, db_file)?).into())
@@ -27,10 +27,12 @@ pub fn setup_datastore(
     Ok(store)
 }
 
-pub fn get_repositories(
-    config: &AppConfig,
-    bus: &Addr<EventBus<EnclaveEvent>>,
-) -> Result<Repositories> {
+pub fn get_repositories(config: &AppConfig) -> Result<Repositories> {
+    let bus = get_enclave_event_bus();
     let store = setup_datastore(config, &bus)?;
     Ok(store.repositories())
+}
+
+pub fn close_all_connections() {
+    SledDb::close_all_connections();
 }
