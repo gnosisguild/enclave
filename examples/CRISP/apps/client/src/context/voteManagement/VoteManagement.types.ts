@@ -1,7 +1,7 @@
 import { ReactNode } from 'react'
 import { BroadcastVoteRequest, BroadcastVoteResponse, VoteStateLite, VotingRound } from '@/model/vote.model'
 import { Poll, PollRequestResult, PollResult } from '@/model/poll.model'
-import { Identity } from '@semaphore-protocol/core/identity'
+import { Identity } from '@semaphore-protocol/core'
 
 export type VoteManagementContextType = {
   isLoading: boolean
