@@ -70,7 +70,10 @@ impl EventBusFactory {
         // Cache miss
         let error_collector = ErrorCollector::<E>::new().start();
         let bus = self.get_event_bus::<E>();
-        bus.do_send(Subscribe::new("*", error_collector.clone().recipient()));
+        bus.do_send(Subscribe::new(
+            "EnclaveError",
+            error_collector.clone().recipient(),
+        ));
         let mut error_collector_cache = self.error_collector_cache.lock().unwrap();
         error_collector_cache.insert(type_id, Box::new(error_collector.clone()));
         error_collector
