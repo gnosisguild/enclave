@@ -15,8 +15,8 @@ import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fix
 import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
 import { deployInputValidatorCheckerFixture } from "./fixtures/MockInputValidatorChecker.fixture";
-import { deployInputValidatorPolicyFactoryFixture } from "./fixtures/MockInputValidatorPolicyFactory.fixture";
 import { deployInputValidatorFactoryFixture } from "./fixtures/MockInputValidatorFactory.fixture";
+import { deployInputValidatorPolicyFactoryFixture } from "./fixtures/MockInputValidatorPolicyFactory.fixture";
 import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
@@ -42,14 +42,15 @@ type SetupConfig = {
   inputLimit: number;
 };
 
-async function extractEventLogs(name: string, tx: ContractTransactionResponse): Promise<EventLog[]> {
+async function extractEventLogs(
+  name: string,
+  tx: ContractTransactionResponse,
+): Promise<EventLog[]> {
   const receipt = await tx.wait();
   if (!receipt) throw new Error("Receipt not returned");
 
   const events = receipt.logs
-    .filter((log): log is EventLog =>
-      (log as EventLog).fragment?.name === name
-    )
+    .filter((log): log is EventLog => (log as EventLog).fragment?.name === name)
     .filter((log) => log.fragment.name === name);
 
   if (events.length === 0) throw new Error(`No "${name}" events found`);
@@ -84,8 +85,11 @@ describe("Enclave", function () {
     const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
 
-    const { inputValidatorChecker, inputValidatorPolicyFactory, inputValidatorFactory } =
-      await deployInputValidatorContracts();
+    const {
+      inputValidatorChecker,
+      inputValidatorPolicyFactory,
+      inputValidatorFactory,
+    } = await deployInputValidatorContracts();
 
     const e3Program = await deployE3ProgramFixture(
       await inputValidatorPolicyFactory.getAddress(),
