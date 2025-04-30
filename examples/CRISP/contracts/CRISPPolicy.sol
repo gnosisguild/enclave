@@ -41,15 +41,13 @@ contract CRISPPolicy is BasePolicy, IEnclavePolicy {
             evidence,
             (ISemaphore.SemaphoreProof)
         );
-
         uint256 n = proof.nullifier;
         if (spentNullifiers[n]) revert AlreadyEnforced();
-        spentNullifiers[n] = true;
-
         if (inputLimit > 0 && enforced[subject] == inputLimit)
             revert MainCalledTooManyTimes();
 
         super._enforce(subject, evidence);
+        spentNullifiers[n] = true;
         enforced[subject]++;
     }
 

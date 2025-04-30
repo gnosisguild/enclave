@@ -11,6 +11,11 @@ contract CRISPInputValidator is IInputValidator, Clone {
     /// @notice The policy that will be used to validate the input.
     IEnclavePolicy internal policy;
 
+    /// @notice The error emitted when the input data is empty.
+    error EmptyInputData();
+    /// @notice The error emitted when the input data is invalid.
+    error InvalidInputData(bytes reason);
+
     /// @notice Initializes the contract with appended bytes data for configuration.
     function _initialize() internal virtual override(Clone) {
         super._initialize();
@@ -28,11 +33,16 @@ contract CRISPInputValidator is IInputValidator, Clone {
         address sender,
         bytes memory data
     ) external returns (bytes memory input) {
+        if (data.length == 0) revert EmptyInputData();
+
         (bytes memory proofBytes, bytes memory vote) = abi.decode(
             data,
             (bytes, bytes)
         );
+
+        // Reverts if the proof is invalid
         policy.enforce(sender, proofBytes);
+
         input = vote;
     }
 }

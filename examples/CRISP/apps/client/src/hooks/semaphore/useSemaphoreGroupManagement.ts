@@ -34,7 +34,6 @@ export const useSemaphoreGroupManagement = (
     const { chain } = useAccount();
     const queryClient = useQueryClient();
 
-    /* ── 1. groupId ──────────────────────────────────────────────── */
     const { data: rawGroupId } = useReadContract({
         address: roundId != null ? E3_PROGRAM_ADDRESS : undefined,
         abi: roundId != null ? E3_PROGRAM_ABI : undefined,
@@ -56,8 +55,8 @@ export const useSemaphoreGroupManagement = (
         });
     }, [chain?.id, roundStartBlock]);
 
-    const membersQuery = useQuery<string[]>({
-        enabled: !!groupId && !!ethersRef.current,
+    const { data: membersData, isFetching: isFetchingMembers } = useQuery<string[]>({
+        enabled: !(groupId == null) && !!ethersRef.current,
         queryKey: ['semaphore-members', groupId?.toString()],
         queryFn: async () => {
             const raw = await ethersRef.current!.getGroupMembers(groupId!.toString());
@@ -65,17 +64,14 @@ export const useSemaphoreGroupManagement = (
         },
         staleTime: 1000 * 60 * 5,
     });
-
-    const isFetchingMembers =
-        membersQuery.data === undefined || membersQuery.isFetching;
-    const groupMembers = membersQuery.data ?? [];
+    const groupMembers = membersData ?? [];
 
     useWatchContractEvent({
         address: SEMAPHORE_ADDRESS,
         abi: SEMAPHORE_ABI,
         eventName: 'MemberAdded',
         onLogs(logs) {
-            if (!groupId) return;
+            if (groupId == null) return;
 
             for (const log of logs as any[]) {
                 const evGroupId: bigint = log.args.groupId;
@@ -97,9 +93,6 @@ export const useSemaphoreGroupManagement = (
         groupMembers.includes(semaphoreIdentity.commitment.toString())
     );
 
-    console.log('isCommitted', isCommitted);
-    console.log('groupMembers', groupMembers);
-
     const {
         data: txHash,
         writeContract,
@@ -111,7 +104,7 @@ export const useSemaphoreGroupManagement = (
         useWaitForTransactionReceipt({ hash: txHash });
 
     const registerIdentity = useCallback(() => {
-        if (!roundId || !semaphoreIdentity) {
+        if (roundId == null || !semaphoreIdentity) {
             showToast({ type: 'danger', message: 'Round or identity missing.' });
             return;
         }
@@ -121,7 +114,7 @@ export const useSemaphoreGroupManagement = (
             functionName: 'registerMember',
             args: [BigInt(roundId), semaphoreIdentity.commitment],
         });
-    }, [roundId, semaphoreIdentity, writeContract, showToast]);
+    }, [roundId, semaphoreIdentity, writeContract]);
 
     useEffect(() => {
         if (isRegConfirmed && groupId && semaphoreIdentity) {
@@ -135,7 +128,7 @@ export const useSemaphoreGroupManagement = (
         if (writeError) {
             showToast({ type: 'danger', message: 'Registration transaction failed' });
         }
-    }, [isRegConfirmed, writeError, queryClient, groupId, semaphoreIdentity]);
+    }, [isRegConfirmed, queryClient, groupId, semaphoreIdentity]);
 
     return {
         groupId,
