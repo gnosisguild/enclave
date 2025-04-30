@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+anyhow = "1.0"

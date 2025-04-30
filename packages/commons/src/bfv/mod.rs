@@ -1,5 +1,8 @@
 use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
+use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
+use anyhow::Result;
+use anyhow::Context;
 
 /// Builds BFV (Brakerski-Fan-Vercauteren) encryption parameters.
 ///
@@ -62,6 +65,97 @@ pub fn build_bfv_params_arc(
     }
 }
 
+/// Deserializes BFV parameters from a byte slice.
+///
+/// # Arguments
+///
+/// * `bytes` - The byte slice containing the serialized parameters
+///
+/// # Returns
+///
+/// Returns a `BfvParameters` instance deserialized from the bytes.
+///
+/// # Panics
+///
+/// Panics if the deserialization fails.
+pub fn deserialize_bfv_params(bytes: &[u8]) -> BfvParameters {
+    match BfvParameters::try_deserialize(bytes) {
+        Ok(params) => params,
+        Err(e) => panic!("Failed to deserialize BFV Parameters: {}", e),
+    }
+}
+
+/// Deserializes BFV parameters from a byte slice and wraps them in an `Arc`.
+///
+/// This is a convenience function that combines `deserialize_bfv_params` with `Arc::new`
+/// to provide thread-safe shared ownership of the deserialized parameters.
+///
+/// # Arguments
+///
+/// * `bytes` - The byte slice containing the serialized parameters
+///
+/// # Returns
+///
+/// Returns an `Arc<BfvParameters>` instance deserialized from the bytes.
+///
+/// # Panics
+///
+/// Panics if the deserialization fails (see `deserialize_bfv_params`).
+pub fn deserialize_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
+    Arc::new(deserialize_bfv_params(bytes))
+}
+
+/// Serializes BFV parameters into a byte vector.
+///
+/// # Arguments
+///
+/// * `params` - The BFV parameters to serialize
+///
+/// # Returns
+///
+/// Returns a `Vec<u8>` containing the serialized parameters.
+///
+/// # Panics
+///
+/// Panics if the serialization fails.
+pub fn serialize_bfv_params(params: &BfvParameters) -> Vec<u8> {
+    params.to_bytes()
+}
+
+/// Encodes BFV parameters into a byte vector.
+///
+/// This function takes a `BfvParameters` instance and returns it serialized as a byte vector.
+///
+/// # Arguments
+///
+/// * `params` - The BFV parameters to encode
+///
+/// # Returns
+///
+/// Returns a `Vec<u8>` containing the serialized parameters.
+pub fn encode_bfv_params(params: &BfvParameters) -> Vec<u8> {
+    params.to_bytes()
+}
+
+/// Decodes BFV parameters from a byte slice.
+///
+/// This function attempts to deserialize BFV parameters from a byte slice
+/// and wraps them in an `Arc` for thread-safe shared ownership.
+///
+/// # Arguments
+///
+/// * `bytes` - The byte slice containing the serialized parameters
+///
+/// # Returns
+///
+/// Returns a `Result<Arc<BfvParameters>>` containing the deserialized parameters
+/// or an error if deserialization fails.
+pub fn decode_params(bytes: &[u8]) -> Result<Arc<BfvParameters>> {
+    Ok(Arc::new(
+        BfvParameters::try_deserialize(bytes).context("Could not decode Bfv Params")?,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,5 +182,87 @@ mod tests {
         assert_eq!(params.degree(), degree);
         assert_eq!(params.plaintext(), plaintext_modulus);
         assert_eq!(params.moduli(), moduli);
+    }
+
+    #[test]
+    fn test_deserialize_bfv_params() {
+        let degree = 2048;
+        let plaintext_modulus = 1032193;
+        let moduli = [0x3FFFFFFF000001];
+        
+        let params = build_bfv_params(degree, plaintext_modulus, &moduli);
+        let serialized = params.to_bytes();
+        let deserialized = deserialize_bfv_params(&serialized);
+        
+        assert_eq!(deserialized.degree(), degree);
+        assert_eq!(deserialized.plaintext(), plaintext_modulus);
+        assert_eq!(deserialized.moduli(), moduli);
+    }
+
+    #[test]
+    fn test_deserialize_bfv_params_arc() {
+        let degree = 2048;
+        let plaintext_modulus = 1032193;
+        let moduli = [0x3FFFFFFF000001];
+        
+        let params = build_bfv_params(degree, plaintext_modulus, &moduli);
+        let serialized = params.to_bytes();
+        let deserialized = deserialize_bfv_params_arc(&serialized);
+        
+        assert_eq!(deserialized.degree(), degree);
+        assert_eq!(deserialized.plaintext(), plaintext_modulus);
+        assert_eq!(deserialized.moduli(), moduli);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_roundtrip() {
+        let degree = 2048;
+        let plaintext_modulus = 1032193;
+        let moduli = [0x3FFFFFFF000001];
+        
+        let params = build_bfv_params(degree, plaintext_modulus, &moduli);
+        let serialized = serialize_bfv_params(&params);
+        let deserialized = deserialize_bfv_params(&serialized);
+        
+        assert_eq!(deserialized.degree(), degree);
+        assert_eq!(deserialized.plaintext(), plaintext_modulus);
+        assert_eq!(deserialized.moduli(), moduli);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_arc_roundtrip() {
+        let degree = 2048;
+        let plaintext_modulus = 1032193;
+        let moduli = [0x3FFFFFFF000001];
+        
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+        let serialized = serialize_bfv_params(&params);
+        let deserialized = deserialize_bfv_params_arc(&serialized);
+        
+        assert_eq!(deserialized.degree(), degree);
+        assert_eq!(deserialized.plaintext(), plaintext_modulus);
+        assert_eq!(deserialized.moduli(), moduli);
+    }
+
+    #[test]
+    fn test_encode_bfv_params() {
+        let degree = 2048;
+        let plaintext_modulus = 1032193;
+        let moduli = vec![0x3FFFFFFF000001];
+
+        let params = build_bfv_params(degree, plaintext_modulus, &moduli);
+        let encoded = encode_bfv_params(&params);
+        let decoded = decode_params(&encoded).unwrap();
+        
+        assert_eq!(decoded.degree(), degree);
+        assert_eq!(decoded.plaintext(), plaintext_modulus);
+        assert_eq!(decoded.moduli(), moduli.as_slice());
+    }
+
+    #[test]
+    fn test_decode_params_error() {
+        let invalid_bytes = vec![0u8; 10];
+        let result = decode_params(&invalid_bytes);
+        assert!(result.is_err());
     }
 }
