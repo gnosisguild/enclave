@@ -4,6 +4,10 @@
 
 set -euxo pipefail
 
+# build to ensure the image exists
 docker compose build 
-docker compose up -d # ensure our container is running in order to have dev persistence and caching 
-docker compose exec enclave-dev ./scripts/tasks/setup.sh
+
+source ./scripts/shared.sh
+
+run_in_docker ./scripts/tasks/setup.sh
+

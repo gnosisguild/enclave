@@ -3,5 +3,6 @@
 # This script will launch all static components so that someone can run the CRISP protocol locally
 set -euxo pipefail
 
-docker compose up -d # ensure our container is running in order to have dev persistence and caching 
-docker compose exec enclave-dev ./scripts/tasks/dev.sh
+source ./scripts/shared.sh
+
+run_in_docker ./scripts/tasks/dev.sh
