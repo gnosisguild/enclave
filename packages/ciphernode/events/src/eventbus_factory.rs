@@ -33,44 +33,46 @@ impl EventBusFactory {
     // Get or create a singleton EventBus for the specific event type
     pub fn get_event_bus<E: Event>(&self) -> Addr<EventBus<E>> {
         let type_id = TypeId::of::<E>();
-        let mut event_bus_cache = self.event_bus_cache.lock().unwrap();
 
-        // If we already have this type of EventBus, return it
-        if let Some(instance) = event_bus_cache.get(&type_id) {
-            return instance
-                .downcast_ref::<Addr<EventBus<E>>>()
-                .expect("Type mismatch in EventBusFactory")
-                .clone();
+        // Cache hit in new scope for mutex
+        {
+            let event_bus_cache = self.event_bus_cache.lock().unwrap();
+            if let Some(instance) = event_bus_cache.get(&type_id) {
+                return instance
+                    .downcast_ref::<Addr<EventBus<E>>>()
+                    .expect("Type mismatch in EventBusFactory")
+                    .clone();
+            }
         }
 
-        // Create a new EventBus for this event type
+        // Cache miss
         let event_bus = EventBus::<E>::default().start();
-
-        // Store it in our HashMap
+        let mut event_bus_cache = self.event_bus_cache.lock().unwrap();
         event_bus_cache.insert(type_id, Box::new(event_bus.clone()));
-
         event_bus
     }
+
+    // Get or create a singleton ErrorCollector for the specific event type
     pub fn get_error_collector<E: ErrorEvent>(&self) -> Addr<ErrorCollector<E>> {
         let type_id = TypeId::of::<E>();
-        let mut error_collector_cache = self.error_collector_cache.lock().unwrap();
 
-        // If we already have this type of ErrorCollector, return it
-        if let Some(instance) = error_collector_cache.get(&type_id) {
-            return instance
-                .downcast_ref::<Addr<ErrorCollector<E>>>()
-                .expect("Type mismatch in EventBusFactory")
-                .clone();
+        // Cache hit in new scope for mutex
+        {
+            let error_collector_cache = self.error_collector_cache.lock().unwrap();
+            if let Some(instance) = error_collector_cache.get(&type_id) {
+                return instance
+                    .downcast_ref::<Addr<ErrorCollector<E>>>()
+                    .expect("Type mismatch in EventBusFactory")
+                    .clone();
+            }
         }
 
-        // Create a new EventBus for this event type
+        // Cache miss
         let error_collector = ErrorCollector::<E>::new().start();
-        // Importantly subscribe to events
         let bus = self.get_event_bus::<E>();
         bus.do_send(Subscribe::new("*", error_collector.clone().recipient()));
-        // Store it in our HashMap
+        let mut error_collector_cache = self.error_collector_cache.lock().unwrap();
         error_collector_cache.insert(type_id, Box::new(error_collector.clone()));
-
         error_collector
     }
 }
