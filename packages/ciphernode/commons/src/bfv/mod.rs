@@ -1,8 +1,8 @@
+use anyhow::Context;
+use anyhow::Result;
 use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
 use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
-use anyhow::Result;
-use anyhow::Context;
 
 /// Builds BFV (Brakerski-Fan-Vercauteren) encryption parameters.
 ///
@@ -189,11 +189,11 @@ mod tests {
         let degree = 2048;
         let plaintext_modulus = 1032193;
         let moduli = [0x3FFFFFFF000001];
-        
+
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
         let serialized = params.to_bytes();
         let deserialized = deserialize_bfv_params(&serialized);
-        
+
         assert_eq!(deserialized.degree(), degree);
         assert_eq!(deserialized.plaintext(), plaintext_modulus);
         assert_eq!(deserialized.moduli(), moduli);
@@ -204,11 +204,11 @@ mod tests {
         let degree = 2048;
         let plaintext_modulus = 1032193;
         let moduli = [0x3FFFFFFF000001];
-        
+
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
         let serialized = params.to_bytes();
         let deserialized = deserialize_bfv_params_arc(&serialized);
-        
+
         assert_eq!(deserialized.degree(), degree);
         assert_eq!(deserialized.plaintext(), plaintext_modulus);
         assert_eq!(deserialized.moduli(), moduli);
@@ -219,11 +219,11 @@ mod tests {
         let degree = 2048;
         let plaintext_modulus = 1032193;
         let moduli = [0x3FFFFFFF000001];
-        
+
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
         let serialized = serialize_bfv_params(&params);
         let deserialized = deserialize_bfv_params(&serialized);
-        
+
         assert_eq!(deserialized.degree(), degree);
         assert_eq!(deserialized.plaintext(), plaintext_modulus);
         assert_eq!(deserialized.moduli(), moduli);
@@ -234,11 +234,11 @@ mod tests {
         let degree = 2048;
         let plaintext_modulus = 1032193;
         let moduli = [0x3FFFFFFF000001];
-        
+
         let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
         let serialized = serialize_bfv_params(&params);
         let deserialized = deserialize_bfv_params_arc(&serialized);
-        
+
         assert_eq!(deserialized.degree(), degree);
         assert_eq!(deserialized.plaintext(), plaintext_modulus);
         assert_eq!(deserialized.moduli(), moduli);
@@ -253,7 +253,7 @@ mod tests {
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
         let encoded = encode_bfv_params(&params);
         let decoded = decode_params(&encoded).unwrap();
-        
+
         assert_eq!(decoded.degree(), degree);
         assert_eq!(decoded.plaintext(), plaintext_modulus);
         assert_eq!(decoded.moduli(), moduli.as_slice());
