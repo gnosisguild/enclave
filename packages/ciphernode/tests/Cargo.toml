@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+commons = { workspace = true }
 net = { workspace = true }
 sortition = { workspace = true }
 events = { workspace = true }

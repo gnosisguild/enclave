@@ -1,4 +1,8 @@
+use actix::prelude::*;
 use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
+use alloy::primitives::Address;
+use anyhow::*;
+use commons::bfv::params::SET_2048_1032193_1;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
@@ -11,23 +15,19 @@ use events::{
 };
 use fhe::ext::FheExtension;
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
-use keyshare::ext::KeyshareExtension;
-use logger::SimpleLogger;
-use net::{events::NetworkPeerEvent, NetworkManager};
-use sortition::SortitionRepositoryFactory;
-use sortition::{CiphernodeSelector, Sortition};
-
-use actix::prelude::*;
-use alloy::primitives::Address;
-use anyhow::*;
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
 use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
+use keyshare::ext::KeyshareExtension;
+use logger::SimpleLogger;
+use net::{events::NetworkPeerEvent, NetworkManager};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use sortition::SortitionRepositoryFactory;
+use sortition::{CiphernodeSelector, Sortition};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 use tokio::{sync::mpsc, time::sleep};
@@ -273,7 +273,8 @@ fn get_common_setup() -> Result<(
     .start();
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
-    let (crp_bytes, params) = create_crp_bytes_params(&[0x3FFFFFFF000001], 2048, 1032193, &seed);
+    let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+    let (crp_bytes, params) = create_crp_bytes_params(&moduli, degree, plaintext_modulus, &seed);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
     let e3_id = E3id::new("1234");
 

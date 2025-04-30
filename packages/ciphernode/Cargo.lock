@@ -6655,6 +6655,7 @@ dependencies = [
  "base64",
  "bincode",
  "clap",
+ "commons",
  "crypto",
  "data",
  "e3_request",

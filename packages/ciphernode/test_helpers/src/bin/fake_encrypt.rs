@@ -1,6 +1,6 @@
 // This is a test script designed to encrypt some fixed data to a fhe public key
 use clap::Parser;
-use commons::bfv::build_bfv_params_arc;
+use commons::bfv::params::build_bfv_params_arc_2048_1032193_1;
 use fhe_rs::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use rand::SeedableRng;
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bytes = fs::read(&args.input)?;
 
     // Decode the base64 string
-    let params = build_bfv_params_arc(1032193, 2048, &[0x3FFFFFFF000001]);
+    let params = build_bfv_params_arc_2048_1032193_1();
     let pubkey = PublicKey::from_bytes(&bytes, &params)?;
 
     let raw_plaintext = args.plaintext;

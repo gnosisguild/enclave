@@ -4,6 +4,36 @@ use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
 use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Predefined BFV parameters for common use cases
+pub mod params {
+    use super::*;
+
+    /// Standard BFV parameters sets
+    /// Each set is a tuple of (degree, plaintext_modulus, moduli).
+    /// Naming convention: SET_<degree>_<plaintext_modulus>_<moduli_count>
+
+    /// - Degree: 2048 (polynomial ring size)
+    /// - Plaintext modulus: 1032193 (allows for efficient encoding of votes)
+    /// - Moduli: [0xffffffff00001] (provides good security level)
+    pub const SET_2048_1032193_1: (usize, u64, [u64; 1]) = (
+        2048,              // degree
+        1032193,           // plaintext_modulus
+        [0xffffffff00001], // moduli
+    );
+
+    /// Creates BFV parameters using the predefined 2048, 1032193, 1 configuration
+    pub fn build_bfv_params_2048_1032193_1() -> BfvParameters {
+        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+        build_bfv_params(degree, plaintext_modulus, &moduli)
+    }
+
+    /// Creates BFV parameters using the predefined 2048, 1032193, 1 configuration, wrapped in Arc
+    pub fn build_bfv_params_arc_2048_1032193_1() -> Arc<BfvParameters> {
+        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+        build_bfv_params_arc(degree, plaintext_modulus, &moduli)
+    }
+}
+
 /// Builds BFV (Brakerski-Fan-Vercauteren) encryption parameters.
 ///
 /// # Arguments
@@ -264,5 +294,61 @@ mod tests {
         let invalid_bytes = vec![0u8; 10];
         let result = decode_bfv_params(&invalid_bytes);
         assert!(result.is_err());
+    }
+
+    mod params_tests {
+        use super::*;
+
+        #[test]
+        fn test_params_constant() {
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            assert_eq!(degree, 2048);
+            assert_eq!(plaintext_modulus, 1032193);
+            assert_eq!(moduli, [0xffffffff00001]);
+        }
+
+        #[test]
+        fn test_params_function() {
+            let params = params::build_bfv_params_2048_1032193_1();
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+
+            assert_eq!(params.degree(), degree);
+            assert_eq!(params.plaintext(), plaintext_modulus);
+            assert_eq!(params.moduli(), moduli);
+        }
+
+        #[test]
+        fn test_params_arc_function() {
+            let params = params::build_bfv_params_arc_2048_1032193_1();
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+
+            assert_eq!(params.degree(), degree);
+            assert_eq!(params.plaintext(), plaintext_modulus);
+            assert_eq!(params.moduli(), moduli);
+        }
+
+        #[test]
+        fn test_params_serialization_roundtrip() {
+            let params = params::build_bfv_params_2048_1032193_1();
+            let serialized = serialize_bfv_params(&params);
+            let deserialized = deserialize_bfv_params(&serialized);
+
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            assert_eq!(deserialized.degree(), degree);
+            assert_eq!(deserialized.plaintext(), plaintext_modulus);
+            assert_eq!(deserialized.moduli(), moduli);
+        }
+
+        #[test]
+        fn test_params_arc_serialization_roundtrip() {
+            let params = params::build_bfv_params_arc_2048_1032193_1();
+            let serialized = serialize_bfv_params(&params);
+            let deserialized = deserialize_bfv_params_arc(&serialized);
+
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            assert_eq!(deserialized.degree(), degree);
+            assert_eq!(deserialized.plaintext(), plaintext_modulus);
+            assert_eq!(deserialized.moduli(), moduli);
+        }
     }
 }
