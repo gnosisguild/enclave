@@ -49,11 +49,11 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     broadcastVote,
   } = useEnclaveServer()
 
-  const { 
-    groupId: currentSemaphoreGroupId, 
-    groupMembers: currentGroupMembers, 
-    isFetchingMembers: fetchingMembers, 
-    isRegistering, 
+  const {
+    groupId: currentSemaphoreGroupId,
+    groupMembers: currentGroupMembers,
+    isFetchingMembers: fetchingMembers,
+    isRegistering,
     isCommitted: isRegisteredForCurrentRound,
     registerIdentity: registerIdentityOnContract
   } = useSemaphoreGroupManagement(roundState?.id, semaphoreIdentity);
@@ -115,17 +115,20 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     if (semaphoreIdentity) {
       return;
     }
-
+    let identity: Identity | null = null;
     if (identityPrivateKey) {
-      let identity = Identity.import(identityPrivateKey);
-      console.log('Semaphore identity loaded from storage.');
-      setSemaphoreIdentity(identity);
+      try {
+        identity = Identity.import(identityPrivateKey);
+        console.log('Semaphore identity loaded from storage.');
+      } catch (error) {
+        console.error('Failed to import Semaphore identity from storage. Will generate a new one.', error);
+      }
     } else {
-      let identity = new Identity();
+      identity = new Identity();
       setIdentityPrivateKey(identity.export());
       console.log('New Semaphore identity generated and saved.');
-      setSemaphoreIdentity(identity);
     }
+    setSemaphoreIdentity(identity);
   }, [identityPrivateKey, semaphoreIdentity]);
 
   useEffect(() => {
