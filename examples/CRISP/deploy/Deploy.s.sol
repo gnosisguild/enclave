@@ -31,6 +31,7 @@ import {SemaphoreVerifier} from "@semaphore-protocol/contracts/base/SemaphoreVer
 import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISemaphoreVerifier.sol";
 import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
+import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
 
 /// @notice Deployment script for the RISC Zero starter project.
 /// @dev Use the following environment variable to control the deployment:
@@ -169,12 +170,19 @@ contract CRISPRisc0Deploy is Script {
         CRISPPolicyFactory policyFactory = new CRISPPolicyFactory();
         console2.log("Deployed CRISPPolicyFactory to", address(policyFactory));
 
+        CRISPInputValidatorFactory inputValidatorFactory = new CRISPInputValidatorFactory();
+        console2.log(
+            "Deployed CRISPInputValidatorFactory to",
+            address(inputValidatorFactory)
+        );
+
         CRISPRisc0 crisp = new CRISPRisc0(
             enclave,
             verifier,
             semaphore,
             checkerFactory,
-            policyFactory
+            policyFactory,
+            inputValidatorFactory
         );
         console2.log("Deployed CRISPRisc0 to", address(crisp));
     }

@@ -2,7 +2,7 @@
 pragma solidity >=0.8.27;
 
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
-import { IEnclavePolicy } from "./interfaces/IEnclavePolicy.sol";
+import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
@@ -62,7 +62,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-    error InvalidComputationRequest(IEnclavePolicy inputValidator);
+    error InvalidComputationRequest(IInputValidator inputValidator);
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
@@ -148,7 +148,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator) = e3Program
+        (bytes32 encryptionSchemeId, IInputValidator inputValidator) = e3Program
             .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
@@ -228,16 +228,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InputDeadlinePassed(e3Id, e3.expiration)
         );
 
-        e3.inputValidator.validate(msg.sender, data);
+        bytes memory input = e3.inputValidator.validate(msg.sender, data);
         uint256 inputHash = PoseidonT3.hash(
-            [uint256(keccak256(data)), inputCounts[e3Id]]
+            [uint256(keccak256(input)), inputCounts[e3Id]]
         );
 
         inputCounts[e3Id]++;
         inputs[e3Id]._insert(inputHash);
         success = true;
 
-        emit InputPublished(e3Id, data, inputHash, inputCounts[e3Id] - 1);
+        emit InputPublished(e3Id, input, inputHash, inputCounts[e3Id] - 1);
     }
 
     function publishCiphertextOutput(

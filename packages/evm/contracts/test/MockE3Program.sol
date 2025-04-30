@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { IE3Program, IEnclavePolicy } from "../interfaces/IE3Program.sol";
+import { IE3Program, IInputValidator } from "../interfaces/IE3Program.sol";
+import { IEnclavePolicy } from "../interfaces/IEnclavePolicy.sol";
 import { IEnclavePolicyFactory } from "../interfaces/IEnclavePolicyFactory.sol";
+import {
+    IInputValidatorFactory
+} from "../interfaces/IInputValidatorFactory.sol";
 
 contract MockE3Program is IE3Program {
     error invalidParams(bytes e3ProgramParams, bytes computeProviderParams);
     error InvalidChecker();
     error InvalidPolicyFactory();
-
+    error InvalidInputValidatorFactory();
     address private constant DO_NOT_OVERRIDE =
         0x9999999999999999999999999999999999999999;
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
     IEnclavePolicyFactory private immutable POLICY_FACTORY;
+    IInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
     address private immutable ENCLAVE_CHECKER;
     uint8 public inputLimit;
 
@@ -22,6 +27,7 @@ contract MockE3Program is IE3Program {
 
     constructor(
         IEnclavePolicyFactory _policyFactory,
+        IInputValidatorFactory _inputValidatorFactory,
         address _enclaveChecker,
         uint8 _inputLimit
     ) {
@@ -32,7 +38,13 @@ contract MockE3Program is IE3Program {
         if (address(_policyFactory) == address(0)) {
             revert InvalidPolicyFactory();
         }
+
+        if (address(_inputValidatorFactory) == address(0)) {
+            revert InvalidInputValidatorFactory();
+        }
+
         POLICY_FACTORY = _policyFactory;
+        INPUT_VALIDATOR_FACTORY = _inputValidatorFactory;
         ENCLAVE_CHECKER = _enclaveChecker;
         inputLimit = _inputLimit;
     }
@@ -49,7 +61,7 @@ contract MockE3Program is IE3Program {
         bytes memory computeProviderParams
     )
         external
-        returns (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator)
+        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator)
     {
         require(
             computeProviderParams.length == 32,
@@ -57,12 +69,15 @@ contract MockE3Program is IE3Program {
         );
 
         if (overrideInputValidator == DO_NOT_OVERRIDE) {
-            inputValidator = IEnclavePolicy(
+            IEnclavePolicy policy = IEnclavePolicy(
                 POLICY_FACTORY.deploy(ENCLAVE_CHECKER, inputLimit)
             );
-            inputValidator.setTarget(msg.sender);
+            inputValidator = IInputValidator(
+                INPUT_VALIDATOR_FACTORY.deploy(address(policy))
+            );
+            policy.setTarget(address(inputValidator));
         } else {
-            inputValidator = IEnclavePolicy(overrideInputValidator);
+            inputValidator = IInputValidator(overrideInputValidator);
         }
 
         encryptionSchemeId = ENCRYPTION_SCHEME_ID;

@@ -6,10 +6,12 @@ import {ImageID} from "./ImageID.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
 import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
+import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
 import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
+import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
 
 contract CRISPRisc0 is IE3Program, Ownable {
     // Constants
@@ -22,6 +24,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
     ISemaphore public semaphore;
     CRISPCheckerFactory private immutable CHECKER_FACTORY;
     CRISPPolicyFactory private immutable POLICY_FACTORY;
+    CRISPInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
     uint8 public constant INPUT_LIMIT = 100;
 
     // Mappings
@@ -44,6 +47,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
     error SemaphoreAddressZero();
     error InvalidPolicyFactory();
     error InvalidCheckerFactory();
+    error InvalidInputValidatorFactory();
     error GroupDoesNotExist();
     error AlreadyRegistered();
 
@@ -53,12 +57,14 @@ contract CRISPRisc0 is IE3Program, Ownable {
     /// @param _semaphore The Semaphore address
     /// @param _checkerFactory The checker factory address
     /// @param _policyFactory The policy factory address
+    /// @param _inputValidatorFactory The input validator factory address
     constructor(
         IEnclave _enclave,
         IRiscZeroVerifier _verifier,
         ISemaphore _semaphore,
         CRISPCheckerFactory _checkerFactory,
-        CRISPPolicyFactory _policyFactory
+        CRISPPolicyFactory _policyFactory,
+        CRISPInputValidatorFactory _inputValidatorFactory
     ) Ownable(msg.sender) {
         require(address(_enclave) != address(0), EnclaveAddressZero());
         require(address(_verifier) != address(0), VerifierAddressZero());
@@ -68,12 +74,17 @@ contract CRISPRisc0 is IE3Program, Ownable {
             InvalidCheckerFactory()
         );
         require(address(_policyFactory) != address(0), InvalidPolicyFactory());
+        require(
+            address(_inputValidatorFactory) != address(0),
+            InvalidInputValidatorFactory()
+        );
 
         enclave = _enclave;
         verifier = _verifier;
         semaphore = _semaphore;
         CHECKER_FACTORY = _checkerFactory;
         POLICY_FACTORY = _policyFactory;
+        INPUT_VALIDATOR_FACTORY = _inputValidatorFactory;
         authorizedContracts[address(_enclave)] = true;
     }
 
@@ -115,7 +126,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
         uint256,
         bytes calldata e3ProgramParams,
         bytes calldata
-    ) external returns (bytes32, IEnclavePolicy inputValidator) {
+    ) external returns (bytes32, IInputValidator inputValidator) {
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
@@ -131,10 +142,15 @@ contract CRISPRisc0 is IE3Program, Ownable {
         address checker = CHECKER_FACTORY.deploy(address(semaphore), groupId);
 
         // Deploy a new policy
-        inputValidator = IEnclavePolicy(
+        IEnclavePolicy policy = IEnclavePolicy(
             POLICY_FACTORY.deploy(checker, INPUT_LIMIT)
         );
-        inputValidator.setTarget(msg.sender);
+
+        // Deploy a new input validator
+        inputValidator = IInputValidator(
+            INPUT_VALIDATOR_FACTORY.deploy(address(policy))
+        );
+        policy.setTarget(address(inputValidator));
 
         return (ENCRYPTION_SCHEME_ID, inputValidator);
     }

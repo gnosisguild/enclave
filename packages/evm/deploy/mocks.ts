@@ -17,6 +17,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
+
   const mockInputValidatorChecker = await deploy("MockInputValidatorChecker", {
     from: deployer,
     args: [],
@@ -32,6 +33,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     },
   );
 
+  const mockInputValidatorFactory = await deploy("MockInputValidatorFactory", {
+    from: deployer,
+    args: [],
+    log: true,
+  });
+
+  const inputValidatorFactory = await hre.ethers.getContractAt(
+    "MockInputValidatorFactory",
+    mockInputValidatorFactory.address,
+  );
+
   const policyFactory = await hre.ethers.getContractAt(
     "MockInputValidatorPolicyFactory",
     inputValidatorPolicyFactory.address,
@@ -42,6 +54,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     from: deployer,
     args: [
       inputValidatorPolicyFactory.address,
+      mockInputValidatorFactory.address,
       mockInputValidatorChecker.address,
       inputLimit,
     ],
@@ -56,6 +69,18 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     );
   } catch (err) {
     console.error("Error setting owner address for policyFactory");
+  }
+
+  try {
+    const tx = await inputValidatorFactory.transferOwnership(
+      mockE3Deployment.address,
+    );
+    await tx.wait();
+    console.log(
+      `Successfully transferred ownership of input validator factory to E3Program contract`,
+    );
+  } catch (err) {
+    console.error("Error setting owner address for input validator factory");
   }
 
   // Set up MockDecryptionVerifier in Enclave contract

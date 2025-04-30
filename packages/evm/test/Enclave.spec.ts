@@ -16,6 +16,7 @@ import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifi
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
 import { deployInputValidatorCheckerFixture } from "./fixtures/MockInputValidatorChecker.fixture";
 import { deployInputValidatorPolicyFactoryFixture } from "./fixtures/MockInputValidatorPolicyFactory.fixture";
+import { deployInputValidatorFactoryFixture } from "./fixtures/MockInputValidatorFactory.fixture";
 import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
@@ -41,15 +42,18 @@ type SetupConfig = {
   inputLimit: number;
 };
 
-async function extractEventLog(name: string, tx: ContractTransactionResponse) {
+async function extractEventLogs(name: string, tx: ContractTransactionResponse): Promise<EventLog[]> {
   const receipt = await tx.wait();
+  if (!receipt) throw new Error("Receipt not returned");
 
-  if (receipt == null) throw new Error("Receipt not returned");
-  const event = receipt.logs.find(
-    (log) => log instanceof EventLog && log.fragment.name === name,
-  ) as EventLog | undefined;
-  if (!event) throw new Error("Event not found");
-  return event;
+  const events = receipt.logs
+    .filter((log): log is EventLog =>
+      (log as EventLog).fragment?.name === name
+    )
+    .filter((log) => log.fragment.name === name);
+
+  if (events.length === 0) throw new Error(`No "${name}" events found`);
+  return events;
 }
 
 function defaultSetupConfig(config: Partial<SetupConfig> = {}): SetupConfig {
@@ -63,10 +67,11 @@ async function deployInputValidatorContracts() {
   const inputValidatorChecker = await deployInputValidatorCheckerFixture();
   const inputValidatorPolicyFactory =
     await deployInputValidatorPolicyFactoryFixture();
-
+  const inputValidatorFactory = await deployInputValidatorFactoryFixture();
   return {
     inputValidatorChecker,
     inputValidatorPolicyFactory,
+    inputValidatorFactory,
   };
 }
 
@@ -79,17 +84,22 @@ describe("Enclave", function () {
     const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
 
-    const { inputValidatorChecker, inputValidatorPolicyFactory } =
+    const { inputValidatorChecker, inputValidatorPolicyFactory, inputValidatorFactory } =
       await deployInputValidatorContracts();
 
     const e3Program = await deployE3ProgramFixture(
       await inputValidatorPolicyFactory.getAddress(),
+      await inputValidatorFactory.getAddress(),
       await inputValidatorChecker.getAddress(),
       config.inputLimit,
     );
 
     // TODO: is it too restrictive to ensure that the e3Program owns the inputValidator policy factory like this?
     await inputValidatorPolicyFactory
+      .connect(owner)
+      .transferOwnership(await e3Program.getAddress());
+
+    await inputValidatorFactory
       .connect(owner)
       .transferOwnership(await e3Program.getAddress());
 
@@ -247,7 +257,8 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      const event = await extractEventLog("CloneDeployed", tx);
+      const events = await extractEventLogs("CloneDeployed", tx);
+      const inputValidatorDeploymentEvent = events[1];
 
       const e3 = await enclave.getE3(0);
 
@@ -255,7 +266,7 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
-      expect(e3.inputValidator).to.equal(event.args[0]);
+      expect(e3.inputValidator).to.equal(inputValidatorDeploymentEvent.args[0]);
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
@@ -634,7 +645,9 @@ describe("Enclave", function () {
         request.computeProviderParams,
         { value: 10 },
       );
-      const event = await extractEventLog("CloneDeployed", tx);
+
+      const events = await extractEventLogs("CloneDeployed", tx);
+      const inputValidatorDeploymentEvent = events[1];
       const e3 = await enclave.getE3(0);
       const block = await ethers.provider.getBlock("latest").catch((e) => e);
 
@@ -642,7 +655,7 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.requestBlock).to.equal(block.number);
-      expect(e3.inputValidator).to.equal(event.args[0]);
+      expect(e3.inputValidator).to.equal(inputValidatorDeploymentEvent.args[0]);
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );

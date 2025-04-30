@@ -11,7 +11,6 @@ import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.so
 contract CRISPPolicy is BasePolicy, IEnclavePolicy {
     /// Errors
     error MainCalledTooManyTimes();
-    error InvalidInitializationAddress();
     error AlreadyEnforced();
 
     /// State Variables
@@ -31,27 +30,13 @@ contract CRISPPolicy is BasePolicy, IEnclavePolicy {
         inputLimit = _inputLimit;
     }
 
-    /// @notice Validate the input and return the vote.
-    /// @param subject The subject to validate the policy on.
-    /// @param evidence Abi-encoded `ISemaphore.SemaphoreProof`.
-    function validate(
-        address subject,
-        bytes calldata evidence
-    ) external override onlyTarget returns (bytes memory voteBytes) {
-        (bytes memory proofBytes, bytes memory vote) = abi.decode(
-            evidence,
-            (bytes, bytes)
-        );
-
-        _enforceChecks(subject, proofBytes);
-
-        return vote;
-    }
-
     /// @notice Internal enforcement logic: checks nullifier, input limit, and marks nullifier spent.
     /// @param subject The interacting address.
     /// @param evidence Abi-encoded `ISemaphore.SemaphoreProof`.
-    function _enforceChecks(address subject, bytes memory evidence) internal {
+    function _enforce(
+        address subject,
+        bytes calldata evidence
+    ) internal override(BasePolicy) onlyTarget {
         ISemaphore.SemaphoreProof memory proof = abi.decode(
             evidence,
             (ISemaphore.SemaphoreProof)
@@ -64,20 +49,8 @@ contract CRISPPolicy is BasePolicy, IEnclavePolicy {
         if (inputLimit > 0 && enforced[subject] == inputLimit)
             revert MainCalledTooManyTimes();
 
-        if (!BASE_CHECKER.check(subject, evidence)) revert UnsuccessfulCheck();
-        emit Enforced(subject, guarded, evidence);
-
+        super._enforce(subject, evidence);
         enforced[subject]++;
-    }
-
-    /// @notice Internal enforcement logic: checks nullifier, input limit, and marks nullifier spent.
-    /// @param subject The interacting address.
-    /// @param evidence Abi-encoded `ISemaphore.SemaphoreProof`.
-    function _enforce(
-        address subject,
-        bytes calldata evidence
-    ) internal override(BasePolicy) onlyTarget {
-        _enforceChecks(subject, evidence);
     }
 
     /// @notice Returns policy identifier "CRISPPolicy".

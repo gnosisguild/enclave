@@ -5,7 +5,7 @@ import { IEnclavePolicy } from "../interfaces/IEnclavePolicy.sol";
 import { BasePolicy } from "@excubiae/contracts/policy/BasePolicy.sol";
 import { BaseChecker } from "@excubiae/contracts/checker/BaseChecker.sol";
 
-/// @title BaseERC721Policy.
+/// @title MockInputValidatorPolicy.
 /// @notice Policy enforcer for Enclave Input validation.
 /// @dev Extends BasePolicy with Enclave specific checks.
 contract MockInputValidatorPolicy is BasePolicy, IEnclavePolicy {
@@ -24,14 +24,6 @@ contract MockInputValidatorPolicy is BasePolicy, IEnclavePolicy {
 
         BASE_CHECKER = BaseChecker(baseCheckerAddr);
         inputLimit = _inputLimit;
-    }
-
-    function validate(
-        address subject,
-        bytes calldata evidence
-    ) external override onlyTarget returns (bytes memory vote) {
-        _enforce(subject, evidence);
-        return vote;
     }
 
     function _enforce(
