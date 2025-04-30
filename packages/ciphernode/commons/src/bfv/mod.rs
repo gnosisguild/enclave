@@ -6,8 +6,6 @@ use std::sync::Arc;
 
 /// Predefined BFV parameters for common use cases
 pub mod params {
-    use super::*;
-
     /// Standard BFV parameters sets
     /// Each set is a tuple of (degree, plaintext_modulus, moduli).
     /// Naming convention: SET_<degree>_<plaintext_modulus>_<moduli_count>
@@ -20,18 +18,6 @@ pub mod params {
         1032193,           // plaintext_modulus
         [0xffffffff00001], // moduli
     );
-
-    /// Creates BFV parameters using the predefined 2048, 1032193, 1 configuration
-    pub fn build_bfv_params_2048_1032193_1() -> BfvParameters {
-        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        build_bfv_params(degree, plaintext_modulus, &moduli)
-    }
-
-    /// Creates BFV parameters using the predefined 2048, 1032193, 1 configuration, wrapped in Arc
-    pub fn build_bfv_params_arc_2048_1032193_1() -> Arc<BfvParameters> {
-        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-        build_bfv_params_arc(degree, plaintext_modulus, &moduli)
-    }
 }
 
 /// Builds BFV (Brakerski-Fan-Vercauteren) encryption parameters.
@@ -309,8 +295,8 @@ mod tests {
 
         #[test]
         fn test_params_function() {
-            let params = params::build_bfv_params_2048_1032193_1();
             let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            let params = build_bfv_params(degree, plaintext_modulus, &moduli);
 
             assert_eq!(params.degree(), degree);
             assert_eq!(params.plaintext(), plaintext_modulus);
@@ -319,8 +305,8 @@ mod tests {
 
         #[test]
         fn test_params_arc_function() {
-            let params = params::build_bfv_params_arc_2048_1032193_1();
             let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
 
             assert_eq!(params.degree(), degree);
             assert_eq!(params.plaintext(), plaintext_modulus);
@@ -329,7 +315,8 @@ mod tests {
 
         #[test]
         fn test_params_serialization_roundtrip() {
-            let params = params::build_bfv_params_2048_1032193_1();
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            let params = build_bfv_params(degree, plaintext_modulus, &moduli);
             let serialized = serialize_bfv_params(&params);
             let deserialized = deserialize_bfv_params(&serialized);
 
@@ -341,7 +328,8 @@ mod tests {
 
         #[test]
         fn test_params_arc_serialization_roundtrip() {
-            let params = params::build_bfv_params_arc_2048_1032193_1();
+            let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
+            let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
             let serialized = serialize_bfv_params(&params);
             let deserialized = deserialize_bfv_params_arc(&serialized);
 
