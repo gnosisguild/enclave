@@ -56,7 +56,11 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     isRegistering,
     isCommitted: isRegisteredForCurrentRound,
     registerIdentity: registerIdentityOnContract
-  } = useSemaphoreGroupManagement(roundState?.id, semaphoreIdentity);
+  } = useSemaphoreGroupManagement(
+      roundState?.id, 
+      roundState?.start_block,
+      semaphoreIdentity
+  );
 
   const initialLoad = async () => {
     console.log("Loading wasm");
@@ -83,7 +87,8 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
       });
     }
     if (fetchedRoundState) {
-      setRoundState(fetchedRoundState);
+      const startBlockNumber = Number(fetchedRoundState.start_block); 
+      setRoundState({ ...fetchedRoundState, start_block: startBlockNumber });
       setVotingRound({ round_id: fetchedRoundState.id, pk_bytes: fetchedRoundState.committee_public_key });
       setPollOptions(generatePoll({ round_id: fetchedRoundState.id, emojis: fetchedRoundState.emojis }));
       setRoundEndDate(convertTimestampToDate(fetchedRoundState.start_time, fetchedRoundState.duration));
