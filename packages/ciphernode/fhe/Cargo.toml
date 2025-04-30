@@ -8,6 +8,7 @@ actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
+commons = { workspace = true }
 config = { workspace = true }
 data = { workspace = true }
 events = { workspace = true }

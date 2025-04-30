@@ -150,7 +150,7 @@ pub fn encode_bfv_params(params: &BfvParameters) -> Vec<u8> {
 ///
 /// Returns a `Result<Arc<BfvParameters>>` containing the deserialized parameters
 /// or an error if deserialization fails.
-pub fn decode_params(bytes: &[u8]) -> Result<Arc<BfvParameters>> {
+pub fn decode_bfv_params(bytes: &[u8]) -> Result<Arc<BfvParameters>> {
     Ok(Arc::new(
         BfvParameters::try_deserialize(bytes).context("Could not decode Bfv Params")?,
     ))
@@ -252,7 +252,7 @@ mod tests {
 
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
         let encoded = encode_bfv_params(&params);
-        let decoded = decode_params(&encoded).unwrap();
+        let decoded = decode_bfv_params(&encoded).unwrap();
 
         assert_eq!(decoded.degree(), degree);
         assert_eq!(decoded.plaintext(), plaintext_modulus);
@@ -262,7 +262,7 @@ mod tests {
     #[test]
     fn test_decode_params_error() {
         let invalid_bytes = vec![0u8; 10];
-        let result = decode_params(&invalid_bytes);
+        let result = decode_bfv_params(&invalid_bytes);
         assert!(result.is_err());
     }
 }

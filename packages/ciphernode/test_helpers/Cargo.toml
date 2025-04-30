@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 actix = { workspace = true }
+commons = { workspace = true }
 events = { workspace = true }
 fhe = { workspace = true }
 bincode = { workspace = true }
