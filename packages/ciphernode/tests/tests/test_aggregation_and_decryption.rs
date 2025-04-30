@@ -5,8 +5,8 @@ use data::{DataStore, InMemStore};
 use e3_request::E3Router;
 use events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    E3RequestComplete, E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig,
-    GetErrors, GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
+    E3RequestComplete, E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, GetErrors,
+    GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
     PublicKeyAggregated, ResetHistory, Seed, Shutdown, Subscribe,
 };
 use fhe::ext::FheExtension;
@@ -268,7 +268,7 @@ fn get_common_setup() -> Result<(
     Addr<ErrorCollector<EnclaveEvent>>,
     Addr<HistoryCollector<EnclaveEvent>>,
 )> {
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+    let bus = EventBus::<EnclaveEvent>::new().start();
     let errors = ErrorCollector::<EnclaveEvent>::new().start();
     let history = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history.clone().recipient()));
@@ -489,7 +489,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+    let bus = EventBus::<EnclaveEvent>::new().start();
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
     let event_rx = event_tx.subscribe();
@@ -571,7 +571,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+    let bus = EventBus::<EnclaveEvent>::new().start();
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
 
