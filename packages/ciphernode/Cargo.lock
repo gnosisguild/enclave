@@ -1881,6 +1881,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 
 [[package]]
+name = "commons"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fhe 0.1.0-beta.7",
+ "fhe-traits",
+]
+
+[[package]]
 name = "compile-time"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
