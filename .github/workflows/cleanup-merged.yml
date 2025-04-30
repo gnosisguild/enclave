@@ -1,0 +1,101 @@
+# .github/workflows/cleanup-merged.yml
+#
+# Deletes merged branches once they’re older than 7 days.
+# Behaviour depends on PR labels:
+#   • keep-branch     → branch is kept (no deletion)
+#   • archive-branch  → branch is tagged archive/<name> then deleted
+#   • no label        → branch is deleted outright
+#
+# Branches already prefixed archive/* are ignored.
+
+name: Cleanup merged branches
+
+on:
+  schedule:
+    # Every night at 02:15 UTC
+    - cron: '15 2 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prune merged branches
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const THRESHOLD_DAYS = 7;
+            const KEEP_LABEL     = 'keep-branch';
+            const ARCHIVE_LABEL  = 'archive-branch';
+
+            const cutoff = Date.now() - THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
+
+            // list all non-protected branches
+            const branches = await github.paginate(github.rest.repos.listBranches, {
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              protected: false
+            });
+
+            for (const branch of branches) {
+              const name = branch.name;
+
+              // Ignore already-archived branches
+              if (name.startsWith('archive/')) continue;
+
+              /* Find any PR that merged this branch */
+              const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                commit_sha: branch.commit.sha
+              });
+
+              // If no PR was merged, skip
+              const pr = prs.data.find(p => p.merged_at);
+              if (!pr) continue;
+
+              // Skip if merge is too recent
+              if (new Date(pr.merged_at).getTime() > cutoff) continue;
+
+              const labels = pr.labels.map(l => l.name);
+
+              /* ---- decision matrix ---- */
+              if (labels.includes(KEEP_LABEL)) {
+                console.log(`⏩  Keeping ${name} (label ${KEEP_LABEL})`);
+                continue;
+              }
+
+              const shouldArchive = labels.includes(ARCHIVE_LABEL);
+
+              if (shouldArchive) {
+                const tagName = `archive/${name}`;
+                console.log(`🏷️  Tagging ${tagName}`);
+
+                // create tag only if it doesn't already exist
+                try {
+                  await github.rest.git.getRef({
+                    owner: context.repo.owner,
+                    repo:  context.repo.repo,
+                    ref:   `tags/${tagName}`
+                  });
+                } catch {
+                  await github.rest.git.createRef({
+                    owner: context.repo.owner,
+                    repo:  context.repo.repo,
+                    ref:   `refs/tags/${tagName}`,
+                    sha:   branch.commit.sha
+                  });
+                }
+              }
+
+              /* Delete the branch */
+              console.log(`🗑️  Deleting ${name}`);
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                ref:   `heads/${name}`
+              });
+            }

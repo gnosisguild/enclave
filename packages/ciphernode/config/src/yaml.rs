@@ -2,13 +2,7 @@ use anyhow::Result;
 use std::{fs, path::PathBuf};
 
 pub fn load_yaml_with_env(file_path: &PathBuf) -> Result<String> {
-    // Read the file content to string
-    let content = match fs::read_to_string(file_path) {
-        Ok(val) => val,
-        Err(_) => "".to_string(),
-    };
-
-    // Collect environment variables and perform substitution
+    let content = fs::read_to_string(file_path)?;
     Ok(shellexpand::env(&content)?.to_string())
 }
 

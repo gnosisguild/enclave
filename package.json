@@ -11,11 +11,12 @@
   "scripts": {
     "clean": "cd packages/evm && pnpm clean",
     "compile": "pnpm evm:compile && pnpm ciphernode:build",
-    "lint": "pnpm evm:lint",
+    "lint": "pnpm evm:lint && pnpm ciphernode:lint",
     "typechain": "pnpm evm:typechain",
     "test": "pnpm evm:test && pnpm ciphernode:test",
-    "test:integration": "./tests/integration/test.sh",
+    "test:integration": "cd ./tests/integration && ./test.sh",
     "coverage": "pnpm evm:coverage",
+    "prepare": "husky",
     "enclave": "cd packages/ciphernode && ./scripts/launch.sh",
     "ciphernode:lint": "cd packages/ciphernode && cargo fmt -- --check",
     "ciphernode:add": "cd packages/evm && pnpm ciphernode:add",
@@ -37,11 +38,13 @@
     "evm:coverage": "cd packages/evm && pnpm coverage",
     "evm:release": "cd packages/evm && pnpm release"
   },
-  "dependencies": {},
   "workspaces": [
     "packages/evm",
     "examples/CRISP",
     "examples/CRISP/apps/client"
   ],
-  "packageManager": "pnpm@9.1.2+sha512.127dc83b9ea10c32be65d22a8efb4a65fb952e8fefbdfded39bdc3c97efc32d31b48b00420df2c1187ace28c921c902f0cb5a134a4d032b8b5295cbfa2c681e2"
+  "packageManager": "pnpm@9.1.2+sha512.127dc83b9ea10c32be65d22a8efb4a65fb952e8fefbdfded39bdc3c97efc32d31b48b00420df2c1187ace28c921c902f0cb5a134a4d032b8b5295cbfa2c681e2",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
 }

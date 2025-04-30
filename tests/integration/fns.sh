@@ -7,8 +7,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PLAINTEXT="1234,567890"
 ID=$(date +%s)
 
-if [[ "$ROOT_DIR" != "$(pwd)" ]]; then 
-  echo "This script must be run from the root"
+if [[ "$SCRIPT_DIR" != "$(pwd)" ]]; then 
+  echo "This script must be run from the test folder"
   exit 1
 fi
 
@@ -38,7 +38,7 @@ NETWORK_PRIVATE_KEY_2="0x21a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85f
 NETWORK_PRIVATE_KEY_3="0x31a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 NETWORK_PRIVATE_KEY_4="0x41a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 
-ENCLAVE_BIN=./packages/ciphernode/target/debug/enclave
+ENCLAVE_BIN=$ROOT_DIR/packages/ciphernode/target/debug/enclave
 
 # Function to clean up background processes
 cleanup() {
@@ -89,20 +89,18 @@ waiton-files() {
   done
 }
 
-set_password() {
+enclave_password_create() {
   local name="$1"
   local password="$2"
   $ENCLAVE_BIN password create \
-    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --name $name \
+    --config "$SCRIPT_DIR/enclave.config.yaml" \
     --password "$password"
 }
 
-launch_ciphernode() {
+enclave_start() {
    local name="$1"
-   local log_file="${SCRIPT_DIR}/logs/${name}.log"
-   local log_dir="$(dirname "$log_file")"
    heading "Launch ciphernode $name"
-   mkdir -p "$log_dir"
 
    # convert OTEL env var to args
    local extra_args=""
@@ -112,47 +110,50 @@ launch_ciphernode() {
 
    $ENCLAVE_BIN start -v \
      --name "$name" \
-     --config "$SCRIPT_DIR/lib/$name/config.yaml" $extra_args 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+     --config "$SCRIPT_DIR/enclave.config.yaml" $extra_args & 
 }
 
-set_private_key() {
+enclave_nodes_up() {
+   $ENCLAVE_BIN nodes up -v \
+     --config "$SCRIPT_DIR/enclave.config.yaml" & 
+}
+
+enclave_nodes_down() {
+  $ENCLAVE_BIN nodes down  
+}
+
+enclave_wallet_set() {
   local name="$1"
   local private_key="$2"
 
   $ENCLAVE_BIN wallet set \
-    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --name $name \
+    --config "$SCRIPT_DIR/enclave.config.yaml" \
     --private-key "$private_key"
 }
 
-set_network_private_key() {
+enclave_net_set_key() {
   local name="$1"
   local private_key="$2"
 
   $ENCLAVE_BIN net set-key \
-    --config "$SCRIPT_DIR/lib/$name/config.yaml" \
+    --name $name \
+    --config "$SCRIPT_DIR/enclave.config.yaml" \
     --net-keypair "$private_key"
 }
 
-launch_aggregator() {
-   local name="$1"
-   local suffix="${2:-}"  # Optional suffix with empty default
-   local log_name="${name}${suffix:+_$suffix}"  # Add suffix with underscore if provided
-   local log_file="${SCRIPT_DIR}/logs/${log_name}.log"
-   local log_dir="$(dirname "$log_file")"
-   heading "Launch aggregator $name"
-   mkdir -p "$log_dir"
+enclave_nodes_stop() {
+  local name="$1"
 
-   # convert OTEL env var to args
-   local extra_args=""
-   if [[ -n "${OTEL+x}" ]] && [[ -n "$OTEL" ]]; then
-      extra_args="--otel=${OTEL}"
-   fi
+  $ENCLAVE_BIN nodes stop $name -v \
+    --config "$SCRIPT_DIR/enclave.config.yaml"
+}
 
-   $ENCLAVE_BIN aggregator start -v \
-     --name "$name" \
-     --config "$SCRIPT_DIR/lib/$name/config.yaml" \
-     --pubkey-write-path "$SCRIPT_DIR/output/pubkey.bin" \
-     --plaintext-write-path "$SCRIPT_DIR/output/plaintext.txt" $extra_args 2>&1 | tee >(strip_ansi > "$log_file") & echo $! > "/tmp/enclave.${ID}_${name}.pid"
+enclave_nodes_start() {
+  local name="$1"
+
+  $ENCLAVE_BIN nodes start $name -v \
+    --config "$SCRIPT_DIR/enclave.config.yaml"
 }
 
 kill_proc() {
@@ -184,8 +185,9 @@ ensure_process_count_equals() {
 }
 
 gracefull_shutdown() {
-  pkill -15 -f "target/debug/enclave" || true
-  sleep 10
+  enclave_nodes_down
+  echo "waiting 5 seconds for processes to shutdown"
+  sleep 5
   ensure_process_count_equals "target/debug/enclave" 0 || return 1
   kill_em_all
 }

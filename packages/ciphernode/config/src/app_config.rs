@@ -1,5 +1,10 @@
+use crate::chain_config::ChainConfig;
+use crate::load_config::find_in_parent;
+use crate::load_config::resolve_config_path;
+use crate::paths_engine::PathsEngine;
+use crate::paths_engine::DEFAULT_CONFIG_NAME;
+use crate::yaml::load_yaml_with_env;
 use alloy::primitives::Address;
-use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
@@ -7,416 +12,506 @@ use figment::{
     providers::{Format, Serialized, Yaml},
     Figment,
 };
-use generate_id::generate_id;
 use serde::{Deserialize, Serialize};
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
-use url::Url;
+use std::collections::HashSet;
+use std::{collections::HashMap, env, path::PathBuf};
 
-use crate::generate_id;
-use crate::yaml::load_yaml_with_env;
-
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(untagged)]
-pub enum Contract {
-    Full {
-        address: String,
-        deploy_block: Option<u64>,
+/// Either "aggregator" or "ciphernode"
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+#[serde(tag = "type")]
+pub enum NodeRole {
+    /// Aggregator role
+    Aggregator {
+        pubkey_write_path: Option<PathBuf>,
+        plaintext_write_path: Option<PathBuf>,
     },
-    AddressOnly(String),
+    /// Ciphernode role
+    Ciphernode,
 }
 
-#[derive(Clone)]
-pub enum RPC {
-    Http(String),
-    Https(String),
-    Ws(String),
-    Wss(String),
-}
-
-impl RPC {
-    pub fn from_url(url: &str) -> Result<Self> {
-        let parsed = Url::parse(url).context("Invalid URL format")?;
-        match parsed.scheme() {
-            "http" => Ok(RPC::Http(url.to_string())),
-            "https" => Ok(RPC::Https(url.to_string())),
-            "ws" => Ok(RPC::Ws(url.to_string())),
-            "wss" => Ok(RPC::Wss(url.to_string())),
-            _ => bail!("Invalid protocol. Expected: http://, https://, ws://, wss://"),
-        }
-    }
-
-    pub fn as_http_url(&self) -> Result<String> {
-        match self {
-            RPC::Http(url) | RPC::Https(url) => Ok(url.clone()),
-            RPC::Ws(url) | RPC::Wss(url) => {
-                let mut parsed =
-                    Url::parse(url).context(format!("Failed to parse URL: {}", url))?;
-                parsed
-                    .set_scheme(if self.is_secure() { "https" } else { "http" })
-                    .map_err(|_| anyhow!("http(s) are valid schemes"))?;
-                Ok(parsed.to_string())
-            }
-        }
-    }
-
-    pub fn as_ws_url(&self) -> Result<String> {
-        match self {
-            RPC::Ws(url) | RPC::Wss(url) => Ok(url.clone()),
-            RPC::Http(url) | RPC::Https(url) => {
-                let mut parsed =
-                    Url::parse(url).context(format!("Failed to parse URL: {}", url))?;
-                parsed
-                    .set_scheme(if self.is_secure() { "wss" } else { "ws" })
-                    .map_err(|_| anyhow!("ws(s) are valid schemes"))?;
-                Ok(parsed.to_string())
-            }
-        }
-    }
-
-    pub fn is_websocket(&self) -> bool {
-        matches!(self, RPC::Ws(_) | RPC::Wss(_))
-    }
-
-    pub fn is_secure(&self) -> bool {
-        matches!(self, RPC::Https(_) | RPC::Wss(_))
-    }
-}
-
-impl Contract {
-    pub fn address(&self) -> &String {
-        use Contract::*;
-        match self {
-            Full { address, .. } => address,
-            AddressOnly(v) => v,
-        }
-    }
-
-    pub fn deploy_block(&self) -> Option<u64> {
-        use Contract::*;
-        match self {
-            Full { deploy_block, .. } => deploy_block.clone(),
-            AddressOnly(_) => None,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ContractAddresses {
-    pub enclave: Contract,
-    pub ciphernode_registry: Contract,
-    pub filter_registry: Contract,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
-#[serde(tag = "type", content = "credentials")]
-pub enum RpcAuth {
-    None,
-    Basic { username: String, password: String },
-    Bearer(String),
-}
-
-impl Default for RpcAuth {
+impl Default for NodeRole {
     fn default() -> Self {
-        RpcAuth::None
+        NodeRole::Ciphernode
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ChainConfig {
-    pub enabled: Option<bool>,
-    pub name: String,
-    rpc_url: String, // We may need multiple per chain for redundancy at a later point
-    #[serde(default)]
-    pub rpc_auth: RpcAuth,
-    pub contracts: ContractAddresses,
-}
-
-impl ChainConfig {
-    pub fn rpc_url(&self) -> Result<RPC> {
-        Ok(RPC::from_url(&self.rpc_url)
-            .map_err(|e| anyhow!("Failed to parse RPC URL for chain {}: {}", self.name, e))?)
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct AppConfig {
-    /// The chains config
-    chains: Vec<ChainConfig>,
-    /// The name for the keyfile
-    key_file: PathBuf,
-    /// The base folder for enclave configuration defaults to `~/.config/enclave` on linux
-    config_dir: PathBuf,
-    /// The name for the database
-    db_file: PathBuf,
-    /// Config file name
-    config_file: PathBuf,
-    /// Used for testing if required
-    cwd: PathBuf,
-    /// The data dir for enclave defaults to `~/.local/share/enclave`
-    data_dir: PathBuf,
+/// The structure within the app configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+#[serde(deny_unknown_fields)]
+pub struct NodeDefinition {
     /// Ethereum Address for the node
-    address: Option<Address>,
+    pub address: Option<Address>,
     /// A list of libp2p multiaddrs to dial to as peers when joining the network
-    peers: Vec<String>,
+    pub peers: Vec<String>,
     /// The port to use for the quic listener
-    quic_port: u16,
-    /// Whether to enable mDNS discovery
-    enable_mdns: bool,
-    /// The node name (used for logs and open telemetry)
-    name: Option<String>,
-    /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
-    otel: Option<String>,
+    pub quic_port: u16,
+    /// The name for the database
+    pub db_file: PathBuf,
+    /// The name for the keyfile
+    pub key_file: PathBuf,
+    /// The data dir for enclave defaults to `~/.local/share/enclave/{name}`
+    pub data_dir: PathBuf,
+    /// Override the base folder for enclave configuration defaults to `~/.config/enclave/{name}` on linux
+    pub config_dir: PathBuf,
+    /// The node role eg. "ciphernode" or "aggregator"
+    #[serde(default)]
+    pub role: NodeRole,
+    /// If a net key has not been set autogenerate one on start
+    pub autonetkey: bool,
+    /// If a password has not been set autogenerate one on start
+    pub autopassword: bool,
+    /// If a wallet has not been set autogenerate one on start
+    pub autowallet: bool,
 }
 
-impl Default for AppConfig {
+impl Default for NodeDefinition {
     fn default() -> Self {
         Self {
-            chains: vec![],
-            key_file: PathBuf::from("key"),   // ~/.config/enclave/key
-            db_file: PathBuf::from("db"),     // ~/.config/enclave/db
-            config_dir: OsDirs::config_dir(), // ~/.config/enclave
-            data_dir: OsDirs::data_dir(),     // ~/.config/enclave
-            config_file: PathBuf::from("config.yaml"), // ~/.config/enclave/config.yaml
-            cwd: env::current_dir().unwrap_or_default(),
-            peers: vec![], // NOTE: After we release for decentralization purposes we should populate this during enclave init via ipns
+            peers: vec![], // NOTE: We should look at generation via ipns fetch for the latest nodes
             address: None,
             quic_port: 9091,
-            enable_mdns: false,
-            name: Some(generate_id()),
-            otel: None,
+            key_file: PathBuf::from("key"), // ~/.config/enclave/key
+            db_file: PathBuf::from("db"),   // ~/.config/enclave/db
+            config_dir: std::path::PathBuf::new(), // ~/.config/enclave
+            data_dir: std::path::PathBuf::new(), // ~/.config/enclave
+            role: NodeRole::Ciphernode,
+            autonetkey: false,
+            autopassword: false,
+            autowallet: false,
         }
     }
+}
+
+/// The config actually used throughout the app
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AppConfig {
+    /// The name of the node
+    name: String,
+    /// All the node definitions in the unscoped config
+    nodes: HashMap<String, NodeDefinition>,
+    /// The chains config
+    chains: Vec<ChainConfig>,
+    /// Non config peers probably from the CLI
+    peers: Vec<String>,
+    /// Store all paths in the paths engine
+    paths: PathsEngine,
+    /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
+    otel: Option<String>,
+    /// If a net key has not been set autogenerate one on start
+    autonetkey: bool,
+    /// If a password has not been set autogenerate one on start
+    autopassword: bool,
+    /// If a wallet has not been set autogenerate one on start
+    autowallet: bool,
 }
 
 impl AppConfig {
-    fn ensure_full_path(&self, dir: &PathBuf, file: &PathBuf) -> PathBuf {
-        normalize_path({
-            // If this is absolute return it
-            if file.is_absolute() || file.to_string_lossy().starts_with("~") {
-                return file.clone();
-            }
+    pub fn try_from_unscoped(
+        name: &str,
+        config: UnscopedAppConfig,
+        default_data_dir: &PathBuf,
+        default_config_dir: &PathBuf,
+        cwd: &PathBuf,
+    ) -> Result<Self> {
+        let mut config = config;
 
-            // We have to find where it should be relative from
-            // Assume it should be the config_dir
-            dir.join(file)
+        if config.nodes.contains_key("_default") {
+            bail!("Cannot use the `_default` node profile name as it is a reserved node name. In order to configure the _default profile use the `node` key in your yaml configuration.");
+        }
+
+        // Deliberately clobber default
+        config.nodes.insert("_default".to_string(), config.node);
+
+        let Some(node) = config.nodes.get(name) else {
+            bail!("Could not find node definition for node '{}'. Did you forget to include it in your configuration?", name);
+        };
+
+        let node = node.clone();
+
+        let config_dir_override = (node.config_dir != std::path::PathBuf::new())
+            .then_some(&node.config_dir)
+            .or_else(|| config.config_dir.as_ref());
+
+        let data_dir_override = (node.data_dir != std::path::PathBuf::new())
+            .then_some(&node.data_dir)
+            .or_else(|| config.data_dir.as_ref());
+
+        let paths = PathsEngine::new(
+            name,
+            cwd,
+            default_data_dir,
+            default_config_dir,
+            config.found_config_file.as_ref(),
+            config_dir_override,
+            data_dir_override,
+            Some(&node.db_file),
+            Some(&node.key_file),
+        );
+
+        Ok(AppConfig {
+            name: name.to_owned(),
+            nodes: config.nodes,
+            chains: config.chains,
+            peers: vec![],
+            paths,
+            otel: config.otel,
+            autopassword: node.autopassword,
+            autowallet: node.autowallet,
+            autonetkey: node.autonetkey,
         })
     }
 
-    fn resolve_base_dir(&self, base_dir: &PathBuf, default_base_dir: &PathBuf) -> PathBuf {
-        if base_dir.is_relative() {
-            // ConfigDir is relative and the config file is absolute then use the location of the
-            // config file. That way all paths are relative to the config file
-            if self.config_file.is_absolute() {
-                self.config_file
-                    .parent()
-                    .map_or_else(|| base_dir.clone(), |p| p.join(base_dir))
-            } else {
-                // If the config_file is not set but there are relative paths use the default dir use the default dir
-                default_base_dir.join(base_dir)
-            }
-        } else {
-            // Use the absolute base_dir
-            base_dir.to_owned()
-        }
+    /// Add the given peers to the peers vector
+    pub fn add_peers(&mut self, peers: Vec<String>) {
+        self.peers = combine_unique(&self.peers, &peers)
     }
 
+    /// Get the key_file
+    pub fn key_file(&self) -> PathBuf {
+        self.paths.key_file()
+    }
+
+    /// Get the database file
+    pub fn db_file(&self) -> PathBuf {
+        self.paths.db_file()
+    }
+
+    fn node_def(&self) -> &NodeDefinition {
+        // NOTE: on creation an invariant we have is that our node name is an extant key in our
+        // nodes datastructure so expect here is ok and we dont have to clone the NodeDefinition
+        self.nodes.get(&self.name).expect(&format!(
+            "Could not find node definition for node '{}'.",
+            &self.name
+        ))
+    }
+
+    /// Use the in-memory store
     pub fn use_in_mem_store(&self) -> bool {
+        // Currently hardcoded to true. In the future we can allow this to be set within the
+        // configuration for testing
         false
     }
 
-    pub fn address(&self) -> Option<Address> {
-        self.address
+    /// Get the peers list
+    pub fn peers(&self) -> Vec<String> {
+        let config_peers = self.node_def().peers.clone();
+        let cli_peers = self.peers.clone();
+        combine_unique(&config_peers, &cli_peers)
     }
 
-    pub fn data_dir(&self) -> PathBuf {
-        normalize_path(self.resolve_base_dir(&self.data_dir, &OsDirs::data_dir()))
+    /// get the quic port
+    pub fn quic_port(&self) -> u16 {
+        self.node_def().quic_port
     }
 
-    pub fn config_dir(&self) -> PathBuf {
-        normalize_path(self.resolve_base_dir(&self.config_dir, &OsDirs::config_dir()))
+    /// Depricated
+    #[deprecated]
+    pub fn enable_mdns(&self) -> bool {
+        false
     }
 
+    /// Get the config file path
+    pub fn config_file(&self) -> PathBuf {
+        self.paths.config_file()
+    }
+
+    /// Get the chains config
     pub fn chains(&self) -> &Vec<ChainConfig> {
         &self.chains
     }
 
-    pub fn key_file(&self) -> PathBuf {
-        self.ensure_full_path(&self.config_dir(), &self.key_file)
+    pub fn name(&self) -> String {
+        self.name.clone()
     }
 
-    pub fn db_file(&self) -> PathBuf {
-        self.ensure_full_path(&self.data_dir(), &self.db_file)
-    }
-
-    pub fn config_file(&self) -> PathBuf {
-        self.ensure_full_path(&self.config_dir(), &self.config_file)
-    }
-
-    pub fn cwd(&self) -> PathBuf {
-        self.cwd.to_owned()
-    }
-
-    pub fn peers(&self) -> Vec<String> {
-        self.peers.clone()
-    }
-
-    pub fn quic_port(&self) -> u16 {
-        self.quic_port
-    }
-
-    pub fn enable_mdns(&self) -> bool {
-        self.enable_mdns
-    }
-
+    /// Get the open telemetry collector url
     pub fn otel(&self) -> Option<String> {
         self.otel.clone()
     }
 
-    pub fn name(&self) -> Option<String> {
-        self.name.clone()
-    }
-}
-
-/// Override props from the global cli
-#[derive(Default, Serialize, Deserialize)]
-pub struct CliOverrides {
-    pub config: Option<String>,
-    pub name: Option<String>,
-    pub otel: Option<String>,
-}
-
-/// Load the config at the config_file or the default location if not provided
-pub fn load_config_from_overrides(cli_overrides: CliOverrides) -> Result<AppConfig> {
-    let config_file = cli_overrides.config.clone();
-    let mut defaults = AppConfig::default();
-    if let Some(file) = config_file {
-        defaults.config_file = file.into();
+    /// Get the node's address
+    pub fn address(&self) -> Option<Address> {
+        self.node_def().address.clone()
     }
 
-    let with_envs = load_yaml_with_env(&defaults.config_file())?;
+    /// Get a collection containing all the node definitions from the configuration
+    pub fn nodes(&self) -> &HashMap<String, NodeDefinition> {
+        &self.nodes
+    }
 
-    let config = Figment::from(Serialized::defaults(&defaults))
-        .merge(Yaml::string(&with_envs))
-        .merge(Serialized::defaults(cli_overrides))
-        .extract()?;
-
-    Ok(config)
-}
-
-pub fn load_config(config_file: Option<String>) -> Result<AppConfig> {
-    let mut overrides = CliOverrides::default();
-    overrides.config = config_file.clone();
-    load_config_from_overrides(overrides)
-}
-
-// Utility to normalize paths
-// We use this so we can avoid using canonicalize() and having to have real files in order to
-// manipulate and validate paths: https://doc.rust-lang.org/std/fs/fn.canonicalize.html
-fn normalize_path(path: impl AsRef<Path>) -> PathBuf {
-    let path = expand_tilde(path.as_ref());
-
-    let mut components = Vec::new();
-
-    for component in path.components() {
-        match component {
-            std::path::Component::ParentDir => {
-                components.pop();
-            }
-            std::path::Component::Normal(name) => {
-                components.push(name);
-            }
-            std::path::Component::RootDir => {
-                components.clear();
-                components.push(component.as_os_str());
-            }
-            std::path::Component::Prefix(prefix) => {
-                components.push(prefix.as_os_str());
-            }
-            std::path::Component::CurDir => {}
+    /// Get the node's role and enriched relevant provided configuration
+    pub fn role(&self) -> NodeRole {
+        match self.node_def().role.clone() {
+            NodeRole::Aggregator {
+                pubkey_write_path,
+                plaintext_write_path,
+            } => NodeRole::Aggregator {
+                // Normalize paths so that these paths are based on the config dir if they are
+                // relative
+                pubkey_write_path: pubkey_write_path
+                    .as_ref()
+                    .map(|p| self.paths.relative_to_config(p)),
+                plaintext_write_path: plaintext_write_path
+                    .as_ref()
+                    .map(|p| self.paths.relative_to_config(p)),
+            },
+            NodeRole::Ciphernode => NodeRole::Ciphernode,
         }
     }
 
-    let mut result = PathBuf::new();
-    for component in components {
-        result.push(component);
-    }
-    result
-}
-
-fn expand_tilde(path: &Path) -> PathBuf {
-    let path_str = match path.to_str() {
-        None => return path.to_path_buf(),
-        Some(s) => s,
-    };
-
-    if !path_str.starts_with('~') {
-        return path.to_path_buf();
+    /// Get the value of autonetkey
+    pub fn autonetkey(&self) -> bool {
+        self.autonetkey
     }
 
-    let home_dir = match env::var("HOME") {
-        Err(_) => return path.to_path_buf(),
-        Ok(dir) => dir,
-    };
+    /// Get the value of autowallet
+    pub fn autowallet(&self) -> bool {
+        self.autowallet
+    }
 
-    if path_str.len() == 1 {
-        PathBuf::from(home_dir)
-    } else {
-        PathBuf::from(format!("{}{}", home_dir, &path_str[1..]))
+    /// Get the value of autopassword
+    pub fn autopassword(&self) -> bool {
+        self.autopassword
     }
 }
 
-struct OsDirs;
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct UnscopedAppConfig {
+    /// The chains config
+    chains: Vec<ChainConfig>,
+    /// The base folder for enclave configuration defaults to `~/.config/enclave` on linux
+    config_dir: Option<PathBuf>,
+    /// The data dir for enclave defaults to `~/.local/share/enclave`
+    data_dir: Option<PathBuf>,
+    /// The config file as found before initialization this is for testing purposes and you should
+    /// not use this in your configurations
+    found_config_file: Option<PathBuf>,
+    /// The default node that runs during commands like `enclave start` without supplying the
+    /// `--name` argument.
+    node: NodeDefinition,
+    /// The `nodes` key in configuration
+    nodes: HashMap<String, NodeDefinition>,
+    /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
+    otel: Option<String>,
+}
+
+impl Default for UnscopedAppConfig {
+    fn default() -> Self {
+        Self {
+            chains: vec![],
+            config_dir: None,
+            data_dir: None,
+            node: NodeDefinition::default(),
+            found_config_file: None,
+            otel: None,
+            nodes: HashMap::new(),
+        }
+    }
+}
+
+impl UnscopedAppConfig {
+    /// Convert to a scoped configuration using local OS based default configuration
+    pub fn into_scoped(self, name: &str) -> Result<AppConfig> {
+        Ok(AppConfig::try_from_unscoped(
+            name,
+            self,
+            &OsDirs::data_dir(),
+            &OsDirs::config_dir(),
+            &env::current_dir()?,
+        )?)
+    }
+
+    /// Convert to a scoped configuration passing in some injected configuration
+    pub fn into_scoped_with_defaults(
+        self,
+        name: &str,
+        default_data_dir: &PathBuf,
+        default_config_dir: &PathBuf,
+        cwd: &PathBuf,
+    ) -> Result<AppConfig> {
+        Ok(AppConfig::try_from_unscoped(
+            name,
+            self,
+            default_data_dir,
+            default_config_dir,
+            cwd,
+        )?)
+    }
+}
+
+/// Value struct for passing configuration from the cli to the configuration
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+struct CliOverrides {
+    pub otel: Option<String>,
+    pub found_config_file: Option<PathBuf>,
+}
+
+/// Load the config at the config_file or the default location if not provided
+pub fn load_config(
+    name: &str,
+    found_config_file: Option<String>,
+    otel: Option<String>,
+) -> Result<AppConfig> {
+    let found_config_file = found_config_file.map(PathBuf::from);
+
+    let resolved_config_path = resolve_config_path(
+        find_in_parent,            // finding strategy
+        env::current_dir()?,       // cwd
+        OsDirs::config_dir(),      // default config folder
+        DEFAULT_CONFIG_NAME,       // hardcoded now to enclave.config.yaml
+        found_config_file.clone(), // config file we have found to exist
+    );
+
+    let loaded_yaml =
+        load_yaml_with_env(&resolved_config_path).context("Configuration file not found")?;
+
+    let config: UnscopedAppConfig =
+        Figment::from(Serialized::defaults(&UnscopedAppConfig::default()))
+            .merge(Yaml::string(&loaded_yaml))
+            .merge(Serialized::defaults(&CliOverrides {
+                otel,
+                found_config_file: Some(resolved_config_path),
+            }))
+            .extract()
+            .context("Could not parse configuration")?;
+
+    Ok(config.into_scoped(name).context(format!(
+        "Could not apply scope '{}' to configuration.",
+        name
+    ))?)
+}
+
+pub struct OsDirs;
 impl OsDirs {
     pub fn config_dir() -> PathBuf {
-        // TODO: handle unwrap error case
-        dirs::config_dir().unwrap().join("enclave")
+        dirs::config_dir()
+            .expect("Enclave may only be run on an OS that can provide a config dir. See https://docs.rs/dirs for more information.")
+            .join("enclave")
     }
 
     pub fn data_dir() -> PathBuf {
-        // TODO: handle unwrap error case
-        dirs::data_local_dir().unwrap().join("enclave")
+        dirs::data_local_dir()
+            .expect("Enclave may only be run on an OS that can provide a data dir. See https://docs.rs/dirs for more information.")
+            .join("enclave")
     }
+}
+
+// TODO: Put this in a universal utils lib
+pub fn combine_unique<T: Eq + std::hash::Hash + Clone + Ord>(a: &[T], b: &[T]) -> Vec<T> {
+    let mut combined_set: HashSet<_> = a.iter().cloned().collect();
+    combined_set.extend(b.iter().cloned());
+    let mut result: Vec<_> = combined_set.into_iter().collect();
+    result.sort();
+    result
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use super::*;
+    use crate::rpc::RpcAuth;
     use figment::Jail;
 
     #[test]
-    fn test_normalization() {
-        Jail::expect_with(|jail| {
-            jail.set_env("HOME", "/home/user");
-            let path = normalize_path(&PathBuf::from("~/foo/bar/../baz.txt"));
-            assert_eq!(path, PathBuf::from(format!("/home/user/foo/baz.txt")));
-            Ok(())
-        })
-    }
+    fn test_deserialization() -> Result<()> {
+        let config_str = r#"
+data_dir: "/mydata/enclave"
+config_dir: "/myconfig/enclave"
+chains:
+  - name: "hardhat"
+    rpc_url: "ws://localhost:8545"
+    rpc_auth:
+      type: "Basic"
+      credentials:
+        username: "testUser"
+        password: "testPassword"
+    contracts:
+      enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      ciphernode_registry:
+        address: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+        deploy_block: 1764352873645
+      filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 
-    #[test]
-    fn test_ensure_relative_path() {
-        Jail::expect_with(|jail| {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/home/testuser".to_string());
-            jail.set_env("HOME", &home);
+node:
+  config_dir: "/myconfig/override"
+  db_file: "./foo"
+  quic_port: 1234
 
-            let config = AppConfig {
-                config_file: format!("{}/docs/myconfig.yaml", &home).into(),
-                config_dir: "../foo".into(),
-                data_dir: "../bar".into(),
-                ..AppConfig::default()
-            };
+nodes:
+  ag:
+    quic_port: 1235
+    peers:
+      - "one"
+      - "two"
+    role:
+      type: aggregator
+      pubkey_write_path: "./output/pubkey.bin"
+      plaintext_write_path: "./output/plaintext.txt"
 
+"#;
+        {
+            // investigate default serialization
+            let unscoped: UnscopedAppConfig = serde_yaml::from_str(config_str).unwrap();
+            let config = unscoped
+                .into_scoped_with_defaults(
+                    "_default",
+                    &PathBuf::from("/default/data"),
+                    &PathBuf::from("/default/config"),
+                    &PathBuf::from("/my/cwd"),
+                )
+                .unwrap();
+            assert_eq!(
+                config.db_file(),
+                PathBuf::from("/mydata/enclave/_default/foo")
+            );
             assert_eq!(
                 config.key_file(),
-                PathBuf::from(format!("{}/foo/key", home))
+                PathBuf::from("/myconfig/override/_default/key")
             );
-            assert_eq!(config.db_file(), PathBuf::from(format!("{}/bar/db", home)));
+            assert_eq!(config.quic_port(), 1234);
+            assert!(config.peers().is_empty());
+        };
+        {
+            // investigate ag serialization
+            let unscoped: UnscopedAppConfig = serde_yaml::from_str(config_str).unwrap();
+            let config = unscoped
+                .into_scoped_with_defaults(
+                    "ag",
+                    &PathBuf::from("/default/data"),
+                    &PathBuf::from("/default/config"),
+                    &PathBuf::from("/my/cwd"),
+                )
+                .unwrap();
+            let chain = config.chains().first().unwrap();
+            assert_eq!(config.quic_port(), 1235);
+            assert_eq!(
+                chain.contracts.ciphernode_registry.address(),
+                "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+            );
+            assert_eq!(config.peers(), vec!["one", "two"]);
+            assert_eq!(
+                config.config_file(),
+                PathBuf::from("/default/config/enclave.config.yaml")
+            );
+            assert_eq!(config.db_file(), PathBuf::from("/mydata/enclave/ag/db"));
+            assert_eq!(config.key_file(), PathBuf::from("/myconfig/enclave/ag/key"));
 
-            Ok(())
-        });
+            // Write paths should be relative to config file if they are relative
+            assert_eq!(
+                config.role(),
+                NodeRole::Aggregator {
+                    pubkey_write_path: Some(PathBuf::from("/default/config/output/pubkey.bin")),
+                    plaintext_write_path: Some(PathBuf::from(
+                        "/default/config/output/plaintext.txt"
+                    ))
+                }
+            );
+        };
+        Ok(())
     }
 
     #[test]
@@ -425,30 +520,43 @@ mod tests {
             let home = std::env::var("HOME").unwrap_or_else(|_| "/home/testuser".to_string());
             jail.set_env("HOME", &home);
 
-            let config = AppConfig::default();
+            let config = UnscopedAppConfig::default()
+                .into_scoped("_default")
+                .map_err(|e| e.to_string())?;
 
             assert_eq!(
                 config.key_file(),
-                PathBuf::from(format!("{}/.config/enclave/key", home))
+                PathBuf::from(format!("{}/.config/enclave/_default/key", home))
             );
 
             assert_eq!(
                 config.db_file(),
-                PathBuf::from(format!("{}/.local/share/enclave/db", home))
+                PathBuf::from(format!("{}/.local/share/enclave/_default/db", home))
             );
 
             assert_eq!(
                 config.config_file(),
-                PathBuf::from(format!("{}/.config/enclave/config.yaml", home))
+                PathBuf::from(format!("{}/.config/enclave/enclave.config.yaml", home))
             );
 
-            assert_eq!(
-                config.config_dir(),
-                PathBuf::from(format!("{}/.config/enclave/", home))
-            );
+            assert_eq!(config.role(), NodeRole::Ciphernode);
 
             Ok(())
         });
+    }
+
+    #[test]
+    fn test_file_not_found() -> Result<()> {
+        let Err(err) = load_config("_default", Some("/nope".to_string()), None) else {
+            bail!("error expected");
+        };
+        let Some(e) = err.downcast_ref::<std::io::Error>() else {
+            bail!("io error expected");
+        };
+
+        assert_eq!(e.kind(), std::io::ErrorKind::NotFound);
+
+        Ok(())
     }
 
     #[test]
@@ -457,7 +565,7 @@ mod tests {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
             jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
-            let filename = format!("{}/.config/enclave/config.yaml", home);
+            let filename = format!("{}/.config/enclave/enclave.config.yaml", home);
             let filedir = format!("{}/.config/enclave", home);
             jail.create_dir(filedir)?;
             jail.create_file(
@@ -480,7 +588,8 @@ chains:
 "#,
             )?;
 
-            let mut config: AppConfig = load_config(None).map_err(|err| err.to_string())?;
+            let mut config = load_config("_default", None, None).map_err(|err| err.to_string())?;
+
             let mut chain = config.chains().first().unwrap();
 
             assert_eq!(chain.name, "hardhat");
@@ -520,7 +629,7 @@ chains:
       filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 "#,
             )?;
-            config = load_config(None).map_err(|err| err.to_string())?;
+            config = load_config("_default", None, None).map_err(|err| err.to_string())?;
             chain = config.chains().first().unwrap();
 
             assert_eq!(chain.rpc_auth, RpcAuth::None);
@@ -543,7 +652,7 @@ chains:
 "#,
             )?;
 
-            config = load_config(None).map_err(|err| err.to_string())?;
+            config = load_config("_default", None, None).map_err(|err| err.to_string())?;
             chain = config.chains().first().unwrap();
             assert_eq!(chain.rpc_auth, RpcAuth::Bearer("testToken".to_string()));
 
@@ -565,7 +674,7 @@ chains:
                 "0x1234567890123456789012345678901234567890",
             );
 
-            let filename = format!("{}/.config/enclave/config.yaml", home);
+            let filename = format!("{}/.config/enclave/enclave.config.yaml", home);
             let filedir = format!("{}/.config/enclave", home);
             jail.create_dir(filedir)?;
             jail.create_file(
@@ -588,7 +697,7 @@ chains:
 "#,
             )?;
 
-            let config: AppConfig = load_config(None).map_err(|err| err.to_string())?;
+            let config = load_config("_default", None, None).map_err(|err| err.to_string())?;
             let chain = config.chains().first().unwrap();
 
             // Test that environment variables are properly substituted

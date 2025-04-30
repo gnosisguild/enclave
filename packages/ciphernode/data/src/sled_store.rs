@@ -1,10 +1,17 @@
-use std::path::PathBuf;
-
-use crate::{Get, Insert, Remove};
+use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
-use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventBusConfig, Subscribe};
+use events::{
+    get_enclave_event_bus, BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventBusConfig,
+    Subscribe,
+};
+use once_cell::sync::Lazy;
 use sled::Db;
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 use tracing::{error, info};
 
 pub struct SledStore {
@@ -18,8 +25,8 @@ impl Actor for SledStore {
 
 impl SledStore {
     pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, path: &PathBuf) -> Result<Addr<Self>> {
-        info!("Starting SledStore");
-        let db = SledDb::new(path)?;
+        info!("Starting SledStore with {:?}", path);
+        let db = SledDb::new(PathBuf::from(path))?;
 
         let store = Self {
             db: Some(db),
@@ -35,11 +42,7 @@ impl SledStore {
     pub fn from_db(db: SledDb) -> Result<Self> {
         Ok(Self {
             db: Some(db),
-            bus: EventBus::<EnclaveEvent>::new(EventBusConfig {
-                capture_history: false,
-                deduplicate: true,
-            })
-            .start(),
+            bus: get_enclave_event_bus(),
         })
     }
 }
@@ -54,6 +57,18 @@ impl Handler<Insert> for SledStore {
                 _ => (),
             }
         }
+    }
+}
+
+impl Handler<InsertSync> for SledStore {
+    type Result = Result<()>;
+
+    fn handle(&mut self, event: InsertSync, _: &mut Self::Context) -> Self::Result {
+        if let Some(ref mut db) = &mut self.db {
+            db.insert(event.into())
+                .map_err(|e| anyhow::anyhow!("{}", e.to_string()))?
+        }
+        Ok(())
     }
 }
 
@@ -103,14 +118,46 @@ pub struct SledDb {
     db: Db,
 }
 
+// Global static cache
+pub static SLED_CACHE: Lazy<Arc<Mutex<HashMap<String, Db>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
+
+fn canonical_key(path: &PathBuf) -> String {
+    path.canonicalize()
+        .unwrap_or_else(|_| path.clone())
+        .to_string_lossy()
+        .into_owned()
+}
+
+fn get_or_open_db(path: &PathBuf) -> Result<Db> {
+    let key = canonical_key(path);
+    let mut cache = SLED_CACHE.lock().unwrap();
+    if let Some(db) = cache.get(&key) {
+        return Ok(db.clone());
+    }
+    let db = sled::open(path)?;
+    cache.insert(key, db.clone());
+    Ok(db)
+}
+
+fn clear_all_caches() {
+    let mut cache_lock = SLED_CACHE.lock().unwrap();
+    cache_lock.clear();
+}
+
 impl SledDb {
-    pub fn new(path: &PathBuf) -> Result<Self> {
-        let db = sled::open(path).with_context(|| {
+    pub fn new(path: PathBuf) -> Result<Self> {
+        let db = get_or_open_db(&path).with_context(|| {
             format!(
                 "Could not open database at path '{}'",
                 path.to_string_lossy()
             )
         })?;
+        if !db.was_recovered() {
+            info!("created db at: {:?}", &path);
+        } else {
+            info!("recovered db st: {:?}", &path);
+        }
         Ok(Self { db })
     }
 
@@ -138,5 +185,79 @@ impl SledDb {
             .context(format!("Failed to fetch {}", str_key))?;
 
         Ok(res.map(|v| v.to_vec()))
+    }
+
+    pub fn close_all_connections() {
+        clear_all_caches()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sled_db_caching() -> Result<()> {
+        use tempfile::tempdir;
+
+        // Section 1: Test basic cache functionality
+        let temp_dir = tempdir().expect("Failed to create temporary directory");
+        let db_path = temp_dir.path().join("test_cache.db");
+
+        // Create first instance and insert data
+        let mut db1 = SledDb::new(db_path.clone())?;
+        db1.insert(Insert::new(b"test_key".to_vec(), b"test_value".to_vec()))?;
+
+        // Create second instance to same path and verify data access
+        let mut db2 = SledDb::new(db_path.clone())?;
+        let result = db2.get(Get::new(b"test_key".to_vec()))?;
+        assert_eq!(
+            result.unwrap(),
+            b"test_value".to_vec(),
+            "Values from db2 should match"
+        );
+
+        // Cross-modify and verify (db1 writes, db2 reads)
+        db1.insert(Insert::new(b"key2".to_vec(), b"value2".to_vec()))?;
+        assert_eq!(
+            db2.get(Get::new(b"key2".to_vec()))?.unwrap(),
+            b"value2".to_vec(),
+            "db2 should see changes from db1"
+        );
+
+        // Section 2: Test cross-instance operations (db2 writes, db1 reads)
+        db2.insert(Insert::new(b"key3".to_vec(), b"value3".to_vec()))?;
+        assert_eq!(
+            db1.get(Get::new(b"key3".to_vec()))?.unwrap(),
+            b"value3".to_vec(),
+            "db1 should see changes from db2"
+        );
+
+        // Section 3: Test cache with different path
+        let second_path = temp_dir.path().join("different_cache.db");
+        let mut db3 = SledDb::new(second_path.clone())?;
+        db3.insert(Insert::new(b"db3_key".to_vec(), b"db3_value".to_vec()))?;
+
+        // Create another instance to the second path
+        let mut db4 = SledDb::new(second_path)?;
+        assert_eq!(
+            db4.get(Get::new(b"db3_key".to_vec()))?.unwrap(),
+            b"db3_value".to_vec(),
+            "db4 should see db3's data"
+        );
+
+        // Verify first path data isn't in second path
+        assert!(
+            db4.get(Get::new(b"test_key".to_vec()))?.is_none(),
+            "db4 should not see data from db1/db2"
+        );
+
+        // Verify second path data isn't in first path
+        assert!(
+            db1.get(Get::new(b"db3_key".to_vec()))?.is_none(),
+            "db1 should not see data from db3/db4"
+        );
+
+        Ok(())
     }
 }

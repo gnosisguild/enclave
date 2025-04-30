@@ -21,6 +21,7 @@ dirs = { workspace = true }
 events = { workspace = true }
 evm = { workspace = true }
 fhe = { workspace = true }
+hex = { workspace = true }
 keyshare = { workspace = true }
 logger = { workspace = true }
 libp2p = { workspace = true }
@@ -30,11 +31,14 @@ rand = { workspace = true }
 rand_chacha = { workspace = true }
 e3_request = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 sortition = { workspace = true }
 test-helpers = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 zeroize = { workspace = true }
+actix-web = { workspace = true }
+reqwest = { workspace = true }
 
 [build-dependencies]
 serde_json = { workspace = true }
