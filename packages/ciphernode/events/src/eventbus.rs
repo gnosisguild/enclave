@@ -230,7 +230,7 @@ pub struct HistoryCollector<E: Event> {
     history: Vec<E>,
 }
 
-impl<E: ErrorEvent> HistoryCollector<E> {
+impl<E: Event> HistoryCollector<E> {
     pub fn new() -> Self {
         Self {
             history: Vec::new(),
