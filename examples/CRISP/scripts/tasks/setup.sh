@@ -6,7 +6,7 @@ set -euo pipefail
 # TOOD: perhaps we can try and move more of this to the dockerfile build process
 # Eg. copy package.json and Cargo.toml and then try to build out dependencies however this is relatively complex
 (cd /app && git submodule update --init --recursive)
-(cd /app && find . -name "node_modules" -type d -prune -exec rm -rf {} + && pnpm install)
+(cd /app && pnpm install --frozen-lockfile)
 echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"

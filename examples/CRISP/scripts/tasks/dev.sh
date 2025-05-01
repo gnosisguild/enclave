@@ -27,6 +27,8 @@ cleanup() {
 
 trap cleanup INT TERM
 
+(cd /app && pnpm install --frozen-lockfile)
+
 concurrently \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
