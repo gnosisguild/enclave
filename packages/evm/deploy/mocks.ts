@@ -23,7 +23,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  const mockE3Deployment = await deploy("MockE3Program", {
+  await deploy("MockE3Program", {
     from: deployer,
     args: [mockInputValidator.address],
     log: true,
