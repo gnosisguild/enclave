@@ -66,19 +66,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
+    error InvalidInput();
     error InvalidStartWindow();
     error InvalidThreshold(uint32[2] threshold);
     error CiphertextOutputAlreadyPublished(uint256 e3Id);
     error CiphertextOutputNotPublished(uint256 e3Id);
     error PaymentRequired(uint256 value);
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
-
-    // Excubiae Errors
-    error UnsuccessfulCheck();
-    error MainCalledTooManyTimes();
-
-    // Excubiae Events
-    event CloneDeployed(address indexed clone);
 
     ////////////////////////////////////////////////////////////
     //                                                        //

@@ -2,14 +2,14 @@
 pragma solidity >=0.8.27;
 
 import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
-import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
+import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
 import {Clone} from "@excubiae/contracts/proxy/Clone.sol";
 
 /// @title CRISPInputValidator.
 /// @notice Enclave Input Validator
 contract CRISPInputValidator is IInputValidator, Clone {
     /// @notice The policy that will be used to validate the input.
-    IEnclavePolicy internal policy;
+    IBasePolicy internal policy;
 
     /// @notice The error emitted when the input data is empty.
     error EmptyInputData();
@@ -22,7 +22,7 @@ contract CRISPInputValidator is IInputValidator, Clone {
         bytes memory data = _getAppendedBytes();
         address policyAddr = abi.decode(data, (address));
 
-        policy = IEnclavePolicy(policyAddr);
+        policy = IBasePolicy(policyAddr);
     }
 
     /// @notice Validates input

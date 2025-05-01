@@ -3,7 +3,6 @@ import {
     useReadContract,
     useWriteContract,
     useWaitForTransactionReceipt,
-    useWatchContractEvent,
 } from 'wagmi';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context';
@@ -11,7 +10,6 @@ import {
     E3_PROGRAM_ADDRESS,
     E3_PROGRAM_ABI,
 } from '@/config/Enclave.abi';
-import { SEMAPHORE_ADDRESS, SEMAPHORE_ABI } from '@/config/Semaphore.abi';
 import { SemaphoreEthers } from '@semaphore-protocol/data';
 import type { Identity } from '@semaphore-protocol/core/identity';
 import { useCallback, useEffect, useRef } from 'react';
@@ -48,13 +46,15 @@ export const useSemaphoreGroupManagement = (
     useEffect(() => {
         const rpcUrl = chain?.rpcUrls?.default?.http[0];
         if (!rpcUrl || !roundStartBlock) return;
-
+        const semaphoreAddress = import.meta.env.VITE_SEMAPHORE_ADDRESS;
+        if (!semaphoreAddress) {
+            throw new Error("VITE_SEMAPHORE_ADDRESS environment variable is not set.");
+        }
         ethersRef.current = new SemaphoreEthers(rpcUrl, {
-            address: SEMAPHORE_ADDRESS,
+            address: semaphoreAddress,
             startBlock: roundStartBlock,
         });
     }, [chain?.id, roundStartBlock]);
-
     const { data: membersData, isFetching: isFetchingMembers } = useQuery<string[]>({
         enabled: !(groupId == null) && !!ethersRef.current,
         queryKey: ['semaphore-members', groupId?.toString()],
@@ -65,28 +65,6 @@ export const useSemaphoreGroupManagement = (
         staleTime: 1000 * 60 * 5,
     });
     const groupMembers = membersData ?? [];
-
-    useWatchContractEvent({
-        address: SEMAPHORE_ADDRESS,
-        abi: SEMAPHORE_ABI,
-        eventName: 'MemberAdded',
-        onLogs(logs) {
-            if (groupId == null) return;
-
-            for (const log of logs as any[]) {
-                const evGroupId: bigint = log.args.groupId;
-                if (evGroupId !== groupId) continue;
-
-                const commitStr: string = log.args.identityCommitment.toString();
-                const key = ['semaphore-members', groupId.toString()];
-
-                queryClient.setQueryData<string[]>(key, (old) =>
-                    old?.includes(commitStr) ? old : [...(old ?? []), commitStr],
-                );
-                queryClient.invalidateQueries({ queryKey: key, exact: true });
-            }
-        },
-    });
 
     const isCommitted = !!(
         semaphoreIdentity &&
@@ -117,13 +95,14 @@ export const useSemaphoreGroupManagement = (
     }, [roundId, semaphoreIdentity, writeContract]);
 
     useEffect(() => {
-        if (isRegConfirmed && groupId && semaphoreIdentity) {
+        if (isRegConfirmed && groupId != null && semaphoreIdentity) {
             showToast({ type: 'success', message: 'Identity registration confirmed!' });
             const key = ['semaphore-members', groupId.toString()];
             const c = semaphoreIdentity.commitment.toString();
             queryClient.setQueryData<string[]>(key, (old) =>
                 old?.includes(c) ? old : [...(old ?? []), c],
             );
+            queryClient.invalidateQueries({ queryKey: key, exact: true });
         }
         if (writeError) {
             showToast({ type: 'danger', message: 'Registration transaction failed' });

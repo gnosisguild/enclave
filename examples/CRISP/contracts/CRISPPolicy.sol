@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
 import {BasePolicy} from "@excubiae/contracts/policy/BasePolicy.sol";
 import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
 
 /// @title CRISPPolicy
 /// @notice Policy contract for validating inputs based on Semaphore proofs and usage limits.
-contract CRISPPolicy is BasePolicy, IEnclavePolicy {
+contract CRISPPolicy is BasePolicy {
     /// Errors
     error MainCalledTooManyTimes();
     error AlreadyEnforced();

@@ -5,7 +5,7 @@ import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {ImageID} from "./ImageID.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
-import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
+import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
 import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
@@ -142,7 +142,7 @@ contract CRISPRisc0 is IE3Program, Ownable {
         address checker = CHECKER_FACTORY.deploy(address(semaphore), groupId);
 
         // Deploy a new policy
-        IEnclavePolicy policy = IEnclavePolicy(
+        IBasePolicy policy = IBasePolicy(
             POLICY_FACTORY.deploy(checker, INPUT_LIMIT)
         );
 

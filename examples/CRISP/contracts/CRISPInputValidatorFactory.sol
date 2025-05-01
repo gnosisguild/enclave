@@ -3,11 +3,10 @@ pragma solidity >=0.8.27;
 
 import {Factory} from "@excubiae/contracts/proxy/Factory.sol";
 import {CRISPInputValidator} from "./CRISPInputValidator.sol";
-import {IInputValidatorFactory} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidatorFactory.sol";
 
 /// @title CRISPInputValidatorFactory
 /// @notice Factory for deploying minimal proxy instances of CRISPInputValidator.
-contract CRISPInputValidatorFactory is IInputValidatorFactory, Factory {
+contract CRISPInputValidatorFactory is Factory {
     /// @notice Initializes the factory with the CRISPInputValidator implementation.
     constructor() Factory(address(new CRISPInputValidator())) {}
 
