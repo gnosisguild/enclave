@@ -1,0 +1,9 @@
+[package]
+name = "commons"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+anyhow = "1.0.86"

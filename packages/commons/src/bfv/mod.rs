@@ -1,6 +1,6 @@
 use anyhow::Context;
 use anyhow::Result;
-use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
+use fhe::bfv::{BfvParameters, BfvParametersBuilder};
 use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -11,7 +11,7 @@ pub mod params {
     /// Naming convention: SET_<degree>_<plaintext_modulus>_<moduli_count>
 
     /// - Degree: 2048 (polynomial ring size)
-    /// - Plaintext modulus: 1032193 (allows for efficient encoding of votes)
+    /// - Plaintext modulus: 1032193
     /// - Moduli: [0xffffffff00001] (provides good security level)
     pub const SET_2048_1032193_1: (usize, u64, [u64; 1]) = (
         2048,              // degree

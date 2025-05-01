@@ -1883,6 +1883,7 @@ checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 [[package]]
 name = "commons"
 version = "0.1.0"
+source = "git+https://github.com/gnosisguild/enclave?branch=refactor/crypto-lib#58f804e6d8cf4521aec13e572f380ef9370b5bc9"
 dependencies = [
  "anyhow",
  "fhe 0.1.0-beta.7",

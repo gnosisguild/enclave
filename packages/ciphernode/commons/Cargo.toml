@@ -1,9 +1,0 @@
-[package]
-name = "commons"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-fhe_rs = { workspace = true }
-fhe-traits = { workspace = true }
-anyhow = { workspace = true }

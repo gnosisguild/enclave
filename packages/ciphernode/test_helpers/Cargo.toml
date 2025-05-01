@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 actix = { workspace = true }
-commons = { workspace = true }
 events = { workspace = true }
 fhe = { workspace = true }
 bincode = { workspace = true }
@@ -15,3 +14,4 @@ fhe-traits = { workspace = true }
 rand_chacha = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
+commons = { git = "https://github.com/gnosisguild/enclave", branch = "refactor/crypto-lib" }
