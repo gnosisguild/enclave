@@ -14,7 +14,7 @@ import { deployCiphernodeRegistryFixture } from "./fixtures/MockCiphernodeRegist
 import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fixture";
 import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
-import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture"
+import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
 import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
@@ -47,7 +47,9 @@ describe("Enclave", function () {
 
     const inputValidator = await deployInputValidatorFixture();
 
-    const e3Program = await deployE3ProgramFixture(await inputValidator.getAddress());
+    const e3Program = await deployE3ProgramFixture(
+      await inputValidator.getAddress(),
+    );
 
     const enclave = await deployEnclaveFixture(
       owner.address,
@@ -210,7 +212,9 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
-      expect(e3.inputValidator).to.equal(await mocks.inputValidator.getAddress());
+      expect(e3.inputValidator).to.equal(
+        await mocks.inputValidator.getAddress(),
+      );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
@@ -578,7 +582,9 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.requestBlock).to.equal(block.number);
-      expect(e3.inputValidator).to.equal(await mocks.inputValidator.getAddress());
+      expect(e3.inputValidator).to.equal(
+        await mocks.inputValidator.getAddress(),
+      );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );

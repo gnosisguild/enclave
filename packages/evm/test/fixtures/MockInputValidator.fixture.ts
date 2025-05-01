@@ -6,7 +6,5 @@ export async function deployInputValidatorFixture() {
   const deployment = await (
     await ethers.getContractFactory("MockInputValidator")
   ).deploy();
-  return MockInputValidator__factory.connect(
-    await deployment.getAddress(),
-  );
+  return MockInputValidator__factory.connect(await deployment.getAddress());
 }
