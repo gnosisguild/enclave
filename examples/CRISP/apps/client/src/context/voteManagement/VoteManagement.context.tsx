@@ -4,7 +4,6 @@ import { useWebAssemblyHook } from '@/hooks/wasm/useWebAssembly'
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { Identity } from '@semaphore-protocol/core/identity'
-import useLocalStorage from '@/hooks/generic/useLocalStorage'
 import { VoteStateLite, VotingRound } from '@/model/vote.model'
 import { useEnclaveServer } from '@/hooks/enclave/useEnclaveServer'
 import { convertPollData, convertTimestampToDate } from '@/utils/methods'
@@ -24,7 +23,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   /**
    * Voting Management States
    **/
-  const [identityPrivateKey, setIdentityPrivateKey] = useLocalStorage<string | undefined>('semaphoreIdentity', undefined)
   const [semaphoreIdentity, setSemaphoreIdentity] = useState<Identity | null>(null)
   const [user, setUser] = useState<{ address: string } | null>(null)
   const [roundState, setRoundState] = useState<VoteStateLite | null>(null)
@@ -117,24 +115,21 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   }, [wasmLoading, enclaveLoading])
 
   useEffect(() => {
-    if (semaphoreIdentity) {
-      return;
-    }
-    let identity: Identity | null = null;
-    if (identityPrivateKey) {
+    if (votingRound?.round_id && user?.address) {
+      const seedString = `semaphore-identity-${user.address}-${votingRound.round_id}`;
       try {
-        identity = Identity.import(identityPrivateKey);
-        console.log('Semaphore identity loaded from storage.');
+        const identity = new Identity(seedString);
+        setSemaphoreIdentity(identity);
+        console.log('Deterministic Semaphore identity generated.');
       } catch (error) {
-        console.error('Failed to import Semaphore identity from storage. Will generate a new one.', error);
+        console.error('Failed to generate deterministic Semaphore identity.', error);
+        setSemaphoreIdentity(null);
       }
     } else {
-      identity = new Identity();
-      setIdentityPrivateKey(identity.export());
-      console.log('New Semaphore identity generated and saved.');
+      setSemaphoreIdentity(null);
+      console.log('No round ID or user address found, Semaphore identity set to null.');
     }
-    setSemaphoreIdentity(identity);
-  }, [identityPrivateKey, semaphoreIdentity]);
+  }, [user?.address, votingRound?.round_id]);
 
   useEffect(() => {
     if (isConnected && address) {
