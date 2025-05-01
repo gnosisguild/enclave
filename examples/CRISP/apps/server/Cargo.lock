@@ -1486,9 +1486,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.83"
+version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25bdb32cbbdce2b519a9cd7df3a678443100e265d5e25ca763b7572a5104f5f3"
+checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
 name = "ark-bn254"
@@ -2473,6 +2473,16 @@ name = "colorchoice"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
+
+[[package]]
+name = "commons"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/enclave?branch=refactor%2Fcrypto-lib#780acee82ed2ce107659c137102cb4c64a9a7cc9"
+dependencies = [
+ "anyhow",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+]
 
 [[package]]
 name = "compute-provider"
@@ -8012,6 +8022,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "voting-core"
 version = "0.1.0"
 dependencies = [
+ "commons",
  "compute-provider",
  "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",

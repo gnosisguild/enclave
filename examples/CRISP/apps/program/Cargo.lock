@@ -1658,6 +1658,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b6a852b24ab71dffc585bcb46eaf7959d175cb865a7152e35b348d1b2960422"
 
 [[package]]
+name = "commons"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/enclave?branch=refactor%2Fcrypto-lib#780acee82ed2ce107659c137102cb4c64a9a7cc9"
+dependencies = [
+ "anyhow",
+ "fhe",
+ "fhe-traits",
+]
+
+[[package]]
 name = "compute-provider"
 version = "0.1.0"
 source = "git+https://github.com/gnosisguild/enclave#7fba85db09bcc4fa934ecbcf00ecb7202eda6447"
@@ -6419,6 +6429,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "voting-core"
 version = "0.1.0"
 dependencies = [
+ "commons",
  "compute-provider",
  "fhe",
  "fhe-traits",

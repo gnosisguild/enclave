@@ -7,3 +7,4 @@ edition = "2021"
 fhe = { workspace = true }
 fhe-traits = { workspace = true }
 compute-provider = { workspace = true }
+commons = { workspace = true }

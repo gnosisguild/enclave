@@ -30,7 +30,7 @@ fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" 
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
 compute-provider = { git = "https://github.com/gnosisguild/enclave" }
-
+commons = { git = "https://github.com/gnosisguild/enclave", branch = "refactor/crypto-lib" }
 
 [profile.release]
 debug = 1

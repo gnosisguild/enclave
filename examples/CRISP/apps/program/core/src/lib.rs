@@ -1,11 +1,11 @@
-use fhe::bfv::{BfvParameters, Ciphertext};
-use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
+use fhe::bfv::Ciphertext;
+use fhe_traits::{DeserializeParametrized, Serialize};
+use commons::bfv::deserialize_bfv_params_arc;
 use compute_provider::FHEInputs;
-use std::sync::Arc;
 
 /// CRISP Implementation of the CiphertextProcessor function
 pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {
-    let params = Arc::new(BfvParameters::try_deserialize(&fhe_inputs.params).unwrap());
+    let params = deserialize_bfv_params_arc(&fhe_inputs.params);
 
     let mut sum = Ciphertext::zero(&params);
     for ciphertext_bytes in &fhe_inputs.ciphertexts {
