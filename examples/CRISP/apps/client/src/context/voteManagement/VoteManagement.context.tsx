@@ -115,7 +115,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   }, [wasmLoading, enclaveLoading])
 
   useEffect(() => {
-    if (votingRound?.round_id && user?.address) {
+    if (!(votingRound?.round_id == null) && user?.address) {
       const seedString = `semaphore-identity-${user.address}-${votingRound.round_id}`;
       try {
         const identity = new Identity(seedString);
