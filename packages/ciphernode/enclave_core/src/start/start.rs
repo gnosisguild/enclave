@@ -13,7 +13,6 @@ use evm::{
 };
 use fhe::ext::FheExtension;
 use keyshare::ext::KeyshareExtension;
-use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
@@ -89,8 +88,6 @@ pub async fn execute(
         repositories.libp2p_keypair(),
     )
     .await?;
-
-    SimpleLogger::<EnclaveEvent>::attach(&config.name(), bus.clone());
 
     Ok((bus, join_handle, peer_id))
 }

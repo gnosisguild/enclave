@@ -8,7 +8,7 @@ use events::{
     Subscribe,
 };
 use std::collections::HashSet;
-use tracing::{info, instrument};
+use tracing::{info, instrument, trace};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
@@ -144,7 +144,7 @@ impl Handler<CiphernodeAdded> for Sortition {
 
     #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
-        info!("Adding node: {}", msg.address);
+        trace!("Adding node: {}", msg.address);
         match self.list.try_mutate(|mut list| {
             list.add(msg.address);
             Ok(list)

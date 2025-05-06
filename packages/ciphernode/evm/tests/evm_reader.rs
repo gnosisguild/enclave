@@ -9,7 +9,9 @@ use alloy::{
 use anyhow::Result;
 use data::Repository;
 use enclave_core::helpers::datastore::get_in_mem_store;
-use events::{EnclaveEvent, EventBus, EventBusConfig, GetHistory, Shutdown, TestEvent};
+use events::{
+    new_event_bus_with_history, EnclaveEvent, GetHistory, HistoryCollector, Shutdown, TestEvent,
+};
 use evm::{helpers::WithChainId, EvmEventReader};
 use std::time::Duration;
 use tokio::time::sleep;
@@ -51,11 +53,7 @@ async fn evm_reader() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.get_provider()).await?;
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
-        capture_history: true,
-        deduplicate: true,
-    })
-    .start();
+    let (bus, history_collector) = new_event_bus_with_history();
     let repository = Repository::new(get_in_mem_store());
 
     EvmEventReader::attach(
@@ -84,7 +82,9 @@ async fn evm_reader() -> Result<()> {
 
     sleep(Duration::from_millis(1)).await;
 
-    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    let history = history_collector
+        .send(GetHistory::<EnclaveEvent>::new())
+        .await?;
 
     assert_eq!(history.len(), 2);
 
@@ -113,12 +113,8 @@ async fn ensure_historical_events() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.get_provider()).await?;
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
-        capture_history: true,
-        deduplicate: true,
-    })
-    .start();
 
+    let (bus, history_collector) = new_event_bus_with_history();
     let historical_msgs = vec!["these", "are", "historical", "events"];
     let live_events = vec!["these", "events", "are", "live"];
 
@@ -155,7 +151,10 @@ async fn ensure_historical_events() -> Result<()> {
 
     let expected: Vec<_> = historical_msgs.into_iter().chain(live_events).collect();
 
-    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    let history = history_collector
+        .send(GetHistory::<EnclaveEvent>::new())
+        .await?;
+
     assert_eq!(history.len(), 8);
 
     let msgs: Vec<_> = history
@@ -183,14 +182,14 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     )
     .await?;
     let contract = EmitLogs::deploy(provider.get_provider()).await?;
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
-        capture_history: true,
-        deduplicate: true,
-    })
-    .start();
+    let (bus, history_collector) = new_event_bus_with_history();
 
-    async fn get_msgs(bus: &Addr<EventBus<EnclaveEvent>>) -> Result<Vec<String>> {
-        let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    async fn get_msgs(
+        history_collector: &Addr<HistoryCollector<EnclaveEvent>>,
+    ) -> Result<Vec<String>> {
+        let history = history_collector
+            .send(GetHistory::<EnclaveEvent>::new())
+            .await?;
         let msgs: Vec<String> = history
             .into_iter()
             .filter_map(|evt| match evt {
@@ -246,7 +245,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     }
 
     sleep(Duration::from_millis(1)).await;
-    let msgs = get_msgs(&bus).await?;
+    let msgs = get_msgs(&history_collector).await?;
     assert_eq!(msgs, ["before", "online", "live", "events"]);
 
     let _ = EvmEventReader::attach(
@@ -260,7 +259,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     .await?;
 
     sleep(Duration::from_millis(1)).await;
-    let msgs = get_msgs(&bus).await?;
+    let msgs = get_msgs(&history_collector).await?;
     assert_eq!(
         msgs,
         ["before", "online", "live", "events", "these", "are", "not", "lost"]
@@ -276,7 +275,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     }
 
     sleep(Duration::from_millis(1)).await;
-    let msgs = get_msgs(&bus).await?;
+    let msgs = get_msgs(&history_collector).await?;
     assert_eq!(
         msgs,
         ["before", "online", "live", "events", "these", "are", "not", "lost", "resumed", "data"]

@@ -5,14 +5,13 @@ use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use e3_request::E3Router;
-use events::{get_enclave_event_bus, EnclaveEvent, EventBus, EventBusConfig};
+use events::{get_enclave_event_bus, EnclaveEvent, EventBus};
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
 use fhe::ext::FheExtension;
-use logger::SimpleLogger;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
@@ -99,8 +98,6 @@ pub async fn execute(
     if let Some(path) = plaintext_write_path {
         PlaintextWriter::attach(&path, bus.clone());
     }
-
-    SimpleLogger::<EnclaveEvent>::attach(&config.name(), bus.clone());
 
     Ok((bus, join_handle, peer_id))
 }
