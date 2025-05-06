@@ -5,7 +5,7 @@ import {
 } from "@nomicfoundation/hardhat-network-helpers";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { ContractTransactionResponse, EventLog, ZeroHash } from "ethers";
+import { ZeroHash } from "ethers";
 import { ethers } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
@@ -14,8 +14,7 @@ import { deployCiphernodeRegistryFixture } from "./fixtures/MockCiphernodeRegist
 import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fixture";
 import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
-import { deployInputValidatorCheckerFixture } from "./fixtures/MockInputValidatorChecker.fixture";
-import { deployInputValidatorPolicyFactoryFixture } from "./fixtures/MockInputValidatorPolicyFactory.fixture";
+import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
 import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
@@ -37,41 +36,8 @@ const proof = "0x1337";
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
-type SetupConfig = {
-  inputLimit: number;
-};
-
-async function extractEventLog(name: string, tx: ContractTransactionResponse) {
-  const receipt = await tx.wait();
-
-  if (receipt == null) throw new Error("Receipt not returned");
-  const event = receipt.logs.find(
-    (log) => log instanceof EventLog && log.fragment.name === name,
-  ) as EventLog | undefined;
-  if (!event) throw new Error("Event not found");
-  return event;
-}
-
-function defaultSetupConfig(config: Partial<SetupConfig> = {}): SetupConfig {
-  return {
-    inputLimit: 0,
-    ...config,
-  };
-}
-
-async function deployInputValidatorContracts() {
-  const inputValidatorChecker = await deployInputValidatorCheckerFixture();
-  const inputValidatorPolicyFactory =
-    await deployInputValidatorPolicyFactoryFixture();
-
-  return {
-    inputValidatorChecker,
-    inputValidatorPolicyFactory,
-  };
-}
-
 describe("Enclave", function () {
-  async function setup(config = defaultSetupConfig()) {
+  async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
 
     const poseidon = await PoseidonT3Fixture();
@@ -79,19 +45,11 @@ describe("Enclave", function () {
     const decryptionVerifier = await deployDecryptionVerifierFixture();
     const computeProvider = await deployComputeProviderFixture();
 
-    const { inputValidatorChecker, inputValidatorPolicyFactory } =
-      await deployInputValidatorContracts();
+    const inputValidator = await deployInputValidatorFixture();
 
     const e3Program = await deployE3ProgramFixture(
-      await inputValidatorPolicyFactory.getAddress(),
-      await inputValidatorChecker.getAddress(),
-      config.inputLimit,
+      await inputValidator.getAddress(),
     );
-
-    // TODO: is it too restrictive to ensure that the e3Program owns the inputValidator policy factory like this?
-    await inputValidatorPolicyFactory
-      .connect(owner)
-      .transferOwnership(await e3Program.getAddress());
 
     const enclave = await deployEnclaveFixture(
       owner.address,
@@ -114,6 +72,7 @@ describe("Enclave", function () {
       mocks: {
         e3Program,
         decryptionVerifier,
+        inputValidator,
         computeProvider,
         registry,
       },
@@ -235,8 +194,8 @@ describe("Enclave", function () {
         .withArgs(1);
     });
     it("returns correct E3 details", async function () {
-      const { enclave, request } = await loadFixture(setup);
-      const tx = await enclave.request(
+      const { enclave, request, mocks } = await loadFixture(setup);
+      await enclave.request(
         request.filter,
         request.threshold,
         request.startTime,
@@ -247,15 +206,15 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      const event = await extractEventLog("CloneDeployed", tx);
-
       const e3 = await enclave.getE3(0);
 
       expect(e3.threshold).to.deep.equal(request.threshold);
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.e3ProgramParams).to.equal(request.e3ProgramParams);
-      expect(e3.inputValidator).to.equal(event.args[0]);
+      expect(e3.inputValidator).to.equal(
+        await mocks.inputValidator.getAddress(),
+      );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
@@ -587,25 +546,6 @@ describe("Enclave", function () {
         .withArgs(encryptionSchemeId);
     });
 
-    it("reverts if given E3 Program does not return input validator address", async function () {
-      const { enclave, mocks, owner, request } = await loadFixture(setup);
-      await mocks.e3Program
-        .connect(owner)
-        .testOverrideInputValidator(ethers.ZeroAddress);
-      await expect(
-        enclave.request(
-          request.filter,
-          request.threshold,
-          request.startTime,
-          request.duration,
-          request.e3Program,
-          request.e3ProgramParams,
-          request.computeProviderParams,
-          { value: 10 },
-        ),
-      ).to.be.revertedWithCustomError(enclave, "InvalidComputationRequest");
-    });
-
     it("reverts if committee selection fails", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
@@ -622,9 +562,9 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
     });
     it("instantiates a new E3", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, mocks } = await loadFixture(setup);
 
-      const tx = await enclave.request(
+      await enclave.request(
         request.filter,
         request.threshold,
         request.startTime,
@@ -634,7 +574,7 @@ describe("Enclave", function () {
         request.computeProviderParams,
         { value: 10 },
       );
-      const event = await extractEventLog("CloneDeployed", tx);
+
       const e3 = await enclave.getE3(0);
       const block = await ethers.provider.getBlock("latest").catch((e) => e);
 
@@ -642,7 +582,9 @@ describe("Enclave", function () {
       expect(e3.expiration).to.equal(0n);
       expect(e3.e3Program).to.equal(request.e3Program);
       expect(e3.requestBlock).to.equal(block.number);
-      expect(e3.inputValidator).to.equal(event.args[0]);
+      expect(e3.inputValidator).to.equal(
+        await mocks.inputValidator.getAddress(),
+      );
       expect(e3.decryptionVerifier).to.equal(
         abiCoder.decode(["address"], request.computeProviderParams)[0],
       );
@@ -939,7 +881,7 @@ describe("Enclave", function () {
       await enclave.activate(0, ethers.ZeroHash);
       await expect(
         enclave.publishInput(0, "0xaabbcc"),
-      ).to.be.revertedWithCustomError(enclave, "UnsuccessfulCheck");
+      ).to.be.revertedWithCustomError(enclave, "InvalidInput");
     });
 
     it("reverts if outside of input window", async function () {
@@ -964,57 +906,9 @@ describe("Enclave", function () {
         enclave.publishInput(0, ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
     });
-    it("allow multiple input rounds when inputLimit is 0 (default)", async function () {
-      const fixtureSetup = () => setup(defaultSetupConfig({ inputLimit: 0 }));
 
-      const { enclave, request } = await loadFixture(fixtureSetup);
-      const inputData = "0x12345678";
-
-      await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
-        { value: 10 },
-      );
-
-      await enclave.activate(0, ethers.ZeroHash);
-
-      // Call once
-      await enclave.publishInput(0, inputData);
-      await expect(
-        enclave.publishInput(0, inputData),
-      ).not.to.be.revertedWithCustomError(enclave, "MainCalledTooManyTimes");
-    });
-    it("it reverts when attempting to publish input twice in the same round when inputLimit is 1", async function () {
-      const fixtureSetup = () => setup(defaultSetupConfig({ inputLimit: 1 }));
-
-      const { enclave, request } = await loadFixture(fixtureSetup);
-      const inputData = "0x12345678";
-      await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
-        { value: 10 },
-      );
-
-      await enclave.activate(0, ethers.ZeroHash);
-
-      // Call once
-      await enclave.publishInput(0, inputData);
-      await expect(
-        enclave.publishInput(0, inputData),
-      ).to.be.revertedWithCustomError(enclave, "MainCalledTooManyTimes");
-    });
     it("it allows publishing input to different requests", async function () {
-      const fixtureSetup = () => setup(defaultSetupConfig({ inputLimit: 1 }));
+      const fixtureSetup = () => setup();
 
       const { enclave, request } = await loadFixture(fixtureSetup);
       const inputData = "0x12345678";

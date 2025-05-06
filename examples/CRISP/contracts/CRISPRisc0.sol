@@ -5,8 +5,13 @@ import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {ImageID} from "./ImageID.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
-import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
+import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
+import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
+import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
+import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
+import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
 
 contract CRISPRisc0 is IE3Program, Ownable {
     // Constants
@@ -16,11 +21,18 @@ contract CRISPRisc0 is IE3Program, Ownable {
     // State variables
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
-    IEnclavePolicy public policy;
+    ISemaphore public semaphore;
+    CRISPCheckerFactory private immutable CHECKER_FACTORY;
+    CRISPPolicyFactory private immutable POLICY_FACTORY;
+    CRISPInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
+    uint8 public constant INPUT_LIMIT = 100;
 
     // Mappings
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
+    mapping(uint256 e3Id => uint256 groupId) public groupIds;
+    mapping(uint256 groupId => mapping(uint256 identityCommitment => bool))
+        public committed;
 
     // Events
     event InputValidatorUpdated(address indexed newValidator);
@@ -30,33 +42,62 @@ contract CRISPRisc0 is IE3Program, Ownable {
     error E3AlreadyInitialized();
     error E3DoesNotExist();
     error EnclaveAddressZero();
+    error VerifierAddressZero();
+    error SemaphoreAddressZero();
+    error InvalidPolicyFactory();
+    error InvalidCheckerFactory();
+    error InvalidInputValidatorFactory();
+    error GroupDoesNotExist();
+    error AlreadyRegistered();
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     /// @param _enclave The enclave address
-    /// @param _policy The enclave policy address
     /// @param _verifier The RISC Zero verifier address
+    /// @param _semaphore The Semaphore address
+    /// @param _checkerFactory The checker factory address
+    /// @param _policyFactory The policy factory address
+    /// @param _inputValidatorFactory The input validator factory address
     constructor(
         IEnclave _enclave,
-        IEnclavePolicy _policy,
-        IRiscZeroVerifier _verifier
+        IRiscZeroVerifier _verifier,
+        ISemaphore _semaphore,
+        CRISPCheckerFactory _checkerFactory,
+        CRISPPolicyFactory _policyFactory,
+        CRISPInputValidatorFactory _inputValidatorFactory
     ) Ownable(msg.sender) {
-        initialize(_enclave, _policy, _verifier);
+        require(address(_enclave) != address(0), EnclaveAddressZero());
+        require(address(_verifier) != address(0), VerifierAddressZero());
+        require(address(_semaphore) != address(0), SemaphoreAddressZero());
+        require(
+            address(_checkerFactory) != address(0),
+            InvalidCheckerFactory()
+        );
+        require(address(_policyFactory) != address(0), InvalidPolicyFactory());
+        require(
+            address(_inputValidatorFactory) != address(0),
+            InvalidInputValidatorFactory()
+        );
+
+        enclave = _enclave;
+        verifier = _verifier;
+        semaphore = _semaphore;
+        CHECKER_FACTORY = _checkerFactory;
+        POLICY_FACTORY = _policyFactory;
+        INPUT_VALIDATOR_FACTORY = _inputValidatorFactory;
+        authorizedContracts[address(_enclave)] = true;
     }
 
-    /// @notice Initialize the contract components
-    /// @param _enclave The enclave address
-    /// @param _policy The enclave policy address
-    /// @param _verifier The RISC Zero verifier address
-    function initialize(
-        IEnclave _enclave,
-        IEnclavePolicy _policy,
-        IRiscZeroVerifier _verifier
-    ) public {
-        require(address(enclave) == address(0), EnclaveAddressZero());
-        enclave = _enclave;
-        policy = _policy;
-        verifier = _verifier;
-        authorizedContracts[address(_enclave)] = true;
+    /// @notice Register a Member to the semaphore group
+    /// @param e3Id The E3 program ID
+    /// @param identityCommitment The identity commitment
+    function registerMember(uint256 e3Id, uint256 identityCommitment) external {
+        require(paramsHashes[e3Id] != bytes32(0), GroupDoesNotExist());
+        uint256 groupId = groupIds[e3Id];
+
+        require(!committed[groupId][identityCommitment], AlreadyRegistered());
+        committed[groupId][identityCommitment] = true;
+
+        semaphore.addMember(groupId, identityCommitment);
     }
 
     /// @notice Get the params hash for an E3 program
@@ -74,16 +115,33 @@ contract CRISPRisc0 is IE3Program, Ownable {
         uint256,
         bytes calldata e3ProgramParams,
         bytes calldata
-    ) external returns (bytes32, IEnclavePolicy) {
+    ) external returns (bytes32, IInputValidator inputValidator) {
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
         );
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
-
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
-        return (ENCRYPTION_SCHEME_ID, policy);
+        // Create a new group
+        uint256 groupId = semaphore.createGroup(address(this));
+        groupIds[e3Id] = groupId;
+
+        // Deploy a new checker
+        address checker = CHECKER_FACTORY.deploy(address(semaphore), groupId);
+
+        // Deploy a new policy
+        IBasePolicy policy = IBasePolicy(
+            POLICY_FACTORY.deploy(checker, INPUT_LIMIT)
+        );
+
+        // Deploy a new input validator
+        inputValidator = IInputValidator(
+            INPUT_VALIDATOR_FACTORY.deploy(address(policy))
+        );
+        policy.setTarget(address(inputValidator));
+
+        return (ENCRYPTION_SCHEME_ID, inputValidator);
     }
 
     /// @notice Verify the proof

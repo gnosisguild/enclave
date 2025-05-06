@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Poll } from '@/model/poll.model'
 import Card from '@/components/Cards/Card'
 import CircularTiles from '@/components/CircularTiles'
@@ -8,42 +8,71 @@ import LoadingAnimation from '@/components/LoadingAnimation'
 import { hasPollEnded } from '@/utils/methods'
 import CountdownTimer from '@/components/CountdownTime'
 import { useModal } from 'connectkit'
+import RegistrationModal from '@/components/RegistrationModal'
+import { useVoteCasting } from '@/hooks/voting/useVoteCasting'
 
 type DailyPollSectionProps = {
-  onVoted?: (vote: Poll) => void
   loading?: boolean
-  voteCasting?: boolean
   endTime: Date | null
 }
 
-const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, voteCasting, endTime }) => {
-  const { user, pollOptions, setPollOptions, roundState } = useVoteManagementContext()
+const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime }) => {
+  const {
+    user,
+    pollOptions,
+    setPollOptions,
+    roundState,
+    isRegistering,
+    isRegisteredForCurrentRound,
+    registerIdentityOnContract,
+    fetchingMembers,
+  } = useVoteManagementContext()
   const isEnded = roundState ? hasPollEnded(roundState?.duration, roundState?.start_time) : false
   const [pollSelected, setPollSelected] = useState<Poll | null>(null)
   const [noPollSelected, setNoPollSelected] = useState<boolean>(true)
   const { setOpen } = useModal()
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false)
+  const { castVoteWithProof, isLoading: isCastingVote } = useVoteCasting()
 
-  const handleChecked = (selectedId: number) => {
-    const updatedOptions = pollOptions.map((option) => ({
-      ...option,
-      checked: !option.checked && option.value === selectedId,
-    }))
-    setPollSelected(updatedOptions.find((opt) => opt.checked) ?? null)
-    setPollOptions(updatedOptions)
-    setNoPollSelected(updatedOptions.every((poll) => !poll.checked))
-  }
+  useEffect(() => {
+    if (isRegisteredForCurrentRound && showRegistrationModal) {
+      setShowRegistrationModal(false);
+    }
+  }, [isRegisteredForCurrentRound, showRegistrationModal]);
 
-  const castVote = () => {
+  const statusClass = !isEnded ? 'lime' : 'red'
+
+  const handleChecked = (selectedPoll: Poll) => {
+    const isAlreadySelected = pollSelected?.value === selectedPoll.value;
+
+    setPollOptions(prevOptions => 
+      prevOptions.map(option => ({ 
+         ...option, 
+         checked: option.value === selectedPoll.value ? !isAlreadySelected : false 
+      }))
+    );
+
+    if (isAlreadySelected) {
+       setPollSelected(null);
+       setNoPollSelected(true);
+    } else {
+       setPollSelected(selectedPoll);
+       setNoPollSelected(false);
+    }
+  };
+
+  const castVote = async () => {
     if (!user) {
       setOpen(true)
       return;
     }
-    if (pollSelected && onVoted) {
-      onVoted(pollSelected)
+    if (!isRegisteredForCurrentRound) {
+      setShowRegistrationModal(true);
+      return;
     }
-  }
 
-  const statusClass = !isEnded ? 'lime' : 'red'
+    await castVoteWithProof(pollSelected);
+  };
 
   return (
     <>
@@ -72,22 +101,22 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, v
             </div>
           )}
 
-          {endTime && !isEnded && !voteCasting && (
+          {endTime && !isEnded && !isCastingVote && (
             <div className='flex items-center justify-center max-sm:py-5 '>
               <CountdownTimer endTime={endTime} />
             </div>
           )}
-          {voteCasting && (
+          {isCastingVote && (
             <div className='flex flex-col items-center justify-center max-sm:py-5 space-y-2'>
               <p className='text-base font-bold uppercase text-slate-600/50'>Casting Vote</p>
-              <LoadingAnimation isLoading={voteCasting} />
+              <LoadingAnimation isLoading={isCastingVote} />
             </div>
           )}
           {loading && (<LoadingAnimation isLoading={loading} />)}
           <div className=' grid w-full grid-cols-2 gap-4 md:gap-8'>
             {pollOptions.map((poll) => (
               <div key={poll.label} className='col-span-2 md:col-span-1'>
-                <Card checked={poll.checked} onChecked={() => handleChecked(poll.value)}>
+                <Card checked={poll.checked} onChecked={() => handleChecked(poll)}>
                   <p className='inline-block text-6xl leading-none md:text-8xl'>{poll.label}</p>
                 </Card>
               </div>
@@ -98,15 +127,21 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ onVoted, loading, v
               {noPollSelected && !isEnded && <div className='text-center text-sm leading-none text-slate-500'>Select your favorite</div>}
               <button
                 className={`button-outlined button-max ${noPollSelected ? 'button-disabled' : ''}`}
-                disabled={noPollSelected || loading || !roundState || isEnded}
+                disabled={noPollSelected || loading || !roundState || isEnded || isRegistering || isCastingVote || fetchingMembers}
                 onClick={castVote}
               >
-                cast vote
+                {isRegistering ? 'Registering...' : fetchingMembers ? 'Loading Group...' : isCastingVote ? 'Processing Vote...' : 'Cast Vote'}
               </button>
             </div>
           )}
         </div>
       </div>
+      <RegistrationModal 
+        isOpen={showRegistrationModal}
+        onClose={() => setShowRegistrationModal(false)}
+        isRegistering={isRegistering}
+        onRegister={() => { registerIdentityOnContract(); }}
+      />
     </>
   )
 }

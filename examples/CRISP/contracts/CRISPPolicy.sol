@@ -1,52 +1,56 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
-import {AdvancedPolicy} from "@excubiae/contracts/policy/AdvancedPolicy.sol";
-import {AdvancedChecker} from "@excubiae/contracts/checker/AdvancedChecker.sol";
-import {Check} from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
+import {BasePolicy} from "@excubiae/contracts/policy/BasePolicy.sol";
+import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
 
-/// @title BaseERC721Policy.
-/// @notice Policy enforcer for Enclave Input validation.
-/// @dev Extends BasePolicy with Enclave specific checks.
-contract CRISPPolicy is AdvancedPolicy, IEnclavePolicy {
+/// @title CRISPPolicy
+/// @notice Policy contract for validating inputs based on Semaphore proofs and usage limits.
+contract CRISPPolicy is BasePolicy {
+    /// Errors
     error MainCalledTooManyTimes();
-    error InvalidInitializationAddress();
+    error AlreadyEnforced();
 
+    /// State Variables
     uint8 public inputLimit;
     mapping(address subject => uint8 count) public enforced;
+    mapping(uint256 => bool) public spentNullifiers;
 
-    /// @notice Constructor to initialize the policy directly upon deployment.
-    /// @param _enclave The address of the Enclave contract that will call enforce (becomes the 'guarded' target).
-    /// @param _checker The address of the AdvancedChecker contract to use.
-    /// @param _inputLimit The maximum number of times enforce can be called per subject.
-    constructor(address _enclave, address _checker, uint8 _inputLimit) {
-        if (_checker == address(0) || _enclave == address(0))
-            revert InvalidInitializationAddress();
-        guarded = _enclave;
-        _transferOwnership(_enclave);
-        ADVANCED_CHECKER = AdvancedChecker(_checker);
-        SKIP_PRE = true;
-        SKIP_POST = true;
+    /// @notice Initializes the contract with appended bytes data for configuration.
+    /// @dev Decodes AdvancedChecker address and sets the owner.
+    function _initialize() internal virtual override {
+        bytes memory data = _getAppendedBytes();
+        (address sender, address baseCheckerAddr, uint8 _inputLimit) = abi
+            .decode(data, (address, address, uint8));
+        _transferOwnership(sender);
+
+        BASE_CHECKER = BaseChecker(baseCheckerAddr);
         inputLimit = _inputLimit;
     }
 
+    /// @notice Internal enforcement logic: checks nullifier, input limit, and marks nullifier spent.
+    /// @param subject The interacting address.
+    /// @param evidence Abi-encoded `ISemaphore.SemaphoreProof`.
     function _enforce(
         address subject,
-        bytes calldata evidence,
-        Check checkType
-    ) internal override(AdvancedPolicy) onlyTarget {
-        uint256 status = enforced[subject];
-        if (inputLimit > 0 && status == inputLimit) {
+        bytes calldata evidence
+    ) internal override(BasePolicy) onlyTarget {
+        ISemaphore.SemaphoreProof memory proof = abi.decode(
+            evidence,
+            (ISemaphore.SemaphoreProof)
+        );
+        uint256 n = proof.nullifier;
+        if (spentNullifiers[n]) revert AlreadyEnforced();
+        if (inputLimit > 0 && enforced[subject] == inputLimit)
             revert MainCalledTooManyTimes();
-        }
 
-        super._enforce(subject, evidence, checkType);
+        super._enforce(subject, evidence);
+        spentNullifiers[n] = true;
         enforced[subject]++;
     }
 
-    /// @notice Returns policy identifier.
-    /// @return Policy trait string.
+    /// @notice Returns policy identifier "CRISPPolicy".
     function trait() external pure returns (string memory) {
         return "CRISPPolicy";
     }
