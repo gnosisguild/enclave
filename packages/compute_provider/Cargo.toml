@@ -7,7 +7,7 @@ edition = "2021"
 serde = { version = "1.0", features = ["derive", "std"] }
 lean-imt = "0.1.2"
 sha3 = "0.10.8"
-num-bigint = "0.4"
+num-bigint = "0.4.6"
 num-traits = "0.2"
 hex = "0.4"
 light-poseidon = "0.2.0"

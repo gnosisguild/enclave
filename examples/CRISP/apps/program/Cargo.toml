@@ -26,11 +26,10 @@ risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", ta
 risc0-zkvm = { version = "2.0.0" }
 risc0-zkp = { version = "2.0.0", default-features = false }
 serde = { version = "1.0", features = ["derive", "std"] }
-fhe = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-compute-provider = { git = "https://github.com/gnosisguild/enclave" }
-
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "floatOp-replacement" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "floatOp-replacement" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "floatOp-replacement" }
+compute-provider = { path = "../../../../packages/compute_provider" }
 
 [profile.release]
 debug = 1

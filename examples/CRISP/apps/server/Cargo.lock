@@ -2324,9 +2324,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.28"
+version = "1.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e80e3b6a3ab07840e1cae9b0666a63970dc28e8ed5ffbcdacbfc760c281bfc1"
+checksum = "8691782945451c1c383942c4874dbe63814f61cb57ef773cda2972682b7bb3c0"
 dependencies = [
  "jobserver",
  "libc",
@@ -2473,6 +2473,22 @@ name = "colorchoice"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
+
+[[package]]
+name = "compute-provider"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254 0.4.0",
+ "ark-ff 0.4.2",
+ "hex",
+ "lean-imt",
+ "light-poseidon",
+ "num-bigint",
+ "num-traits",
+ "rayon",
+ "serde",
+ "sha3",
+]
 
 [[package]]
 name = "compute-provider"
@@ -2666,7 +2682,7 @@ dependencies = [
  "alloy-sol-types 0.6.4",
  "bincode",
  "chrono",
- "compute-provider",
+ "compute-provider 0.1.0 (git+https://github.com/gnosisguild/enclave)",
  "config",
  "dialoguer",
  "dotenvy",
@@ -2971,6 +2987,15 @@ dependencies = [
  "const-oid",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "directories"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a49173b84e034382284f27f1af4dcbbd231ffa358c0fe316541a7337f376a35"
+dependencies = [
+ "dirs-sys",
 ]
 
 [[package]]
@@ -3645,12 +3670,12 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#9624766dcfbb40ecfb01147f59c2f6292c447707"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement#43d7784837fbc6ed858db29cbfbedb3ba101f221"
 dependencies = [
  "doc-comment",
- "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -3690,16 +3715,17 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#9624766dcfbb40ecfb01147f59c2f6292c447707"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement#43d7784837fbc6ed858db29cbfbedb3ba101f221"
 dependencies = [
  "ethnum",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
  "num-bigint-dig",
  "num-traits",
+ "prime-number-utils",
  "prost 0.12.4",
  "prost-build",
  "rand",
@@ -3720,7 +3746,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#9624766dcfbb40ecfb01147f59c2f6292c447707"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement#43d7784837fbc6ed858db29cbfbedb3ba101f221"
 dependencies = [
  "rand",
 ]
@@ -3739,12 +3765,15 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#9624766dcfbb40ecfb01147f59c2f6292c447707"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement#43d7784837fbc6ed858db29cbfbedb3ba101f221"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
  "num-traits",
+ "prime-number-utils",
+ "prime_factorization",
  "rand",
+ "rayon",
 ]
 
 [[package]]
@@ -4786,9 +4815,12 @@ dependencies = [
 
 [[package]]
 name = "lean-imt"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e72b0683df18378c72877bfc0a1befc69b009f43e8f0ef3689f0cc98f067222"
+checksum = "fa2acc6dee32b12409446a76b9c1877e5ba9afb36dfcbe96d0ddaf15ca08f18d"
+dependencies = [
+ "hashbrown 0.15.2",
+]
 
 [[package]]
 name = "libc"
@@ -5105,10 +5137,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-bigint"
-version = "0.4.5"
+name = "num"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c165a9ab64cf766f73521c0dd2cfdff64f488b8f0b3e621face3462d3db536d7"
+checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
+dependencies = [
+ "num-bigint",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -5133,9 +5179,9 @@ dependencies = [
 
 [[package]]
 name = "num-complex"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23c6602fda94a57c990fe0df199a035d83576b496aa29f4e634a8ac6004e68a6"
+checksum = "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495"
 dependencies = [
  "num-traits",
 ]
@@ -5162,6 +5208,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1429034a0490724d0075ebb2bc9e875d6503c3cf69e235a8941aa757d83ef5bf"
 dependencies = [
  "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
+dependencies = [
+ "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -5687,6 +5744,27 @@ checksum = "5f12335488a2f3b0a83b14edad48dca9879ce89b2edd10e80237e4e852dd645e"
 dependencies = [
  "proc-macro2",
  "syn 2.0.98",
+]
+
+[[package]]
+name = "prime-number-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18abe995f8af4c79d68e775eaaf7d2d1d4729838a9dad9c780a5d2fda6d176c6"
+dependencies = [
+ "num-bigint",
+ "num-iter",
+]
+
+[[package]]
+name = "prime_factorization"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb24cb4f70d64221509ab3dca82ad2ec24e1d7f3fa3e7cb9eed4ced578683287"
+dependencies = [
+ "itertools 0.10.5",
+ "num",
+ "rand",
 ]
 
 [[package]]
@@ -6306,6 +6384,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "risc0-build-kernel"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cc3029ee7a4103aa176346f85431f1aa5193ea4025844417fcf1591f66299d4"
+dependencies = [
+ "cc",
+ "directories",
+ "glob",
+ "hex",
+ "rayon",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
 name = "risc0-circuit-keccak"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6398,6 +6491,16 @@ dependencies = [
  "risc0-zkp",
  "serde",
  "stability",
+]
+
+[[package]]
+name = "risc0-sys"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11abd6064c039f24b58676419cd13c92cbf4858e66948dd55b188b03511db44c"
+dependencies = [
+ "anyhow",
+ "risc0-build-kernel",
 ]
 
 [[package]]
@@ -8012,9 +8115,9 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "voting-core"
 version = "0.1.0"
 dependencies = [
- "compute-provider",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "compute-provider 0.1.0",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
 ]
 
 [[package]]
@@ -8027,16 +8130,17 @@ dependencies = [
  "bincode",
  "bytemuck",
  "clap",
- "compute-provider",
+ "compute-provider 0.1.0",
  "env_logger 0.10.2",
  "ethers",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement)",
  "log",
  "methods",
  "rand",
  "risc0-ethereum-contracts",
+ "risc0-sys",
  "risc0-zkvm",
  "serde",
  "tokio",

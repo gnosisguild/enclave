@@ -738,7 +738,6 @@ checksum = "67ba02a97a2bd10f4b59b25c7973101c79642302776489e030cd13cdab09ed15"
 [[package]]
 name = "compute-provider"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave#31de6e53cb35a83f59b63cb7529a8878b588d9fa"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -1114,7 +1113,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#93ce9d45374bdc52ad02e5320a11e13eb777e1eb"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement#43d7784837fbc6ed858db29cbfbedb3ba101f221"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -1137,7 +1136,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#93ce9d45374bdc52ad02e5320a11e13eb777e1eb"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement#43d7784837fbc6ed858db29cbfbedb3ba101f221"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -1147,6 +1146,7 @@ dependencies = [
  "num-bigint",
  "num-bigint-dig",
  "num-traits",
+ "prime-number-utils",
  "prost",
  "prost-build",
  "rand",
@@ -1159,7 +1159,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#93ce9d45374bdc52ad02e5320a11e13eb777e1eb"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement#43d7784837fbc6ed858db29cbfbedb3ba101f221"
 dependencies = [
  "rand",
 ]
@@ -1167,12 +1167,15 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#93ce9d45374bdc52ad02e5320a11e13eb777e1eb"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=floatOp-replacement#43d7784837fbc6ed858db29cbfbedb3ba101f221"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
  "num-traits",
+ "prime-number-utils",
+ "prime_factorization",
  "rand",
+ "rayon",
 ]
 
 [[package]]
@@ -1198,6 +1201,12 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "foldhash"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "foreign-types"
@@ -1300,6 +1309,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
 dependencies = [
  "allocator-api2",
+ "equivalent",
+ "foldhash",
 ]
 
 [[package]]
@@ -1444,9 +1455,12 @@ dependencies = [
 
 [[package]]
 name = "lean-imt"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e72b0683df18378c72877bfc0a1befc69b009f43e8f0ef3689f0cc98f067222"
+checksum = "fa2acc6dee32b12409446a76b9c1877e5ba9afb36dfcbe96d0ddaf15ca08f18d"
+dependencies = [
+ "hashbrown 0.15.2",
+]
 
 [[package]]
 name = "libc"
@@ -1562,10 +1576,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5b0c77c1b780822bc749a33e39aeb2c07584ab93332303babeabb645298a76e"
 
 [[package]]
-name = "num-bigint"
-version = "0.4.5"
+name = "num"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c165a9ab64cf766f73521c0dd2cfdff64f488b8f0b3e621face3462d3db536d7"
+checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
+dependencies = [
+ "num-bigint",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -1583,8 +1611,6 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "rand",
- "serde",
  "smallvec",
 ]
 
@@ -1613,6 +1639,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1429034a0490724d0075ebb2bc9e875d6503c3cf69e235a8941aa757d83ef5bf"
 dependencies = [
  "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
+dependencies = [
+ "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -1737,6 +1774,27 @@ checksum = "479cf940fbbb3426c32c5d5176f62ad57549a0bb84773423ba8be9d089f5faba"
 dependencies = [
  "proc-macro2",
  "syn 2.0.98",
+]
+
+[[package]]
+name = "prime-number-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18abe995f8af4c79d68e775eaaf7d2d1d4729838a9dad9c780a5d2fda6d176c6"
+dependencies = [
+ "num-bigint",
+ "num-iter",
+]
+
+[[package]]
+name = "prime_factorization"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb24cb4f70d64221509ab3dca82ad2ec24e1d7f3fa3e7cb9eed4ced578683287"
+dependencies = [
+ "itertools 0.10.5",
+ "num",
+ "rand",
 ]
 
 [[package]]

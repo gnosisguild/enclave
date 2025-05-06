@@ -3,6 +3,14 @@ name = "voting-host"
 version = { workspace = true }
 edition = { workspace = true }
 
+[lib]
+name = "voting_host_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "voting_host_bin"
+path = "src/main.rs"
+
 [dependencies]
 bincode = "1.3"
 bytemuck = { version = "1" }
@@ -25,3 +33,10 @@ fhe-util = { workspace = true }
 voting-core = { path = "../core" }
 rand = "0.8"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+risc0-sys = "1.4.0"
+
+
+[features]
+cuda = ["risc0-zkvm/cuda"]
+default = []
+prove = ["risc0-zkvm/prove"]
