@@ -12,6 +12,8 @@ use tokio::sync::{broadcast, mpsc};
 use tokio::time::{sleep, Duration};
 use tracing::error;
 use tracing::info;
+use tracing::trace;
+use tracing::warn;
 
 use crate::{
     events::{NetworkPeerCommand, NetworkPeerEvent},
@@ -71,7 +73,7 @@ async fn attempt_connection(
     let multi = get_resolved_multiaddr(multiaddr).map_err(to_retry)?;
     let opts: DialOpts = multi.clone().into();
     let dial_connection = opts.connection_id();
-    info!("Dialing: '{}' with connection '{}'", multi, dial_connection);
+    trace!("Dialing: '{}' with connection '{}'", multi, dial_connection);
     cmd_tx
         .send(NetworkPeerCommand::Dial(opts))
         .await
@@ -92,16 +94,16 @@ async fn wait_for_connection(
                 match result.map_err(to_retry)? {
                     NetworkPeerEvent::ConnectionEstablished { connection_id } => {
                         if connection_id == dial_connection {
-                            info!("Connection Established");
+                            trace!("Connection Established");
                             return Ok(());
                         }
                     }
                     NetworkPeerEvent::DialError { error } => {
-                        info!("DialError!");
+                        warn!("DialError!");
                         return match error.as_ref() {
                             // If we are dialing ourself then we should just fail
                             DialError::NoAddresses { .. } => {
-                                info!("DialError received. Returning RetryError::Failure");
+                                warn!("DialError received. Returning RetryError::Failure");
                                 Err(RetryError::Failure(error.clone().into()))
                             }
                             // Try again otherwise
@@ -112,9 +114,9 @@ async fn wait_for_connection(
                         connection_id,
                         error,
                     } => {
-                        info!("OutgoingConnectionError!");
+                        trace!("OutgoingConnectionError!");
                         if connection_id == dial_connection {
-                            info!(
+                            warn!(
                                 "Connection {} failed because of error {}. Retrying...",
                                 connection_id, error
                             );
@@ -132,7 +134,7 @@ async fn wait_for_connection(
                 }
             }
             _ = sleep(Duration::from_secs(60)) => {
-                info!("Connection attempt timed out after 60 seconds of no events");
+                warn!("Connection attempt timed out after 60 seconds of no events");
                 return Err(RetryError::Retry(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
                     "Connection attempt timed out",

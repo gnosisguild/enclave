@@ -9,9 +9,9 @@ use data::{DataStore, InMemStore};
 use e3_request::E3Router;
 use events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig, GetErrors,
-    GetHistory, KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated,
-    ResetHistory, Seed, Shutdown,
+    E3RequestComplete, E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, GetErrors,
+    GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
+    PublicKeyAggregated, ResetHistory, Seed, Shutdown, Subscribe,
 };
 use fhe::ext::FheExtension;
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
@@ -265,12 +265,15 @@ fn get_common_setup() -> Result<(
     Arc<BfvParameters>,
     CommonRandomPoly,
     E3id,
+    Addr<ErrorCollector<EnclaveEvent>>,
+    Addr<HistoryCollector<EnclaveEvent>>,
 )> {
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
-        capture_history: true,
-        deduplicate: true,
-    })
-    .start();
+    let bus = EventBus::<EnclaveEvent>::new().start();
+    let errors = ErrorCollector::<EnclaveEvent>::new().start();
+    let history = HistoryCollector::<EnclaveEvent>::new().start();
+    bus.do_send(Subscribe::new("*", history.clone().recipient()));
+    bus.do_send(Subscribe::new("EnclaveError", errors.clone().recipient()));
+
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
@@ -278,13 +281,13 @@ fn get_common_setup() -> Result<(
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
     let e3_id = E3id::new("1234");
 
-    Ok((bus, rng, seed, params, crpoly, e3_id))
+    Ok((bus, rng, seed, params, crpoly, e3_id, errors, history))
 }
 
 #[actix::test]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // Setup
-    let (bus, rng, seed, params, crpoly, e3_id) = get_common_setup()?;
+    let (bus, rng, seed, params, crpoly, e3_id, _, history_collector) = get_common_setup()?;
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
 
     // Setup actual ciphernodes and dispatch add events
@@ -338,10 +341,12 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         }),
     ]);
 
-    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    let history = history_collector
+        .send(GetHistory::<EnclaveEvent>::new())
+        .await?;
     assert_eq!(history.len(), 9);
     assert_eq!(history, expected_history);
-    bus.send(ResetHistory).await?;
+    history_collector.send(ResetHistory).await?;
 
     // Aggregate decryption
 
@@ -381,7 +386,9 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         }),
     ]);
 
-    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    let history = history_collector
+        .send(GetHistory::<EnclaveEvent>::new())
+        .await?;
     assert_eq!(history.len(), 6);
     assert_eq!(history, expected_history);
 
@@ -390,7 +397,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
 #[actix::test]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
-    let (bus, rng, seed, params, crpoly, e3_id) = get_common_setup()?;
+    let (bus, rng, seed, params, crpoly, e3_id, error_collector, history_collector) =
+        get_common_setup()?;
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
 
     let eth_addrs = create_random_eth_addrs(2);
@@ -412,8 +420,12 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     )
     .await?;
 
-    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
-    let errors = bus.send(GetErrors::<EnclaveEvent>::new()).await?;
+    let history = history_collector
+        .send(GetHistory::<EnclaveEvent>::new())
+        .await?;
+    let errors = error_collector
+        .send(GetErrors::<EnclaveEvent>::new())
+        .await?;
 
     println!("{:?}", errors);
 
@@ -423,7 +435,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     bus.send(EnclaveEvent::from(Shutdown)).await?;
 
     // Reset history
-    bus.send(ResetHistory).await?;
+    history_collector.send(ResetHistory).await?;
 
     // Check event count is correct
     assert_eq!(history.len(), 7);
@@ -460,7 +472,9 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     )
     .await?;
 
-    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    let history = history_collector
+        .send(GetHistory::<EnclaveEvent>::new())
+        .await?;
 
     let actual = history.iter().find_map(|evt| match evt {
         EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
@@ -476,11 +490,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, mut cmd_rx) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, _) = broadcast::channel(100); // Receive byte events from the network
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
-        capture_history: true,
-        deduplicate: true,
-    })
-    .start();
+    let bus = EventBus::<EnclaveEvent>::new().start();
+    let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
+    bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
     let event_rx = event_tx.subscribe();
     // Pas cmd and event channels to NetworkManager
     NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
@@ -533,7 +545,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     sleep(Duration::from_millis(1)).await; // need to push to next tick
 
     // check the history of the event bus
-    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    let history = history_collector
+        .send(GetHistory::<EnclaveEvent>::new())
+        .await?;
 
     assert_eq!(
         *msgs.lock().await,
@@ -558,11 +572,10 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // Setup elements in test
     let (cmd_tx, _) = mpsc::channel(100); // Transmit byte events to the network
     let (event_tx, event_rx) = broadcast::channel(100); // Receive byte events from the network
-    let bus = EventBus::<EnclaveEvent>::new(EventBusConfig {
-        capture_history: true,
-        deduplicate: true,
-    })
-    .start();
+    let bus = EventBus::<EnclaveEvent>::new().start();
+    let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
+    bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
+
     NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
 
     // Capture messages from output on msgs vec
@@ -580,7 +593,9 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     sleep(Duration::from_millis(1)).await; // need to push to next tick
 
     // check the history of the event bus
-    let history = bus.send(GetHistory::<EnclaveEvent>::new()).await?;
+    let history = history_collector
+        .send(GetHistory::<EnclaveEvent>::new())
+        .await?;
 
     assert_eq!(history, vec![event]);
 

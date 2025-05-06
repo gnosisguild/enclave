@@ -3,12 +3,14 @@ import { VoteManagementContextType, VoteManagementProviderProps } from '@/contex
 import { useWebAssemblyHook } from '@/hooks/wasm/useWebAssembly'
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
+import { Identity } from '@semaphore-protocol/core/identity'
 import { VoteStateLite, VotingRound } from '@/model/vote.model'
 import { useEnclaveServer } from '@/hooks/enclave/useEnclaveServer'
 import { convertPollData, convertTimestampToDate } from '@/utils/methods'
 import { Poll, PollResult } from '@/model/poll.model'
 import { generatePoll } from '@/utils/generate-random-poll'
 import { handleGenericError } from '@/utils/handle-generic-error'
+import { useSemaphoreGroupManagement } from '@/hooks/semaphore/useSemaphoreGroupManagement'
 
 const [useVoteManagementContext, VoteManagementContextProvider] = createGenericContext<VoteManagementContextType>()
 
@@ -21,6 +23,7 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   /**
    * Voting Management States
    **/
+  const [semaphoreIdentity, setSemaphoreIdentity] = useState<Identity | null>(null)
   const [user, setUser] = useState<{ address: string } | null>(null)
   const [roundState, setRoundState] = useState<VoteStateLite | null>(null)
   const [votingRound, setVotingRound] = useState<VotingRound | null>(null)
@@ -44,6 +47,19 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     broadcastVote,
   } = useEnclaveServer()
 
+  const {
+    groupId: currentSemaphoreGroupId,
+    groupMembers: currentGroupMembers,
+    isFetchingMembers: fetchingMembers,
+    isRegistering,
+    isCommitted: isRegisteredForCurrentRound,
+    registerIdentity: registerIdentityOnContract
+  } = useSemaphoreGroupManagement(
+    roundState?.id,
+    roundState?.start_block,
+    semaphoreIdentity
+  );
+
   const initialLoad = async () => {
     console.log("Loading wasm");
     const currentRound = await getCurrentRound()
@@ -59,26 +75,23 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     }
   }
 
-  const logout = () => {
-    setUser(null)
-  }
-
   const getRoundStateLite = async (roundCount: number) => {
-    const roundState = await getRoundStateLiteRequest(roundCount)
+    const fetchedRoundState = await getRoundStateLiteRequest(roundCount);
 
-    if (roundState?.committee_public_key.length === 1 && roundState.committee_public_key[0] === 0) {
+    if (fetchedRoundState?.committee_public_key.length === 1 && fetchedRoundState.committee_public_key[0] === 0) {
       handleGenericError('getRoundStateLite', {
         message: 'Enclave server failed generating the necessary pk bytes',
         name: 'getRoundStateLite',
-      })
+      });
     }
-    if (roundState) {
-      setRoundState(roundState)
-      setVotingRound({ round_id: roundState.id, pk_bytes: roundState.committee_public_key })
-      setPollOptions(generatePoll({ round_id: roundState.id, emojis: roundState.emojis }))
-      setRoundEndDate(convertTimestampToDate(roundState.start_time, roundState.duration))
+    if (fetchedRoundState) {
+      const startBlockNumber = Number(fetchedRoundState.start_block);
+      setRoundState({ ...fetchedRoundState, start_block: startBlockNumber });
+      setVotingRound({ round_id: fetchedRoundState.id, pk_bytes: fetchedRoundState.committee_public_key });
+      setPollOptions(generatePoll({ round_id: fetchedRoundState.id, emojis: fetchedRoundState.emojis }));
+      setRoundEndDate(convertTimestampToDate(fetchedRoundState.start_time, fetchedRoundState.duration));
     }
-  }
+  };
 
   const getPastPolls = async () => {
     try {
@@ -101,7 +114,23 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     setIsLoading(false)
   }, [wasmLoading, enclaveLoading])
 
-  // Update user state when wallet connection changes
+  useEffect(() => {
+    if (!(votingRound?.round_id == null) && user?.address) {
+      const seedString = `semaphore-identity-${user.address}-${votingRound.round_id}`;
+      try {
+        const identity = new Identity(seedString);
+        setSemaphoreIdentity(identity);
+        console.log('Deterministic Semaphore identity generated.');
+      } catch (error) {
+        console.error('Failed to generate deterministic Semaphore identity.', error);
+        setSemaphoreIdentity(null);
+      }
+    } else {
+      setSemaphoreIdentity(null);
+      console.log('No round ID or user address found, Semaphore identity set to null.');
+    }
+  }, [user?.address, votingRound?.round_id]);
+
   useEffect(() => {
     if (isConnected && address) {
       setUser({ address })
@@ -115,7 +144,13 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
       value={{
         isLoading,
         user,
+        semaphoreIdentity,
         votingRound,
+        isRegistering,
+        fetchingMembers,
+        currentSemaphoreGroupId,
+        currentGroupMembers,
+        isRegisteredForCurrentRound,
         roundEndDate,
         pollOptions,
         roundState,
@@ -133,10 +168,10 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
         setPollOptions,
         initialLoad,
         broadcastVote,
+        registerIdentityOnContract,
         setVotingRound,
         setUser,
         encryptVote,
-        logout,
       }}
     >
       {children}

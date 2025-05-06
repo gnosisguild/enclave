@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import { IEnclavePolicy } from "./IEnclavePolicy.sol";
+import { IInputValidator } from "./IInputValidator.sol";
 
 interface IE3Program {
     /// @notice This function should be called by the Enclave contract to validate the computation parameters.
@@ -18,7 +18,7 @@ interface IE3Program {
         bytes calldata computeProviderParams
     )
         external
-        returns (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator);
+        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator);
 
     /// @notice This function should be called by the Enclave contract to verify the decrypted output of an E3.
     /// @param e3Id ID of the E3.

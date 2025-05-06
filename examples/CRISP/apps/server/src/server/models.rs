@@ -51,6 +51,7 @@ pub struct EncryptedVote {
     pub round_id: u64,
     pub enc_vote_bytes: Vec<u8>,
     pub address: String,
+    pub proof_sem: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -93,7 +94,8 @@ pub struct E3StateLite {
     pub start_time: u64,
     pub duration: u64,
     pub expiration: u64,
-
+    pub start_block: u64,
+  
     pub committee_public_key: Vec<u8>,
     pub emojis: [String; 2],
 }
@@ -156,6 +158,7 @@ impl From<E3> for E3StateLite {
             status: e3.status,
             vote_count: e3.vote_count,
             start_time: e3.start_time,
+            start_block: e3.block_start,
             duration: e3.duration,
             expiration: e3.expiration,
             committee_public_key: e3.committee_public_key,
