@@ -32,6 +32,6 @@ trap cleanup INT TERM
 concurrently \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
-  "anvil" \
+  "anvil --host 0.0.0.0" \
   "./scripts/tasks/evm_deploy.sh && ./scripts/tasks/risc0_deploy.sh && ./scripts/tasks/dev_services.sh"
 
