@@ -1,6 +1,7 @@
 use super::SharedRng;
 use commons::bfv::build_bfv_params_arc;
-use fhe_rs::{bfv::BfvParameters, mbfv::CommonRandomPoly};
+use fhe_rs::bfv::BfvParameters;
+use fhe_rs::mbfv::CommonRandomPoly;
 use fhe_traits::Serialize;
 use std::sync::Arc;
 

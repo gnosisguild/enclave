@@ -1,12 +1,12 @@
 [package]
 name = "test-helpers"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
-events = { workspace = true }
-fhe = { workspace = true }
+events = { path = "../events" }
+fhe = { path = "../fhe" }
 bincode = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 fhe_rs = { workspace = true }
@@ -14,4 +14,4 @@ fhe-traits = { workspace = true }
 rand_chacha = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
-commons = { git = "https://github.com/gnosisguild/enclave", branch = "refactor/crypto-lib" }
+commons = { path = "../../commons" }

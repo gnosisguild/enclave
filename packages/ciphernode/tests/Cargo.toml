@@ -1,21 +1,21 @@
 [package]
 name = "tests"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-net = { workspace = true }
-sortition = { workspace = true }
-events = { workspace = true }
-evm = { workspace = true }
-logger = { workspace = true }
-fhe = { workspace = true }
-crypto = { workspace = true }
-data = { workspace = true }
-keyshare = { workspace = true }
-aggregator = { workspace = true }
-e3_request = { workspace = true }
-test-helpers = { workspace = true }
+net = { path = "../net" }
+sortition = { path = "../sortition" }
+events = { path = "../events" }
+evm = { path = "../evm" }
+logger = { path = "../logger" }
+fhe = { path = "../fhe" }
+crypto = { path = "../crypto" }
+data = { path = "../data" }
+keyshare = { path = "../keyshare" }
+aggregator = { path = "../aggregator" }
+e3_request = { path = "../e3_request" }
+test-helpers = { path = "../test_helpers" }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
@@ -30,4 +30,4 @@ bincode = { workspace = true }
 base64 = { workspace = true }
 actix = { workspace = true }
 anyhow = { workspace = true }
-commons = { git = "https://github.com/gnosisguild/enclave", branch = "refactor/crypto-lib" }
+commons = { path = "../../commons" }

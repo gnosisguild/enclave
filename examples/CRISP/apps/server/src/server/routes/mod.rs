@@ -1,6 +1,6 @@
+mod rounds;
 mod state;
 mod voting;
-mod rounds;
 
 use actix_web::web;
 

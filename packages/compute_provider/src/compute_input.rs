@@ -23,7 +23,10 @@ impl ComputeInput {
         let processed_hash = Keccak256::digest(&processed_ciphertext).to_vec();
         let params_hash = Keccak256::digest(&self.fhe_inputs.params).to_vec();
 
-        assert_eq!(processed_hash, self.ciphertext_hash, "Ciphertext hash mismatch");
+        assert_eq!(
+            processed_hash, self.ciphertext_hash,
+            "Ciphertext hash mismatch"
+        );
 
         let merkle_root = MerkleTree {
             leaf_hashes: self.leaf_hashes.clone(),

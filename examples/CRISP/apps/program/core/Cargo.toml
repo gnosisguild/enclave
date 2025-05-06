@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-fhe = { workspace = true }
-fhe-traits = { workspace = true }
-compute-provider = { workspace = true }
-commons = { workspace = true }
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+compute-provider = { path = "../../../../../packages/compute_provider" }
+commons = { path = "../../../../../packages/commons" }

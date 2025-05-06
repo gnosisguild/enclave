@@ -1,39 +1,39 @@
 [package]
 name = "enclave_core"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 build = "build.rs"
 
 [dependencies]
 actix = { workspace = true }
-aggregator = { workspace = true }
+aggregator = { path = "../aggregator" }
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
-config = { workspace = true }
+config = { path = "../config" }
 clap = { workspace = true }
-crypto = { workspace = true }
-data = { workspace = true }
+crypto = { path = "../crypto" }
+data = { path = "../data" }
 dirs = { workspace = true }
-events = { workspace = true }
-evm = { workspace = true }
-fhe = { workspace = true }
+events = { path = "../events" }
+evm = { path = "../evm" }
+fhe = { path = "../fhe" }
 hex = { workspace = true }
-keyshare = { workspace = true }
-logger = { workspace = true }
+keyshare = { path = "../keyshare" }
+logger = { path = "../logger" }
 libp2p = { workspace = true }
-net = { workspace = true }
-phf = { workspace = true }
+net = { path = "../net" }
+phf = { workspace = true, features = ["macros"] }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
-e3_request = { workspace = true }
+e3_request = { path = "../e3_request" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sortition = { workspace = true }
-test-helpers = { workspace = true }
+sortition = { path = "../sortition" }
+test-helpers = { path = "../test_helpers" }
 tokio = { workspace = true }
 tracing = { workspace = true }
 zeroize = { workspace = true }

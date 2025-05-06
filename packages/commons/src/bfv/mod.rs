@@ -1,6 +1,6 @@
 use anyhow::Context;
 use anyhow::Result;
-use fhe::bfv::{BfvParameters, BfvParametersBuilder};
+use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
 use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -12,11 +12,11 @@ pub mod params {
 
     /// - Degree: 2048 (polynomial ring size)
     /// - Plaintext modulus: 1032193
-    /// - Moduli: [0xffffffff00001] (provides good security level)
+    /// - Moduli: [0x3FFFFFFF000001] (provides good security level)
     pub const SET_2048_1032193_1: (usize, u64, [u64; 1]) = (
         2048,              // degree
         1032193,           // plaintext_modulus
-        [0xffffffff00001], // moduli
+        [0x3FFFFFFF000001], // moduli
     );
 }
 

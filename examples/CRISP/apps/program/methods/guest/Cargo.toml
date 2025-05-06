@@ -7,17 +7,14 @@ edition = "2021"
 name = "voting"
 path = "src/bin/voting.rs"
 
-[workspace]
-
 [dependencies]
 alloy-primitives = { version = "0.8", default-features = false, features = ["rlp", "serde", "std"] }
-alloy-sol-types = { version = "0.8" }
+alloy-sol-types = "0.6"
 risc0-zkvm = { version = "2.0.0", default-features = false, features = ['std'] }
-compute-provider = { git = "https://github.com/gnosisguild/enclave" }
+compute-provider = { path = "../../../../../../packages/compute_provider" }
 voting-core ={ path = "../../core" }
-bincode = "1.3"
-anyhow = { version = "1.0.75" }
-
+bincode = "1.3.3"
+anyhow = "1.0.86"
 
 [profile.release]
 lto = "thin"

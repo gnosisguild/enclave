@@ -1,8 +1,8 @@
+use chrono::Utc;
 use env_logger::{Builder, Target};
 use log::{LevelFilter, Record};
 use std::io::Write;
 use std::path::Path;
-use chrono::Utc;
 
 pub fn init_logger() {
     let mut builder = Builder::new();

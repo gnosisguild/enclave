@@ -1,7 +1,7 @@
 [package]
 name = "sortition"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 path = "src/lib.rs"
@@ -13,9 +13,9 @@ actix = { workspace = true }
 alloy = { workspace = true, features = ["full"] }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-config = { workspace = true }
-data = { workspace = true }
-events = { workspace = true }
+config = { path = "../config" }
+data = { path = "../data" }
+events = { path = "../events" }
 num = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

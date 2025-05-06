@@ -1,15 +1,15 @@
 [package]
 name = "e3_request"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
-events = { workspace = true }
-data = { workspace = true }
+events = { path = "../events" }
+data = { path = "../data" }
 anyhow = { workspace = true }
 serde = { workspace = true }
-config = { workspace = true }
+config = { path = "../config" }
 bincode = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }

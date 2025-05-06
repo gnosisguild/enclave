@@ -1,13 +1,13 @@
 [package]
 name = "data"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Data persistence for enclave"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
 [dependencies]
 actix = { workspace = true }
-events = { workspace = true }
+events = { path = "../events" }
 anyhow = { workspace = true }
 serde = { workspace = true }
 sled = { workspace = true }

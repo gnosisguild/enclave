@@ -1,7 +1,7 @@
-use fhe::bfv::Ciphertext;
-use fhe_traits::{DeserializeParametrized, Serialize};
 use commons::bfv::deserialize_bfv_params_arc;
 use compute_provider::FHEInputs;
+use fhe_rs::bfv::Ciphertext;
+use fhe_traits::{DeserializeParametrized, Serialize};
 
 /// CRISP Implementation of the CiphertextProcessor function
 pub fn fhe_processor(fhe_inputs: &FHEInputs) -> Vec<u8> {

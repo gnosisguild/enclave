@@ -1,8 +1,8 @@
 [package]
 # we have to name this other than core for disambiguation
 name = "events"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 

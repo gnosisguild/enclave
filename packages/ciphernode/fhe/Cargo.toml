@@ -1,21 +1,21 @@
 [package]
 name = "fhe"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
-config = { workspace = true }
-data = { workspace = true }
-events = { workspace = true }
+config = { path = "../config" }
+data = { path = "../data" }
+events = { path = "../events" }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 fhe_rs = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
-e3_request = { workspace = true }
+e3_request = { path = "../e3_request" }
 serde = { workspace = true }
-commons = { git = "https://github.com/gnosisguild/enclave", branch = "refactor/crypto-lib" }
+commons = { path = "../../commons" }

@@ -1,18 +1,18 @@
 [package]
 name = "aggregator"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
-config = { workspace = true }
+config = { path = "../config" }
 async-trait = { workspace = true }
-events = { workspace = true }
-fhe = { workspace = true  }
-sortition = {  workspace = true  }
-e3_request = { workspace = true }
-data = { workspace = true }
+events = { path = "../events" }
+fhe = { path = "../fhe" }
+sortition = {  path = "../sortition" }
+e3_request = { path = "../e3_request" }
+data = { path = "../data" }
 tracing = { workspace = true }

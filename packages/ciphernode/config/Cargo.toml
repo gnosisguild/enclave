@@ -1,14 +1,14 @@
 [package]
 name = "config"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 alloy = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
-events = { workspace = true }
-figment = { workspace = true }
+events = { path = "../events" }
+figment = { workspace = true, features = ["yaml", "test"] }
 path-clean = { workspace = true }
 petname = { workspace = true }
 rand = { workspace = true }

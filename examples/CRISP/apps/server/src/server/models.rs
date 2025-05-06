@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::server::database::SledDB;
+use serde::{Deserialize, Serialize};
 
 pub struct AppState {
     pub sled: SledDB,
@@ -9,7 +9,6 @@ pub struct AppState {
 pub struct JsonResponse {
     pub response: String,
 }
-
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -25,7 +24,6 @@ pub struct VoteResponse {
     pub tx_hash: Option<String>,
     pub message: Option<String>,
 }
-
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RoundCount {
@@ -60,7 +58,6 @@ pub struct GetRoundRequest {
     pub round_id: u64,
 }
 
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ComputeProviderParams {
     pub name: String,
@@ -89,14 +86,14 @@ pub struct E3StateLite {
     pub id: u64,
     pub chain_id: u64,
     pub enclave_address: String,
-  
+
     pub status: String,
     pub vote_count: u64,
-  
+
     pub start_time: u64,
     pub duration: u64,
     pub expiration: u64,
-  
+
     pub committee_public_key: Vec<u8>,
     pub emojis: [String; 2],
 }
@@ -107,7 +104,7 @@ pub struct E3 {
     pub id: u64,
     pub chain_id: u64,
     pub enclave_address: String,
-    
+
     // Status-related
     pub status: String,
     pub has_voted: Vec<String>,
@@ -135,7 +132,6 @@ pub struct E3 {
     // Emojis
     pub emojis: [String; 2],
 }
-
 
 impl From<E3> for WebResultRequest {
     fn from(e3: E3) -> Self {

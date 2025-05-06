@@ -1,10 +1,10 @@
 [package]
 name = "logger"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-events = { workspace = true }
+events = { path = "../events" }
 actix = { workspace = true }
 base64 = { workspace = true }
 tracing = { workspace = true }

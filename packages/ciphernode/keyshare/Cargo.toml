@@ -1,17 +1,17 @@
 [package]
 name = "keyshare"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-config = { workspace = true }
-data = { workspace = true }
-crypto = { workspace = true }
-events = { workspace = true }
-fhe = { workspace = true }
-e3_request = { workspace = true }
+config = { path = "../config" }
+data = { path = "../data" }
+crypto = { path = "../crypto" }
+events = { path = "../events" }
+fhe = { path = "../fhe" }
+e3_request = { path = "../e3_request" }
 serde = { workspace = true }
 tracing = { workspace = true }

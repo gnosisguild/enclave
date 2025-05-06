@@ -8,13 +8,13 @@ use super::{
 use crate::server::{
     config::CONFIG,
     database::{generate_emoji, get_e3, update_e3_status, GLOBAL_DB},
-    models::{E3, CurrentRound},
+    models::{CurrentRound, E3},
 };
 use chrono::Utc;
 use compute_provider::FHEInputs;
 use log::info;
 use std::error::Error;
-use std::time::{UNIX_EPOCH, Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
 use voting_host::run_compute;
 
@@ -72,14 +72,13 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
     GLOBAL_DB.insert(&key, &e3_obj).await?;
 
     // Set Current Round
-    let current_round = CurrentRound {
-        id: e3_id,
-    };
+    let current_round = CurrentRound { id: e3_id };
     GLOBAL_DB.insert("e3:current_round", &current_round).await?;
 
-    let expiration = Instant::now() + (UNIX_EPOCH + Duration::from_secs(e3.expiration.to::<u64>()))
-    .duration_since(SystemTime::now())
-    .unwrap_or_else(|_| Duration::ZERO);
+    let expiration = Instant::now()
+        + (UNIX_EPOCH + Duration::from_secs(e3.expiration.to::<u64>()))
+            .duration_since(SystemTime::now())
+            .unwrap_or_else(|_| Duration::ZERO);
 
     info!("Expiration: {:?}", expiration);
 
@@ -190,7 +189,10 @@ pub async fn handle_plaintext_output_published(
 
 pub async fn handle_committee_published(committee_published: CommitteePublished) -> Result<()> {
     info!("Handling CommitteePublished event...");
-    info!("Committee Published for round: {:?}", committee_published.e3Id);
+    info!(
+        "Committee Published for round: {:?}",
+        committee_published.e3Id
+    );
 
     let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
     let tx = contract
