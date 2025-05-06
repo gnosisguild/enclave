@@ -1,6 +1,4 @@
 use actix::prelude::*;
-use anyhow::anyhow;
-use anyhow::Result;
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
@@ -27,6 +25,21 @@ pub trait ErrorEvent: Event {
     fn from_error(err_type: Self::ErrorType, error: anyhow::Error) -> Self;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// Configuration
+//////////////////////////////////////////////////////////////////////////////
+
+/// Configuration for EventBus behavior
+pub struct EventBusConfig {
+    pub deduplicate: bool,
+}
+
+impl Default for EventBusConfig {
+    fn default() -> Self {
+        Self { deduplicate: true }
+    }
+}
+
 fn default_bloomfilter() -> BloomFilter {
     let num_items = 10000000;
     let fp_rate = 0.001;
@@ -42,6 +55,7 @@ fn default_bloomfilter() -> BloomFilter {
 /// actually get published as well as ensure that local events are not rebroadcast locally after
 /// being published.
 pub struct EventBus<E: Event> {
+    config: EventBusConfig,
     ids: BloomFilter,
     listeners: HashMap<String, Vec<Recipient<E>>>,
 }
@@ -51,11 +65,16 @@ impl<E: Event> Actor for EventBus<E> {
 }
 
 impl<E: Event> EventBus<E> {
-    pub fn new() -> Self {
+    pub fn new(config: EventBusConfig) -> Self {
         EventBus {
+            config,
             listeners: HashMap::new(),
             ids: default_bloomfilter(),
         }
+    }
+
+    pub fn set_config(&mut self, config: EventBusConfig) {
+        self.config = config;
     }
 
     fn track(&mut self, event: E) {
@@ -70,6 +89,7 @@ impl<E: Event> EventBus<E> {
 impl<E: Event> Default for EventBus<E> {
     fn default() -> Self {
         Self {
+            config: EventBusConfig::default(),
             listeners: HashMap::new(),
             ids: default_bloomfilter(),
         }
@@ -208,7 +228,7 @@ pub struct HistoryCollector<E: Event> {
     history: Vec<E>,
 }
 
-impl<E: Event> HistoryCollector<E> {
+impl<E: ErrorEvent> HistoryCollector<E> {
     pub fn new() -> Self {
         Self {
             history: Vec::new(),
