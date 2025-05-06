@@ -1,4 +1,4 @@
-use actix::{Actor, Addr};
+use actix::Addr;
 use alloy::primitives::Address;
 use anyhow::Result;
 use config::AppConfig;
