@@ -53,14 +53,14 @@ RUN rzup install cpp 2024.1.5
 RUN rzup install r0vm 2.0.0
 RUN rzup install cargo-risczero 2.0.0
 
-RUN pnpm config set store-dir "/home/${USERNAME}/.pnpm-store"
 RUN sudo wget https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz -O - |\
   tar xz && sudo mv yq_linux_amd64 /usr/bin/yq
 
 RUN sudo mkdir -p /app && sudo chown -R $USERNAME:$USERNAME /app
 
-RUN pnpm --version
-
 WORKDIR /app/examples/CRISP
+
+RUN pnpm config set store-dir "/home/${USERNAME}/.pnpm-store"
+RUN pnpm --version
 
 ENTRYPOINT ["/bin/bash"]
