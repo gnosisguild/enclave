@@ -28,6 +28,7 @@ services:
     command: >
       /bin/bash -c '
       sudo chown -R devuser:devuser /app &&
+      sudo chown -R devuser:devuser /home/devuser &&
       tail -f /dev/null
       '
 
