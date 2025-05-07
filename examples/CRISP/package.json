@@ -13,7 +13,11 @@
     "dev:setup": "bash scripts/setup.sh",
     "dev:build": "bash scripts/build.sh",
     "dev:up": "bash scripts/dev.sh",
-    "dev:down": "bash scripts/clean.sh"
+    "dev:down": "bash scripts/clean.sh",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
