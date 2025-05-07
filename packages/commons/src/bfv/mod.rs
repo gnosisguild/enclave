@@ -290,7 +290,7 @@ mod tests {
             let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
             assert_eq!(degree, 2048);
             assert_eq!(plaintext_modulus, 1032193);
-            assert_eq!(moduli, [0xffffffff00001]);
+            assert_eq!(moduli, [0x3FFFFFFF000001]);
         }
 
         #[test]
