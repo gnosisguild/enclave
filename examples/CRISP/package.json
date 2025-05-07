@@ -20,8 +20,8 @@
     "@gnosis-guild/enclave": "workspace:*",
     "@semaphore-protocol/contracts": "^4.9.2",
     "@zk-kit/lean-imt.sol": "2.0.0",
-    "solady": "^0.1.13",
-    "poseidon-solidity": "^0.0.5"
+    "poseidon-solidity": "^0.0.5",
+    "solady": "^0.1.13"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
@@ -33,6 +33,7 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
     "@nomicfoundation/ignition-core": "^0.15.5",
+    "@playwright/test": "^1.52.0",
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",
     "@types/chai": "^4.2.0",
