@@ -7,7 +7,7 @@ export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
 # This is all stuff that has to happen after the source code is mounted 
 # TOOD: perhaps we can try and move more of this to the dockerfile build process
 # Eg. copy package.json and Cargo.toml and then try to build out dependencies however this is relatively complex
-(cd /app && git init && git submodule update --init --recursive)
+(cd /app && git submodule update --init --recursive)
 (cd /app && pnpm install --frozen-lockfile)
 echo "evm"
 (cd /app/packages/evm && pnpm compile)

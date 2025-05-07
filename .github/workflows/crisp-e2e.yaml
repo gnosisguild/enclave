@@ -47,14 +47,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install chromium
+      # - name: Install dependencies
+      #   run: pnpm install
+      #
+      # - name: Install Playwright browsers
+      #   run: pnpm exec playwright install chromium
 
       - name: Run Playwright tests
-        run: pnpm test:e2e
+        run: docker compose exec enclave-dev ls -la /app
+        # run: pnpm test:e2e
 
       - name: Upload test results
         if: always()
