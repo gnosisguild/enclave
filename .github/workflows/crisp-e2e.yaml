@@ -46,7 +46,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
       
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
