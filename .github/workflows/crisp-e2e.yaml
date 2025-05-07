@@ -45,6 +45,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
+        working-directory: .
         run: pnpm install --frozen-lockfile
       
       - name: Install Playwright browsers
