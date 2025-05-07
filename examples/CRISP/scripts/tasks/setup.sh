@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-git config --global --add safe.directory /app
+export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
 
 # This is all stuff that has to happen after the source code is mounted 
 # TOOD: perhaps we can try and move more of this to the dockerfile build process
