@@ -15,9 +15,6 @@ jobs:
   test:
     name: e2e
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./examples/CRISP
 
     steps:
       - uses: actions/checkout@v4
@@ -51,9 +48,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       
       - name: Install Playwright browsers
+        working-directory: ./examples/CRISP
         run: pnpm exec playwright install chromium
 
       - name: Run Playwright tests
+        working-directory: ./examples/CRISP
         run: pnpm test:e2e
 
       - name: Upload test results
