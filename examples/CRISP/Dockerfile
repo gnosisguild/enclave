@@ -56,6 +56,8 @@ RUN rzup install cargo-risczero 2.0.0
 RUN pnpm config set store-dir "/home/${USERNAME}/.pnpm-store"
 RUN sudo wget https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz -O - |\
   tar xz && sudo mv yq_linux_amd64 /usr/bin/yq
+
+WORKDIR /app
 RUN sudo chown -R $USERNAME:$USERNAME /app
 
 ENTRYPOINT ["/bin/bash"]
