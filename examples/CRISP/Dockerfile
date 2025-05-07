@@ -59,4 +59,6 @@ RUN sudo wget https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux
 
 RUN sudo mkdir -p /app && sudo chown -R $USERNAME:$USERNAME /app
 
+WORKDIR /app/examples/CRISP
+
 ENTRYPOINT ["/bin/bash"]
