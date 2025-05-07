@@ -30,6 +30,7 @@ trap cleanup INT TERM
 (cd /app && pnpm install --frozen-lockfile)
 
 concurrently \
+  -ks first \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
   "anvil --host 0.0.0.0" \
