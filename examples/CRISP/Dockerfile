@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y \
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && npm install -g corepack concurrently wait-on \
-    && corepack enable
+    && corepack enable \
+    && corepack prepare pnpm@10.7.1 --activate
 
 # Create user
 ENV USERNAME=devuser
