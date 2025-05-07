@@ -54,7 +54,7 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Run Playwright tests
-        run: pnpm exec playwright test
+        run: pnpm test:e2e
 
       - name: Upload test results
         if: always()
