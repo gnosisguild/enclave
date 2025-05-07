@@ -27,11 +27,7 @@ services:
       - "4000:4000"
     command: >
       /bin/bash -c '
-      sudo chown -R devuser:devuser /home/devuser/.cargo &&
-      sudo chown -R devuser:devuser /app/examples/CRISP/apps/server &&
-      sudo chown -R devuser:devuser /app/examples/CRISP/node_modules &&
-      sudo chown -R devuser:devuser /app/examples/CRISP/out &&
-      find /app -name "node_modules" -type d -exec sudo chown -R devuser:users {} \; &&
+      sudo chown -R devuser:devuser /app &&
       tail -f /dev/null
       '
 
