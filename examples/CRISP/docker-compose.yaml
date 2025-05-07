@@ -10,6 +10,7 @@ services:
         USERNAME: devuser
     volumes:
       - ../..:/app
+      - git-folder:/app/.git
       - cargo-bin:/home/devuser/.cargo/bin
       - cargo-registry:/home/devuser/.cargo/registry
       - server-target:/app/examples/CRISP/apps/server/target
@@ -43,3 +44,4 @@ volumes:
   client-node-modules:
   crisp-node-modules:
   crisp-foundry-cache:
+  git-folder:
