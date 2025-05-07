@@ -53,10 +53,11 @@ jobs:
       # - name: Install Playwright browsers
       #   run: pnpm exec playwright install chromium
       - name: Run docker
-        run : docker compose up -d
+        run : whoami && docker compose up -d
 
       - name: Run Playwright tests
-        run: docker compose exec enclave-dev ls -la /app
+        run:  docker compose exec enclave-dev ls -la /app
+      
         # run: pnpm test:e2e
 
       # - name: Upload test results
