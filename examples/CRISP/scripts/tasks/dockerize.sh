@@ -21,7 +21,7 @@ function run_in_docker() {
         docker compose up -d # ensure our container is running
         
         # Pass all arguments to docker compose exec
-        docker compose exec enclave-dev "$@"
+        docker compose exec enclave-dev "cd /app/examples/CRISP && $@"
     fi
 }
 
