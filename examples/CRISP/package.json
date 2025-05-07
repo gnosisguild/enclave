@@ -14,7 +14,8 @@
     "dev:build": "bash scripts/build.sh",
     "dev:up": "bash scripts/dev.sh",
     "dev:down": "bash scripts/clean.sh",
-    "test": "playwright test",
+    "test:e2e": "concurrently -k -s first \"pnpm dev:setup && pnpm dev:up\" \"wait-on tcp:3000 && playwright test\"",
+    "test": "pnpm test:e2e",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report"
@@ -42,6 +43,7 @@
     "@typechain/hardhat": "^9.0.0",
     "@types/chai": "^4.2.0",
     "@types/mocha": ">=9.1.0",
+    "concurrently": "^9.1.2",
     "hardhat": "^2.22.10",
     "hardhat-deploy": "^0.12.4",
     "hardhat-gas-reporter": "^1.0.8",
