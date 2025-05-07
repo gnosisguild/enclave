@@ -53,11 +53,10 @@ jobs:
       # - name: Install Playwright browsers
       #   run: pnpm exec playwright install chromium
       - name: Run docker
-        run : ls -la && pwd
-        # run: cd ./examples/CRISP && docker compose up -d
+        run : docker compose up -d
 
       - name: Run Playwright tests
-        run: cd ./examples/CRISP && docker compose exec enclave-dev ls -la /app
+        run: docker compose exec enclave-dev ls -la /app
         # run: pnpm test:e2e
 
       # - name: Upload test results
