@@ -100,7 +100,6 @@ tracing-opentelemetry = "0.30.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 url = "2.5.4"
 libp2p = { version = "0.54.1", features = [
-  "async-std",
   "gossipsub",
   "identify",
   "kad",
