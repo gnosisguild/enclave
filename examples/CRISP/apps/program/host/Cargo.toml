@@ -10,9 +10,6 @@ serde = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }
-clap = { workspace = true }
-env_logger = { workspace = true }
-ethers = { workspace = true }
 log = { workspace = true }
 methods = { workspace = true }
 risc0-ethereum-contracts = { workspace = true }
