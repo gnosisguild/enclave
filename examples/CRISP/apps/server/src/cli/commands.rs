@@ -9,7 +9,7 @@ use alloy::primitives::{Address, Bytes, U256};
 use commons::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use crisp::server::blockchain::relayer::EnclaveContract;
 use fhe_rs::bfv::{
-    BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
+    BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
 };
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,

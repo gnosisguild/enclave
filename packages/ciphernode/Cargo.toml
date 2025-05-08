@@ -50,7 +50,7 @@ alloy-primitives = { version = "0.8", default-features = false, features = [
   "serde",
   "std",
 ] }
-alloy-sol-types = "0.6"
+alloy-sol-types = "0.8"
 alloy-dyn-abi = "1.1.0"
 argon2 = "0.5.2"
 anyhow = "1.0.86"

@@ -11,10 +11,6 @@ use crate::server::{
     database::{get_e3, GLOBAL_DB},
     models::{EncryptedVote, VoteResponse, VoteResponseStatus, E3},
 };
-use actix_web::{web, HttpResponse, Responder};
-use alloy::primitives::{Bytes, U256};
-use eyre::Error;
-use log::info;
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(

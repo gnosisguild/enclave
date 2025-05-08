@@ -1,18 +1,18 @@
 [package]
 name = "methods"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [package.metadata.risc0]
 methods = ["guest"]
 
 [build-dependencies]
-hex = "0.4.3"
-risc0-build = { version = "2.0.1", features = ["docker"] }
-risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0" }
-risc0-zkp = { version = "2.0.0", default-features = false }
+hex = { workspace = true }
+risc0-build = { workspace = true }
+risc0-build-ethereum = { workspace = true }
+risc0-zkp = { workspace = true }
 
 [dev-dependencies]
-alloy-primitives = "0.8"
-alloy-sol-types = "0.6"
-risc0-zkvm = { version = "2.0.0" }
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+risc0-zkvm = { workspace = true }
