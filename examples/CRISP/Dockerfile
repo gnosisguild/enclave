@@ -26,8 +26,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 
 # Create user
 ENV USERNAME=devuser
-ENV USER_UID=1000
-ENV USER_GID=1000
+ARG USER_UID=1000
+ARG USER_GID=1000
+
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
