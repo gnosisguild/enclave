@@ -2,14 +2,14 @@ name: CRISP
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'examples/CRISP/**'
+      - "examples/CRISP/**"
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'examples/CRISP/**'
-  workflow_dispatch:  # Allow manual triggering
+      - "examples/CRISP/**"
+  workflow_dispatch: # Allow manual triggering
 
 jobs:
   test:
@@ -17,12 +17,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # https://stackoverflow.com/questions/75536771/github-runner-out-of-disk-space-after-building-docker-image
+      - name: Remove unnecessary files
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
+      - uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -47,7 +52,7 @@ jobs:
       - name: Install dependencies
         working-directory: .
         run: pnpm --version && pnpm install --frozen-lockfile
-      
+
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
         run: pnpm exec playwright install chromium
