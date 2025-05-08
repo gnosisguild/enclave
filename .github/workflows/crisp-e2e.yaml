@@ -28,11 +28,7 @@ jobs:
           submodules: recursive
 
       - name: Prepare test environment
-        run: |
-          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results
-          chmod 777 $GITHUB_WORKSPACE/examples/CRISP/test-results
-          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report
-          chmod 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+        run: mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results && sudo chmod 777 $GITHUB_WORKSPACE/examples/CRISP/test-results && mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report && chmod 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
