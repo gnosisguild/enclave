@@ -10,14 +10,14 @@ actix = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 compile-time = { workspace = true }
-config = { path = "../config" }
-crypto = { path = "../crypto" }
+config = { workspace = true }
+crypto = { workspace = true }
 dialoguer = { workspace = true }
-enclave_core = { path = "../enclave_core" }
-events = { path = "../events" }
+enclave_core = { workspace = true }
+events = { workspace = true }
 hex = { workspace = true }
 opentelemetry = { workspace = true }
-opentelemetry-otlp = { workspace = true, features = ["grpc-tonic"] }
+opentelemetry-otlp = { workspace = true }
 opentelemetry-stdout = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 petname = { workspace = true }

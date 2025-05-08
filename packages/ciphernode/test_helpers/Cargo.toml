@@ -5,10 +5,10 @@ edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
-events = { path = "../events" }
-fhe = { path = "../fhe" }
+events = { workspace = true }
+fhe = { workspace = true }
 bincode = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
+clap = { workspace = true }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 rand_chacha = { workspace = true }

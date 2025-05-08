@@ -5,17 +5,17 @@ edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
-alloy = { workspace = true, features = ["node-bindings"] }
+alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
-crypto = { path = "../crypto" }
-config = { path = "../config" }
-data = { path = "../data" }
-events = { path = "../events" }
+crypto = { workspace = true }
+config = { workspace = true }
+data = { workspace = true }
+events = { workspace = true }
 futures-util = { workspace = true }
-sortition = { path = "../sortition" }
+sortition = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -23,5 +23,5 @@ url = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
-enclave_core = { path = "../enclave_core" }
+enclave_core = { workspace = true }
 

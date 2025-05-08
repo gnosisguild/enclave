@@ -10,12 +10,12 @@ path = "src/lib.rs"
 
 [dependencies]
 actix = { workspace = true }
-alloy = { workspace = true, features = ["full"] }
+alloy = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-config = { path = "../config" }
-data = { path = "../data" }
-events = { path = "../events" }
+config = { workspace = true }
+data = { workspace = true }
+events = { workspace = true }
 num = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

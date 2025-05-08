@@ -5,11 +5,11 @@ edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
-events = { path = "../events" }
-data = { path = "../data" }
+events = { workspace = true }
+data = { workspace = true}
 anyhow = { workspace = true }
 serde = { workspace = true }
-config = { path = "../config" }
+config = { workspace = true }
 bincode = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }

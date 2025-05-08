@@ -7,8 +7,8 @@ edition.workspace = true
 alloy = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
-events = { path = "../events" }
-figment = { workspace = true, features = ["yaml", "test"] }
+events = { workspace = true }
+figment = { workspace = true }
 path-clean = { workspace = true }
 petname = { workspace = true }
 rand = { workspace = true }
