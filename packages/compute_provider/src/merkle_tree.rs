@@ -1,10 +1,10 @@
-use sha3::{Digest, Keccak256};
-use num_bigint::BigUint;
-use num_traits::Num;
 use ark_bn254::Fr;
 use ark_ff::{BigInt, BigInteger};
-use light_poseidon::{Poseidon, PoseidonHasher};
 use lean_imt::LeanIMT;
+use light_poseidon::{Poseidon, PoseidonHasher};
+use num_bigint::BigUint;
+use num_traits::Num;
+use sha3::{Digest, Keccak256};
 use std::str::FromStr;
 
 pub struct MerkleTree {

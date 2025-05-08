@@ -1,16 +1,22 @@
 use chrono::Utc;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
-use serde::{Deserialize, Serialize};
-use reqwest::Client;
 use log::info;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 
+use super::{CLI_DB, CONFIG};
 use alloy::primitives::{Address, Bytes, U256};
+use commons::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use crisp::server::blockchain::relayer::EnclaveContract;
-use fhe::bfv::{BfvParameters, BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey, Ciphertext};
-use fhe_traits::{DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter, Serialize as FheSerialize};
+use fhe_rs::bfv::{
+    BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
+};
+use fhe_traits::{
+    DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
+    Serialize as FheSerialize,
+};
 use rand::thread_rng;
-
-use super::{CONFIG, CLI_DB};
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct FHEParams {
@@ -44,7 +50,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
     let e3_program: Address = CONFIG.e3_program_address.parse()?;
 
     info!("Enabling E3 Program...");
-    match contract.is_e3_program_enabled(e3_program).await {    
+    match contract.is_e3_program_enabled(e3_program).await {
         Ok(enabled) => {
             if !enabled {
                 match contract.enable_e3_program(e3_program).await {
@@ -60,9 +66,12 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
 
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
-    let start_window: [U256; 2] = [U256::from(Utc::now().timestamp()), U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64)];
+    let start_window: [U256; 2] = [
+        U256::from(Utc::now().timestamp()),
+        U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
+    ];
     let duration: U256 = U256::from(CONFIG.e3_duration);
-    let e3_params = Bytes::from(generate_bfv_parameters()?.to_bytes());
+    let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.to_string(),
         parallel: CONFIG.e3_compute_provider_parallel,
@@ -70,7 +79,17 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
     };
     let compute_provider_params_bytes = Bytes::from(serde_json::to_vec(&compute_provider_params)?);
 
-    let res = contract.request_e3(filter, threshold, start_window, duration, e3_program, e3_params, compute_provider_params_bytes).await?;
+    let res = contract
+        .request_e3(
+            filter,
+            threshold,
+            start_window,
+            duration,
+            e3_program,
+            e3_params,
+            compute_provider_params_bytes,
+        )
+        .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);
 
     Ok(())
@@ -81,7 +100,7 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
         .with_prompt("Enter CRISP round ID.")
         .interact_text()?;
 
-    let params = generate_bfv_parameters()?;
+    let params = generate_bfv_parameters();
     let (sk, pk) = generate_keys(&params);
     let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
     let pk_bytes = Bytes::from(pk.to_bytes());
@@ -90,7 +109,7 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
     info!("E3 activated. TxHash: {:?}", res.transaction_hash);
 
     let e3_params = FHEParams {
-        params: params.to_bytes(),
+        params: encode_bfv_params(&params),
         pk: pk.to_bytes(),
         sk: sk.coeffs.into_vec(),
     };
@@ -104,19 +123,25 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
     Ok(())
 }
 
-pub async fn participate_in_existing_round(client: &Client) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn participate_in_existing_round(
+    client: &Client,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let input_crisp_id: u64 = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter CRISP round ID.")
         .interact_text()?;
 
     let url = format!("{}/rounds/public-key", CONFIG.enclave_server_url);
-    let resp = client.post(&url)
-        .json(&PKRequest { round_id: input_crisp_id, pk_bytes: vec![0] })
+    let resp = client
+        .post(&url)
+        .json(&PKRequest {
+            round_id: input_crisp_id,
+            pk_bytes: vec![0],
+        })
         .send()
         .await?;
 
     let pk_res: PKRequest = resp.json().await?;
-    let params = generate_bfv_parameters()?;
+    let params = generate_bfv_parameters();
     let pk_deserialized = PublicKey::from_bytes(&pk_res.pk_bytes, &params)?;
 
     let vote_choice = get_user_vote()?;
@@ -132,23 +157,31 @@ pub async fn participate_in_existing_round(client: &Client) -> Result<(), Box<dy
     Ok(())
 }
 
-pub async fn decrypt_and_publish_result(client: &Client) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn decrypt_and_publish_result(
+    client: &Client,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let input_crisp_id: u64 = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter CRISP round ID.")
         .interact_text()?;
 
     let url = format!("{}/rounds/ciphertext", CONFIG.enclave_address);
-    let resp = client.post(&url)
-        .json(&CTRequest { round_id: input_crisp_id, ct_bytes: vec![0] })
+    let resp = client
+        .post(&url)
+        .json(&CTRequest {
+            round_id: input_crisp_id,
+            ct_bytes: vec![0],
+        })
         .send()
         .await?;
 
     let ct_res: CTRequest = resp.json().await?;
 
     let db = CLI_DB.read().await;
-    let params_bytes = db.get(format!("e3:{}", input_crisp_id))?.ok_or("Key not found")?;
+    let params_bytes = db
+        .get(format!("e3:{}", input_crisp_id))?
+        .ok_or("Key not found")?;
     let e3_params: FHEParams = serde_json::from_slice(&params_bytes)?;
-    let params = generate_bfv_parameters()?;
+    let params = generate_bfv_parameters();
     let sk_deserialized = SecretKey::new(e3_params.sk, &params);
 
     let ct = Ciphertext::from_bytes(&ct_res.ct_bytes, &params)?;
@@ -165,15 +198,12 @@ pub async fn decrypt_and_publish_result(client: &Client) -> Result<(), Box<dyn s
     Ok(())
 }
 
-fn generate_bfv_parameters() -> Result<std::sync::Arc<BfvParameters>, Box<dyn std::error::Error + Send + Sync>> {
-    Ok(BfvParametersBuilder::new()
-        .set_degree(2048)
-        .set_plaintext_modulus(1032193)
-        .set_moduli(&[0xffffffff00001])
-        .build_arc()?)
+fn generate_bfv_parameters() -> Arc<BfvParameters> {
+    let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+    build_bfv_params_arc(degree, plaintext_modulus, &moduli)
 }
 
-fn generate_keys(params: &std::sync::Arc<BfvParameters>) -> (SecretKey, PublicKey) {
+fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {
     let mut rng = thread_rng();
     let sk = SecretKey::random(params, &mut rng);
     let pk = PublicKey::new(&sk, &mut rng);

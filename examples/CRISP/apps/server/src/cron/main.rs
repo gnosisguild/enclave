@@ -10,7 +10,8 @@ const MAX_RETRIES: u8 = 5;
 async fn main() -> Result<(), Box<dyn Error>> {
     let client = Client::new();
     let cron_api_key = std::env::var("CRON_API_KEY").unwrap_or_else(|_| "1234567890".to_string());
-    let enclave_server_url = std::env::var("ENCLAVE_SERVER_URL").unwrap_or_else(|_| "http://localhost:4000".to_string());
+    let enclave_server_url =
+        std::env::var("ENCLAVE_SERVER_URL").unwrap_or_else(|_| "http://localhost:4000".to_string());
 
     loop {
         println!("Requesting new E3 round...");
@@ -43,14 +44,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             retries += 1;
             if retries < MAX_RETRIES {
-                let backoff_time = Duration::from_secs(2u64.pow(retries.into())); 
+                let backoff_time = Duration::from_secs(2u64.pow(retries.into()));
                 println!("Retrying in {} seconds...", backoff_time.as_secs());
                 sleep(backoff_time).await;
             }
         }
 
         if !success {
-            println!("Failed to request new E3 round after {} retries. Skipping for now.", MAX_RETRIES);
+            println!(
+                "Failed to request new E3 round after {} retries. Skipping for now.",
+                MAX_RETRIES
+            );
         }
 
         sleep(Duration::from_secs(24 * 60 * 60)).await;
