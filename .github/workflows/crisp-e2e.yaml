@@ -23,14 +23,14 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Prepare test environment
         run: |
           mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results
           chmod 777 $GITHUB_WORKSPACE/examples/CRISP/test-results
-
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
