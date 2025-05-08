@@ -45,7 +45,11 @@ actix = "0.13.5"
 actix-web = "4.10.2"
 aes-gcm = "0.10.3"
 alloy = { version = "0.8", features = ["node-bindings", "full"] }
-alloy-primitives = "0.8"
+alloy-primitives = { version = "0.8", default-features = false, features = [
+  "rlp",
+  "serde",
+  "std",
+] }
 alloy-sol-types = "0.6"
 alloy-dyn-abi = "1.1.0"
 argon2 = "0.5.2"
@@ -83,7 +87,7 @@ phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
 reqwest = "0.12.15"
-serde = "1.0.208"
+serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.133"
 sled = "0.34.7"
 serde_yaml = "0.9.34"
@@ -93,7 +97,7 @@ tempfile = "3.14.0"
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"
 tracing-opentelemetry = "0.30.0"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 url = "2.5.4"
 libp2p = { version = "0.54.1", features = [
   "async-std",
