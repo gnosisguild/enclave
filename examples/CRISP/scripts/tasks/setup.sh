@@ -17,7 +17,7 @@ echo "ciphernode"
 # echo "risc0"
 # (cd ./apps/program && cargo build)
 echo "server"
-(cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo check)
+(cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo build)
 echo "crisp-wasm-crypto"
 (cd ./apps/wasm-crypto && cargo check)
 echo "client"
