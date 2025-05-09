@@ -43,3 +43,5 @@ node_modules
 types
 deployments
 .enclave
+test-results/
+playwright-report/

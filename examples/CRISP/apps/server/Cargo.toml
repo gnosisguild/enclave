@@ -36,7 +36,7 @@ jwt = "0.16.0"
 sha2 = "0.10.8"
 
 # Local dependencies
-compute-provider = { git = "https://github.com/gnosisguild/enclave" }
+compute-provider = { path = "../../../../packages/compute_provider" }
 voting-host = { path = "../program/host" }
 
 # CLI and user interaction

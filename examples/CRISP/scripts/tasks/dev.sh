@@ -4,7 +4,9 @@ set -euo pipefail
 
 cleanup() {
   echo "Cleaning up processes..."
+  echo "Shutting down docker compose..."
   enclave nodes down
+  echo "Compose is down"
   sleep 1
 
   pkill -9 -f "anvil" 2>/dev/null || true
@@ -30,6 +32,7 @@ trap cleanup INT TERM
 (cd /app && pnpm install --frozen-lockfile)
 
 concurrently \
+  -ks first \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
   "anvil --host 0.0.0.0" \
