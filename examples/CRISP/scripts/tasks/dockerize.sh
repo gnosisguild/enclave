@@ -11,7 +11,7 @@ function run_in_docker() {
     fi
     
     # Check if we're already inside a Docker container
-    if [ -f /.dockerenv ] || grep -q 'docker\|lxc' /proc/1/cgroup 2>/dev/null; then
+    if [ -f /.dockerenv ]; then
         # Already in container, just run the command directly
         echo "Detected running inside container, executing command directly"
         "$@"
