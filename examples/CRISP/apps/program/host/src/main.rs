@@ -17,7 +17,7 @@ fn generate_inputs() -> (FHEInputs, SecretKey) {
     let inputs: Vec<u64> = (1..=2).collect();
     let incs: Vec<Vec<u8>> = encrypt_inputs(&inputs, &pk, &params)
         .iter()
-        .map(|c| c.to_raw_ntt_bytes().unwrap())
+        .map(|c| c.to_bytes())
         .collect();
 
     println!("Generated {} encrypted inputs for profiling", incs.len());

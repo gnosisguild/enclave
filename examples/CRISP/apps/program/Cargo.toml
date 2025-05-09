@@ -20,11 +20,11 @@ ethers = { version = "2.0" }
 hex = { version = "0.4" }
 log = { version = "0.4" }
 methods = { path = "./methods" }
-risc0-build = { version = "2.0.1", features = ["docker"] }
-risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0" }
-risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0" }
-risc0-zkvm = { version = "2.0.0" }
-risc0-zkp = { version = "2.0.0", default-features = false }
+risc0-build = { version = "2.1.1", features = ["docker"] }
+risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.2" }
+risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.2" }
+risc0-zkvm = { version = "2.0.2" }
+risc0-zkp = { version = "2.0.1", default-features = false }
 serde = { version = "1.0", features = ["derive", "std"] }
 fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "floatOp-replacement" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "floatOp-replacement" }
