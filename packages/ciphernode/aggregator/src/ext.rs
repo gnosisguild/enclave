@@ -69,7 +69,6 @@ impl E3Extension for PlaintextAggregatorExtension {
                         bus: self.bus.clone(),
                         sortition: self.sortition.clone(),
                         e3_id: e3_id.clone(),
-                        src_chain_id: meta.src_chain_id,
                     },
                     sync_state,
                 )
@@ -102,21 +101,12 @@ impl E3Extension for PlaintextAggregatorExtension {
             return Ok(());
         };
 
-        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::PlaintextAggregation,
-                anyhow!(ERROR_PLAINTEXT_META_MISSING),
-            );
-            return Ok(());
-        };
-
         let value = PlaintextAggregator::new(
             PlaintextAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
-                src_chain_id: meta.src_chain_id,
             },
             sync_state,
         )
@@ -185,7 +175,6 @@ impl E3Extension for PublicKeyAggregatorExtension {
                         bus: self.bus.clone(),
                         sortition: self.sortition.clone(),
                         e3_id,
-                        src_chain_id: meta.src_chain_id,
                     },
                     sync_state,
                 )
@@ -219,22 +208,12 @@ impl E3Extension for PublicKeyAggregatorExtension {
             return Ok(());
         };
 
-        let Some(meta) = ctx.get_dependency(META_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::PublickeyAggregation,
-                anyhow!(ERROR_PUBKEY_META_MISSING),
-            );
-
-            return Ok(());
-        };
-
         let value = PublicKeyAggregator::new(
             PublicKeyAggregatorParams {
                 fhe: fhe.clone(),
                 bus: self.bus.clone(),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
-                src_chain_id: meta.src_chain_id,
             },
             sync_state,
         )

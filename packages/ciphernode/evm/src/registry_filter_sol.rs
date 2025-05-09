@@ -63,7 +63,7 @@ impl Handler<EnclaveEvent> for RegistryFilterSolWriter {
         match msg {
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
                 // Only publish if the src and destination chains match
-                if self.provider.get_chain_id() == data.src_chain_id {
+                if self.provider.get_chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
