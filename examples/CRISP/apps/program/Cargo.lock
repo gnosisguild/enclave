@@ -1660,7 +1660,6 @@ checksum = "0b6a852b24ab71dffc585bcb46eaf7959d175cb865a7152e35b348d1b2960422"
 [[package]]
 name = "compute-provider"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave#7fba85db09bcc4fa934ecbcf00ecb7202eda6447"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -3604,9 +3603,12 @@ dependencies = [
 
 [[package]]
 name = "lean-imt"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e72b0683df18378c72877bfc0a1befc69b009f43e8f0ef3689f0cc98f067222"
+checksum = "fa2acc6dee32b12409446a76b9c1877e5ba9afb36dfcbe96d0ddaf15ca08f18d"
+dependencies = [
+ "hashbrown 0.15.2",
+]
 
 [[package]]
 name = "libc"

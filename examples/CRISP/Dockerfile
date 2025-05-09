@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 # Set environment variables
-ENV RUST_VERSION=1.85.1 \
+ENV RUST_VERSION=1.85.0 \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
 # Install dependencies
@@ -50,7 +50,7 @@ RUN foundryup
 
 ENV PATH="/home/${USERNAME}/.risc0/bin:${PATH}"
 RUN curl -L https://risczero.com/install | bash
-RUN rzup install rust 1.81.0 
+RUN rzup install rust 1.85.0 
 RUN rzup install cpp 2024.1.5 
 RUN rzup install r0vm 2.0.0
 RUN rzup install cargo-risczero 2.0.0
