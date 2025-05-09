@@ -4,7 +4,9 @@ set -euo pipefail
 
 cleanup() {
   echo "Cleaning up processes..."
+  echo "Shutting down docker compose..."
   enclave nodes down
+  echo "Compose is down"
   sleep 1
 
   pkill -9 -f "anvil" 2>/dev/null || true
