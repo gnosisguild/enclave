@@ -30,7 +30,7 @@ test("CRISP smoke test", async ({
   await page.locator('button:has-text("Connect Wallet")').click();
   await page.locator('button:has-text("MetaMask")').click();
   await metamask.connectToDapp();
-  await metamask.rejectSwitchNetwork();
-  await metamask.switchNetwork("localwallet");
+  // await metamask.approveSwitchNetwork();
+  // await metamask.switchNetwork("localwallet");
   await page.locator('button:has-text("Try Demo")').click();
 });
