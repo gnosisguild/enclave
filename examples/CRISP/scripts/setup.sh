@@ -3,8 +3,11 @@
 set -e
 
 if command -v docker &> /dev/null; then
-    docker compose build 
+    time docker compose build 
+    echo "#### docker compose build finished ####"
 fi
 
-./scripts/tasks/dockerize.sh ./scripts/tasks/setup.sh
+time ./scripts/tasks/dockerize.sh ./scripts/tasks/setup.sh
+echo "#### ./scripts/tasks/setup.sh finished ####"
+
 
