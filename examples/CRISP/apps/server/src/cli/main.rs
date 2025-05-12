@@ -12,8 +12,8 @@ use config::CONFIG;
 use crisp::logger::init_logger;
 use log::info;
 
+use clap::{Parser, Subcommand};
 use once_cell::sync::Lazy;
-
 use sled::Db;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -23,34 +23,58 @@ pub static CLI_DB: Lazy<Arc<RwLock<Db>>> = Lazy::new(|| {
     Arc::new(RwLock::new(sled::open(pathdb).unwrap()))
 });
 
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// Optional environment selection (default: 0)
+    #[arg(short, long, default_value_t = 0)]
+    environment: usize,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Initialize new E3 round
+    Init,
+
+    /// Participate in an E3 round
+    Participate,
+}
+
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_logger();
 
     let client = Client::new();
+    let cli = Cli::parse();
 
-    let environment = select_environment()?;
-    if environment != 0 {
+    if cli.environment != 0 {
         info!("Check back soon!");
         return Ok(());
     }
 
-    let action = select_action()?;
-
-    match action {
-        0 => {
+    match cli.command {
+        Some(Commands::Init) => {
             initialize_crisp_round().await?;
         }
-        2 => {
-            activate_e3_round().await?;
-        }
-        1 => {
+        Some(Commands::Participate) => {
             participate_in_existing_round(&client).await?;
         }
-        3 => {
-            decrypt_and_publish_result(&client).await?;
+        None => {
+            // Fall back to interactive mode if no command was specified
+            let action = select_action()?;
+            match action {
+                0 => {
+                    initialize_crisp_round().await?;
+                }
+                1 => {
+                    participate_in_existing_round(&client).await?;
+                }
+                _ => unreachable!(),
+            }
         }
-        _ => unreachable!(),
     }
 
     Ok(())

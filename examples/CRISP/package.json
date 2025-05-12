@@ -11,6 +11,7 @@
   "scripts": {
     "hardhat": "hardhat",
     "compile": "forge compile",
+    "cli": "pnpm sh ./scripts/cli.sh",
     "dev:setup": "bash ./scripts/setup.sh",
     "dev:build": "bash ./scripts/build.sh",
     "dev:up": "bash ./scripts/dev.sh",
