@@ -44,14 +44,12 @@ test("CRISP smoke test", async ({
   await page.locator('button:has-text("Connect Wallet")').click();
   await page.locator('button:has-text("MetaMask")').click();
   await metamask.connectToDapp();
-  // await metamask.approveSwitchNetwork();
-  // await metamask.switchNetwork("localwallet");
   await page.locator('button:has-text("Try Demo")').click();
   await page
     .locator("[data-test-id='poll-button-0'] > [data-test-id='card']")
     .click();
   await page.locator('button:has-text("Cast Vote")').click();
   await page.locator('button:has-text("Register Identity")').click();
-  await metamask.confirmTransaction();
-  // await page.pause();
+  // await metamask.confirmTransaction();
+  await page.pause();
 });
