@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+export CARGO_INCREMENTAL=1
+
 # This is all stuff that has to happen after the source code is mounted 
 # TOOD: perhaps we can try and move more of this to the dockerfile build process
 # Eg. copy package.json and Cargo.toml and then try to build out dependencies however this is relatively complex
@@ -15,7 +17,7 @@ echo "ciphernode"
 # echo "risc0"
 # (cd ./apps/program && cargo build)
 echo "server"
-(cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo build)
+(cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env && cargo build --bin cli && cargo build --bin server)
 echo "crisp-wasm-crypto"
 (cd ./apps/wasm-crypto && cargo check)
 echo "client"

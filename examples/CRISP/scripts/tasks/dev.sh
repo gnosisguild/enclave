@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+export CARGO_INCREMENTAL=1
+
 cleanup() {
   echo "Cleaning up processes..."
   echo "Shutting down docker compose..."
