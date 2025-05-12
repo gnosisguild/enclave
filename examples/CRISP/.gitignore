@@ -45,3 +45,4 @@ deployments
 .enclave
 test-results/
 playwright-report/
+.cache-synpress/

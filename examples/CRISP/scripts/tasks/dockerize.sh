@@ -2,6 +2,16 @@
 
 set -x
 
+cleanup() {
+  if [ ! -f /.dockerenv ]; then
+    echo "Running docker compose down..."
+    docker compose down
+    sleep 1
+  fi
+}
+
+trap cleanup INT TERM
+
 function run_in_docker() {
     # Check if any arguments were provided
     if [ $# -eq 0 ]; then
