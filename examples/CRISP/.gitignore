@@ -42,3 +42,4 @@ dist
 node_modules
 types
 deployments
+.enclave

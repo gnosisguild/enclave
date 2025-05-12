@@ -84,8 +84,7 @@ async fn get_round_state_lite(data: web::Json<GetRoundRequest>) -> impl Responde
             let state_lite: E3StateLite = state.into();
             HttpResponse::Ok().json(state_lite)
         }
-        Err(e) => {
-            info!("Error getting E3 state: {:?}", e);
+        Err(_e) => {
             HttpResponse::InternalServerError().body("Failed to get E3 state")
         }
     }

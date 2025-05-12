@@ -17,8 +17,11 @@
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
+    "@gnosis-guild/enclave": "workspace:*",
+    "@semaphore-protocol/contracts": "^4.9.2",
+    "@zk-kit/lean-imt.sol": "2.0.0",
     "solady": "^0.1.13",
-    "@gnosis-guild/enclave": "workspace:*"
+    "poseidon-solidity": "^0.0.5"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
@@ -37,7 +40,6 @@
     "hardhat": "^2.22.10",
     "hardhat-deploy": "^0.12.4",
     "hardhat-gas-reporter": "^1.0.8",
-    "poseidon-solidity": "^0.0.5",
     "solidity-coverage": "^0.8.1",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.0",

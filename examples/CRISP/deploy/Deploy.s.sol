@@ -26,8 +26,12 @@ import {CRISPRisc0} from "../contracts/CRISPRisc0.sol";
 import {CRISPPolicy} from "../contracts/CRISPPolicy.sol";
 import {CRISPChecker} from "../contracts/CRISPChecker.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
-import {IEnclavePolicy} from "@gnosis-guild/enclave/contracts/interfaces/IEnclavePolicy.sol";
-import {IEnclaveChecker} from "@gnosis-guild/enclave/contracts/interfaces/IEnclaveChecker.sol";
+import {Semaphore} from "@semaphore-protocol/contracts/Semaphore.sol";
+import {SemaphoreVerifier} from "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol";
+import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISemaphoreVerifier.sol";
+import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
+import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
+import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
 
 /// @notice Deployment script for the RISC Zero starter project.
 /// @dev Use the following environment variable to control the deployment:
@@ -146,23 +150,39 @@ contract CRISPRisc0Deploy is Script {
         console2.log("Enclave Address: ", address(enclave));
         console2.log("Verifier Address: ", address(verifier));
 
-        console2.log("Deploying CRISPChecker");
-        CRISPChecker checker = new CRISPChecker();
-        console2.log("Deployed CRISPChecker to", address(checker));
-
-        console2.log("Deploying CRISPPolicy");
-        CRISPPolicy policy = new CRISPPolicy(
-            address(enclave),
-            address(checker),
-            100
+        SemaphoreVerifier semaphoreVerifier = new SemaphoreVerifier();
+        console2.log(
+            "Deployed SemaphoreVerifier to",
+            address(semaphoreVerifier)
         );
-        console2.log("Deployed CRISPPolicy to", address(policy));
 
-        console2.log("Deploying CRISPRisc0");
+        Semaphore semaphore = new Semaphore(
+            ISemaphoreVerifier(address(semaphoreVerifier))
+        );
+        console2.log("Deployed Semaphore to", address(semaphore));
+
+        CRISPCheckerFactory checkerFactory = new CRISPCheckerFactory();
+        console2.log(
+            "Deployed CRISPCheckerFactory to",
+            address(checkerFactory)
+        );
+
+        CRISPPolicyFactory policyFactory = new CRISPPolicyFactory();
+        console2.log("Deployed CRISPPolicyFactory to", address(policyFactory));
+
+        CRISPInputValidatorFactory inputValidatorFactory = new CRISPInputValidatorFactory();
+        console2.log(
+            "Deployed CRISPInputValidatorFactory to",
+            address(inputValidatorFactory)
+        );
+
         CRISPRisc0 crisp = new CRISPRisc0(
             enclave,
-            IEnclavePolicy(policy),
-            verifier
+            verifier,
+            semaphore,
+            checkerFactory,
+            policyFactory,
+            inputValidatorFactory
         );
         console2.log("Deployed CRISPRisc0 to", address(crisp));
     }

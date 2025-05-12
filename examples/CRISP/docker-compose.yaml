@@ -1,5 +1,6 @@
 services:
   enclave-dev:
+    user: devuser
     platform: linux/amd64
     build:
       context: .
@@ -12,6 +13,11 @@ services:
       - cargo-bin:/home/devuser/.cargo/bin
       - cargo-registry:/home/devuser/.cargo/registry
       - server-target:/app/examples/CRISP/apps/server/target
+      - evm-node-modules:/app/packages/evm/node_modules
+      - root-node-modules:/app/node_modules
+      - client-node-modules:/app/examples/CRISP/apps/client/node_modules
+      - crisp-node-modules:/app/examples/CRISP/node_modules
+      - crisp-foundry-cache:/app/examples/CRISP/out
     entrypoint:
       - ""
     ports:
@@ -19,13 +25,21 @@ services:
       - "3000:3000"
       - "4000:4000"
     command: >
-      /bin/bash -c "
+      /bin/bash -c '
       sudo chown -R devuser:devuser /home/devuser/.cargo &&
       sudo chown -R devuser:devuser /app/examples/CRISP/apps/server &&
+      sudo chown -R devuser:devuser /app/examples/CRISP/node_modules &&
+      sudo chown -R devuser:devuser /app/examples/CRISP/out &&
+      find /app -name "node_modules" -type d -exec sudo chown -R devuser:users {} \; &&
       tail -f /dev/null
-      "
+      '
 
 volumes:
   cargo-bin:
   cargo-registry:
   server-target:
+  evm-node-modules:
+  root-node-modules:
+  client-node-modules:
+  crisp-node-modules:
+  crisp-foundry-cache:

@@ -1,0 +1,19 @@
+{
+  "name": "crisp-web",
+  "type": "module",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gnosisguild/enclave"
+  },
+  "files": [
+    "crisp_web_bg.wasm",
+    "crisp_web.js",
+    "crisp_web.d.ts"
+  ],
+  "main": "crisp_web.js",
+  "types": "crisp_web.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
