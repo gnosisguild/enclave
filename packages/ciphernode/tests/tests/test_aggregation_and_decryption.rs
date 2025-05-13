@@ -297,17 +297,11 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .map(|tup| tup.0.to_owned())
         .collect();
     let add_events = add_ciphernodes(&bus, &eth_addrs).await?;
-    let encoded_params = encode_bfv_parameters(
-        params.degree() as u64,
-        params.plaintext(),
-        params.moduli().to_vec(),
-    );
-
     let e3_request_event = EnclaveEvent::from(E3Requested {
         e3_id: e3_id.clone(),
         threshold_m: 3,
         seed: seed.clone(),
-        params: encoded_params.clone(),
+        params: params.to_bytes(),
         src_chain_id: 1,
     });
 
@@ -409,12 +403,6 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
 
     let eth_addrs = create_random_eth_addrs(2);
 
-    let encoded_params = encode_bfv_parameters(
-        params.degree() as u64,
-        params.plaintext(),
-        params.moduli().to_vec(),
-    );
-
     let cn1 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[0], None, &cipher).await?;
     let cn2 = setup_local_ciphernode(&bus, &rng, true, &eth_addrs[1], None, &cipher).await?;
     add_ciphernodes(&bus, &eth_addrs).await?;
@@ -425,7 +413,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             seed: seed.clone(),
-            params: encoded_params.clone(),
+            params: params.to_bytes(),
             src_chain_id: 1,
         })
         .clone(),
