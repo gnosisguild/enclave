@@ -1,25 +1,13 @@
 mod greco;
 mod util;
 
+use commons::bfv::{build_bfv_params_arc, params::SET_2048_1032193_1};
 use console_log;
-use greco::greco::*;
-use log::info; // Use log macros from the `log` crate
+use fhe_rs::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
+use fhe_traits::{DeserializeParametrized, FheDecrypter, FheEncoder, Serialize};
+use rand::thread_rng;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*; // For setting up logging to the browser console
-
-use serde::Deserialize;
-use std::{env, sync::Arc, thread, time};
-
-use fhe::{
-    bfv::{BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
-    mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
-    proto::bfv::Parameters,
-};
-use fhe_traits::{
-    DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter, Serialize,
-};
-use rand::{distributions::Uniform, prelude::Distribution, rngs::OsRng, thread_rng, SeedableRng};
-use util::timeit::{timeit, timeit_n};
 
 #[wasm_bindgen]
 pub struct Encrypt {
@@ -36,16 +24,8 @@ impl Encrypt {
     }
 
     pub fn encrypt_vote(&mut self, vote: u64, public_key: Vec<u8>) -> Result<Vec<u8>, JsValue> {
-        let degree = 2048;
-        let plaintext_modulus: u64 = 1032193;
-        let moduli = vec![0xffffffff00001];
-
-        let params = BfvParametersBuilder::new()
-            .set_degree(degree)
-            .set_plaintext_modulus(plaintext_modulus)
-            .set_moduli(&moduli)
-            .build_arc()
-            .map_err(|e| JsValue::from_str(&format!("Error generating parameters: {}", e)))?;
+        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
 
         let pk = PublicKey::from_bytes(&public_key, &params)
             .map_err(|e| JsValue::from_str(&format!("Error deserializing public key: {}", e)))?;
@@ -83,17 +63,8 @@ fn test_encrypt_vote() {
     // Initialize the logger to print to the browser's console
     console_log::init_with_level(log::Level::Info).expect("Error initializing logger");
 
-    let degree = 2048;
-    let plaintext_modulus: u64 = 1032193; // Must be Co-prime with Q
-    let moduli = vec![0xffffffff00001]; // Must be 52-bit or less
-
-    let params = BfvParametersBuilder::new()
-        .set_degree(degree)
-        .set_plaintext_modulus(plaintext_modulus)
-        .set_moduli(&moduli)
-        .build_arc()
-        .unwrap();
-
+    let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
     let mut rng = thread_rng();
     let sk = SecretKey::random(&params, &mut rng);
     let pk = PublicKey::new(&sk, &mut rng);

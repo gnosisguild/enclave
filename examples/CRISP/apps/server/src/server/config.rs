@@ -19,7 +19,6 @@ pub struct Config {
     pub e3_threshold_max: u32,
     pub e3_window_size: u64,
     pub e3_duration: u64,
-    pub e3_input_limit: u8,
     pub e3_compute_provider_name: String,
     pub e3_compute_provider_parallel: bool,
     pub e3_compute_provider_batch_size: u32,
@@ -35,6 +34,5 @@ impl Config {
     }
 }
 
-pub static CONFIG: Lazy<Config> = Lazy::new(|| {
-    Config::from_env().expect("Failed to load configuration")
-});
+pub static CONFIG: Lazy<Config> =
+    Lazy::new(|| Config::from_env().expect("Failed to load configuration"));

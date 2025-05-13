@@ -1,7 +1,7 @@
+use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, Context, Handler, Message};
+use anyhow::Result;
 use std::collections::BTreeMap;
-
-use crate::{Get, Insert, Remove};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash)]
 #[rtype(result = "Vec<DataOp>")]
@@ -42,6 +42,18 @@ impl Handler<Insert> for InMemStore {
         if self.capture {
             self.log.push(DataOp::Insert(event));
         }
+    }
+}
+
+impl Handler<InsertSync> for InMemStore {
+    type Result = Result<()>;
+
+    fn handle(&mut self, event: InsertSync, _: &mut Self::Context) -> Self::Result {
+        self.db.insert(event.key().to_vec(), event.value().to_vec());
+        if self.capture {
+            self.log.push(DataOp::Insert(event.into()));
+        }
+        Ok(())
     }
 }
 

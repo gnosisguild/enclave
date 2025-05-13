@@ -1,0 +1,31 @@
+chains:
+  - name: "hardhat"
+    rpc_url: "ws://localhost:8545"
+    contracts:
+      enclave: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      ciphernode_registry: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      filter_registry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+
+nodes:
+  cn1:
+    address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+    quic_port: 9201
+    autonetkey: true
+    autopassword: true
+  cn2:
+    address: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
+    quic_port: 9202
+    autonetkey: true
+    autopassword: true
+  cn3:
+    address: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
+    quic_port: 9203
+    autonetkey: true
+    autopassword: true
+  ag:
+    address: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+    quic_port: 9094
+    autonetkey: true
+    autopassword: true
+    role:
+      type: aggregator

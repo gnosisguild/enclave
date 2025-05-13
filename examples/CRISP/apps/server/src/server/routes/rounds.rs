@@ -5,12 +5,10 @@ use crate::server::models::{
     AppState, CTRequest, ComputeProviderParams, CronRequestE3, CurrentRound, JsonResponse,
     PKRequest,
 };
-use crate::server::utils::encode_bfv_parameters;
-use crate::server::utils::generate_bfv_parameters;
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use chrono::Utc;
-use fhe_traits::Serialize;
+use commons::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
@@ -137,13 +135,8 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         Err(e) => error!("Error checking E3 Program enabled: {:?}", e),
     }
     info!("Generating parameters...");
-    let params = generate_bfv_parameters()?;
-
-    let encoded = encode_bfv_parameters(
-        params.degree() as u64,
-        params.plaintext(),
-        params.moduli().to_vec(),
-    );
+    let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+    let params = encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli));
 
     info!("Requesting E3...");
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
@@ -153,8 +146,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
     ];
     let duration: U256 = U256::from(CONFIG.e3_duration);
-    let input_limit: u8 = CONFIG.e3_input_limit;
-    let e3_params = encoded.clone();
+    let e3_params = Bytes::from(params);
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.clone(),
         parallel: CONFIG.e3_compute_provider_parallel,
@@ -168,9 +160,8 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
             threshold,
             start_window,
             duration,
-            input_limit,
             e3_program,
-            hex::encode(e3_params).into(),
+            e3_params,
             compute_provider_params,
         )
         .await?;

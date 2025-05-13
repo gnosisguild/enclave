@@ -1,15 +1,17 @@
+use anyhow::{Error, Result};
+use bincode::serialize;
 use compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
 use methods::VOTING_ELF;
 use risc0_ethereum_contracts::groth16;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};
-use voting_core::fhe_processor;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use bincode::serialize;
-use anyhow::{Error, Result};
+use voting_core::fhe_processor;
 
 fn encode_input(input: &[u8]) -> Result<Vec<u8>, Error> {
-    Ok(bytemuck::pod_collect_to_vec(&risc0_zkvm::serde::to_vec(input)?))
+    Ok(bytemuck::pod_collect_to_vec(&risc0_zkvm::serde::to_vec(
+        input,
+    )?))
 }
 
 pub struct Risc0Provider;
@@ -24,7 +26,7 @@ pub struct Risc0Output {
 impl ComputeProvider for Risc0Provider {
     type Output = Risc0Output;
 
-    fn prove(&self, input: &ComputeInput) -> Self::Output {   
+    fn prove(&self, input: &ComputeInput) -> Self::Output {
         let encoded_input = encode_input(&serialize(input).unwrap()).unwrap();
         let env = ExecutorEnv::builder()
             .write_slice(&encoded_input)
@@ -70,8 +72,10 @@ pub fn run_compute(params: FHEInputs) -> Result<(Risc0Output, Vec<u8>)> {
     let minutes = elapsed_time.as_secs() / 60;
     let seconds = elapsed_time.as_secs() % 60;
 
-    println!("Prove function execution time: {} minutes and {} seconds", minutes, seconds);
-
+    println!(
+        "Prove function execution time: {} minutes and {} seconds",
+        minutes, seconds
+    );
 
     Ok(output)
 }

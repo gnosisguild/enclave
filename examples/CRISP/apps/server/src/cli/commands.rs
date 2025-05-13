@@ -4,22 +4,19 @@ use log::info;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use alloy::dyn_abi::{DynSolType, DynSolValue};
+use super::{CLI_DB, CONFIG};
 use alloy::primitives::{Address, Bytes, U256};
-use alloy_sol_types::{sol, SolType, SolValue};
-
+use commons::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use crisp::server::blockchain::relayer::EnclaveContract;
-use fhe::bfv::{
-    BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
+use fhe_rs::bfv::{
+    BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
 };
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
     Serialize as FheSerialize,
 };
-use hex;
 use rand::thread_rng;
-
-use super::{CLI_DB, CONFIG};
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct FHEParams {
@@ -81,8 +78,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
     ];
     let duration: U256 = U256::from(CONFIG.e3_duration);
-    let input_limit: u8 = CONFIG.e3_input_limit;
-    let e3_params = encoded.clone();
+    let e3_params = Bytes::from(encode_bfv_params(&generate_bfv_parameters()));
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.to_string(),
         parallel: CONFIG.e3_compute_provider_parallel,
@@ -96,9 +92,8 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
             threshold,
             start_window,
             duration,
-            input_limit,
             e3_program,
-            hex::encode(e3_params).into(),
+            e3_params,
             compute_provider_params_bytes,
         )
         .await?;
@@ -112,13 +107,7 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
         .with_prompt("Enter CRISP round ID.")
         .interact_text()?;
 
-    let params = generate_bfv_parameters()?;
-    let encoded = encode_bfv_parameters(
-        params.degree() as u64,
-        params.plaintext(),
-        params.moduli().to_vec(),
-    );
-
+    let params = generate_bfv_parameters();
     let (sk, pk) = generate_keys(&params);
     let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
     let pk_bytes = Bytes::from(pk.to_bytes());
@@ -127,7 +116,7 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
     info!("E3 activated. TxHash: {:?}", res.transaction_hash);
 
     let e3_params = FHEParams {
-        params: hex::encode(encoded.clone()).into(),
+        params: encode_bfv_params(&params),
         pk: pk.to_bytes(),
         sk: sk.coeffs.into_vec(),
     };
@@ -159,7 +148,7 @@ pub async fn participate_in_existing_round(
         .await?;
 
     let pk_res: PKRequest = resp.json().await?;
-    let params = generate_bfv_parameters()?;
+    let params = generate_bfv_parameters();
     let pk_deserialized = PublicKey::from_bytes(&pk_res.pk_bytes, &params)?;
 
     let vote_choice = get_user_vote()?;
@@ -199,7 +188,7 @@ pub async fn decrypt_and_publish_result(
         .get(format!("e3:{}", input_crisp_id))?
         .ok_or("Key not found")?;
     let e3_params: FHEParams = serde_json::from_slice(&params_bytes)?;
-    let params = generate_bfv_parameters()?;
+    let params = generate_bfv_parameters();
     let sk_deserialized = SecretKey::new(e3_params.sk, &params);
 
     let ct = Ciphertext::from_bytes(&ct_res.ct_bytes, &params)?;
@@ -216,33 +205,12 @@ pub async fn decrypt_and_publish_result(
     Ok(())
 }
 
-fn generate_bfv_parameters(
-) -> Result<std::sync::Arc<BfvParameters>, Box<dyn std::error::Error + Send + Sync>> {
-    Ok(BfvParametersBuilder::new()
-        .set_degree(2048)
-        .set_plaintext_modulus(1032193)
-        .set_moduli(&[0xffffffff00001])
-        .build_arc()?)
+fn generate_bfv_parameters() -> Arc<BfvParameters> {
+    let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+    build_bfv_params_arc(degree, plaintext_modulus, &moduli)
 }
 
-pub fn encode_bfv_parameters(degree: u64, plaintext_modulus: u64, moduli: Vec<u64>) -> Vec<u8> {
-    DynSolValue::Tuple(vec![
-        DynSolValue::Uint(U256::from(degree), 256),
-        DynSolValue::Uint(U256::from(plaintext_modulus), 256),
-        DynSolValue::Array(
-            moduli
-                .iter()
-                .map(|&m| U256::from(m))
-                .collect::<Vec<_>>()
-                .iter()
-                .map(|m| DynSolValue::Uint(*m, 256))
-                .collect(),
-        ),
-    ])
-    .abi_encode_params()
-}
-
-fn generate_keys(params: &std::sync::Arc<BfvParameters>) -> (SecretKey, PublicKey) {
+fn generate_keys(params: &Arc<BfvParameters>) -> (SecretKey, PublicKey) {
     let mut rng = thread_rng();
     let sk = SecretKey::random(params, &mut rng);
     let pk = PublicKey::new(&sk, &mut rng);

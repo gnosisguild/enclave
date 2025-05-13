@@ -2,7 +2,7 @@ use crate::Repository;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
-use tracing::error;
+use tracing::{error, info, trace};
 
 /// This trait enables the self type to report their state snapshot
 pub trait Snapshot
@@ -28,7 +28,7 @@ pub trait Checkpoint: Snapshot {
         let snapshot = match self.snapshot() {
             Ok(v) => v,
             Err(err) => {
-                error!("Not saving data because '{}'", err);
+                trace!("Not saving data because '{}'", err);
                 return;
             }
         };

@@ -1,5 +1,4 @@
 use super::set_up_crp;
-use alloy::dyn_abi::{DynSolType, DynSolValue};
 use anyhow::*;
 use async_trait::async_trait;
 use data::{FromSnapshotWithParams, Snapshot};
@@ -44,66 +43,12 @@ impl Fhe {
         Self { params, crp, rng }
     }
 
-    pub fn decode_bfv_parameters(bytes: &[u8]) -> Result<(u64, u64, Vec<u64>)> {
-        let params_type = DynSolType::Tuple(vec![
-            DynSolType::Uint(256),
-            DynSolType::Uint(256),
-            DynSolType::Array(Box::new(DynSolType::Uint(256))),
-        ]);
-
-        let decoded = params_type.abi_decode_params(bytes)?;
-
-        if let DynSolValue::Tuple(values) = decoded {
-            // Extract degree
-            let degree = if let DynSolValue::Uint(val, _) = &values[0] {
-                val.to::<u64>()
-            } else {
-                return Err(anyhow!("Expected Uint for degree"));
-            };
-
-            // Extract plaintext_modulus
-            let plaintext_modulus = if let DynSolValue::Uint(val, _) = &values[1] {
-                val.to::<u64>()
-            } else {
-                return Err(anyhow!("Expected Uint for plaintext modulus"));
-            };
-
-            // Extract moduli
-            let moduli = if let DynSolValue::Array(decoded_moduli) = &values[2] {
-                decoded_moduli
-                    .iter()
-                    .map(|v| {
-                        if let DynSolValue::Uint(val, _) = v {
-                            Ok(val.to::<u64>())
-                        } else {
-                            Err(anyhow!("Expected Uint for modulus"))
-                        }
-                    })
-                    .collect::<Result<Vec<u64>>>()?
-            } else {
-                return Err(anyhow!("Expected Array for moduli"));
-            };
-
-            Ok((degree, plaintext_modulus, moduli))
-        } else {
-            Err(anyhow!("Expected Tuple for decoded result"))
-        }
-    }
-
     pub fn from_encoded(bytes: &[u8], seed: Seed, rng: SharedRng) -> Result<Self> {
-        let (degree, plaintext_modulus, moduli) = Self::decode_bfv_parameters(bytes).unwrap();
-
-        let params = (BfvParametersBuilder::new()
-            .set_degree(degree as usize)
-            .set_plaintext_modulus(plaintext_modulus)
-            .set_moduli(&moduli)
-            .build_arc()?);
-
+        let params = Arc::new(BfvParameters::try_deserialize(bytes)?);
         let crp = set_up_crp(
             params.clone(),
             Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
         );
-
         Ok(Fhe::new(params, crp, rng))
     }
 

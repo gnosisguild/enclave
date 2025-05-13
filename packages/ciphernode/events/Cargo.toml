@@ -1,8 +1,8 @@
 [package]
 # we have to name this other than core for disambiguation
 name = "events"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
@@ -10,13 +10,15 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
 [dependencies]
 actix = { workspace = true }
-sha2 = { workspace = true }
-bs58 = { workspace = true }
-serde = { workspace = true }
-bincode = { workspace = true }
-futures-util = { workspace = true }
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
 anyhow = { workspace = true }
-lazy_static = { workspace = true }
+bincode = { workspace = true }
+bloom = { workspace = true }
+bs58 = { workspace = true }
+futures-util = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
+tracing = { workspace = true }

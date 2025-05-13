@@ -1,4 +1,5 @@
 use crate::server::CONFIG;
+use alloy::providers::fillers::BlobGasFiller;
 use alloy::{
     network::{Ethereum, EthereumWallet},
     primitives::{Address, Bytes, U256},
@@ -40,7 +41,7 @@ sol! {
         mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
         mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
-        function request(address filter, uint32[2] calldata threshold, uint256[2] calldata startWindow, uint256 duration, uint8 inputLimit, address e3Program, bytes memory e3ProgramParams, bytes memory computeProviderParams) external payable returns (uint256 e3Id, E3 memory e3);        
+        function request(address filter, uint32[2] calldata threshold, uint256[2] calldata startWindow, uint256 duration, address e3Program, bytes memory e3ProgramParams, bytes memory computeProviderParams) external payable returns (uint256 e3Id, E3 memory e3);
         function activate(uint256 e3Id,bytes memory publicKey) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
         function publishInput(uint256 e3Id, bytes memory data) external returns (bool success);
@@ -53,7 +54,10 @@ sol! {
 
 type CRISPProvider = FillProvider<
     JoinFill<
-        JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>,
+        JoinFill<
+            Identity,
+            JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+        >,
         WalletFiller<EthereumWallet>,
     >,
     RootProvider<BoxTransport>,
@@ -76,7 +80,6 @@ impl EnclaveContract {
             .on_builtin(&CONFIG.http_rpc_url)
             .await?;
 
-
         Ok(Self {
             provider: Arc::new(provider),
             contract_address: contract_address.parse()?,
@@ -89,22 +92,22 @@ impl EnclaveContract {
         threshold: [u32; 2],
         start_window: [U256; 2],
         duration: U256,
-        input_limit: u8,
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
     ) -> Result<TransactionReceipt> {
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.request(
-            filter,
-            threshold,
-            start_window,
-            duration,
-            input_limit,
-            e3_program,
-            e3_params,
-            compute_provider_params,
-        ).value(U256::from(1));
+        let builder = contract
+            .request(
+                filter,
+                threshold,
+                start_window,
+                duration,
+                e3_program,
+                e3_params,
+                compute_provider_params,
+            )
+            .value(U256::from(1));
         let receipt = builder.send().await.unwrap().get_receipt().await.unwrap();
         Ok(receipt)
     }

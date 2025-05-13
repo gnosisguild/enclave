@@ -1,15 +1,19 @@
+use std::any::Any;
+
 use crate::helpers::telemetry::setup_tracing;
 use crate::net;
 use crate::net::NetCommands;
+use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
+use crate::start;
 use crate::wallet::WalletCommands;
-use crate::{aggregator, init, password, wallet};
-use crate::{aggregator::AggregatorCommands, start};
-use anyhow::Result;
+use crate::{init, password, wallet};
+use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
-use config::{load_config_from_overrides, AppConfig, CliOverrides};
-use tracing::Level;
+use config::{load_config, AppConfig};
+use enclave_core::helpers::datastore::close_all_connections;
+use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
 #[command(name = "enclave")]
@@ -65,57 +69,108 @@ impl Cli {
         }
     }
 
+    #[instrument(skip_all)]
     pub async fn execute(self) -> Result<()> {
-        let config = self.load_config()?;
+        // Attempt to load the config, but only treat “not found” as
+        // the trigger for the init flow.  All other errors bubble up.
+        let config = match self.load_config() {
+            Ok(cfg) => cfg,
+            // If the file truly doesn’t exist, fall back to init
+            Err(e)
+                if matches!(
+                    e.downcast_ref::<std::io::Error>(),
+                    Some(ioe) if ioe.kind() == std::io::ErrorKind::NotFound
+                ) =>
+            {
+                // Existing init branch
+                match self.command {
+                    Commands::Init {
+                        rpc_url,
+                        eth_address,
+                        password,
+                        skip_eth,
+                        net_keypair,
+                        generate_net_keypair,
+                    } => {
+                        init::execute(
+                            rpc_url,
+                            eth_address,
+                            password,
+                            skip_eth,
+                            net_keypair,
+                            generate_net_keypair,
+                        )
+                        .await?
+                    }
+                    _ => bail!(
+                        "Configuration file not found. Have you created `enclave.config.yaml` in your project?"
+                    ),
+                };
+                return Ok(());
+            }
+            // Any other error is fatal
+            Err(e) => return Err(e),
+        };
+
         setup_tracing(&config, self.log_level())?;
+        info!("Config loaded from: {:?}", config.config_file());
+
+        if config.autopassword() {
+            enclave_core::password::create::autopassword(&config).await?;
+        }
+
+        if config.autonetkey() {
+            enclave_core::net::generate::autonetkey(&config).await?;
+        }
+
+        if config.autowallet() {
+            enclave_core::wallet::set::autowallet(&config).await?;
+        }
 
         match self.command {
-            Commands::Start => start::execute(config).await?,
-            Commands::Init {
-                rpc_url,
-                eth_address,
-                password,
-                skip_eth,
-                net_keypair,
-                generate_net_keypair,
-            } => {
-                init::execute(
-                    rpc_url,
-                    eth_address,
-                    password,
-                    skip_eth,
-                    net_keypair,
-                    generate_net_keypair,
-                )
-                .await?
+            Commands::Start { peers } => start::execute(config, peers).await?,
+            Commands::Init { .. } => {
+                bail!("Cannot run `enclave init` when a configuration exists.");
+            }
+            Commands::Nodes { command } => {
+                nodes::execute(command, &config, self.verbose, self.config).await?
             }
             Commands::Password { command } => password::execute(command, &config).await?,
-            Commands::Aggregator { command } => aggregator::execute(command, config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
         }
 
+        close_all_connections();
+
         Ok(())
     }
 
-    fn load_config(&self) -> Result<AppConfig> {
-        load_config_from_overrides(CliOverrides {
-            config: self.config.clone(),
-            name: self.name.clone(),
-            otel: self.otel.clone().map(Into::into),
-        })
+    pub fn load_config(&self) -> Result<AppConfig> {
+        let config = load_config(
+            &self.name(),
+            self.config.clone(),
+            self.otel.clone().map(Into::into),
+        )?;
+        Ok(config)
+    }
+
+    pub fn name(&self) -> String {
+        // If no name is provided assume we are working with the default node
+        self.name.clone().unwrap_or("_default".to_string())
     }
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Start the application
-    Start,
-
-    /// Aggregator node management commands
-    Aggregator {
-        #[command(subcommand)]
-        command: AggregatorCommands,
+    Start {
+        #[arg(
+            long = "peer",
+            action = clap::ArgAction::Append,
+            value_name = "PEER",
+            help = "Sets a peer URL",
+        )]
+        peers: Vec<String>,
     },
 
     /// Password management commands
@@ -161,5 +216,11 @@ pub enum Commands {
         /// Generate a new network keypair
         #[arg(long = "generate-net-keypair")]
         generate_net_keypair: bool,
+    },
+
+    /// Manage multiple node processes together as a set
+    Nodes {
+        #[command(subcommand)]
+        command: NodeCommands,
     },
 }

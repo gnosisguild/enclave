@@ -4,8 +4,9 @@ set -euo pipefail
 
 cleanup() {
   echo "Cleaning up processes..."
-  # Kill specific processes first
-  pkill -9 -f "target/debug/enclave" 2>/dev/null || true
+  enclave nodes down
+  sleep 1
+
   pkill -9 -f "anvil" 2>/dev/null || true
   
   # Kill any remaining background jobs from this script
@@ -26,9 +27,11 @@ cleanup() {
 
 trap cleanup INT TERM
 
+(cd /app && pnpm install --frozen-lockfile)
+
 concurrently \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
-  "anvil" \
-  "./scripts/tasks/evm_deploy.sh && ./scripts/tasks/risc0_deploy.sh && ./scripts/tasks/dev_after_deploy.sh"
+  "anvil --host 0.0.0.0" \
+  "./scripts/tasks/evm_deploy.sh && ./scripts/tasks/risc0_deploy.sh && ./scripts/tasks/dev_services.sh"
 

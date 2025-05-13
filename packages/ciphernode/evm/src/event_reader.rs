@@ -200,7 +200,7 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
             }
         }
         Err(e) => {
-            warn!("Failed to fetch historical events: {}", e);
+            error!("Failed to fetch historical events: {}", e);
             bus.err(EnclaveErrorType::Evm, anyhow!(e));
             return;
         }
@@ -220,10 +220,10 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                                 trace!("Received log from EVM");
                                 let Some(event) = extractor(log.data(), log.topic0(), chain_id)
                                 else {
-                                    warn!("Failed to extract log from EVM.");
+                                    trace!("Unknown log from EVM. This will happen from time to time.");
                                     continue;
                                 };
-                                info!("Extracted Evm Event: {}", event);
+                                trace!("Extracted Evm Event: {}", event);
                                 processor.do_send(EnclaveEvmEvent::new(event, block_number));
 
                             }
@@ -278,10 +278,10 @@ where
     fn handle(&mut self, wrapped: EnclaveEvmEvent, _: &mut Self::Context) -> Self::Result {
         match self.state.try_mutate(|mut state| {
             let event_id = wrapped.get_id();
-            info!("Processing event: {}", event_id);
-            info!("cache length: {}", state.ids.len());
+            trace!("Processing event: {}", event_id);
+            trace!("cache length: {}", state.ids.len());
             if state.ids.contains(&event_id) {
-                error!(
+                warn!(
                     "Event id {} has already been seen and was not forwarded to the bus",
                     &event_id
                 );
@@ -294,7 +294,7 @@ where
             self.bus.do_send(wrapped.event);
 
             // Save processed ids
-            info!("Storing event(EVM) in cache {}({})", event_type, event_id);
+            trace!("Storing event(EVM) in cache {}({})", event_type, event_id);
 
             state.ids.insert(event_id);
             state.last_block = wrapped.block;

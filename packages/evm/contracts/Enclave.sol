@@ -2,12 +2,8 @@
 pragma solidity >=0.8.27;
 
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
-import { IEnclavePolicy } from "./interfaces/IEnclavePolicy.sol";
+import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
-import {
-    IAdvancedPolicy
-} from "@excubiae/contracts/interfaces/IAdvancedPolicy.sol";
-import { Check } from "@excubiae/contracts/interfaces/IAdvancedChecker.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -71,23 +67,17 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
-    error InvalidComputationRequest(IAdvancedPolicy inputValidator);
+    error InvalidComputationRequest(IInputValidator inputValidator);
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
+    error InvalidInput();
     error InvalidStartWindow();
     error InvalidThreshold(uint32[2] threshold);
     error CiphertextOutputAlreadyPublished(uint256 e3Id);
     error CiphertextOutputNotPublished(uint256 e3Id);
     error PaymentRequired(uint256 value);
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
-
-    // Excubiae Errors
-    error UnsuccessfulCheck();
-    error MainCalledTooManyTimes();
-
-    // Excubiae Events
-    event CloneDeployed(address indexed clone);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -135,7 +125,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint32[2] calldata threshold,
         uint256[2] calldata startWindow,
         uint256 duration,
-        uint8 inputLimit,
         IE3Program e3Program,
         bytes memory e3ProgramParams,
         bytes memory computeProviderParams
@@ -168,14 +157,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        (bytes32 encryptionSchemeId, IEnclavePolicy inputValidator) = e3Program
-            .validate(
-                e3Id,
-                seed,
-                inputLimit,
-                e3ProgramParams,
-                computeProviderParams
-            );
+        (bytes32 encryptionSchemeId, IInputValidator inputValidator) = e3Program
+            .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
         ];
@@ -254,16 +237,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InputDeadlinePassed(e3Id, e3.expiration)
         );
 
-        e3.inputValidator.enforce(msg.sender, data, Check.MAIN);
+        bytes memory input = e3.inputValidator.validate(msg.sender, data);
         uint256 inputHash = PoseidonT3.hash(
-            [uint256(keccak256(data)), inputCounts[e3Id]]
+            [uint256(keccak256(input)), inputCounts[e3Id]]
         );
 
         inputCounts[e3Id]++;
         inputs[e3Id]._insert(inputHash);
         success = true;
 
-        emit InputPublished(e3Id, data, inputHash, inputCounts[e3Id] - 1);
+        emit InputPublished(e3Id, input, inputHash, inputCounts[e3Id] - 1);
     }
 
     function publishCiphertextOutput(

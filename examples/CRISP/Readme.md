@@ -26,7 +26,6 @@ CRISP
 ├── deploy - Deployment scripts
 ├── docker-compose.yaml
 └── scripts
-    ├── local_dev - Scripts for local development
     └── tasks - Scripts for tasks to be run inside the docker container
 ```
 
@@ -246,7 +245,7 @@ CRON_API_KEY=1234567890
 ENCLAVE_ADDRESS="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
 CIPHERNODE_REGISTRY_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 NAIVE_REGISTRY_FILTER_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPRisc0 Contract Address
+E3_PROGRAM_ADDRESS="0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1" # CRISPRisc0 Contract Address
 
 # E3 Config
 E3_WINDOW_SIZE=600
@@ -312,6 +311,19 @@ Ensure all services are running correctly and that components are communicating 
 ## Contributing
 
 We welcome and encourage community contributions to this repository. Please ensure that you read and understand the [Contributor License Agreement (CLA)](https://github.com/gnosisguild/CLA) before submitting any contributions.
+
+### Branch Cleanup Policy
+
+To help keep the repository clean and maintainable, we automatically delete merged branches after **7 days**.  
+You can control this behavior using **PR labels**:
+
+| Label           | Effect                                        |
+|------------------|-----------------------------------------------|
+| `keep-branch`     | ❌ Branch will not be deleted                 |
+| `archive-branch`  | 🏷️ Branch will be **tagged** and then deleted |
+| *no label*        | 🗑️ Branch will be deleted (no tag preserved)  |
+
+> Only apply these labels **before merging** your PR if you want to preserve history or keep the branch alive.
 
 ## Security and Liability
 
