@@ -299,8 +299,7 @@ async fn sync_e3_with_db(e3_id: U256, contract_e3: &ContractE3, vote_count: u64)
     db_e3.status = "Finished".to_string();
 
     // Decode plaintext output to obtain vote counts.
-    let decoded: Vec<u64> = bincode::deserialize(&db_e3.plaintext_output)
-        .unwrap_or(vec![0, 0]);
+    let decoded: Vec<u64> = bincode::deserialize(&db_e3.plaintext_output).unwrap_or(vec![0, 0]);
 
     if decoded.len() >= 2 {
         db_e3.votes_option_2 = decoded[0];

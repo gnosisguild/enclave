@@ -17,19 +17,41 @@ members = [
   "test_helpers",
   "tests",
 ]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
 
 [workspace.dependencies]
+aggregator = { path = "./aggregator" }
+config = { path = "./config" }
+crypto = { path = "./crypto" }
+data = { path = "./data" }
+e3_request = { path = "./e3_request" }
+enclave = { path = "./enclave" }
+enclave_core = { path = "./enclave_core" }
+events = { path = "./events" }
+evm = { path = "./evm" }
+fhe = { path = "./fhe" }
+keyshare = { path = "./keyshare" }
+logger = { path = "./logger" }
+net = { path = "./net" }
+sortition = { path = "./sortition" }
+test_helpers = { package = "test-helpers", path = "./test_helpers" }
+tests = { path = "./tests" }
+
 actix = "0.13.5"
 actix-web = "4.10.2"
 aes-gcm = "0.10.3"
-aggregator = { path = "./aggregator" }
-alloy = { version = "0.5.2", features = ["full", "node-bindings"] }
-alloy-primitives = { version = "0.6", default-features = false, features = [
+alloy = { version = "0.8", features = ["node-bindings", "full"] }
+alloy-primitives = { version = "0.8", default-features = false, features = [
   "rlp",
   "serde",
   "std",
 ] }
-alloy-sol-types = { version = "0.6" }
+alloy-sol-types = "0.8"
+alloy-dyn-abi = "1.1.0"
 argon2 = "0.5.2"
 anyhow = "1.0.86"
 async-std = { version = "1.12", features = ["attributes"] }
@@ -39,30 +61,23 @@ bloom = "0.3.2"
 bs58 = "0.5.1"
 base64 = "0.22.1"
 clap = { version = "4.5.17", features = ["derive"] }
-crypto = { path = "./crypto" }
 compile-time = "0.2.0"
-config = { path = "./config" }
 dirs = "5.0.1"
-data = { path = "./data" }
 dialoguer = "0.11.0"
-events = { path = "./events" }
-enclave_core = { path = "./enclave_core" }
-evm = { path = "./evm" }
-fhe = { path = "./fhe" }
-fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", version = "0.1.0-beta.7" }
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git", branch = "feature/greco-integration" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
 figment = { version = "0.10.19", features = ["yaml", "test"] }
 futures = "0.3.30"
 futures-util = "0.3"
 hex = "0.4.3"
-keyshare = { path = "./keyshare" }
 lazy_static = "1.5.0"
-logger = { path = "./logger" }
 num = "0.4.3"
-net = { path = "./net" }
+num-bigint = "0.4.6"
+num-traits = "0.2"
 once_cell = "1.19.0"
-opentelemetry = { version = "0.29.1" }
+opentelemetry = "0.29.0"
 opentelemetry-otlp = { version = "0.29.0", features = ["grpc-tonic"] }
 opentelemetry_sdk = "0.29.0"
 opentelemetry-stdout = "0.29.0"
@@ -72,15 +87,12 @@ phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
 reqwest = "0.12.15"
-e3_request = { path = "./e3_request" }
 serde = { version = "1.0.208", features = ["derive"] }
-serde_json = { version = "1.0.133" }
+serde_json = "1.0.133"
 sled = "0.34.7"
 serde_yaml = "0.9.34"
 sha2 = "0.10.8"
 shellexpand = "3.1.0"
-sortition = { path = "./sortition" }
-test-helpers = { path = "./test_helpers" }
 tempfile = "3.14.0"
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"
@@ -88,12 +100,13 @@ tracing-opentelemetry = "0.30.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 url = "2.5.4"
 libp2p = { version = "0.54.1", features = [
-  "async-std",
-  "identify",
-  "macros",
-  "ping",
-  "tokio",
   "gossipsub",
+  "identify",
+  "kad",
+  "macros",
+  "mdns",
+  "ping",
   "quic",
-] }
+  "tokio",
+]}
 zeroize = "1.6.0"

@@ -4,9 +4,9 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
 
-use fhe::bfv::{BfvParameters, Ciphertext, Plaintext, PublicKey};
 use fhe_math::rq::{Poly, Representation};
 use fhe_math::zq::Modulus;
+use fhe_rs::bfv::{BfvParameters, Ciphertext, Plaintext, PublicKey};
 use serde_json::json;
 
 use crate::greco::poly::*;
