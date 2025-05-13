@@ -11,13 +11,14 @@ export async function deployEnclaveFixture(
   const [signer] = await ethers.getSigners();
   const polynomial_degree = ethers.toBigInt(2048);
   const plaintext_modulus = ethers.toBigInt(1032193);
-  const moduli = [ethers.toBigInt("4503599626321921")];
+  const moduli = [ethers.toBigInt("4503599626321921")]; // 0x3FFFFFFF000001
 
   // Encode just the struct (NOT the function selector)
   const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
     ["uint256", "uint256", "uint256[]"],
     [polynomial_degree, plaintext_modulus, moduli],
   );
+
   const deployment = await (
     await ethers.getContractFactory("Enclave", {
       libraries: {

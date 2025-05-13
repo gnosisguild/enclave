@@ -1801,7 +1801,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 name = "commons"
 version = "0.1.0"
 dependencies = [
- "anyhow",
+ "alloy-dyn-abi",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
 ]

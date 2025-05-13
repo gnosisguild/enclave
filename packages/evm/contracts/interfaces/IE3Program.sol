@@ -14,7 +14,7 @@ interface IE3Program {
     function validate(
         uint256 e3Id,
         uint256 seed,
-        bytes calldata e3ProgramParams,
+        bytes memory e3ProgramParams,
         bytes calldata computeProviderParams
     )
         external

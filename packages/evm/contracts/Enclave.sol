@@ -44,9 +44,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
         public decryptionVerifiers;
 
-    /// Mapping of valid encryption scheme parameters configurations.
-    mapping(bytes encryptionParameters => bool isValid)
-        public validEncryptionParameters;
+    /// Mapping that stores the valid E3 program ABI encoded parameter sets (e.g., BFV).
+    mapping(bytes e3ProgramParamsHashPacked => bool allowed)
+        public e3ProgramsParams;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -56,7 +56,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     error CommitteeSelectionFailed();
     error E3ProgramNotAllowed(IE3Program e3Program);
-    error E3ProgramParamsNotAllowed(bytes e3ProgramParams);
     error E3AlreadyActivated(uint256 e3Id);
     error E3Expired();
     error E3NotActivated(uint256 e3Id);
@@ -87,30 +86,35 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
-    /// @param _supportedParams A set of supported params @todo
+    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV)
     constructor(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
         uint256 _maxDuration,
-        bytes[] memory _supportedParams
+        bytes[] memory _e3ProgramsParams
     ) {
-        initialize(_owner, _ciphernodeRegistry, _maxDuration, _supportedParams);
+        initialize(
+            _owner,
+            _ciphernodeRegistry,
+            _maxDuration,
+            _e3ProgramsParams
+        );
     }
 
     /// @param _owner The owner of this contract
     /// @param _ciphernodeRegistry The address of the ciphernode registry
     /// @param _maxDuration The maximum duration of a computation in seconds
-    /// @param _supportedParams Array of encoded encryption parameter sets to be marked as valid
+    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV)
     function initialize(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
         uint256 _maxDuration,
-        bytes[] memory _supportedParams
+        bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
-        setSupportedParams(_supportedParams);
+        setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -147,10 +151,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidDuration(duration)
         );
         require(e3Programs[e3Program], E3ProgramNotAllowed(e3Program));
-        require(
-            !validEncryptionParameters[e3ProgramParams],
-            E3ProgramParamsNotAllowed(e3ProgramParams)
-        );
 
         // TODO: should IDs be incremental or produced deterministically?
         e3Id = nexte3Id;
@@ -329,18 +329,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit CiphernodeRegistrySet(address(_ciphernodeRegistry));
     }
 
-    function setSupportedParams(
-        bytes[] memory _supportedParams
+    function setE3ProgramsParams(
+        bytes[] memory _e3ProgramsParams
     ) public onlyOwner returns (bool success) {
-        uint256 length = _supportedParams.length;
+        uint256 length = _e3ProgramsParams.length;
         for (uint256 i; i < length; ) {
-            validEncryptionParameters[_supportedParams[i]] = true;
+            e3ProgramsParams[_e3ProgramsParams[i]] = true;
             unchecked {
                 ++i;
             }
         }
         success = true;
-        emit EncryptionParametersUpdated(_supportedParams);
+        emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
     }
 
     function enableE3Program(

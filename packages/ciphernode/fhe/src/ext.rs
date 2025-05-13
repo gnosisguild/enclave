@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey};
 use events::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
-use hex;
 use std::sync::Arc;
 
 pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
@@ -42,9 +41,7 @@ impl E3Extension for FheExtension {
             ..
         } = data.clone();
 
-        let params_bytes: Vec<u8> = params.iter().map(|&x| x as u8).collect();
-
-        let Ok(fhe_inner) = Fhe::from_encoded(&params_bytes, seed, self.rng.clone()) else {
+        let Ok(fhe_inner) = Fhe::from_encoded(&params, seed, self.rng.clone()) else {
             self.bus.err(
                 EnclaveErrorType::KeyGeneration,
                 anyhow!(ERROR_FHE_FAILED_TO_DECODE),
