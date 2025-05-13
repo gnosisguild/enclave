@@ -13,8 +13,8 @@ pub mod params {
     /// - Plaintext modulus: 1032193
     /// - Moduli: [0x3FFFFFFF000001] (provides good security level)
     pub const SET_2048_1032193_1: (usize, u64, [u64; 1]) = (
-        2048,              // degree
-        1032193,           // plaintext_modulus
+        2048,               // degree
+        1032193,            // plaintext_modulus
         [0x3FFFFFFF000001], // moduli
     );
 }
@@ -173,15 +173,15 @@ pub fn encode_bfv_params(params: &BfvParameters) -> Vec<u8> {
 /// Panics if the decoding/deserialization fails.
 pub fn decode_bfv_params(bytes: &[u8]) -> BfvParameters {
     let bytes_type = DynSolType::Bytes;
-    let decoded = bytes_type.abi_decode(bytes)
+    let decoded = bytes_type
+        .abi_decode(bytes)
         .expect("Failed to ABI decode bytes");
-    
+
     match decoded {
         DynSolValue::Bytes(inner_bytes) => {
-            BfvParameters::try_deserialize(&inner_bytes)
-                .expect("Could not decode Bfv Params")
+            BfvParameters::try_deserialize(&inner_bytes).expect("Could not decode Bfv Params")
         }
-        _ => panic!("Expected bytes value in ABI encoding")
+        _ => panic!("Expected bytes value in ABI encoding"),
     }
 }
 
@@ -255,20 +255,26 @@ mod tests {
         let moduli = vec![0x3FFFFFFF000001];
 
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
-        
+
         // First serialize to raw bytes
         let serialized = serialize_bfv_params(&params);
-        
+
         // Then ABI encode the raw bytes
         let encoded = encode_bfv_params(&params);
-        
+
         // Verify the encoded result is deterministic
         let encoded_again = encode_bfv_params(&params);
-        assert_eq!(encoded, encoded_again, "ABI encoding should be deterministic");
-        
+        assert_eq!(
+            encoded, encoded_again,
+            "ABI encoding should be deterministic"
+        );
+
         // Verify the ABI-encoded result is different from the raw serialized bytes
-        assert_ne!(encoded, serialized, "ABI-encoded result should be different from raw serialized bytes");
-        
+        assert_ne!(
+            encoded, serialized,
+            "ABI-encoded result should be different from raw serialized bytes"
+        );
+
         // Verify we can ABI-decode and deserialize back to the original parameters
         let decoded = decode_bfv_params(&encoded);
         assert_eq!(decoded.degree(), degree);
@@ -284,7 +290,7 @@ mod tests {
 
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
         let encoded = encode_bfv_params(&params);
-        
+
         // Verify we can ABI-decode and deserialize back to the original parameters with Arc
         let decoded = decode_bfv_params_arc(&encoded);
         assert_eq!(decoded.degree(), degree);
