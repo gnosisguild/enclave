@@ -38,5 +38,5 @@ concurrently \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
   "anvil --host 0.0.0.0" \
-  "./scripts/tasks/evm_deploy.sh && ./scripts/tasks/risc0_deploy.sh && ./scripts/tasks/dev_services.sh"
+  "./scripts/tasks/evm_deploy.sh && ./scripts/tasks/crisp_deploy.sh && ./scripts/tasks/dev_services.sh"
 
