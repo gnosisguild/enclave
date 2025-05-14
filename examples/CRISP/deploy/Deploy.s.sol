@@ -32,6 +32,7 @@ import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISema
 import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
+import {MockRISC0Verifier} from "../contracts/Mocks/MockRISC0Verifier.sol";
 
 /// @notice Deployment script for the RISC Zero starter project.
 /// @dev Use the following environment variable to control the deployment:
@@ -93,7 +94,12 @@ contract CRISPRisc0Deploy is Script {
             enclave = IEnclave(enclaveAddress);
         }
 
-        if (address(verifier) == address(0)) {
+        bool useMockEnv = vm.envOr("USE_MOCK_VERIFIER", false);
+        if (useMockEnv) {
+            console2.log("Using MockRISC0Verifier");
+            verifier = new MockRISC0Verifier();
+            console2.log("Deployed MockRISC0Verifier to", address(verifier));
+        } else if (address(verifier) == address(0)) {
             verifier = new RiscZeroGroth16Verifier(
                 ControlID.CONTROL_ROOT,
                 ControlID.BN254_CONTROL_ID
