@@ -8,9 +8,7 @@ use super::{CLI_DB, CONFIG};
 use alloy::primitives::{Address, Bytes, U256};
 use commons::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use crisp::server::blockchain::relayer::EnclaveContract;
-use fhe_rs::bfv::{
-    BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
-};
+use fhe_rs::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
     Serialize as FheSerialize,
@@ -46,12 +44,6 @@ struct CTRequest {
 
 pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Starting new CRISP round!");
-    let e3_params = generate_bfv_parameters()?;
-    let encoded = encode_bfv_parameters(
-        e3_params.degree() as u64,
-        e3_params.plaintext(),
-        e3_params.moduli().to_vec(),
-    );
 
     let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;

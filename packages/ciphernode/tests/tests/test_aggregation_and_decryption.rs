@@ -2,7 +2,7 @@ use actix::prelude::*;
 use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use alloy::primitives::Address;
 use anyhow::*;
-use commons::bfv::params::SET_2048_1032193_1;
+use commons::bfv::{encode_bfv_params, params::SET_2048_1032193_1};
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
@@ -301,7 +301,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         e3_id: e3_id.clone(),
         threshold_m: 3,
         seed: seed.clone(),
-        params: params.to_bytes(),
+        params: encode_bfv_params(&params),
         src_chain_id: 1,
     });
 
@@ -413,7 +413,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             seed: seed.clone(),
-            params: params.to_bytes(),
+            params: encode_bfv_params(&params),
             src_chain_id: 1,
         })
         .clone(),
