@@ -3,8 +3,9 @@
 set -e
 
 if [ "$1" == "--ui" ]; then
-  pnpm concurrently -krs first "pnpm dev:setup && pnpm dev:up" "wait-on http://localhost:3000 && pnpm synpress && pnpm playwright test --ui && sleep 3"
+  PLAYWRIGHT_CMD="pnpm synpress && pnpm playwright test --ui"
 else
-  pnpm concurrently -krs first "pnpm dev:setup && pnpm dev:up" "wait-on http://localhost:3000 && pnpm synpress --headless && xvfb-run pnpm playwright test
- && sleep 3"
+  PLAYWRIGHT_CMD="pnpm synpress --headless && xvfb-run pnpm playwright test"
 fi
+
+pnpm concurrently -krs first "pnpm dev:setup && pnpm dev:up" "wait-on http://localhost:3000 && ${PLAYWRIGHT_CMD} && sleep 3"
