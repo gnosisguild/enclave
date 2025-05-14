@@ -50,6 +50,15 @@ test("CRISP smoke test", async ({
     .click();
   await page.locator('button:has-text("Cast Vote")').click();
   await page.locator('button:has-text("Register Identity")').click();
-  // await metamask.confirmTransaction();
-  await page.pause();
+  await metamask.confirmTransaction();
+  await page.locator('button:has-text("Cast Vote")').click();
+  await page.waitForTimeout(60000);
+  await page.locator('button:has-text("Historic Polls")').click();
+  await expect(page.locator("h1")).toHaveText("Historic Polls");
+  await expect(
+    page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3"),
+  ).toHaveText("100%");
+  await expect(
+    page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-1']"),
+  ).toHaveText("0%");
 });
