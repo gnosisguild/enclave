@@ -22,7 +22,7 @@ import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {RiscZeroGroth16Verifier} from "risc0/groth16/RiscZeroGroth16Verifier.sol";
 import {ControlID} from "risc0/groth16/ControlID.sol";
 
-import {CRISPRisc0} from "../contracts/CRISPRisc0.sol";
+import {CRISPProgram} from "../contracts/CRISPProgram.sol";
 import {CRISPPolicy} from "../contracts/CRISPPolicy.sol";
 import {CRISPChecker} from "../contracts/CRISPChecker.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
@@ -45,7 +45,7 @@ import {MockRISC0Verifier} from "../contracts/Mocks/MockRISC0Verifier.sol";
 ///
 /// https://book.getfoundry.sh/tutorials/solidity-scripting
 /// https://book.getfoundry.sh/reference/forge/forge-script
-contract CRISPRisc0Deploy is Script {
+contract CRISPProgramDeploy is Script {
     // Path to deployment config file, relative to the project root.
     string constant CONFIG_FILE = "deploy/config.toml";
 
@@ -61,7 +61,7 @@ contract CRISPRisc0Deploy is Script {
         setupVerifier();
 
         // Contracts to Deploy
-        deployCrispRisc0();
+        deployCrispProgram();
 
         vm.stopBroadcast();
     }
@@ -152,7 +152,7 @@ contract CRISPRisc0Deploy is Script {
         return configProfile;
     }
 
-    function deployCrispRisc0() private {
+    function deployCrispProgram() private {
         console2.log("Enclave Address: ", address(enclave));
         console2.log("Verifier Address: ", address(verifier));
 
@@ -182,7 +182,7 @@ contract CRISPRisc0Deploy is Script {
             address(inputValidatorFactory)
         );
 
-        CRISPRisc0 crisp = new CRISPRisc0(
+        CRISPProgram crisp = new CRISPProgram(
             enclave,
             verifier,
             semaphore,
@@ -190,6 +190,6 @@ contract CRISPRisc0Deploy is Script {
             policyFactory,
             inputValidatorFactory
         );
-        console2.log("Deployed CRISPRisc0 to", address(crisp));
+        console2.log("Deployed CRISPProgram to", address(crisp));
     }
 }

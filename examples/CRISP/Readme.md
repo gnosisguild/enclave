@@ -224,7 +224,7 @@ The following steps are optional. You can config [Bonsai](https://dev.risczero.c
    forge script --rpc-url http://localhost:8545 --broadcast script/Deploy.s.sol
    ```
 
-Note down the `CRISPRisc0` contract Address, which will be used as the E3 Program Address.
+Note down the `CRISPProgram` contract Address, which will be used as the E3 Program Address.
 
 ### Step 4: Set up Environment Variables
 
@@ -245,7 +245,7 @@ CRON_API_KEY=1234567890
 ENCLAVE_ADDRESS="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
 CIPHERNODE_REGISTRY_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 NAIVE_REGISTRY_FILTER_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-E3_PROGRAM_ADDRESS="0x0165878A594ca255338adfa4d48449f69242Eb8F" # CRISPRisc0 Contract Address
+E3_PROGRAM_ADDRESS="0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1" # CRISPProgram Contract Address
 
 # E3 Config
 E3_WINDOW_SIZE=600
@@ -317,11 +317,11 @@ We welcome and encourage community contributions to this repository. Please ensu
 To help keep the repository clean and maintainable, we automatically delete merged branches after **7 days**.  
 You can control this behavior using **PR labels**:
 
-| Label           | Effect                                        |
-|------------------|-----------------------------------------------|
-| `keep-branch`     | ❌ Branch will not be deleted                 |
-| `archive-branch`  | 🏷️ Branch will be **tagged** and then deleted |
-| *no label*        | 🗑️ Branch will be deleted (no tag preserved)  |
+| Label            | Effect                                        |
+| ---------------- | --------------------------------------------- |
+| `keep-branch`    | ❌ Branch will not be deleted                 |
+| `archive-branch` | 🏷️ Branch will be **tagged** and then deleted |
+| _no label_       | 🗑️ Branch will be deleted (no tag preserved)  |
 
 > Only apply these labels **before merging** your PR if you want to preserve history or keep the branch alive.
 
