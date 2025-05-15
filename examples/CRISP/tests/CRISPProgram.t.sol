@@ -20,16 +20,16 @@ import {RiscZeroCheats} from "risc0/test/RiscZeroCheats.sol";
 import {console2} from "forge-std/console2.sol";
 import {Test} from "forge-std/Test.sol";
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
-import {CRISPRisc0} from "../contracts/CRISPRisc0.sol";
+import {CRISPProgram} from "../contracts/CRISPProgram.sol";
 import {Elf} from "./Elf.sol"; // auto-generated contract after running `cargo build`.
 
-contract CRISPRisc0Test is RiscZeroCheats, Test {
-    CRISPRisc0 public crispRisc0;
+contract CRISPProgramTest is RiscZeroCheats, Test {
+    CRISPProgram public crispProgram;
 
     // function setUp() public {
     //     IRiscZeroVerifier verifier = deployRiscZeroVerifier();
-    //     crispRisc0 = new CRISPRisc0(verifier);
-    //     assertEq(crispRisc0.owner(), address(this));
+    //     crispProgram = new CRISPProgram(verifier);
+    //     assertEq(crispProgram.owner(), address(this));
     // }
 
     // function test_SetEven() public {
