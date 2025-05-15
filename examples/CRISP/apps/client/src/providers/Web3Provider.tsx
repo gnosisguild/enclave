@@ -8,11 +8,13 @@ const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 
 if (!walletConnectProjectId)
   console.warn('VITE_WALLETCONNECT_PROJECT_ID is not set in .env file. WalletConnect will not function properly.')
 
+const chains = import.meta.env.DEV ? [sepolia, anvil] as const : [sepolia] as const
+
 const config = createConfig(
   getDefaultConfig({
     appName: 'CRISP',
     enableFamily: false,
-    chains: [sepolia, anvil],
+    chains,
     walletConnectProjectId: walletConnectProjectId,
   }),
 )
