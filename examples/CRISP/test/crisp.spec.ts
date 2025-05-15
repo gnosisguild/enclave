@@ -50,6 +50,7 @@ test("CRISP smoke test", async ({
     .click();
   await page.locator('button:has-text("Cast Vote")').click();
   await page.locator('button:has-text("Register Identity")').click();
+  await page.waitForTimeout(1000);
   await metamask.confirmTransaction();
   await page.locator('button:has-text("Cast Vote")').click();
   await page.waitForTimeout(60000);
