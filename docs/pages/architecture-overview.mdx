@@ -1,0 +1,99 @@
+This section provides a breakdown of Enclave’s architecture, focusing on the essential components
+and workflows to help you implement it effectively.
+
+## Core Components
+
+### 1. Key Actors
+
+#### Requesters
+
+- Initiate and define computation requests, including parameters and requirements
+- Retrieve and utilize final computation results
+- Can be applications or other entities
+
+#### Data Providers
+
+- Supply private input data required for computation
+- Are responsible for encrypting data before submission
+- Can be end users, systems, or other applications
+
+#### Ciphernodes
+
+- Provide cryptographic services as staked network nodes
+- Handle distributed key generation and decryption operations
+- Form Ciphernode Committees (CiCos) for specific computations
+
+### 2. Smart Contracts
+
+#### Enclave Contract
+
+- Central coordinator of the E3 ecosystem
+- Manages computation requests and lifecycle
+- Coordinates Ciphernode selection and CiCo formation
+- Maintains input integrity via Merkle trees
+- Emits events for off-chain services
+
+#### E3 Program (E3P) Contract
+
+- Defines computation logic
+- Validates program parameters
+- Verifies computation proofs
+- Interfaces with the Enclave contract
+- Ensures correct execution of the E3P
+
+#### InputValidator Contract
+
+- Validates and sanitizes input data
+- Verifies Zero-Knowledge Proofs (ZKPs)
+- Prevents malicious input injection
+
+#### Decryption Verifier Contract
+
+- Validates Ciphernode decryption shares
+- Ensures correct result decryption
+- Verifies threshold signature schemes
+
+### 3. Compute Infrastructure
+
+#### Compute Provider (CP)
+
+- Runs the E3 Program over the published inputs
+- Reports computation reults of the E3P to the Enclave contract
+
+Enclave supports multiple CPs with a variety of different trust, scalability, and cost properties.
+
+**Supported systems:**
+
+1. **Verifiable Systems**
+
+   - [RISC Zero zkVM](https://www.risczero.com/)
+   - [Succint SP1](https://docs.succinct.xyz/) (coming soon)
+   - [Jolt](https://jolt.a16zcrypto.com/) (coming soon)
+
+2. **Oracle-Based Systems**
+   - zkTLS VMs (coming soon)
+   - Committee-based oracles (coming soon)
+   - Game theory-based oracles (coming soon)
+
+## Interaction Flow
+
+The following steps outline how these components interact in a typical computation:
+![E3 Flow](/e3-flow.png)
+
+1. **Computation Request**: A Requester submits a computation request with specific parameters.
+2. **Node Selection**: Ciphernodes are selected via sortition to form a Ciphernode Committee (CiCo).
+3. **Key Generation**: The CiCo generates and publishes a shared public key for encryption.
+4. **Data Submission**: Data Providers encrypt their inputs using the CiCo's shared public key and
+   publish commitments to the encrypted inputs onchain.
+5. **Computation Execution**: The Compute Provider (CP) runs the E3 Program (E3P) over the published
+   inputs.
+6. **Decryption**: The CiCo collectively decrypts the final result.
+7. **Result Retrieval**: The Requester retrieves and consumes the decrypted output of the E3P.
+
+## Developer's Perspective
+
+As a developer, you'll interact with:
+
+- **Enclave's Smart Contracts**: To submit requests and retrieve results.
+- **Compute Providers**: To run your E3P using verfiable or oracle-based systems.
+- **E3 Smart Contracts**: To verify the inputs and computation result.

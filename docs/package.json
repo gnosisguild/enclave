@@ -1,0 +1,31 @@
+{
+  "name": "enclave-docs",
+  "version": "1.0.0",
+  "description": "the official documentation for Enclave.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^14.2.1",
+    "nextra": "^2.13.4",
+    "nextra-theme-docs": "^2.13.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "sharp": "^0.34.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.10.4",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "prettier": "^3.5.3",
+    "typescript": "5.5.4"
+  },
+  "author": {
+    "name": "gnosisguild",
+    "url": "https://github.com/gnosisguild"
+  },
+  "license": "LGPL-3.0-only"
+}

@@ -5,10 +5,10 @@ use alloy::{
     sol_types::SolEvent,
     transports::BoxTransport,
 };
+use eyre::eyre;
 use eyre::Result;
 use futures::stream::StreamExt;
 use log::{error, info};
-use eyre::eyre;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

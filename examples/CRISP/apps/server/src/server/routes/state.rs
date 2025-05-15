@@ -2,29 +2,28 @@ use actix_web::{web, HttpResponse, Responder};
 use log::info;
 
 use crate::server::database::{get_e3, GLOBAL_DB};
-use crate::server::models::{E3StateLite, CurrentRound, GetRoundRequest, WebResultRequest};
+use crate::server::models::{CurrentRound, E3StateLite, GetRoundRequest, WebResultRequest};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
-    config
-        .service(
-            web::scope("/state")
-                .route("/result", web::post().to(get_round_result))
-                .route("/all", web::get().to(get_all_round_results))
-                .route("/lite", web::post().to(get_round_state_lite))
-        );
+    config.service(
+        web::scope("/state")
+            .route("/result", web::post().to(get_round_result))
+            .route("/all", web::get().to(get_all_round_results))
+            .route("/lite", web::post().to(get_round_state_lite)),
+    );
 }
 
 /// Get the result for a given round
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `GetRoundRequest` - The request data containing the round ID
-/// 
+///
 /// # Returns
-/// 
+///
 async fn get_round_result(data: web::Json<GetRoundRequest>) -> impl Responder {
     let incoming = data.into_inner();
-    
+
     match get_e3(incoming.round_id).await {
         Ok((state, _)) => {
             let response: WebResultRequest = state.into();
@@ -38,9 +37,9 @@ async fn get_round_result(data: web::Json<GetRoundRequest>) -> impl Responder {
 }
 
 /// Get all the results for all rounds
-/// 
+///
 /// # Returns
-/// 
+///
 /// * A JSON response containing the results for all rounds
 async fn get_all_round_results() -> impl Responder {
     let round_count = match GLOBAL_DB.get::<CurrentRound>("e3:current_round").await {
@@ -69,13 +68,13 @@ async fn get_all_round_results() -> impl Responder {
 }
 
 /// Get the state for a given round
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `GetRoundRequest` - The request data containing the round ID
-/// 
+///
 /// # Returns
-/// 
+///
 async fn get_round_state_lite(data: web::Json<GetRoundRequest>) -> impl Responder {
     let incoming = data.into_inner();
 

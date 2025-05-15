@@ -1,33 +1,23 @@
 [package]
 name = "net"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-std = { workspace = true, features = ["attributes"] }
+async-std = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 crypto = { workspace = true }
 config = { workspace = true }
 data = { workspace = true }
-libp2p = { workspace = true, features = [
-  "async-std",
-  "gossipsub",
-  "identify",
-  "kad",
-  "macros",
-  "mdns",
-  "ping",
-  "quic",
-  "tokio",
-] }
-tokio = { workspace = true, features = ["full"] }
+libp2p = { workspace = true }
+tokio = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-subscriber = { workspace = true }
 events = { workspace = true }
 anyhow = { workspace = true }
 actix = { workspace = true }

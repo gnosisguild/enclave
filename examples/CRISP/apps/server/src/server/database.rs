@@ -1,12 +1,12 @@
 use super::models::E3;
+use log::error;
 use once_cell::sync::Lazy;
 use rand::Rng;
+use serde::{de::DeserializeOwned, Serialize};
 use sled::Db;
 use std::{error::Error, str, sync::Arc};
-use tokio::sync::RwLock;
-use log::error;
 use thiserror::Error;
-use serde::{Serialize, de::DeserializeOwned};
+use tokio::sync::RwLock;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {
@@ -23,7 +23,9 @@ pub struct SledDB {
 impl SledDB {
     pub fn new(path: &str) -> Result<Self, DatabaseError> {
         let db = sled::open(path)?;
-        Ok(Self { db: Arc::new(RwLock::new(db)) })
+        Ok(Self {
+            db: Arc::new(RwLock::new(db)),
+        })
     }
 
     pub async fn insert<T: Serialize>(&self, key: &str, value: &T) -> Result<(), DatabaseError> {
@@ -43,9 +45,7 @@ impl SledDB {
 }
 
 pub static GLOBAL_DB: Lazy<SledDB> = Lazy::new(|| {
-    let pathdb = std::env::current_dir()
-        .unwrap()
-        .join("database/server");
+    let pathdb = std::env::current_dir().unwrap().join("database/server");
     SledDB::new(pathdb.to_str().unwrap()).unwrap()
 });
 
@@ -60,7 +60,10 @@ pub async fn get_e3(e3_id: u64) -> Result<(E3, String), Box<dyn Error + Send + S
     }
 }
 
-pub async fn update_e3_status(e3_id: u64, status: String) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub async fn update_e3_status(
+    e3_id: u64,
+    status: String,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let key = format!("e3:{}", e3_id);
     let mut e3 = GLOBAL_DB.get::<E3>(&key).await?.unwrap();
     e3.status = status;

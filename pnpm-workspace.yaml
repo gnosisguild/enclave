@@ -2,3 +2,4 @@ packages:
   - packages/evm
   - examples/CRISP
   - examples/CRISP/apps/client
+  - docs

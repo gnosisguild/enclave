@@ -18,7 +18,7 @@ use alloy::{
             },
             Http,
         },
-        ws::WsConnect,
+        ws::{WebSocketConfig, WsConnect},
         Authorization, BoxTransport, Transport,
     },
 };
@@ -176,10 +176,18 @@ impl ProviderConfig {
     }
 
     fn create_ws_connect(&self) -> Result<WsConnect> {
+        let config = WebSocketConfig {
+            max_frame_size: Some(32 * 1024 * 1024),
+            max_message_size: Some(32 * 1024 * 1024),
+            ..Default::default()
+        };
+
         Ok(if let Some(ws_auth) = self.auth.to_ws_auth() {
-            WsConnect::new(self.rpc.as_ws_url()?).with_auth(ws_auth)
-        } else {
             WsConnect::new(self.rpc.as_ws_url()?)
+                .with_auth(ws_auth)
+                .with_config(config)
+        } else {
+            WsConnect::new(self.rpc.as_ws_url()?).with_config(config)
         })
     }
 

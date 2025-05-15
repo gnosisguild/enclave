@@ -1,9 +1,10 @@
 [package]
 name = "voting-core"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-fhe = { workspace = true }
+fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
-compute-provider = { workspace = true }
+compute-provider = { path = "../../../../../packages/compute_provider" }
+commons = { path = "../../../../../packages/commons" }

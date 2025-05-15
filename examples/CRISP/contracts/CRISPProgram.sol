@@ -13,7 +13,7 @@ import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
 
-contract CRISPRisc0 is IE3Program, Ownable {
+contract CRISPProgram is IE3Program, Ownable {
     // Constants
     bytes32 public constant IMAGE_ID = ImageID.VOTING_ID;
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");

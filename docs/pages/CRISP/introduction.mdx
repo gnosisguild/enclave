@@ -1,0 +1,60 @@
+---
+title: 'CRISP Introduction'
+description: ''
+---
+
+# Introduction to CRISP
+CRISP (Coercion-Resistant Impartial Selection Protocol) is a secure protocol for digital decision-making, leveraging fully homomorphic encryption (FHE) and distributed threshold cryptography (DTC) to enable verifiable secret ballots. Built with Enclave, CRISP safeguards democratic systems and decision-making applications against coercion, manipulation, and other vulnerabilities.
+
+This project is a comprehensive example of an E3 Program, designed to demonstrate secure and impartial decision-making processes. It includes a full-stack implementation with a front-end, back-end, smart contracts, and zkVM components, providing a robust framework for developers to explore and extend.
+
+## Why CRISP?
+
+Open ballots are known to produce suboptimal outcomes, exposing participants to bribery and coercion. CRISP mitigates these risks and other vulnerabilities with secret, receipt-free ballots, fostering secure and impartial decision-making environments.
+
+
+## CRISP Overview
+![CRISP Project Structure](/crisp-overview-light.png)
+
+---
+
+### **Client**
+The Client is a React application that serves as the front-end interface for users to interact with the CRISP protocol. It is organized into the following components:
+
+- `/libs/wasm/pkg/`: A WebAssembly library package responsible for encrypting the user's vote before sending it to the server.
+- `/public/`: Static assets such as images and stylesheets.
+- `/src/`: React components and the source code for the application.
+- Configuration files and README for project setup and documentation.
+
+---
+
+### **Server**
+The Server is an Actix backend that handles the core functionality of the CRISP protocol:
+
+- **Voting:** Provides a secure interface for users to cast their votes.
+- **Blockchain Event Listener:** Listens for and responds to events from the Enclave smart contracts.
+- **Compute Provider Invocation:** Calls the Compute Provider to execute the Secure Process inside the RISC Zero zkVM (Zero-Knowledge Virtual Machine) to perform Fully Homomorphic Encryption (FHE) computations.
+- **Result Publishing:** Publishes the computed results back to the blockchain for transparency and immutability.
+
+Aside from the core functionality, the Server module also includes a CLI that can be used to request a new voting round, submit a vote, and publish results.
+
+---
+
+### **RISC Zero**
+CRISP utilizes the RISC Zero zkVM to run its Secure Process and perform FHE computations. This module includes:
+
+- The Secure Process, written in Rust, that performs encrypted computations.
+  - `/apps`: The host application that is responsible for interfacing with the Client and the Server.
+  - `/core`: The common logic shared between the host and the guest program.
+  - `/methods`: The Secure Process that is executed inside the zkVM.
+- Verifier contracts that ensure the integrity and correctness of the computations.
+
+---
+
+### **Compute Provider**
+A helper library designed to interface with the RISC Zero Compute Provider for executing secure computations. It can be used to run any Secure Process within a Compute Provider of your choice (e.g., SP1, Jolt, etc.).
+
+---
+
+### **Web Rust**
+The Web Rust module contains the logic for encrypting data using an FHE public key. Compiled to WebAssembly, it is used by the Client to securely encrypt the user's vote before sending it to the Server for further processing.

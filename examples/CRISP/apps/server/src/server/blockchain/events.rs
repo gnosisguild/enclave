@@ -1,11 +1,11 @@
-use alloy::{
-    rpc::types::Log,
-    sol,
-};
+use alloy::{rpc::types::Log, sol};
 
 use eyre::Result;
 
-use super::handlers::{handle_e3, handle_input_published, handle_plaintext_output_published, handle_ciphertext_output_published, handle_committee_published};
+use super::handlers::{
+    handle_ciphertext_output_published, handle_committee_published, handle_e3,
+    handle_input_published, handle_plaintext_output_published,
+};
 use super::listener::ContractEvent;
 
 sol! {

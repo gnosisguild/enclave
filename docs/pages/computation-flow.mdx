@@ -1,0 +1,101 @@
+---
+title: 'Computation Flow'
+---
+
+## Computation Flow
+
+The computation process within Enclave is decentralized and open, allowing any participant to
+contribute to each phase of execution. This design ensures transparency and flexibility, enabling
+different roles to be fulfilled by various actors, including the application server, Compute
+Providers, or other network participant.
+
+### Phase 1: Request
+
+1. **Define the E3 Program**: The core FHE logic of your application must be written in a supported
+   FHE scheme. Currently, Enclave supports the [fhe.rs](https://github.com/gnosisguild/fhe.rs)
+   implementation of the BFV encryption scheme.
+2. **Choose a Compute Provider**: Your E3 program will likely need to be written to explicitly
+   support your chosen Compute Provider. For our demo application, [CRISP](/CRISP/introduction), we
+   use [Risc Zero](https://www.risczero.com/) as our Compute Provider.
+3. **Specify Parameters**:
+   - Set the threshold (t/n) for the Ciphernode Committee (CiCo), which defines the number of nodes
+     that must coordinate to decrypt the computation output. This can be user-defined or
+     pre-configured based on your application's needs.
+   - Provide any necessary parameters specific to the Compute Provider.
+   - Configure E3 Program parameters, including input submission deadlines and computation duration.
+4. **Submit the Request**: Call `request` on the Enclave contract to publish the request and
+   initialize the E3.
+
+```solidity
+function request(
+        address filter,
+        uint32[2] calldata threshold,
+        uint256[2] calldata startWindow,
+        uint256 duration,
+        IE3Program e3Program,
+        bytes memory e3ProgramParams,
+        bytes memory computeProviderParams
+    ) external payable returns (uint256 e3Id, E3 memory e3)
+```
+
+### Phase 2: Node Selection
+
+Each new request to the Enclave contracts initiates a verifiable sortition process to select a
+Ciphernode Committee (CiCo). The selected Ciphernodes use the E3 Program parameters to determine the
+appropriate Fully Homomorphic Encryption (FHE) scheme, then generate and publish a shared public
+encryption key.
+
+![Node Selection](/node-selection.png)
+
+### Phase 3: Input Window
+
+During this phase, Data Providers — who may include individual users, applications, or institutions
+— encrypt their data to the CiCo's public key and publish commitments to those inputs onchain.
+
+1. **Data Encryption**: Data Providers encrypt their inputs using the CiCo's public key.
+2. **Input Validation**: Data Providers generate several Zero-Knowledge Proofs about their inputs to
+   ensure they are valid for the requested E3. Some of these proofs are generic (e.g., proof of
+   valid encryption) while others will be specific to your application.
+3. **Submit Inputs**: Both encrypted data and ZKPs are submitted to the Enclave contract, which will
+   call the `validate` function on your E3P smart contract. The input hash is then added to a Merkle
+   tree, the root of which can later be used to anchor proofs of correct execution of your E3
+   Program.
+
+   ```solidity
+   function validate(
+        uint256 e3Id,
+        uint256 seed,
+        bytes calldata e3ProgramParams,
+        bytes calldata computeProviderParams
+    )
+        external
+        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator);
+   ```
+
+### Phase 4: Execution
+
+In this phase, the Compute Provider (CP) executes the Secure Process defined in your E3 Program and
+publishes the encrypted output back to Enclave contract.
+
+1. **Execution**: The CP retrieves encrypted inputs and executes the Secure Process defined in your
+   E3 program.
+2. **Publish Output**: Your E3 Program contract must implement a `verify` function that will be
+   invoked by the Enclave contract to publish the ciphertext output of your computation.
+
+   ```solidity
+   function publishCiphertextOutput(
+        uint256 e3Id,
+        bytes memory ciphertextOutput,
+        bytes memory proof
+    ) external returns (bool success);
+   ```
+
+### Phase 5: Decryption
+
+After the ciphertext output is published, the CiCo for the given E3 coordinates to decrypt the
+ciphertext output and publish the resulting plaintext. The plaintext output can be queried from the
+Enclave contract's `getE3()` function.
+
+```solidity
+function getE3(uint256 e3Id) external view returns (E3 memory e3);
+```
