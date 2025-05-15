@@ -36,43 +36,43 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
 
   useEffect(() => {
     if (isRegisteredForCurrentRound && showRegistrationModal) {
-      setShowRegistrationModal(false);
+      setShowRegistrationModal(false)
     }
-  }, [isRegisteredForCurrentRound, showRegistrationModal]);
+  }, [isRegisteredForCurrentRound, showRegistrationModal])
 
   const statusClass = !isEnded ? 'lime' : 'red'
 
   const handleChecked = (selectedPoll: Poll) => {
-    const isAlreadySelected = pollSelected?.value === selectedPoll.value;
+    const isAlreadySelected = pollSelected?.value === selectedPoll.value
 
-    setPollOptions(prevOptions => 
-      prevOptions.map(option => ({ 
-         ...option, 
-         checked: option.value === selectedPoll.value ? !isAlreadySelected : false 
-      }))
-    );
+    setPollOptions((prevOptions) =>
+      prevOptions.map((option) => ({
+        ...option,
+        checked: option.value === selectedPoll.value ? !isAlreadySelected : false,
+      })),
+    )
 
     if (isAlreadySelected) {
-       setPollSelected(null);
-       setNoPollSelected(true);
+      setPollSelected(null)
+      setNoPollSelected(true)
     } else {
-       setPollSelected(selectedPoll);
-       setNoPollSelected(false);
+      setPollSelected(selectedPoll)
+      setNoPollSelected(false)
     }
-  };
+  }
 
   const castVote = async () => {
     if (!user) {
       setOpen(true)
-      return;
+      return
     }
     if (!isRegisteredForCurrentRound) {
-      setShowRegistrationModal(true);
-      return;
+      setShowRegistrationModal(true)
+      return
     }
 
-    await castVoteWithProof(pollSelected);
-  };
+    await castVoteWithProof(pollSelected)
+  }
 
   return (
     <>
@@ -107,15 +107,15 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
             </div>
           )}
           {isCastingVote && (
-            <div className='flex flex-col items-center justify-center max-sm:py-5 space-y-2'>
+            <div className='flex flex-col items-center justify-center space-y-2 max-sm:py-5'>
               <p className='text-base font-bold uppercase text-slate-600/50'>Casting Vote</p>
               <LoadingAnimation isLoading={isCastingVote} />
             </div>
           )}
-          {loading && (<LoadingAnimation isLoading={loading} />)}
+          {loading && <LoadingAnimation isLoading={loading} />}
           <div className=' grid w-full grid-cols-2 gap-4 md:gap-8'>
             {pollOptions.map((poll) => (
-              <div key={poll.label} className='col-span-2 md:col-span-1'>
+              <div data-test-id={`poll-button-${poll.value}`} key={poll.label} className='col-span-2 md:col-span-1'>
                 <Card checked={poll.checked} onChecked={() => handleChecked(poll)}>
                   <p className='inline-block text-6xl leading-none md:text-8xl'>{poll.label}</p>
                 </Card>
@@ -130,17 +130,25 @@ const DailyPollSection: React.FC<DailyPollSectionProps> = ({ loading, endTime })
                 disabled={noPollSelected || loading || !roundState || isEnded || isRegistering || isCastingVote || fetchingMembers}
                 onClick={castVote}
               >
-                {isRegistering ? 'Registering...' : fetchingMembers ? 'Loading Group...' : isCastingVote ? 'Processing Vote...' : 'Cast Vote'}
+                {isRegistering
+                  ? 'Registering...'
+                  : fetchingMembers
+                    ? 'Loading Group...'
+                    : isCastingVote
+                      ? 'Processing Vote...'
+                      : 'Cast Vote'}
               </button>
             </div>
           )}
         </div>
       </div>
-      <RegistrationModal 
+      <RegistrationModal
         isOpen={showRegistrationModal}
         onClose={() => setShowRegistrationModal(false)}
         isRegistering={isRegistering}
-        onRegister={() => { registerIdentityOnContract(); }}
+        onRegister={() => {
+          registerIdentityOnContract()
+        }}
       />
     </>
   )

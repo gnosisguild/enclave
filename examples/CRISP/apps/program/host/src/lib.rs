@@ -45,7 +45,14 @@ impl ComputeProvider for Risc0Provider {
 
         let decoded_journal = receipt.journal.decode().unwrap();
 
-        let seal = groth16::encode(receipt.inner.groth16().unwrap().seal.clone()).unwrap();
+        let seal = if !std::env::var("RISC0_DEV_MODE")
+            .unwrap_or_default()
+            .is_empty()
+        {
+            vec![]
+        } else {
+            groth16::encode(receipt.inner.groth16().unwrap().seal.clone()).unwrap()
+        };
 
         Risc0Output {
             result: decoded_journal,

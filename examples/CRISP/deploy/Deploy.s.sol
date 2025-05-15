@@ -22,7 +22,7 @@ import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {RiscZeroGroth16Verifier} from "risc0/groth16/RiscZeroGroth16Verifier.sol";
 import {ControlID} from "risc0/groth16/ControlID.sol";
 
-import {CRISPProgram} from "../contracts/CRISPProgram.sol";
+import {CRISPRisc0} from "../contracts/CRISPRisc0.sol";
 import {CRISPPolicy} from "../contracts/CRISPPolicy.sol";
 import {CRISPChecker} from "../contracts/CRISPChecker.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
@@ -32,6 +32,7 @@ import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISema
 import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
+import {MockRISC0Verifier} from "../contracts/Mocks/MockRISC0Verifier.sol";
 
 /// @notice Deployment script for the RISC Zero starter project.
 /// @dev Use the following environment variable to control the deployment:
@@ -44,7 +45,7 @@ import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactor
 ///
 /// https://book.getfoundry.sh/tutorials/solidity-scripting
 /// https://book.getfoundry.sh/reference/forge/forge-script
-contract CRISPProgramDeploy is Script {
+contract CRISPRisc0Deploy is Script {
     // Path to deployment config file, relative to the project root.
     string constant CONFIG_FILE = "deploy/config.toml";
 
@@ -60,7 +61,7 @@ contract CRISPProgramDeploy is Script {
         setupVerifier();
 
         // Contracts to Deploy
-        deployCrispProgram();
+        deployCrispRisc0();
 
         vm.stopBroadcast();
     }
@@ -93,7 +94,12 @@ contract CRISPProgramDeploy is Script {
             enclave = IEnclave(enclaveAddress);
         }
 
-        if (address(verifier) == address(0)) {
+        bool useMockEnv = vm.envOr("USE_MOCK_VERIFIER", false);
+        if (useMockEnv) {
+            console2.log("Using MockRISC0Verifier");
+            verifier = new MockRISC0Verifier();
+            console2.log("Deployed MockRISC0Verifier to", address(verifier));
+        } else if (address(verifier) == address(0)) {
             verifier = new RiscZeroGroth16Verifier(
                 ControlID.CONTROL_ROOT,
                 ControlID.BN254_CONTROL_ID
@@ -146,7 +152,7 @@ contract CRISPProgramDeploy is Script {
         return configProfile;
     }
 
-    function deployCrispProgram() private {
+    function deployCrispRisc0() private {
         console2.log("Enclave Address: ", address(enclave));
         console2.log("Verifier Address: ", address(verifier));
 
@@ -176,7 +182,7 @@ contract CRISPProgramDeploy is Script {
             address(inputValidatorFactory)
         );
 
-        CRISPProgram crisp = new CRISPProgram(
+        CRISPRisc0 crisp = new CRISPRisc0(
             enclave,
             verifier,
             semaphore,
@@ -184,6 +190,6 @@ contract CRISPProgramDeploy is Script {
             policyFactory,
             inputValidatorFactory
         );
-        console2.log("Deployed CRISPProgram to", address(crisp));
+        console2.log("Deployed CRISPRisc0 to", address(crisp));
     }
 }
