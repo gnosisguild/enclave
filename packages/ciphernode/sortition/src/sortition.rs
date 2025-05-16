@@ -7,7 +7,7 @@ use events::{
     BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
     Subscribe,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use tracing::{info, instrument, trace};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
@@ -16,6 +16,7 @@ pub struct GetHasNode {
     pub seed: Seed,
     pub address: String,
     pub size: usize,
+    pub chain_id: u64,
 }
 
 pub trait SortitionList<T> {
@@ -83,17 +84,19 @@ impl SortitionList<String> for SortitionModule {
 
 #[derive(Message)]
 #[rtype(result = "Vec<String>")]
-pub struct GetNodes;
+pub struct GetNodes {
+    pub chain_id: u64,
+}
 
 pub struct Sortition {
-    list: Persistable<SortitionModule>,
+    list: Persistable<HashMap<u64, SortitionModule>>,
     bus: Addr<EventBus<EnclaveEvent>>,
 }
 
 #[derive(Debug)]
 pub struct SortitionParams {
     bus: Addr<EventBus<EnclaveEvent>>,
-    list: Persistable<SortitionModule>,
+    list: Persistable<HashMap<u64, SortitionModule>>,
 }
 
 impl Sortition {
@@ -107,9 +110,9 @@ impl Sortition {
     #[instrument(name = "sortition", skip_all)]
     pub async fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        store: Repository<SortitionModule>,
+        store: Repository<HashMap<u64, SortitionModule>>,
     ) -> Result<Addr<Sortition>> {
-        let list = store.load_or_default(SortitionModule::default()).await?;
+        let list = store.load_or_default(HashMap::new()).await?;
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
@@ -119,8 +122,14 @@ impl Sortition {
         Ok(addr)
     }
 
-    pub fn get_nodes(&self) -> Vec<String> {
-        self.list.get().unwrap().nodes.clone().into_iter().collect()
+    pub fn get_nodes(&self, chain_id: u64) -> Result<Vec<String>> {
+        let list_by_chain_id = self.list.get().ok_or(anyhow!(
+            "Could not get sortition's list cache. This should not happen."
+        ))?;
+        let list = list_by_chain_id
+            .get(&chain_id)
+            .ok_or(anyhow!("No list found for chain_id {}", chain_id))?;
+        Ok(list.nodes.clone().into_iter().collect())
     }
 }
 
@@ -145,9 +154,13 @@ impl Handler<CiphernodeAdded> for Sortition {
     #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
         trace!("Adding node: {}", msg.address);
-        match self.list.try_mutate(|mut list| {
-            list.add(msg.address);
-            Ok(list)
+        match self.list.try_mutate(|mut list_map| {
+            list_map
+                .entry(msg.chain_id)
+                .or_insert_with(|| SortitionModule::default())
+                .add(msg.address);
+
+            Ok(list_map)
         }) {
             Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
             _ => (),
@@ -161,9 +174,14 @@ impl Handler<CiphernodeRemoved> for Sortition {
     #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
         info!("Removing node: {}", msg.address);
-        match self.list.try_mutate(|mut list| {
-            list.remove(msg.address);
-            Ok(list)
+        match self.list.try_mutate(|mut list_map| {
+            list_map
+                .get_mut(&msg.chain_id)
+                .ok_or(anyhow!(
+                    "Cannot remove a node from list that does not exist. It appears that the list for chain_id '{}' has not yet been created.", &msg.chain_id
+                ))?
+                .remove(msg.address);
+            Ok(list_map)
         }) {
             Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
             _ => (),
@@ -177,7 +195,13 @@ impl Handler<GetHasNode> for Sortition {
     #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
         self.list
-            .try_with(|list| list.contains(msg.seed, msg.size, msg.address))
+            .try_with(|list_map| {
+                if let Some(entry) = list_map.get(&msg.chain_id) {
+                    return entry.contains(msg.seed, msg.size, msg.address);
+                }
+
+                Ok(false)
+            })
             .unwrap_or_else(|err| {
                 self.bus.err(EnclaveErrorType::Sortition, err);
                 false
@@ -188,7 +212,7 @@ impl Handler<GetHasNode> for Sortition {
 impl Handler<GetNodes> for Sortition {
     type Result = Vec<String>;
 
-    fn handle(&mut self, _msg: GetNodes, _ctx: &mut Self::Context) -> Self::Result {
-        self.get_nodes()
+    fn handle(&mut self, msg: GetNodes, _ctx: &mut Self::Context) -> Self::Result {
+        self.get_nodes(msg.chain_id).unwrap_or(vec![])
     }
 }
