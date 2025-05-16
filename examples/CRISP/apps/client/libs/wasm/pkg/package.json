@@ -1,5 +1,5 @@
 {
-  "name": "crisp-web",
+  "name": "crisp-wasm-crypto",
   "type": "module",
   "version": "0.1.0",
   "repository": {
@@ -7,12 +7,12 @@
     "url": "https://github.com/gnosisguild/enclave"
   },
   "files": [
-    "crisp_web_bg.wasm",
-    "crisp_web.js",
-    "crisp_web.d.ts"
+    "crisp_wasm_crypto_bg.wasm",
+    "crisp_wasm_crypto.js",
+    "crisp_wasm_crypto.d.ts"
   ],
-  "main": "crisp_web.js",
-  "types": "crisp_web.d.ts",
+  "main": "crisp_wasm_crypto.js",
+  "types": "crisp_wasm_crypto.d.ts",
   "sideEffects": [
     "./snippets/*"
   ]
