@@ -42,11 +42,11 @@ fn get_zeroizing_pw_vec(input: Option<String>) -> Result<Zeroizing<Vec<u8>>> {
 
 pub async fn execute(config: &AppConfig, input: Option<String>) -> Result<()> {
     println!("Setting password...");
-    enclave_core::password::create::preflight(config).await?;
+    enclave_core::password::set::preflight(config).await?;
 
     let pw = get_zeroizing_pw_vec(input)?;
 
-    enclave_core::password::create::execute(config, pw).await?;
+    enclave_core::password::set::execute(config, pw).await?;
 
     println!("Password successfully set.");
 

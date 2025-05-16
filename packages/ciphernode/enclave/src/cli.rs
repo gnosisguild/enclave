@@ -114,11 +114,11 @@ impl Cli {
         info!("Config loaded from: {:?}", config.config_file());
 
         if config.autopassword() {
-            enclave_core::password::create::autopassword(&config).await?;
+            enclave_core::password::set::autopassword(&config).await?;
         }
 
         if config.autonetkey() {
-            enclave_core::net::generate::autonetkey(&config).await?;
+            enclave_core::net::keypair::generate::autonetkey(&config).await?;
         }
 
         if config.autowallet() {
