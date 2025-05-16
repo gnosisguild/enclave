@@ -54,8 +54,8 @@ test("CRISP smoke test", async ({
   await metamask.confirmTransaction();
   await page.locator('button:has-text("Cast Vote")').click();
   await page.waitForTimeout(60000);
-  await page.locator('a:has-text("Historic Polls")').click();
-  await expect(page.locator("h1")).toHaveText("Historic Polls");
+  await page.locator('a:has-text("Historic polls")').click();
+  await expect(page.locator("h1")).toHaveText("Historic polls");
   await expect(
     page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3"),
   ).toHaveText("100%");
