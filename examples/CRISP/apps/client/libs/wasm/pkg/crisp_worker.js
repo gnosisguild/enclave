@@ -1,4 +1,4 @@
-import * as WasmInstance from './crisp_web';
+import * as WasmInstance from './crisp_wasm_crypto';
 
 let wasmInstance = null;
 let encryptInstance = null;
@@ -20,7 +20,9 @@ self.onmessage = async function (event) {
                 if (!wasmInstance || !encryptInstance) {
                     await initWasm();
                 }
+                console.log('encrypt_vote', voteId, publicKey)
                 const encryptedVote = encryptInstance.encrypt_vote(voteId, publicKey);
+                console.log('encryptedVote', encryptedVote)
                 self.postMessage({ type: 'encrypt_vote', success: true, encryptedVote });
             } catch (error) {
                 self.postMessage({ type: 'encrypt_vote', success: false, error: error.message });
