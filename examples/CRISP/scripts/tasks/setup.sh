@@ -13,9 +13,6 @@ echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"
 (cd /app/packages/ciphernode && cargo build && cargo install --path ./enclave --force)
-# Can I remove this because it is contained within 'server'?
-# echo "risc0"
-# (cd ./apps/program && cargo build)
 echo "server"
 (cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo build --bin cli && cargo build --bin server)
 echo "crisp-wasm-crypto"
