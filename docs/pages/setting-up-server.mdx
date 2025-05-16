@@ -1,0 +1,89 @@
+---
+title: 'Setting Up An E3 Nudging Server'
+description: ''
+---
+
+# Setting Up an E3 Nudging Server
+
+The end-to-end flow of an Encrypted Execution Environment (E3) involves multiple phases, each of which can be nudged along by anyone. However, to reduce delays and ensure a smooth progression of processes in your application, running a dedicated **E3 Nudging Server** can greatly enhance reliability and quality of service. While the protocol itself is decentralized and open to all, application developers are encouraged to manage this infrastructure for a more seamless experience.
+
+## **What is an E3 Nudging Server?**
+
+An **E3 Nudging Server** is a process designed to ensure the seamless progression of the Enclave protocol. While any party can theoretically nudge an E3 forward, certain critical operations require dependable infratructure for efficient execution, such as:
+
+1. Event Monitoring: Listening for blockchain events.
+2. Input Aggregation: Collecting and managing inputs for computations.
+3. Computation Triggers: Running secure processes in a zkVM or similar environments.
+4. Result Publication: Verifying and submitting outputs to the Enclave smart contracts.
+
+By providing an automated and secure solution, the E3 Nudging Server reduces manual overhead for developers, ensures process continuity, and minimizes delays.
+
+### **Why Use an E3 Nudging Server?**
+
+Enclave relies on external actions to progress through its phases. Without an E3 Nudging Serverr, the following challenges may arise:
+
+- Missed Protocol Events: Key actions like **Key Publish** or **Input Publish** might go unnoticed, stalling the process.
+- Increased Developer Overhead: Manual event handling and protocol nudging require custom infrastructure.
+- Reduced Reliability: Disruptions in protocol execution can lead to delays or errors, impacting user trust.
+
+The E3 Nudging Server ensures:
+
+- Seamless event handling and input collection.
+- Reliable computation triggers in secure environments (e.g., zkVM).
+- Automatic publication of verified results to maintain decentralized integrity
+
+## **Building on Enclave with the Starter Template**
+
+To simplify development, the **Enclave Starter Template** provides a pre-built foundation for developers to interact with the
+protocol, write secure zkVM-based computations, and deploy reliable infrastructure. Template features:
+
+1. **Server Implementation**: An E3 Nudging Server for automating protocol progression.
+2. **zkVM Framework**: Based on
+   [RISC Zero Foundry Template](https://github.com/risc0/risc0-foundry-template), enabling secure, verifiable off-chain computations.
+
+### **How to Use the Starter Template**
+
+#### **1. Setting Up the Server**
+
+The E3 Nudging Server ensures the protocol progresses by listening for events, gathering inputs, and triggering the next steps.
+
+- Clone and build the server:
+
+  ```bash
+  git clone https://github.com/gnosisguild/enclave-starter-template.git
+  cd packages/server
+  cargo build
+  ```
+
+- Implement custom logic if necessary:
+  - Event handlers can be extended to perform application-specific tasks.
+  - Routes and models can be customized to match your application's requirements.
+
+#### **2. Writing E3 Programs**
+
+The E3 Nudging Server interacts with the E3 Program (zkVM logic) to securely process inputs and publish
+verified outputs. Refer to the [**Building an E3 Program**](./write-secure-program.mdx) section of
+the documentation for detailed instructions on:
+
+- Writing the Secure Process logic.
+- Implementing guest programs.
+- Deploying the associated smart contracts.
+
+> **Note:** The zkVM framework follows the
+> [RISC Zero Foundry Template](https://github.com/risc0/risc0-foundry-template). Developers can use
+> the guide linked above to understand the nuances of RISC Zero development.
+
+#### **3. Configuring the Protocol Interaction**
+
+Use the E3 Nudging Server to automate protocol nudging by:
+
+- Monitoring events such as **Key Publish** or **E3 Round Activiation**.
+- Managing custom blockchain interaction logic under the `blockchain` directory.
+
+#### **4. Deploying Smart Contracts**
+
+The E3 Nudging Server publishes computation results to the blockchain using smart contracts. Use the template's pre-built
+contracts as a starting point:
+
+- `CRISPRisc0.sol`: Verifies zkVM proofs and updates the state.
+- Extend or modify contracts as needed to fit your application's logic.

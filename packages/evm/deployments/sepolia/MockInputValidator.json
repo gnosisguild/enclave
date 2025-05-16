@@ -1,16 +1,21 @@
 {
-  "address": "0xd6e450c59c3b4886507e608B39AcAcd1E06C06c6",
+  "address": "0xe2be22b924CAF680500497f5Ba77A927EbdeD1Ae",
   "abi": [
+    {
+      "inputs": [],
+      "name": "InvalidInput",
+      "type": "error"
+    },
     {
       "inputs": [
         {
           "internalType": "address",
-          "name": "",
+          "name": "sender",
           "type": "address"
         },
         {
           "internalType": "bytes",
-          "name": "params",
+          "name": "data",
           "type": "bytes"
         }
       ],
@@ -20,47 +25,58 @@
           "internalType": "bytes",
           "name": "input",
           "type": "bytes"
-        },
-        {
-          "internalType": "bool",
-          "name": "success",
-          "type": "bool"
         }
       ],
       "stateMutability": "pure",
       "type": "function"
     }
   ],
-  "transactionHash": "0x705ce6e389804e65e690745bec7b7bac0d90c32695f816e3b6cbabfe2cda3a97",
+  "transactionHash": "0xe3bc8ded11d3d01c8274925fb6098ead7d18e415696d76147e7ae07cff5e240c",
   "receipt": {
     "to": null,
     "from": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B",
-    "contractAddress": "0xd6e450c59c3b4886507e608B39AcAcd1E06C06c6",
-    "transactionIndex": 19,
-    "gasUsed": "129617",
+    "contractAddress": "0xe2be22b924CAF680500497f5Ba77A927EbdeD1Ae",
+    "transactionIndex": 158,
+    "gasUsed": "133279",
     "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-    "blockHash": "0x4d31dc58493ce869676d3a0ab200329f2037772f5e3319e11ad5cd70646ab749",
-    "transactionHash": "0x705ce6e389804e65e690745bec7b7bac0d90c32695f816e3b6cbabfe2cda3a97",
+    "blockHash": "0x2c7450e1b75de04dc93b47579d785d6f1cbdeefaec14dff79b643a434b7c9d37",
+    "transactionHash": "0xe3bc8ded11d3d01c8274925fb6098ead7d18e415696d76147e7ae07cff5e240c",
     "logs": [],
-    "blockNumber": 6982719,
-    "cumulativeGasUsed": "4540546",
+    "blockNumber": 8332812,
+    "cumulativeGasUsed": "15860788",
     "status": 1,
     "byzantium": true
   },
   "args": [],
-  "numDeployments": 1,
-  "solcInputHash": "c9b7037486bd8b1125ffad462d6531cb",
-  "metadata": "{\"compiler\":{\"version\":\"0.8.27+commit.40a35a09\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"params\",\"type\":\"bytes\"}],\"name\":\"validate\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"input\",\"type\":\"bytes\"},{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/test/MockInputValidator.sol\":\"MockInputValidator\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"none\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":800},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/interfaces/IInputValidator.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\ninterface IInputValidator {\\n    /// @notice This function should be called by the Enclave contract to validate the input parameters.\\n    /// @param params ABI encoded input parameters.\\n    /// @return input The input data to be published.\\n    /// @return success Whether the input parameters are valid.\\n    function validate(\\n        address sender,\\n        bytes memory params\\n    ) external returns (bytes memory input, bool success);\\n}\\n\",\"keccak256\":\"0xb36d367543af680b61d0ce6b2a28045f3e8fae5753e8f6ba245752609ff2bb4a\",\"license\":\"LGPL-3.0-only\"},\"contracts/test/MockInputValidator.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\nimport { IInputValidator } from \\\"../interfaces/IInputValidator.sol\\\";\\n\\ncontract MockInputValidator is IInputValidator {\\n    function validate(\\n        address,\\n        bytes memory params\\n    ) external pure returns (bytes memory input, bool success) {\\n        input = params;\\n\\n        if (input.length == 3) {\\n            success = false;\\n        } else {\\n            success = true;\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0x5cc01d27a2ee82ed07350b0a801146d831f9d63af9771989fb66600745d4287d\",\"license\":\"LGPL-3.0-only\"}},\"version\":1}",
-  "bytecode": "0x60808060405234601557610161908161001b8239f35b600080fdfe6080600436101561000f57600080fd5b60003560e01c63caf927851461002457600080fd5b346101395760403660031901126101395760043573ffffffffffffffffffffffffffffffffffffffff8116036101395760243567ffffffffffffffff811161013957366023820112156101395780600401359067ffffffffffffffff821161013e57601f8201601f19908116603f0116830167ffffffffffffffff81118482101761013e576040528183523660248383010111610139578160009260246020930183860137830101528051600303610131576000905b60405180926040825282519283604084015260005b84811061011957505091606092600084838501015215156020830152601f80199101168101030190f35b602082820181015160608884010152869450016100ef565b6001906100da565b600080fd5b634e487b7160e01b600052604160045260246000fdfea164736f6c634300081b000a",
-  "deployedBytecode": "0x6080600436101561000f57600080fd5b60003560e01c63caf927851461002457600080fd5b346101395760403660031901126101395760043573ffffffffffffffffffffffffffffffffffffffff8116036101395760243567ffffffffffffffff811161013957366023820112156101395780600401359067ffffffffffffffff821161013e57601f8201601f19908116603f0116830167ffffffffffffffff81118482101761013e576040528183523660248383010111610139578160009260246020930183860137830101528051600303610131576000905b60405180926040825282519283604084015260005b84811061011957505091606092600084838501015215156020830152601f80199101168101030190f35b602082820181015160608884010152869450016100ef565b6001906100da565b600080fd5b634e487b7160e01b600052604160045260246000fdfea164736f6c634300081b000a",
+  "numDeployments": 2,
+  "solcInputHash": "f32a0aa4ee06fa210859a817cc9dafc5",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.27+commit.40a35a09\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"InvalidInput\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"validate\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"input\",\"type\":\"bytes\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{\"validate(address,bytes)\":{\"params\":{\"data\":\"The input to be verified.\",\"sender\":\"The account that is submitting the input.\"},\"returns\":{\"input\":\"The decoded, policy-approved application payload.\"}}},\"title\":\"MockInputValidator.\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"validate(address,bytes)\":{\"notice\":\"Validates input\"}},\"notice\":\"Enclave Input Validator\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/test/MockInputValidator.sol\":\"MockInputValidator\"},\"evmVersion\":\"paris\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"none\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":800},\"remappings\":[],\"viaIR\":true},\"sources\":{\"contracts/interfaces/IInputValidator.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\ninterface IInputValidator {\\n    /// @notice This function should be called by the Enclave contract to validate the\\n    /// input of a computation.\\n    /// @param sender The account that is submitting the input.\\n    /// @param data The input to be verified.\\n    /// @return input The decoded, policy-approved application payload.\\n    function validate(\\n        address sender,\\n        bytes memory data\\n    ) external returns (bytes memory input);\\n}\\n\",\"keccak256\":\"0x20d4016bd59c317c5571cfe6c3e8f46cbabddc0b926dc64019eeae8d29788653\",\"license\":\"LGPL-3.0-only\"},\"contracts/test/MockInputValidator.sol\":{\"content\":\"// SPDX-License-Identifier: LGPL-3.0-only\\npragma solidity >=0.8.27;\\n\\nimport { IInputValidator } from \\\"../interfaces/IInputValidator.sol\\\";\\n\\n/// @title MockInputValidator.\\n/// @notice Enclave Input Validator\\ncontract MockInputValidator is IInputValidator {\\n    error InvalidInput();\\n\\n    /// @notice Validates input\\n    /// @param sender The account that is submitting the input.\\n    /// @param data The input to be verified.\\n    /// @return input The decoded, policy-approved application payload.\\n    function validate(\\n        address sender,\\n        bytes memory data\\n    ) external pure returns (bytes memory input) {\\n        if (data.length == 3 || sender == address(0)) {\\n            revert InvalidInput();\\n        }\\n\\n        input = data;\\n    }\\n}\\n\",\"keccak256\":\"0x59f5459aa10a90d47c6971e4bc66781539cb71734fa6817f447a8118603cd4cf\",\"license\":\"LGPL-3.0-only\"}},\"version\":1}",
+  "bytecode": "0x60808060405234601557610172908161001b8239f35b600080fdfe6080600436101561000f57600080fd5b60003560e01c63caf927851461002457600080fd5b3461014a57604036600319011261014a5760043573ffffffffffffffffffffffffffffffffffffffff811680910361014a5760243567ffffffffffffffff811161014a573660238201121561014a5780600401359067ffffffffffffffff821161014f57601f8201601f19908116603f0116840167ffffffffffffffff81118582101761014f57604052818452366024838301011161014a578160009260246020930183870137840101526003825114908115610141575b506101305760405190602082528181519182602083015260005b8381106101185750508160006040809484010152601f80199101168101030190f35b602082820181015160408784010152859350016100f6565b63b4fa3fb360e01b60005260046000fd5b905015386100dc565b600080fd5b634e487b7160e01b600052604160045260246000fdfea164736f6c634300081b000a",
+  "deployedBytecode": "0x6080600436101561000f57600080fd5b60003560e01c63caf927851461002457600080fd5b3461014a57604036600319011261014a5760043573ffffffffffffffffffffffffffffffffffffffff811680910361014a5760243567ffffffffffffffff811161014a573660238201121561014a5780600401359067ffffffffffffffff821161014f57601f8201601f19908116603f0116840167ffffffffffffffff81118582101761014f57604052818452366024838301011161014a578160009260246020930183870137840101526003825114908115610141575b506101305760405190602082528181519182602083015260005b8381106101185750508160006040809484010152601f80199101168101030190f35b602082820181015160408784010152859350016100f6565b63b4fa3fb360e01b60005260046000fd5b905015386100dc565b600080fd5b634e487b7160e01b600052604160045260246000fdfea164736f6c634300081b000a",
   "devdoc": {
     "kind": "dev",
-    "methods": {},
+    "methods": {
+      "validate(address,bytes)": {
+        "params": {
+          "data": "The input to be verified.",
+          "sender": "The account that is submitting the input."
+        },
+        "returns": {
+          "input": "The decoded, policy-approved application payload."
+        }
+      }
+    },
+    "title": "MockInputValidator.",
     "version": 1
   },
   "userdoc": {
     "kind": "user",
-    "methods": {},
+    "methods": {
+      "validate(address,bytes)": {
+        "notice": "Validates input"
+      }
+    },
+    "notice": "Enclave Input Validator",
     "version": 1
   },
   "storageLayout": {
