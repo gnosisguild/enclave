@@ -29,7 +29,7 @@ fi
 
 # Set password and private key
 echo "Setting password"
-enclave password create --config "$CONFIG_FILE" --password "$PASSWORD"
+enclave password set --config "$CONFIG_FILE" --password "$PASSWORD"
 
 # Set network private key
 echo "Setting network private key"
@@ -40,7 +40,7 @@ if [ "$AGGREGATOR" = "true" ]; then
     enclave wallet set --config "$CONFIG_FILE" --private-key "$PRIVATE_KEY"
 
     echo "Starting aggregator"
-    exec enclave aggregator start -v --config "$CONFIG_FILE"
+    exec enclave start -v --config "$CONFIG_FILE"
 else
     echo "Starting Ciphernode"
     exec enclave start -v --config "$CONFIG_FILE"
