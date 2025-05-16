@@ -60,6 +60,6 @@ test("CRISP smoke test", async ({
     page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3"),
   ).toHaveText("100%");
   await expect(
-    page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-1']"),
+    page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-1'] h3"),
   ).toHaveText("0%");
 });
