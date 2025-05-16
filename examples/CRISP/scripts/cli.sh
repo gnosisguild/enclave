@@ -2,5 +2,5 @@
 
 set -e
 
-./scripts/tasks/dockerize.sh ./scripts/tasks/cli.sh $@
+./scripts/tasks/dockerize.sh ./scripts/tasks/cli.sh "$@"
 
