@@ -95,6 +95,12 @@ contract CRISPProgram is IE3Program, Ownable {
         imageId = _imageId;
     }
 
+    /// @notice Set the RISC Zero verifier address
+    /// @param _verifier The new RISC Zero verifier address
+    function setVerifier(IRiscZeroVerifier _verifier) external onlyOwner {
+        verifier = _verifier;
+    }
+
     /// @notice Register a Member to the semaphore group
     /// @param e3Id The E3 program ID
     /// @param identityCommitment The identity commitment
