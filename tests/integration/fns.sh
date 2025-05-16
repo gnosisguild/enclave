@@ -89,10 +89,10 @@ waiton-files() {
   done
 }
 
-enclave_password_create() {
+enclave_password_set() {
   local name="$1"
   local password="$2"
-  $ENCLAVE_BIN password create \
+  $ENCLAVE_BIN password set \
     --name $name \
     --config "$SCRIPT_DIR/enclave.config.yaml" \
     --password "$password"
