@@ -4,7 +4,7 @@ use enclave_core::init;
 use tracing::instrument;
 
 use crate::net;
-use crate::net::NetCommands;
+use crate::net::{NetCommands, NetKeypairCommands};
 use crate::password;
 use crate::password::PasswordCommands;
 
@@ -53,18 +53,17 @@ pub async fn execute(
     let config = init::execute(rpc_url, eth_address).await?;
 
     password::execute(
-        PasswordCommands::Create {
+        PasswordCommands::Set {
             password,
-            overwrite: true,
         },
         &config,
     )
     .await?;
 
     if generate_net_keypair {
-        net::execute(net::NetCommands::GenerateKey, &config).await?;
+        net::execute(NetCommands::Keypair { command: NetKeypairCommands::Generate }, &config).await?;
     } else {
-        net::execute(NetCommands::SetKey { net_keypair }, &config).await?;
+        net::execute(NetCommands::Keypair { command: NetKeypairCommands::Set { net_keypair } }, &config).await?;
     }
 
     println!("Enclave configuration successfully created!");

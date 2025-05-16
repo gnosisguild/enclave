@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use crate::helpers::telemetry::setup_tracing;
 use crate::net;
 use crate::net::NetCommands;
