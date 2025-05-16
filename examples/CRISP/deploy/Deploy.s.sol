@@ -33,6 +33,7 @@ import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
 import {MockRISC0Verifier} from "../contracts/Mocks/MockRISC0Verifier.sol";
+import {ImageID} from "../contracts/ImageID.sol";
 
 /// @notice Deployment script for the RISC Zero starter project.
 /// @dev Use the following environment variable to control the deployment:
@@ -188,7 +189,8 @@ contract CRISPProgramDeploy is Script {
             semaphore,
             checkerFactory,
             policyFactory,
-            inputValidatorFactory
+            inputValidatorFactory,
+            ImageID.VOTING_ID
         );
         console2.log("Deployed CRISPProgram to", address(crisp));
     }
