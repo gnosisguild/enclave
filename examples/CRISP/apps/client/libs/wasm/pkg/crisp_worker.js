@@ -1,4 +1,4 @@
-import * as WasmInstance from './crisp_web';
+import * as WasmInstance from './crisp_wasm_crypto';
 
 let wasmInstance = null;
 let encryptInstance = null;

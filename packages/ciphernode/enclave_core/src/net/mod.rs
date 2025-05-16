@@ -1,3 +1,2 @@
-pub mod generate;
-pub mod purge;
-pub mod set;
+pub mod keypair;
+pub mod peer_id;

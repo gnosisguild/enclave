@@ -53,9 +53,9 @@ You can now setup your wallet if you have your node configured for writing to th
 $ enclave wallet set --private-key "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 ```
 
-_*NOTE: do not use the above private key as this is obviously public and all funds will be lost_
+_\*NOTE: do not use the above private key as this is obviously public and all funds will be lost_
 
-## Configuration 
+## Configuration
 
 Enclave is configured using a configuration file. By default this file is located under `~/.config/enclave/config.yaml`
 
@@ -81,7 +81,7 @@ data_dir: "~/.local/share/enclave"
 
 ### Setting a relative folder as a config dir
 
-You may set a relative folder for your config and data dirs. 
+You may set a relative folder for your config and data dirs.
 
 ```
 # /path/to/config.yaml
@@ -112,7 +112,7 @@ Your encryption password is required to encrypt sensitive data within the databa
 ## Provide your password using the commandline
 
 ```
-> enclave password create
+> enclave password set
 
 Please enter a new password:
 ```
@@ -145,5 +145,3 @@ You can change the location of your keyfile by using the `key_file` option withi
 # ~/.config/enclave/config.yaml
 key_file: "/path/to/enclave/key"
 ```
-
-

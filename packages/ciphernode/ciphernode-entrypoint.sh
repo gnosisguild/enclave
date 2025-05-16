@@ -29,7 +29,7 @@ fi
 
 # Set password and private key
 echo "Setting password"
-enclave password create --config "$CONFIG_FILE" --password "$PASSWORD"
+enclave password set --config "$CONFIG_FILE" --password "$PASSWORD"
 
 # Set network private key
 echo "Setting network private key"

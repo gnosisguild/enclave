@@ -5,22 +5,23 @@ use zeroize::Zeroizing;
 
 use crate::helpers::rand::generate_random_bytes;
 
-pub async fn preflight(config: &AppConfig, overwrite: bool) -> Result<()> {
+pub async fn preflight(config: &AppConfig) -> Result<()> {
     let key_file = config.key_file();
     let pm = FilePasswordManager::new(key_file);
 
-    if !overwrite && pm.is_set() {
-        bail!("Keyfile already exists. Refusing to overwrite. Try using `enclave password overwrite` or `enclave password delete` in order to change or delete your password.")
+    if pm.is_set() {
+        bail!("Keyfile already exists. Try using `enclave password set` to set a new password or `enclave password delete` to remove the existing one.")
     }
 
     Ok(())
 }
 
-pub async fn execute(config: &AppConfig, pw: Zeroizing<Vec<u8>>, overwrite: bool) -> Result<()> {
+pub async fn execute(config: &AppConfig, pw: Zeroizing<Vec<u8>>) -> Result<()> {
     let key_file = config.key_file();
     let mut pm = FilePasswordManager::new(key_file);
 
-    if overwrite && pm.is_set() {
+    // If a password exists, delete it first
+    if pm.is_set() {
         pm.delete_key().await?;
     }
 
@@ -34,7 +35,7 @@ pub async fn autopassword(config: &AppConfig) -> Result<()> {
     let pm = FilePasswordManager::new(key_file);
     if !pm.is_set() {
         let pw = generate_random_bytes(128);
-        execute(config, pw.into(), false).await?;
+        execute(config, pw.into()).await?;
     }
     Ok(())
 }
