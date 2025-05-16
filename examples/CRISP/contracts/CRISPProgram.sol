@@ -2,7 +2,6 @@
 pragma solidity >=0.8.27;
 
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
-import {ImageID} from "./ImageID.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
 import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
@@ -15,7 +14,6 @@ import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
 
 contract CRISPProgram is IE3Program, Ownable {
     // Constants
-    bytes32 public constant IMAGE_ID = ImageID.VOTING_ID;
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
     // State variables
@@ -26,6 +24,7 @@ contract CRISPProgram is IE3Program, Ownable {
     CRISPPolicyFactory private immutable POLICY_FACTORY;
     CRISPInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
     uint8 public constant INPUT_LIMIT = 100;
+    bytes32 public imageId;
 
     // Mappings
     mapping(address => bool) public authorizedContracts;
@@ -57,13 +56,15 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @param _checkerFactory The checker factory address
     /// @param _policyFactory The policy factory address
     /// @param _inputValidatorFactory The input validator factory address
+    /// @param _imageId The image ID for the guest program
     constructor(
         IEnclave _enclave,
         IRiscZeroVerifier _verifier,
         ISemaphore _semaphore,
         CRISPCheckerFactory _checkerFactory,
         CRISPPolicyFactory _policyFactory,
-        CRISPInputValidatorFactory _inputValidatorFactory
+        CRISPInputValidatorFactory _inputValidatorFactory,
+        bytes32 _imageId
     ) Ownable(msg.sender) {
         require(address(_enclave) != address(0), EnclaveAddressZero());
         require(address(_verifier) != address(0), VerifierAddressZero());
@@ -85,6 +86,13 @@ contract CRISPProgram is IE3Program, Ownable {
         POLICY_FACTORY = _policyFactory;
         INPUT_VALIDATOR_FACTORY = _inputValidatorFactory;
         authorizedContracts[address(_enclave)] = true;
+        imageId = _imageId;
+    }
+
+    /// @notice Set the Image ID for the guest program
+    /// @param _imageId The new image ID.
+    function setImageId(bytes32 _imageId) external onlyOwner {
+        imageId = _imageId;
     }
 
     /// @notice Register a Member to the semaphore group
@@ -161,7 +169,7 @@ contract CRISPProgram is IE3Program, Ownable {
         encodeLengthPrefixAndHash(journal, 132, paramsHashes[e3Id]);
         encodeLengthPrefixAndHash(journal, 264, inputRoot);
 
-        verifier.verify(proof, IMAGE_ID, sha256(journal));
+        verifier.verify(proof, imageId, sha256(journal));
         return true;
     }
 
