@@ -20,9 +20,7 @@ self.onmessage = async function (event) {
                 if (!wasmInstance || !encryptInstance) {
                     await initWasm();
                 }
-                console.log('encrypt_vote', voteId, publicKey)
                 const encryptedVote = encryptInstance.encrypt_vote(voteId, publicKey);
-                console.log('encryptedVote', encryptedVote)
                 self.postMessage({ type: 'encrypt_vote', success: true, encryptedVote });
             } catch (error) {
                 self.postMessage({ type: 'encrypt_vote', success: false, error: error.message });
