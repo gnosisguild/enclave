@@ -2,7 +2,7 @@ use anyhow::*;
 use clap::Subcommand;
 use config::AppConfig;
 
-use crate::{password_set, password_delete};
+use crate::{password_delete, password_set};
 
 #[derive(Subcommand, Debug)]
 pub enum PasswordCommands {

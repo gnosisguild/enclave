@@ -51,4 +51,4 @@ pub async fn execute(config: &AppConfig, input: Option<String>) -> Result<()> {
     println!("Password successfully set.");
 
     Ok(())
-} 
+}

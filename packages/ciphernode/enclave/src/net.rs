@@ -42,7 +42,9 @@ pub async fn execute(command: NetCommands, config: &AppConfig) -> Result<()> {
     match command {
         NetCommands::Keypair { command } => match command {
             NetKeypairCommands::Generate => net_generate::execute(&config).await?,
-            NetKeypairCommands::Set { net_keypair } => net_set::execute(&config, net_keypair).await?,
+            NetKeypairCommands::Set { net_keypair } => {
+                net_set::execute(&config, net_keypair).await?
+            }
         },
         NetCommands::PeerId { command } => match command {
             NetPeerIdCommands::Purge => net_purge::execute(&config).await?,

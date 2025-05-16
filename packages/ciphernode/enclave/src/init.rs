@@ -52,18 +52,24 @@ pub async fn execute(
 
     let config = init::execute(rpc_url, eth_address).await?;
 
-    password::execute(
-        PasswordCommands::Set {
-            password,
-        },
-        &config,
-    )
-    .await?;
+    password::execute(PasswordCommands::Set { password }, &config).await?;
 
     if generate_net_keypair {
-        net::execute(NetCommands::Keypair { command: NetKeypairCommands::Generate }, &config).await?;
+        net::execute(
+            NetCommands::Keypair {
+                command: NetKeypairCommands::Generate,
+            },
+            &config,
+        )
+        .await?;
     } else {
-        net::execute(NetCommands::Keypair { command: NetKeypairCommands::Set { net_keypair } }, &config).await?;
+        net::execute(
+            NetCommands::Keypair {
+                command: NetKeypairCommands::Set { net_keypair },
+            },
+            &config,
+        )
+        .await?;
     }
 
     println!("Enclave configuration successfully created!");
