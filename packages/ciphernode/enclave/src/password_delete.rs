@@ -4,27 +4,9 @@ use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Confirm};
 use zeroize::Zeroize;
 
-pub enum DeleteMode {
-    Delete,
-    Overwrite,
-}
-
-impl DeleteMode {
-    fn to_string(&self) -> String {
-        match self {
-            DeleteMode::Delete => "delete".to_owned(),
-            DeleteMode::Overwrite => "overwrite".to_owned(),
-        }
-    }
-}
-
-pub async fn prompt_delete(config: &AppConfig, delete_mode: DeleteMode) -> Result<bool> {
-    let mode = delete_mode.to_string();
-
+pub async fn prompt_delete(config: &AppConfig) -> Result<bool> {
     if !Confirm::with_theme(&ColorfulTheme::default())
-        .with_prompt(format!(
-            "Are you sure you want to {mode} the key? This action cannot be undone."
-        ))
+        .with_prompt("Are you sure you want to delete the key? This action cannot be undone.")
         .default(false)
         .interact()?
     {
@@ -48,9 +30,9 @@ pub async fn prompt_delete(config: &AppConfig, delete_mode: DeleteMode) -> Resul
 }
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
-    if prompt_delete(config, DeleteMode::Delete).await? {
+    if prompt_delete(config).await? {
         enclave_core::password::delete::execute(config).await?;
-        println!("Key successfully deleted.");
+        println!("Password successfully deleted.");
     } else {
         println!("Operation cancelled.");
     }
