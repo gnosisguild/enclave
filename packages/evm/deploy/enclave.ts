@@ -1,3 +1,4 @@
+import { ethers } from "hardhat";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { PoseidonT3, proxy } from "poseidon-solidity";
@@ -36,10 +37,19 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   }
 
   // Deploy Enclave contract
+  const polynomial_degree = ethers.toBigInt(2048);
+  const plaintext_modulus = ethers.toBigInt(1032193);
+  const moduli = [ethers.toBigInt("4503599626321921")]; // 0x3FFFFFFF000001
+
+  // Encode just the struct (NOT the function selector)
+  const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
+    ["uint256", "uint256", "uint256[]"],
+    [polynomial_degree, plaintext_modulus, moduli],
+  );
 
   const enclave = await deploy("Enclave", {
     from: deployer,
-    args: [deployer, addressOne, THIRTY_DAYS_IN_SECONDS],
+    args: [deployer, addressOne, THIRTY_DAYS_IN_SECONDS, [encoded]],
     log: true,
     libraries: {
       PoseidonT3: PoseidonT3.address,
