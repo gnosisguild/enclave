@@ -95,7 +95,7 @@ pub struct E3StateLite {
     pub duration: u64,
     pub expiration: u64,
     pub start_block: u64,
-
+  
     pub committee_public_key: Vec<u8>,
     pub emojis: [String; 2],
 }

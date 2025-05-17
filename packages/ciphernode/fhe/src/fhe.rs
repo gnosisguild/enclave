@@ -1,11 +1,12 @@
 use super::set_up_crp;
 use anyhow::*;
 use async_trait::async_trait;
-use commons::bfv::{build_bfv_params_arc, decode_bfv_params_arc};
 use data::{FromSnapshotWithParams, Snapshot};
 use events::{OrderedSet, Seed};
 use fhe_rs::{
-    bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
+    bfv::{
+        BfvParameters, BfvParametersBuilder, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
+    },
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
 use fhe_traits::{Deserialize, DeserializeParametrized, FheDecoder, Serialize};
@@ -43,7 +44,7 @@ impl Fhe {
     }
 
     pub fn from_encoded(bytes: &[u8], seed: Seed, rng: SharedRng) -> Result<Self> {
-        let params = decode_bfv_params_arc(bytes);
+        let params = Arc::new(BfvParameters::try_deserialize(bytes)?);
         let crp = set_up_crp(
             params.clone(),
             Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
@@ -58,7 +59,11 @@ impl Fhe {
         crp: &[u8],
         rng: Arc<Mutex<ChaCha20Rng>>,
     ) -> Result<Self> {
-        let params = build_bfv_params_arc(degree, plaintext_modulus, moduli);
+        let params = BfvParametersBuilder::new()
+            .set_degree(degree)
+            .set_plaintext_modulus(plaintext_modulus)
+            .set_moduli(moduli)
+            .build_arc()?;
 
         Ok(Fhe::new(
             params.clone(),
