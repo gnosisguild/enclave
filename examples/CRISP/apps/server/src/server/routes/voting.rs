@@ -1,16 +1,16 @@
-use actix_web::{web, HttpResponse, Responder};
-use log::info;
-use alloy::{
-    dyn_abi::DynSolValue,
-    primitives::{Bytes, U256},
-};
-use eyre::Error;
 use crate::server::{
     blockchain::relayer::EnclaveContract,
     config::CONFIG,
     database::{get_e3, GLOBAL_DB},
     models::{EncryptedVote, VoteResponse, VoteResponseStatus, E3},
 };
+use actix_web::{web, HttpResponse, Responder};
+use alloy::{
+    dyn_abi::DynSolValue,
+    primitives::{Bytes, U256},
+};
+use eyre::Error;
+use log::info;
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -46,7 +46,9 @@ async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Respon
     let encoded_params = Bytes::from(params_value.abi_encode_params());
 
     // Broadcast vote to blockchain
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await.unwrap();
+    let contract = EnclaveContract::new(CONFIG.enclave_address.clone())
+        .await
+        .unwrap();
     match contract.publish_input(e3_id, encoded_params).await {
         Ok(hash) => HttpResponse::Ok().json(VoteResponse {
             status: VoteResponseStatus::Success,
