@@ -134,6 +134,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         }
         Err(e) => error!("Error checking E3 Program enabled: {:?}", e),
     }
+
     info!("Generating parameters...");
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
     let params = encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli));
