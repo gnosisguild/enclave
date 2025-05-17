@@ -43,7 +43,7 @@ You can deploy your contracts and run an end-to-end test or demo as follows:
 4. Deploy your contract by running:
 
     ```bash
-    FOUNDRY_PROFILE=local forge script --rpc-url http://localhost:8545 --broadcast deploy/Deploy.s.sol
+    FOUNDRY_PROFILE=local USE_MOCK_VERIFIER=true forge script --rpc-url http://localhost:8545 --broadcast deploy/Deploy.s.sol
     ```
 
     This command should output something similar to:

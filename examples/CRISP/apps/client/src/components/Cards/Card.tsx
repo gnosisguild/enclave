@@ -29,6 +29,7 @@ const Card: React.FC<CardProps> = ({ children, isActive, isDetails, checked, onC
 
   return (
     <div
+      data-test-id='card'
       className={`
         h-full w-full
         cursor-pointer

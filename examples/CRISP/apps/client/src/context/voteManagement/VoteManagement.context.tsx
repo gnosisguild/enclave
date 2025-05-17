@@ -53,15 +53,11 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     isFetchingMembers: fetchingMembers,
     isRegistering,
     isCommitted: isRegisteredForCurrentRound,
-    registerIdentity: registerIdentityOnContract
-  } = useSemaphoreGroupManagement(
-    roundState?.id,
-    roundState?.start_block,
-    semaphoreIdentity
-  );
+    registerIdentity: registerIdentityOnContract,
+  } = useSemaphoreGroupManagement(roundState?.id, roundState?.start_block, semaphoreIdentity)
 
   const initialLoad = async () => {
-    console.log("Loading wasm");
+    console.log('Loading wasm')
     const currentRound = await getCurrentRound()
     if (currentRound) {
       await getRoundStateLite(currentRound.id)
@@ -76,22 +72,22 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
   }
 
   const getRoundStateLite = async (roundCount: number) => {
-    const fetchedRoundState = await getRoundStateLiteRequest(roundCount);
+    const fetchedRoundState = await getRoundStateLiteRequest(roundCount)
 
     if (fetchedRoundState?.committee_public_key.length === 1 && fetchedRoundState.committee_public_key[0] === 0) {
       handleGenericError('getRoundStateLite', {
         message: 'Enclave server failed generating the necessary pk bytes',
         name: 'getRoundStateLite',
-      });
+      })
     }
     if (fetchedRoundState) {
-      const startBlockNumber = Number(fetchedRoundState.start_block);
-      setRoundState({ ...fetchedRoundState, start_block: startBlockNumber });
-      setVotingRound({ round_id: fetchedRoundState.id, pk_bytes: fetchedRoundState.committee_public_key });
-      setPollOptions(generatePoll({ round_id: fetchedRoundState.id, emojis: fetchedRoundState.emojis }));
-      setRoundEndDate(convertTimestampToDate(fetchedRoundState.start_time, fetchedRoundState.duration));
+      const startBlockNumber = Number(fetchedRoundState.start_block)
+      setRoundState({ ...fetchedRoundState, start_block: startBlockNumber })
+      setVotingRound({ round_id: fetchedRoundState.id, pk_bytes: fetchedRoundState.committee_public_key })
+      setPollOptions(generatePoll({ round_id: fetchedRoundState.id, emojis: fetchedRoundState.emojis }))
+      setRoundEndDate(convertTimestampToDate(fetchedRoundState.start_time, fetchedRoundState.duration))
     }
-  };
+  }
 
   const getPastPolls = async () => {
     try {
@@ -116,20 +112,21 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
 
   useEffect(() => {
     if (!(votingRound?.round_id == null) && user?.address) {
-      const seedString = `semaphore-identity-${user.address}-${votingRound.round_id}`;
+      // TODO: important: generate this from signature entropy and store encrypted in browser storage based on a password
+      const seedString = `semaphore-identity-${user.address}-${votingRound.round_id}`
       try {
-        const identity = new Identity(seedString);
-        setSemaphoreIdentity(identity);
-        console.log('Deterministic Semaphore identity generated.');
+        const identity = new Identity(seedString)
+        setSemaphoreIdentity(identity)
+        console.log('Deterministic Semaphore identity generated.')
       } catch (error) {
-        console.error('Failed to generate deterministic Semaphore identity.', error);
-        setSemaphoreIdentity(null);
+        console.error('Failed to generate deterministic Semaphore identity.', error)
+        setSemaphoreIdentity(null)
       }
     } else {
-      setSemaphoreIdentity(null);
-      console.log('No round ID or user address found, Semaphore identity set to null.');
+      setSemaphoreIdentity(null)
+      console.log('No round ID or user address found, Semaphore identity set to null.')
     }
-  }, [user?.address, votingRound?.round_id]);
+  }, [user?.address, votingRound?.round_id])
 
   useEffect(() => {
     if (isConnected && address) {

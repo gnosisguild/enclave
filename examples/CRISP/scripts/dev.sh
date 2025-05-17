@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# This script will launch all static components so that someone can run the CRISP protocol locally
-set -euxo pipefail
+set -e
 
-docker compose up -d # ensure our container is running in order to have dev persistence and caching 
-docker compose exec enclave-dev ./scripts/tasks/dev.sh
+./scripts/tasks/dockerize.sh ./scripts/tasks/dev.sh
+

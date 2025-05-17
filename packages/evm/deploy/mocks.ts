@@ -5,7 +5,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  await deploy("MockComputeProvider", {
+  const computeProvider = await deploy("MockComputeProvider", {
     from: deployer,
     args: [],
     log: true,
@@ -23,11 +23,20 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  await deploy("MockE3Program", {
+  const mockE3Program = await deploy("MockE3Program", {
     from: deployer,
     args: [mockInputValidator.address],
     log: true,
   });
+
+  console.log(`
+MockDeployments:
+----------------------------------------------------------------------
+MockComputeProvider:${computeProvider.address}
+MockDecryptionVerifier:${mockDecryptionVerifier.address}
+MockInputValidator:${mockInputValidator.address}
+MockE3Program:${mockE3Program.address}
+`);
 
   // Set up MockDecryptionVerifier in Enclave contract
   const enclaveDeployment = await hre.deployments.get("Enclave");

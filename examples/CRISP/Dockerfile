@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 # Set environment variables
-ENV RUST_VERSION=1.85.1 \
+ENV RUST_VERSION=1.85.0 \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
 # Install dependencies
@@ -21,12 +21,14 @@ RUN apt-get update && apt-get install -y \
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && npm install -g corepack concurrently wait-on \
-    && corepack enable
+    && corepack enable \
+    && corepack prepare pnpm@10.7.1 --activate
 
 # Create user
 ENV USERNAME=devuser
-ENV USER_UID=1000
-ENV USER_GID=1000
+ARG USER_UID=1000
+ARG USER_GID=1000
+
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
@@ -48,17 +50,19 @@ RUN foundryup
 
 ENV PATH="/home/${USERNAME}/.risc0/bin:${PATH}"
 RUN curl -L https://risczero.com/install | bash
-RUN rzup install rust 1.81.0 
+RUN rzup install rust 1.85.0 
 RUN rzup install cpp 2024.1.5 
 RUN rzup install r0vm 2.0.0
 RUN rzup install cargo-risczero 2.0.0
 
+RUN sudo wget https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz -O - |\
+  tar xz && sudo mv yq_linux_amd64 /usr/bin/yq
+
+RUN sudo mkdir -p /app && sudo chown -R $USERNAME:$USERNAME /app
+
 WORKDIR /app/examples/CRISP
 
-RUN sudo chown -R $USERNAME:$USERNAME /app
 RUN pnpm config set store-dir "/home/${USERNAME}/.pnpm-store"
-USER root
-RUN wget https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz -O - |\
-  tar xz && mv yq_linux_amd64 /usr/bin/yq
-USER $USERNAME
+RUN pnpm --version
+
 ENTRYPOINT ["/bin/bash"]

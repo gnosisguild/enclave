@@ -20,7 +20,7 @@ const PollCardResult: React.FC<PollCardResultProps> = ({ isResult, results, tota
   return (
     <div className={`grid ${isResult ? 'sm:w-full md:w-1/3' : 'w-full'} z-50 grid-cols-2 gap-4 md:gap-8`}>
       {results.map((poll) => (
-        <div className='col-span-1 w-full' key={`${poll.label}-${poll.value}`}>
+        <div data-test-id={`poll-result-${poll.value}`} className='col-span-1 w-full' key={`${poll.label}-${poll.value}`}>
           <div
             className={`flex w-full flex-col items-center justify-center ${isResult ? 'aspect-square space-y-6 max-sm:space-y-2' : 'space-y-4'}`}
           >

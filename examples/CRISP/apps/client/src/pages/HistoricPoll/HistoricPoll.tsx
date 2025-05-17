@@ -74,19 +74,15 @@ const HistoricPoll: React.FC = () => {
         {visiblePolls.length > 0 && (
           <div className='mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-8 overflow-y-auto p-4 md:grid-cols-3'>
             {visiblePolls.map((pollResult: PollResult, index: number) => {
-              if (visiblePolls.length === index + 1) {
-                return (
-                  <div className='flex items-center justify-center' key={`${pollResult.roundId}-${index}`}>
-                    <PollCard {...pollResult} />
-                  </div>
-                )
-              } else {
-                return (
-                  <div className='flex items-center justify-center' key={`${pollResult.roundId}-${index}`}>
-                    <PollCard {...pollResult} />
-                  </div>
-                )
-              }
+              return (
+                <div
+                  data-test-id={`poll-${pollResult.roundId}-${index}`}
+                  className='flex items-center justify-center'
+                  key={`${pollResult.roundId}-${index}`}
+                >
+                  <PollCard {...pollResult} />
+                </div>
+              )
             })}
           </div>
         )}
