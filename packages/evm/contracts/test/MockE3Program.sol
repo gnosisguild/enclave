@@ -23,8 +23,8 @@ contract MockE3Program is IE3Program {
     function validate(
         uint256 e3Id,
         uint256,
-        bytes calldata e3ProgramParams,
-        bytes calldata computeProviderParams
+        bytes memory e3ProgramParams,
+        bytes memory computeProviderParams
     ) external returns (bytes32, IInputValidator) {
         require(
             computeProviderParams.length == 32,
