@@ -33,15 +33,6 @@ const dataHash = ethers.keccak256(data);
 const _publicKeyHash = ethers.keccak256(abiCoder.encode(["uint256"], [0]));
 const proof = "0x1337";
 
-const polynomial_degree = ethers.toBigInt(2048);
-const plaintext_modulus = ethers.toBigInt(1032193);
-const moduli = [ethers.toBigInt("4503599626321921")]; // 0x3FFFFFFF000001
-
-const encodedE3ProgramParams = ethers.AbiCoder.defaultAbiCoder().encode(
-  ["uint256", "uint256", "uint256[]"],
-  [polynomial_degree, plaintext_modulus, moduli],
-);
-
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
@@ -73,8 +64,6 @@ describe("Enclave", function () {
 
     await enclave.enableE3Program(await e3Program.getAddress());
 
-    await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
-
     return {
       owner,
       notTheOwner,
@@ -96,7 +85,7 @@ describe("Enclave", function () {
         ],
         duration: time.duration.days(30),
         e3Program: await e3Program.getAddress(),
-        e3ProgramParams: encodedE3ProgramParams,
+        e3ProgramParams: "0x12345678",
         computeProviderParams: abiCoder.encode(
           ["address"],
           [await decryptionVerifier.getAddress()],
@@ -193,70 +182,6 @@ describe("Enclave", function () {
       await expect(enclave.setCiphernodeRegistry(AddressTwo))
         .to.emit(enclave, "CiphernodeRegistrySet")
         .withArgs(AddressTwo);
-    });
-  });
-
-  describe("setE3ProgramsParams()", function () {
-    const polynomial_degree = ethers.toBigInt(2048);
-    const plaintext_modulus = ethers.toBigInt(1032193);
-    const moduli = [ethers.toBigInt("4503599626321921")]; // 0x3FFFFFFF000001
-
-    const encodedE3ProgramParams = ethers.AbiCoder.defaultAbiCoder().encode(
-      ["uint256", "uint256", "uint256[]"],
-      [polynomial_degree, plaintext_modulus, moduli],
-    );
-
-    const encodedE3ProgramsParams = [encodedE3ProgramParams];
-
-    it("reverts if not called by owner", async function () {
-      const { enclave, notTheOwner } = await loadFixture(setup);
-
-      await expect(
-        enclave
-          .connect(notTheOwner)
-          .setE3ProgramsParams(encodedE3ProgramsParams),
-      )
-        .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
-        .withArgs(notTheOwner);
-    });
-
-    it("sets E3 program parameters correctly", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
-
-      expect(await enclave.e3ProgramsParams(encodedE3ProgramsParams[0])).to.be
-        .true;
-    });
-
-    it("returns true if parameters are set successfully", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      const result = await enclave.setE3ProgramsParams.staticCall(
-        encodedE3ProgramsParams,
-      );
-      expect(result).to.be.true;
-    });
-
-    it("emits AllowedE3ProgramsParamsSet event", async function () {
-      const { enclave } = await loadFixture(setup);
-
-      await expect(enclave.setE3ProgramsParams(encodedE3ProgramsParams))
-        .to.emit(enclave, "AllowedE3ProgramsParamsSet")
-        .withArgs(encodedE3ProgramsParams);
-    });
-
-    it("handles multiple parameters", async function () {
-      const { enclave } = await loadFixture(setup);
-      encodedE3ProgramsParams.push(
-        "0x0000000000000000000000000000000000000000000000000000000000000001",
-      );
-
-      await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
-
-      for (const param of encodedE3ProgramsParams) {
-        expect(await enclave.e3ProgramsParams(param)).to.be.true;
-      }
     });
   });
 
@@ -612,12 +537,7 @@ describe("Enclave", function () {
           request.startTime,
           request.duration,
           request.e3Program,
-          ethers.keccak256(
-            abiCoder.encode(
-              ["bytes", "address"],
-              [ZeroHash, ethers.ZeroAddress],
-            ),
-          ),
+          abiCoder.encode(["bytes", "address"], [ZeroHash, ethers.ZeroAddress]),
           request.computeProviderParams,
           { value: 10 },
         ),
