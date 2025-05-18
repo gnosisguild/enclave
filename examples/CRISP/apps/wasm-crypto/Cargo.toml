@@ -16,7 +16,7 @@ rand = "0.8.5"
 ethers = "2.0"
 getrandom = { version = "0.2.11", features = ["js"] }
 bincode = "1.3.3"
-enclave-sdk = { path = "../../../../packages/enclave-sdk" }
+enclave-sdk-isomorphic = { path = "../../../../packages/enclave-sdk-isomorphic" }
 rayon = "1.10.0"
 ndarray = "0.15.6"
 itertools = "0.13.0"

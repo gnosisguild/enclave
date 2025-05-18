@@ -2410,6 +2410,7 @@ dependencies = [
  "dialoguer",
  "dotenvy",
  "enclave-sdk",
+ "enclave-sdk-isomorphic",
  "env_logger",
  "eyre",
  "fhe",
@@ -2847,6 +2848,15 @@ dependencies = [
  "alloy 0.8.3",
  "anyhow",
  "eyre",
+ "fhe",
+ "fhe-traits",
+]
+
+[[package]]
+name = "enclave-sdk-isomorphic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "fhe",
  "fhe-traits",
 ]
@@ -6763,7 +6773,7 @@ name = "voting-core"
 version = "0.1.0"
 dependencies = [
  "compute-provider",
- "enclave-sdk",
+ "enclave-sdk-isomorphic",
  "fhe",
  "fhe-traits",
 ]

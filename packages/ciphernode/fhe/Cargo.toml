@@ -18,4 +18,4 @@ rand = { workspace = true }
 rand_chacha = { workspace = true }
 e3_request = { workspace = true }
 serde = { workspace = true }
-enclave-sdk = { path = "../../enclave-sdk" }
+enclave-sdk-isomorphic = { path = "../../enclave-sdk-isomorphic" }

@@ -1,5 +1,5 @@
 pub mod blockchain;
-mod config;
+pub mod config;
 mod database;
 mod models;
 mod routes;
