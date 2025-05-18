@@ -33,7 +33,10 @@ impl EventBusFactory {
     // Get or create a singleton EventBus for the specific event type
     pub fn get_event_bus<E: Event>(&self) -> Addr<EventBus<E>> {
         let type_id = TypeId::of::<E>();
-        let mut event_bus_cache = self.event_bus_cache.lock().expect("event_bus_cache mutex failed to lock");
+        let mut event_bus_cache = self
+            .event_bus_cache
+            .lock()
+            .expect("event_bus_cache mutex failed to lock");
 
         // If we already have this type of EventBus, return it
         if let Some(instance) = event_bus_cache.get(&type_id) {
