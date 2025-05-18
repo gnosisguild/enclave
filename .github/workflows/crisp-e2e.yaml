@@ -6,7 +6,7 @@ on:
     paths:
       - "examples/CRISP/**"
   pull_request:
-    branches: [main]
+    branches: [main, hacknet]
     paths:
       - "examples/CRISP/**"
   workflow_dispatch: # Allow manual triggering
