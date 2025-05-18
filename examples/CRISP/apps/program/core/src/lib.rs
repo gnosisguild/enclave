@@ -1,5 +1,5 @@
 use compute_provider::FHEInputs;
-use enclave_sdk::bfv::deserialize_bfv_params_arc;
+use enclave_sdk_isomorphic::bfv::deserialize_bfv_params_arc;
 use fhe_rs::bfv::Ciphertext;
 use fhe_traits::{DeserializeParametrized, Serialize};
 
