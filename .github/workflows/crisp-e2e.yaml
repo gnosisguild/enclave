@@ -1,0 +1,81 @@
+name: CRISP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "examples/CRISP/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "examples/CRISP/**"
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  test:
+    name: e2e
+    runs-on: ubuntu-latest
+
+    steps:
+      # https://stackoverflow.com/questions/75536771/github-runner-out-of-disk-space-after-building-docker-image
+      - name: Remove unnecessary files
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Set environment variables for Docker Compose
+        run: |
+          echo "USER_UID=$(id -u)" >> $GITHUB_ENV
+          echo "USER_GID=$(id -g)" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Prepare test environment
+        run: mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results && sudo chmod 777 $GITHUB_WORKSPACE/examples/CRISP/test-results && mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report && chmod 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.7.1
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        working-directory: .
+        run: pnpm --version && pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: ./examples/CRISP
+        run: pnpm exec playwright install chromium
+
+      - name: Run Playwright tests
+        working-directory: ./examples/CRISP
+        run: pnpm test:e2e
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: ./examples/CRISP/playwright-report/
+          retention-days: 30
