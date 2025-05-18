@@ -12,7 +12,7 @@ on:
   workflow_dispatch: # Allow manual triggering
 
 jobs:
-  test:
+  ci:
     name: e2e
     runs-on: ubuntu-latest
 
