@@ -4,6 +4,7 @@ on:
     branches:
       - release
       - main
+      - hacknet
     paths:
       - "packages/ciphernode/**"
       - "packages/evm/contracts/**"
@@ -11,6 +12,7 @@ on:
     branches:
       - release
       - main
+      - hacknet
     paths:
       - "packages/ciphernode/**"
       - "packages/evm/contracts/**"
