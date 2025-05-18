@@ -387,15 +387,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "commons"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "fhe",
- "fhe-traits",
-]
-
-[[package]]
 name = "console"
 version = "0.15.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -492,9 +483,9 @@ name = "crisp-wasm-crypto"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "commons",
  "console",
  "console_log",
+ "enclave-sdk",
  "ethers",
  "fhe",
  "fhe-math",
@@ -725,6 +716,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c533630cf40e9caa44bd91aadc88a75d75a4c3a12b4cfde353cbed41daa1e1f1"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "enclave-sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fhe",
+ "fhe-traits",
 ]
 
 [[package]]

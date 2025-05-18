@@ -1,7 +1,5 @@
 use super::events::InputPublished;
-use super::relayer::E3 as ContractE3;
 use crate::server::{
-    blockchain::relayer::EnclaveContract,
     config::CONFIG,
     database::{generate_emoji, get_e3, update_e3_status, GLOBAL_DB},
     models::{CurrentRound, E3},
@@ -13,6 +11,7 @@ use alloy::{
     sol_types::SolEvent,
 };
 use compute_provider::FHEInputs;
+use enclave_sdk::evm::contracts::{EnclaveContract, E3 as ContractE3};
 use futures::future::join_all;
 use log::{error, info, warn};
 use std::{
@@ -29,7 +28,15 @@ use voting_host::run_compute;
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 pub async fn sync_server() -> Result<()> {
     info!("Starting server synchronization...");
-    let contract = Arc::new(EnclaveContract::new(CONFIG.enclave_address.clone()).await?);
+
+    let contract = Arc::new(
+        EnclaveContract::new(
+            &CONFIG.http_rpc_url,
+            &CONFIG.private_key,
+            &CONFIG.enclave_address,
+        )
+        .await?,
+    );
 
     // Retrieve the current round from the database.
     let current_round = match GLOBAL_DB.get::<CurrentRound>("e3:current_round").await? {

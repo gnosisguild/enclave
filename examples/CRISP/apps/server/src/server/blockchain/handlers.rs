@@ -1,9 +1,6 @@
-use super::{
-    events::{
-        CiphertextOutputPublished, CommitteePublished, E3Activated, InputPublished,
-        PlaintextOutputPublished,
-    },
-    relayer::EnclaveContract,
+use super::events::{
+    CiphertextOutputPublished, CommitteePublished, E3Activated, InputPublished,
+    PlaintextOutputPublished,
 };
 use crate::server::{
     config::CONFIG,
@@ -12,6 +9,7 @@ use crate::server::{
 };
 use chrono::Utc;
 use compute_provider::FHEInputs;
+use enclave_sdk::evm::contracts::EnclaveContract;
 use log::info;
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -25,7 +23,12 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
     info!("Handling E3 request with id {}", e3_id);
 
     // Fetch E3 from the contract
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+    let contract = EnclaveContract::new(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.enclave_address,
+    )
+    .await?;
 
     let e3 = contract.get_e3(e3_activated.e3Id).await?;
     info!("Fetched E3 from the contract.");
@@ -194,7 +197,13 @@ pub async fn handle_committee_published(committee_published: CommitteePublished)
         committee_published.e3Id
     );
 
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+    let contract = EnclaveContract::new(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.enclave_address,
+    )
+    .await?;
+
     let tx = contract
         .activate(committee_published.e3Id, committee_published.publicKey)
         .await?;

@@ -736,15 +736,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67ba02a97a2bd10f4b59b25c7973101c79642302776489e030cd13cdab09ed15"
 
 [[package]]
-name = "commons"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "fhe",
- "fhe-traits",
-]
-
-[[package]]
 name = "compute-provider"
 version = "0.1.0"
 dependencies = [
@@ -1038,6 +1029,15 @@ name = "embedded-io"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
+
+[[package]]
+name = "enclave-sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fhe",
+ "fhe-traits",
+]
 
 [[package]]
 name = "enum-ordinalize"
@@ -2685,8 +2685,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "voting-core"
 version = "0.1.0"
 dependencies = [
- "commons",
  "compute-provider",
+ "enclave-sdk",
  "fhe",
  "fhe-traits",
 ]
