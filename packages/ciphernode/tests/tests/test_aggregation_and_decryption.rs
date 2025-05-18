@@ -2,7 +2,7 @@ use actix::prelude::*;
 use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use alloy::primitives::Address;
 use anyhow::*;
-use commons::bfv::params::SET_2048_1032193_1;
+use enclave_sdk::bfv::params::SET_2048_1032193_1;
 use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};

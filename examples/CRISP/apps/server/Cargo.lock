@@ -2207,15 +2207,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
-name = "commons"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "fhe",
- "fhe-traits",
-]
-
-[[package]]
 name = "compute-provider"
 version = "0.1.0"
 dependencies = [
@@ -2414,11 +2405,11 @@ dependencies = [
  "bincode",
  "chrono",
  "clap",
- "commons",
  "compute-provider",
  "config",
  "dialoguer",
  "dotenvy",
+ "enclave-sdk",
  "env_logger",
  "eyre",
  "fhe",
@@ -2848,6 +2839,17 @@ name = "embedded-io"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
+
+[[package]]
+name = "enclave-sdk"
+version = "0.1.0"
+dependencies = [
+ "alloy 0.8.3",
+ "anyhow",
+ "eyre",
+ "fhe",
+ "fhe-traits",
+]
 
 [[package]]
 name = "encode_unicode"
@@ -6760,8 +6762,8 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "voting-core"
 version = "0.1.0"
 dependencies = [
- "commons",
  "compute-provider",
+ "enclave-sdk",
  "fhe",
  "fhe-traits",
 ]
