@@ -7,4 +7,4 @@ edition = { workspace = true }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 compute-provider = { path = "../../../../../packages/compute_provider" }
-commons = { path = "../../../../../packages/commons" }
+enclave-sdk = { path = "../../../../../packages/enclave-sdk" }
