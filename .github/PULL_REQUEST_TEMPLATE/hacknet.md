@@ -1,10 +1,10 @@
 ## Title
 
-Content.
+Content
 
-#### Reviewers
+#### Post Merge Reviewers (If any)
 
-- [ ] Reviewer
+- [ ] reviewer
 
 #### Notes
 
