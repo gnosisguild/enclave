@@ -25,10 +25,11 @@ const queryClient = new QueryClient()
 
 const options = import.meta.env.DEV
   ? ({
-      // NOTE: this ensures that clicking the button doesn't force the change of network which we need for testing
-      initialChainId: 0,
-    } as ConnectkitOptions)
-  : undefined
+    initialChainId: anvil.id,
+  } as ConnectkitOptions)
+  : ({
+    initialChainId: sepolia.id,
+  } as ConnectkitOptions);
 
 export const Web3Provider = ({ children }: { children: React.ReactNode }) => {
   return (
