@@ -6,11 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{CLI_DB, CONFIG};
 use alloy::primitives::{Address, Bytes, U256};
-use commons::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use crisp::server::blockchain::relayer::EnclaveContract;
-use fhe_rs::bfv::{
-    BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
-};
+use enclave_sdk::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
+use fhe_rs::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
     Serialize as FheSerialize,
