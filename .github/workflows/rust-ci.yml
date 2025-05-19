@@ -49,15 +49,13 @@ jobs:
       - name: "Compile the contracts and generate the TypeChain bindings"
         run: "pnpm typechain"
 
-        # Now we can check rust formatting and run tests
-      - name: Checking code format
+      - name: Checking code format sdk
         run: cd ./packages/enclave-sdk && cargo fmt -- --check
 
       - name: Run tests
         run: "pnpm sdk:test"
 
-        # Now we can check rust formatting and run tests
-      - name: Checking code format
+      - name: Checking code format ciphernode
         run: cd ./packages/ciphernode && cargo fmt -- --check
 
       - name: Run tests
