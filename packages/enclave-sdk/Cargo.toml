@@ -17,5 +17,5 @@ optional         = true
 
 [features]
 default = ["host"]
-host = ["alloy/full", "alloy/rpc-types-eth"]
+host = ["alloy/full", "alloy/rpc-types-eth", "eyre"]
 risc0 = ["alloy/dyn-abi", "alloy/rlp", "alloy/serde"]
