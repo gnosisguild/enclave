@@ -35,6 +35,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
     info!("E3: {:?}", e3);
 
     let start_time = Utc::now().timestamp() as u64;
+    let expiration =  e3_activated.expiration.to::<u64>();
 
     let e3_obj = E3 {
         // Identifiers
@@ -53,7 +54,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
         start_time,
         block_start: e3.requestBlock.to::<u64>(),
         duration: e3.duration.to::<u64>(),
-        expiration: e3.expiration.to::<u64>(),
+        expiration,
 
         // Parameters
         e3_params: e3.e3ProgramParams.to_vec(),
@@ -79,7 +80,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
     GLOBAL_DB.insert("e3:current_round", &current_round).await?;
 
     let expiration = Instant::now()
-        + (UNIX_EPOCH + Duration::from_secs(e3.expiration.to::<u64>()))
+        + (UNIX_EPOCH + Duration::from_secs(expiration))
             .duration_since(SystemTime::now())
             .unwrap_or_else(|_| Duration::ZERO);
 
@@ -128,7 +129,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
         info!("E3 has no votes to decrypt. Setting status to Finished.");
         e3.status = "Finished".to_string();
 
-        GLOBAL_DB.insert(&key, &e3_obj).await?;
+        GLOBAL_DB.insert(&key, &e3).await?;
     }
     info!("E3 request handled successfully.");
     Ok(())
