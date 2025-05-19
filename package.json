@@ -23,6 +23,7 @@
     "ciphernode:remove": "cd packages/evm && pnpm ciphernode:remove",
     "ciphernode:test": "cd packages/ciphernode && ./scripts/test.sh",
     "ciphernode:build": "cd packages/ciphernode && cargo build --release",
+    "sdk:test": "cd packages/enclave-sdk && ./scripts/test.sh",
     "preciphernode:build": "pnpm evm:compile",
     "committee:new": "cd packages/evm && pnpm committee:new",
     "committee:publish": "cd packages/evm && pnpm hardhat committee:publish",
