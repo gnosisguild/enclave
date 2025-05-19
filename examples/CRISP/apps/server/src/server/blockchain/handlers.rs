@@ -1,9 +1,6 @@
-use super::{
-    events::{
-        CiphertextOutputPublished, CommitteePublished, E3Activated, InputPublished,
-        PlaintextOutputPublished,
-    },
-    relayer::EnclaveContract,
+use super::events::{
+    CiphertextOutputPublished, CommitteePublished, E3Activated, InputPublished,
+    PlaintextOutputPublished,
 };
 use crate::server::{
     config::CONFIG,
@@ -12,6 +9,7 @@ use crate::server::{
 };
 use chrono::Utc;
 use compute_provider::FHEInputs;
+use enclave_sdk::evm::contracts::EnclaveContract;
 use log::info;
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -25,13 +23,19 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
     info!("Handling E3 request with id {}", e3_id);
 
     // Fetch E3 from the contract
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+    let contract = EnclaveContract::new(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.enclave_address,
+    )
+    .await?;
 
     let e3 = contract.get_e3(e3_activated.e3Id).await?;
     info!("Fetched E3 from the contract.");
     info!("E3: {:?}", e3);
 
     let start_time = Utc::now().timestamp() as u64;
+    let expiration =  e3_activated.expiration.to::<u64>();
 
     let e3_obj = E3 {
         // Identifiers
@@ -50,7 +54,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
         start_time,
         block_start: e3.requestBlock.to::<u64>(),
         duration: e3.duration.to::<u64>(),
-        expiration: e3.expiration.to::<u64>(),
+        expiration,
 
         // Parameters
         e3_params: e3.e3ProgramParams.to_vec(),
@@ -76,7 +80,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
     GLOBAL_DB.insert("e3:current_round", &current_round).await?;
 
     let expiration = Instant::now()
-        + (UNIX_EPOCH + Duration::from_secs(e3.expiration.to::<u64>()))
+        + (UNIX_EPOCH + Duration::from_secs(expiration))
             .duration_since(SystemTime::now())
             .unwrap_or_else(|_| Duration::ZERO);
 
@@ -125,7 +129,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
         info!("E3 has no votes to decrypt. Setting status to Finished.");
         e3.status = "Finished".to_string();
 
-        GLOBAL_DB.insert(&key, &e3_obj).await?;
+        GLOBAL_DB.insert(&key, &e3).await?;
     }
     info!("E3 request handled successfully.");
     Ok(())
@@ -194,7 +198,13 @@ pub async fn handle_committee_published(committee_published: CommitteePublished)
         committee_published.e3Id
     );
 
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+    let contract = EnclaveContract::new(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.enclave_address,
+    )
+    .await?;
+
     let tx = contract
         .activate(committee_published.e3Id, committee_published.publicKey)
         .await?;

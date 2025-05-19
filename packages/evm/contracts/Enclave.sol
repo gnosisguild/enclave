@@ -199,11 +199,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             keccak256(publicKey) == publicKeyHash,
             CommitteeSelectionFailed()
         );
-
-        e3s[e3Id].expiration = block.timestamp + e3.duration;
+        uint256 expiresAt = block.timestamp + e3.duration;
+        e3s[e3Id].expiration = expiresAt;
         e3s[e3Id].committeePublicKey = keccak256(publicKey);
 
-        emit E3Activated(e3Id, e3.expiration, publicKey);
+        emit E3Activated(e3Id, expiresAt, publicKey);
 
         return true;
     }

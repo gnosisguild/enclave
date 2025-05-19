@@ -6,11 +6,12 @@ use serde::{Deserialize, Serialize};
 
 use super::{CLI_DB, CONFIG};
 use alloy::primitives::{Address, Bytes, U256};
-use commons::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
-use crisp::server::blockchain::relayer::EnclaveContract;
-use fhe_rs::bfv::{
-    BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey,
+use crisp::server::config::CONFIG as SERVER_CONFIG; // TODO: unify configuration
+use enclave_sdk::evm::contracts::EnclaveContract;
+use enclave_sdk_isomorphic::bfv::{
+    build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1,
 };
+use fhe_rs::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
     Serialize as FheSerialize,
@@ -46,7 +47,12 @@ struct CTRequest {
 
 pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Starting new CRISP round!");
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+    let contract = EnclaveContract::new(
+        &SERVER_CONFIG.http_rpc_url,
+        &SERVER_CONFIG.private_key,
+        &SERVER_CONFIG.enclave_address,
+    )
+    .await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;
 
     info!("Enabling E3 Program...");
@@ -102,7 +108,12 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
 
     let params = generate_bfv_parameters();
     let (sk, pk) = generate_keys(&params);
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+    let contract = EnclaveContract::new(
+        &SERVER_CONFIG.http_rpc_url,
+        &SERVER_CONFIG.private_key,
+        &SERVER_CONFIG.enclave_address,
+    )
+    .await?;
     let pk_bytes = Bytes::from(pk.to_bytes());
     let e3_id = U256::from(input_e3_id);
     let res = contract.activate(e3_id, pk_bytes).await?;
@@ -147,7 +158,12 @@ pub async fn participate_in_existing_round(
     let vote_choice = get_user_vote()?;
     if let Some(vote) = vote_choice {
         let ct = encrypt_vote(vote, &pk_deserialized, &params)?;
-        let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+        let contract = EnclaveContract::new(
+            &SERVER_CONFIG.http_rpc_url,
+            &SERVER_CONFIG.private_key,
+            &SERVER_CONFIG.enclave_address,
+        )
+        .await?;
         let res = contract
             .publish_input(U256::from(input_crisp_id), Bytes::from(ct.to_bytes()))
             .await?;
@@ -189,7 +205,12 @@ pub async fn decrypt_and_publish_result(
     let votes = Vec::<u64>::try_decode(&pt, Encoding::poly())?[0];
     info!("Vote count: {:?}", votes);
 
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+    let contract = EnclaveContract::new(
+        &SERVER_CONFIG.http_rpc_url,
+        &SERVER_CONFIG.private_key,
+        &SERVER_CONFIG.enclave_address,
+    )
+    .await?;
     let res = contract
         .publish_plaintext_output(U256::from(input_crisp_id), Bytes::from(votes.to_be_bytes()))
         .await?;

@@ -44,7 +44,7 @@ tests = { path = "./tests" }
 actix = "0.13.5"
 actix-web = "4.10.2"
 aes-gcm = "0.10.3"
-alloy = { version = "0.8", features = ["node-bindings", "full"] }
+alloy = { version = "0.8.3", features = ["node-bindings", "full"] }
 alloy-primitives = { version = "0.8", default-features = false, features = [
   "rlp",
   "serde",
