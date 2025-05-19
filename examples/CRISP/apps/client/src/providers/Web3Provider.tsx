@@ -25,7 +25,7 @@ const queryClient = new QueryClient()
 
 const options = import.meta.env.DEV
   ? ({
-    initialChainId: anvil.id,
+    initialChainId: 0,
   } as ConnectkitOptions)
   : ({
     initialChainId: sepolia.id,
