@@ -11,7 +11,7 @@
   "scripts": {
     "clean": "cd packages/evm && pnpm clean",
     "compile": "pnpm evm:compile && pnpm ciphernode:build",
-    "lint": "pnpm evm:lint && pnpm ciphernode:lint",
+    "lint": "pnpm evm:lint && pnpm ciphernode:lint && pnpm sdk:lint",
     "typechain": "pnpm evm:typechain",
     "test": "pnpm evm:test && pnpm ciphernode:test",
     "test:integration": "cd ./tests/integration && ./test.sh",
@@ -24,6 +24,7 @@
     "ciphernode:test": "cd packages/ciphernode && ./scripts/test.sh",
     "ciphernode:build": "cd packages/ciphernode && cargo build --release",
     "sdk:test": "cd packages/enclave-sdk && ./scripts/test.sh",
+    "sdk:lint": "cd packages/enclave-sdk && cargo fmt -- --check",
     "preciphernode:build": "pnpm evm:compile",
     "committee:new": "cd packages/evm && pnpm committee:new",
     "committee:publish": "cd packages/evm && pnpm hardhat committee:publish",
