@@ -2420,7 +2420,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "enclave-sdk-isomorphic"
+name = "enclave-sdk"
 version = "0.1.0"
 dependencies = [
  "alloy",
@@ -2658,7 +2658,7 @@ dependencies = [
  "config",
  "data",
  "e3_request",
- "enclave-sdk-isomorphic",
+ "enclave-sdk",
  "events",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
@@ -6511,7 +6511,7 @@ dependencies = [
  "actix",
  "bincode",
  "clap",
- "enclave-sdk-isomorphic",
+ "enclave-sdk",
  "events",
  "fhe 0.1.0",
  "fhe 0.1.0-beta.7",
@@ -6537,7 +6537,7 @@ dependencies = [
  "crypto",
  "data",
  "e3_request",
- "enclave-sdk-isomorphic",
+ "enclave-sdk",
  "events",
  "evm",
  "fhe 0.1.0",

@@ -1302,7 +1302,7 @@ dependencies = [
  "bincode",
  "console",
  "console_log",
- "enclave-sdk-isomorphic",
+ "enclave-sdk",
  "ethers",
  "fhe",
  "fhe-math",
@@ -1618,7 +1618,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "enclave-sdk-isomorphic"
+name = "enclave-sdk"
 version = "0.1.0"
 dependencies = [
  "alloy",
