@@ -7,4 +7,4 @@ edition = { workspace = true }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 compute-provider = { path = "../../../../../packages/compute_provider" }
-enclave-sdk-isomorphic = { path = "../../../../../packages/enclave-sdk-isomorphic" }
+enclave-sdk-isomorphic = { path = "../../../../../packages/enclave-sdk-isomorphic", default-features = false, features = ["guest"] }
