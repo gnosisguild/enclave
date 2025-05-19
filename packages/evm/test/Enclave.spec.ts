@@ -1,9 +1,9 @@
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import {
   loadFixture,
   mine,
   time,
 } from "@nomicfoundation/hardhat-network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { ZeroHash } from "ethers";
