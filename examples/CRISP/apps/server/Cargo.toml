@@ -37,8 +37,7 @@ sha2 = "0.10.8"
 
 # Local dependencies
 compute-provider = { path = "../../../../packages/compute_provider" }
-enclave-sdk = { path = "../../../../packages/enclave-sdk" }
-enclave-sdk-isomorphic = { path = "../../../../packages/enclave-sdk-isomorphic" }
+enclave-sdk = { path = "../../../../packages/enclave-sdk", features = ["full"] }
 voting-host = { path = "../program/host" }
 
 # CLI and user interaction

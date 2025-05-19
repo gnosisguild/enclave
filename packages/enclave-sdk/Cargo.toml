@@ -8,6 +8,16 @@ edition = "2021"
 anyhow = "1.0.86"
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
-alloy = { version = "0.8.3", features = ["full", "rpc-types-eth"] }
-eyre = { version = "0.6.12" }
+eyre = { version = "0.6.12", optional = true }
 
+
+[dependencies.alloy]
+version = "0.8.3"
+default-features = false
+optional = true
+
+
+[features]
+default = ["full"]
+full = ["alloy/full", "alloy/rpc-types-eth", "eyre"]
+guest = []

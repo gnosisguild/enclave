@@ -1019,7 +1019,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
-name = "enclave-sdk-isomorphic"
+name = "enclave-sdk"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2694,7 +2694,7 @@ name = "voting-core"
 version = "0.1.0"
 dependencies = [
  "compute-provider",
- "enclave-sdk-isomorphic",
+ "enclave-sdk",
  "fhe",
  "fhe-traits",
 ]
