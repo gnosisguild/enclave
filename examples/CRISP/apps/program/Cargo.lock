@@ -645,6 +645,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
+name = "app"
+version = "0.1.0"
+
+[[package]]
 name = "ark-bn254"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1388,15 +1392,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67ba02a97a2bd10f4b59b25c7973101c79642302776489e030cd13cdab09ed15"
 
 [[package]]
-name = "commons"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "fhe",
- "fhe-traits",
-]
-
-[[package]]
 name = "compute-provider"
 version = "0.1.0"
 dependencies = [
@@ -1867,6 +1862,15 @@ name = "embedded-io"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
+
+[[package]]
+name = "enclave-sdk-isomorphic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fhe",
+ "fhe-traits",
+]
 
 [[package]]
 name = "encoding_rs"
@@ -5218,8 +5222,8 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "voting-core"
 version = "0.1.0"
 dependencies = [
- "commons",
  "compute-provider",
+ "enclave-sdk-isomorphic",
  "fhe",
  "fhe-traits",
 ]

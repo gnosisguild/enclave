@@ -1,0 +1,13 @@
+[package]
+name = "enclave-sdk"
+version = "0.1.0"
+edition = "2021"
+
+# Core dependencies compatible with everything
+[dependencies]
+anyhow = "1.0.86"
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+alloy = { version = "0.8.3", features = ["full", "rpc-types-eth"] }
+eyre = { version = "0.6.12" }
+

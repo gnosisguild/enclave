@@ -1,0 +1,10 @@
+[package]
+name = "enclave-sdk-isomorphic"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+

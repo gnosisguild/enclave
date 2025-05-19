@@ -1,4 +1,3 @@
-use crate::server::CONFIG;
 use alloy::providers::fillers::BlobGasFiller;
 use alloy::{
     network::{Ethereum, EthereumWallet},
@@ -52,7 +51,7 @@ sol! {
     }
 }
 
-type CRISPProvider = FillProvider<
+pub type CRISPProvider = FillProvider<
     JoinFill<
         JoinFill<
             Identity,
@@ -71,13 +70,17 @@ pub struct EnclaveContract {
 }
 
 impl EnclaveContract {
-    pub async fn new(contract_address: String) -> Result<Self> {
-        let signer: PrivateKeySigner = CONFIG.private_key.parse()?;
-        let wallet = EthereumWallet::from(signer.clone());
+    pub async fn new(
+        http_rpc_url: &str,
+        private_key: &str,
+        contract_address: &str,
+    ) -> Result<Self> {
+        let signer: PrivateKeySigner = private_key.parse()?;
+        let wallet = EthereumWallet::from(signer);
         let provider = ProviderBuilder::new()
             .with_recommended_fillers()
             .wallet(wallet)
-            .on_builtin(&CONFIG.http_rpc_url)
+            .on_builtin(http_rpc_url)
             .await?;
 
         Ok(Self {
