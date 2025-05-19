@@ -35,7 +35,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
     info!("E3: {:?}", e3);
 
     let start_time = Utc::now().timestamp() as u64;
-    let expiration =  e3_activated.expiration.to::<u64>();
+    let expiration = e3_activated.expiration.to::<u64>();
 
     let e3_obj = E3 {
         // Identifiers

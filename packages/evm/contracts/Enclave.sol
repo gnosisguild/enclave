@@ -44,6 +44,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
         public decryptionVerifiers;
 
+    /// Mapping that stores the valid E3 program ABI encoded parameter sets (e.g., BFV).
+    mapping(bytes e3ProgramParamsHashPacked => bool allowed)
+        public e3ProgramsParams;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //
@@ -82,24 +86,35 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// @param _owner The owner of this contract
     /// @param _maxDuration The maximum duration of a computation in seconds
+    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV)
     constructor(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
-        uint256 _maxDuration
+        uint256 _maxDuration,
+        bytes[] memory _e3ProgramsParams
     ) {
-        initialize(_owner, _ciphernodeRegistry, _maxDuration);
+        initialize(
+            _owner,
+            _ciphernodeRegistry,
+            _maxDuration,
+            _e3ProgramsParams
+        );
     }
 
     /// @param _owner The owner of this contract
+    /// @param _ciphernodeRegistry The address of the ciphernode registry
     /// @param _maxDuration The maximum duration of a computation in seconds
+    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV)
     function initialize(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
-        uint256 _maxDuration
+        uint256 _maxDuration,
+        bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
+        setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -362,6 +377,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         success = true;
         emit EncryptionSchemeDisabled(encryptionSchemeId);
+    }
+
+    function setE3ProgramsParams(
+        bytes[] memory _e3ProgramsParams
+    ) public onlyOwner returns (bool success) {
+        uint256 length = _e3ProgramsParams.length;
+        for (uint256 i; i < length; ) {
+            e3ProgramsParams[_e3ProgramsParams[i]] = true;
+            unchecked {
+                ++i;
+            }
+        }
+        success = true;
+        emit AllowedE3ProgramsParamsSet(_e3ProgramsParams);
     }
 
     ////////////////////////////////////////////////////////////
