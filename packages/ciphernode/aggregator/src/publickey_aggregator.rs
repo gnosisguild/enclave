@@ -55,7 +55,6 @@ pub struct PublicKeyAggregator {
     sortition: Addr<Sortition>,
     e3_id: E3id,
     state: Persistable<PublicKeyAggregatorState>,
-    src_chain_id: u64,
 }
 
 pub struct PublicKeyAggregatorParams {
@@ -63,7 +62,6 @@ pub struct PublicKeyAggregatorParams {
     pub bus: Addr<EventBus<EnclaveEvent>>,
     pub sortition: Addr<Sortition>,
     pub e3_id: E3id,
-    pub src_chain_id: u64,
 }
 
 /// Aggregate PublicKey for a committee of nodes. This actor listens for KeyshareCreated events
@@ -82,7 +80,6 @@ impl PublicKeyAggregator {
             bus: params.bus,
             sortition: params.sortition,
             e3_id: params.e3_id,
-            src_chain_id: params.src_chain_id,
             state,
         }
     }
@@ -153,12 +150,14 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
         let size = threshold_m;
         let address = event.node;
+        let chain_id = event.e3_id.chain_id();
         let e3_id = event.e3_id.clone();
         let pubkey = event.pubkey.clone();
 
         Box::pin(
             self.sortition
                 .send(GetHasNode {
+                    chain_id,
                     address,
                     size,
                     seed,
@@ -221,7 +220,9 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
     fn handle(&mut self, msg: NotifyNetwork, _: &mut Self::Context) -> Self::Result {
         Box::pin(
             self.sortition
-                .send(GetNodes)
+                .send(GetNodes {
+                    chain_id: msg.e3_id.chain_id(),
+                })
                 .into_actor(self)
                 .map(move |res, act, _| {
                     let nodes = res?;
@@ -230,7 +231,6 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                         pubkey: msg.pubkey.clone(),
                         e3_id: msg.e3_id.clone(),
                         nodes: OrderedSet::from(nodes),
-                        src_chain_id: act.src_chain_id,
                     });
                     act.bus.do_send(event);
                     Ok(())

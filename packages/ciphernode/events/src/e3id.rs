@@ -4,40 +4,37 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct E3id(pub String);
+pub struct E3id {
+    id: String,
+    chain_id: u64,
+}
+
 impl fmt::Display for E3id {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+        write!(f, "{}:{}", self.chain_id, self.id)
     }
 }
 
 impl E3id {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
+    pub fn new(id: impl Into<String>, chain_id: u64) -> Self {
+        Self {
+            id: id.into(),
+            chain_id,
+        }
     }
-}
 
-impl From<u32> for E3id {
-    fn from(value: u32) -> Self {
-        E3id::new(value.to_string())
+    pub fn e3_id(&self) -> &str {
+        &self.id
     }
-}
 
-impl From<String> for E3id {
-    fn from(value: String) -> Self {
-        E3id::new(value)
-    }
-}
-
-impl From<&str> for E3id {
-    fn from(value: &str) -> Self {
-        E3id::new(value)
+    pub fn chain_id(&self) -> u64 {
+        self.chain_id
     }
 }
 
 impl TryFrom<E3id> for U256 {
     type Error = ParseError;
     fn try_from(value: E3id) -> Result<Self, Self::Error> {
-        U256::from_str_radix(&value.0, 10)
+        U256::from_str_radix(&value.id, 10)
     }
 }
