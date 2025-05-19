@@ -3,7 +3,7 @@ use alloy::{
     providers::{ProviderBuilder, WsConnect},
     sol,
 };
-use enclave_sdk::evm::listener::create_enclave_contract_listener;
+use enclave_sdk::evm::listener::EventListener;
 use eyre::Result;
 
 sol!(
@@ -24,7 +24,7 @@ async fn listener() -> Result<()> {
     let contract = EmitLogs::deploy(provider).await?;
 
     let mut dispatcher =
-        create_enclave_contract_listener(&anvil.ws_endpoint(), contract.address()).await?;
+        EventListener::create_contract_listener(&anvil.ws_endpoint(), contract.address()).await?;
 
     dispatcher.add_event_handler::<EmitLogs::ValueChanged>(
         move |event: &EmitLogs::ValueChanged| {

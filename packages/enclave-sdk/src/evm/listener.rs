@@ -70,16 +70,16 @@ impl EventListener {
 
         Ok(())
     }
-}
 
-pub async fn create_enclave_contract_listener(
-    rpc_url: &str,
-    contract_address: &Address,
-) -> Result<EventListener> {
-    let provider = Arc::new(ProviderBuilder::new().on_builtin(rpc_url).await?);
-    let filter = Filter::new()
-        .address(contract_address.clone())
-        .from_block(BlockNumberOrTag::Latest);
+    pub async fn create_contract_listener(
+        ws_url: &str,
+        contract_address: &Address,
+    ) -> Result<Self> {
+        let provider = Arc::new(ProviderBuilder::new().on_builtin(ws_url).await?);
+        let filter = Filter::new()
+            .address(contract_address.clone())
+            .from_block(BlockNumberOrTag::Latest);
 
-    Ok(EventListener::new(provider, filter))
+        Ok(EventListener::new(provider, filter))
+    }
 }
