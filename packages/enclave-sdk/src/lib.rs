@@ -1,4 +1,4 @@
 pub mod bfv;
 
-#[cfg(feature = "host")]
+#[cfg(feature = "full")]
 pub mod evm;
