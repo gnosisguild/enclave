@@ -1,5 +1,5 @@
 use clap::{command, Parser};
-use enclave_sdk_isomorphic::bfv::{build_bfv_params_arc, encode_bfv_params};
+use enclave_sdk::bfv::{build_bfv_params_arc, encode_bfv_params};
 use std::{error::Error, num::ParseIntError, process};
 
 fn parse_hex(arg: &str) -> Result<u64, ParseIntError> {
