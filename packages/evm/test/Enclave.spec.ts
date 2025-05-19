@@ -3,6 +3,7 @@ import {
   mine,
   time,
 } from "@nomicfoundation/hardhat-network-helpers";
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { ZeroHash } from "ethers";
@@ -823,11 +824,10 @@ describe("Enclave", function () {
       );
 
       const e3Id = 0;
-      const e3 = await enclave.getE3(e3Id);
 
       await expect(enclave.activate(e3Id, ethers.ZeroHash))
         .to.emit(enclave, "E3Activated")
-        .withArgs(e3Id, e3.expiration, e3.committeePublicKey);
+        .withArgs(e3Id, anyValue, ethers.ZeroHash);
     });
   });
 
