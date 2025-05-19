@@ -2423,6 +2423,7 @@ dependencies = [
 name = "enclave-sdk-isomorphic"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
