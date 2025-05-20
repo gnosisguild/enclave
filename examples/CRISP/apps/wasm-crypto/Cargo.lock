@@ -2098,7 +2098,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=feature%2Fgreco-integration#26e5f2ff6c860d47a1c88a777936bc68eaedb129"
+source = "git+https://github.com/gnosisguild/fhe.rs.git#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -2121,7 +2121,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=feature%2Fgreco-integration#26e5f2ff6c860d47a1c88a777936bc68eaedb129"
+source = "git+https://github.com/gnosisguild/fhe.rs.git#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -2143,7 +2143,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=feature%2Fgreco-integration#26e5f2ff6c860d47a1c88a777936bc68eaedb129"
+source = "git+https://github.com/gnosisguild/fhe.rs.git#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "rand",
 ]
@@ -2151,12 +2151,14 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=feature%2Fgreco-integration#26e5f2ff6c860d47a1c88a777936bc68eaedb129"
+source = "git+https://github.com/gnosisguild/fhe.rs.git#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
  "num-traits",
+ "prime_factorization",
  "rand",
+ "rayon",
 ]
 
 [[package]]
@@ -3063,6 +3065,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
+name = "num"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3135b08af27d103b0a51f2ae0f8632117b7b185ccf931445affa8df530576a41"
+dependencies = [
+ "num-bigint",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3120,6 +3136,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d869c01cc0c455284163fd0092f1f93835385ccab5a98a0dcc497b2f8bf055a9"
 dependencies = [
  "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
+dependencies = [
+ "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -3487,6 +3514,17 @@ checksum = "5ac2cf0f2e4f42b49f5ffd07dae8d746508ef7526c13940e5f524012ae6c6550"
 dependencies = [
  "proc-macro2",
  "syn 2.0.101",
+]
+
+[[package]]
+name = "prime_factorization"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb24cb4f70d64221509ab3dca82ad2ec24e1d7f3fa3e7cb9eed4ced578683287"
+dependencies = [
+ "itertools 0.10.5",
+ "num",
+ "rand",
 ]
 
 [[package]]

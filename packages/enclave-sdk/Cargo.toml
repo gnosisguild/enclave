@@ -6,8 +6,8 @@ edition = "2021"
 # Core dependencies compatible with everything
 [dependencies]
 anyhow = "1.0.86"
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
-fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 eyre = { version = "0.6.12", optional = true }
 futures = { version = "0.3.30", optional = true }
 tokio = { version = "1.37.0", optional = true }

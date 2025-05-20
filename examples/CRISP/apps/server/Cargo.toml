@@ -29,8 +29,8 @@ futures = "0.3.30"
 alloy = { version = "0.8.3", features = ["full", "rpc-types-eth"] }
 alloy-primitives = { version = "0.8", default-features = false, features = ["rlp", "serde", "std"] }
 alloy-sol-types = "0.8"
-fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 hmac = "0.12.1"
 jwt = "0.16.0"
 sha2 = "0.10.8"
