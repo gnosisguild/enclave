@@ -2428,6 +2428,8 @@ dependencies = [
  "eyre",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
+ "futures",
+ "tokio",
 ]
 
 [[package]]

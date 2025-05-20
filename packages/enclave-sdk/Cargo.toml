@@ -9,6 +9,8 @@ anyhow = "1.0.86"
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
 eyre = { version = "0.6.12", optional = true }
+futures = { version = "0.3.30", optional = true }
+tokio = { version = "1.37.0", optional = true }
 
 [dependencies.alloy]
 version          = "0.8.3"
@@ -17,5 +19,12 @@ optional         = true
 
 [features]
 default = ["full"]
-full = ["alloy/full", "alloy/rpc-types-eth", "eyre"]
+full = [
+  "alloy/full", 
+  "alloy/rpc-types-eth",
+  "alloy/node-bindings",
+  "eyre",
+  "futures",
+  "tokio/full",
+]
 risc0 = ["alloy/dyn-abi", "alloy/rlp", "alloy/serde"]
