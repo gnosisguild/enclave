@@ -45,8 +45,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         public decryptionVerifiers;
 
     /// Mapping that stores the valid E3 program ABI encoded parameter sets (e.g., BFV).
-    mapping(bytes e3ProgramParamsHashPacked => bool allowed)
-        public e3ProgramsParams;
+    mapping(bytes e3ProgramParams => bool allowed) public e3ProgramsParams;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
