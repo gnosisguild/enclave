@@ -6,7 +6,7 @@ use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
 use e3_request::E3Router;
-use enclave_sdk::bfv::params::SET_2048_1032193_1;
+use enclave_sdk::bfv::{encode_bfv_params, params::SET_2048_1032193_1};
 use events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig,
@@ -304,7 +304,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         e3_id: e3_id.clone(),
         threshold_m: 3,
         seed: seed.clone(),
-        params: params.to_bytes(),
+        params: encode_bfv_params(&params),
     });
 
     // Send the computation requested event
@@ -414,7 +414,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             e3_id: e3_id.clone(),
             threshold_m: 2,
             seed: seed.clone(),
-            params: params.to_bytes(),
+            params: encode_bfv_params(&params),
         })
         .clone(),
     )
@@ -583,7 +583,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         e3_id: E3id::new("1234", 1),
         threshold_m: 3,
         seed: seed.clone(),
-        params: params.to_bytes(),
+        params: encode_bfv_params(&params),
     }))
     .await?;
 
@@ -616,7 +616,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         e3_id: E3id::new("1234", 2),
         threshold_m: 3,
         seed: seed.clone(),
-        params: params.to_bytes(),
+        params: encode_bfv_params(&params),
     }))
     .await?;
 
