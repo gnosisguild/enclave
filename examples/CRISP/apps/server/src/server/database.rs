@@ -1,4 +1,6 @@
 use super::models::E3;
+use async_trait::async_trait;
+use enclave_sdk::indexer::DataStore;
 use log::error;
 use once_cell::sync::Lazy;
 use rand::Rng;
@@ -27,14 +29,18 @@ impl SledDB {
             db: Arc::new(RwLock::new(db)),
         })
     }
+}
 
-    pub async fn insert<T: Serialize>(&self, key: &str, value: &T) -> Result<(), DatabaseError> {
+#[async_trait]
+impl DataStore for SledDb {
+    type Error = DatabaseError;
+    async fn insert<T: Serialize>(&self, key: &str, value: &T) -> Result<(), Self::Error> {
         let serialized = serde_json::to_vec(value)?;
         self.db.write().await.insert(key.as_bytes(), serialized)?;
         Ok(())
     }
 
-    pub async fn get<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>, DatabaseError> {
+    async fn get<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>, Self::Error> {
         if let Some(bytes) = self.db.read().await.get(key.as_bytes())? {
             let value = serde_json::from_slice(&bytes)?;
             Ok(Some(value))

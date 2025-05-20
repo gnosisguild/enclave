@@ -51,7 +51,7 @@ sol! {
     }
 }
 
-pub type CRISPProvider = FillProvider<
+pub type EnclaveProvider = FillProvider<
     JoinFill<
         JoinFill<
             Identity,
@@ -65,7 +65,7 @@ pub type CRISPProvider = FillProvider<
 >;
 
 pub struct EnclaveContract {
-    pub provider: Arc<CRISPProvider>,
+    pub provider: Arc<EnclaveProvider>,
     pub contract_address: Address,
 }
 

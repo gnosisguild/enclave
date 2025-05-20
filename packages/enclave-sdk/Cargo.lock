@@ -952,6 +952,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
 
 [[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1341,10 +1350,15 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "anyhow",
+ "async-trait",
+ "bincode",
  "eyre",
  "fhe",
  "fhe-traits",
  "futures",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
  "tokio",
 ]
 
@@ -1421,7 +1435,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -1444,7 +1458,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -1466,7 +1480,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -1474,7 +1488,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",

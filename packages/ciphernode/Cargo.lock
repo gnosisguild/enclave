@@ -2425,10 +2425,14 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "anyhow",
+ "async-trait",
+ "bincode",
  "eyre",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
  "futures",
+ "serde",
+ "thiserror 1.0.69",
  "tokio",
 ]
 

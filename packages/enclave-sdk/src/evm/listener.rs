@@ -8,16 +8,18 @@ use alloy::{
 use eyre::Result;
 use futures::stream::StreamExt;
 use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
 
 // Define a domain event type that's decoupled from Log
 pub trait DomainEvent: Send + Sync {
     fn signature(&self) -> B256;
 }
 
+#[derive(Clone)]
 pub struct EventListener {
     provider: Arc<RootProvider<BoxTransport>>,
     filter: Filter,
-    handlers: HashMap<B256, Vec<Box<dyn Fn(&Log) -> Result<()> + Send + Sync>>>,
+    handlers: Arc<RwLock<HashMap<B256, Vec<Box<dyn Fn(&Log) -> Result<()> + Send + Sync>>>>>,
 }
 
 impl EventListener {
@@ -25,11 +27,11 @@ impl EventListener {
         Self {
             provider,
             filter,
-            handlers: HashMap::new(),
+            handlers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub fn add_event_handler<E>(
+    pub async fn add_event_handler<E>(
         &mut self,
         handler: impl Fn(&E) -> Result<()> + Send + Sync + 'static,
     ) where
@@ -41,6 +43,8 @@ impl EventListener {
             handler(&event)
         });
         self.handlers
+            .write()
+            .await
             .entry(signature)
             .or_insert_with(Vec::new)
             .push(wrapped_handler);
@@ -55,7 +59,7 @@ impl EventListener {
 
         while let Some(log) = stream.next().await {
             if let Some(topic0) = log.topic0() {
-                if let Some(handlers) = self.handlers.get(topic0) {
+                if let Some(handlers) = self.handlers.read().await.get(topic0) {
                     for handler in handlers {
                         if let Err(e) = handler(&log) {
                             // We don't necessarily want logging here so just printing to stderr
@@ -70,13 +74,11 @@ impl EventListener {
         Ok(())
     }
 
-    pub async fn create_contract_listener(
-        ws_url: &str,
-        contract_address: &Address,
-    ) -> Result<Self> {
+    pub async fn create_contract_listener(ws_url: &str, contract_address: &str) -> Result<Self> {
         let provider = Arc::new(ProviderBuilder::new().on_builtin(ws_url).await?);
+        let address = contract_address.parse::<Address>()?;
         let filter = Filter::new()
-            .address(contract_address.clone())
+            .address(address)
             .from_block(BlockNumberOrTag::Latest);
 
         Ok(EventListener::new(provider, filter))

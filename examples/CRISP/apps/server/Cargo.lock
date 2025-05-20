@@ -2436,6 +2436,7 @@ dependencies = [
  "alloy 0.8.3",
  "alloy-primitives",
  "alloy-sol-types",
+ "async-trait",
  "bincode",
  "chrono",
  "clap",
@@ -2446,8 +2447,8 @@ dependencies = [
  "enclave-sdk",
  "env_logger",
  "eyre",
- "fhe",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration)",
  "futures",
  "hex",
  "hmac",
@@ -2880,10 +2881,14 @@ version = "0.1.0"
 dependencies = [
  "alloy 0.8.3",
  "anyhow",
+ "async-trait",
+ "bincode",
  "eyre",
- "fhe",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "futures",
+ "serde",
+ "thiserror 1.0.69",
  "tokio",
 ]
 
@@ -3007,12 +3012,35 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+dependencies = [
+ "doc-comment",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration)",
+ "itertools 0.12.1",
+ "ndarray",
+ "num-bigint",
+ "num-traits",
+ "prost 0.12.6",
+ "prost-build",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "serde",
+ "thiserror 1.0.69",
+ "zeroize",
+ "zeroize_derive",
+]
+
+[[package]]
+name = "fhe"
+version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "doc-comment",
- "fhe-math",
- "fhe-traits",
- "fhe-util",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -3030,11 +3058,33 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+dependencies = [
+ "ethnum",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration)",
+ "itertools 0.12.1",
+ "ndarray",
+ "num-bigint",
+ "num-bigint-dig",
+ "num-traits",
+ "prost 0.12.6",
+ "prost-build",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "sha2",
+ "thiserror 1.0.69",
+ "zeroize",
+]
+
+[[package]]
+name = "fhe-math"
+version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "ethnum",
- "fhe-traits",
- "fhe-util",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -3052,9 +3102,30 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+dependencies = [
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "fhe-traits"
+version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "rand 0.8.5",
+]
+
+[[package]]
+name = "fhe-util"
+version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+dependencies = [
+ "itertools 0.12.1",
+ "num-bigint-dig",
+ "num-traits",
+ "prime_factorization",
+ "rand 0.8.5",
+ "rayon",
 ]
 
 [[package]]
@@ -6800,8 +6871,8 @@ version = "0.1.0"
 dependencies = [
  "compute-provider",
  "enclave-sdk",
- "fhe",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
 ]
 
 [[package]]
@@ -6814,9 +6885,9 @@ dependencies = [
  "bincode",
  "bytemuck",
  "compute-provider",
- "fhe",
- "fhe-traits",
- "fhe-util",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "log",
  "methods",
  "rand 0.8.5",
