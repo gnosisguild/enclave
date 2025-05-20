@@ -1,3 +1,4 @@
+// Stub indexer
 use crate::evm::contracts::EnclaveContract;
 
 pub struct EnclaveIndexer {
@@ -5,5 +6,7 @@ pub struct EnclaveIndexer {
 }
 
 impl EnclaveIndexer {
-    pub fn start() {}
+    pub fn start() {
+        todo!();
+    }
 }
