@@ -40,13 +40,10 @@ impl EventListener {
             let event = log.log_decode::<E>()?.inner.data;
             handler(&event)
         });
-        println!("ADDING TO HANDLER!");
-        println!("Handler len before: {}", self.handlers.len());
         self.handlers
             .entry(signature)
             .or_insert_with(Vec::new)
             .push(wrapped_handler);
-        println!("Handler len after: {}", self.handlers.len());
     }
 
     pub async fn listen(&self) -> Result<()> {
@@ -61,7 +58,9 @@ impl EventListener {
                 if let Some(handlers) = self.handlers.get(topic0) {
                     for handler in handlers {
                         if let Err(e) = handler(&log) {
-                            println!("Error processing event 0x{:x}: {:?}", topic0, e);
+                            // We don't necessarily want logging here so just printing to stderr
+                            // for now. We can make this fancier later if we need to.
+                            eprintln!("Error processing event 0x{:x}: {:?}", topic0, e);
                         }
                     }
                 }
