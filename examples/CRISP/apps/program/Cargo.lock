@@ -2033,7 +2033,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -2056,7 +2056,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -2078,7 +2078,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -2086,7 +2086,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=feature%2Fgreco-integration#b529be34a8b6cfa589b3ce451dbba0ce0126b92a"
+source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
