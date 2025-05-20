@@ -50,13 +50,13 @@ jobs:
         run: "pnpm typechain"
 
       - name: Checking code format sdk
-        run: cd ./packages/enclave-sdk && cargo fmt -- --check
+        run: pnpm sdk:lint
 
       - name: Run tests
         run: "pnpm sdk:test"
 
       - name: Checking code format ciphernode
-        run: cd ./packages/ciphernode && cargo fmt -- --check
+        run: pnpm ciphernode:lint
 
       - name: Run tests
         run: "pnpm ciphernode:test"
