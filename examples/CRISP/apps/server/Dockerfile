@@ -34,7 +34,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 ############### stage 2: planner ###############
 FROM base-dev AS planner
 WORKDIR /app
-COPY --from=chef /app/examples/CRISP/apps/server/recipe.json recipe.json
+COPY --from=chef /app/examples/CRISP/apps/server/recipe.json /app/examples/CRISP/apps/server/recipe.json
 
 COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
 COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
@@ -55,7 +55,7 @@ COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
 COPY packages/enclave-sdk/          packages/enclave-sdk/
 COPY packages/compute_provider/     packages/compute_provider/
 
-COPY --from=planner /app/target /app/target
+COPY --from=planner /app/examples/CRISP/apps/server/target /app/examples/CRISP/apps/server/target
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -66,5 +66,5 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 FROM gcr.io/distroless/cc-debian12 AS runtime
 WORKDIR /
 
-COPY --from=builder /app/target/release/server /usr/local/bin/server
+COPY --from=builder /app/examples/CRISP/apps/server/target/release/server /usr/local/bin/server
 ENTRYPOINT ["/usr/local/bin/server"]
