@@ -64,6 +64,10 @@ jobs:
           build-args: |
             SKIP_SOLIDITY=1
           cache-from: |
-            type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+            type=gha,scope=cargo-registry
+            type=gha,scope=cargo-target
+            type=gha,scope=buildcache
           cache-to: |
-            type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+            type=gha,mode=max,scope=cargo-registry
+            type=gha,mode=max,scope=cargo-target
+            type=gha,mode=max,scope=buildcache

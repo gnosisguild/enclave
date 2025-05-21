@@ -9,8 +9,7 @@ use crate::server::{
 };
 use chrono::Utc;
 use compute_provider::FHEInputs;
-use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
-use enclave_sdk::indexer::DataStore;
+use enclave_sdk::evm::contracts::EnclaveContract;
 use log::info;
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -193,10 +192,12 @@ pub async fn handle_plaintext_output_published(
 }
 
 pub async fn handle_committee_published(committee_published: CommitteePublished) -> Result<()> {
+    info!("Handling CommitteePublished event...");
     info!(
-        "Handling CommitteePublished event for E3: {}",
+        "Committee Published for round: {:?}",
         committee_published.e3Id
     );
+
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
