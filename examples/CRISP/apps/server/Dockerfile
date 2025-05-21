@@ -54,14 +54,12 @@ RUN set -eux; \
     packages/enclave-sdk \
     packages/compute_provider \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
-    | while IFS= read -r -d '' manifest; do \
-    crate_dir="$(dirname "$manifest")"; \
+    | xargs -0 -I '{}' sh -c '\
+    crate_dir=$(dirname "{}"); \
     mkdir -p "$crate_dir/src"; \
     if [ ! -f "$crate_dir/src/lib.rs" ] && [ ! -f "$crate_dir/src/main.rs" ]; then \
-    echo '// stub added by Dockerfile so cargo-chef can parse the manifest' \
-    > "$crate_dir/src/lib.rs"; \
-    fi; \
-    done
+    echo "// stub for cargo-chef" > "$crate_dir/src/lib.rs"; \
+    fi'
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
