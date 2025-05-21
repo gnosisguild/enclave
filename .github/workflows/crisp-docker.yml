@@ -7,6 +7,7 @@ on:
       - release
       - main
       - hacknet
+      - hmza/379-crisp-dockerfile
     paths:
       - 'examples/CRISP/apps/server/**'
   pull_request:
@@ -14,6 +15,7 @@ on:
       - release
       - main
       - hacknet
+      - hmza/379-crisp-dockerfile
     paths:
       - 'examples/CRISP/apps/server/**'
 
