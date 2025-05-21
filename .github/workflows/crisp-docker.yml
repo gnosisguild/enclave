@@ -59,24 +59,11 @@ jobs:
           file: ${{ env.DOCKERFILE_PATH }}
           push: true
           tags: |
-           ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ github.ref == 'refs/heads/release' && format('{0}:latest', env.IMAGE_NAME) || '' }}
           build-args: |
             SKIP_SOLIDITY=1
           cache-from: |
             type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
           cache-to: |
             type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
-
-      - name: Push to GHCR
-        env:
-          IMAGE_TAG: ${{ steps.version.outputs.version }}
-        run: |
-          docker push $IMAGE_NAME:$IMAGE_TAG
-
-      - name: Push Latest to GHCR
-        if: github.ref == 'refs/heads/release'
-        env:
-          IMAGE_TAG: ${{ steps.version.outputs.version }}
-        run: |
-          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
-          docker push $IMAGE_NAME:latest
