@@ -13,7 +13,7 @@ sol!(
 );
 
 #[tokio::test]
-async fn event_listener() -> Result<()> {
+async fn test_event_listener() -> Result<()> {
     let anvil = Anvil::new().block_time(1).try_spawn()?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
     let (tx_addr, mut rx_addr) = tokio::sync::mpsc::channel::<String>(10);
@@ -24,22 +24,32 @@ async fn event_listener() -> Result<()> {
 
     let contract = EmitLogs::deploy(provider).await?;
 
-    let mut event_listener =
-        EventListener::create_contract_listener(&anvil.ws_endpoint(), contract.address()).await?;
+    let mut event_listener = EventListener::create_contract_listener(
+        &anvil.ws_endpoint(),
+        &contract.address().to_string(),
+    )
+    .await?;
 
-    event_listener.add_event_handler::<EmitLogs::ValueChanged>(
-        move |event: &EmitLogs::ValueChanged| {
-            let _ = tx.clone().try_send(event.value.clone());
-            Ok(())
-        },
-    );
+    event_listener
+        .add_event_handler(move |event: EmitLogs::ValueChanged| {
+            let tx = tx.clone();
+            async move {
+                let _ = tx.clone().try_send(event.value.clone());
+                Ok(())
+            }
+        })
+        .await;
 
-    event_listener.add_event_handler::<EmitLogs::ValueChanged>(
-        move |event: &EmitLogs::ValueChanged| {
-            let _ = tx_addr.clone().try_send(event.author.to_string());
-            Ok(())
-        },
-    );
+    event_listener
+        .add_event_handler(move |event: EmitLogs::ValueChanged| {
+            let tx_addr = tx_addr.clone();
+            async move {
+                let _ = tx_addr.clone().try_send(event.author.to_string());
+                Ok(())
+            }
+        })
+        .await;
+
     tokio::spawn(async move { event_listener.listen().await.unwrap() });
 
     contract
