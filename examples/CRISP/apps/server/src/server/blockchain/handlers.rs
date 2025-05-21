@@ -193,12 +193,10 @@ pub async fn handle_plaintext_output_published(
 }
 
 pub async fn handle_committee_published(committee_published: CommitteePublished) -> Result<()> {
-    info!("Handling CommitteePublished event...");
     info!(
-        "Committee Published for round: {:?}",
+        "Handling CommitteePublished event for E3: {}",
         committee_published.e3Id
     );
-
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
