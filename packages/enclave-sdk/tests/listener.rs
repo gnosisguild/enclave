@@ -31,18 +31,25 @@ async fn test_event_listener() -> Result<()> {
     .await?;
 
     event_listener
-        .add_event_handler(move |event: &EmitLogs::ValueChanged| {
-            let _ = tx.clone().try_send(event.value.clone());
-            Ok(())
+        .add_event_handler(move |event: EmitLogs::ValueChanged| {
+            let tx = tx.clone();
+            async move {
+                let _ = tx.clone().try_send(event.value.clone());
+                Ok(())
+            }
         })
         .await;
 
     event_listener
-        .add_event_handler(move |event: &EmitLogs::ValueChanged| {
-            let _ = tx_addr.clone().try_send(event.author.to_string());
-            Ok(())
+        .add_event_handler(move |event: EmitLogs::ValueChanged| {
+            let tx_addr = tx_addr.clone();
+            async move {
+                let _ = tx_addr.clone().try_send(event.author.to_string());
+                Ok(())
+            }
         })
         .await;
+
     tokio::spawn(async move { event_listener.listen().await.unwrap() });
 
     contract

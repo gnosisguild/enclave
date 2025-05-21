@@ -1,8 +1,8 @@
 pub mod models;
-use std::collections::HashMap;
+use alloy::providers::Provider;
+use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
-// use alloy::primitives::Address;
 use async_trait::async_trait;
 use eyre::Result;
 use models::E3;
@@ -10,6 +10,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
 
 use crate::evm::{
+    contracts::{
+        EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveReadOnlyProvider, ReadOnly,
+    },
     events::{E3Activated, InputPublished},
     listener::EventListener,
 };
@@ -25,10 +28,10 @@ pub enum IndexerError {
 }
 
 #[async_trait]
-pub trait DataStore {
+pub trait DataStore: Send + Sync + 'static {
     type Error;
     async fn insert<T: Serialize + Send + Sync>(
-        &self,
+        &mut self,
         key: &str,
         value: &T,
     ) -> Result<(), Self::Error>;
@@ -39,13 +42,13 @@ pub trait DataStore {
 }
 
 pub struct InMemoryStore {
-    data: RwLock<HashMap<String, Vec<u8>>>,
+    data: HashMap<String, Vec<u8>>,
 }
 
 impl InMemoryStore {
     pub fn new() -> Self {
         Self {
-            data: RwLock::new(HashMap::new()),
+            data: HashMap::new(),
         }
     }
 }
@@ -55,13 +58,11 @@ impl DataStore for InMemoryStore {
     type Error = eyre::Error;
 
     async fn insert<T: Serialize + Send + Sync>(
-        &self,
+        &mut self,
         key: &str,
         value: &T,
     ) -> Result<(), Self::Error> {
         self.data
-            .write()
-            .await
             .insert(key.to_string(), bincode::serialize(value)?);
         Ok(())
     }
@@ -72,185 +73,139 @@ impl DataStore for InMemoryStore {
     ) -> Result<Option<T>, Self::Error> {
         Ok(self
             .data
-            .read()
-            .await
             .get(key)
             .map(|bytes| bincode::deserialize(bytes))
             .transpose()?)
     }
 }
 
-pub struct EnclaveIndexer<D: DataStore> {
+#[derive(Clone)]
+pub struct EnclaveIndexer<Store: DataStore> {
     listener: EventListener,
-    store: D,
+    contract: EnclaveContract<EnclaveReadOnlyProvider, ReadOnly>,
+    store: Arc<RwLock<Store>>,
+    contract_address: String,
+    chain_id: u64,
 }
 
-impl<D: DataStore> EnclaveIndexer<D> {
-    pub async fn new(ws_url: &str, contract_address: &str, store: D) -> Result<Self> {
+impl<Store: DataStore> EnclaveIndexer<Store> {
+    pub async fn new(
+        ws_url: &str,
+        contract_address: &str,
+        store: Arc<RwLock<Store>>,
+    ) -> Result<Self> {
         let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
-
-        Ok(Self { store, listener })
+        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+        let chain_id = contract.provider.get_chain_id().await?;
+        Ok(Self {
+            store,
+            contract,
+            listener,
+            contract_address: contract_address.to_string(),
+            chain_id,
+        })
     }
 
-    pub async fn initialize(mut self) -> Result<Self> {
+    pub async fn init_e3_activated(&mut self) -> Result<()> {
+        let db = self.store.clone();
+        let contract = self.contract.clone();
+        let chain_id = self.chain_id;
+        let enclave_address = self.contract_address.clone();
         self.listener
-            .add_event_handler::<InputPublished>(|input: &InputPublished| {
-                // let e3_id = input.e3Id.to::<u64>();
-                // let (mut e3, key) = self.get_e3(e3_id).await?;
-                Ok(())
+            .add_event_handler(move |e: E3Activated| {
+                let db = db.clone();
+                let enclave_address = enclave_address.clone();
+                let contract = contract.clone();
+                async move {
+                    println!("E3Activated:{:?}", e);
+                    let e3_id = e.e3Id.to::<u64>();
+                    let e3 = contract.get_e3(e.e3Id).await?;
+                    let e3_obj = E3 {
+                        chain_id,
+                        ciphertext_inputs: vec![],
+                        ciphertext_output: vec![],
+                        committee_public_key: e.committeePublicKey.to_vec(),
+                        duration: e3.duration.to::<u64>(),
+                        e3_params: e3.e3ProgramParams.to_vec(),
+                        enclave_address,
+                        encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
+                        expiration: e.expiration.to::<u64>(),
+                        id: e3_id,
+                        plaintext_output: vec![],
+                        request_block: e3.requestBlock.to::<u64>(),
+                        seed: e3.seed.to::<u64>(), // TODO: make this into a bytes32
+                        start_window: e3.startWindow.map(|n| n.to::<u64>()),
+                        threshold: e3.threshold,
+                    };
+
+                    let key = format!("e3:{}", e3_id);
+
+                    db.write()
+                        .await
+                        .insert(&key, &e3_obj)
+                        .await
+                        .map_err(|_| IndexerError::Serialization(e3_id))?;
+
+                    Ok(())
+                }
             })
             .await;
+        Ok(())
+    }
 
-        Ok(self)
+    pub async fn init_input_published(&mut self) -> Result<()> {
+        let store = self.store.clone();
+        self.listener
+            .add_event_handler(move |e: InputPublished| {
+                let store = store.clone();
+                async move {
+                    println!("InputPublished:{:?}", e);
+                    let e3_id = e.e3Id.to::<u64>();
+                    let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
+                    e3.ciphertext_inputs
+                        .push((e.data.to_vec(), e.index.to::<u64>()));
+                    store
+                        .write()
+                        .await
+                        .insert(&key, &e3)
+                        .await
+                        .map_err(|_| IndexerError::Serialization(e3_id))?;
+
+                    Ok(())
+                }
+            })
+            .await;
+        Ok(())
+    }
+
+    pub async fn initialize(&mut self) -> Result<()> {
+        self.init_e3_activated().await?;
+        self.init_input_published().await?;
+        Ok(())
     }
 
     pub async fn start(&self) -> Result<()> {
         self.listener.listen().await
     }
 
-    pub async fn get_e3(&self, e3_id: u64) -> Result<(E3, String), IndexerError> {
-        let key = format!("e3:{}", e3_id);
-        match self
-            .store
-            .get::<E3>(&key)
-            .await
-            .map_err(|_| IndexerError::Serialization(e3_id))?
-        {
-            Some(e3) => Ok((e3, key)),
-            None => Err(IndexerError::E3NotFound(e3_id)),
-        }
+    pub fn get_store(&self) -> Arc<RwLock<Store>> {
+        self.store.clone()
     }
 }
 
-// pub async fn handle_input_published(input: InputPublished) -> Result<()> {
-//     // info!("Handling VoteCast event...");
-//
-//     let e3_id = input.e3Id.to::<u64>();
-//     let (mut e3, key) = get_e3(e3_id).await?;
-//
-//     // e3.ciphertext_inputs
-//     //     .push((input.data.to_vec(), input.index.to::<u64>()));
-//     // e3.vote_count += 1;
-//
-//     GLOBAL_DB.insert(&key, &e3).await?;
-//
-//     info!("Saved Input with Hash: {:?}", input.inputHash);
-//     Ok(())
-// }
-
-// pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
-//     let e3_id = e3_activated.e3Id.to::<u64>();
-//     // info!("Handling E3 request with id {}", e3_id);
-//
-//     // Fetch E3 from the contract
-//     let contract = EnclaveContract::new(
-//         &CONFIG.http_rpc_url,
-//         &CONFIG.private_key,
-//         &CONFIG.enclave_address,
-//     )
-//     .await?;
-//
-//     let e3 = contract.get_e3(e3_activated.e3Id).await?;
-//     info!("Fetched E3 from the contract.");
-//     info!("E3: {:?}", e3);
-//
-//     let start_time = Utc::now().timestamp() as u64;
-//     let expiration = e3_activated.expiration.to::<u64>();
-//
-//     let e3_obj = E3 {
-//         // Identifiers
-//         id: e3_id,
-//         chain_id: CONFIG.chain_id, // Hardcoded for testing
-//         enclave_address: CONFIG.enclave_address.clone(),
-//
-//         // Status-related
-//         status: "Active".to_string(),
-//         has_voted: vec![],
-//         vote_count: 0,
-//         votes_option_1: 0,
-//         votes_option_2: 0,
-//
-//         // Timing-related
-//         start_time,
-//         block_start: e3.requestBlock.to::<u64>(),
-//         duration: e3.duration.to::<u64>(),
-//         expiration,
-//
-//         // Parameters
-//         e3_params: e3.e3ProgramParams.to_vec(),
-//         committee_public_key: e3_activated.committeePublicKey.to_vec(),
-//
-//         // Outputs
-//         ciphertext_output: vec![],
-//         plaintext_output: vec![],
-//
-//         // Ciphertext Inputs
-//         ciphertext_inputs: vec![],
-//
-//         // Emojis
-//         emojis: generate_emoji(),
-//     };
-//
-//     // Save E3 to the database
-//     let key = format!("e3:{}", e3_id);
-//     GLOBAL_DB.insert(&key, &e3_obj).await?;
-//
-//     // Set Current Round
-//     let current_round = CurrentRound { id: e3_id };
-//     GLOBAL_DB.insert("e3:current_round", &current_round).await?;
-//
-//     let expiration = Instant::now()
-//         + (UNIX_EPOCH + Duration::from_secs(expiration))
-//             .duration_since(SystemTime::now())
-//             .unwrap_or_else(|_| Duration::ZERO);
-//
-//     info!("Expiration: {:?}", expiration);
-//
-//     // Sleep till the E3 expires (instantly if in the past)
-//     sleep_until(expiration).await;
-//
-//     // Get All Encrypted Votes
-//     let (mut e3, _) = get_e3(e3_id).await.unwrap();
-//     update_e3_status(e3_id, "Expired".to_string()).await?;
-//
-//     if e3.vote_count > 0 {
-//         info!("E3 FROM DB");
-//         info!("Vote Count: {:?}", e3.vote_count);
-//
-//         let fhe_inputs = FHEInputs {
-//             params: e3.e3_params,
-//             ciphertexts: e3.ciphertext_inputs,
-//         };
-//         info!("Starting computation for E3: {}", e3_id);
-//         update_e3_status(e3_id, "Computing".to_string()).await?;
-//         // Call Compute Provider in a separate thread
-//         let (risc0_output, ciphertext) =
-//             tokio::task::spawn_blocking(move || run_compute(fhe_inputs).unwrap())
-//                 .await
-//                 .unwrap();
-//
-//         info!("Computation completed for E3: {}", e3_id);
-//         info!("RISC0 Output: {:?}", risc0_output);
-//         update_e3_status(e3_id, "PublishingCiphertext".to_string()).await?;
-//         // Params will be encoded on chain to create the journal
-//         let tx = contract
-//             .publish_ciphertext_output(
-//                 e3_activated.e3Id,
-//                 ciphertext.into(),
-//                 risc0_output.seal.into(),
-//             )
-//             .await?;
-//
-//         info!(
-//             "CiphertextOutputPublished event published with tx: {:?}",
-//             tx.transaction_hash
-//         );
-//     } else {
-//         info!("E3 has no votes to decrypt. Setting status to Finished.");
-//         e3.status = "Finished".to_string();
-//
-//         GLOBAL_DB.insert(&key, &e3).await?;
-//     }
-//     info!("E3 request handled successfully.");
-//     Ok(())
-// }
+pub async fn get_e3(
+    store: Arc<RwLock<impl DataStore>>,
+    e3_id: u64,
+) -> Result<(E3, String), IndexerError> {
+    let key = format!("e3:{}", e3_id);
+    match store
+        .read()
+        .await
+        .get::<E3>(&key)
+        .await
+        .map_err(|_| IndexerError::Serialization(e3_id))?
+    {
+        Some(e3) => Ok((e3, key)),
+        None => Err(IndexerError::E3NotFound(e3_id)),
+    }
+}
