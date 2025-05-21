@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use alloy::{
     node_bindings::Anvil,
@@ -6,9 +6,9 @@ use alloy::{
     providers::{ProviderBuilder, WsConnect},
     sol,
 };
-use enclave_sdk::indexer::{models::E3, DataStore, EnclaveIndexer, InMemoryStore};
+use enclave_sdk::indexer::{EnclaveIndexer, InMemoryStore};
 use eyre::Result;
-use tokio::{sync::RwLock, time::sleep};
+use tokio::time::sleep;
 
 sol!(
     #[sol(rpc)]
@@ -28,9 +28,7 @@ async fn test_indexer() -> Result<()> {
     let address = contract.address().to_string();
     let endpoint = anvil.ws_endpoint();
 
-    let mut indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
-
-    indexer.initialize().await?;
+    let indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
 
     indexer.start()?;
 

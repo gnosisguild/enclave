@@ -12,7 +12,7 @@ use crate::evm::{
     contracts::{
         EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveReadOnlyProvider, ReadOnly,
     },
-    events::{E3Activated, InputPublished},
+    events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
     listener::EventListener,
 };
 
@@ -92,16 +92,18 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
         let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
         let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
         let chain_id = contract.provider.get_chain_id().await?;
-        Ok(Self {
+        let mut instance = Self {
             store: Arc::new(RwLock::new(store)),
             contract,
             listener,
             contract_address: contract_address.to_string(),
             chain_id,
-        })
+        };
+        instance.setup_listeners().await?;
+        Ok(instance)
     }
 
-    async fn init_e3_activated(&mut self) -> Result<()> {
+    async fn capture_e3_activated(&mut self) -> Result<()> {
         let db = self.store.clone();
         let contract = self.contract.clone();
         let chain_id = self.chain_id;
@@ -148,7 +150,7 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
         Ok(())
     }
 
-    async fn init_input_published(&mut self) -> Result<()> {
+    async fn capture_input_published(&mut self) -> Result<()> {
         let store = self.store.clone();
         self.listener
             .add_event_handler(move |e: InputPublished| {
@@ -173,9 +175,61 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
         Ok(())
     }
 
-    pub async fn initialize(&mut self) -> Result<()> {
-        self.init_e3_activated().await?;
-        self.init_input_published().await?;
+    async fn capture_ciphertext_output_published(&mut self) -> Result<()> {
+        let store = self.store.clone();
+        self.listener
+            .add_event_handler(move |e: CiphertextOutputPublished| {
+                let store = store.clone();
+                async move {
+                    println!("CiphertextOutputPublished:{:?}", e);
+                    let e3_id = e.e3Id.to::<u64>();
+                    let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
+                    e3.ciphertext_output = e.ciphertextOutput.to_vec();
+
+                    store
+                        .write()
+                        .await
+                        .insert(&key, &e3)
+                        .await
+                        .map_err(|_| IndexerError::Serialization(e3_id))?;
+
+                    Ok(())
+                }
+            })
+            .await;
+        Ok(())
+    }
+
+    async fn capture_plaintext_output_published(&mut self) -> Result<()> {
+        let store = self.store.clone();
+        self.listener
+            .add_event_handler(move |e: PlaintextOutputPublished| {
+                let store = store.clone();
+                async move {
+                    println!("PlaintextOutputPublished:{:?}", e);
+                    let e3_id = e.e3Id.to::<u64>();
+                    let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
+                    e3.plaintext_output = e.plaintextOutput.to_vec();
+
+                    store
+                        .write()
+                        .await
+                        .insert(&key, &e3)
+                        .await
+                        .map_err(|_| IndexerError::Serialization(e3_id))?;
+
+                    Ok(())
+                }
+            })
+            .await;
+        Ok(())
+    }
+
+    async fn setup_listeners(&mut self) -> Result<()> {
+        self.capture_e3_activated().await?;
+        self.capture_input_published().await?;
+        self.capture_ciphertext_output_published().await?;
+        self.capture_plaintext_output_published().await?;
         Ok(())
     }
 
