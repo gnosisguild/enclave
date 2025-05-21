@@ -32,7 +32,7 @@ impl SledDB {
 }
 
 #[async_trait]
-impl DataStore for SledDb {
+impl DataStore for SledDB {
     type Error = DatabaseError;
     async fn insert<T: Serialize>(&self, key: &str, value: &T) -> Result<(), Self::Error> {
         let serialized = serde_json::to_vec(value)?;

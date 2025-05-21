@@ -26,11 +26,12 @@ pub enum IndexerError {
     Serialization(E3Id),
 }
 
+/// Trait for injectable DataStore. Note the implementor must manage interior mutability
 #[async_trait]
 pub trait DataStore: Send + Sync + 'static {
     type Error;
     async fn insert<T: Serialize + Send + Sync>(
-        &mut self,
+        &self,
         key: &str,
         value: &T,
     ) -> Result<(), Self::Error>;
@@ -41,13 +42,13 @@ pub trait DataStore: Send + Sync + 'static {
 }
 
 pub struct InMemoryStore {
-    data: HashMap<String, Vec<u8>>,
+    data: Arc<RwLock<HashMap<String, Vec<u8>>>>,
 }
 
 impl InMemoryStore {
     pub fn new() -> Self {
         Self {
-            data: HashMap::new(),
+            data: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -57,11 +58,13 @@ impl DataStore for InMemoryStore {
     type Error = eyre::Error;
 
     async fn insert<T: Serialize + Send + Sync>(
-        &mut self,
+        &self,
         key: &str,
         value: &T,
     ) -> Result<(), Self::Error> {
         self.data
+            .write()
+            .await
             .insert(key.to_string(), bincode::serialize(value)?);
         Ok(())
     }
@@ -72,6 +75,8 @@ impl DataStore for InMemoryStore {
     ) -> Result<Option<T>, Self::Error> {
         Ok(self
             .data
+            .read()
+            .await
             .get(key)
             .map(|bytes| bincode::deserialize(bytes))
             .transpose()?)
