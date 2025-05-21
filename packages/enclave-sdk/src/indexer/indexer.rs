@@ -8,6 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
 
 use crate::evm::{
     contracts::{
@@ -242,14 +243,14 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
         Ok(())
     }
 
-    pub fn start(&self) -> Result<()> {
+    pub fn start(&self) -> Result<JoinHandle<()>> {
         let listener = self.listener.clone();
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             if let Err(e) = listener.listen().await {
                 eprintln!("Error: {}", e);
             }
         });
-        Ok(())
+        Ok(handle)
     }
 
     pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {
