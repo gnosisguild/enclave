@@ -17,9 +17,6 @@
   "[solidity]": {
     "editor.defaultFormatter": "NomicFoundation.hardhat-solidity"
   },
-  "[dockerfile]": {
-    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
-  },
   "[rust]": {
     "editor.defaultFormatter": "rust-lang.rust-analyzer"
   }

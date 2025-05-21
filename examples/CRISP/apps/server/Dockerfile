@@ -55,20 +55,20 @@ COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 
 RUN set -eux; \
     find \
-    examples/CRISP/apps/program packages/enclave-sdk packages/compute_provider \
+    examples/CRISP/apps/program \
+    packages/enclave-sdk \
+    packages/compute_provider \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
-    | while IFS= read -r -d '' manifest; do \
-    if [ "$(basename "$(dirname "$manifest")")" == "program" ] && [ "$(basename "$manifest")" == "Cargo.toml" ]; then \
-    if [ -f "$(dirname "$manifest")/src/lib.rs" ] || [ -f "$(dirname "$manifest")/src/main.rs" ]; then \
-    :; # It has src, proceed (though unlikely for a virtual manifest) else \
-    continue; # It's likely a virtual manifest, skip stub creation fi; \
-    fi; \
-    crate_dir="$(dirname "$manifest")"; \
-    mkdir -p "$crate_dir/src"; \
-    if [ ! -f "$crate_dir/src/lib.rs" ] && [ ! -f "$crate_dir/src/main.rs" ]; then \
-    echo '// stub added by Dockerfile so cargo-chef can parse the manifest' \
-    > "$crate_dir/src/lib.rs"; \
-    fi; \
+    | while IFS= read -r -d '' manifest_path; do \
+        crate_dir="$(dirname "$manifest_path")"; \
+        if [ "$manifest_path" = "examples/CRISP/apps/program/Cargo.toml" ]; then \
+            echo "Skipping stub creation for virtual manifest: $manifest_path"; \
+            continue; \
+        fi; \
+        mkdir -p "$crate_dir/src"; \
+        if [ ! -f "$crate_dir/src/lib.rs" ] && [ ! -f "$crate_dir/src/main.rs" ]; then \
+            echo "// Stub lib.rs for $crate_dir" > "$crate_dir/src/lib.rs"; \
+        fi; \
     done
 
 WORKDIR /app/examples/CRISP/apps/server
