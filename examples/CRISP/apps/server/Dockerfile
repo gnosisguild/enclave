@@ -25,8 +25,7 @@ FROM base-dev AS chef
 WORKDIR /app
 
 COPY examples/CRISP/apps/server/Cargo.*  examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/*/Cargo.*  examples/CRISP/apps/program/
-COPY examples/CRISP/apps/program/*/*/Cargo.*  examples/CRISP/apps/program/
+COPY examples/CRISP/apps/program/**/Cargo.*  examples/CRISP/apps/program/
 COPY packages/enclave-sdk/Cargo.*  packages/enclave-sdk/
 COPY packages/compute_provider/Cargo.*  packages/compute_provider/
 
@@ -44,8 +43,7 @@ COPY --from=chef /app/examples/CRISP/apps/server/recipe.json \
     /app/examples/CRISP/apps/server/recipe.json
 
 COPY examples/CRISP/apps/server/Cargo.*  examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/*/Cargo.*  examples/CRISP/apps/program/
-COPY examples/CRISP/apps/program/*/*/Cargo.*  examples/CRISP/apps/program/
+COPY examples/CRISP/apps/program/**/Cargo.*  examples/CRISP/apps/program/
 COPY packages/enclave-sdk/Cargo.*  packages/enclave-sdk/
 COPY packages/compute_provider/Cargo.*  packages/compute_provider/
 
