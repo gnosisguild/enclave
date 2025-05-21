@@ -48,6 +48,21 @@ COPY examples/CRISP/apps/program/**/Cargo.*  examples/CRISP/apps/program/
 COPY packages/enclave-sdk/Cargo.*            packages/enclave-sdk/
 COPY packages/compute_provider/Cargo.*       packages/compute_provider/
 
+RUN set -eux; \
+    find \
+    examples/CRISP/apps/program \
+    packages/enclave-sdk \
+    packages/compute_provider \
+    -type f -name Cargo.toml ! -path '*/target/*' -print0 \
+    | while IFS= read -r -d '' manifest; do \
+    crate_dir="$(dirname "$manifest")"; \
+    mkdir -p "$crate_dir/src"; \
+    if [ ! -f "$crate_dir/src/lib.rs" ] && [ ! -f "$crate_dir/src/main.rs" ]; then \
+    echo '// stub added by Dockerfile so cargo-chef can parse the manifest' \
+    > "$crate_dir/src/lib.rs"; \
+    fi; \
+    done
+
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/examples/CRISP/apps/server/target,sharing=locked \
