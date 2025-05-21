@@ -11,7 +11,11 @@ use alloy::{
     sol_types::SolEvent,
 };
 use compute_provider::FHEInputs;
-use enclave_sdk::evm::contracts::{EnclaveContract, E3 as ContractE3};
+use enclave_sdk::evm::contracts::{
+    EnclaveContract, EnclaveRead, EnclaveReadOnlyProvider, EnclaveWrite, ReadOnly, ReadWrite,
+    E3 as ContractE3,
+};
+use enclave_sdk::indexer::DataStore;
 use futures::future::join_all;
 use log::{error, info, warn};
 use std::{
@@ -123,7 +127,7 @@ async fn find_last_finished_e3_id(latest_db_id: u64) -> Result<Option<u64>> {
 
 /// Fetches events from the blockchain starting from a specific block.
 async fn fetch_events(
-    contract: Arc<EnclaveContract>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
     from_block: u64,
 ) -> Result<HashMap<U256, Vec<Log>>> {
     let filter = Filter::new()
@@ -152,7 +156,7 @@ async fn fetch_events(
 /// Synchronizes a single E3.
 async fn sync_e3(
     e3_id: U256,
-    contract: Arc<EnclaveContract>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
     published_events: Arc<HashMap<U256, Vec<Log>>>,
 ) -> Result<()> {
     let events_clone = published_events.clone();
@@ -222,7 +226,7 @@ fn calculate_expiration(expiration_secs: &U256) -> Result<Instant> {
 /// Computes and publishes the ciphertext output.
 async fn compute_and_publish_ciphertext(
     e3_id: U256,
-    contract: Arc<EnclaveContract>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
     events: Arc<HashMap<U256, Vec<Log>>>,
 ) -> Result<()> {
     let ciphertext_inputs = events

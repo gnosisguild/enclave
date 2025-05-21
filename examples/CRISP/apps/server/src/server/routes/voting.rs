@@ -8,7 +8,8 @@ use alloy::{
     dyn_abi::DynSolValue,
     primitives::{Bytes, U256},
 };
-use enclave_sdk::evm::contracts::EnclaveContract;
+use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
+use enclave_sdk::indexer::DataStore;
 use eyre::Error;
 use log::info;
 

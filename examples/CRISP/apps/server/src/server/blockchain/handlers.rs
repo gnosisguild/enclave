@@ -9,7 +9,8 @@ use crate::server::{
 };
 use chrono::Utc;
 use compute_provider::FHEInputs;
-use enclave_sdk::evm::contracts::EnclaveContract;
+use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
+use enclave_sdk::indexer::DataStore;
 use log::info;
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
