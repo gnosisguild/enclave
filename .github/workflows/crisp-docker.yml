@@ -43,5 +43,7 @@ jobs:
           context: .
           file: ${{ env.DOCKERFILE_PATH }}
           push: false
+          build-args: |
+            SKIP_SOLIDITY=1
           tags: |
             ${{ env.IMAGE_NAME }}:latest

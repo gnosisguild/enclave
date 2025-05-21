@@ -1,6 +1,7 @@
 ############### stage 0: base-dev ###############
 ARG RUST_VERSION=1.85.0
 ARG RISC0_VERSION=2.0.0
+ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base-dev
 
@@ -33,6 +34,10 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 ############### stage 2: planner ###############
 FROM base-dev AS planner
+
+ARG SKIP_SOLIDITY
+ENV SKIP_SOLIDITY=${SKIP_SOLIDITY}
+
 WORKDIR /app
 COPY --from=chef /app/examples/CRISP/apps/server/recipe.json /app/examples/CRISP/apps/server/recipe.json
 
@@ -48,6 +53,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 ############### stage 3: builder ###############
 FROM base-dev AS builder
+
+ARG SKIP_SOLIDITY
+ENV SKIP_SOLIDITY=${SKIP_SOLIDITY}
+
 WORKDIR /app
 
 COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
