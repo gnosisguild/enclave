@@ -56,7 +56,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: $DOCKERFILE_PATH
+          file: ${{ env.DOCKERFILE_PATH }}
           push: true
           tags: |
            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
