@@ -24,10 +24,12 @@ RUN cargo install --locked cargo-chef
 FROM base-dev AS chef
 WORKDIR /app
 
-COPY examples/CRISP/apps/server/Cargo.*  examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/**/Cargo.*  examples/CRISP/apps/program/
-COPY packages/enclave-sdk/Cargo.*  packages/enclave-sdk/
-COPY packages/compute_provider/Cargo.*  packages/compute_provider/
+COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
+COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
+COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
+COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
+COPY packages/enclave-sdk/Cargo.toml packages/enclave-sdk/
+COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN cargo chef prepare --recipe-path recipe.json
@@ -42,10 +44,12 @@ WORKDIR /app
 COPY --from=chef /app/examples/CRISP/apps/server/recipe.json \
     /app/examples/CRISP/apps/server/recipe.json
 
-COPY examples/CRISP/apps/server/Cargo.*  examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/**/Cargo.*  examples/CRISP/apps/program/
-COPY packages/enclave-sdk/Cargo.*  packages/enclave-sdk/
-COPY packages/compute_provider/Cargo.*  packages/compute_provider/
+COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
+COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
+COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
+COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
+COPY packages/enclave-sdk/Cargo.toml packages/enclave-sdk/
+COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 
 RUN set -eux; \
     find \
