@@ -34,13 +34,20 @@ impl SledDB {
 #[async_trait]
 impl DataStore for SledDB {
     type Error = DatabaseError;
-    async fn insert<T: Serialize>(&self, key: &str, value: &T) -> Result<(), Self::Error> {
+    async fn insert<T: Serialize + Send + Sync>(
+        &self,
+        key: &str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
         let serialized = serde_json::to_vec(value)?;
         self.db.write().await.insert(key.as_bytes(), serialized)?;
         Ok(())
     }
 
-    async fn get<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>, Self::Error> {
+    async fn get<T: DeserializeOwned + Send + Sync>(
+        &self,
+        key: &str,
+    ) -> Result<Option<T>, Self::Error> {
         if let Some(bytes) = self.db.read().await.get(key.as_bytes())? {
             let value = serde_json::from_slice(&bytes)?;
             Ok(Some(value))
