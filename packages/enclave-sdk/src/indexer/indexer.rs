@@ -122,25 +122,25 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
                 let contract = contract.clone();
                 async move {
                     println!("E3Activated:{:?}", e);
-                    let e3_id = e.e3Id.to::<u64>();
+                    let e3_id = u64_try_from(e.e3Id)?;
                     let e3 = contract.get_e3(e.e3Id).await?;
                     let e3_obj = E3 {
                         chain_id,
                         ciphertext_inputs: vec![],
                         ciphertext_output: vec![],
                         committee_public_key: e.committeePublicKey.to_vec(),
-                        duration: u64_try_convert(e3.duration)?,
+                        duration: u64_try_from(e3.duration)?,
                         e3_params: e3.e3ProgramParams.to_vec(),
                         enclave_address,
                         encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
-                        expiration: u64_try_convert(e.expiration)?,
+                        expiration: u64_try_from(e.expiration)?,
                         id: e3_id,
                         plaintext_output: vec![],
-                        request_block: u64_try_convert(e3.requestBlock)?,
-                        seed: u64_try_convert(e3.seed)?, // TODO: make this into a bytes32
+                        request_block: u64_try_from(e3.requestBlock)?,
+                        seed: u64_try_from(e3.seed)?, // TODO: make this into a bytes32
                         start_window: [
-                            u64_try_convert(e3.startWindow[0])?,
-                            u64_try_convert(e3.startWindow[1])?,
+                            u64_try_from(e3.startWindow[0])?,
+                            u64_try_from(e3.startWindow[1])?,
                         ],
                         threshold: e3.threshold,
                     };
@@ -167,7 +167,7 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
                 let store = store.clone();
                 async move {
                     println!("InputPublished:{:?}", e);
-                    let e3_id = e.e3Id.to::<u64>();
+                    let e3_id = u64_try_from(e.e3Id)?;
                     let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
                     e3.ciphertext_inputs
                         .push((e.data.to_vec(), e.index.to::<u64>()));
@@ -192,7 +192,7 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
                 let store = store.clone();
                 async move {
                     println!("CiphertextOutputPublished:{:?}", e);
-                    let e3_id = e.e3Id.to::<u64>();
+                    let e3_id = u64_try_from(e.e3Id)?;
                     let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
                     e3.ciphertext_output = e.ciphertextOutput.to_vec();
 
@@ -217,7 +217,7 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
                 let store = store.clone();
                 async move {
                     println!("PlaintextOutputPublished:{:?}", e);
-                    let e3_id = e.e3Id.to::<u64>();
+                    let e3_id = u64_try_from(e.e3Id)?;
                     let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
                     e3.plaintext_output = e.plaintextOutput.to_vec();
 
@@ -280,6 +280,6 @@ pub async fn get_e3(
     }
 }
 
-fn u64_try_convert(input: Uint<256, 4>) -> Result<u64> {
+fn u64_try_from(input: Uint<256, 4>) -> Result<u64> {
     u64::try_from(input).map_err(|_| eyre!("larger than 64-bit"))
 }
