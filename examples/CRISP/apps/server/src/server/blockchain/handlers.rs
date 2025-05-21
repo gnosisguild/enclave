@@ -9,7 +9,8 @@ use crate::server::{
 };
 use chrono::Utc;
 use compute_provider::FHEInputs;
-use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead};
+use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
+use enclave_sdk::indexer::DataStore;
 use log::info;
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -23,7 +24,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
     info!("Handling E3 request with id {}", e3_id);
 
     // Fetch E3 from the contract
-    let contract = EnclaveContractFactory::create_write(
+    let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
         &CONFIG.enclave_address,

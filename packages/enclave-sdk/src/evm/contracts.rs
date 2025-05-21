@@ -119,23 +119,47 @@ pub trait EnclaveWrite {
 }
 
 /// Generic type to represent different provider types
-pub trait ProviderType: Send {}
+pub trait ProviderType: Send {
+    type Provider: Provider + Send + Sync + 'static;
+}
 
 /// Marker type for read-only provider
 #[derive(Clone)]
 pub struct ReadOnly;
-impl ProviderType for ReadOnly {}
-
+impl ProviderType for ReadOnly {
+    type Provider = EnclaveReadOnlyProvider;
+}
 /// Marker type for read-write provider
 pub struct ReadWrite;
-impl ProviderType for ReadWrite {}
+impl ProviderType for ReadWrite {
+    type Provider = EnclaveWriteProvider;
+}
 
 /// Generic Enclave contract
 #[derive(Clone)]
-pub struct EnclaveContract<P, T: ProviderType + Send> {
-    pub provider: Arc<P>,
+pub struct EnclaveContract<T: ProviderType> {
+    pub provider: Arc<T::Provider>,
     pub contract_address: Address,
     _marker: PhantomData<T>,
+}
+
+impl EnclaveContract<ReadWrite> {
+    pub async fn new(
+        http_rpc_url: &str,
+        contract_address: &str,
+        private_key: &str,
+    ) -> Result<EnclaveContract<ReadWrite>> {
+        EnclaveContractFactory::create_write(http_rpc_url, contract_address, private_key).await
+    }
+}
+
+impl EnclaveContract<ReadOnly> {
+    pub async fn create_read(
+        http_rpc_url: &str,
+        contract_address: &str,
+    ) -> Result<EnclaveContract<ReadOnly>> {
+        EnclaveContractFactory::create_read(http_rpc_url, contract_address).await
+    }
 }
 
 /// Type alias for read-only provider
@@ -156,8 +180,8 @@ pub type EnclaveWriteProvider = FillProvider<
 >;
 
 /// Type aliases for the two contract variants
-pub type EnclaveReadContract = EnclaveContract<EnclaveReadOnlyProvider, ReadOnly>;
-pub type EnclaveWriteContract = EnclaveContract<EnclaveWriteProvider, ReadWrite>;
+pub type EnclaveReadContract = EnclaveContract<ReadOnly>;
+pub type EnclaveWriteContract = EnclaveContract<ReadWrite>;
 
 // Factory for creating contract instances
 pub struct EnclaveContractFactory;
@@ -168,7 +192,7 @@ impl EnclaveContractFactory {
         http_rpc_url: &str,
         contract_address: &str,
         private_key: &str,
-    ) -> Result<EnclaveContract<EnclaveWriteProvider, ReadWrite>> {
+    ) -> Result<EnclaveContract<ReadWrite>> {
         let contract_address = contract_address.parse()?;
 
         let signer: PrivateKeySigner = private_key.parse()?;
@@ -179,7 +203,7 @@ impl EnclaveContractFactory {
             .on_builtin(http_rpc_url)
             .await?;
 
-        Ok(EnclaveContract::<EnclaveWriteProvider, ReadWrite> {
+        Ok(EnclaveContract::<ReadWrite> {
             provider: Arc::new(provider),
             contract_address,
             _marker: PhantomData,
@@ -190,12 +214,12 @@ impl EnclaveContractFactory {
     pub async fn create_read(
         http_rpc_url: &str,
         contract_address: &str,
-    ) -> Result<EnclaveContract<EnclaveReadOnlyProvider, ReadOnly>> {
+    ) -> Result<EnclaveContract<ReadOnly>> {
         let contract_address = contract_address.parse()?;
 
         let provider = ProviderBuilder::new().on_builtin(http_rpc_url).await?;
 
-        Ok(EnclaveContract::<EnclaveReadOnlyProvider, ReadOnly> {
+        Ok(EnclaveContract::<ReadOnly> {
             provider: Arc::new(provider),
             contract_address,
             _marker: PhantomData,
@@ -205,9 +229,8 @@ impl EnclaveContractFactory {
 
 // Implement EnclaveRead for any EnclaveContract regardless of provider type
 #[async_trait]
-impl<P, T: Send + Sync> EnclaveRead for EnclaveContract<P, T>
+impl<T: Send + Sync> EnclaveRead for EnclaveContract<T>
 where
-    P: Provider + Send + Sync + 'static,
     T: ProviderType,
 {
     async fn get_e3_id(&self) -> Result<U256> {
@@ -254,7 +277,7 @@ where
 
 // Implement EnclaveWrite only for contracts with ReadWrite marker
 #[async_trait]
-impl EnclaveWrite for EnclaveContract<EnclaveWriteProvider, ReadWrite> {
+impl EnclaveWrite for EnclaveContract<ReadWrite> {
     async fn request_e3(
         &self,
         filter: Address,

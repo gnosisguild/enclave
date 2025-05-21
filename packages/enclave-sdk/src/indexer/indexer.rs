@@ -86,7 +86,7 @@ impl DataStore for InMemoryStore {
 #[derive(Clone)]
 pub struct EnclaveIndexer<Store: DataStore> {
     listener: EventListener,
-    contract: EnclaveContract<EnclaveReadOnlyProvider, ReadOnly>,
+    contract: EnclaveContract<ReadOnly>,
     store: Arc<RwLock<Store>>,
     contract_address: String,
     chain_id: u64,
