@@ -1,11 +1,12 @@
-use alloy::providers::Provider;
-use std::{collections::HashMap, sync::Arc};
-use thiserror::Error;
-
 use super::models::E3;
+use alloy::primitives::Uint;
+use alloy::providers::Provider;
 use async_trait::async_trait;
+use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
+use std::{collections::HashMap, sync::Arc};
+use thiserror::Error;
 use tokio::sync::RwLock;
 
 use crate::evm::{
@@ -127,16 +128,19 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
                         ciphertext_inputs: vec![],
                         ciphertext_output: vec![],
                         committee_public_key: e.committeePublicKey.to_vec(),
-                        duration: e3.duration.to::<u64>(),
+                        duration: u64_try_convert(e3.duration)?,
                         e3_params: e3.e3ProgramParams.to_vec(),
                         enclave_address,
                         encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
-                        expiration: e.expiration.to::<u64>(),
+                        expiration: u64_try_convert(e.expiration)?,
                         id: e3_id,
                         plaintext_output: vec![],
-                        request_block: e3.requestBlock.to::<u64>(),
-                        seed: e3.seed.to::<u64>(), // TODO: make this into a bytes32
-                        start_window: e3.startWindow.map(|n| n.to::<u64>()),
+                        request_block: u64_try_convert(e3.requestBlock)?,
+                        seed: u64_try_convert(e3.seed)?, // TODO: make this into a bytes32
+                        start_window: [
+                            u64_try_convert(e3.startWindow[0])?,
+                            u64_try_convert(e3.startWindow[1])?,
+                        ],
                         threshold: e3.threshold,
                     };
 
@@ -273,4 +277,8 @@ pub async fn get_e3(
         Some(e3) => Ok((e3, key)),
         None => Err(IndexerError::E3NotFound(e3_id)),
     }
+}
+
+fn u64_try_convert(input: Uint<256, 4>) -> Result<u64> {
+    u64::try_from(input).map_err(|_| eyre!("larger than 64-bit"))
 }
