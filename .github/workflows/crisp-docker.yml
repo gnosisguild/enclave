@@ -54,20 +54,18 @@ jobs:
 
       - name: Build image
         uses: docker/build-push-action@v5
-        env:
-          IMAGE_TAG: ${{ steps.version.outputs.version }}
         with:
           context: .
           file: $DOCKERFILE_PATH
           push: true
           tags: |
-           $IMAGE_NAME:$IMAGE_TAG
+           ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
           build-args: |
             SKIP_SOLIDITY=1
           cache-from: |
-            type=registry,ref=$IMAGE_NAME:buildcache
+            type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
           cache-to: |
-            type=registry,ref=$IMAGE_NAME:buildcache,mode=max
+            type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
 
       - name: Push to GHCR
         env:
