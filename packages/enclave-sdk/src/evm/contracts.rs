@@ -146,8 +146,8 @@ pub struct EnclaveContract<T: ProviderType> {
 impl EnclaveContract<ReadWrite> {
     pub async fn new(
         http_rpc_url: &str,
-        contract_address: &str,
         private_key: &str,
+        contract_address: &str,
     ) -> Result<EnclaveContract<ReadWrite>> {
         EnclaveContractFactory::create_write(http_rpc_url, contract_address, private_key).await
     }
