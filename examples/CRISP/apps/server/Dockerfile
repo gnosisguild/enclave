@@ -25,6 +25,7 @@ FROM base-dev AS chef
 WORKDIR /app
 
 COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
+COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
 COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
 COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
@@ -45,6 +46,7 @@ COPY --from=chef /app/examples/CRISP/apps/server/recipe.json \
     /app/examples/CRISP/apps/server/recipe.json
 
 COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
+COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
 COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
 COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
@@ -53,11 +55,14 @@ COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 
 RUN set -eux; \
     find \
-    examples/CRISP/apps/program \
-    packages/enclave-sdk \
-    packages/compute_provider \
+    examples/CRISP/apps/program packages/enclave-sdk packages/compute_provider \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
     | while IFS= read -r -d '' manifest; do \
+    if [ "$(basename "$(dirname "$manifest")")" == "program" ] && [ "$(basename "$manifest")" == "Cargo.toml" ]; then \
+    if [ -f "$(dirname "$manifest")/src/lib.rs" ] || [ -f "$(dirname "$manifest")/src/main.rs" ]; then \
+    :; # It has src, proceed (though unlikely for a virtual manifest) else \
+    continue; # It's likely a virtual manifest, skip stub creation fi; \
+    fi; \
     crate_dir="$(dirname "$manifest")"; \
     mkdir -p "$crate_dir/src"; \
     if [ ! -f "$crate_dir/src/lib.rs" ] && [ ! -f "$crate_dir/src/main.rs" ]; then \
