@@ -1,8 +1,8 @@
-use actix_web::{web, HttpResponse, Responder};
-use log::info;
-
 use crate::server::database::{get_e3, GLOBAL_DB};
 use crate::server::models::{CurrentRound, E3StateLite, GetRoundRequest, WebResultRequest};
+use actix_web::{web, HttpResponse, Responder};
+use enclave_sdk::evm::contracts::{EnclaveRead, EnclaveWrite};
+use log::info;
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(

@@ -12,7 +12,8 @@ use alloy::{
 };
 use compute_provider::FHEInputs;
 use enclave_sdk::evm::contracts::{
-    EnclaveContract, EnclaveReadOnlyProvider, ReadOnly, ReadWrite, E3 as ContractE3,
+    EnclaveContract, EnclaveRead, EnclaveReadOnlyProvider, EnclaveWrite, ReadOnly, ReadWrite,
+    E3 as ContractE3,
 };
 use enclave_sdk::indexer::DataStore;
 use futures::future::join_all;
@@ -126,7 +127,7 @@ async fn find_last_finished_e3_id(latest_db_id: u64) -> Result<Option<u64>> {
 
 /// Fetches events from the blockchain starting from a specific block.
 async fn fetch_events(
-    contract: Arc<EnclaveContract<ReadOnly>>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
     from_block: u64,
 ) -> Result<HashMap<U256, Vec<Log>>> {
     let filter = Filter::new()
