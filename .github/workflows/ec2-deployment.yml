@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Image
+    name: Build & Push Image
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.version.outputs.version }}
