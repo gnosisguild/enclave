@@ -89,18 +89,17 @@ COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
 COPY packages/enclave-sdk/          packages/enclave-sdk/
 COPY packages/compute_provider/     packages/compute_provider/
 
-COPY --from=planner /app/examples/CRISP/apps/server/target \
-    /app/examples/CRISP/apps/server/target
-
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/examples/CRISP/apps/server/target,sharing=locked \
-    cargo build --release --bin server
+    cargo build --release --bin server && \
+    mkdir -p /app/dist && \
+    cp /app/examples/CRISP/apps/server/target/release/server /app/dist/server
 
 ############### stage 4: runtime ###############
 FROM gcr.io/distroless/cc-debian12 AS runtime
 WORKDIR /
 
-COPY --from=builder /app/examples/CRISP/apps/server/target/release/server \
+COPY --from=builder /app/dist/server \
     /usr/local/bin/server
 ENTRYPOINT ["/usr/local/bin/server"]
