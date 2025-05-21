@@ -55,18 +55,7 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
-    // sleep(Duration::from_millis(100)).await;
-
-    // let Some(e3) = store
-    //     .read()
-    //     .await
-    //     .get::<E3>(&format!("e3:{}", e3_id))
-    //     .await?
-    // else {
-    //     panic!("Could not get e3");
-    // };
-    //
-    // assert_eq!(e3.ciphertext_inputs.len(), 0);
+    sleep(Duration::from_millis(1)).await;
 
     let data = "Random data that wont actually be a string".to_string();
     let data_hash = 1234;
@@ -83,17 +72,18 @@ async fn test_indexer() -> Result<()> {
         .await?
         .watch()
         .await?;
+    sleep(Duration::from_millis(1)).await;
 
-    // let Some(e3) = store
-    //     .read()
-    //     .await
-    //     .get::<E3>(&format!("e3:{}", e3_id))
-    //     .await?
-    // else {
-    //     panic!("Could not get e3");
-    // };
-    //
-    // assert_eq!(e3.ciphertext_inputs.len(), 1);
+    let Some(e3) = store
+        .read()
+        .await
+        .get::<E3>(&format!("e3:{}", e3_id))
+        .await?
+    else {
+        panic!("Could not get e3");
+    };
 
+    assert_eq!(e3.ciphertext_inputs.len(), 1);
+    println!("{:?}", e3.ciphertext_inputs[0].0);
     Ok(())
 }
