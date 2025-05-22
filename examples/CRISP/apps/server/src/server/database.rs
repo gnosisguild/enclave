@@ -55,10 +55,10 @@ impl DataStore for SledDB {
         }
     }
 
-    async fn modify<T, F>(&mut self, key: &str, f: F) -> Result<Option<T>, Self::Error>
+    async fn modify<T, F>(&mut self, key: &str, mut f: F) -> Result<Option<T>, Self::Error>
     where
         T: Serialize + DeserializeOwned + Send + Sync,
-        F: FnOnce(Option<T>) -> Option<T> + Send,
+        F: FnMut(Option<T>) -> Option<T> + Send,
     {
         // Edit in place
         let result = self.db.update_and_fetch(key, |old_bytes| {
