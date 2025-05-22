@@ -56,7 +56,7 @@ impl DataStore for SledDB {
     }
 }
 
-pub static GLOBAL_DB: Lazy<RwLock<SledDB>> = Lazy::new(|| {
+static GLOBAL_DB: Lazy<RwLock<SledDB>> = Lazy::new(|| {
     let pathdb = std::env::current_dir().unwrap().join("database/server");
     RwLock::new(SledDB::new(pathdb.to_str().unwrap()).unwrap())
 });
