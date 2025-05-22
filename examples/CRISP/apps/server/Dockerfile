@@ -73,8 +73,8 @@ RUN set -eux; \
     done
 
 WORKDIR /app/examples/CRISP/apps/server
-RUN --mount=type=cache,id=cargo-registry,target=$CARGO_HOME/registry,sharing=locked \
-    --mount=type=cache,id=cargo-git,target=$CARGO_HOME/git,sharing=locked \
+RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/examples/CRISP/apps/server/target,sharing=locked \
     cargo chef cook --release --recipe-path recipe.json
 
@@ -92,8 +92,8 @@ COPY packages/enclave-sdk/          packages/enclave-sdk/
 COPY packages/compute_provider/     packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server
-RUN --mount=type=cache,id=cargo-registry,target=$CARGO_HOME/registry,sharing=locked \
-    --mount=type=cache,id=cargo-git,target=$CARGO_HOME/git,sharing=locked \
+RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/examples/CRISP/apps/server/target,sharing=locked \
     cargo build --release --bin server && \
     mkdir -p /app/dist && \
