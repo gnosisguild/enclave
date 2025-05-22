@@ -257,6 +257,10 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
     pub fn get_listener(&self) -> EventListener {
         self.listener.clone()
     }
+
+    pub fn get_store(&self) -> Arc<RwLock<Store>> {
+        self.store.clone()
+    }
 }
 
 pub async fn get_e3(

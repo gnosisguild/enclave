@@ -23,17 +23,23 @@ bincode = { version = "1.3.3" }
 bytemuck = { version = "1" }
 hex = { version = "0.4.3" }
 log = { version = "0.4" }
+eyre = { version = "0.6.12" }
+async-trait = { version = "0.1.88" }
 risc0-build = { version = "2.0.1", features = ["docker"] }
 risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0" }
 risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0" }
 risc0-zkvm = { version = "2.0.0" }
 risc0-zkp = { version = "2.0.0", default-features = false }
 serde = { version = "1.0.208", features = ["derive", "std"] }
+serde_json = "1.0.133"
+sled = "0.34.7"
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 compute-provider = { path = "../../../../packages/compute_provider" }
+enclave-sdk = { path = "../../../../packages/enclave-sdk" }
 tokio = { version = "1.38", features = ["full"] }
+clap = { version = "4.5.17", features = ["derive"] }
 rand = { version = "0.8.5" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
