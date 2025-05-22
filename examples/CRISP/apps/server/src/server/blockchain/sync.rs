@@ -1,7 +1,7 @@
 use super::events::InputPublished;
 use crate::server::{
     config::CONFIG,
-    database::{generate_emoji, get_e3, update_e3_status, GLOBAL_DB},
+    database::{db_get, db_insert, generate_emoji, get_e3, update_e3_status},
     models::{CurrentRound, E3},
 };
 use alloy::{
@@ -43,7 +43,7 @@ pub async fn sync_server() -> Result<()> {
     );
 
     // Retrieve the current round from the database.
-    let current_round = match GLOBAL_DB.get::<CurrentRound>("e3:current_round").await? {
+    let current_round = match db_get::<CurrentRound>("e3:current_round").await? {
         Some(round) => round,
         None => {
             info!("No current round found in DB. Exiting sync process. Will compute next round.");
@@ -103,9 +103,7 @@ pub async fn sync_server() -> Result<()> {
     let new_current_round = CurrentRound {
         id: latest_contract_e3_id,
     };
-    GLOBAL_DB
-        .insert("e3:current_round", &new_current_round)
-        .await?;
+    db_insert("e3:current_round", &new_current_round).await?;
 
     info!("Server synchronization completed.");
     Ok(())
@@ -250,9 +248,7 @@ async fn compute_and_publish_ciphertext(
     // Update vote count
     let mut db_e3 = get_e3(e3_id.to::<u64>()).await?.0;
     db_e3.vote_count = ciphertext_inputs.len() as u64;
-    GLOBAL_DB
-        .insert(&format!("e3:{}", e3_id.to::<u64>()), &db_e3)
-        .await?;
+    db_insert(&format!("e3:{}", e3_id.to::<u64>()), &db_e3).await?;
 
     let contract_e3 = contract.get_e3(e3_id).await?;
     let fhe_inputs = FHEInputs {
@@ -320,7 +316,7 @@ async fn sync_e3_with_db(e3_id: U256, contract_e3: &ContractE3, vote_count: u64)
         warn!("Unexpected plaintext output format for E3 {}", e3_id);
     }
 
-    GLOBAL_DB.insert(&key, &db_e3).await?;
+    db_insert(&key, &db_e3).await?;
     info!("E3 {} synced with DB", e3_id);
 
     Ok(())
