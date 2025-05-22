@@ -9,7 +9,7 @@ use alloy::{
 use enclave_sdk::indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
 use tokio::time::sleep;
-use Enclave::E3Activated;
+use Enclave::{E3Activated, InputPublished};
 
 sol!(
     #[sol(rpc)]
@@ -31,16 +31,17 @@ async fn test_indexer() -> Result<()> {
 
     let mut indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
 
-    // indexer
-    //     .add_event_handler(move |e: E3Activated, store| async move {
-    //         store
-    //             .write()
-    //             .await
-    //             .insert("foo", &String::from("hello"))
-    //             .await?;
-    //         Ok(())
-    //     })
-    //     .await;
+    indexer
+        .add_event_handler(move |_: InputPublished, mut store| async move {
+            store
+                .modify("input_count", |counter: Option<u64>| {
+                    Some(counter.map_or(1, |c| c + 1))
+                })
+                .await?;
+
+            Ok(())
+        })
+        .await;
 
     // Start tracking state
     indexer.start()?;
@@ -118,9 +119,14 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
+    sleep(Duration::from_millis(10)).await;
+
     let e3 = indexer.get_e3(e3_id).await?;
 
     assert_eq!(e3.ciphertext_output, ciphertext_output);
 
+    let store = indexer.get_store();
+    let val = store.get::<u64>("input_count").await?.unwrap();
+    assert_eq!(val, 3);
     Ok(())
 }
