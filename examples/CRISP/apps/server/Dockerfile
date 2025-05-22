@@ -5,14 +5,16 @@ ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base-dev
 
+ENV RISC0_HOME=/root/.risc0
+ENV PATH="${RISC0_HOME}/bin:${PATH}"
+ENV CARGO_HOME=/usr/local/cargo
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     pkg-config libssl-dev curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl -sSfL https://risczero.com/install | bash
-ENV RISC0_HOME=/root/.risc0
-ENV PATH="${RISC0_HOME}/bin:${PATH}"
 RUN rzup install rust ${RUST_VERSION}
 RUN rzup install r0vm ${RISC0_VERSION}
 RUN rzup install cargo-risczero ${RISC0_VERSION}
@@ -69,9 +71,10 @@ RUN set -eux; \
             echo "// Stub lib.rs for $crate_dir" > "$crate_dir/src/lib.rs"; \
         fi; \
     done
-    
+
 WORKDIR /app/examples/CRISP/apps/server
-RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+RUN --mount=type=cache,id=cargo-registry,target=$CARGO_HOME/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=$CARGO_HOME/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/examples/CRISP/apps/server/target,sharing=locked \
     cargo chef cook --release --recipe-path recipe.json
 
@@ -89,7 +92,8 @@ COPY packages/enclave-sdk/          packages/enclave-sdk/
 COPY packages/compute_provider/     packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server
-RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+RUN --mount=type=cache,id=cargo-registry,target=$CARGO_HOME/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=$CARGO_HOME/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/examples/CRISP/apps/server/target,sharing=locked \
     cargo build --release --bin server && \
     mkdir -p /app/dist && \

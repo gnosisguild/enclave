@@ -65,9 +65,11 @@ jobs:
             SKIP_SOLIDITY=1
           cache-from: |
             type=gha,scope=cargo-registry
+            type=gha,scope=cargo-git
             type=gha,scope=cargo-target
             type=gha,scope=buildcache
           cache-to: |
             type=gha,mode=max,scope=cargo-registry
+            type=gha,mode=max,scope=cargo-git
             type=gha,mode=max,scope=cargo-target
             type=gha,mode=max,scope=buildcache
