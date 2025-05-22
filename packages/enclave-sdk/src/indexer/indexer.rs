@@ -1,19 +1,19 @@
 use super::models::E3;
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
+use alloy::sol_types::SolEvent;
 use async_trait::async_trait;
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
+use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 use crate::evm::{
-    contracts::{
-        EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveReadOnlyProvider, ReadOnly,
-    },
+    contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
     events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
     listener::EventListener,
 };
@@ -104,6 +104,23 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
         };
         instance.setup_listeners().await?;
         Ok(instance)
+    }
+
+    pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
+    where
+        E: SolEvent + Send + Clone + 'static,
+        F: Fn(E, Arc<RwLock<Store>>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        let store = self.store.clone();
+        let handler = Arc::new(handler);
+        self.listener
+            .add_event_handler(move |e: E| {
+                let handler = Arc::clone(&handler);
+                let store = store.clone();
+                async move { handler(e, store).await }
+            })
+            .await;
     }
 
     async fn capture_e3_activated(&mut self) -> Result<()> {

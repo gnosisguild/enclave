@@ -6,9 +6,10 @@ use alloy::{
     providers::{ProviderBuilder, WsConnect},
     sol,
 };
-use enclave_sdk::indexer::{EnclaveIndexer, InMemoryStore};
+use enclave_sdk::indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
 use tokio::time::sleep;
+use Enclave::E3Activated;
 
 sol!(
     #[sol(rpc)]
@@ -28,7 +29,18 @@ async fn test_indexer() -> Result<()> {
     let address = contract.address().to_string();
     let endpoint = anvil.ws_endpoint();
 
-    let indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
+    let mut indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
+
+    // indexer
+    //     .add_event_handler(move |e: E3Activated, store| async move {
+    //         store
+    //             .write()
+    //             .await
+    //             .insert("foo", &String::from("hello"))
+    //             .await?;
+    //         Ok(())
+    //     })
+    //     .await;
 
     // Start tracking state
     indexer.start()?;
