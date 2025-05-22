@@ -1,4 +1,4 @@
-use crate::server::database::{get_e3, GLOBAL_DB};
+use crate::server::database::{db_get, get_e3};
 use crate::server::models::{CurrentRound, E3StateLite, GetRoundRequest, WebResultRequest};
 use actix_web::{web, HttpResponse, Responder};
 use enclave_sdk::evm::contracts::{EnclaveRead, EnclaveWrite};
@@ -43,7 +43,7 @@ async fn get_round_result(data: web::Json<GetRoundRequest>) -> impl Responder {
 ///
 /// * A JSON response containing the results for all rounds
 async fn get_all_round_results() -> impl Responder {
-    let round_count = match GLOBAL_DB.get::<CurrentRound>("e3:current_round").await {
+    let round_count = match db_get::<CurrentRound>("e3:current_round").await {
         Ok(count) => count.unwrap().id,
         Err(e) => {
             info!("Error retrieving round count: {:?}", e);

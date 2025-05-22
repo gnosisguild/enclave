@@ -8,8 +8,6 @@ use actix_cors::Cors;
 use actix_web::{middleware::Logger, web, App, HttpServer};
 
 use blockchain::listener::start_listener;
-use database::GLOBAL_DB;
-use models::AppState;
 
 use crate::logger::init_logger;
 use config::CONFIG;
@@ -47,9 +45,6 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         App::new()
             .wrap(cors)
             .wrap(Logger::new(r#"%a "%r" %s %b %T"#))
-            .app_data(web::Data::new(AppState {
-                sled: GLOBAL_DB.clone(),
-            }))
             .configure(routes::setup_routes)
     })
     .bind("0.0.0.0:4000")?

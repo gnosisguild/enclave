@@ -1,8 +1,7 @@
 use crate::server::config::CONFIG;
-use crate::server::database::get_e3;
+use crate::server::database::{db_get, get_e3};
 use crate::server::models::{
-    AppState, CTRequest, ComputeProviderParams, CronRequestE3, CurrentRound, JsonResponse,
-    PKRequest,
+    CTRequest, ComputeProviderParams, CronRequestE3, CurrentRound, JsonResponse, PKRequest,
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
@@ -50,15 +49,11 @@ async fn request_new_round(data: web::Json<CronRequestE3>) -> impl Responder {
 
 /// Get the current E3 round
 ///
-/// # Arguments
-///
-/// * `AppState` - The application state
-///
 /// # Returns
 ///
 /// * A JSON response containing the current round
-async fn get_current_round(state: web::Data<AppState>) -> impl Responder {
-    match state.sled.get::<CurrentRound>("e3:current_round").await {
+async fn get_current_round() -> impl Responder {
+    match db_get::<CurrentRound>("e3:current_round").await {
         Ok(Some(current_round)) => HttpResponse::Ok().json(current_round),
         Ok(None) => HttpResponse::NotFound().json(JsonResponse {
             response: "No current round found".to_string(),
