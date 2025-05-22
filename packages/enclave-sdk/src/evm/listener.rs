@@ -33,20 +33,18 @@ impl EventListener {
     pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
     where
         E: SolEvent + Send + Clone + 'static,
-        F: FnMut(E) -> Fut + Send + Sync + 'static,
+        F: Fn(E) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         let signature = E::SIGNATURE_HASH;
-        let handler = Arc::new(RwLock::new(handler));
-
+        let handler = Arc::new(handler);
         let wrapped_handler = Box::new(move |log: &Log| {
             let handler = Arc::clone(&handler);
             let log = log.clone();
             async move {
                 let decoded = log.log_decode::<E>()?;
                 let event = decoded.inner.data;
-                let mut fnwrite = handler.write().await;
-                fnwrite(event.clone()).await
+                handler(event.clone()).await
             }
             .boxed()
         });
