@@ -1,8 +1,9 @@
 use crate::server::database::SledDB;
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 
 pub struct AppState {
-    pub sled: SledDB,
+    pub sled: RwLock<SledDB>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

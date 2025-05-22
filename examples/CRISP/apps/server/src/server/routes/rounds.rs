@@ -58,7 +58,13 @@ async fn request_new_round(data: web::Json<CronRequestE3>) -> impl Responder {
 ///
 /// * A JSON response containing the current round
 async fn get_current_round(state: web::Data<AppState>) -> impl Responder {
-    match state.sled.get::<CurrentRound>("e3:current_round").await {
+    match state
+        .sled
+        .read()
+        .await
+        .get::<CurrentRound>("e3:current_round")
+        .await
+    {
         Ok(Some(current_round)) => HttpResponse::Ok().json(current_round),
         Ok(None) => HttpResponse::NotFound().json(JsonResponse {
             response: "No current round found".to_string(),

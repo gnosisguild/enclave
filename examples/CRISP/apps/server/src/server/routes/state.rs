@@ -1,4 +1,4 @@
-use crate::server::database::{get_e3, GLOBAL_DB};
+use crate::server::database::{db_get, get_e3};
 use crate::server::models::{CurrentRound, E3StateLite, GetRoundRequest, WebResultRequest};
 use actix_web::{web, HttpResponse, Responder};
 use enclave_sdk::evm::contracts::{EnclaveRead, EnclaveWrite};
