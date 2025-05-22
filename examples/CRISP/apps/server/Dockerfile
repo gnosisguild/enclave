@@ -47,8 +47,8 @@ COPY packages/enclave-sdk/          packages/enclave-sdk/
 COPY packages/compute_provider/     packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
+RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=cargo-target,target=/app/target \
     cargo chef cook --release --recipe-path recipe.json
 
 ############### stage 3: builder ###############
@@ -67,8 +67,8 @@ COPY packages/compute_provider/     packages/compute_provider/
 COPY --from=planner /app/examples/CRISP/apps/server/target /app/examples/CRISP/apps/server/target
 
 WORKDIR /app/examples/CRISP/apps/server
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
+RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=cargo-target,target=/app/target \
     cargo build --release --bin server
 
 ############### stage 4: runtime ###############
