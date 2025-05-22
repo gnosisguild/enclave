@@ -61,10 +61,6 @@ static GLOBAL_DB: Lazy<RwLock<SledDB>> = Lazy::new(|| {
     RwLock::new(SledDB::new(pathdb.to_str().unwrap()).unwrap())
 });
 
-pub fn db_instance() -> Lazy<RwLock<SledDB>> {
-    GLOBAL_DB
-}
-
 pub async fn db_insert<T: Serialize + Send + Sync>(
     key: &str,
     value: &T,
