@@ -75,7 +75,7 @@ RUN set -eux; \
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=cargo-target,target=/app/examples/CRISP/apps/server/target,sharing=locked \
+    --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \
     cargo chef cook --release --recipe-path recipe.json
 
 ############### stage 3: builder ###############
@@ -94,10 +94,9 @@ COPY packages/compute_provider/     packages/compute_provider/
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=cargo-target,target=/app/examples/CRISP/apps/server/target,sharing=locked \
+    --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \
     cargo build --release --bin server && \
-    mkdir -p /app/dist && \
-    cp /app/examples/CRISP/apps/server/target/release/server /app/dist/server
+    mkdir -p /app/dist && cp target/release/server /app/dist/server
 
 ############### stage 4: runtime ###############
 FROM gcr.io/distroless/cc-debian12 AS runtime
