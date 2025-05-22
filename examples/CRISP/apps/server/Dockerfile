@@ -24,20 +24,20 @@ RUN cargo install --locked cargo-chef
 FROM base-dev AS chef
 WORKDIR /app
 
-COPY examples/CRISP/apps/server/Cargo.* examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/Cargo.* examples/CRISP/apps/program/
-COPY examples/CRISP/apps/program/host/Cargo.* examples/CRISP/apps/program/host/
-COPY examples/CRISP/apps/program/core/Cargo.* examples/CRISP/apps/program/core/
-COPY examples/CRISP/apps/program/methods/Cargo.* examples/CRISP/apps/program/methods/
-COPY packages/enclave-sdk/Cargo.* packages/enclave-sdk/
-COPY packages/compute_provider/Cargo.* packages/compute_provider/
+COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
+COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
+COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
+COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
+COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
+COPY packages/enclave-sdk/Cargo.toml packages/enclave-sdk/
+COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN cargo chef prepare --recipe-path recipe.json
 
 ############### stage 2: planner ###############
 FROM base-dev AS planner
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ARG SKIP_SOLIDITY
 ENV SKIP_SOLIDITY=${SKIP_SOLIDITY}
 
@@ -45,30 +45,10 @@ WORKDIR /app
 COPY --from=chef /app/examples/CRISP/apps/server/recipe.json \
     /app/examples/CRISP/apps/server/recipe.json
 
-COPY examples/CRISP/apps/server/Cargo.*  examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/Cargo.*  examples/CRISP/apps/program/
-COPY examples/CRISP/apps/program/host/Cargo.*  examples/CRISP/apps/program/host/
-COPY examples/CRISP/apps/program/core/Cargo.*  examples/CRISP/apps/program/core/
-COPY examples/CRISP/apps/program/methods/Cargo.*  examples/CRISP/apps/program/methods/
-COPY packages/enclave-sdk/Cargo.* packages/enclave-sdk/
-COPY packages/compute_provider/Cargo.* packages/compute_provider/
-
-RUN set -eux; \
-    find \
-    examples/CRISP/apps/program \
-    packages/enclave-sdk \
-    packages/compute_provider \
-    -type f -name Cargo.toml ! -path '*/target/*' -print0 \
-    | while IFS= read -r -d '' manifest_path; do \
-        crate_dir="$(dirname "$manifest_path")"; \
-        if [ "$manifest_path" = "examples/CRISP/apps/program/Cargo.toml" ]; then \
-            continue; \
-        fi; \
-        mkdir -p "$crate_dir/src"; \
-        if [ ! -f "$crate_dir/src/lib.rs" ] && [ ! -f "$crate_dir/src/main.rs" ]; then \
-            echo "// Stub lib.rs for $crate_dir" > "$crate_dir/src/lib.rs"; \
-        fi; \
-    done
+COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
+COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
+COPY packages/enclave-sdk/          packages/enclave-sdk/
+COPY packages/compute_provider/     packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
