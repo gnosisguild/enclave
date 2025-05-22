@@ -193,8 +193,9 @@ pub async fn handle_plaintext_output_published(
 }
 
 pub async fn handle_committee_published(committee_published: CommitteePublished) -> Result<()> {
+    info!("Handling CommitteePublished event...");
     info!(
-        "Handling CommitteePublished event for E3: {}",
+        "Committee Published for round: {:?}",
         committee_published.e3Id
     );
 
