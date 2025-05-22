@@ -45,7 +45,7 @@ WORKDIR /app
 COPY --from=chef /app/examples/CRISP/apps/server/recipe.json \
     /app/examples/CRISP/apps/server/recipe.json
 
-COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
+COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
 COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
 COPY packages/enclave-sdk/          packages/enclave-sdk/
 COPY packages/compute_provider/     packages/compute_provider/
