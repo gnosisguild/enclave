@@ -8,6 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sled::Db;
 use std::{error::Error, str, sync::Arc};
 use thiserror::Error;
+use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 
 #[derive(Error, Debug)]
@@ -19,15 +20,13 @@ pub enum DatabaseError {
 }
 #[derive(Clone)]
 pub struct SledDB {
-    pub db: Arc<RwLock<Db>>,
+    pub db: Arc<Db>,
 }
 
 impl SledDB {
     pub fn new(path: &str) -> Result<Self, DatabaseError> {
         let db = sled::open(path)?;
-        Ok(Self {
-            db: Arc::new(RwLock::new(db)),
-        })
+        Ok(Self { db: Arc::new(db) })
     }
 }
 
@@ -35,12 +34,12 @@ impl SledDB {
 impl DataStore for SledDB {
     type Error = DatabaseError;
     async fn insert<T: Serialize + Send + Sync>(
-        &self,
+        &mut self,
         key: &str,
         value: &T,
     ) -> Result<(), Self::Error> {
         let serialized = serde_json::to_vec(value)?;
-        self.db.write().await.insert(key.as_bytes(), serialized)?;
+        self.db.insert(key.as_bytes(), serialized)?;
         Ok(())
     }
 
@@ -48,7 +47,7 @@ impl DataStore for SledDB {
         &self,
         key: &str,
     ) -> Result<Option<T>, Self::Error> {
-        if let Some(bytes) = self.db.read().await.get(key.as_bytes())? {
+        if let Some(bytes) = self.db.get(key.as_bytes())? {
             let value = serde_json::from_slice(&bytes)?;
             Ok(Some(value))
         } else {
@@ -57,14 +56,30 @@ impl DataStore for SledDB {
     }
 }
 
-pub static GLOBAL_DB: Lazy<SledDB> = Lazy::new(|| {
+pub static GLOBAL_DB: Lazy<RwLock<SledDB>> = Lazy::new(|| {
     let pathdb = std::env::current_dir().unwrap().join("database/server");
-    SledDB::new(pathdb.to_str().unwrap()).unwrap()
+    RwLock::new(SledDB::new(pathdb.to_str().unwrap()).unwrap())
 });
+
+pub async fn db_insert<T: Serialize + Send + Sync>(
+    key: &str,
+    value: &T,
+) -> Result<(), DatabaseError> {
+    let mut db = GLOBAL_DB.write().await;
+    db.insert(key, value).await?;
+    Ok(())
+}
+
+pub async fn db_get<T: DeserializeOwned + Send + Sync>(
+    key: &str,
+) -> Result<Option<T>, DatabaseError> {
+    let db = GLOBAL_DB.read().await;
+    db.get::<T>(key).await
+}
 
 pub async fn get_e3(e3_id: u64) -> Result<(E3, String), Box<dyn Error + Send + Sync>> {
     let key = format!("e3:{}", e3_id);
-    match GLOBAL_DB.get::<E3>(&key).await? {
+    match db_get::<E3>(&key).await? {
         Some(e3) => Ok((e3, key)),
         None => {
             error!("E3 state not found for key: {}", key);
@@ -78,9 +93,9 @@ pub async fn update_e3_status(
     status: String,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let key = format!("e3:{}", e3_id);
-    let mut e3 = GLOBAL_DB.get::<E3>(&key).await?.unwrap();
+    let mut e3 = db_get::<E3>(&key).await?.unwrap();
     e3.status = status;
-    GLOBAL_DB.insert(&key, &e3).await?;
+    db_insert(&key, &e3).await?;
     Ok(())
 }
 

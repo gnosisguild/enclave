@@ -33,7 +33,7 @@ pub enum IndexerError {
 pub trait DataStore: Send + Sync + 'static {
     type Error;
     async fn insert<T: Serialize + Send + Sync>(
-        &self,
+        &mut self,
         key: &str,
         value: &T,
     ) -> Result<(), Self::Error>;
@@ -44,13 +44,13 @@ pub trait DataStore: Send + Sync + 'static {
 }
 
 pub struct InMemoryStore {
-    data: Arc<RwLock<HashMap<String, Vec<u8>>>>,
+    data: HashMap<String, Vec<u8>>,
 }
 
 impl InMemoryStore {
     pub fn new() -> Self {
         Self {
-            data: Arc::new(RwLock::new(HashMap::new())),
+            data: HashMap::new(),
         }
     }
 }
@@ -60,13 +60,11 @@ impl DataStore for InMemoryStore {
     type Error = eyre::Error;
 
     async fn insert<T: Serialize + Send + Sync>(
-        &self,
+        &mut self,
         key: &str,
         value: &T,
     ) -> Result<(), Self::Error> {
         self.data
-            .write()
-            .await
             .insert(key.to_string(), bincode::serialize(value)?);
         Ok(())
     }
@@ -77,8 +75,6 @@ impl DataStore for InMemoryStore {
     ) -> Result<Option<T>, Self::Error> {
         Ok(self
             .data
-            .read()
-            .await
             .get(key)
             .map(|bytes| bincode::deserialize(bytes))
             .transpose()?)

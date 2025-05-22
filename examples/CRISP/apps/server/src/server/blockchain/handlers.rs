@@ -4,7 +4,7 @@ use super::events::{
 };
 use crate::server::{
     config::CONFIG,
-    database::{generate_emoji, get_e3, update_e3_status, GLOBAL_DB},
+    database::{db_get, db_insert, generate_emoji, get_e3, update_e3_status},
     models::{CurrentRound, E3},
 };
 use chrono::Utc;
@@ -74,11 +74,11 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
 
     // Save E3 to the database
     let key = format!("e3:{}", e3_id);
-    GLOBAL_DB.insert(&key, &e3_obj).await?;
+    db_insert(&key, &e3_obj).await?;
 
     // Set Current Round
     let current_round = CurrentRound { id: e3_id };
-    GLOBAL_DB.insert("e3:current_round", &current_round).await?;
+    db_insert("e3:current_round", &current_round).await?;
 
     let expiration = Instant::now()
         + (UNIX_EPOCH + Duration::from_secs(expiration))
@@ -130,7 +130,7 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
         info!("E3 has no votes to decrypt. Setting status to Finished.");
         e3.status = "Finished".to_string();
 
-        GLOBAL_DB.insert(&key, &e3).await?;
+        db_insert(&key, &e3).await?;
     }
     info!("E3 request handled successfully.");
     Ok(())
@@ -146,7 +146,7 @@ pub async fn handle_input_published(input: InputPublished) -> Result<()> {
         .push((input.data.to_vec(), input.index.to::<u64>()));
     e3.vote_count += 1;
 
-    GLOBAL_DB.insert(&key, &e3).await?;
+    db_insert(&key, &e3).await?;
 
     info!("Saved Input with Hash: {:?}", input.inputHash);
     Ok(())
@@ -163,7 +163,7 @@ pub async fn handle_ciphertext_output_published(
     e3.ciphertext_output = ciphertext_output.ciphertextOutput.to_vec();
     e3.status = "CiphertextPublished".to_string();
 
-    GLOBAL_DB.insert(&key, &e3).await?;
+    db_insert(&key, &e3).await?;
 
     info!("CiphertextOutputPublished event handled.");
     Ok(())
@@ -186,7 +186,7 @@ pub async fn handle_plaintext_output_published(
     info!("Votes Option 1: {:?}", e3.votes_option_1);
     info!("Votes Option 2: {:?}", e3.votes_option_2);
 
-    GLOBAL_DB.insert(&key, &e3).await?;
+    db_insert(&key, &e3).await?;
 
     info!("PlaintextOutputPublished event handled.");
     Ok(())

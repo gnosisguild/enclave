@@ -1,6 +1,6 @@
 use crate::server::{
     config::CONFIG,
-    database::{get_e3, GLOBAL_DB},
+    database::{db_get, db_insert, get_e3},
     models::{EncryptedVote, VoteResponse, VoteResponseStatus, E3},
 };
 use actix_web::{web, HttpResponse, Responder};
@@ -88,7 +88,7 @@ async fn validate_and_update_vote_status(
     }
 
     state_data.has_voted.push(vote.address.clone());
-    GLOBAL_DB.insert(&key, &state_data).await.unwrap();
+    db_insert(&key, &state_data).await.unwrap();
 
     Ok((state_data, key.to_string()))
 }
@@ -112,7 +112,7 @@ async fn handle_vote_error(
     // Rollback the vote
     if let Some(pos) = state_data.has_voted.iter().position(|x| x == address) {
         state_data.has_voted.remove(pos);
-        GLOBAL_DB.insert(key, state_data).await.unwrap();
+        db_insert(key, state_data).await.unwrap();
     }
 
     HttpResponse::Ok().json(VoteResponse {
