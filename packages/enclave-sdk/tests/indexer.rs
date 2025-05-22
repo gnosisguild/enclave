@@ -106,6 +106,8 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
+    sleep(Duration::from_millis(10)).await;
+
     let e3 = indexer.get_e3(e3_id).await?;
 
     assert_eq!(e3.ciphertext_output, ciphertext_output);
