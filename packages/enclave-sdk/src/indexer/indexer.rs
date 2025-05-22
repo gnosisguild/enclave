@@ -44,7 +44,7 @@ pub trait DataStore: Send + Sync + 'static {
     async fn modify<T, F>(&mut self, key: &str, f: F) -> Result<Option<T>, Self::Error>
     where
         T: Serialize + DeserializeOwned + Send + Sync,
-        F: FnOnce(Option<T>) -> Option<T> + Send;
+        F: FnMut(Option<T>) -> Option<T> + Send;
 }
 
 pub struct InMemoryStore {
@@ -84,10 +84,10 @@ impl DataStore for InMemoryStore {
             .transpose()?)
     }
 
-    async fn modify<T, F>(&mut self, key: &str, f: F) -> Result<Option<T>, Self::Error>
+    async fn modify<T, F>(&mut self, key: &str, mut f: F) -> Result<Option<T>, Self::Error>
     where
         T: Serialize + DeserializeOwned + Send + Sync,
-        F: FnOnce(Option<T>) -> Option<T> + Send,
+        F: FnMut(Option<T>) -> Option<T> + Send,
     {
         let current = self
             .data
@@ -147,7 +147,7 @@ impl<S: DataStore> DataStore for StoreWrapper<S> {
     async fn modify<T, F>(&mut self, key: &str, f: F) -> Result<Option<T>, Self::Error>
     where
         T: Serialize + DeserializeOwned + Send + Sync,
-        F: FnOnce(Option<T>) -> Option<T> + Send,
+        F: FnMut(Option<T>) -> Option<T> + Send,
     {
         self.inner.write().await.modify(key, f).await
     }

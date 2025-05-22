@@ -22,7 +22,6 @@ pub enum DatabaseError {
 pub struct SledDB {
     pub db: Db,
 }
-
 impl SledDB {
     pub fn new(path: &str) -> Result<Self, DatabaseError> {
         let db = sled::open(path)?;
@@ -33,6 +32,7 @@ impl SledDB {
 #[async_trait]
 impl DataStore for SledDB {
     type Error = DatabaseError;
+
     async fn insert<T: Serialize + Send + Sync>(
         &mut self,
         key: &str,
@@ -62,13 +62,16 @@ impl DataStore for SledDB {
     {
         // Edit in place
         let result = self.db.update_and_fetch(key, |old_bytes| {
-            let current_value = old_bytes.and_then(|bytes| bincode::deserialize(bytes).ok());
+            let current_value = old_bytes.and_then(|bytes| serde_json::from_slice(bytes).ok());
             let new_value = f(current_value);
-            new_value.and_then(|val| bincode::serialize(&val).ok())
+            new_value.and_then(|val| serde_json::to_vec(&val).ok())
         })?;
 
         // Deserialize the final result
-        result.map(|bytes| bincode::deserialize(&bytes)).transpose()
+        result
+            .map(|bytes| serde_json::from_slice(&bytes))
+            .transpose()
+            .map_err(|e| e.into())
     }
 }
 
