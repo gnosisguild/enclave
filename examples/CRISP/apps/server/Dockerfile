@@ -8,6 +8,7 @@ FROM rust:${RUST_VERSION}-slim-bullseye AS base-dev
 ENV RISC0_HOME=/root/.risc0
 ENV PATH="${RISC0_HOME}/bin:${PATH}"
 ENV CARGO_HOME=/usr/local/cargo
+ENV CARGO_TARGET_DIR=/app/target
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -73,6 +74,24 @@ RUN set -eux; \
     done
 
 WORKDIR /app/examples/CRISP/apps/server
+
+RUN echo "==== PLANNER: DEBUGGING BEFORE cargo chef cook ====" && \
+    echo "Current PWD: $(pwd)" && \
+    echo "CARGO_HOME: ${CARGO_HOME}" && \
+    echo "CARGO_TARGET_DIR: ${CARGO_TARGET_DIR}" && \
+    echo "--- Listing CARGO_HOME (${CARGO_HOME}) ---" && \
+    ls -la "${CARGO_HOME}" || echo "CARGO_HOME not found or empty" && \
+    echo "--- Listing CARGO_HOME/registry (${CARGO_HOME}/registry) ---" && \
+    ls -la "${CARGO_HOME}/registry" || echo "Registry dir not found or empty" && \
+    echo "--- Listing CARGO_HOME/git (${CARGO_HOME}/git) ---" && \
+    ls -la "${CARGO_HOME}/git" || echo "Git dir not found or empty" && \
+    echo "--- Listing CARGO_TARGET_DIR (${CARGO_TARGET_DIR}) ---" && \
+    ls -la "${CARGO_TARGET_DIR}" || echo "CARGO_TARGET_DIR not found or empty" && \
+    echo "--- Listing current WORKDIR target (./target) ---" && \
+    ls -la "./target" || echo "./target not found or empty" && \
+    echo "Recipe file:" && ls -la recipe.json && \
+    echo "==== PLANNER: END DEBUGGING ===="
+
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \
@@ -92,6 +111,29 @@ COPY packages/enclave-sdk/          packages/enclave-sdk/
 COPY packages/compute_provider/     packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server
+
+RUN echo "==== BUILDER: DEBUGGING BEFORE cargo build ====" && \
+    echo "Current PWD: $(pwd)" && \
+    echo "CARGO_HOME: ${CARGO_HOME}" && \
+    echo "CARGO_TARGET_DIR: ${CARGO_TARGET_DIR}" && \
+    echo "--- Listing CARGO_HOME (${CARGO_HOME}) ---" && \
+    ls -la "${CARGO_HOME}" || echo "CARGO_HOME not found or empty" && \
+    echo "--- Listing CARGO_HOME/registry (${CARGO_HOME}/registry) (should be populated by cache mount) ---" && \
+    ls -la "${CARGO_HOME}/registry" || echo "Registry dir not found or empty" && \
+    echo "  Specific check: ${CARGO_HOME}/registry/index/github.com-*" && \
+    ls -la "${CARGO_HOME}/registry/index/github.com-"* || echo "Crates.io index missing" && \
+    echo "--- Listing CARGO_HOME/git (${CARGO_HOME}/git) (should be populated by cache mount) ---" && \
+    ls -la "${CARGO_HOME}/git" || echo "Git dir not found or empty" && \
+    echo "  Specific check: ${CARGO_HOME}/git/db" && \
+    ls -la "${CARGO_HOME}/git/db" || echo "Git db missing" && \
+    echo "--- Listing CARGO_TARGET_DIR (${CARGO_TARGET_DIR}) (should be populated by cache mount from planner) ---" && \
+    ls -la "${CARGO_TARGET_DIR}" || echo "CARGO_TARGET_DIR not found or empty" && \
+    echo "  Specific check: ${CARGO_TARGET_DIR}/release/.fingerprint" && \
+    ls -la "${CARGO_TARGET_DIR}/release/.fingerprint" || echo "Fingerprints in CARGO_TARGET_DIR missing" && \
+    echo "--- Listing current WORKDIR target (./target) ---" && \
+    ls -la "./target" || echo "./target not found or empty" && \
+    echo "==== BUILDER: END DEBUGGING ===="
+    
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \
