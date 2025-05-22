@@ -20,13 +20,13 @@ pub enum DatabaseError {
 }
 #[derive(Clone)]
 pub struct SledDB {
-    pub db: Arc<Db>,
+    pub db: Db,
 }
 
 impl SledDB {
     pub fn new(path: &str) -> Result<Self, DatabaseError> {
         let db = sled::open(path)?;
-        Ok(Self { db: Arc::new(db) })
+        Ok(Self { db })
     }
 }
 
