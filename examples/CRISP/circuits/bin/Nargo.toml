@@ -1,0 +1,7 @@
+[package]
+name = "crisp_circuit"
+type = "bin"
+authors = [""]
+
+[dependencies]
+crisp_lib = { path = "../lib" }

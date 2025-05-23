@@ -42,6 +42,17 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 RUN rustup component add rustfmt clippy
 
+# Install Noir development tools and add it to PATH
+RUN mkdir -p /home/${USERNAME}/.nargo/bin
+ENV PATH="/home/${USERNAME}/.nargo/bin:${PATH}"
+RUN curl -L https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash -s -- --no-modify-path
+RUN /home/${USERNAME}/.nargo/bin/noirup
+
+# Install Barretenberg proving backend and add it to PATH
+RUN curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/master/barretenberg/bbup/install | bash
+ENV PATH="/home/${USERNAME}/.bb/bin:${PATH}"
+RUN /home/${USERNAME}/.bb/bin/bbup
+
 ENV SHELL=/bin/bash
 
 ENV PATH="/home/${USERNAME}/.foundry/bin:${PATH}"
