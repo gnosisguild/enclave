@@ -45,7 +45,7 @@ RUN rustup component add rustfmt clippy
 # Install Noir development tools and add it to PATH
 RUN mkdir -p /home/${USERNAME}/.nargo/bin
 ENV PATH="/home/${USERNAME}/.nargo/bin:${PATH}"
-RUN curl -L https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash -s -- --no-modify-path
+RUN curl -L https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash -s
 RUN /home/${USERNAME}/.nargo/bin/noirup
 
 # Install Barretenberg proving backend and add it to PATH
