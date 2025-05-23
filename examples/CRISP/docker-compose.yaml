@@ -19,6 +19,7 @@ services:
       - client-node-modules:/app/examples/CRISP/apps/client/node_modules
       - crisp-node-modules:/app/examples/CRISP/node_modules
       - crisp-foundry-cache:/app/examples/CRISP/out
+      - noir-cache:/home/devuser/.noir
     entrypoint:
       - ""
     ports:
@@ -42,3 +43,4 @@ volumes:
   crisp-node-modules:
   crisp-foundry-cache:
   git-folder:
+  noir-cache:
