@@ -1,4 +1,4 @@
-use actix::{Actor, Addr};
+use actix::Addr;
 use alloy::{
     node_bindings::Anvil,
     primitives::{FixedBytes, LogData},

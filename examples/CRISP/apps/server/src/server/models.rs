@@ -1,9 +1,6 @@
 use crate::server::database::SledDB;
 use serde::{Deserialize, Serialize};
-
-pub struct AppState {
-    pub sled: SledDB,
-}
+use tokio::sync::RwLock;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct JsonResponse {
@@ -95,7 +92,7 @@ pub struct E3StateLite {
     pub duration: u64,
     pub expiration: u64,
     pub start_block: u64,
-  
+
     pub committee_public_key: Vec<u8>,
     pub emojis: [String; 2],
 }

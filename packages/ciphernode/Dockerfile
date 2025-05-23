@@ -43,8 +43,8 @@ COPY ./packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
 COPY ./packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
 COPY ./packages/ciphernode/rust-toolchain.toml .
 
-# Copy commons package
-COPY ./packages/commons ../commons
+# Copy enclave-sdk package
+COPY ./packages/enclave-sdk ../enclave-sdk
 
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \

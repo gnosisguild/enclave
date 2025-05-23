@@ -1,9 +1,7 @@
 use super::events::InputPublished;
-use super::relayer::E3 as ContractE3;
 use crate::server::{
-    blockchain::relayer::EnclaveContract,
     config::CONFIG,
-    database::{generate_emoji, get_e3, update_e3_status, GLOBAL_DB},
+    database::{db_get, db_insert, generate_emoji, get_e3, update_e3_status},
     models::{CurrentRound, E3},
 };
 use alloy::{
@@ -13,6 +11,11 @@ use alloy::{
     sol_types::SolEvent,
 };
 use compute_provider::FHEInputs;
+use enclave_sdk::evm::contracts::{
+    EnclaveContract, EnclaveRead, EnclaveReadOnlyProvider, EnclaveWrite, ReadOnly, ReadWrite,
+    E3 as ContractE3,
+};
+use enclave_sdk::indexer::DataStore;
 use futures::future::join_all;
 use log::{error, info, warn};
 use std::{
@@ -29,10 +32,18 @@ use voting_host::run_compute;
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 pub async fn sync_server() -> Result<()> {
     info!("Starting server synchronization...");
-    let contract = Arc::new(EnclaveContract::new(CONFIG.enclave_address.clone()).await?);
+
+    let contract = Arc::new(
+        EnclaveContract::new(
+            &CONFIG.http_rpc_url,
+            &CONFIG.private_key,
+            &CONFIG.enclave_address,
+        )
+        .await?,
+    );
 
     // Retrieve the current round from the database.
-    let current_round = match GLOBAL_DB.get::<CurrentRound>("e3:current_round").await? {
+    let current_round = match db_get::<CurrentRound>("e3:current_round").await? {
         Some(round) => round,
         None => {
             info!("No current round found in DB. Exiting sync process. Will compute next round.");
@@ -92,9 +103,7 @@ pub async fn sync_server() -> Result<()> {
     let new_current_round = CurrentRound {
         id: latest_contract_e3_id,
     };
-    GLOBAL_DB
-        .insert("e3:current_round", &new_current_round)
-        .await?;
+    db_insert("e3:current_round", &new_current_round).await?;
 
     info!("Server synchronization completed.");
     Ok(())
@@ -116,7 +125,7 @@ async fn find_last_finished_e3_id(latest_db_id: u64) -> Result<Option<u64>> {
 
 /// Fetches events from the blockchain starting from a specific block.
 async fn fetch_events(
-    contract: Arc<EnclaveContract>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
     from_block: u64,
 ) -> Result<HashMap<U256, Vec<Log>>> {
     let filter = Filter::new()
@@ -145,7 +154,7 @@ async fn fetch_events(
 /// Synchronizes a single E3.
 async fn sync_e3(
     e3_id: U256,
-    contract: Arc<EnclaveContract>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
     published_events: Arc<HashMap<U256, Vec<Log>>>,
 ) -> Result<()> {
     let events_clone = published_events.clone();
@@ -215,7 +224,7 @@ fn calculate_expiration(expiration_secs: &U256) -> Result<Instant> {
 /// Computes and publishes the ciphertext output.
 async fn compute_and_publish_ciphertext(
     e3_id: U256,
-    contract: Arc<EnclaveContract>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
     events: Arc<HashMap<U256, Vec<Log>>>,
 ) -> Result<()> {
     let ciphertext_inputs = events
@@ -239,9 +248,7 @@ async fn compute_and_publish_ciphertext(
     // Update vote count
     let mut db_e3 = get_e3(e3_id.to::<u64>()).await?.0;
     db_e3.vote_count = ciphertext_inputs.len() as u64;
-    GLOBAL_DB
-        .insert(&format!("e3:{}", e3_id.to::<u64>()), &db_e3)
-        .await?;
+    db_insert(&format!("e3:{}", e3_id.to::<u64>()), &db_e3).await?;
 
     let contract_e3 = contract.get_e3(e3_id).await?;
     let fhe_inputs = FHEInputs {
@@ -309,7 +316,7 @@ async fn sync_e3_with_db(e3_id: U256, contract_e3: &ContractE3, vote_count: u64)
         warn!("Unexpected plaintext output format for E3 {}", e3_id);
     }
 
-    GLOBAL_DB.insert(&key, &db_e3).await?;
+    db_insert(&key, &db_e3).await?;
     info!("E3 {} synced with DB", e3_id);
 
     Ok(())

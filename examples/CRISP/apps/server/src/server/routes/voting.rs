@@ -1,16 +1,17 @@
+use crate::server::{
+    config::CONFIG,
+    database::{db_get, db_insert, get_e3},
+    models::{EncryptedVote, VoteResponse, VoteResponseStatus, E3},
+};
 use actix_web::{web, HttpResponse, Responder};
-use log::info;
 use alloy::{
     dyn_abi::DynSolValue,
     primitives::{Bytes, U256},
 };
+use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
+use enclave_sdk::indexer::DataStore;
 use eyre::Error;
-use crate::server::{
-    blockchain::relayer::EnclaveContract,
-    config::CONFIG,
-    database::{get_e3, GLOBAL_DB},
-    models::{EncryptedVote, VoteResponse, VoteResponseStatus, E3},
-};
+use log::info;
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -46,7 +47,14 @@ async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Respon
     let encoded_params = Bytes::from(params_value.abi_encode_params());
 
     // Broadcast vote to blockchain
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await.unwrap();
+    let contract = EnclaveContract::new(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.enclave_address,
+    )
+    .await
+    .unwrap();
+
     match contract.publish_input(e3_id, encoded_params).await {
         Ok(hash) => HttpResponse::Ok().json(VoteResponse {
             status: VoteResponseStatus::Success,
@@ -80,7 +88,7 @@ async fn validate_and_update_vote_status(
     }
 
     state_data.has_voted.push(vote.address.clone());
-    GLOBAL_DB.insert(&key, &state_data).await.unwrap();
+    db_insert(&key, &state_data).await.unwrap();
 
     Ok((state_data, key.to_string()))
 }
@@ -104,7 +112,7 @@ async fn handle_vote_error(
     // Rollback the vote
     if let Some(pos) = state_data.has_voted.iter().position(|x| x == address) {
         state_data.has_voted.remove(pos);
-        GLOBAL_DB.insert(key, state_data).await.unwrap();
+        db_insert(key, state_data).await.unwrap();
     }
 
     HttpResponse::Ok().json(VoteResponse {

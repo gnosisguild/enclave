@@ -1,8 +1,9 @@
-use actix_web::{web, HttpResponse, Responder};
-use log::info;
-
-use crate::server::database::{get_e3, GLOBAL_DB};
+use crate::server::database::{db_get, get_e3};
 use crate::server::models::{CurrentRound, E3StateLite, GetRoundRequest, WebResultRequest};
+use actix_web::{web, HttpResponse, Responder};
+use enclave_sdk::evm::contracts::{EnclaveRead, EnclaveWrite};
+use enclave_sdk::indexer::DataStore;
+use log::info;
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -42,7 +43,7 @@ async fn get_round_result(data: web::Json<GetRoundRequest>) -> impl Responder {
 ///
 /// * A JSON response containing the results for all rounds
 async fn get_all_round_results() -> impl Responder {
-    let round_count = match GLOBAL_DB.get::<CurrentRound>("e3:current_round").await {
+    let round_count = match db_get::<CurrentRound>("e3:current_round").await {
         Ok(count) => count.unwrap().id,
         Err(e) => {
             info!("Error retrieving round count: {:?}", e);
@@ -83,8 +84,6 @@ async fn get_round_state_lite(data: web::Json<GetRoundRequest>) -> impl Responde
             let state_lite: E3StateLite = state.into();
             HttpResponse::Ok().json(state_lite)
         }
-        Err(_e) => {
-            HttpResponse::InternalServerError().body("Failed to get E3 state")
-        }
+        Err(_e) => HttpResponse::InternalServerError().body("Failed to get E3 state"),
     }
 }

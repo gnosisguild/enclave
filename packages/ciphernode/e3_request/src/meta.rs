@@ -10,7 +10,6 @@ pub const META_KEY: TypedKey<E3Meta> = TypedKey::new("meta");
 pub struct E3Meta {
     pub threshold_m: usize,
     pub seed: Seed,
-    pub src_chain_id: u64,
 }
 
 pub struct E3MetaExtension;
@@ -30,17 +29,12 @@ impl E3Extension for E3MetaExtension {
         let E3Requested {
             threshold_m,
             seed,
-            src_chain_id,
             e3_id,
             ..
         } = data.clone();
 
         // Meta doesn't implement Checkpoint so we are going to store it manually
-        let meta = E3Meta {
-            threshold_m,
-            seed,
-            src_chain_id,
-        };
+        let meta = E3Meta { threshold_m, seed };
         ctx.repositories().meta(&e3_id).write(&meta);
         let _ = ctx.set_dependency(META_KEY, meta);
     }
