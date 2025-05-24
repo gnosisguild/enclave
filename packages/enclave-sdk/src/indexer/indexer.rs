@@ -1,4 +1,9 @@
 use super::models::E3;
+use crate::evm::{
+    contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
+    events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
+    listener::EventListener,
+};
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
 use alloy::sol_types::SolEvent;
@@ -11,12 +16,6 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-
-use crate::evm::{
-    contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
-    events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
-    listener::EventListener,
-};
 
 type E3Id = u64;
 
@@ -205,10 +204,13 @@ impl<S: DataStore> EnclaveIndexer<S> {
                 let db = db.clone();
                 let enclave_address = enclave_address.clone();
                 let contract = contract.clone();
+
                 async move {
                     println!("E3Activated:{:?}", e);
                     let e3_id = u64_try_from(e.e3Id)?;
                     let e3 = contract.get_e3(e.e3Id).await?;
+                    // NOTE: we are only saving protocol specific info
+                    // here and not CRISP specific info so E3 corresponds to the solidity E3
                     let e3_obj = E3 {
                         chain_id,
                         ciphertext_inputs: vec![],
@@ -222,7 +224,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
                         id: e3_id,
                         plaintext_output: vec![],
                         request_block: u64_try_from(e3.requestBlock)?,
-                        seed: u64_try_from(e3.seed)?, // TODO: make this into a bytes32
+                        seed: u64_try_from(e3.seed)?, // TODO: make this into a bytes32?
                         start_window: [
                             u64_try_from(e3.startWindow[0])?,
                             u64_try_from(e3.startWindow[1])?,

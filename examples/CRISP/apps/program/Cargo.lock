@@ -1166,12 +1166,15 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
+ "compute-provider",
  "enclave-sdk",
  "eyre",
+ "log",
  "serde",
  "serde_json",
  "sled",
  "tokio",
+ "voting-host",
 ]
 
 [[package]]

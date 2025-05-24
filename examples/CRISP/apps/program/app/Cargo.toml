@@ -13,3 +13,7 @@ eyre.workspace = true
 serde.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
+log.workspace = true
+compute-provider.workspace = true
+voting-host.workspace = true
+ 
