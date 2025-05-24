@@ -108,26 +108,26 @@ impl DataStore for InMemoryStore {
     }
 }
 
-pub struct StoreWrapper<S> {
+pub struct SharedStore<S> {
     inner: Arc<RwLock<S>>,
 }
 
-impl<S: DataStore> Clone for StoreWrapper<S> {
+impl<S: DataStore> Clone for SharedStore<S> {
     fn clone(&self) -> Self {
-        StoreWrapper {
+        SharedStore {
             inner: Arc::clone(&self.inner),
         }
     }
 }
 
-impl<S: DataStore> StoreWrapper<S> {
-    pub fn new(inner: Arc<RwLock<S>>) -> StoreWrapper<S> {
+impl<S: DataStore> SharedStore<S> {
+    pub fn new(inner: Arc<RwLock<S>>) -> SharedStore<S> {
         Self { inner }
     }
 }
 
 #[async_trait]
-impl<S: DataStore> DataStore for StoreWrapper<S> {
+impl<S: DataStore> DataStore for SharedStore<S> {
     type Error = S::Error;
     async fn insert<T: Serialize + Send + Sync>(
         &mut self,
@@ -181,10 +181,10 @@ impl<S: DataStore> EnclaveIndexer<S> {
     pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
     where
         E: SolEvent + Send + Clone + 'static,
-        F: Fn(E, StoreWrapper<S>) -> Fut + Send + Sync + 'static,
+        F: Fn(E, SharedStore<S>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        let store = StoreWrapper::new(self.store.clone());
+        let store = SharedStore::new(self.store.clone());
         let handler = Arc::new(handler);
         self.listener
             .add_event_handler(move |e: E| {
@@ -347,8 +347,8 @@ impl<S: DataStore> EnclaveIndexer<S> {
         self.listener.clone()
     }
 
-    pub fn get_store(&self) -> StoreWrapper<S> {
-        StoreWrapper::new(self.store.clone())
+    pub fn get_store(&self) -> SharedStore<S> {
+        SharedStore::new(self.store.clone())
     }
 }
 

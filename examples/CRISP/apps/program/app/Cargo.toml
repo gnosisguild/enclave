@@ -12,3 +12,4 @@ sled.workspace = true
 eyre.workspace = true
 serde.workspace = true
 async-trait.workspace = true
+chrono.workspace = true

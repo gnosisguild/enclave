@@ -1,13 +1,12 @@
-use std::time::Duration;
-
+mod helpers;
 use alloy::{
-    node_bindings::Anvil,
     primitives::{Bytes, Uint},
-    providers::{ProviderBuilder, WsConnect},
     sol,
 };
 use enclave_sdk::indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
+use helpers::{setup_fake_enclave, setup_provider};
+use std::time::Duration;
 use tokio::time::sleep;
 use Enclave::{E3Activated, InputPublished};
 
@@ -19,15 +18,7 @@ sol!(
 
 #[tokio::test]
 async fn test_indexer() -> Result<()> {
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
-
-    let provider = ProviderBuilder::new()
-        .on_ws(WsConnect::new(anvil.ws_endpoint()))
-        .await?;
-
-    let contract = Enclave::deploy(provider).await?;
-    let address = contract.address().to_string();
-    let endpoint = anvil.ws_endpoint();
+    let (contract, address, endpoint, _anvil) = setup_fake_enclave().await?;
 
     let mut indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
 

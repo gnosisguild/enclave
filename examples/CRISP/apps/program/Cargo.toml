@@ -21,6 +21,7 @@ alloy-sol-types = { version = "0.8" }
 anyhow = { version = "1.0.86" }
 bincode = { version = "1.3.3" }
 bytemuck = { version = "1" }
+chrono = "0.4.38"
 hex = { version = "0.4.3" }
 log = { version = "0.4" }
 eyre = { version = "0.6.12" }
