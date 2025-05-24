@@ -1,14 +1,14 @@
-use std::time::Duration;
-
+mod helpers;
 use alloy::{
-    node_bindings::Anvil,
     primitives::{Bytes, Uint},
-    providers::{ProviderBuilder, WsConnect},
     sol,
 };
-use enclave_sdk::indexer::{EnclaveIndexer, InMemoryStore};
+use enclave_sdk::indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
+use helpers::{setup_fake_enclave, setup_provider};
+use std::time::Duration;
 use tokio::time::sleep;
+use Enclave::{E3Activated, InputPublished};
 
 sol!(
     #[sol(rpc)]
@@ -18,17 +18,21 @@ sol!(
 
 #[tokio::test]
 async fn test_indexer() -> Result<()> {
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
+    let (contract, address, endpoint, _anvil) = setup_fake_enclave().await?;
 
-    let provider = ProviderBuilder::new()
-        .on_ws(WsConnect::new(anvil.ws_endpoint()))
-        .await?;
+    let mut indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
 
-    let contract = Enclave::deploy(provider).await?;
-    let address = contract.address().to_string();
-    let endpoint = anvil.ws_endpoint();
+    indexer
+        .add_event_handler(move |_: InputPublished, mut store| async move {
+            store
+                .modify("input_count", |counter: Option<u64>| {
+                    Some(counter.map_or(1, |c| c + 1))
+                })
+                .await?;
 
-    let indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
+            Ok(())
+        })
+        .await;
 
     // Start tracking state
     indexer.start()?;
@@ -112,5 +116,8 @@ async fn test_indexer() -> Result<()> {
 
     assert_eq!(e3.ciphertext_output, ciphertext_output);
 
+    let store = indexer.get_store();
+    let val = store.get::<u64>("input_count").await?.unwrap();
+    assert_eq!(val, 3);
     Ok(())
 }

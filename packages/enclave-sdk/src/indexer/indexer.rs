@@ -1,19 +1,19 @@
 use super::models::E3;
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
+use alloy::sol_types::SolEvent;
 use async_trait::async_trait;
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
+use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 use crate::evm::{
-    contracts::{
-        EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveReadOnlyProvider, ReadOnly,
-    },
+    contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
     events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
     listener::EventListener,
 };
@@ -41,6 +41,10 @@ pub trait DataStore: Send + Sync + 'static {
         &self,
         key: &str,
     ) -> Result<Option<T>, Self::Error>;
+    async fn modify<T, F>(&mut self, key: &str, f: F) -> Result<Option<T>, Self::Error>
+    where
+        T: Serialize + DeserializeOwned + Send + Sync,
+        F: FnMut(Option<T>) -> Option<T> + Send;
 }
 
 pub struct InMemoryStore {
@@ -79,19 +83,87 @@ impl DataStore for InMemoryStore {
             .map(|bytes| bincode::deserialize(bytes))
             .transpose()?)
     }
+
+    async fn modify<T, F>(&mut self, key: &str, mut f: F) -> Result<Option<T>, Self::Error>
+    where
+        T: Serialize + DeserializeOwned + Send + Sync,
+        F: FnMut(Option<T>) -> Option<T> + Send,
+    {
+        let current = self
+            .data
+            .get(key)
+            .and_then(|bytes| bincode::deserialize(bytes).ok());
+
+        match f(current) {
+            Some(new_value) => {
+                self.data
+                    .insert(key.to_string(), bincode::serialize(&new_value)?);
+                Ok(Some(new_value))
+            }
+            None => {
+                self.data.remove(key);
+                Ok(None)
+            }
+        }
+    }
+}
+
+pub struct SharedStore<S> {
+    inner: Arc<RwLock<S>>,
+}
+
+impl<S: DataStore> Clone for SharedStore<S> {
+    fn clone(&self) -> Self {
+        SharedStore {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+}
+
+impl<S: DataStore> SharedStore<S> {
+    pub fn new(inner: Arc<RwLock<S>>) -> SharedStore<S> {
+        Self { inner }
+    }
+}
+
+#[async_trait]
+impl<S: DataStore> DataStore for SharedStore<S> {
+    type Error = S::Error;
+    async fn insert<T: Serialize + Send + Sync>(
+        &mut self,
+        key: &str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        self.inner.write().await.insert(key, value).await
+    }
+
+    async fn get<T: DeserializeOwned + Send + Sync>(
+        &self,
+        key: &str,
+    ) -> Result<Option<T>, Self::Error> {
+        self.inner.read().await.get(key).await
+    }
+
+    async fn modify<T, F>(&mut self, key: &str, f: F) -> Result<Option<T>, Self::Error>
+    where
+        T: Serialize + DeserializeOwned + Send + Sync,
+        F: FnMut(Option<T>) -> Option<T> + Send,
+    {
+        self.inner.write().await.modify(key, f).await
+    }
 }
 
 #[derive(Clone)]
-pub struct EnclaveIndexer<Store: DataStore> {
+pub struct EnclaveIndexer<S: DataStore> {
     listener: EventListener,
     contract: EnclaveContract<ReadOnly>,
-    store: Arc<RwLock<Store>>,
+    store: Arc<RwLock<S>>,
     contract_address: String,
     chain_id: u64,
 }
 
-impl<Store: DataStore> EnclaveIndexer<Store> {
-    pub async fn new(ws_url: &str, contract_address: &str, store: Store) -> Result<Self> {
+impl<S: DataStore> EnclaveIndexer<S> {
+    pub async fn new(ws_url: &str, contract_address: &str, store: S) -> Result<Self> {
         let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
         let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
         let chain_id = contract.provider.get_chain_id().await?;
@@ -104,6 +176,23 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
         };
         instance.setup_listeners().await?;
         Ok(instance)
+    }
+
+    pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
+    where
+        E: SolEvent + Send + Clone + 'static,
+        F: Fn(E, SharedStore<S>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        let store = SharedStore::new(self.store.clone());
+        let handler = Arc::new(handler);
+        self.listener
+            .add_event_handler(move |e: E| {
+                let handler = Arc::clone(&handler);
+                let store = store.clone();
+                async move { handler(e, store).await }
+            })
+            .await;
     }
 
     async fn capture_e3_activated(&mut self) -> Result<()> {
@@ -256,6 +345,10 @@ impl<Store: DataStore> EnclaveIndexer<Store> {
 
     pub fn get_listener(&self) -> EventListener {
         self.listener.clone()
+    }
+
+    pub fn get_store(&self) -> SharedStore<S> {
+        SharedStore::new(self.store.clone())
     }
 }
 

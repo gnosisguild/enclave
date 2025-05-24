@@ -63,14 +63,19 @@ impl EventListener {
             .subscribe_logs(&self.filter)
             .await?
             .into_stream();
-
         while let Some(log) = stream.next().await {
             if let Some(topic0) = log.topic0() {
-                if let Some(handlers) = self.handlers.clone().read().await.get(topic0) {
+                let topic_val = *topic0;
+                if let Some(handlers) = self.handlers.read().await.get(topic0) {
                     for handler in handlers {
-                        if let Err(e) = handler(&log).await {
-                            eprintln!("Error processing event 0x{:x}: {:?}", topic0, e);
-                        }
+                        let log_clone = log.clone();
+                        let fut = handler(&log_clone);
+                        tokio::spawn(async move {
+                            // Spawn the future so that the handlers are processed concurrently
+                            if let Err(e) = fut.await {
+                                eprintln!("Error processing event 0x{:x}: {:?}", topic_val, e);
+                            }
+                        });
                     }
                 }
             }
@@ -87,3 +92,5 @@ impl EventListener {
         Ok(EventListener::new(provider, filter))
     }
 }
+
+use std::time::{SystemTime, UNIX_EPOCH};

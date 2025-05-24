@@ -2,6 +2,7 @@ pragma solidity >=0.4.24;
 
 contract EmitLogs {
     event ValueChanged(address indexed author, uint256 count, string value);
+    event PublishMessage(string value);
 
     string _value;
 
@@ -19,5 +20,9 @@ contract EmitLogs {
         count++;
         emit ValueChanged(msg.sender, count, value);
         _value = value;
+    }
+
+    function emitPublishMessage(string memory value) public {
+        emit PublishMessage(value);
     }
 }
