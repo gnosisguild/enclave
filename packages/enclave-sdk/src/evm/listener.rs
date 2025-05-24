@@ -71,6 +71,7 @@ impl EventListener {
                         let log_clone = log.clone();
                         let fut = handler(&log_clone);
                         tokio::spawn(async move {
+                            // Spawn the future so that the handlers are processed concurrently
                             if let Err(e) = fut.await {
                                 eprintln!("Error processing event 0x{:x}: {:?}", topic_val, e);
                             }
