@@ -45,7 +45,7 @@ fn test_event_extractor(
 async fn evm_reader() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
+    let anvil = Anvil::new().block_time_f64(0.01).try_spawn()?;
     let provider = WithChainId::new(
         ProviderBuilder::new()
             .on_ws(WsConnect::new(anvil.ws_endpoint()))
@@ -105,7 +105,7 @@ async fn evm_reader() -> Result<()> {
 async fn ensure_historical_events() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
+    let anvil = Anvil::new().block_time_f64(0.01).try_spawn()?;
     let provider = WithChainId::new(
         ProviderBuilder::new()
             .on_ws(WsConnect::new(anvil.ws_endpoint()))
@@ -174,7 +174,7 @@ async fn ensure_historical_events() -> Result<()> {
 async fn ensure_resume_after_shutdown() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
-    let anvil = Anvil::new().block_time(1).try_spawn()?;
+    let anvil = Anvil::new().block_time_f64(0.01).try_spawn()?;
     let provider = WithChainId::new(
         ProviderBuilder::new()
             .on_ws(WsConnect::new(anvil.ws_endpoint()))

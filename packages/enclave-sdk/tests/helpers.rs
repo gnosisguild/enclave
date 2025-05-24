@@ -46,7 +46,7 @@ pub async fn setup_fake_enclave() -> Result<(
 
 pub async fn setup_provider() -> Result<(RootProvider<PubSubFrontend>, String, AnvilInstance)> {
     // Set anvil with fast blocktimes for testing
-    let anvil = Anvil::new().block_time_f64(0.01f64).try_spawn()?;
+    let anvil = Anvil::new().block_time_f64(0.01).try_spawn()?;
 
     let provider = ProviderBuilder::new()
         .on_ws(WsConnect::new(anvil.ws_endpoint()))
