@@ -16,4 +16,4 @@ chrono.workspace = true
 log.workspace = true
 compute-provider.workspace = true
 voting-host.workspace = true
- 
+bincode.workspace = true 

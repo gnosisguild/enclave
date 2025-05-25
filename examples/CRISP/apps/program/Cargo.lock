@@ -1164,6 +1164,7 @@ name = "app"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bincode",
  "chrono",
  "clap",
  "compute-provider",
