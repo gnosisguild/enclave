@@ -13,6 +13,8 @@ echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"
 (cd /app/packages/ciphernode && cargo build && cargo install --path ./enclave --force)
+echo "program"
+(cd ./apps/program && cargo build --bin crisp-program)
 echo "server"
 (cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo build --bin cli && cargo build --bin server)
 echo "crisp-wasm-crypto"

@@ -4,18 +4,17 @@ use super::events::{
 };
 use crate::server::{
     config::CONFIG,
-    database::{db_get, db_insert, generate_emoji, get_e3, update_e3_status},
+    database::{db_insert, generate_emoji, get_e3, update_e3_status},
     models::{CurrentRound, E3},
 };
 use chrono::Utc;
 use compute_provider::FHEInputs;
 use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
-use enclave_sdk::indexer::DataStore;
 use log::info;
+use program_client::run_compute;
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
-use voting_host::run_compute;
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
@@ -104,22 +103,17 @@ pub async fn handle_e3(e3_activated: E3Activated) -> Result<()> {
         };
         info!("Starting computation for E3: {}", e3_id);
         update_e3_status(e3_id, "Computing".to_string()).await?;
-        // Call Compute Provider in a separate thread
+
         let (risc0_output, ciphertext) =
-            tokio::task::spawn_blocking(move || run_compute(fhe_inputs).unwrap())
-                .await
-                .unwrap();
+            run_compute(fhe_inputs.params, fhe_inputs.ciphertexts).await?;
 
         info!("Computation completed for E3: {}", e3_id);
         info!("RISC0 Output: {:?}", risc0_output);
         update_e3_status(e3_id, "PublishingCiphertext".to_string()).await?;
+
         // Params will be encoded on chain to create the journal
         let tx = contract
-            .publish_ciphertext_output(
-                e3_activated.e3Id,
-                ciphertext.into(),
-                risc0_output.seal.into(),
-            )
+            .publish_ciphertext_output(e3_activated.e3Id, ciphertext.into(), risc0_output.into())
             .await?;
 
         info!(
