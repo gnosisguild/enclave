@@ -1,13 +1,13 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ComputeRequest {
     pub params: Vec<u8>,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct ComputeResponse {
     pub ciphertext: Vec<u8>,
     pub proof: Vec<u8>,

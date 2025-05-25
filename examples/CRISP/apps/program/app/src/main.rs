@@ -7,8 +7,8 @@ use serde_json::json;
 // Run compute handler
 async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
     let fhe_inputs = FHEInputs {
-        params: req.params,
-        ciphertexts: req.ciphertext_inputs,
+        params: req.params.clone(),
+        ciphertexts: req.ciphertext_inputs.clone(),
     };
     let (risc0_output, ciphertext) =
         tokio::task::spawn_blocking(move || voting_host::run_compute(fhe_inputs))
@@ -28,24 +28,18 @@ async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().json(response))
 }
 
-// Health check endpoint
-async fn health_check() -> Result<HttpResponse> {
-    Ok(HttpResponse::Ok().json(json!({
-        "status": "healthy",
-        "service": "enclave_program"
-    })))
-}
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
-
-    HttpServer::new(|| {
+    let bind_addr = "0.0.0.0:4001";
+    let server = HttpServer::new(|| {
         App::new()
             .wrap(Logger::default())
             .route("/run_compute", web::post().to(run_compute))
     })
-    .bind("0.0.0.0:4001")?
-    .run()
-    .await
+    .bind(bind_addr)?;
+
+    println!("'crisp-program' listening on http://{}", bind_addr);
+
+    server.run().await
 }
