@@ -1,46 +1,49 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
+use compute_provider::FHEInputs;
+use program_client::{ComputeRequest, ComputeResponse};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-// Hello world handler
-async fn hello_world() -> Result<HttpResponse> {
-    Ok(HttpResponse::Ok().json(json!({
-        "message": "Hello, World!",
-        "status": "success"
-    })))
+// Run compute handler
+async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
+    let fhe_inputs = FHEInputs {
+        params: req.params,
+        ciphertexts: req.ciphertext_inputs,
+    };
+    let (risc0_output, ciphertext) =
+        tokio::task::spawn_blocking(move || voting_host::run_compute(fhe_inputs))
+            .await
+            .map_err(|e| {
+                eprintln!("Task spawn error: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Task execution failed")
+            })?
+            .map_err(|e| {
+                eprintln!("Compute function error: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Computation failed")
+            })?;
+
+    let proof: Vec<u8> = risc0_output.seal.into();
+    let response = ComputeResponse { ciphertext, proof };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 // Health check endpoint
 async fn health_check() -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().json(json!({
         "status": "healthy",
-        "service": "actix-web-api"
+        "service": "enclave_program"
     })))
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // Initialize logger
     env_logger::init();
-
-    println!("Starting Actix Web server on port 4001...");
 
     HttpServer::new(|| {
         App::new()
             .wrap(Logger::default())
-            .route("/hello", web::get().to(hello_world))
-            .route("/health", web::get().to(health_check))
-            .route(
-                "/",
-                web::get().to(|| async {
-                    HttpResponse::Ok().json(json!({
-                        "message": "Welcome to the Actix Web API",
-                        "endpoints": [
-                            "GET /hello - Hello world endpoint",
-                            "GET /health - Health check endpoint"
-                        ]
-                    }))
-                }),
-            )
+            .route("/run_compute", web::post().to(run_compute))
     })
     .bind("0.0.0.0:4001")?
     .run()

@@ -12,12 +12,12 @@ use alloy::{
 };
 use compute_provider::FHEInputs;
 use enclave_sdk::evm::contracts::{
-    EnclaveContract, EnclaveRead, EnclaveReadOnlyProvider, EnclaveWrite, ReadOnly, ReadWrite,
-    E3 as ContractE3,
+    EnclaveContract, EnclaveRead, EnclaveWrite, ReadWrite, E3 as ContractE3,
 };
 use enclave_sdk::indexer::DataStore;
 use futures::future::join_all;
 use log::{error, info, warn};
+use program_client::run_compute;
 use std::{
     collections::HashMap,
     error::Error,
@@ -26,7 +26,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::time::{sleep_until, Instant};
-use voting_host::run_compute;
 
 /// Type alias for results with a boxed error.
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
@@ -256,13 +255,11 @@ async fn compute_and_publish_ciphertext(
         ciphertexts: ciphertext_inputs,
     };
 
-    let (risc0_output, ciphertext) =
-        tokio::task::spawn_blocking(move || run_compute(fhe_inputs).unwrap())
-            .await
-            .unwrap();
+    let (risc0_output, ciphertext) = run_compute(fhe_inputs.params, fhe_inputs.ciphertexts).await?;
 
+    // Params will be encoded on chain to create the journal
     let tx = contract
-        .publish_ciphertext_output(e3_id, ciphertext.into(), risc0_output.seal.into())
+        .publish_ciphertext_output(e3_id, ciphertext.into(), risc0_output.into())
         .await?;
 
     info!(
