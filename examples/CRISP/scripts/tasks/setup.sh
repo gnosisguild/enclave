@@ -21,3 +21,8 @@ echo "crisp-wasm-crypto"
 (cd ./apps/wasm-crypto && cargo check)
 echo "client"
 (cd ./apps/client && if [[ ! -f .env ]]; then cp .env.example .env; fi)
+echo "noir"
+(cd ./circuits && nargo compile)
+# Copy circuits compilation artifacts to public client app folder
+mkdir -p ./apps/client/public/circuits
+cp -r ./circuits/target/* ./apps/client/public/circuits/
