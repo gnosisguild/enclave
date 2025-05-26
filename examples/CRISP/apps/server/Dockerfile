@@ -18,6 +18,7 @@ FROM base AS deps
 WORKDIR /app
 
 COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
+COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
 COPY examples/CRISP/apps/program/client/Cargo.toml examples/CRISP/apps/program/client/
 COPY packages/enclave-sdk/Cargo.toml packages/enclave-sdk/
 COPY packages/compute_provider/Cargo.toml packages/compute_provider/
@@ -30,6 +31,9 @@ RUN set -eux; \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
     | while IFS= read -r -d '' manifest_path; do \
         crate_dir="$(dirname "$manifest_path")"; \
+        if [ "$manifest_path" = "examples/CRISP/apps/program/Cargo.toml" ]; then \
+            continue; \
+        fi; \
         mkdir -p "$crate_dir/src"; \
         if [ ! -f "$crate_dir/src/lib.rs" ] && [ ! -f "$crate_dir/src/main.rs" ]; then \
             echo "// Stub lib.rs for $crate_dir" > "$crate_dir/src/lib.rs"; \
@@ -47,7 +51,7 @@ FROM base AS builder
 WORKDIR /app
 
 COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/client/   examples/CRISP/apps/program/client/
+COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
 COPY packages/enclave-sdk/          packages/enclave-sdk/
 COPY packages/compute_provider/     packages/compute_provider/
 
