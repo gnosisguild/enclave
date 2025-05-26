@@ -2,9 +2,8 @@
 
 This module does the following:
 
-- Listens for Enclave `events` from the blockchain
-- Manages `risc0` computations
-- Persist processed `events`
+- Run a local webserver that accepts calls from the client
+- Run computations using risc0
 
 This is the program component for our architecture here.
 
