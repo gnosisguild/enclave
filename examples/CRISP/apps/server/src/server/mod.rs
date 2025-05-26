@@ -33,8 +33,8 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             eprintln!("Listener failed: {:?}", e);
         }
     });
-
-    let _ = HttpServer::new(|| {
+    let bind_addr = "0.0.0.0:4000";
+    let server = HttpServer::new(|| {
         let cors = Cors::default()
             .allow_any_origin()
             .allowed_methods(vec!["GET", "POST", "OPTIONS"])
@@ -47,9 +47,11 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .wrap(Logger::new(r#"%a "%r" %s %b %T"#))
             .configure(routes::setup_routes)
     })
-    .bind("0.0.0.0:4000")?
-    .run()
-    .await;
+    .bind(bind_addr)?;
+
+    println!("'crisp-server' listening on http://{}", bind_addr);
+
+    server.run().await?;
 
     Ok(())
 }
