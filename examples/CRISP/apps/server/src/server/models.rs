@@ -130,6 +130,16 @@ pub struct E3 {
     pub emojis: [String; 2],
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct E3Crisp {
+    pub emojis: [String; 2],
+    pub has_voted: Vec<String>,
+    pub start_time: u64,
+    pub status: String,
+    pub votes_option_1: u64,
+    pub votes_option_2: u64,
+}
+
 impl From<E3> for WebResultRequest {
     fn from(e3: E3) -> Self {
         WebResultRequest {

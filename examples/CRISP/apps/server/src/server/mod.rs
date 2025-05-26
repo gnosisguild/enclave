@@ -2,6 +2,7 @@ pub mod blockchain;
 pub mod config;
 mod database;
 mod models;
+mod repo;
 mod routes;
 
 use actix_cors::Cors;

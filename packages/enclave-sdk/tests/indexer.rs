@@ -5,10 +5,10 @@ use alloy::{
 };
 use enclave_sdk::indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
-use helpers::{setup_fake_enclave, setup_provider};
+use helpers::setup_fake_enclave;
 use std::time::Duration;
 use tokio::time::sleep;
-use Enclave::{E3Activated, InputPublished};
+use Enclave::InputPublished;
 
 sol!(
     #[sol(rpc)]
