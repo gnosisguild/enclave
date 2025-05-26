@@ -1,10 +1,43 @@
 use super::{
     database::generate_emoji,
-    models::{CurrentRound, E3Crisp},
+    models::{CurrentRound, E3Crisp, E3StateLite, WebResultRequest},
 };
 use chrono::Utc;
 use enclave_sdk::indexer::{models::E3 as EnclaveE3, DataStore, SharedStore};
 use eyre::Result;
+
+pub struct CurrentRoundRepository<S: DataStore> {
+    store: SharedStore<S>,
+}
+
+impl<S: DataStore> CurrentRoundRepository<S> {
+    pub fn new(store: SharedStore<S>) -> Self {
+        Self { store }
+    }
+
+    pub async fn set_current_round(&mut self, value: CurrentRound) -> Result<()> {
+        let key = self.current_round_key();
+        self.store
+            .insert(&key, &value)
+            .await
+            .map_err(|_| eyre::eyre!("Could not set current_round for '{key}'"))?;
+        Ok(())
+    }
+
+    pub async fn get_current_round(&self) -> Result<Option<CurrentRound>> {
+        let key = self.current_round_key();
+        let round = self
+            .store
+            .get::<CurrentRound>(&key)
+            .await
+            .map_err(|_| eyre::eyre!("Could get e3 at '{key}'"))?;
+        Ok(round)
+    }
+
+    fn current_round_key(&self) -> String {
+        format!("e3:current_round")
+    }
+}
 
 pub struct CrispE3Repository<S: DataStore> {
     store: SharedStore<S>,
@@ -63,24 +96,8 @@ impl<S: DataStore> CrispE3Repository<S> {
     }
 
     pub async fn get_vote_count(&self) -> Result<usize> {
-        let key = self.e3_key();
-        let e3 = self
-            .store
-            .get::<EnclaveE3>(&key)
-            .await
-            .map_err(|_| eyre::eyre!("Could get e3 at '{key}'"))?
-            .ok_or(eyre::eyre!("No data found at {key}"))?;
-
+        let e3 = self.get_e3().await?;
         Ok(e3.ciphertext_inputs.len())
-    }
-
-    pub async fn set_current_round(&mut self, value: CurrentRound) -> Result<()> {
-        let key = self.current_round_key();
-        self.store
-            .insert(&key, &value)
-            .await
-            .map_err(|_| eyre::eyre!("Could not set current_round for '{key}'"))?;
-        Ok(())
     }
 
     pub async fn update_status(&mut self, value: &str) -> Result<()> {
@@ -98,7 +115,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
-    pub async fn append_ciphertext_input(&mut self, data: Vec<u8>, index: u64) -> Result<()> {
+    pub async fn insert_ciphertext_input(&mut self, data: Vec<u8>, index: u64) -> Result<()> {
         let key = self.e3_key();
         self.store
             .modify(&key, |e3_obj: Option<EnclaveE3>| {
@@ -142,6 +159,43 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
+    pub async fn get_ciphertext_output(&self) -> Result<Vec<u8>> {
+        let e3 = self.get_e3().await?;
+        Ok(e3.ciphertext_output)
+    }
+
+    pub async fn get_web_result_request(&self) -> Result<WebResultRequest> {
+        let e3 = self.get_e3().await?;
+        let e3_crisp = self.get_crisp().await?;
+        Ok(WebResultRequest {
+            round_id: e3.id,
+            option_1_tally: e3_crisp.votes_option_1,
+            option_2_tally: e3_crisp.votes_option_2,
+            total_votes: e3_crisp.votes_option_1 + e3_crisp.votes_option_2,
+            option_1_emoji: e3_crisp.emojis[0].clone(),
+            option_2_emoji: e3_crisp.emojis[1].clone(),
+            end_time: e3.expiration,
+        })
+    }
+
+    pub async fn get_e3_state_lite(&self) -> Result<E3StateLite> {
+        let e3 = self.get_e3().await?;
+        let e3_crisp = self.get_crisp().await?;
+        Ok(E3StateLite {
+            emojis: e3_crisp.emojis,
+            expiration: e3.expiration,
+            id: self.e3_id,
+            status: e3_crisp.status,
+            chain_id: e3.chain_id,
+            duration: e3.duration,
+            vote_count: u64::try_from(e3.ciphertext_inputs.len())?,
+            start_time: e3_crisp.start_time,
+            start_block: e3.request_block,
+            enclave_address: e3.enclave_address,
+            committee_public_key: e3.committee_public_key,
+        })
+    }
+
     pub async fn set_ciphertext_output(&mut self, data: Vec<u8>) -> Result<()> {
         let key = self.e3_key();
         self.store
@@ -156,6 +210,30 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
+    async fn has_voted(&self, address: String) -> Result<bool> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.has_voted.contains(&address))
+    }
+
+    async fn insert_voter_address(&mut self, address: String) -> Result<()> {
+        let key = self.crisp_key();
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.has_voted.push(address.clone());
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not insert address on '{key}'"))?;
+        Ok(())
+    }
+
+    async fn is_finished(&self) -> Result<bool> {
+        let e3 = self.get_crisp().await?;
+        Ok(e3.status == "Finished")
+    }
+
     fn crisp_key(&self) -> String {
         let e3_id = self.e3_id;
         format!("e3:crisp:{e3_id}")
@@ -164,7 +242,5 @@ impl<S: DataStore> CrispE3Repository<S> {
         let e3_id = self.e3_id;
         format!("e3:{e3_id}")
     }
-    fn current_round_key(&self) -> String {
-        format!("e3:current_round")
-    }
 }
+
