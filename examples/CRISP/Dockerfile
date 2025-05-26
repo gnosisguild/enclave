@@ -1,7 +1,7 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
-ARG NOIR_VERSION=1.0.0-beta.6
-ARG BB_VERSION=0.87.2
+ARG NOIR_VERSION=1.0.0-beta.3
+ARG BB_VERSION=0.82.2
 ARG FOUNDRY_VERSION=0.1.0
 ARG RISCZERO_VERSION=2.0.0
 ARG CPP_VERSION=2024.1.5
@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     sudo \
     wget \
+    libc++1 \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
@@ -30,15 +32,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && corepack enable \
     && corepack prepare pnpm@10.7.1 --activate
 
-# Create user
-ENV USERNAME=devuser
+# Use existing user
+ENV USERNAME=ubuntu
 ARG USER_UID=1000
 ARG USER_GID=1000
 
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME && \
+    chmod 0440 /etc/sudoers.d/$USERNAME
 
 USER $USERNAME
 WORKDIR /home/$USERNAME
@@ -53,15 +53,17 @@ ENV SHELL=/bin/bash
 RUN curl -L https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash
 RUN echo 'export NARGO_HOME="$HOME/.nargo"' >> ~/.bashrc
 RUN echo 'export PATH="$PATH:$NARGO_HOME/bin"' >> ~/.bashrc
+ENV NARGO_HOME="/home/${USERNAME}/.nargo"
+ENV PATH="${PATH}:${NARGO_HOME}/bin --version ${NOIR_VERSION}"
 RUN . ~/.bashrc && /home/${USERNAME}/.nargo/bin/noirup --version ${NOIR_VERSION}
 
-# Install Barretenberg proving backend and add it to PATH
-ENV SHELL=/bin/bash
-RUN mkdir -p /home/${USERNAME}/.bb
-RUN curl -fsSL https://raw.githubusercontent.com/AztecProtocol/aztec-packages/master/barretenberg/bbup/bbup -o /home/${USERNAME}/.bb/bbup
-RUN chmod 755 /home/${USERNAME}/.bb/bbup
-RUN echo 'export PATH="${HOME}/.bb:${PATH}"' >> ~/.bashrc
-RUN . ~/.bashrc && /home/${USERNAME}/.bb/bbup -v ${BB_VERSION}
+# Install Barretenberg proving backend
+RUN curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/master/barretenberg/bbup/install | bash
+RUN echo 'export BB_HOME="$HOME/.bb"' >> ~/.bashrc
+RUN echo 'export PATH="$PATH:$BB_HOME"' >> ~/.bashrc
+ENV BB_HOME="/home/${USERNAME}/.bb"
+ENV PATH="${PATH}:${BB_HOME}"
+RUN . ~/.bashrc && bbup -v ${BB_VERSION}
 
 ENV PATH="/home/${USERNAME}/.foundry/bin:${PATH}"
 RUN curl -L https://foundry.paradigm.xyz | bash
