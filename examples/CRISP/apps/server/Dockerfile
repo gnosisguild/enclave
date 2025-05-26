@@ -5,25 +5,25 @@ ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base-dev
 
-ENV RISC0_HOME=/root/.risc0
-ENV PATH="${RISC0_HOME}/bin:${PATH}"
 ENV CARGO_HOME=/usr/local/cargo
+ENV CARGO_TARGET_DIR=/app/target
+ENV RISC0_HOME=/root/.risc0
+ENV PATH="${CARGO_HOME}/bin:${RISC0_HOME}/bin:${PATH}"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     pkg-config libssl-dev curl ca-certificates && \
+    curl -sSfL https://risczero.com/install | bash && \
+    rzup install rust ${RUST_VERSION} && \
+    rzup install r0vm ${RISC0_VERSION} && \
+    rzup install cargo-risczero ${RISC0_VERSION} && \
     rm -rf /var/lib/apt/lists/*
-
-RUN curl -sSfL https://risczero.com/install | bash
-RUN rzup install rust ${RUST_VERSION}
-RUN rzup install r0vm ${RISC0_VERSION}
-RUN rzup install cargo-risczero ${RISC0_VERSION}
 
 RUN cargo install --locked cargo-chef
 
 #################################################
-############### stage 1: chef ###################
-FROM base-dev AS chef
+############### stage 1: recipe-generator ###################
+FROM base-dev AS recipe-generator
 WORKDIR /app
 
 COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
@@ -37,14 +37,14 @@ COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 WORKDIR /app/examples/CRISP/apps/server
 RUN cargo chef prepare --recipe-path recipe.json
 
-############### stage 2: planner ###############
-FROM base-dev AS planner
+############### stage 2: dependency-builder ###############
+FROM base-dev AS dependency-builder
 
 ARG SKIP_SOLIDITY
 ENV SKIP_SOLIDITY=${SKIP_SOLIDITY}
 
 WORKDIR /app
-COPY --from=chef /app/examples/CRISP/apps/server/recipe.json \
+COPY --from=recipe-generator /app/examples/CRISP/apps/server/recipe.json \
     /app/examples/CRISP/apps/server/recipe.json
 
 COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
@@ -74,7 +74,7 @@ RUN set -eux; \
 
 WORKDIR /app/examples/CRISP/apps/server
 
-RUN echo "==== PLANNER: DEBUGGING BEFORE cargo chef cook ====" && \
+RUN echo "==== DEPENDENCY-BUILDER: DEBUGGING BEFORE cargo chef cook ====" && \
     echo "Current PWD: $(pwd)" && \
     echo "CARGO_HOME: ${CARGO_HOME}" && \
     echo "CARGO_TARGET_DIR: ${CARGO_TARGET_DIR}" && \
@@ -89,11 +89,12 @@ RUN echo "==== PLANNER: DEBUGGING BEFORE cargo chef cook ====" && \
     echo "--- Listing current WORKDIR target (./target) ---" && \
     ls -la "./target" || echo "./target not found or empty" && \
     echo "Recipe file:" && ls -la recipe.json && \
-    echo "==== PLANNER: END DEBUGGING ===="
+    echo "==== DEPENDENCY-BUILDER: END DEBUGGING ===="
 
-RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \
+WORKDIR /app/examples/CRISP/apps/server
+RUN --mount=type=cache,id=cargo-registry,target=${CARGO_HOME}/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=${CARGO_HOME}/git,sharing=locked \
+    --mount=type=cache,id=cargo-target,target=${CARGO_TARGET_DIR},sharing=locked \
     cargo chef cook --release --recipe-path recipe.json
 
 ############### stage 3: builder ###############
@@ -125,7 +126,7 @@ RUN echo "==== BUILDER: DEBUGGING BEFORE cargo build ====" && \
     ls -la "${CARGO_HOME}/git" || echo "Git dir not found or empty" && \
     echo "  Specific check: ${CARGO_HOME}/git/db" && \
     ls -la "${CARGO_HOME}/git/db" || echo "Git db missing" && \
-    echo "--- Listing CARGO_TARGET_DIR (${CARGO_TARGET_DIR}) (should be populated by cache mount from planner) ---" && \
+    echo "--- Listing CARGO_TARGET_DIR (${CARGO_TARGET_DIR}) (should be populated by cache mount from dependency-builder) ---" && \
     ls -la "${CARGO_TARGET_DIR}" || echo "CARGO_TARGET_DIR not found or empty" && \
     echo "  Specific check: ${CARGO_TARGET_DIR}/release/.fingerprint" && \
     ls -la "${CARGO_TARGET_DIR}/release/.fingerprint" || echo "Fingerprints in CARGO_TARGET_DIR missing" && \
@@ -133,11 +134,11 @@ RUN echo "==== BUILDER: DEBUGGING BEFORE cargo build ====" && \
     ls -la "./target" || echo "./target not found or empty" && \
     echo "==== BUILDER: END DEBUGGING ===="
 
-RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \
+RUN --mount=type=cache,id=cargo-registry,target=${CARGO_HOME}/registry,sharing=locked \
+    --mount=type=cache,id=cargo-git,target=${CARGO_HOME}/git,sharing=locked \
+    --mount=type=cache,id=cargo-target,target=${CARGO_TARGET_DIR},sharing=locked \
     cargo build --release --bin server && \
-    mkdir -p /app/dist && cp target/release/server /app/dist/server
+    mkdir -p /app/dist && cp ${CARGO_TARGET_DIR}/release/server /app/dist/server
 
 ############### stage 4: runtime ###############
 FROM gcr.io/distroless/cc-debian12 AS runtime
