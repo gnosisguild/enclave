@@ -54,6 +54,25 @@ impl DataStore for SledDB {
             Ok(None)
         }
     }
+
+    async fn modify<T, F>(&mut self, key: &str, mut f: F) -> Result<Option<T>, Self::Error>
+    where
+        T: Serialize + DeserializeOwned + Send + Sync,
+        F: FnMut(Option<T>) -> Option<T> + Send,
+    {
+        // Edit in place
+        let result = self.db.update_and_fetch(key, |old_bytes| {
+            let current_value = old_bytes.and_then(|bytes| serde_json::from_slice(bytes).ok());
+            let new_value = f(current_value);
+            new_value.and_then(|val| serde_json::to_vec(&val).ok())
+        })?;
+
+        // Deserialize the final result
+        result
+            .map(|bytes| serde_json::from_slice(&bytes))
+            .transpose()
+            .map_err(|e| e.into())
+    }
 }
 
 static GLOBAL_DB: Lazy<RwLock<SledDB>> = Lazy::new(|| {
