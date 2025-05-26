@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use sled::Db;
-use std::{error::Error, str};
+use std::{error::Error, str, sync::Arc};
 use thiserror::Error;
 use tokio::sync::RwLock;
 
@@ -74,9 +74,9 @@ impl DataStore for SledDB {
     }
 }
 
-static GLOBAL_DB: Lazy<RwLock<SledDB>> = Lazy::new(|| {
+pub static GLOBAL_DB: Lazy<Arc<RwLock<SledDB>>> = Lazy::new(|| {
     let pathdb = std::env::current_dir().unwrap().join("database/server");
-    RwLock::new(SledDB::new(pathdb.to_str().unwrap()).unwrap())
+    Arc::new(RwLock::new(SledDB::new(pathdb.to_str().unwrap()).unwrap()))
 });
 
 pub async fn db_insert<T: Serialize + Send + Sync>(
@@ -104,6 +104,10 @@ pub async fn get_e3(e3_id: u64) -> Result<(E3, String), Box<dyn Error + Send + S
             Err("E3 state not found".into())
         }
     }
+}
+
+pub async fn db_clone() -> SledDB {
+    GLOBAL_DB.read().await.clone()
 }
 
 pub async fn update_e3_status(

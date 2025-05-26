@@ -35,7 +35,7 @@ impl<S: DataStore> CurrentRoundRepository<S> {
     }
 
     fn current_round_key(&self) -> String {
-        format!("e3:current_round")
+        format!("_e3:current_round")
     }
 }
 
@@ -95,9 +95,9 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(e3)
     }
 
-    pub async fn get_vote_count(&self) -> Result<usize> {
+    pub async fn get_vote_count(&self) -> Result<u64> {
         let e3 = self.get_e3().await?;
-        Ok(e3.ciphertext_inputs.len())
+        Ok(u64::try_from(e3.ciphertext_inputs.len())?)
     }
 
     pub async fn update_status(&mut self, value: &str) -> Result<()> {
@@ -236,11 +236,10 @@ impl<S: DataStore> CrispE3Repository<S> {
 
     fn crisp_key(&self) -> String {
         let e3_id = self.e3_id;
-        format!("e3:crisp:{e3_id}")
+        format!("_e3:crisp:{e3_id}")
     }
     fn e3_key(&self) -> String {
         let e3_id = self.e3_id;
-        format!("e3:{e3_id}")
+        format!("_e3:{e3_id}")
     }
 }
-

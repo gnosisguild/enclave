@@ -1,14 +1,15 @@
 pub mod blockchain;
 pub mod config;
 mod database;
+mod indexer;
 mod models;
 mod repo;
 mod routes;
 
 use actix_cors::Cors;
 use actix_web::{middleware::Logger, App, HttpServer};
-
 use blockchain::listener::start_listener;
+// use indexer::start_indexer;
 
 use crate::logger::init_logger;
 use config::CONFIG;
@@ -34,6 +35,20 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             eprintln!("Listener failed: {:?}", e);
         }
     });
+    // New indexer
+    // tokio::spawn(async {
+    //     if let Err(e) = start_indexer(
+    //         &CONFIG.ws_rpc_url,
+    //         &CONFIG.enclave_address,
+    //         database::GLOBAL_DB.read().await.clone(),
+    //         &CONFIG.private_key,
+    //     )
+    //     .await
+    //     {
+    //         eprintln!("Listener failed: {:?}", e);
+    //     }
+    // });
+
     let bind_addr = "0.0.0.0:4000";
     let server = HttpServer::new(|| {
         let cors = Cors::default()

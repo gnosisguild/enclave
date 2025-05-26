@@ -14,7 +14,6 @@ use compute_provider::FHEInputs;
 use enclave_sdk::evm::contracts::{
     EnclaveContract, EnclaveRead, EnclaveWrite, ReadWrite, E3 as ContractE3,
 };
-use enclave_sdk::indexer::DataStore;
 use futures::future::join_all;
 use log::{error, info, warn};
 use program_client::run_compute;
