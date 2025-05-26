@@ -9,15 +9,19 @@ This is the program component for our overall CRISP architecture:
 
 ```mermaid
 graph TD
-  subgraph ec2_1["NODE"]
+  subgraph frontend["FRONTEND"]
+    client
+  end
+  subgraph ec2_1["BACKEND"]
     server["server"] --> db
     db[(DB)]
-    client --"HTTP"--> server
+
     server --HTTP--> program
   end
   subgraph thirdparty["3rd PARTY"]
     bonsai
   end
+  client --"HTTP"--> server
   program ---> bonsai
 
   bonsai["bonsai (risc0)"]
