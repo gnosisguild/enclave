@@ -5,7 +5,7 @@ mod models;
 mod routes;
 
 use actix_cors::Cors;
-use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web::{middleware::Logger, App, HttpServer};
 
 use blockchain::listener::start_listener;
 

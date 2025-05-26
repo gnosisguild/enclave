@@ -6,9 +6,8 @@ use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use sled::Db;
-use std::{error::Error, str, sync::Arc};
+use std::{error::Error, str};
 use thiserror::Error;
-use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 
 #[derive(Error, Debug)]

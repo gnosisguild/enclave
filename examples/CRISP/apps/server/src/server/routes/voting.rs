@@ -1,6 +1,6 @@
 use crate::server::{
     config::CONFIG,
-    database::{db_get, db_insert, get_e3},
+    database::{db_insert, get_e3},
     models::{EncryptedVote, VoteResponse, VoteResponseStatus, E3},
 };
 use actix_web::{web, HttpResponse, Responder};
@@ -8,8 +8,7 @@ use alloy::{
     dyn_abi::DynSolValue,
     primitives::{Bytes, U256},
 };
-use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
-use enclave_sdk::indexer::DataStore;
+use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveWrite};
 use eyre::Error;
 use log::info;
 

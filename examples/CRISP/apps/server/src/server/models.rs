@@ -1,6 +1,4 @@
-use crate::server::database::SledDB;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct JsonResponse {
