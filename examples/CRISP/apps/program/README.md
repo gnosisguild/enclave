@@ -5,7 +5,7 @@ This module does the following:
 - Run a local webserver that accepts calls from the client
 - Run computations using risc0
 
-This is the program component for our architecture here.
+This is the program component for our overall CRISP architecture:
 
 ```mermaid
 graph TD
