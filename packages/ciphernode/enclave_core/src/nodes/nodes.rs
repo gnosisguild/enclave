@@ -1,7 +1,6 @@
 use anyhow::*;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env, process::Stdio, sync::Arc};
+use std::{collections::HashMap, process::Stdio, sync::Arc};
 use tokio::{
     process::{Child, Command},
     sync::Mutex,

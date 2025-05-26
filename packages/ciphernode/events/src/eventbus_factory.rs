@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 use std::any::Any;
 use std::any::TypeId;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use crate::EnclaveEvent;
 use crate::ErrorCollector;
