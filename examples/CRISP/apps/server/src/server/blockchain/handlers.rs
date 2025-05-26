@@ -149,7 +149,10 @@ pub async fn handle_input_published(input: InputPublished) -> Result<()> {
 pub async fn handle_ciphertext_output_published(
     ciphertext_output: CiphertextOutputPublished,
 ) -> Result<()> {
-    info!("Handling CiphertextOutputPublished event...");
+    info!(
+        "Handling CiphertextOutputPublished event for E3: {}",
+        ciphertext_output.e3Id
+    );
 
     let e3_id = ciphertext_output.e3Id.to::<u64>();
     let (mut e3, key) = get_e3(e3_id).await?;
