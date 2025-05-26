@@ -1,5 +1,5 @@
 use anyhow::*;
-use tracing::{error, instrument};
+use tracing::instrument;
 
 use super::client;
 

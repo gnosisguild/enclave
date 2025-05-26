@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use bloom::{BloomFilter, ASMS};
-use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Display};
+use std::collections::HashMap;
+use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
 

@@ -2,8 +2,7 @@ use crate::{Get, Insert, InsertSync, Remove};
 use actix::{Actor, ActorContext, Addr, Handler};
 use anyhow::{Context, Result};
 use events::{
-    get_enclave_event_bus, BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventBusConfig,
-    Subscribe,
+    get_enclave_event_bus, BusError, EnclaveErrorType, EnclaveEvent, EventBus, Subscribe,
 };
 use once_cell::sync::Lazy;
 use sled::Db;

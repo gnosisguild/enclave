@@ -11,9 +11,7 @@ use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
 use crate::evm::{
-    contracts::{
-        EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveReadOnlyProvider, ReadOnly,
-    },
+    contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
     events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
     listener::EventListener,
 };
