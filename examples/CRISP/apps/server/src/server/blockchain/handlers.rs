@@ -166,7 +166,10 @@ pub async fn handle_ciphertext_output_published(
 pub async fn handle_plaintext_output_published(
     plaintext_output: PlaintextOutputPublished,
 ) -> Result<()> {
-    info!("Handling PlaintextOutputPublished event...");
+    info!(
+        "Handling PlaintextOutputPublished event for E3: {}",
+        plaintext_output.e3Id
+    );
     let e3_id = plaintext_output.e3Id.to::<u64>();
     let (mut e3, key) = get_e3(e3_id).await?;
 
