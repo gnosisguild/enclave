@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+// This correlates with the information from the contract
+// with an addition of a chain_id
 #[derive(Debug, Deserialize, Serialize)]
 pub struct E3 {
     pub chain_id: u64,
