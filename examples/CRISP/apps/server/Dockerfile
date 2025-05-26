@@ -1,14 +1,22 @@
 ############### stage 0: base-dev ###############
 ARG RUST_VERSION=1.85.0
+ARG RISC0_VERSION=2.0.0
+ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base
 
 ENV CARGO_HOME=/usr/local/cargo \
-    CARGO_TARGET_DIR=/app/target
+    CARGO_TARGET_DIR=/app/target \
+    RISC0_HOME=/root/.risc0 \
+    PATH="${CARGO_HOME}/bin:${RISC0_HOME}/bin:${PATH}"
 
-RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates; \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev curl ca-certificates && \
+    curl -sSfL https://risczero.com/install | bash && \
+    rzup install rust ${RUST_VERSION} && \
+    rzup install r0vm ${RISC0_VERSION} && \
+    rzup install cargo-risczero ${RISC0_VERSION} && \
     rm -rf /var/lib/apt/lists/*
 
 
