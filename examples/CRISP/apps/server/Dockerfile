@@ -5,10 +5,10 @@ ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base
 
-ENV CARGO_HOME=/usr/local/cargo \
-    CARGO_TARGET_DIR=/app/target \
-    RISC0_HOME=/root/.risc0 \
-    PATH="${CARGO_HOME}/bin:${RISC0_HOME}/bin:${PATH}"
+ENV CARGO_HOME=/usr/local/cargo
+ENV CARGO_TARGET_DIR=/app/target
+ENV RISC0_HOME=/root/.risc0
+ENV PATH="${CARGO_HOME}/bin:${RISC0_HOME}/bin:${PATH}"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
