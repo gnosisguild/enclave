@@ -61,8 +61,6 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
             ${{ github.ref == 'refs/heads/release' && format('{0}:latest', env.IMAGE_NAME) || '' }}
-          build-args: |
-            SKIP_SOLIDITY=1
           cache-from: |
             type=gha,scope=cargo-registry
             type=gha,scope=cargo-git
