@@ -46,9 +46,10 @@ async fn evm_reader() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
+    let rpc_url = anvil.ws_endpoint(); // Get RPC URL
     let provider = WithChainId::new(
         ProviderBuilder::new()
-            .on_ws(WsConnect::new(anvil.ws_endpoint()))
+            .on_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )
     .await?;
@@ -63,6 +64,7 @@ async fn evm_reader() -> Result<()> {
         None,
         &bus,
         &repository,
+        rpc_url.clone(), // Pass RPC URL
     )
     .await?;
 
@@ -106,9 +108,10 @@ async fn ensure_historical_events() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
+    let rpc_url = anvil.ws_endpoint(); // Get RPC URL
     let provider = WithChainId::new(
         ProviderBuilder::new()
-            .on_ws(WsConnect::new(anvil.ws_endpoint()))
+            .on_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )
     .await?;
@@ -135,6 +138,7 @@ async fn ensure_historical_events() -> Result<()> {
         None,
         &bus,
         &repository,
+        rpc_url.clone(), // Pass RPC URL
     )
     .await?;
 
@@ -175,9 +179,10 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     // Create a WS provider
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
+    let rpc_url = anvil.ws_endpoint(); // Get RPC URL
     let provider = WithChainId::new(
         ProviderBuilder::new()
-            .on_ws(WsConnect::new(anvil.ws_endpoint()))
+            .on_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )
     .await?;
@@ -219,6 +224,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
         None,
         &bus,
         &repository,
+        rpc_url.clone(), // Pass RPC URL
     )
     .await?;
 
@@ -255,6 +261,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
         None,
         &bus,
         &repository,
+        rpc_url.clone(), // Pass RPC URL
     )
     .await?;
 
