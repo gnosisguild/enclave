@@ -1,4 +1,3 @@
-pub mod blockchain;
 pub mod config;
 mod database;
 mod indexer;
