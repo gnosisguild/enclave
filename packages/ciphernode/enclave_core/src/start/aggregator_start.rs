@@ -1,4 +1,4 @@
-use actix::{Actor, Addr};
+use actix::Addr;
 use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use anyhow::Result;
 use config::AppConfig;

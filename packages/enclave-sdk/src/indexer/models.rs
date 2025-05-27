@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+// This correlates with the information from the contract
+// with an addition of a chain_id
 #[derive(Debug, Deserialize, Serialize)]
 pub struct E3 {
     pub chain_id: u64,
@@ -14,7 +16,7 @@ pub struct E3 {
     pub id: u64,
     pub plaintext_output: Vec<u8>,
     pub request_block: u64,
-    pub seed: u64,
+    pub seed: [u8; 32],
     pub start_window: [u64; 2],
     pub threshold: [u32; 2],
 }
