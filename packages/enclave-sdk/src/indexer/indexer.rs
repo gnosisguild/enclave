@@ -194,7 +194,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
             .await;
     }
 
-    async fn capture_e3_activated(&mut self) -> Result<()> {
+    async fn register_e3_activated(&mut self) -> Result<()> {
         let db = self.store.clone();
         let contract = self.contract.clone();
         let chain_id = self.chain_id;
@@ -247,7 +247,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
-    async fn capture_input_published(&mut self) -> Result<()> {
+    async fn register_input_published(&mut self) -> Result<()> {
         let store = self.store.clone();
         self.listener
             .add_event_handler(move |e: InputPublished| {
@@ -272,7 +272,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
-    async fn capture_ciphertext_output_published(&mut self) -> Result<()> {
+    async fn register_ciphertext_output_published(&mut self) -> Result<()> {
         let store = self.store.clone();
         self.listener
             .add_event_handler(move |e: CiphertextOutputPublished| {
@@ -297,7 +297,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
-    async fn capture_plaintext_output_published(&mut self) -> Result<()> {
+    async fn register_plaintext_output_published(&mut self) -> Result<()> {
         let store = self.store.clone();
         self.listener
             .add_event_handler(move |e: PlaintextOutputPublished| {
@@ -323,10 +323,10 @@ impl<S: DataStore> EnclaveIndexer<S> {
     }
 
     async fn setup_listeners(&mut self) -> Result<()> {
-        self.capture_e3_activated().await?;
-        self.capture_input_published().await?;
-        self.capture_ciphertext_output_published().await?;
-        self.capture_plaintext_output_published().await?;
+        self.register_e3_activated().await?;
+        self.register_input_published().await?;
+        self.register_ciphertext_output_published().await?;
+        self.register_plaintext_output_published().await?;
         Ok(())
     }
 

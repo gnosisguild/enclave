@@ -48,7 +48,7 @@ async fn get_all_round_results() -> impl Responder {
     };
 
     let mut states = Vec::new();
-    // FIX: This assumes ids are in order and is a logic bug
+    // FIXME: This assumes ids are ordered
     for i in 0..round_count + 1 {
         let repo = get_e3_repo(i).await;
         match repo.get_web_result_request().await {

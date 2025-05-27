@@ -5,7 +5,7 @@ use crate::server::{
 use compute_provider::FHEInputs;
 use enclave_sdk::{
     evm::{
-        contracts::{EnclaveContract, EnclaveRead, EnclaveWrite},
+        contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, ReadWrite},
         events::{
             CiphertextOutputPublished, CommitteePublished, E3Activated, InputPublished,
             PlaintextOutputPublished,
@@ -22,16 +22,10 @@ use tokio::time::{sleep_until, Instant};
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
-pub async fn setup_indexer(
-    ws_url: &str,
-    contract_address: &str,
-    store: impl DataStore,
-    private_key: &str,
+pub async fn register_e3_activated(
+    mut indexer: EnclaveIndexer<impl DataStore>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
-    let mut indexer = EnclaveIndexer::new(ws_url, contract_address, store).await?;
-
-    let contract = Arc::new(EnclaveContract::new(&ws_url, &private_key, &contract_address).await?);
-
     // E3Activated
     indexer
         .add_event_handler(move |event: E3Activated, store| {
@@ -101,7 +95,12 @@ pub async fn setup_indexer(
             }
         })
         .await;
+    Ok(indexer)
+}
 
+pub async fn register_input_published(
+    mut indexer: EnclaveIndexer<impl DataStore>,
+) -> Result<EnclaveIndexer<impl DataStore>> {
     // InputPublished
     indexer
         .add_event_handler(move |event: InputPublished, store| {
@@ -114,7 +113,12 @@ pub async fn setup_indexer(
             }
         })
         .await;
+    Ok(indexer)
+}
 
+pub async fn register_ciphertext_output_published(
+    mut indexer: EnclaveIndexer<impl DataStore>,
+) -> Result<EnclaveIndexer<impl DataStore>> {
     // CiphertextOutputPublished
     indexer
         .add_event_handler(move |event: CiphertextOutputPublished, store| {
@@ -129,7 +133,12 @@ pub async fn setup_indexer(
             }
         })
         .await;
+    Ok(indexer)
+}
 
+pub async fn register_plaintext_output_published(
+    mut indexer: EnclaveIndexer<impl DataStore>,
+) -> Result<EnclaveIndexer<impl DataStore>> {
     // PlaintextOutputPublished
     indexer
         .add_event_handler(move |event: PlaintextOutputPublished, store| {
@@ -149,31 +158,18 @@ pub async fn setup_indexer(
             }
         })
         .await;
-
     Ok(indexer)
 }
 
-pub async fn start_indexer(
-    ws_url: &str,
-    contract_address: &str,
-    store: impl DataStore,
-    private_key: &str,
-) -> Result<()> {
-    let ws_url = ws_url.to_string();
-    let contract_address = contract_address.to_string();
-    let private_key = private_key.to_string();
-    let mut indexer = setup_indexer(&ws_url, &contract_address, store, &private_key).await?;
-
+pub async fn register_committee_published(
+    mut indexer: EnclaveIndexer<impl DataStore>,
+    contract: Arc<EnclaveContract<ReadWrite>>,
+) -> Result<EnclaveIndexer<impl DataStore>> {
     // CommitteePublished
     indexer
         .add_event_handler(move |event: CommitteePublished, _| {
-            let ws_url = ws_url.clone();
-            let contract_address = contract_address.clone();
-            let private_key = private_key.clone();
+            let contract = contract.clone();
             async move {
-                let contract =
-                    EnclaveContract::new(&ws_url, &private_key, &contract_address).await?;
-
                 // We need to do this to ensure this is idempotent.
                 // TODO: conserve bandwidth and check for E3AlreadyActivated error instead of
                 // making two calls to contract
@@ -190,6 +186,31 @@ pub async fn start_indexer(
             }
         })
         .await;
+    Ok(indexer)
+}
 
+pub async fn setup_indexer(
+    ws_url: &str,
+    contract_address: &str,
+    store: impl DataStore,
+    private_key: &str,
+) -> Result<EnclaveIndexer<impl DataStore>> {
+    let indexer = EnclaveIndexer::new(ws_url, contract_address, store).await?;
+    let contract = Arc::new(EnclaveContract::new(&ws_url, &private_key, &contract_address).await?);
+    let indexer = register_e3_activated(indexer, contract.clone()).await?;
+    let indexer = register_input_published(indexer).await?;
+    let indexer = register_ciphertext_output_published(indexer).await?;
+    let indexer = register_plaintext_output_published(indexer).await?;
+    let indexer = register_committee_published(indexer, contract).await?;
+    Ok(indexer)
+}
+
+pub async fn start_indexer(
+    ws_url: &str,
+    contract_address: &str,
+    store: impl DataStore,
+    private_key: &str,
+) -> Result<()> {
+    let _ = setup_indexer(&ws_url, &contract_address, store, &private_key).await?;
     Ok(())
 }
