@@ -92,5 +92,3 @@ impl EventListener {
         Ok(EventListener::new(provider, filter))
     }
 }
-
-use std::time::{SystemTime, UNIX_EPOCH};

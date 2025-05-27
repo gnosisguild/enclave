@@ -163,6 +163,7 @@ pub async fn start_indexer(
     let contract_address = contract_address.to_string();
     let private_key = private_key.to_string();
     let mut indexer = setup_indexer(&ws_url, &contract_address, store, &private_key).await?;
+
     // CommitteePublished
     indexer
         .add_event_handler(move |event: CommitteePublished, _| {
@@ -173,6 +174,16 @@ pub async fn start_indexer(
                 let contract =
                     EnclaveContract::new(&ws_url, &private_key, &contract_address).await?;
 
+                // We need to do this to ensure this is idempotent.
+                // TODO: conserve bandwidth and check for E3AlreadyActivated error instead of
+                // making two calls to contract
+                let e3 = contract.get_e3(event.e3Id).await?;
+                if u64::try_from(e3.expiration)? > 0 {
+                    info!("E3 already activated '{}'", event.e3Id);
+                    return Ok(());
+                }
+
+                // If not activated activate
                 let tx = contract.activate(event.e3Id, event.publicKey).await?;
                 info!("E3 activated with tx: {:?}", tx.transaction_hash);
                 Ok(())
