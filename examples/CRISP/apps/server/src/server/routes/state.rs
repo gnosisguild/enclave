@@ -1,7 +1,7 @@
 use crate::server::database::{get_current_round_repo, get_e3_repo};
 use crate::server::models::GetRoundRequest;
 use actix_web::{web, HttpResponse, Responder};
-use log::info;
+use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -26,7 +26,7 @@ async fn get_round_result(data: web::Json<GetRoundRequest>) -> impl Responder {
     match repo.get_web_result_request().await {
         Ok(response) => HttpResponse::Ok().json(response),
         Err(e) => {
-            info!("Error getting E3 state: {:?}", e);
+            error!("Error getting E3 state: {:?}", e);
             HttpResponse::InternalServerError().body("Failed to get E3 state")
         }
     }

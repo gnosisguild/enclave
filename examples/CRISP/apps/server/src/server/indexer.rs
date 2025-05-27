@@ -5,11 +5,12 @@ use crate::server::{
 use compute_provider::FHEInputs;
 use enclave_sdk::{
     evm::{
-        contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, ReadWrite},
+        contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, ReadOnly, ReadWrite},
         events::{
             CiphertextOutputPublished, CommitteePublished, E3Activated, InputPublished,
             PlaintextOutputPublished,
         },
+        listener::EventListener,
     },
     indexer::{DataStore, EnclaveIndexer},
 };
@@ -98,24 +99,6 @@ pub async fn register_e3_activated(
     Ok(indexer)
 }
 
-pub async fn register_input_published(
-    mut indexer: EnclaveIndexer<impl DataStore>,
-) -> Result<EnclaveIndexer<impl DataStore>> {
-    // InputPublished
-    indexer
-        .add_event_handler(move |event: InputPublished, store| {
-            let e3_id = event.e3Id.to::<u64>();
-            let mut repo = CrispE3Repository::new(store, e3_id);
-            async move {
-                repo.insert_ciphertext_input(event.data.to_vec(), event.index.to::<u64>())
-                    .await?;
-                Ok(())
-            }
-        })
-        .await;
-    Ok(indexer)
-}
-
 pub async fn register_ciphertext_output_published(
     mut indexer: EnclaveIndexer<impl DataStore>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
@@ -125,9 +108,6 @@ pub async fn register_ciphertext_output_published(
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store, e3_id);
             async move {
-                repo.set_ciphertext_output(event.ciphertextOutput.to_vec())
-                    .await?;
-
                 repo.update_status("CiphertextPublished").await?;
                 Ok(())
             }
@@ -145,14 +125,18 @@ pub async fn register_plaintext_output_published(
             let e3_id = event.e3Id.to::<u64>();
             let mut repo = CrispE3Repository::new(store, e3_id);
             async move {
+                info!("CRISP: handling 'PlaintextOutputPublished'");
+                // TODO: explain this logic as it is confusing
                 let decoded: Vec<u64> = bincode::deserialize(&event.plaintextOutput.to_vec())?;
+                let option_2 = decoded[0];
                 let total_votes = repo.get_vote_count().await?;
-                repo.set_plaintext_output(event.plaintextOutput.to_vec())
-                    .await?;
-                let option_1 = decoded[0];
-                let option_2 = total_votes - option_1;
-                repo.set_votes(option_1, option_2).await?;
+                let option_1 = total_votes - option_2;
 
+                info!("Vote Count: {:?}", total_votes);
+                info!("Votes Option 1: {:?}", option_1);
+                info!("Votes Option 2: {:?}", option_2);
+
+                repo.set_votes(option_1, option_2).await?;
                 repo.update_status("Finished").await?;
                 Ok(())
             }
@@ -162,12 +146,12 @@ pub async fn register_plaintext_output_published(
 }
 
 pub async fn register_committee_published(
-    mut indexer: EnclaveIndexer<impl DataStore>,
+    mut listener: EventListener,
     contract: Arc<EnclaveContract<ReadWrite>>,
-) -> Result<EnclaveIndexer<impl DataStore>> {
+) -> Result<EventListener> {
     // CommitteePublished
-    indexer
-        .add_event_handler(move |event: CommitteePublished, _| {
+    listener
+        .add_event_handler(move |event: CommitteePublished| {
             let contract = contract.clone();
             async move {
                 // We need to do this to ensure this is idempotent.
@@ -186,31 +170,50 @@ pub async fn register_committee_published(
             }
         })
         .await;
-    Ok(indexer)
+    Ok(listener)
 }
 
 pub async fn setup_indexer(
     ws_url: &str,
     contract_address: &str,
+    registry_filter_address: &str,
     store: impl DataStore,
     private_key: &str,
-) -> Result<EnclaveIndexer<impl DataStore>> {
+) -> Result<(EnclaveIndexer<impl DataStore>, EventListener)> {
     let indexer = EnclaveIndexer::new(ws_url, contract_address, store).await?;
-    let contract = Arc::new(EnclaveContract::new(&ws_url, &private_key, &contract_address).await?);
+    let contract = Arc::new(
+        EnclaveContract::<ReadWrite>::new(&ws_url, &private_key, &contract_address).await?,
+    );
     let indexer = register_e3_activated(indexer, contract.clone()).await?;
-    let indexer = register_input_published(indexer).await?;
     let indexer = register_ciphertext_output_published(indexer).await?;
     let indexer = register_plaintext_output_published(indexer).await?;
-    let indexer = register_committee_published(indexer, contract).await?;
-    Ok(indexer)
+
+    let registry_listener =
+        EventListener::create_contract_listener(&ws_url, registry_filter_address).await?;
+    let listener = register_committee_published(registry_listener, contract).await?;
+    Ok((indexer, listener))
 }
 
 pub async fn start_indexer(
     ws_url: &str,
     contract_address: &str,
+    registry_filter_address: &str,
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
-    let _ = setup_indexer(&ws_url, &contract_address, store, &private_key).await?;
+    let (indexer, listener) = setup_indexer(
+        ws_url,
+        contract_address,
+        registry_filter_address,
+        store,
+        private_key,
+    )
+    .await?;
+    indexer.start()?;
+    tokio::spawn(async move {
+        if let Err(e) = listener.listen().await {
+            eprintln!("Error: {}", e);
+        }
+    });
     Ok(())
 }

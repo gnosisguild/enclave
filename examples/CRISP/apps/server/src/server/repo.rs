@@ -3,8 +3,9 @@ use super::{
     models::{CurrentRound, E3Crisp, E3StateLite, WebResultRequest},
 };
 use chrono::Utc;
-use enclave_sdk::indexer::{models::E3 as EnclaveE3, DataStore, SharedStore};
+use enclave_sdk::indexer::{models::E3 as EnclaveE3, DataStore, E3Repository, SharedStore};
 use eyre::Result;
+use log::info;
 
 pub struct CurrentRoundRepository<S: DataStore> {
     store: SharedStore<S>,
@@ -73,7 +74,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             .store
             .get::<E3Crisp>(&key)
             .await
-            .map_err(|_| eyre::eyre!("Could get crisp at '{key}'"))?
+            .map_err(|e| eyre::eyre!("Could get crisp at '{key}' due to error: {e}"))?
             .ok_or(eyre::eyre!("No data found at {key}"))?;
         Ok(e3_crisp)
     }
@@ -92,15 +93,12 @@ impl<S: DataStore> CrispE3Repository<S> {
         .await
     }
 
-    pub async fn get_e3(&self) -> Result<EnclaveE3> {
-        let key = self.e3_key();
-        let e3 = self
-            .store
-            .get::<EnclaveE3>(&key)
-            .await
-            .map_err(|_| eyre::eyre!("Could get e3 at '{key}'"))?
-            .ok_or(eyre::eyre!("No data found at {key}"))?;
+    fn get_e3_repo(&self) -> E3Repository<S> {
+        E3Repository::new(self.store.clone(), self.e3_id)
+    }
 
+    pub async fn get_e3(&self) -> Result<EnclaveE3> {
+        let e3 = self.get_e3_repo().get_e3().await?;
         Ok(e3)
     }
 
@@ -124,37 +122,9 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
-    pub async fn insert_ciphertext_input(&mut self, data: Vec<u8>, index: u64) -> Result<()> {
-        let key = self.e3_key();
-        self.store
-            .modify(&key, |e3_obj: Option<EnclaveE3>| {
-                e3_obj.map(|mut e| {
-                    e.ciphertext_inputs.push((data.clone(), index));
-                    e
-                })
-            })
-            .await
-            .map_err(|_| eyre::eyre!("Could not append ciphertext_input for '{key}'"))?;
-
-        Ok(())
-    }
-
-    pub async fn set_plaintext_output(&mut self, data: Vec<u8>) -> Result<()> {
-        let key = self.e3_key();
-        self.store
-            .modify(&key, |e3_obj: Option<EnclaveE3>| {
-                e3_obj.map(|mut e| {
-                    e.plaintext_output = data.clone();
-                    e
-                })
-            })
-            .await
-            .map_err(|_| eyre::eyre!("Could not append ciphertext_input for '{key}'"))?;
-        Ok(())
-    }
-
     pub async fn set_votes(&mut self, option_1: u64, option_2: u64) -> Result<()> {
-        let key = self.e3_key();
+        info!("set_votes(option_1:{} option_2:{})", option_1, option_2);
+        let key = self.crisp_key();
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
@@ -211,16 +181,7 @@ impl<S: DataStore> CrispE3Repository<S> {
     }
 
     pub async fn set_ciphertext_output(&mut self, data: Vec<u8>) -> Result<()> {
-        let key = self.e3_key();
-        self.store
-            .modify(&key, |e3_obj: Option<EnclaveE3>| {
-                e3_obj.map(|mut e| {
-                    e.ciphertext_output = data.clone();
-                    e
-                })
-            })
-            .await
-            .map_err(|_| eyre::eyre!("Could not append ciphertext_input for '{key}'"))?;
+        self.get_e3_repo().set_ciphertext_output(data).await?;
         Ok(())
     }
 
@@ -269,9 +230,5 @@ impl<S: DataStore> CrispE3Repository<S> {
     fn crisp_key(&self) -> String {
         let e3_id = self.e3_id;
         format!("_e3:crisp:{e3_id}")
-    }
-    fn e3_key(&self) -> String {
-        let e3_id = self.e3_id;
-        format!("_e3:{e3_id}")
     }
 }

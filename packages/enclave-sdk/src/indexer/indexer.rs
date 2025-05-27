@@ -1,8 +1,13 @@
 use super::models::E3;
-use crate::evm::{
-    contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
-    events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
-    listener::EventListener,
+use crate::{
+    evm::{
+        contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
+        events::{
+            CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished,
+        },
+        listener::EventListener,
+    },
+    indexer::E3Repository,
 };
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
@@ -11,8 +16,8 @@ use async_trait::async_trait;
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
-use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
+use std::{fmt::Display, future::Future};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -30,7 +35,7 @@ pub enum IndexerError {
 /// Trait for injectable DataStore. Note the implementor must manage interior mutability
 #[async_trait]
 pub trait DataStore: Send + Sync + 'static {
-    type Error;
+    type Error: Display;
     async fn insert<T: Serialize + Send + Sync>(
         &mut self,
         key: &str,
@@ -201,7 +206,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
         let enclave_address = self.contract_address.clone();
         self.listener
             .add_event_handler(move |e: E3Activated| {
-                let db = db.clone();
+                let db = SharedStore::new(db.clone());
                 let enclave_address = enclave_address.clone();
                 let contract = contract.clone();
 
@@ -209,6 +214,14 @@ impl<S: DataStore> EnclaveIndexer<S> {
                     println!("E3Activated:{:?}", e);
                     let e3_id = u64_try_from(e.e3Id)?;
                     let e3 = contract.get_e3(e.e3Id).await?;
+                    let duration = u64_try_from(e3.duration)?;
+                    let expiration = u64_try_from(e.expiration)?;
+                    let seed = e3.seed.to_be_bytes();
+                    let request_block = u64_try_from(e3.requestBlock)?;
+                    let start_window = [
+                        u64_try_from(e3.startWindow[0])?,
+                        u64_try_from(e3.startWindow[1])?,
+                    ];
                     // NOTE: we are only saving protocol specific info
                     // here and not CRISP specific info so E3 corresponds to the solidity E3
                     let e3_obj = E3 {
@@ -216,30 +229,22 @@ impl<S: DataStore> EnclaveIndexer<S> {
                         ciphertext_inputs: vec![],
                         ciphertext_output: vec![],
                         committee_public_key: e.committeePublicKey.to_vec(),
-                        duration: u64_try_from(e3.duration)?,
+                        duration,
                         e3_params: e3.e3ProgramParams.to_vec(),
                         enclave_address,
                         encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
-                        expiration: u64_try_from(e.expiration)?,
+                        expiration,
                         id: e3_id,
                         plaintext_output: vec![],
-                        request_block: u64_try_from(e3.requestBlock)?,
-                        seed: u64_try_from(e3.seed)?, // TODO: make this into a bytes32?
-                        start_window: [
-                            u64_try_from(e3.startWindow[0])?,
-                            u64_try_from(e3.startWindow[1])?,
-                        ],
+                        request_block,
+                        seed,
+                        start_window,
                         threshold: e3.threshold,
                     };
 
-                    let key = format!("e3:{}", e3_id);
+                    let mut repo = E3Repository::new(db, e3_id);
 
-                    db.write()
-                        .await
-                        .insert(&key, &e3_obj)
-                        .await
-                        .map_err(|_| IndexerError::Serialization(e3_id))?;
-
+                    repo.set_e3(e3_obj).await?;
                     Ok(())
                 }
             })
@@ -251,20 +256,14 @@ impl<S: DataStore> EnclaveIndexer<S> {
         let store = self.store.clone();
         self.listener
             .add_event_handler(move |e: InputPublished| {
-                let store = store.clone();
+                let store = SharedStore::new(store.clone());
                 async move {
                     println!("InputPublished:{:?}", e);
                     let e3_id = u64_try_from(e.e3Id)?;
-                    let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
-                    e3.ciphertext_inputs
-                        .push((e.data.to_vec(), e.index.to::<u64>()));
-                    store
-                        .write()
-                        .await
-                        .insert(&key, &e3)
-                        .await
-                        .map_err(|_| IndexerError::Serialization(e3_id))?;
 
+                    let mut repo = E3Repository::new(store, e3_id);
+                    repo.insert_ciphertext_input(e.data.to_vec(), e.index.to::<u64>())
+                        .await?;
                     Ok(())
                 }
             })
@@ -276,19 +275,14 @@ impl<S: DataStore> EnclaveIndexer<S> {
         let store = self.store.clone();
         self.listener
             .add_event_handler(move |e: CiphertextOutputPublished| {
-                let store = store.clone();
+                let store = SharedStore::new(store.clone());
                 async move {
                     println!("CiphertextOutputPublished:{:?}", e);
                     let e3_id = u64_try_from(e.e3Id)?;
-                    let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
-                    e3.ciphertext_output = e.ciphertextOutput.to_vec();
 
-                    store
-                        .write()
-                        .await
-                        .insert(&key, &e3)
-                        .await
-                        .map_err(|_| IndexerError::Serialization(e3_id))?;
+                    let mut repo = E3Repository::new(store, e3_id);
+                    repo.set_ciphertext_output(e.ciphertextOutput.to_vec())
+                        .await?;
 
                     Ok(())
                 }
@@ -301,19 +295,13 @@ impl<S: DataStore> EnclaveIndexer<S> {
         let store = self.store.clone();
         self.listener
             .add_event_handler(move |e: PlaintextOutputPublished| {
-                let store = store.clone();
+                let store = SharedStore::new(store.clone());
                 async move {
                     println!("PlaintextOutputPublished:{:?}", e);
                     let e3_id = u64_try_from(e.e3Id)?;
-                    let (mut e3, key) = get_e3(store.clone(), e3_id).await?;
-                    e3.plaintext_output = e.plaintextOutput.to_vec();
-
-                    store
-                        .write()
-                        .await
-                        .insert(&key, &e3)
-                        .await
-                        .map_err(|_| IndexerError::Serialization(e3_id))?;
+                    let mut repo = E3Repository::new(store, e3_id);
+                    repo.set_plaintext_output(e.plaintextOutput.to_vec())
+                        .await?;
 
                     Ok(())
                 }
@@ -358,7 +346,7 @@ pub async fn get_e3(
     store: Arc<RwLock<impl DataStore>>,
     e3_id: u64,
 ) -> Result<(E3, String), IndexerError> {
-    let key = format!("e3:{}", e3_id);
+    let key = format!("_e3:{}", e3_id);
     match store
         .read()
         .await

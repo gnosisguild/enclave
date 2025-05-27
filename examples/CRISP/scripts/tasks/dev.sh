@@ -33,6 +33,7 @@ trap cleanup INT TERM
 
 (cd /app && pnpm install --frozen-lockfile)
 
+
 concurrently \
   -ks first \
   --names "ANVIL,DEPLOY,NODES" \
