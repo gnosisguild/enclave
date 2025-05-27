@@ -1,7 +1,7 @@
 use crate::server::config::CONFIG;
-use crate::server::database::{db_get, get_e3};
+use crate::server::database::{get_current_round_repo, get_e3_repo};
 use crate::server::models::{
-    CTRequest, ComputeProviderParams, CronRequestE3, CurrentRound, JsonResponse, PKRequest,
+    CTRequest, ComputeProviderParams, CronRequestE3, JsonResponse, PKRequest,
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
@@ -52,7 +52,8 @@ async fn request_new_round(data: web::Json<CronRequestE3>) -> impl Responder {
 ///
 /// * A JSON response containing the current round
 async fn get_current_round() -> impl Responder {
-    match db_get::<CurrentRound>("e3:current_round").await {
+    let repo = get_current_round_repo().await;
+    match repo.get_current_round().await {
         Ok(Some(current_round)) => HttpResponse::Ok().json(current_round),
         Ok(None) => HttpResponse::NotFound().json(JsonResponse {
             response: "No current round found".to_string(),
@@ -74,10 +75,9 @@ async fn get_current_round() -> impl Responder {
 /// * A JSON response containing the ciphertext
 async fn get_ciphertext(data: web::Json<CTRequest>) -> impl Responder {
     let mut incoming = data.into_inner();
+    let repo = get_e3_repo(incoming.round_id).await;
 
-    let (state_data, _) = get_e3(incoming.round_id).await.unwrap();
-
-    incoming.ct_bytes = state_data.ciphertext_output;
+    incoming.ct_bytes = repo.get_ciphertext_output().await.unwrap();
 
     HttpResponse::Ok().json(incoming)
 }
@@ -94,9 +94,9 @@ async fn get_ciphertext(data: web::Json<CTRequest>) -> impl Responder {
 async fn get_public_key(data: web::Json<PKRequest>) -> impl Responder {
     let mut incoming = data.into_inner();
 
-    let (state_data, _) = get_e3(incoming.round_id).await.unwrap();
+    let repo = get_e3_repo(incoming.round_id).await;
 
-    incoming.pk_bytes = state_data.committee_public_key;
+    incoming.pk_bytes = repo.get_committee_public_key().await.unwrap();
 
     HttpResponse::Ok().json(incoming)
 }

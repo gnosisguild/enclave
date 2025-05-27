@@ -34,6 +34,15 @@ impl<S: DataStore> CurrentRoundRepository<S> {
         Ok(round)
     }
 
+    pub async fn get_current_round_id(&self) -> Result<u64> {
+        let round = self
+            .get_current_round()
+            .await?
+            .ok_or(eyre::eyre!("No current round has been saved"))?;
+
+        Ok(round.id)
+    }
+
     fn current_round_key(&self) -> String {
         format!("_e3:current_round")
     }
@@ -164,6 +173,11 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(e3.ciphertext_output)
     }
 
+    pub async fn get_committee_public_key(&self) -> Result<Vec<u8>> {
+        let e3 = self.get_e3().await?;
+        Ok(e3.committee_public_key)
+    }
+
     pub async fn get_web_result_request(&self) -> Result<WebResultRequest> {
         let e3 = self.get_e3().await?;
         let e3_crisp = self.get_crisp().await?;
@@ -210,12 +224,12 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
-    async fn has_voted(&self, address: String) -> Result<bool> {
+    pub async fn has_voted(&self, address: String) -> Result<bool> {
         let e3_crisp = self.get_crisp().await?;
         Ok(e3_crisp.has_voted.contains(&address))
     }
 
-    async fn insert_voter_address(&mut self, address: String) -> Result<()> {
+    pub async fn insert_voter_address(&mut self, address: String) -> Result<()> {
         let key = self.crisp_key();
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
@@ -229,7 +243,25 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
-    async fn is_finished(&self) -> Result<bool> {
+    pub async fn remove_voter_address(&mut self, address: &str) -> Result<()> {
+        let key = self.crisp_key();
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.has_voted = e
+                        .has_voted
+                        .into_iter()
+                        .filter(|item| item != address)
+                        .collect();
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not remove address {address}"))?;
+        Ok(())
+    }
+
+    pub async fn is_finished(&self) -> Result<bool> {
         let e3 = self.get_crisp().await?;
         Ok(e3.status == "Finished")
     }

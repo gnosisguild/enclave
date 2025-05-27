@@ -1,7 +1,7 @@
 use super::events::InputPublished;
 use crate::server::{
     config::CONFIG,
-    database::{db_get, db_insert, generate_emoji, get_e3, update_e3_status},
+    database::{db_insert, generate_emoji, get_current_round_repo, get_e3_repo, update_e3_status},
     models::{CurrentRound, E3},
 };
 use alloy::{
@@ -41,7 +41,7 @@ pub async fn sync_server() -> Result<()> {
     );
 
     // Retrieve the current round from the database.
-    let current_round = match db_get::<CurrentRound>("e3:current_round").await? {
+    let current_round = match get_current_round_repo().await.get_current_round().await? {
         Some(round) => round,
         None => {
             info!("No current round found in DB. Exiting sync process. Will compute next round.");
@@ -51,7 +51,8 @@ pub async fn sync_server() -> Result<()> {
     info!("Current round: {}", current_round.id);
 
     // Fetch the latest E3 from the database and the contract.
-    let (latest_db_e3, _) = get_e3(current_round.id).await?;
+    let repo = get_e3_repo(current_round.id).await;
+
     let contract_e3_id = contract.get_e3_id().await?.to::<u64>();
     if contract_e3_id == 0 {
         warn!("No E3 IDs found in the contract.");
@@ -60,13 +61,13 @@ pub async fn sync_server() -> Result<()> {
     let latest_contract_e3_id = contract_e3_id - 1;
 
     // Check if synchronization is needed.
-    if latest_db_e3.status == "Finished" && latest_db_e3.id == latest_contract_e3_id {
+    if repo.is_finished().await? && current_round.id == latest_contract_e3_id {
         info!("Database is up to date with the contract. No sync needed.");
         return Ok(());
     }
 
     // Identify the last finished E3 in the database.
-    let last_finished_e3_id = find_last_finished_e3_id(latest_db_e3.id).await?;
+    let last_finished_e3_id = find_last_finished_e3_id(current_round.id).await?;
     info!("Last finished E3 ID: {:?}", last_finished_e3_id);
 
     // Determine the range of E3 IDs to synchronize.
@@ -110,11 +111,8 @@ pub async fn sync_server() -> Result<()> {
 /// Finds the last finished E3 ID in the database.
 async fn find_last_finished_e3_id(latest_db_id: u64) -> Result<Option<u64>> {
     for id in (0..=latest_db_id).rev() {
-        let (e3, _) = match get_e3(id).await {
-            Ok(e3) => e3,
-            Err(_) => continue,
-        };
-        if e3.status == "Finished" {
+        let repo = get_e3_repo(id).await;
+        if repo.is_finished().await? {
             return Ok(Some(id));
         }
     }
@@ -244,9 +242,12 @@ async fn compute_and_publish_ciphertext(
     }
 
     // Update vote count
-    let mut db_e3 = get_e3(e3_id.to::<u64>()).await?.0;
-    db_e3.vote_count = ciphertext_inputs.len() as u64;
-    db_insert(&format!("e3:{}", e3_id.to::<u64>()), &db_e3).await?;
+    let mut repo = get_e3_repo(u64::try_from(e3_id)?).await;
+
+    for (ciphertext_input, index) in ciphertext_inputs.clone() {
+        repo.insert_ciphertext_input(ciphertext_input, index)
+            .await?;
+    }
 
     let contract_e3 = contract.get_e3(e3_id).await?;
     let fhe_inputs = FHEInputs {

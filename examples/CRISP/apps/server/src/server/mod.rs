@@ -8,8 +8,8 @@ mod routes;
 
 use actix_cors::Cors;
 use actix_web::{middleware::Logger, App, HttpServer};
-use blockchain::listener::start_listener;
-// use indexer::start_indexer;
+// use blockchain::listener::start_listener;
+use indexer::start_indexer;
 
 use crate::logger::init_logger;
 use config::CONFIG;
@@ -18,36 +18,39 @@ use config::CONFIG;
 pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_logger();
 
-    tokio::spawn(async {
-        if let Err(e) = blockchain::sync::sync_server().await {
-            eprintln!("Sync server failed: {:?}", e);
-        }
-    });
-
-    tokio::spawn(async {
-        if let Err(e) = start_listener(
-            &CONFIG.ws_rpc_url,
-            &CONFIG.enclave_address,
-            &CONFIG.ciphernode_registry_address,
-        )
-        .await
-        {
-            eprintln!("Listener failed: {:?}", e);
-        }
-    });
-    // New indexer
+    // XXX: NOT NECESSARY FOR THE TEST BUT WE NEED TO TEST THIS USECASE
+    // PLAN IS TO DO THIS IN A DIFFERENT WAY
     // tokio::spawn(async {
-    //     if let Err(e) = start_indexer(
+    //     if let Err(e) = blockchain::sync::sync_server().await {
+    //         eprintln!("Sync server failed: {:?}", e);
+    //     }
+    // });
+
+    // XXX: COMMENTING OUT TO TEST NEW INDEXER
+    // tokio::spawn(async {
+    //     if let Err(e) = start_listener(
     //         &CONFIG.ws_rpc_url,
     //         &CONFIG.enclave_address,
-    //         database::GLOBAL_DB.read().await.clone(),
-    //         &CONFIG.private_key,
+    //         &CONFIG.ciphernode_registry_address,
     //     )
     //     .await
     //     {
     //         eprintln!("Listener failed: {:?}", e);
     //     }
     // });
+    // New indexer
+    tokio::spawn(async {
+        if let Err(e) = start_indexer(
+            &CONFIG.ws_rpc_url,
+            &CONFIG.enclave_address,
+            database::GLOBAL_DB.read().await.clone(),
+            &CONFIG.private_key,
+        )
+        .await
+        {
+            eprintln!("Listener failed: {:?}", e);
+        }
+    });
 
     let bind_addr = "0.0.0.0:4000";
     let server = HttpServer::new(|| {
