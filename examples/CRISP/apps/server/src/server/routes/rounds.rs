@@ -160,8 +160,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         parallel: CONFIG.e3_compute_provider_parallel,
         batch_size: CONFIG.e3_compute_provider_batch_size,
     };
-    let compute_provider_params =
-        Bytes::from(bincode::serialize(&compute_provider_params).unwrap());
+    let compute_provider_params = Bytes::from(bincode::serialize(&compute_provider_params)?);
     let res = contract
         .request_e3(
             filter,

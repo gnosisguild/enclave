@@ -73,13 +73,19 @@ async fn broadcast_encrypted_vote(
     let encoded_params = Bytes::from(params_value.abi_encode_params());
 
     // Broadcast vote to blockchain
-    let contract = EnclaveContract::new(
+    let contract = match EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
         &CONFIG.enclave_address,
     )
     .await
-    .unwrap();
+    {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Database error checking vote status: {:?}", e);
+            return HttpResponse::InternalServerError().json("Internal server error");
+        }
+    };
 
     match contract.publish_input(e3_id, encoded_params).await {
         Ok(hash) => HttpResponse::Ok().json(VoteResponse {

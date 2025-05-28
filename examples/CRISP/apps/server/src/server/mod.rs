@@ -13,6 +13,7 @@ use actix_web::{middleware::Logger, web, App, HttpServer};
 use app_data::AppData;
 use database::SledDB;
 use enclave_sdk::indexer::SharedStore;
+use eyre::OptionExt;
 use indexer::start_indexer;
 use tokio::sync::RwLock;
 
@@ -24,9 +25,8 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_logger();
 
     let pathdb = std::env::current_dir()?.join("database/server");
-    let db = SharedStore::new(Arc::new(RwLock::new(SledDB::new(
-        pathdb.to_str().unwrap(),
-    )?)));
+    let pathdb = pathdb.to_str().ok_or_eyre("Path could not be determined")?;
+    let db = SharedStore::new(Arc::new(RwLock::new(SledDB::new(pathdb)?)));
 
     // New indexer
     tokio::spawn({
