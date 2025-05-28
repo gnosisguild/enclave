@@ -57,7 +57,7 @@ impl EventListener {
             .push(wrapped_handler);
     }
 
-    pub async fn listen(&self) -> Result<()> {
+    async fn listen(&self) -> Result<()> {
         let mut stream = self
             .provider
             .subscribe_logs(&self.filter)
