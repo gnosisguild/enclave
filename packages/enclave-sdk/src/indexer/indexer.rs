@@ -148,19 +148,28 @@ pub struct EnclaveIndexer<S: DataStore> {
 }
 
 impl<S: DataStore> EnclaveIndexer<S> {
-    pub async fn new(ws_url: &str, contract_address: &str, store: S) -> Result<Self> {
-        let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+    pub async fn new(
+        listener: EventListener,
+        contract: EnclaveContract<ReadOnly>,
+        store: S,
+    ) -> Result<Self> {
         let chain_id = contract.provider.get_chain_id().await?;
+        let contract_address = contract.address().to_string();
         let mut instance = Self {
             store: Arc::new(RwLock::new(store)),
             contract,
             listener,
-            contract_address: contract_address.to_string(),
+            contract_address,
             chain_id,
         };
         instance.setup_listeners().await?;
         Ok(instance)
+    }
+
+    pub async fn from_strings(ws_url: &str, contract_address: &str, store: S) -> Result<Self> {
+        let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
+        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+        EnclaveIndexer::new(listener, contract, store).await
     }
 
     pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
