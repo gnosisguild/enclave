@@ -126,10 +126,23 @@ pub async fn register_plaintext_output_published(
             let mut repo = CrispE3Repository::new(store, e3_id);
             async move {
                 info!("CRISP: handling 'PlaintextOutputPublished'");
-                // TODO: explain this logic as it is confusing
+
+                // The plaintextOutput from the event contains the result of the FHE computation.
+                // The computation sums the encrypted votes: '0' for Option 1, '1' for Option 2.
+                // Thus, the decrypted sum directly represents the number of votes for Option 2.
+                // The output is expected to be a bincode-serialized Vec<u64>.
                 let decoded: Vec<u64> = bincode::deserialize(&event.plaintextOutput.to_vec())?;
+
+                // decoded[0] is the sum of all encrypted votes (0s and 1s).
+                // Since Option 1 votes are encrypted as '0' and Option 2 votes as '1',
+                // this sum is equivalent to the count of votes for Option 2.
                 let option_2 = decoded[0];
+
+                // Retrieve the total number of votes that were cast and recorded for this round.
                 let total_votes = repo.get_vote_count().await?;
+
+                // The number of votes for Option 1 can be derived by subtracting
+                // the Option 2 votes (the sum from the FHE output) from the total votes.
                 let option_1 = total_votes - option_2;
 
                 info!("Vote Count: {:?}", total_votes);
