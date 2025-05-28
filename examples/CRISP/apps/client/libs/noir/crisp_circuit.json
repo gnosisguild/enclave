@@ -1,0 +1,38 @@
+{
+    "noir_version": "1.0.0-beta.3+ceaa1986628197bd1170147f6a07f0f98d21030a",
+    "hash": 9698608154529829736,
+    "abi": {
+        "parameters": [
+            {
+                "name": "x",
+                "type": {
+                    "kind": "field"
+                },
+                "visibility": "public"
+            },
+            {
+                "name": "y",
+                "type": {
+                    "kind": "field"
+                },
+                "visibility": "public"
+            }
+        ],
+        "return_type": null,
+        "error_types": {}
+    },
+    "bytecode": "H4sIAAAAAAAA/7VSSQ7DIAwEkqrtueQfNkswt36lqOT/T6iqYgkRegoZCQ2yrWFsLMUPqpwv5sJS7ME1z8JwDFhrWVidy8FktPgCExN5cD6thISe/NuQtZkchZhigIjOZtx8tFsRk+N8gez0fErzavAAVGV8pO4s+ovwb1E4dm94qfLTwFmyvj5HH66dHpfqrps+e/8AB8F6U+GL2EM1Oa69Nf7keH/Yepk6bzEehXUV43l+ALYVV8qVBAAA",
+    "debug_symbols": "lY3LCsMgEEX/ZdYuGmgK9VdKCT7GMCAqoxaK5N9jQgLZZnnumbm3gUVd54mCixnkp4GPRhWKoVODxx7lpMJGuSguIJ9vARgsyHFcBDjyCPI1LF8Bw53zDprJe5qn62aPf4pJaY8HuhrMxZZ/Os35nzgatJVxa9pdr18B",
+    "file_map": {
+        "61": {
+            "source": "fn main(x: pub Field, y: pub Field) {\n    assert(x != y);\n}\n",
+            "path": "enclave/examples/CRISP/circuits/src/main.nr"
+        }
+    },
+    "names": [
+        "main"
+    ],
+    "brillig_names": [
+        "directive_invert"
+    ]
+}
