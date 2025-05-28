@@ -1,4 +1,4 @@
-use super::models::E3;
+use super::{models::E3, DataStore};
 use crate::{
     evm::{
         contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
@@ -16,8 +16,8 @@ use async_trait::async_trait;
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
+use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
-use std::{fmt::Display, future::Future};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -30,25 +30,6 @@ pub enum IndexerError {
     E3NotFound(E3Id),
     #[error("Object not serializable: {0}")]
     Serialization(E3Id),
-}
-
-/// Trait for injectable DataStore. Note the implementor must manage interior mutability
-#[async_trait]
-pub trait DataStore: Send + Sync + 'static {
-    type Error: Display;
-    async fn insert<T: Serialize + Send + Sync>(
-        &mut self,
-        key: &str,
-        value: &T,
-    ) -> Result<(), Self::Error>;
-    async fn get<T: DeserializeOwned + Send + Sync>(
-        &self,
-        key: &str,
-    ) -> Result<Option<T>, Self::Error>;
-    async fn modify<T, F>(&mut self, key: &str, f: F) -> Result<Option<T>, Self::Error>
-    where
-        T: Serialize + DeserializeOwned + Send + Sync,
-        F: FnMut(Option<T>) -> Option<T> + Send;
 }
 
 pub struct InMemoryStore {
@@ -167,19 +148,28 @@ pub struct EnclaveIndexer<S: DataStore> {
 }
 
 impl<S: DataStore> EnclaveIndexer<S> {
-    pub async fn new(ws_url: &str, contract_address: &str, store: S) -> Result<Self> {
-        let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
-        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+    pub async fn new(
+        listener: EventListener,
+        contract: EnclaveContract<ReadOnly>,
+        store: S,
+    ) -> Result<Self> {
         let chain_id = contract.provider.get_chain_id().await?;
+        let contract_address = contract.address().to_string();
         let mut instance = Self {
             store: Arc::new(RwLock::new(store)),
             contract,
             listener,
-            contract_address: contract_address.to_string(),
+            contract_address,
             chain_id,
         };
         instance.setup_listeners().await?;
         Ok(instance)
+    }
+
+    pub async fn from_strings(ws_url: &str, contract_address: &str, store: S) -> Result<Self> {
+        let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
+        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+        EnclaveIndexer::new(listener, contract, store).await
     }
 
     pub async fn add_event_handler<E, F, Fut>(&mut self, handler: F)
@@ -318,14 +308,8 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
-    pub fn start(&self) -> Result<JoinHandle<()>> {
-        let listener = self.listener.clone();
-        let handle = tokio::spawn(async move {
-            if let Err(e) = listener.listen().await {
-                eprintln!("Error: {}", e);
-            }
-        });
-        Ok(handle)
+    pub fn start(&self) -> JoinHandle<Result<()>> {
+        self.listener.start()
     }
 
     pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {

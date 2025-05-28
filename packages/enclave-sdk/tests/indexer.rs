@@ -20,7 +20,8 @@ sol!(
 async fn test_indexer() -> Result<()> {
     let (contract, address, endpoint, _anvil) = setup_fake_enclave().await?;
 
-    let mut indexer = EnclaveIndexer::new(&endpoint, &address, InMemoryStore::new()).await?;
+    let mut indexer =
+        EnclaveIndexer::from_strings(&endpoint, &address, InMemoryStore::new()).await?;
 
     indexer
         .add_event_handler(move |_: InputPublished, mut store| async move {
@@ -35,7 +36,7 @@ async fn test_indexer() -> Result<()> {
         .await;
 
     // Start tracking state
-    indexer.start()?;
+    let _ = indexer.start();
 
     // E3Activated
     let e3_id = 10;

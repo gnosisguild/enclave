@@ -9,7 +9,7 @@ use eyre::Result;
 use futures::stream::StreamExt;
 use futures_util::future::FutureExt;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
-use tokio::sync::RwLock;
+use tokio::{sync::RwLock, task::JoinHandle};
 
 type EventHandler =
     Box<dyn Fn(&Log) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
@@ -57,7 +57,7 @@ impl EventListener {
             .push(wrapped_handler);
     }
 
-    pub async fn listen(&self) -> Result<()> {
+    async fn listen(&self) -> Result<()> {
         let mut stream = self
             .provider
             .subscribe_logs(&self.filter)
@@ -81,6 +81,11 @@ impl EventListener {
             }
         }
         Ok(())
+    }
+
+    pub fn start(&self) -> JoinHandle<Result<()>> {
+        let this = self.clone();
+        tokio::spawn(async move { this.listen().await })
     }
 
     pub async fn create_contract_listener(ws_url: &str, contract_address: &str) -> Result<Self> {

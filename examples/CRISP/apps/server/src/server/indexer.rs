@@ -5,10 +5,11 @@ use crate::server::{
 use compute_provider::FHEInputs;
 use enclave_sdk::{
     evm::{
-        contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, ReadOnly, ReadWrite},
+        contracts::{
+            EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveWrite, ReadWrite,
+        },
         events::{
-            CiphertextOutputPublished, CommitteePublished, E3Activated, InputPublished,
-            PlaintextOutputPublished,
+            CiphertextOutputPublished, CommitteePublished, E3Activated, PlaintextOutputPublished,
         },
         listener::EventListener,
     },
@@ -25,8 +26,9 @@ type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 pub async fn register_e3_activated(
     mut indexer: EnclaveIndexer<impl DataStore>,
-    contract: Arc<EnclaveContract<ReadWrite>>,
+    contract: EnclaveContract<ReadWrite>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
+    let contract = Arc::new(contract);
     // E3Activated
     indexer
         .add_event_handler(move |event: E3Activated, store| {
@@ -160,7 +162,7 @@ pub async fn register_plaintext_output_published(
 
 pub async fn register_committee_published(
     mut listener: EventListener,
-    contract: Arc<EnclaveContract<ReadWrite>>,
+    contract: EnclaveContract<ReadWrite>,
 ) -> Result<EventListener> {
     // CommitteePublished
     listener
@@ -186,27 +188,6 @@ pub async fn register_committee_published(
     Ok(listener)
 }
 
-pub async fn setup_indexer(
-    ws_url: &str,
-    contract_address: &str,
-    registry_filter_address: &str,
-    store: impl DataStore,
-    private_key: &str,
-) -> Result<(EnclaveIndexer<impl DataStore>, EventListener)> {
-    let indexer = EnclaveIndexer::new(ws_url, contract_address, store).await?;
-    let contract = Arc::new(
-        EnclaveContract::<ReadWrite>::new(&ws_url, &private_key, &contract_address).await?,
-    );
-    let indexer = register_e3_activated(indexer, contract.clone()).await?;
-    let indexer = register_ciphertext_output_published(indexer).await?;
-    let indexer = register_plaintext_output_published(indexer).await?;
-
-    let registry_listener =
-        EventListener::create_contract_listener(&ws_url, registry_filter_address).await?;
-    let listener = register_committee_published(registry_listener, contract).await?;
-    Ok((indexer, listener))
-}
-
 pub async fn start_indexer(
     ws_url: &str,
     contract_address: &str,
@@ -214,19 +195,28 @@ pub async fn start_indexer(
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
-    let (indexer, listener) = setup_indexer(
-        ws_url,
-        contract_address,
-        registry_filter_address,
-        store,
-        private_key,
-    )
-    .await?;
-    indexer.start()?;
-    tokio::spawn(async move {
-        if let Err(e) = listener.listen().await {
-            eprintln!("Error: {}", e);
-        }
-    });
+    let readonly_contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+
+    let readwrite_contract =
+        EnclaveContractFactory::create_write(ws_url, contract_address, private_key).await?;
+
+    let enclave_contract_listener =
+        EventListener::create_contract_listener(ws_url, contract_address).await?;
+
+    // CRISP indexer
+    let crisp_indexer =
+        EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store).await?;
+    let crisp_indexer = register_e3_activated(crisp_indexer, readwrite_contract.clone()).await?;
+    let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
+    let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
+    crisp_indexer.start();
+
+    // Registry Listener
+    let registry_contract_listener =
+        EventListener::create_contract_listener(&ws_url, registry_filter_address).await?;
+    let registry_listener =
+        register_committee_published(registry_contract_listener, readwrite_contract).await?;
+    registry_listener.start();
+
     Ok(())
 }

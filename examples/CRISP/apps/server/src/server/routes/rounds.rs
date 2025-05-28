@@ -1,5 +1,5 @@
+use crate::server::app_data::AppData;
 use crate::server::config::CONFIG;
-use crate::server::database::{get_current_round_repo, get_e3_repo};
 use crate::server::models::{
     CTRequest, ComputeProviderParams, CronRequestE3, JsonResponse, PKRequest,
 };
@@ -51,9 +51,8 @@ async fn request_new_round(data: web::Json<CronRequestE3>) -> impl Responder {
 /// # Returns
 ///
 /// * A JSON response containing the current round
-async fn get_current_round() -> impl Responder {
-    let repo = get_current_round_repo().await;
-    match repo.get_current_round().await {
+async fn get_current_round(store: web::Data<AppData>) -> impl Responder {
+    match store.current_round().get_current_round().await {
         Ok(Some(current_round)) => HttpResponse::Ok().json(current_round),
         Ok(None) => HttpResponse::NotFound().json(JsonResponse {
             response: "No current round found".to_string(),
@@ -73,13 +72,18 @@ async fn get_current_round() -> impl Responder {
 /// # Returns
 ///
 /// * A JSON response containing the ciphertext
-async fn get_ciphertext(data: web::Json<CTRequest>) -> impl Responder {
+async fn get_ciphertext(data: web::Json<CTRequest>, store: web::Data<AppData>) -> impl Responder {
     let mut incoming = data.into_inner();
-    let repo = get_e3_repo(incoming.round_id).await;
 
-    incoming.ct_bytes = repo.get_ciphertext_output().await.unwrap();
-
-    HttpResponse::Ok().json(incoming)
+    match store.e3(incoming.round_id).get_ciphertext_output().await {
+        Ok(ct_bytes) => {
+            incoming.ct_bytes = ct_bytes;
+            HttpResponse::Ok().json(incoming)
+        }
+        Err(e) => HttpResponse::InternalServerError().json(JsonResponse {
+            response: format!("Failed to retrieve ciphertext output: {}", e),
+        }),
+    }
 }
 
 /// Get the public key for a given round
@@ -91,14 +95,18 @@ async fn get_ciphertext(data: web::Json<CTRequest>) -> impl Responder {
 /// # Returns
 ///
 /// * A JSON response containing the public key
-async fn get_public_key(data: web::Json<PKRequest>) -> impl Responder {
+async fn get_public_key(data: web::Json<PKRequest>, store: web::Data<AppData>) -> impl Responder {
     let mut incoming = data.into_inner();
 
-    let repo = get_e3_repo(incoming.round_id).await;
-
-    incoming.pk_bytes = repo.get_committee_public_key().await.unwrap();
-
-    HttpResponse::Ok().json(incoming)
+    match store.e3(incoming.round_id).get_committee_public_key().await {
+        Ok(pk_bytes) => {
+            incoming.pk_bytes = pk_bytes;
+            HttpResponse::Ok().json(incoming)
+        }
+        Err(e) => HttpResponse::InternalServerError().json(JsonResponse {
+            response: format!("Failed to retrieve public key: {}", e),
+        }),
+    }
 }
 
 /// Initialize a new CRISP round
@@ -152,8 +160,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         parallel: CONFIG.e3_compute_provider_parallel,
         batch_size: CONFIG.e3_compute_provider_batch_size,
     };
-    let compute_provider_params =
-        Bytes::from(bincode::serialize(&compute_provider_params).unwrap());
+    let compute_provider_params = Bytes::from(bincode::serialize(&compute_provider_params)?);
     let res = contract
         .request_e3(
             filter,
