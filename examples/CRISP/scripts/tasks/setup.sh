@@ -26,3 +26,7 @@ echo "noir"
 # Copy circuits compilation artifacts to public client app folder
 mkdir -p ./apps/client/libs/noir
 cp -r ./circuits/target/* ./apps/client/libs/noir/
+# Generate the Verifier & copy to the contracts folder
+bb write_vk -b ./circuits/target/*.json -o ./circuits/target --oracle_hash keccak
+bb write_solidity_verifier -k ./circuits/target/vk -o ./circuits/target/CRISPVerifier.sol
+cp ./circuits/target/CRISPVerifier.sol ./contracts/CRISPVerifier.sol
