@@ -8,7 +8,7 @@ use super::{CLI_DB, CONFIG};
 use alloy::primitives::{Address, Bytes, U256};
 use crisp::server::config::CONFIG as SERVER_CONFIG; // TODO: unify configuration
 use enclave_sdk::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
-use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
+use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, ReadOnly};
 use fhe_rs::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{
     DeserializeParametrized, FheDecoder, FheDecrypter, FheEncoder, FheEncrypter,
@@ -124,7 +124,7 @@ pub async fn activate_e3_round() -> Result<(), Box<dyn std::error::Error + Send 
     };
 
     let db = CLI_DB.write().await;
-    let key = format!("e3:{}", input_e3_id);
+    let key = format!("_e3:{}", input_e3_id);
     db.insert(key, serde_json::to_vec(&e3_params)?)?;
     db.flush()?;
     info!("E3 parameters stored in database.");
@@ -192,7 +192,7 @@ pub async fn decrypt_and_publish_result(
 
     let db = CLI_DB.read().await;
     let params_bytes = db
-        .get(format!("e3:{}", input_crisp_id))?
+        .get(format!("_e3:{}", input_crisp_id))?
         .ok_or("Key not found")?;
     let e3_params: FHEParams = serde_json::from_slice(&params_bytes)?;
     let params = generate_bfv_parameters();

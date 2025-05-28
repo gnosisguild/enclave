@@ -151,14 +151,22 @@ impl EnclaveContract<ReadWrite> {
     ) -> Result<EnclaveContract<ReadWrite>> {
         EnclaveContractFactory::create_write(http_rpc_url, contract_address, private_key).await
     }
+
+    pub fn get_provider(&self) -> Arc<EnclaveWriteProvider> {
+        self.provider.clone()
+    }
 }
 
 impl EnclaveContract<ReadOnly> {
-    pub async fn create_read(
+    pub async fn read_only(
         http_rpc_url: &str,
         contract_address: &str,
     ) -> Result<EnclaveContract<ReadOnly>> {
         EnclaveContractFactory::create_read(http_rpc_url, contract_address).await
+    }
+
+    pub fn get_provider(&self) -> Arc<EnclaveReadOnlyProvider> {
+        self.provider.clone()
     }
 }
 

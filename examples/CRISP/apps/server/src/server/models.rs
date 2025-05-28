@@ -1,6 +1,4 @@
-use crate::server::database::SledDB;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct JsonResponse {
@@ -130,6 +128,16 @@ pub struct E3 {
 
     // Emojis
     pub emojis: [String; 2],
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct E3Crisp {
+    pub emojis: [String; 2],
+    pub has_voted: Vec<String>,
+    pub start_time: u64,
+    pub status: String,
+    pub votes_option_1: u64,
+    pub votes_option_2: u64,
 }
 
 impl From<E3> for WebResultRequest {

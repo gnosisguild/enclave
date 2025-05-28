@@ -19,6 +19,7 @@ impl EnclaveSol {
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
+        rpc_url: String,
     ) -> Result<()> {
         EnclaveSolReader::attach(
             bus,
@@ -26,6 +27,7 @@ impl EnclaveSol {
             contract_address,
             repository,
             start_block,
+            rpc_url,
         )
         .await?;
         EnclaveSolWriter::attach(bus, write_provider, contract_address).await?;

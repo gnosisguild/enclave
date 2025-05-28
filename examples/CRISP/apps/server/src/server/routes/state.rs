@@ -1,9 +1,7 @@
-use crate::server::database::{db_get, get_e3};
-use crate::server::models::{CurrentRound, E3StateLite, GetRoundRequest, WebResultRequest};
+use crate::server::database::{get_current_round_repo, get_e3_repo};
+use crate::server::models::GetRoundRequest;
 use actix_web::{web, HttpResponse, Responder};
-use enclave_sdk::evm::contracts::{EnclaveRead, EnclaveWrite};
-use enclave_sdk::indexer::DataStore;
-use log::info;
+use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -24,14 +22,11 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
 ///
 async fn get_round_result(data: web::Json<GetRoundRequest>) -> impl Responder {
     let incoming = data.into_inner();
-
-    match get_e3(incoming.round_id).await {
-        Ok((state, _)) => {
-            let response: WebResultRequest = state.into();
-            HttpResponse::Ok().json(response)
-        }
+    let repo = get_e3_repo(incoming.round_id).await;
+    match repo.get_web_result_request().await {
+        Ok(response) => HttpResponse::Ok().json(response),
         Err(e) => {
-            info!("Error getting E3 state: {:?}", e);
+            error!("Error getting E3 state: {:?}", e);
             HttpResponse::InternalServerError().body("Failed to get E3 state")
         }
     }
@@ -43,8 +38,9 @@ async fn get_round_result(data: web::Json<GetRoundRequest>) -> impl Responder {
 ///
 /// * A JSON response containing the results for all rounds
 async fn get_all_round_results() -> impl Responder {
-    let round_count = match db_get::<CurrentRound>("e3:current_round").await {
-        Ok(count) => count.unwrap().id,
+    let repo = get_current_round_repo().await;
+    let round_count = match repo.get_current_round_id().await {
+        Ok(count) => count,
         Err(e) => {
             info!("Error retrieving round count: {:?}", e);
             return HttpResponse::InternalServerError().body("Failed to retrieve round count");
@@ -52,12 +48,11 @@ async fn get_all_round_results() -> impl Responder {
     };
 
     let mut states = Vec::new();
+    // FIXME: This assumes ids are ordered
     for i in 0..round_count + 1 {
-        match get_e3(i).await {
-            Ok((state, _key)) => {
-                let web_result: WebResultRequest = state.into();
-                states.push(web_result);
-            }
+        let repo = get_e3_repo(i).await;
+        match repo.get_web_result_request().await {
+            Ok(w) => states.push(w),
             Err(e) => {
                 info!("Error retrieving state for round {}: {:?}", i, e);
                 continue;
@@ -78,12 +73,9 @@ async fn get_all_round_results() -> impl Responder {
 ///
 async fn get_round_state_lite(data: web::Json<GetRoundRequest>) -> impl Responder {
     let incoming = data.into_inner();
-
-    match get_e3(incoming.round_id as u64).await {
-        Ok((state, _)) => {
-            let state_lite: E3StateLite = state.into();
-            HttpResponse::Ok().json(state_lite)
-        }
-        Err(_e) => HttpResponse::InternalServerError().body("Failed to get E3 state"),
+    let repo = get_e3_repo(incoming.round_id).await;
+    match repo.get_e3_state_lite().await {
+        Ok(state_lite) => HttpResponse::Ok().json(state_lite),
+        Err(_) => HttpResponse::InternalServerError().body("Failed to get E3 state"),
     }
 }
