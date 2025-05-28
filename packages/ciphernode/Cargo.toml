@@ -10,6 +10,7 @@ members = [
   "events",
   "evm",
   "fhe",
+  "init", 
   "keyshare",
   "logger",
   "net",
@@ -31,6 +32,7 @@ data = { path = "./data" }
 e3_request = { path = "./e3_request" }
 enclave = { path = "./enclave" }
 enclave_core = { path = "./enclave_core" }
+enclave-init = { path = "./init" }
 events = { path = "./events" }
 evm = { path = "./evm" }
 fhe = { path = "./fhe" }
@@ -56,6 +58,7 @@ argon2 = "0.5.2"
 anyhow = "1.0.86"
 async-std = { version = "1.12", features = ["attributes"] }
 async-trait = "0.1"
+async-recursion = "1.1.1"
 bincode = "1.3.3"
 bloom = "0.3.2"
 bs58 = "0.5.1"
@@ -71,6 +74,7 @@ fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 figment = { version = "0.10.19", features = ["yaml", "test"] }
 futures = "0.3.30"
 futures-util = "0.3"
+git2 = "0.20.2"
 hex = "0.4.3"
 lazy_static = "1.5.0"
 num = "0.4.3"
