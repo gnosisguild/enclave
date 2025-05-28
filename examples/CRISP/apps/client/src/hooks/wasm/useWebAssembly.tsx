@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react'
 import { handleGenericError } from '@/utils/handle-generic-error'
 import { useNotificationAlertContext } from '@/context/NotificationAlert'
+import { UltraHonkBackend } from '@aztec/bb.js';
+import { Noir } from '@noir-lang/noir_js';
+import crisp_circuit from 'libs/noir/crisp_circuit.json'
+
+const generateProof = async (x: number, y: number) => {
+  const noir = new Noir(crisp_circuit as any)
+  console.log("Starting execution")
+  const backend = new UltraHonkBackend(crisp_circuit.bytecode, { threads: 4 });
+  const { witness } = await noir.execute({ x, y });
+  console.log("Witness", witness)
+  console.log("Generating proof")
+  const { proof } = await backend.generateProof(witness);
+  console.log("Proof", proof)
+  return proof
+}
 
 export const useWebAssemblyHook = () => {
   const { showToast } = useNotificationAlertContext()
@@ -26,10 +41,11 @@ export const useWebAssemblyHook = () => {
     return new Promise<Uint8Array | undefined>((resolve, reject) => {
       setIsLoading(true)
       worker.postMessage({ type: 'encrypt_vote', data: { voteId, publicKey } })
-      worker.onmessage = (event) => {
+      worker.onmessage = async (event) => {
         const { type, success, encryptedVote, error } = event.data
         if (type === 'encrypt_vote') {
           if (success) {
+            const proof = await generateProof(1, 2);
             resolve(encryptedVote)
           } else {
             showToast({

@@ -24,5 +24,5 @@ echo "client"
 echo "noir"
 (cd ./circuits && nargo compile)
 # Copy circuits compilation artifacts to public client app folder
-mkdir -p ./apps/client/public/circuits
-cp -r ./circuits/target/* ./apps/client/public/circuits/
+mkdir -p ./apps/client/libs/noir
+cp -r ./circuits/target/* ./apps/client/libs/noir/

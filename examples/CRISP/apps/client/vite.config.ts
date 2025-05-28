@@ -16,7 +16,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
-    exclude: ['@rollup/browser'],
+    exclude: ['@rollup/browser', '@noir-lang/noirc_abi', '@noir-lang/acvm_js'],
   },
   resolve: {
     alias: {
