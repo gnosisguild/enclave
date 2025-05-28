@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
-use enclave_core::init;
+use enclave_core::wizard;
 use tracing::instrument;
 
 use crate::net;
@@ -19,19 +19,19 @@ pub async fn execute(
 ) -> Result<()> {
     let rpc_url = match rpc_url {
         Some(url) => {
-            init::validate_rpc_url(&url)?;
+            wizard::validate_rpc_url(&url)?;
             url
         }
         None => Input::<String>::new()
             .with_prompt("Enter WebSocket devnet RPC URL")
             .default("wss://ethereum-sepolia-rpc.publicnode.com".to_string())
-            .validate_with(init::validate_rpc_url)
+            .validate_with(wizard::validate_rpc_url)
             .interact_text()?,
     };
 
     let eth_address: Option<String> = match eth_address {
         Some(address) => {
-            init::validate_eth_address(&address)?;
+            wizard::validate_eth_address(&address)?;
             Some(address)
         }
         None => {
@@ -41,7 +41,7 @@ pub async fn execute(
                 Input::with_theme(&ColorfulTheme::default())
                     .with_prompt("Enter your Ethereum address (press Enter to skip)")
                     .allow_empty(true)
-                    .validate_with(init::validate_eth_address)
+                    .validate_with(wizard::validate_eth_address)
                     .interact()
                     .ok()
                     .map(|s| if s.is_empty() { None } else { Some(s) })
@@ -50,7 +50,7 @@ pub async fn execute(
         }
     };
 
-    let config = init::execute(rpc_url, eth_address).await?;
+    let config = wizard::execute(rpc_url, eth_address).await?;
 
     password::execute(PasswordCommands::Set { password }, &config).await?;
 

@@ -4,7 +4,6 @@ use tracing::info;
 
 mod cli;
 pub mod helpers;
-mod init;
 pub mod net;
 mod net_generate;
 mod net_purge;
@@ -24,6 +23,7 @@ mod password_set;
 mod start;
 mod wallet;
 mod wallet_set;
+mod wizard;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     

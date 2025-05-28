@@ -5,7 +5,7 @@ use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::start;
 use crate::wallet::WalletCommands;
-use crate::{init, password, wallet};
+use crate::{password, wallet, wizard};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
@@ -82,7 +82,7 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
-                    Commands::Init {
+                    Commands::Wizard {
                         rpc_url,
                         eth_address,
                         password,
@@ -90,7 +90,7 @@ impl Cli {
                         net_keypair,
                         generate_net_keypair,
                     } => {
-                        init::execute(
+                        wizard::execute(
                             rpc_url,
                             eth_address,
                             password,
@@ -127,7 +127,7 @@ impl Cli {
 
         match self.command {
             Commands::Start { peers } => start::execute(config, peers).await?,
-            Commands::Init { .. } => {
+            Commands::Wizard { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }
             Commands::Nodes { command } => {
@@ -190,7 +190,7 @@ pub enum Commands {
     },
 
     /// Initialize your ciphernode by setting up a configuration
-    Init {
+    Wizard {
         /// An rpc url for enclave to connect to
         #[arg(long = "rpc-url")]
         rpc_url: Option<String>,
