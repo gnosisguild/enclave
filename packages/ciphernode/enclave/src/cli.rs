@@ -1,11 +1,10 @@
 use crate::helpers::telemetry::setup_tracing;
-use crate::net;
 use crate::net::NetCommands;
 use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::start;
 use crate::wallet::WalletCommands;
-use crate::{password, wallet, wizard};
+use crate::{init, net, password, wallet, wizard};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use config::validation::ValidUrl;
@@ -82,6 +81,7 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
+                    Commands::Init  => init::execute().await?,
                     Commands::Wizard {
                         rpc_url,
                         eth_address,
@@ -127,8 +127,11 @@ impl Cli {
 
         match self.command {
             Commands::Start { peers } => start::execute(config, peers).await?,
-            Commands::Wizard { .. } => {
+            Commands::Init { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
+            }
+            Commands::Wizard { .. } => {
+                bail!("Cannot run `enclave wizard` when a configuration exists.");
             }
             Commands::Nodes { command } => {
                 nodes::execute(command, &config, self.verbose, self.config).await?
@@ -170,6 +173,9 @@ pub enum Commands {
         )]
         peers: Vec<String>,
     },
+
+    /// Initialize an enclave project
+    Init,
 
     /// Password management commands
     Password {

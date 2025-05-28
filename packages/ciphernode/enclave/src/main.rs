@@ -4,6 +4,7 @@ use tracing::info;
 
 mod cli;
 pub mod helpers;
+mod init;
 pub mod net;
 mod net_generate;
 mod net_purge;
