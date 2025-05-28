@@ -1,7 +1,9 @@
 use crate::server::{
+    app_data::AppData,
     config::CONFIG,
-    database::get_e3_repo,
+    database::SledDB,
     models::{EncryptedVote, VoteResponse, VoteResponseStatus},
+    repo::CrispE3Repository,
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::{
@@ -27,12 +29,18 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
 /// # Returns
 ///
 /// * A JSON response indicating the success or failure of the operation
-async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Responder {
+async fn broadcast_encrypted_vote(
+    data: web::Json<EncryptedVote>,
+    store: web::Data<AppData>,
+) -> impl Responder {
     let vote = data.into_inner();
-    let mut repo = get_e3_repo(vote.round_id).await;
 
     // Validate and update vote status
-    let has_voted = match repo.has_voted(vote.address.clone()).await {
+    let has_voted = match store
+        .e3(vote.round_id)
+        .has_voted(vote.address.clone())
+        .await
+    {
         Ok(voted) => voted,
         Err(e) => {
             log::error!("Database error checking vote status: {:?}", e);
@@ -47,6 +55,8 @@ async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Respon
             message: Some("User Has Already Voted".to_string()),
         });
     }
+
+    let mut repo = store.e3(vote.round_id);
 
     if let Err(e) = repo.insert_voter_address(vote.address.clone()).await {
         log::error!("Database error inserting voter: {:?}", e);
@@ -63,13 +73,19 @@ async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Respon
     let encoded_params = Bytes::from(params_value.abi_encode_params());
 
     // Broadcast vote to blockchain
-    let contract = EnclaveContract::new(
+    let contract = match EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
         &CONFIG.enclave_address,
     )
     .await
-    .unwrap();
+    {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Database error checking vote status: {:?}", e);
+            return HttpResponse::InternalServerError().json("Internal server error");
+        }
+    };
 
     match contract.publish_input(e3_id, encoded_params).await {
         Ok(hash) => HttpResponse::Ok().json(VoteResponse {
@@ -77,7 +93,7 @@ async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Respon
             tx_hash: Some(hash.transaction_hash.to_string()),
             message: Some("Vote Successful".to_string()),
         }),
-        Err(e) => handle_vote_error(e, vote.round_id, &vote.address).await,
+        Err(e) => handle_vote_error(e, repo, &vote.address).await,
     }
 }
 
@@ -89,12 +105,14 @@ async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Respon
 /// * `state_data` - The state data to be rolled back
 /// * `key` - The key for the state data
 /// * `address` - The address for the vote
-async fn handle_vote_error(e: Error, e3_id: u64, address: &str) -> HttpResponse {
+async fn handle_vote_error(
+    e: Error,
+    mut repo: CrispE3Repository<SledDB>,
+    address: &str,
+) -> HttpResponse {
     info!("Error while sending vote transaction: {:?}", e);
 
     // Rollback the vote
-    let mut repo = get_e3_repo(e3_id).await;
-
     match repo.remove_voter_address(address).await {
         Ok(_) => (),
         Err(err) => error!("Error rolling back the vote: {err}"),

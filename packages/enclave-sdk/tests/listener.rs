@@ -45,7 +45,7 @@ async fn test_event_listener() -> Result<()> {
         })
         .await;
 
-    tokio::spawn(async move { event_listener.listen().await.unwrap() });
+    event_listener.start();
 
     contract
         .setValue("hello".to_string())
@@ -138,7 +138,7 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
         })
         .await;
 
-    tokio::spawn(async move { event_listener.listen().await.unwrap() });
+    event_listener.start();
 
     // For clarity the events should be returned
     // roughly in this order:

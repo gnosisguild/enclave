@@ -130,6 +130,7 @@ impl ProviderType for ReadOnly {
     type Provider = EnclaveReadOnlyProvider;
 }
 /// Marker type for read-write provider
+#[derive(Clone)]
 pub struct ReadWrite;
 impl ProviderType for ReadWrite {
     type Provider = EnclaveWriteProvider;
@@ -155,6 +156,10 @@ impl EnclaveContract<ReadWrite> {
     pub fn get_provider(&self) -> Arc<EnclaveWriteProvider> {
         self.provider.clone()
     }
+
+    pub fn address(&self) -> &Address {
+        &self.contract_address
+    }
 }
 
 impl EnclaveContract<ReadOnly> {
@@ -167,6 +172,10 @@ impl EnclaveContract<ReadOnly> {
 
     pub fn get_provider(&self) -> Arc<EnclaveReadOnlyProvider> {
         self.provider.clone()
+    }
+
+    pub fn address(&self) -> &Address {
+        &self.contract_address
     }
 }
 
