@@ -75,13 +75,15 @@ async fn get_current_round(store: web::Data<AppData>) -> impl Responder {
 async fn get_ciphertext(data: web::Json<CTRequest>, store: web::Data<AppData>) -> impl Responder {
     let mut incoming = data.into_inner();
 
-    incoming.ct_bytes = store
-        .e3(incoming.round_id)
-        .get_ciphertext_output()
-        .await
-        .unwrap();
-
-    HttpResponse::Ok().json(incoming)
+    match store.e3(incoming.round_id).get_ciphertext_output().await {
+        Ok(ct_bytes) => {
+            incoming.ct_bytes = ct_bytes;
+            HttpResponse::Ok().json(incoming)
+        }
+        Err(e) => HttpResponse::InternalServerError().json(JsonResponse {
+            response: format!("Failed to retrieve ciphertext output: {}", e),
+        }),
+    }
 }
 
 /// Get the public key for a given round
@@ -96,13 +98,15 @@ async fn get_ciphertext(data: web::Json<CTRequest>, store: web::Data<AppData>) -
 async fn get_public_key(data: web::Json<PKRequest>, store: web::Data<AppData>) -> impl Responder {
     let mut incoming = data.into_inner();
 
-    incoming.pk_bytes = store
-        .e3(incoming.round_id)
-        .get_committee_public_key()
-        .await
-        .unwrap();
-
-    HttpResponse::Ok().json(incoming)
+    match store.e3(incoming.round_id).get_committee_public_key().await {
+        Ok(pk_bytes) => {
+            incoming.pk_bytes = pk_bytes;
+            HttpResponse::Ok().json(incoming)
+        }
+        Err(e) => HttpResponse::InternalServerError().json(JsonResponse {
+            response: format!("Failed to retrieve public key: {}", e),
+        }),
+    }
 }
 
 /// Initialize a new CRISP round
