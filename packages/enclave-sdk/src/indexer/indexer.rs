@@ -1,4 +1,4 @@
-use super::models::E3;
+use super::{models::E3, DataStore};
 use crate::{
     evm::{
         contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
@@ -16,8 +16,8 @@ use async_trait::async_trait;
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
+use std::future::Future;
 use std::{collections::HashMap, sync::Arc};
-use std::{fmt::Display, future::Future};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -30,25 +30,6 @@ pub enum IndexerError {
     E3NotFound(E3Id),
     #[error("Object not serializable: {0}")]
     Serialization(E3Id),
-}
-
-/// Trait for injectable DataStore. Note the implementor must manage interior mutability
-#[async_trait]
-pub trait DataStore: Send + Sync + 'static {
-    type Error: Display;
-    async fn insert<T: Serialize + Send + Sync>(
-        &mut self,
-        key: &str,
-        value: &T,
-    ) -> Result<(), Self::Error>;
-    async fn get<T: DeserializeOwned + Send + Sync>(
-        &self,
-        key: &str,
-    ) -> Result<Option<T>, Self::Error>;
-    async fn modify<T, F>(&mut self, key: &str, f: F) -> Result<Option<T>, Self::Error>
-    where
-        T: Serialize + DeserializeOwned + Send + Sync,
-        F: FnMut(Option<T>) -> Option<T> + Send;
 }
 
 pub struct InMemoryStore {
@@ -318,14 +299,8 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(())
     }
 
-    pub fn start(&self) -> Result<JoinHandle<()>> {
-        let listener = self.listener.clone();
-        let handle = tokio::spawn(async move {
-            if let Err(e) = listener.listen().await {
-                eprintln!("Error: {}", e);
-            }
-        });
-        Ok(handle)
+    pub fn start(&self) -> JoinHandle<Result<()>> {
+        self.listener.start()
     }
 
     pub async fn get_e3(&self, e3_id: u64) -> Result<E3, IndexerError> {

@@ -35,7 +35,7 @@ async fn test_indexer() -> Result<()> {
         .await;
 
     // Start tracking state
-    indexer.start()?;
+    let _ = indexer.start();
 
     // E3Activated
     let e3_id = 10;

@@ -5,10 +5,9 @@ use crate::server::{
 use compute_provider::FHEInputs;
 use enclave_sdk::{
     evm::{
-        contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, ReadOnly, ReadWrite},
+        contracts::{EnclaveContract, EnclaveRead, EnclaveWrite, ReadWrite},
         events::{
-            CiphertextOutputPublished, CommitteePublished, E3Activated, InputPublished,
-            PlaintextOutputPublished,
+            CiphertextOutputPublished, CommitteePublished, E3Activated, PlaintextOutputPublished,
         },
         listener::EventListener,
     },
@@ -173,13 +172,12 @@ pub async fn register_committee_published(
     Ok(listener)
 }
 
-pub async fn setup_indexer(
+pub async fn setup_crisp_e3_indexer(
     ws_url: &str,
     contract_address: &str,
-    registry_filter_address: &str,
     store: impl DataStore,
     private_key: &str,
-) -> Result<(EnclaveIndexer<impl DataStore>, EventListener)> {
+) -> Result<EnclaveIndexer<impl DataStore>> {
     let indexer = EnclaveIndexer::new(ws_url, contract_address, store).await?;
     let contract = Arc::new(
         EnclaveContract::<ReadWrite>::new(&ws_url, &private_key, &contract_address).await?,
@@ -188,10 +186,22 @@ pub async fn setup_indexer(
     let indexer = register_ciphertext_output_published(indexer).await?;
     let indexer = register_plaintext_output_published(indexer).await?;
 
-    let registry_listener =
-        EventListener::create_contract_listener(&ws_url, registry_filter_address).await?;
-    let listener = register_committee_published(registry_listener, contract).await?;
-    Ok((indexer, listener))
+    Ok(indexer)
+}
+
+pub async fn setup_registry_listener(
+    ws_url: &str,
+    contract_address: &str,
+    private_key: &str,
+) -> Result<EventListener> {
+    let contract =
+        Arc::new(EnclaveContract::<ReadWrite>::new(ws_url, private_key, contract_address).await?);
+    let listener = register_committee_published(
+        EventListener::create_contract_listener(&ws_url, contract_address).await?,
+        contract,
+    )
+    .await?;
+    Ok(listener)
 }
 
 pub async fn start_indexer(
@@ -201,19 +211,9 @@ pub async fn start_indexer(
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
-    let (indexer, listener) = setup_indexer(
-        ws_url,
-        contract_address,
-        registry_filter_address,
-        store,
-        private_key,
-    )
-    .await?;
-    indexer.start()?;
-    tokio::spawn(async move {
-        if let Err(e) = listener.listen().await {
-            eprintln!("Error: {}", e);
-        }
-    });
+    let indexer = setup_crisp_e3_indexer(ws_url, contract_address, store, private_key).await?;
+    let listener = setup_registry_listener(ws_url, registry_filter_address, private_key).await?;
+    indexer.start();
+    listener.start();
     Ok(())
 }
