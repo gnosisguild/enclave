@@ -13,7 +13,7 @@ use enclave_sdk::{
         },
         listener::EventListener,
     },
-    indexer::{self, DataStore, EnclaveIndexer},
+    indexer::{DataStore, EnclaveIndexer},
 };
 use log::info;
 use program_client::run_compute;

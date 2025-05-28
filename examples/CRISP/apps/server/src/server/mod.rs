@@ -1,3 +1,4 @@
+mod app_data;
 pub mod config;
 mod database;
 mod indexer;
@@ -5,9 +6,15 @@ mod models;
 mod repo;
 mod routes;
 
+use std::sync::Arc;
+
 use actix_cors::Cors;
-use actix_web::{middleware::Logger, App, HttpServer};
+use actix_web::{middleware::Logger, web, App, HttpServer};
+use app_data::AppData;
+use database::SledDB;
+use enclave_sdk::indexer::SharedStore;
 use indexer::start_indexer;
+use tokio::sync::RwLock;
 
 use crate::logger::init_logger;
 use config::CONFIG;
@@ -16,23 +23,32 @@ use config::CONFIG;
 pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_logger();
 
+    let pathdb = std::env::current_dir()?.join("database/server");
+    let db = SharedStore::new(Arc::new(RwLock::new(SledDB::new(
+        pathdb.to_str().unwrap(),
+    )?)));
+
     // New indexer
-    tokio::spawn(async {
-        if let Err(e) = start_indexer(
-            &CONFIG.ws_rpc_url,
-            &CONFIG.enclave_address,
-            &CONFIG.ciphernode_registry_address,
-            database::GLOBAL_DB.read().await.clone(),
-            &CONFIG.private_key,
-        )
-        .await
-        {
-            eprintln!("Listener failed: {:?}", e);
+    tokio::spawn({
+        let db = db.clone();
+        async move {
+            if let Err(e) = start_indexer(
+                &CONFIG.ws_rpc_url,
+                &CONFIG.enclave_address,
+                &CONFIG.ciphernode_registry_address,
+                db.clone(),
+                &CONFIG.private_key,
+            )
+            .await
+            {
+                eprintln!("Listener failed: {:?}", e);
+            }
         }
     });
 
     let bind_addr = "0.0.0.0:4000";
-    let server = HttpServer::new(|| {
+    let db_clone = db.clone();
+    let server = HttpServer::new(move || {
         let cors = Cors::default()
             .allow_any_origin()
             .allowed_methods(vec!["GET", "POST", "OPTIONS"])
@@ -43,6 +59,7 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         App::new()
             .wrap(cors)
             .wrap(Logger::new(r#"%a "%r" %s %b %T"#))
+            .app_data(web::Data::new(AppData::new(db_clone.clone())))
             .configure(routes::setup_routes)
     })
     .bind(bind_addr)?;
