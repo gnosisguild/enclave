@@ -24,6 +24,7 @@ mod password_set;
 mod start;
 mod wallet;
 mod wallet_set;
+mod wizard;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     

@@ -32,6 +32,7 @@ COPY ./packages/ciphernode/e3_request/Cargo.toml ./e3_request/Cargo.toml
 COPY ./packages/ciphernode/enclave/Cargo.toml ./enclave/Cargo.toml
 COPY ./packages/ciphernode/enclave_core/Cargo.toml ./enclave_core/Cargo.toml
 COPY ./packages/ciphernode/enclave_core/build.rs ./enclave_core/build.rs
+COPY ./packages/ciphernode/init/Cargo.toml ./init/Cargo.toml
 COPY ./packages/ciphernode/events/Cargo.toml ./events/Cargo.toml
 COPY ./packages/ciphernode/evm/Cargo.toml ./evm/Cargo.toml
 COPY ./packages/ciphernode/fhe/Cargo.toml ./fhe/Cargo.toml
