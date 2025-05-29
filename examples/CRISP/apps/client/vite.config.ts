@@ -16,6 +16,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
+    esbuildOptions: { target: "esnext" },
     exclude: ['@rollup/browser', '@noir-lang/noirc_abi', '@noir-lang/acvm_js'],
   },
   resolve: {
