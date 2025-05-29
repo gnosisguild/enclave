@@ -1,38 +1,289 @@
 {
     "noir_version": "1.0.0-beta.3+ceaa1986628197bd1170147f6a07f0f98d21030a",
-    "hash": 9698608154529829736,
+    "hash": 15998918307140277646,
     "abi": {
         "parameters": [
             {
-                "name": "x",
+                "name": "pk0is",
                 "type": {
-                    "kind": "field"
+                    "kind": "array",
+                    "length": 2,
+                    "type": {
+                        "kind": "struct",
+                        "path": "Polynomial",
+                        "fields": [
+                            {
+                                "name": "coefficients",
+                                "type": {
+                                    "kind": "array",
+                                    "length": 128,
+                                    "type": {
+                                        "kind": "field"
+                                    }
+                                }
+                            }
+                        ]
+                    }
                 },
-                "visibility": "public"
+                "visibility": "private"
             },
             {
-                "name": "y",
+                "name": "pk1is",
                 "type": {
-                    "kind": "field"
+                    "kind": "array",
+                    "length": 2,
+                    "type": {
+                        "kind": "struct",
+                        "path": "Polynomial",
+                        "fields": [
+                            {
+                                "name": "coefficients",
+                                "type": {
+                                    "kind": "array",
+                                    "length": 128,
+                                    "type": {
+                                        "kind": "field"
+                                    }
+                                }
+                            }
+                        ]
+                    }
                 },
-                "visibility": "public"
+                "visibility": "private"
+            },
+            {
+                "name": "ct0is",
+                "type": {
+                    "kind": "array",
+                    "length": 2,
+                    "type": {
+                        "kind": "struct",
+                        "path": "Polynomial",
+                        "fields": [
+                            {
+                                "name": "coefficients",
+                                "type": {
+                                    "kind": "array",
+                                    "length": 128,
+                                    "type": {
+                                        "kind": "field"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "ct1is",
+                "type": {
+                    "kind": "array",
+                    "length": 2,
+                    "type": {
+                        "kind": "struct",
+                        "path": "Polynomial",
+                        "fields": [
+                            {
+                                "name": "coefficients",
+                                "type": {
+                                    "kind": "array",
+                                    "length": 128,
+                                    "type": {
+                                        "kind": "field"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "u",
+                "type": {
+                    "kind": "struct",
+                    "path": "Polynomial",
+                    "fields": [
+                        {
+                            "name": "coefficients",
+                            "type": {
+                                "kind": "array",
+                                "length": 128,
+                                "type": {
+                                    "kind": "field"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "e0",
+                "type": {
+                    "kind": "struct",
+                    "path": "Polynomial",
+                    "fields": [
+                        {
+                            "name": "coefficients",
+                            "type": {
+                                "kind": "array",
+                                "length": 128,
+                                "type": {
+                                    "kind": "field"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "e1",
+                "type": {
+                    "kind": "struct",
+                    "path": "Polynomial",
+                    "fields": [
+                        {
+                            "name": "coefficients",
+                            "type": {
+                                "kind": "array",
+                                "length": 128,
+                                "type": {
+                                    "kind": "field"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "k1",
+                "type": {
+                    "kind": "struct",
+                    "path": "Polynomial",
+                    "fields": [
+                        {
+                            "name": "coefficients",
+                            "type": {
+                                "kind": "array",
+                                "length": 128,
+                                "type": {
+                                    "kind": "field"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "r1is",
+                "type": {
+                    "kind": "array",
+                    "length": 2,
+                    "type": {
+                        "kind": "struct",
+                        "path": "Polynomial",
+                        "fields": [
+                            {
+                                "name": "coefficients",
+                                "type": {
+                                    "kind": "array",
+                                    "length": 255,
+                                    "type": {
+                                        "kind": "field"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "r2is",
+                "type": {
+                    "kind": "array",
+                    "length": 2,
+                    "type": {
+                        "kind": "struct",
+                        "path": "Polynomial",
+                        "fields": [
+                            {
+                                "name": "coefficients",
+                                "type": {
+                                    "kind": "array",
+                                    "length": 127,
+                                    "type": {
+                                        "kind": "field"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "p1is",
+                "type": {
+                    "kind": "array",
+                    "length": 2,
+                    "type": {
+                        "kind": "struct",
+                        "path": "Polynomial",
+                        "fields": [
+                            {
+                                "name": "coefficients",
+                                "type": {
+                                    "kind": "array",
+                                    "length": 255,
+                                    "type": {
+                                        "kind": "field"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "visibility": "private"
+            },
+            {
+                "name": "p2is",
+                "type": {
+                    "kind": "array",
+                    "length": 2,
+                    "type": {
+                        "kind": "struct",
+                        "path": "Polynomial",
+                        "fields": [
+                            {
+                                "name": "coefficients",
+                                "type": {
+                                    "kind": "array",
+                                    "length": 127,
+                                    "type": {
+                                        "kind": "field"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "visibility": "private"
             }
         ],
         "return_type": null,
         "error_types": {}
     },
-    "bytecode": "H4sIAAAAAAAA/7VSSQ7DIAwEkqrtueQfNkswt36lqOT/T6iqYgkRegoZCQ2yrWFsLMUPqpwv5sJS7ME1z8JwDFhrWVidy8FktPgCExN5cD6thISe/NuQtZkchZhigIjOZtx8tFsRk+N8gez0fErzavAAVGV8pO4s+ovwb1E4dm94qfLTwFmyvj5HH66dHpfqrps+e/8AB8F6U+GL2EM1Oa69Nf7keH/Yepk6bzEehXUV43l+ALYVV8qVBAAA",
-    "debug_symbols": "lY3LCsMgEEX/ZdYuGmgK9VdKCT7GMCAqoxaK5N9jQgLZZnnumbm3gUVd54mCixnkp4GPRhWKoVODxx7lpMJGuSguIJ9vARgsyHFcBDjyCPI1LF8Bw53zDprJe5qn62aPf4pJaY8HuhrMxZZ/Os35nzgatJVxa9pdr18B",
-    "file_map": {
-        "61": {
-            "source": "fn main(x: pub Field, y: pub Field) {\n    assert(x != y);\n}\n",
-            "path": "enclave/examples/CRISP/circuits/src/main.nr"
-        }
-    },
+    "bytecode": "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",
+    "debug_symbols": "XYxLCoAwDAXvkrUn8Coi0k9aAqEpsRWk9O5+cCFdzhveNPBoa9woBdlhXhqwOFNI0k2tT2CVmCluw3wYJWMZPww1uZ8tZ8bhn1Uc+qr4lF7X134B",
+    "file_map": {},
     "names": [
         "main"
     ],
-    "brillig_names": [
-        "directive_invert"
-    ]
+    "brillig_names": []
 }

@@ -212,7 +212,7 @@ pub fn reduce_coefficients_by_cyclo(coefficients: &mut Vec<BigInt>, cyclo: &[Big
 ///
 /// This function takes an arbitrary number and reduces it modulo the specified prime modulus.
 /// After reduction, the number is adjusted to be within the symmetric range
-/// [−(modulus−1)/2, (modulus−1)/2]. If the number is already within this range, it remains unchanged.
+/// [(−(modulus−1))/2, (modulus−1)/2]. If the number is already within this range, it remains unchanged.
 ///
 /// # Parameters
 ///
@@ -231,7 +231,11 @@ pub fn reduce_and_center(x: &BigInt, modulus: &BigInt, half_modulus: &BigInt) ->
     }
 
     // Adjust the remainder if it is greater than half_modulus
-    if r > *half_modulus {
+    if (modulus % BigInt::from(2)) == BigInt::from(1) {
+        if r > *half_modulus {
+            r -= modulus;
+        }
+    } else if r >= *half_modulus {
         r -= modulus;
     }
 
@@ -258,6 +262,7 @@ pub fn reduce_and_center_coefficients_mut(coefficients: &mut [BigInt], modulus: 
         .iter_mut()
         .for_each(|x| *x = reduce_and_center(x, modulus, &half_modulus));
 }
+
 pub fn reduce_and_center_coefficients(
     coefficients: &mut [BigInt],
     modulus: &BigInt,
@@ -335,6 +340,17 @@ pub fn range_check_centered(vec: &[BigInt], lower_bound: &BigInt, upper_bound: &
         .all(|coeff| coeff >= lower_bound && coeff <= upper_bound)
 }
 
+pub fn range_check_standard_2bounds(
+    vec: &[BigInt],
+    low_bound: &BigInt,
+    up_bound: &BigInt,
+    modulus: &BigInt,
+) -> bool {
+    vec.iter().all(|coeff| {
+        (coeff >= &BigInt::from(0) && coeff <= up_bound)
+            || (coeff >= &(modulus + low_bound) && coeff < modulus)
+    })
+}
 pub fn range_check_standard(vec: &[BigInt], bound: &BigInt, modulus: &BigInt) -> bool {
     vec.iter().all(|coeff| {
         (coeff >= &BigInt::from(0) && coeff <= bound)

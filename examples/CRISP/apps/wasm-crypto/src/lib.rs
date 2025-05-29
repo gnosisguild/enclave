@@ -5,8 +5,10 @@ use console_log;
 use e3_bfv_helpers::{build_bfv_params_arc, params::SET_2048_1032193_1};
 use fhe_rs::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, FheDecrypter, FheEncoder, Serialize};
+use greco::greco::InputValidationVectors;
 use rand::thread_rng;
 use wasm_bindgen::prelude::*;
+pub use wasm_bindgen_rayon::init_thread_pool;
 use wasm_bindgen_test::*; // For setting up logging to the browser console
 
 #[wasm_bindgen]
@@ -15,15 +17,37 @@ pub struct Encrypt {
 }
 
 #[wasm_bindgen]
+pub struct EncryptResult {
+    vote: Vec<u8>,
+    circuit_inputs: String,
+}
+
+#[wasm_bindgen]
+impl EncryptResult {
+    #[wasm_bindgen(getter)]
+    pub fn vote(&self) -> Vec<u8> {
+        self.vote.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn circuit_inputs(&self) -> String {
+        self.circuit_inputs.clone()
+    }
+}
+
+#[wasm_bindgen]
 impl Encrypt {
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Encrypt {
-        Encrypt {
-            encrypted_vote: Vec::new(),
+    pub fn new() -> Self {
+        Self {
+            encrypted_vote: vec![],
         }
     }
 
-    pub fn encrypt_vote(&mut self, vote: u64, public_key: Vec<u8>) -> Result<Vec<u8>, JsValue> {
+    pub fn encrypt_vote(
+        &mut self,
+        vote: u64,
+        public_key: Vec<u8>,
+    ) -> Result<EncryptResult, JsValue> {
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
         let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
 
@@ -38,14 +62,20 @@ impl Encrypt {
             .try_encrypt_extended(&pt, &mut thread_rng())
             .map_err(|e| JsValue::from_str(&format!("Error encrypting vote: {}", e)))?;
 
-        // Create Greco input validation ZKP proof
-        // let input_val_vectors =
-        //     InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk).map_err(
-        //         |e| JsValue::from_str(&format!("Error computing input validation vectors: {}", e)),
-        //     )?;
+        // Create Greco ZK Circuit input
+        let circuit_inputs =
+            InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk).map_err(
+                |e| JsValue::from_str(&format!("Error computing input validation vectors: {}", e)),
+            )?;
 
-        self.encrypted_vote = ct.to_bytes();
-        Ok(self.encrypted_vote.clone())
+        let encrypted_vote = ct.to_bytes();
+        self.encrypted_vote = encrypted_vote.clone();
+
+        let circuit_inputs_json = circuit_inputs.to_json().to_string();
+        Ok(EncryptResult {
+            vote: encrypted_vote,
+            circuit_inputs: circuit_inputs_json,
+        })
     }
 
     pub fn test() {

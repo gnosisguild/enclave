@@ -1,20 +1,11 @@
 import { useState, useEffect } from 'react'
 import { handleGenericError } from '@/utils/handle-generic-error'
 import { useNotificationAlertContext } from '@/context/NotificationAlert'
-import { UltraHonkBackend } from '@aztec/bb.js'
-import { Noir } from '@noir-lang/noir_js'
-import crisp_circuit from 'libs/noir/crisp_circuit.json'
-
-const generateProof = async (x: number, y: number) => {
-  const noir = new Noir(crisp_circuit as any)
-  console.log('Starting execution')
-  const backend = new UltraHonkBackend((crisp_circuit as any).bytecode, { threads: 4 })
-  const { witness } = await noir.execute({ x, y })
-  console.log('Generating proof')
-  const { proof } = await backend.generateProof(witness)
-  console.log('Proof', proof)
-  return proof
-}
+import { EncryptedVote } from '@/model/vote.model'
+import {
+  generateProof,
+  CircuitInputs,
+} from '@/utils/proofUtils'
 
 export const useWebAssemblyHook = () => {
   const { showToast } = useNotificationAlertContext()
@@ -31,21 +22,26 @@ export const useWebAssemblyHook = () => {
     }
   }, [])
 
-  const encryptVote = async (voteId: bigint, publicKey: Uint8Array): Promise<Uint8Array | undefined> => {
+  const encryptVote = async (voteId: bigint, publicKey: Uint8Array): Promise<EncryptedVote | undefined> => {
     if (!worker) {
       console.error('WebAssembly worker not initialized')
       return
     }
 
-    return new Promise<Uint8Array | undefined>((resolve, reject) => {
+    return new Promise<EncryptedVote | undefined>((resolve, reject) => {
       setIsLoading(true)
       worker.postMessage({ type: 'encrypt_vote', data: { voteId, publicKey } })
       worker.onmessage = async (event) => {
         const { type, success, encryptedVote, error } = event.data
         if (type === 'encrypt_vote') {
           if (success) {
-            await generateProof(1, 2)
-            resolve(encryptedVote)
+            const { vote, circuitInputs } = encryptedVote;
+            const proof = await generateProof(circuitInputs as CircuitInputs);
+            resolve({
+              vote: vote,
+              proof: proof,
+              public_inputs: [],
+            })
           } else {
             showToast({
               type: 'danger',
