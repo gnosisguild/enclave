@@ -32,6 +32,7 @@ import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISema
 import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
+import {HonkVerifier} from "../contracts/CRISPVerifier.sol";
 import {MockRISC0Verifier} from "../contracts/Mocks/MockRISC0Verifier.sol";
 import {ImageID} from "../contracts/ImageID.sol";
 
@@ -183,6 +184,9 @@ contract CRISPProgramDeploy is Script {
             address(inputValidatorFactory)
         );
 
+        HonkVerifier honkVerifier = new HonkVerifier();
+        console2.log("Deployed HonkVerifier to", address(honkVerifier));
+
         CRISPProgram crisp = new CRISPProgram(
             enclave,
             verifier,
@@ -190,6 +194,7 @@ contract CRISPProgramDeploy is Script {
             checkerFactory,
             policyFactory,
             inputValidatorFactory,
+            honkVerifier,
             ImageID.VOTING_ID
         );
         console2.log("Deployed CRISPProgram to", address(crisp));
