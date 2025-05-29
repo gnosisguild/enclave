@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use async_recursion::async_recursion;
-use git2::FetchOptions;
+use git2::{FetchOptions, IndexAddOption, Repository, Signature};
 use std::env;
 use std::path::Path;
 use tokio::process::Command as TokioCommand;
@@ -10,8 +10,11 @@ pub async fn execute() -> Result<()> {
     let template_folder = "examples/basic";
     let branch = "ry/389-enclave-init-crisp";
     let temp_dir = "/tmp/enclave-basic-example";
+    let cwd = env::current_dir()?;
+    check_empty_folder(&cwd)?;
     clone_repo(github_repo, template_folder, branch, temp_dir).await?;
     Pnpm::run(&["install"]).await?;
+    init_git_repo_if_needed(&cwd).await?;
     Ok(())
 }
 
@@ -51,6 +54,71 @@ impl Pnpm {
     }
 }
 
+fn is_git_repository<P: AsRef<Path>>(dir: P) -> bool {
+    Repository::open(dir.as_ref()).is_ok()
+}
+
+async fn init_git_repo_if_needed<P: AsRef<Path>>(dir: P) -> Result<()> {
+    let dir = dir.as_ref();
+
+    // Check if directory is already a git repository
+    if is_git_repository(dir) {
+        println!("Directory is already a git repository, skipping initialization.");
+        return Ok(());
+    }
+
+    println!("Initializing git repository...");
+
+    // Initialize new git repository
+    let repo = Repository::init(dir)?;
+
+    // Get the repository index
+    let mut index = repo.index()?;
+
+    // Add all files to the index
+    index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None)?;
+    index.write()?;
+
+    // Create the tree from the index
+    let tree_id = index.write_tree()?;
+    let tree = repo.find_tree(tree_id)?;
+
+    // Create signature for the commit
+    let signature = Signature::now("Enclave Init", "developers@enclave.gg")?;
+
+    // Create the initial commit
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        "Initial commit",
+        &tree,
+        &[],
+    )?;
+
+    println!("Git repository initialized with initial commit.");
+    Ok(())
+}
+
+pub fn check_empty_folder<P: AsRef<Path>>(path: P) -> Result<()> {
+    let path = path.as_ref();
+
+    if !path.exists() {
+        bail!("Path '{}' does not exist", path.display());
+    }
+    if !path.is_dir() {
+        bail!("Path '{}' is not a directory", path.display());
+    }
+
+    let mut entries = std::fs::read_dir(path)
+        .map_err(|e| anyhow::anyhow!("Failed to read directory '{}': {}", path.display(), e))?;
+
+    if entries.next().is_some() {
+        bail!("Directory '{}' is not empty", path.display());
+    }
+
+    Ok(())
+}
 async fn clone_repo(
     github_repo: &str,
     template_folder: &str,
