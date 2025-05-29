@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { BroadcastVoteRequest, BroadcastVoteResponse, VoteStateLite, VotingRound } from '@/model/vote.model'
+import { BroadcastVoteRequest, BroadcastVoteResponse, VoteStateLite, VotingRound, EncryptedVote } from '@/model/vote.model'
 import { Poll, PollRequestResult, PollResult } from '@/model/poll.model'
 import { Identity } from '@semaphore-protocol/core'
 
@@ -28,7 +28,7 @@ export type VoteManagementContextType = {
   getPastPolls: () => Promise<void>
   setVotingRound: React.Dispatch<React.SetStateAction<VotingRound | null>>
   setUser: React.Dispatch<React.SetStateAction<{ address: string } | null>>
-  encryptVote: (voteId: bigint, publicKey: Uint8Array) => Promise<Uint8Array | undefined>
+  encryptVote: (voteId: bigint, publicKey: Uint8Array) => Promise<EncryptedVote | undefined>
   registerIdentityOnContract: () => void
   broadcastVote: (vote: BroadcastVoteRequest) => Promise<BroadcastVoteResponse | undefined>
   getRoundStateLite: (roundCount: number) => Promise<void>
