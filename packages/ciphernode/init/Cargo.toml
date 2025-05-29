@@ -1,0 +1,10 @@
+[package]
+name = "enclave-init"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+git2.workspace = true
+async-recursion.workspace = true 
