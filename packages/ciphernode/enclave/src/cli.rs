@@ -195,6 +195,7 @@ pub enum Commands {
         command: NetCommands,
     },
 
+    #[command(hide = true)]
     /// Initialize your ciphernode by setting up a configuration
     Wizard {
         /// An rpc url for enclave to connect to
