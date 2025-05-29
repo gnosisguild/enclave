@@ -12,7 +12,19 @@ pub async fn execute() -> Result<()> {
     let temp_dir = "/tmp/enclave-basic-example";
     let cwd = env::current_dir()?;
     check_empty_folder(&cwd)?;
-    clone_repo(github_repo, template_folder, branch, temp_dir).await?;
+    clone_repo(
+        github_repo,
+        &[
+            (template_folder, "."), // Copy to current directory
+            (
+                "packages/ciphernode/init/templates/support",
+                ".enclave/support",
+            ),
+        ],
+        branch,
+        temp_dir,
+    )
+    .await?;
     Pnpm::run(&["install"]).await?;
     init_git_repo_if_needed(&cwd).await?;
     Ok(())
@@ -119,9 +131,10 @@ pub fn check_empty_folder<P: AsRef<Path>>(path: P) -> Result<()> {
 
     Ok(())
 }
+
 async fn clone_repo(
     github_repo: &str,
-    template_folder: &str,
+    copy_operations: &[(&str, &str)],
     branch: &str,
     temp_dir: &str,
 ) -> Result<()> {
@@ -138,26 +151,52 @@ async fn clone_repo(
     builder.branch(branch);
     builder.clone(github_repo, Path::new(temp_dir))?;
 
-    let source_path = Path::new(temp_dir).join(template_folder);
-
-    if !source_path.exists() {
-        anyhow::bail!(
-            "Template folder '{}' not found in repository",
-            template_folder
-        );
-    }
-
     // Get current working directory
     let cwd = std::env::current_dir()?;
 
-    // Copy contents using async filesystem operations
-    println!("Copying template contents to current directory...");
-    copy_dir_contents_async(&source_path, &cwd).await?;
+    // Perform all copy operations
+    for (source, destination) in copy_operations {
+        let source_path = Path::new(temp_dir).join(source);
+
+        if !source_path.exists() {
+            anyhow::bail!("Source path '{}' not found in repository", source);
+        }
+
+        let destination_path = if *destination == "." {
+            cwd.clone()
+        } else {
+            cwd.join(destination)
+        };
+
+        println!("Copying '{}' to '{}'...", source, destination);
+
+        // Create destination directory if it doesn't exist
+        if let Some(parent) = destination_path.parent() {
+            if !parent.exists() {
+                tokio::fs::create_dir_all(parent).await?;
+            }
+        }
+
+        // If destination is a directory that should contain the contents
+        if source_path.is_dir() {
+            if *destination == "." {
+                // Copy contents to current directory
+                copy_dir_contents_async(&source_path, &destination_path).await?;
+            } else {
+                // Create the destination directory and copy contents
+                tokio::fs::create_dir_all(&destination_path).await?;
+                copy_dir_contents_async(&source_path, &destination_path).await?;
+            }
+        } else {
+            // Copy single file
+            tokio::fs::copy(&source_path, &destination_path).await?;
+        }
+    }
 
     // Clean up temporary directory
     tokio::fs::remove_dir_all(temp_dir).await?;
 
-    println!("Template copied successfully!");
+    println!("All templates copied successfully!");
     Ok(())
 }
 
