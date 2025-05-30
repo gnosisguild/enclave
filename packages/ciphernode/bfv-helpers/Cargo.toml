@@ -1,0 +1,10 @@
+[package]
+name = "e3-bfv-helpers"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+alloy = { version = "0.8.3" , features = ["dyn-abi", "rlp", "serde"] }
+fhe-traits.workspace = true
+fhe_rs.workspace = true
+

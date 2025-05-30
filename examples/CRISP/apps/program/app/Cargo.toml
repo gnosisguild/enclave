@@ -1,0 +1,14 @@
+[package]
+name = "crisp-program"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+actix-web.workspace = true
+env_logger.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+e3-compute-provider.workspace = true
+voting-host.workspace = true
+program-client.workspace = true

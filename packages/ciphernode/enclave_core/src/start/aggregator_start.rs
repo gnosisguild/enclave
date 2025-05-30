@@ -1,4 +1,4 @@
-use actix::{Actor, Addr};
+use actix::Addr;
 use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use anyhow::Result;
 use config::AppConfig;
@@ -56,6 +56,7 @@ pub async fn execute(
             &chain.contracts.enclave.address(),
             &repositories.enclave_sol_reader(read_provider.get_chain_id()),
             chain.contracts.enclave.deploy_block(),
+            chain.rpc_url.clone(),
         )
         .await?;
         RegistryFilterSol::attach(
@@ -70,6 +71,7 @@ pub async fn execute(
             &chain.contracts.ciphernode_registry.address(),
             &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
             chain.contracts.ciphernode_registry.deploy_block(),
+            chain.rpc_url.clone(),
         )
         .await?;
     }

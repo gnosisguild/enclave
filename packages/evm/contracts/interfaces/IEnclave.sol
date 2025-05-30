@@ -82,6 +82,10 @@ interface IEnclave {
     /// @param e3Program The address of the E3 Program.
     event E3ProgramDisabled(IE3Program e3Program);
 
+    /// @notice Emitted when the allowed E3 encryption scheme parameters are configured.
+    /// @param e3ProgramParams Array of encoded encryption scheme parameters (e.g, for BFV)
+    event AllowedE3ProgramsParamsSet(bytes[] e3ProgramParams);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Core Entrypoints                      //

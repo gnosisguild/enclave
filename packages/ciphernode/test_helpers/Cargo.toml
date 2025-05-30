@@ -14,4 +14,4 @@ fhe-traits = { workspace = true }
 rand_chacha = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
-commons = { path = "../../commons" }
+e3-sdk = { workspace = true }

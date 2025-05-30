@@ -27,7 +27,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use config::{RpcAuth, RPC};
 use crypto::Cipher;
 use data::Repository;
-use std::{env, marker::PhantomData, sync::Arc};
+use std::{env, io, marker::PhantomData, sync::Arc};
 use zeroize::Zeroizing;
 pub trait AuthConversions {
     fn to_header_value(&self) -> Option<HeaderValue>;
@@ -79,7 +79,10 @@ where
     T: Transport + Clone,
 {
     pub async fn new(provider: P) -> Result<Self> {
-        let chain_id = provider.get_chain_id().await?;
+        let chain_id = provider
+            .get_chain_id()
+            .await
+            .map_err(|e| handle_conn_refused(e.into()))?;
         Ok(Self {
             provider: Arc::new(provider),
             chain_id,
@@ -127,7 +130,8 @@ impl ProviderConfig {
     async fn create_ws_provider(&self) -> Result<RootProvider<BoxTransport>> {
         Ok(ProviderBuilder::new()
             .on_ws(self.create_ws_connect()?)
-            .await?
+            .await
+            .map_err(|e| handle_conn_refused(e.into()))?
             .boxed())
     }
 
@@ -158,7 +162,7 @@ impl ProviderConfig {
             .wallet(wallet)
             .on_ws(self.create_ws_connect()?)
             .await
-            .context("Failed to create WS signer provider")?;
+            .map_err(|e| handle_conn_refused(e.into()))?;
 
         WithChainId::new(provider).await
     }
@@ -226,6 +230,21 @@ pub async fn get_signer_from_repository(
 
     let signer = private_key.parse()?;
     Ok(Arc::new(signer))
+}
+
+fn handle_conn_refused(err: anyhow::Error) -> anyhow::Error {
+    if err.chain().any(|cause| {
+        cause
+            .downcast_ref::<io::Error>()
+            .is_some_and(|ioe| ioe.kind() == io::ErrorKind::ConnectionRefused)
+    }) {
+        err.context(
+            "Failed to connect to RPC: connection refused. \
+Please ensure your local node is running and that the RPC URL is correct.",
+        )
+    } else {
+        err
+    }
 }
 
 #[cfg(test)]

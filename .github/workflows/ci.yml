@@ -20,6 +20,7 @@ on:
   push:
     branches:
       - main
+      - hacknet
 
 jobs:
   ci:
@@ -46,7 +47,7 @@ jobs:
         run: "pnpm install"
 
       - name: "Lint the code"
-        run: "pnpm lint"
+        run: "pnpm evm:lint"
 
       - name: "Add lint summary"
         run: |

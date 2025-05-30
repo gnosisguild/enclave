@@ -2,6 +2,6 @@
 
 set -e
 
-pushd ./evm && ./scripts/build_fixtures.sh && popd
+./scripts/build_fixtures.sh
 
 cargo test -- $@

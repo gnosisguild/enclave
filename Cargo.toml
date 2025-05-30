@@ -1,0 +1,132 @@
+[workspace]
+members = [
+  "packages/ciphernode/aggregator", 
+  "packages/ciphernode/config",
+  "packages/ciphernode/crypto",
+  "packages/ciphernode/compute-provider",
+  "packages/ciphernode/data",
+  "packages/ciphernode/bfv-helpers",
+  "packages/ciphernode/evm-helpers",
+  "packages/ciphernode/indexer",
+  "packages/ciphernode/e3_request",
+  "packages/ciphernode/enclave",
+  "packages/ciphernode/enclave_core",
+  "packages/ciphernode/events",
+  "packages/ciphernode/evm", 
+  "packages/ciphernode/fhe", 
+  "packages/ciphernode/init", 
+  "packages/ciphernode/keyshare",
+  "packages/ciphernode/logger",
+  "packages/ciphernode/net", 
+  "packages/ciphernode/sdk",
+  "packages/ciphernode/sortition",
+  "packages/ciphernode/test_helpers",
+  "packages/ciphernode/tests",
+]
+exclude = [
+  "examples/CRISP/apps/server",
+  "examples/CRISP/apps/program",
+  "examples/CRISP/apps/wasm-crypto"
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+aggregator = { path = "./packages/ciphernode/aggregator" }
+e3-bfv-helpers = { path = "./packages/ciphernode/bfv-helpers" }
+config = { path = "./packages/ciphernode/config" }
+crypto = { path = "./packages/ciphernode/crypto" }
+data = { path = "./packages/ciphernode/data" }
+e3_request = { path = "./packages/ciphernode/e3_request" }
+e3-sdk = { path = "./packages/ciphernode/sdk" }
+enclave = { path = "./packages/ciphernode/enclave" }
+enclave_core = { path = "./packages/ciphernode/enclave_core" }
+enclave-init = { path = "./packages/ciphernode/init" }
+events = { path = "./packages/ciphernode/events" }
+evm = { path = "./packages/ciphernode/evm" }
+e3-evm-helpers = { path = "./packages/ciphernode/evm-helpers" }
+fhe = { path = "./packages/ciphernode/fhe" }
+e3-indexer = { path = "./packages/ciphernode/indexer" }
+keyshare = { path = "./packages/ciphernode/keyshare" }
+logger = { path = "./packages/ciphernode/logger" }
+net = { path = "./packages/ciphernode/net" }
+sortition = { path = "./packages/ciphernode/sortition" }
+test_helpers = { package = "test-helpers", path = "./packages/ciphernode/test_helpers" }
+tests = { path = "./packages/ciphernode/tests" }
+
+actix = "0.13.5"
+actix-web = "4.10.2"
+aes-gcm = "0.10.3"
+alloy = { version = "0.8.3", features = ["node-bindings", "full"] }
+alloy-primitives = { version = "0.8", default-features = false, features = [
+  "rlp",
+  "serde",
+  "std",
+] }
+alloy-sol-types = "0.8"
+alloy-dyn-abi = "1.1.0"
+argon2 = "0.5.2"
+anyhow = "1.0.86"
+async-std = { version = "1.12", features = ["attributes"] }
+async-trait = "0.1"
+async-recursion = "1.1.1"
+bincode = "1.3.3"
+bloom = "0.3.2"
+bs58 = "0.5.1"
+base64 = "0.22.1"
+clap = { version = "4.5.17", features = ["derive"] }
+compile-time = "0.2.0"
+dirs = "5.0.1"
+dialoguer = "0.11.0"
+eyre = { version = "0.6.12" }
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
+figment = { version = "0.10.19", features = ["yaml", "test"] }
+futures = "0.3.30"
+futures-util = "0.3"
+git2 = "0.20.2"
+hex = "0.4.3"
+lazy_static = "1.5.0"
+num = "0.4.3"
+num-bigint = "0.4.6"
+num-traits = "0.2"
+once_cell = "1.19.0"
+opentelemetry = "0.29.0"
+opentelemetry-otlp = { version = "0.29.0", features = ["grpc-tonic"] }
+opentelemetry_sdk = "0.29.0"
+opentelemetry-stdout = "0.29.0"
+path-clean = "1.0.1"
+petname = "2.0.2"
+phf = { version = "0.11", features = ["macros"] }
+rand_chacha = "0.3.1"
+rand = "0.8.5"
+reqwest = "0.12.15"
+serde = { version = "1.0.208", features = ["derive"] }
+serde_json = "1.0.133"
+sled = "0.34.7"
+serde_yaml = "0.9.34"
+sha2 = "0.10.8"
+shellexpand = "3.1.0"
+tempfile = "3.14.0"
+thiserror =  { version = "1.0.58" }
+tokio = { version = "1.38", features = ["full"] }
+tracing = "0.1.37"
+tracing-opentelemetry = "0.30.0"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
+url = "2.5.4"
+libp2p = { version = "0.54.1", features = [
+  "gossipsub",
+  "identify",
+  "kad",
+  "macros",
+  "mdns",
+  "ping",
+  "quic",
+  "tokio",
+]}
+zeroize = "1.6.0"

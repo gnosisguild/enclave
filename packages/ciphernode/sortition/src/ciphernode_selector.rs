@@ -60,6 +60,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
         let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
+        let chain_id = data.e3_id.chain_id();
 
         Box::pin(async move {
             let seed = data.seed;
@@ -67,6 +68,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
 
             if let Ok(is_selected) = sortition
                 .send(GetHasNode {
+                    chain_id,
                     seed,
                     address: address.clone(),
                     size,

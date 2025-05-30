@@ -1,14 +1,13 @@
-use crate::server::blockchain::relayer::EnclaveContract;
+use crate::server::app_data::AppData;
 use crate::server::config::CONFIG;
-use crate::server::database::get_e3;
 use crate::server::models::{
-    AppState, CTRequest, ComputeProviderParams, CronRequestE3, CurrentRound, JsonResponse,
-    PKRequest,
+    CTRequest, ComputeProviderParams, CronRequestE3, JsonResponse, PKRequest,
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use chrono::Utc;
-use commons::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
+use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
+use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
@@ -49,15 +48,11 @@ async fn request_new_round(data: web::Json<CronRequestE3>) -> impl Responder {
 
 /// Get the current E3 round
 ///
-/// # Arguments
-///
-/// * `AppState` - The application state
-///
 /// # Returns
 ///
 /// * A JSON response containing the current round
-async fn get_current_round(state: web::Data<AppState>) -> impl Responder {
-    match state.sled.get::<CurrentRound>("e3:current_round").await {
+async fn get_current_round(store: web::Data<AppData>) -> impl Responder {
+    match store.current_round().get_current_round().await {
         Ok(Some(current_round)) => HttpResponse::Ok().json(current_round),
         Ok(None) => HttpResponse::NotFound().json(JsonResponse {
             response: "No current round found".to_string(),
@@ -77,14 +72,18 @@ async fn get_current_round(state: web::Data<AppState>) -> impl Responder {
 /// # Returns
 ///
 /// * A JSON response containing the ciphertext
-async fn get_ciphertext(data: web::Json<CTRequest>) -> impl Responder {
+async fn get_ciphertext(data: web::Json<CTRequest>, store: web::Data<AppData>) -> impl Responder {
     let mut incoming = data.into_inner();
 
-    let (state_data, _) = get_e3(incoming.round_id).await.unwrap();
-
-    incoming.ct_bytes = state_data.ciphertext_output;
-
-    HttpResponse::Ok().json(incoming)
+    match store.e3(incoming.round_id).get_ciphertext_output().await {
+        Ok(ct_bytes) => {
+            incoming.ct_bytes = ct_bytes;
+            HttpResponse::Ok().json(incoming)
+        }
+        Err(e) => HttpResponse::InternalServerError().json(JsonResponse {
+            response: format!("Failed to retrieve ciphertext output: {}", e),
+        }),
+    }
 }
 
 /// Get the public key for a given round
@@ -96,14 +95,18 @@ async fn get_ciphertext(data: web::Json<CTRequest>) -> impl Responder {
 /// # Returns
 ///
 /// * A JSON response containing the public key
-async fn get_public_key(data: web::Json<PKRequest>) -> impl Responder {
+async fn get_public_key(data: web::Json<PKRequest>, store: web::Data<AppData>) -> impl Responder {
     let mut incoming = data.into_inner();
 
-    let (state_data, _) = get_e3(incoming.round_id).await.unwrap();
-
-    incoming.pk_bytes = state_data.committee_public_key;
-
-    HttpResponse::Ok().json(incoming)
+    match store.e3(incoming.round_id).get_committee_public_key().await {
+        Ok(pk_bytes) => {
+            incoming.pk_bytes = pk_bytes;
+            HttpResponse::Ok().json(incoming)
+        }
+        Err(e) => HttpResponse::InternalServerError().json(JsonResponse {
+            response: format!("Failed to retrieve public key: {}", e),
+        }),
+    }
 }
 
 /// Initialize a new CRISP round
@@ -115,8 +118,12 @@ async fn get_public_key(data: web::Json<PKRequest>) -> impl Responder {
 /// * A result indicating the success of the operation
 pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Starting new CRISP round!");
-
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await?;
+    let contract = EnclaveContract::new(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.enclave_address,
+    )
+    .await?;
     let e3_program: Address = CONFIG.e3_program_address.parse()?;
 
     // Enable E3 Program
@@ -153,8 +160,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         parallel: CONFIG.e3_compute_provider_parallel,
         batch_size: CONFIG.e3_compute_provider_batch_size,
     };
-    let compute_provider_params =
-        Bytes::from(bincode::serialize(&compute_provider_params).unwrap());
+    let compute_provider_params = Bytes::from(bincode::serialize(&compute_provider_params)?);
     let res = contract
         .request_e3(
             filter,

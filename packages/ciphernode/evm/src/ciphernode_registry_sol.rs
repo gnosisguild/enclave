@@ -22,54 +22,63 @@ sol!(
     "../../evm/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json"
 );
 
-impl From<ICiphernodeRegistry::CiphernodeAdded> for events::CiphernodeAdded {
-    fn from(value: ICiphernodeRegistry::CiphernodeAdded) -> Self {
+struct CiphernodeAddedWithChainId(pub ICiphernodeRegistry::CiphernodeAdded, pub u64);
+
+impl From<CiphernodeAddedWithChainId> for events::CiphernodeAdded {
+    fn from(value: CiphernodeAddedWithChainId) -> Self {
         events::CiphernodeAdded {
-            address: value.node.to_string(),
+            address: value.0.node.to_string(),
             // TODO: limit index and numNodes to uint32 at the solidity level
             index: value
+                .0
                 .index
                 .try_into()
                 .expect("Index exceeds usize capacity"),
             num_nodes: value
+                .0
                 .numNodes
                 .try_into()
                 .expect("NumNodes exceeds usize capacity"),
+            chain_id: value.1,
         }
     }
 }
 
-impl From<ICiphernodeRegistry::CiphernodeAdded> for EnclaveEvent {
-    fn from(value: ICiphernodeRegistry::CiphernodeAdded) -> Self {
+impl From<CiphernodeAddedWithChainId> for EnclaveEvent {
+    fn from(value: CiphernodeAddedWithChainId) -> Self {
         let payload: events::CiphernodeAdded = value.into();
         EnclaveEvent::from(payload)
     }
 }
 
-impl From<ICiphernodeRegistry::CiphernodeRemoved> for events::CiphernodeRemoved {
-    fn from(value: ICiphernodeRegistry::CiphernodeRemoved) -> Self {
+struct CiphernodeRemovedWithChainId(pub ICiphernodeRegistry::CiphernodeRemoved, pub u64);
+impl From<CiphernodeRemovedWithChainId> for events::CiphernodeRemoved {
+    fn from(value: CiphernodeRemovedWithChainId) -> Self {
         events::CiphernodeRemoved {
-            address: value.node.to_string(),
+            address: value.0.node.to_string(),
             index: value
+                .0
                 .index
                 .try_into()
                 .expect("Index exceeds usize capacity"),
             num_nodes: value
+                .0
                 .numNodes
                 .try_into()
                 .expect("NumNodes exceeds usize capacity"),
+            chain_id: value.1,
         }
     }
 }
 
-impl From<ICiphernodeRegistry::CiphernodeRemoved> for EnclaveEvent {
-    fn from(value: ICiphernodeRegistry::CiphernodeRemoved) -> Self {
+impl From<CiphernodeRemovedWithChainId> for EnclaveEvent {
+    fn from(value: CiphernodeRemovedWithChainId) -> Self {
         let payload: events::CiphernodeRemoved = value.into();
         EnclaveEvent::from(payload)
     }
 }
 
-pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<EnclaveEvent> {
+pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
             let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data, true)
@@ -77,7 +86,9 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<Enclave
                 error!("Error parsing event CiphernodeAdded after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(event))
+            Some(EnclaveEvent::from(CiphernodeAddedWithChainId(
+                event, chain_id,
+            )))
         }
         Some(&ICiphernodeRegistry::CiphernodeRemoved::SIGNATURE_HASH) => {
             let Ok(event) = ICiphernodeRegistry::CiphernodeRemoved::decode_log_data(data, true)
@@ -85,7 +96,9 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, _: u64) -> Option<Enclave
                 error!("Error parsing event CiphernodeRemoved after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(event))
+            Some(EnclaveEvent::from(CiphernodeRemovedWithChainId(
+                event, chain_id,
+            )))
         }
 
         _topic => {
@@ -107,6 +120,7 @@ impl CiphernodeRegistrySolReader {
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
+        rpc_url: String,
     ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
         let addr = EvmEventReader::attach(
             provider,
@@ -115,6 +129,7 @@ impl CiphernodeRegistrySolReader {
             start_block,
             &bus.clone().into(),
             repository,
+            rpc_url,
         )
         .await?;
 
@@ -133,6 +148,7 @@ impl CiphernodeRegistrySol {
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
+        rpc_url: String,
     ) -> Result<()> {
         CiphernodeRegistrySolReader::attach(
             bus,
@@ -140,6 +156,7 @@ impl CiphernodeRegistrySol {
             contract_address,
             repository,
             start_block,
+            rpc_url,
         )
         .await?;
         // TODO: Writer if needed

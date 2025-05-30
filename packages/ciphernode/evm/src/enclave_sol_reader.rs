@@ -7,7 +7,7 @@ use alloy::transports::BoxTransport;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use data::Repository;
-use events::{EnclaveEvent, EventBus};
+use events::{E3id, EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 
 sol!(
@@ -24,8 +24,7 @@ impl From<E3RequestedWithChainId> for events::E3Requested {
             params: value.0.e3.e3ProgramParams.to_vec(),
             threshold_m: value.0.e3.threshold[0] as usize,
             seed: value.0.e3.seed.into(),
-            e3_id: value.0.e3Id.to_string().into(),
-            src_chain_id: value.1,
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
         }
     }
 }
@@ -37,17 +36,19 @@ impl From<E3RequestedWithChainId> for EnclaveEvent {
     }
 }
 
-impl From<IEnclave::CiphertextOutputPublished> for events::CiphertextOutputPublished {
-    fn from(value: IEnclave::CiphertextOutputPublished) -> Self {
+struct CiphertextOutputPublishedWithChainId(pub IEnclave::CiphertextOutputPublished, pub u64);
+
+impl From<CiphertextOutputPublishedWithChainId> for events::CiphertextOutputPublished {
+    fn from(value: CiphertextOutputPublishedWithChainId) -> Self {
         events::CiphertextOutputPublished {
-            e3_id: value.e3Id.to_string().into(),
-            ciphertext_output: value.ciphertextOutput.to_vec(),
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
+            ciphertext_output: value.0.ciphertextOutput.to_vec(),
         }
     }
 }
 
-impl From<IEnclave::CiphertextOutputPublished> for EnclaveEvent {
-    fn from(value: IEnclave::CiphertextOutputPublished) -> Self {
+impl From<CiphertextOutputPublishedWithChainId> for EnclaveEvent {
+    fn from(value: CiphertextOutputPublishedWithChainId) -> Self {
         let payload: events::CiphertextOutputPublished = value.into();
         EnclaveEvent::from(payload)
     }
@@ -67,7 +68,9 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event CiphertextOutputPublished after topic matched!"); // TODO: provide more info
                 return None;
             };
-            Some(EnclaveEvent::from(event))
+            Some(EnclaveEvent::from(CiphertextOutputPublishedWithChainId(
+                event, chain_id,
+            )))
         }
 
         _topic => {
@@ -90,6 +93,7 @@ impl EnclaveSolReader {
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
+        rpc_url: String,
     ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
         let addr = EvmEventReader::attach(
             provider,
@@ -98,6 +102,7 @@ impl EnclaveSolReader {
             start_block,
             &bus.clone(),
             repository,
+            rpc_url,
         )
         .await?;
 

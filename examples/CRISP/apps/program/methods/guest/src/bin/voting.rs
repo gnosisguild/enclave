@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 use bincode::deserialize;
-use compute_provider::{ComputeInput, ComputeResult};
+use e3_compute_provider::{ComputeInput, ComputeResult};
 use risc0_zkvm::guest::env;
 use std::io::Read;
 use voting_core::fhe_processor;

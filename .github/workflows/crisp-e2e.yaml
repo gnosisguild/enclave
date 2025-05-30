@@ -1,15 +1,12 @@
 name: CRISP
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "examples/CRISP/**"
+  workflow_dispatch:
   pull_request:
-    branches: [main]
-    paths:
-      - "examples/CRISP/**"
-  workflow_dispatch: # Allow manual triggering
+  push:
+    branches:
+      - main
+      - hacknet
 
 jobs:
   test:

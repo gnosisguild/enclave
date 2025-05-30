@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["host", "core", "methods"]
+members = ["host", "core", "methods", "app", "client"]
 exclude = ["methods/guests"]
 
 [workspace.package]
@@ -11,6 +11,7 @@ edition = "2021"
 voting-host = { path = "./host" }
 voting-core = { path = "./core" }
 methods = { path = "./methods" }
+program-client = { path = "./client" }
 
 alloy-primitives = { version = "0.8", default-features = false, features = [
     "rlp",
@@ -19,20 +20,24 @@ alloy-primitives = { version = "0.8", default-features = false, features = [
 ]}
 alloy-sol-types = { version = "0.8" }
 anyhow = { version = "1.0.86" }
+actix-web = "4.10.2"
 bincode = { version = "1.3.3" }
 bytemuck = { version = "1" }
+env_logger = "0.11.5"
 hex = { version = "0.4.3" }
 log = { version = "0.4" }
+reqwest = { version = "0.12.15", features = ["json"] }
 risc0-build = { version = "2.0.1", features = ["docker"] }
 risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0" }
 risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.0.0" }
 risc0-zkvm = { version = "2.0.0" }
 risc0-zkp = { version = "2.0.0", default-features = false }
 serde = { version = "1.0.208", features = ["derive", "std"] }
-fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "feature/greco-integration" }
-compute-provider = { path = "../../../../packages/compute_provider" }
+serde_json = "1.0.133"
+fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
+e3-compute-provider = { path = "../../../../packages/ciphernode/compute-provider" }
 tokio = { version = "1.38", features = ["full"] }
 rand = { version = "0.8.5" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
