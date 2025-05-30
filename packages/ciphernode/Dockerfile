@@ -45,8 +45,6 @@ COPY ./packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
 COPY ./packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
 COPY ./packages/ciphernode/rust-toolchain.toml .
 
-# Copy e3-sdk package
-
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
             mkdir -p "$d/src" && \
