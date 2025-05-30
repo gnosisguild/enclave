@@ -59,6 +59,7 @@ COPY packages/ciphernode/aggregator/Cargo.toml packages/ciphernode/aggregator/Ca
 COPY packages/ciphernode/bfv-helpers/Cargo.toml packages/ciphernode/bfv-helpers/Cargo.toml
 COPY packages/ciphernode/Cargo.lock packages/ciphernode/Cargo.lock
 COPY packages/ciphernode/Cargo.toml packages/ciphernode/Cargo.toml
+COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/Cargo.toml
 COPY packages/ciphernode/config/Cargo.toml packages/ciphernode/config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml packages/ciphernode/crypto/Cargo.toml
 COPY packages/ciphernode/data/Cargo.toml packages/ciphernode/data/Cargo.toml
@@ -78,6 +79,7 @@ COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/Cargo.toml
 COPY packages/ciphernode/sortition/Cargo.toml packages/ciphernode/sortition/Cargo.toml
 COPY packages/ciphernode/test_helpers/Cargo.toml packages/ciphernode/test_helpers/Cargo.toml
 COPY packages/ciphernode/tests/Cargo.toml packages/ciphernode/tests/Cargo.toml
+
 
 COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/
 
