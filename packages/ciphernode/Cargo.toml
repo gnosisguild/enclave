@@ -1,19 +1,23 @@
 [workspace]
 members = [
-  "aggregator", "bfv-helpers",
+  "aggregator", 
   "config",
   "crypto",
   "data",
+  "bfv-helpers",
+  "evm-helpers",
+  "indexer",
   "e3_request",
   "enclave",
   "enclave_core",
   "events",
-  "evm", "evm-helpers",
-  "fhe", "indexer",
+  "evm", 
+  "fhe", 
   "init", 
   "keyshare",
   "logger",
-  "net", "sdk",
+  "net", 
+  "sdk",
   "sortition",
   "test_helpers",
   "tests",
@@ -26,19 +30,20 @@ edition = "2021"
 
 [workspace.dependencies]
 aggregator = { path = "./aggregator" }
-bfv-helpers = { path = "./bfv-helpers" }
+e3-bfv-helpers = { path = "./bfv-helpers" }
 config = { path = "./config" }
 crypto = { path = "./crypto" }
 data = { path = "./data" }
 e3_request = { path = "./e3_request" }
+e3-sdk = { path = "./sdk" }
 enclave = { path = "./enclave" }
 enclave_core = { path = "./enclave_core" }
 enclave-init = { path = "./init" }
 events = { path = "./events" }
 evm = { path = "./evm" }
-evm-helpers = { path = "./evm-helpers" }
+e3-evm-helpers = { path = "./evm-helpers" }
 fhe = { path = "./fhe" }
-indexer = { path = "./indexer" }
+e3-indexer = { path = "./indexer" }
 keyshare = { path = "./keyshare" }
 logger = { path = "./logger" }
 net = { path = "./net" }

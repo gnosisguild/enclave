@@ -1,9 +1,9 @@
 [package]
-name = "sdk"
+name = "e3-sdk"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-evm-helpers.workspace = true
-bfv-helpers.workspace = true
-indexer.workspace = true
+e3-evm-helpers.workspace = true
+e3-bfv-helpers.workspace = true
+e3-indexer.workspace = true

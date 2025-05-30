@@ -5,7 +5,7 @@ use alloy::{
 };
 use eyre::Result;
 use helpers::setup_fake_enclave;
-use indexer::{DataStore, EnclaveIndexer, InMemoryStore};
+use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use std::time::Duration;
 use tokio::time::sleep;
 use Enclave::InputPublished;
