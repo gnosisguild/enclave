@@ -6,8 +6,8 @@ use crate::server::models::{
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use chrono::Utc;
-use enclave_sdk::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
-use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
+use e3_sdk::bfv::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
+use e3_sdk::evm::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {

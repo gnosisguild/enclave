@@ -30,4 +30,4 @@ bincode = { workspace = true }
 base64 = { workspace = true }
 actix = { workspace = true }
 anyhow = { workspace = true }
-enclave-sdk = { path = "../../enclave-sdk" }
+e3-sdk = { path = "../../e3-sdk" }

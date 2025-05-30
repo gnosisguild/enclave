@@ -31,7 +31,8 @@ COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
 COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
 COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
-COPY packages/enclave-sdk/Cargo.toml packages/enclave-sdk/
+COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/
+COPY packages/ciphernode/Cargo.toml packages/ciphernode/Cargo.lock packages/ciphernode/
 COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server
@@ -52,13 +53,13 @@ COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
 COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
 COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
-COPY packages/enclave-sdk/Cargo.toml packages/enclave-sdk/
+COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/
 COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 
 RUN set -eux; \
     find \
     examples/CRISP/apps/program \
-    packages/enclave-sdk \
+    packages/ciphernode \
     packages/compute_provider \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
     | while IFS= read -r -d '' manifest_path; do \
@@ -88,7 +89,7 @@ WORKDIR /app
 
 COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
 COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
-COPY packages/enclave-sdk/          packages/enclave-sdk/
+COPY packages/ciphernode/sdk/       packages/ciphernode/sdk/
 COPY packages/compute_provider/     packages/compute_provider/
 
 WORKDIR /app/examples/CRISP/apps/server

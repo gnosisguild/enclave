@@ -12,7 +12,7 @@ use actix_cors::Cors;
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use app_data::AppData;
 use database::SledDB;
-use enclave_sdk::indexer::SharedStore;
+use e3_sdk::indexer::SharedStore;
 use eyre::OptionExt;
 use indexer::start_indexer;
 use tokio::sync::RwLock;

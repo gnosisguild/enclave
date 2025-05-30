@@ -10,7 +10,7 @@ use alloy::{
     dyn_abi::DynSolValue,
     primitives::{Bytes, U256},
 };
-use enclave_sdk::evm::contracts::{EnclaveContract, EnclaveWrite};
+use e3_sdk::evm::contracts::{EnclaveContract, EnclaveWrite};
 use eyre::Error;
 use log::{error, info};
 

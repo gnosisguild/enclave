@@ -6,7 +6,7 @@ use crypto::Cipher;
 use data::RepositoriesFactory;
 use data::{DataStore, InMemStore};
 use e3_request::E3Router;
-use enclave_sdk::bfv::{encode_bfv_params, params::SET_2048_1032193_1};
+use e3_sdk::bfv::{encode_bfv_params, params::SET_2048_1032193_1};
 use events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig,

@@ -26,6 +26,7 @@ edition = "2021"
 
 [workspace.dependencies]
 aggregator = { path = "./aggregator" }
+bfv-helpers = { path = "./bfv-helpers" }
 config = { path = "./config" }
 crypto = { path = "./crypto" }
 data = { path = "./data" }
