@@ -22,6 +22,7 @@ self.onmessage = async function (event) {
                 }
                 const result = encryptInstance.encrypt_vote(voteId, publicKey);
                 const circuitInputs = JSON.parse(result.circuit_inputs);
+                console.log('vote generated', circuitInputs);
                 self.postMessage({
                     type: 'encrypt_vote',
                     success: true,
