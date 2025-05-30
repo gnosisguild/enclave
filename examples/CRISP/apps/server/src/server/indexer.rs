@@ -2,7 +2,7 @@ use crate::server::{
     models::CurrentRound,
     repo::{CrispE3Repository, CurrentRoundRepository},
 };
-use compute_provider::FHEInputs;
+use e3_compute_provider::FHEInputs;
 use e3_sdk::{
     evm_helpers::{
         contracts::{

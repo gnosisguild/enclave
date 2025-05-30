@@ -15,7 +15,7 @@ To use this library, add it to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-compute-provider = { git = "https://github.com/gnosisguild/enclave.git", path = "packages/compute_provider"}
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave.git", path = "packages/ciphernode/compute-provider"}
 ```
 
 ## Usage
@@ -28,7 +28,7 @@ To use the library, follow these steps:
 
 ```rust
 use anyhow::Result;
-use compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
+use e3_compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
 use voting_core::fhe_processor;
 
 // Define your Risc0Provider struct and implement the ComputeProvider trait
@@ -40,13 +40,12 @@ pub fn run_compute(params: FHEInputs) -> Result<(Risc0Output, Vec<u8>)> {
 }
 ```
 
-
 ## Risc0 Example
 
 Here's a more detailed example of how to use the Compute Manager with Risc0:
 
 ```rust
-use compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
+use e3_compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
 use methods::VOTING_ELF;
 use risc0_ethereum_contracts::groth16;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};
@@ -72,7 +71,6 @@ pub fn run_compute(params: FHEInputs) -> Result<(Risc0Output, Vec<u8>)> {
     Ok(output)
 }
 ```
-
 
 This example demonstrates how to create a Risc0Provider, use it with the ComputeManager, and measure the execution time of the computation.
 
