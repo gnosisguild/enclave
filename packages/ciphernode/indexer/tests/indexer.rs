@@ -3,9 +3,9 @@ use alloy::{
     primitives::{Bytes, Uint},
     sol,
 };
+use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
 use helpers::setup_fake_enclave;
-use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use std::time::Duration;
 use tokio::time::sleep;
 use Enclave::InputPublished;

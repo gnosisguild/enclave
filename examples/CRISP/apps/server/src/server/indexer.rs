@@ -4,7 +4,7 @@ use crate::server::{
 };
 use compute_provider::FHEInputs;
 use e3_sdk::{
-    evm::{
+    evm_helpers::{
         contracts::{
             EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveWrite, ReadWrite,
         },
