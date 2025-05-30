@@ -2,6 +2,6 @@
 
 set -e
 
-./scripts/build_fixtures.sh
+# ./scripts/build_fixtures.sh
 
 cargo fmt -- --check
