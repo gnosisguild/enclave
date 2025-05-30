@@ -67,6 +67,13 @@ async fn broadcast_encrypted_vote(
     let e3_id = U256::from(vote.round_id);
     let params_value = DynSolValue::Tuple(vec![
         DynSolValue::Bytes(vote.proof_sem),
+        DynSolValue::Bytes(vote.proof),
+        DynSolValue::Array(
+            vote.public_inputs
+                .into_iter()
+                .map(|pi_array_u8| DynSolValue::FixedBytes(pi_array_u8.into(), 32))
+                .collect(),
+        ),
         DynSolValue::Bytes(vote.enc_vote_bytes),
     ]);
 

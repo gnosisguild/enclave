@@ -27,7 +27,7 @@ self.onmessage = async function (event) {
                     type: 'encrypt_vote',
                     success: true,
                     encryptedVote: {
-                        vote: result.vote,
+                        vote: result.encrypted_vote,
                         circuitInputs,
                     },
                 });
