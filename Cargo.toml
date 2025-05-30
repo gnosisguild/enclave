@@ -24,7 +24,9 @@ members = [
   "packages/ciphernode/tests",
 ]
 exclude = [
-  "examples/**/*"
+  "app/examples/CRISP/apps/server"
+  "app/examples/CRISP/apps/program"
+  "app/examples/CRISP/apps/wasm-crypto"
 ]
 resolver = "2"
 
