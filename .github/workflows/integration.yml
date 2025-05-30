@@ -49,10 +49,10 @@ jobs:
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
 
-      - name: Install Rust 1.81.0
+      - name: Install Rust 1.85.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.81.0
+          toolchain: 1.85.0
           override: true
 
       - name: Cache node modules
@@ -83,9 +83,9 @@ jobs:
         with:
           name: build-artifacts
           path: |
-            packages/ciphernode/target/debug/enclave
-            packages/ciphernode/target/debug/fake_encrypt
-            packages/ciphernode/target/debug/pack_e3_params
+            target/debug/enclave
+            target/debug/fake_encrypt
+            target/debug/pack_e3_params
 
   test:
     needs: prebuild
@@ -107,10 +107,10 @@ jobs:
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
 
-      - name: Install Rust 1.81.0
+      - name: Install Rust 1.85.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.81.0
+          toolchain: 1.85.0
           override: true
 
       - name: Cache node modules
@@ -126,13 +126,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts
-          path: packages/ciphernode/target/debug/
+          path: target/debug/
 
       - name: "Set executable permissions"
         run: |
-          chmod +x packages/ciphernode/target/debug/enclave
-          chmod +x packages/ciphernode/target/debug/fake_encrypt
-          chmod +x packages/ciphernode/target/debug/pack_e3_params
+          chmod +x target/debug/enclave
+          chmod +x target/debug/fake_encrypt
+          chmod +x target/debug/pack_e3_params
 
       - name: "Run ${{ matrix.test-suite }} tests"
         run: "pnpm test:integration ${{ matrix.test-suite }} --no-prebuild"
