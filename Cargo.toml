@@ -24,7 +24,7 @@ members = [
   "packages/ciphernode/tests",
 ]
 exclude = [
-    "examples/**/*"
+  "examples/**/*"
 ]
 resolver = "2"
 
