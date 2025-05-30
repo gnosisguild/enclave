@@ -18,7 +18,7 @@
     "coverage": "pnpm evm:coverage",
     "prepare": "husky",
     "enclave": "cd packages/ciphernode && ./scripts/launch.sh",
-    "ciphernode:lint": "cd packages/ciphernode && cargo fmt -- --check",
+    "ciphernode:lint": "cd packages/ciphernode && ./scripts/lint.sh",
     "ciphernode:add": "cd packages/evm && pnpm ciphernode:add",
     "ciphernode:remove": "cd packages/evm && pnpm ciphernode:remove",
     "ciphernode:test": "cd packages/ciphernode && ./scripts/test.sh",
