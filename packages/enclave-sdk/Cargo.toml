@@ -40,4 +40,4 @@ full = [
   "futures-util",
   "chrono"
 ]
-risc0 = ["alloy/dyn-abi", "alloy/rlp", "alloy/serde"]
+risc0 = ["alloy/dyn-abi", "alloy/std"]

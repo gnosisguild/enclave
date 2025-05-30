@@ -1,18 +1,18 @@
 services:
   enclave-dev:
-    user: devuser
+    user: ubuntu
     platform: linux/amd64
     build:
       context: .
       args:
         USER_UID: ${USER_UID:-1000}
         USER_GID: ${USER_GID:-1000}
-        USERNAME: devuser
+        USERNAME: ubuntu
     volumes:
       - ../..:/app
       - git-folder:/app/.git
-      - cargo-bin:/home/devuser/.cargo/bin
-      - cargo-registry:/home/devuser/.cargo/registry
+      - cargo-bin:/home/ubuntu/.cargo/bin
+      - cargo-registry:/home/ubuntu/.cargo/registry
       - server-target:/app/examples/CRISP/apps/server/target
       - evm-node-modules:/app/packages/evm/node_modules
       - root-node-modules:/app/node_modules
@@ -27,8 +27,8 @@ services:
       - "4000:4000"
     command: >
       /bin/bash -c '
-      sudo chown -R devuser:devuser /app &&
-      sudo chown -R devuser:devuser /home/devuser &&
+      sudo chown -R ubuntu:ubuntu /app &&
+      sudo chown -R ubuntu:ubuntu /home/ubuntu &&
       tail -f /dev/null
       '
 
