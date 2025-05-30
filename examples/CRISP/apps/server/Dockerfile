@@ -54,30 +54,30 @@ COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/hos
 COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
 
-#  find ./packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n"
-COPY ./packages/ciphernode/aggregator/Cargo.toml ./packages/ciphernode/aggregator/Cargo.toml
-COPY ./packages/ciphernode/bfv-helpers/Cargo.toml ./packages/ciphernode/bfv-helpers/Cargo.toml
-COPY ./packages/ciphernode/Cargo.lock ./packages/ciphernode/Cargo.lock
-COPY ./packages/ciphernode/Cargo.toml ./packages/ciphernode/Cargo.toml
-COPY ./packages/ciphernode/config/Cargo.toml ./packages/ciphernode/config/Cargo.toml
-COPY ./packages/ciphernode/crypto/Cargo.toml ./packages/ciphernode/crypto/Cargo.toml
-COPY ./packages/ciphernode/data/Cargo.toml ./packages/ciphernode/data/Cargo.toml
-COPY ./packages/ciphernode/e3_request/Cargo.toml ./packages/ciphernode/e3_request/Cargo.toml
-COPY ./packages/ciphernode/enclave/Cargo.toml ./packages/ciphernode/enclave/Cargo.toml
-COPY ./packages/ciphernode/enclave_core/Cargo.toml ./packages/ciphernode/enclave_core/Cargo.toml
-COPY ./packages/ciphernode/events/Cargo.toml ./packages/ciphernode/events/Cargo.toml
-COPY ./packages/ciphernode/evm/Cargo.toml ./packages/ciphernode/evm/Cargo.toml
-COPY ./packages/ciphernode/evm-helpers/Cargo.toml ./packages/ciphernode/evm-helpers/Cargo.toml
-COPY ./packages/ciphernode/fhe/Cargo.toml ./packages/ciphernode/fhe/Cargo.toml
-COPY ./packages/ciphernode/indexer/Cargo.toml ./packages/ciphernode/indexer/Cargo.toml
-COPY ./packages/ciphernode/init/Cargo.toml ./packages/ciphernode/init/Cargo.toml
-COPY ./packages/ciphernode/keyshare/Cargo.toml ./packages/ciphernode/keyshare/Cargo.toml
-COPY ./packages/ciphernode/logger/Cargo.toml ./packages/ciphernode/logger/Cargo.toml
-COPY ./packages/ciphernode/net/Cargo.toml ./packages/ciphernode/net/Cargo.toml
-COPY ./packages/ciphernode/sdk/Cargo.toml ./packages/ciphernode/sdk/Cargo.toml
-COPY ./packages/ciphernode/sortition/Cargo.toml ./packages/ciphernode/sortition/Cargo.toml
-COPY ./packages/ciphernode/test_helpers/Cargo.toml ./packages/ciphernode/test_helpers/Cargo.toml
-COPY ./packages/ciphernode/tests/Cargo.toml ./packages/ciphernode/tests/Cargo.toml
+# find packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n"
+COPY packages/ciphernode/aggregator/Cargo.toml packages/ciphernode/aggregator/Cargo.toml
+COPY packages/ciphernode/bfv-helpers/Cargo.toml packages/ciphernode/bfv-helpers/Cargo.toml
+COPY packages/ciphernode/Cargo.lock packages/ciphernode/Cargo.lock
+COPY packages/ciphernode/Cargo.toml packages/ciphernode/Cargo.toml
+COPY packages/ciphernode/config/Cargo.toml packages/ciphernode/config/Cargo.toml
+COPY packages/ciphernode/crypto/Cargo.toml packages/ciphernode/crypto/Cargo.toml
+COPY packages/ciphernode/data/Cargo.toml packages/ciphernode/data/Cargo.toml
+COPY packages/ciphernode/e3_request/Cargo.toml packages/ciphernode/e3_request/Cargo.toml
+COPY packages/ciphernode/enclave/Cargo.toml packages/ciphernode/enclave/Cargo.toml
+COPY packages/ciphernode/enclave_core/Cargo.toml packages/ciphernode/enclave_core/Cargo.toml
+COPY packages/ciphernode/events/Cargo.toml packages/ciphernode/events/Cargo.toml
+COPY packages/ciphernode/evm/Cargo.toml packages/ciphernode/evm/Cargo.toml
+COPY packages/ciphernode/evm-helpers/Cargo.toml packages/ciphernode/evm-helpers/Cargo.toml
+COPY packages/ciphernode/fhe/Cargo.toml packages/ciphernode/fhe/Cargo.toml
+COPY packages/ciphernode/indexer/Cargo.toml packages/ciphernode/indexer/Cargo.toml
+COPY packages/ciphernode/init/Cargo.toml packages/ciphernode/init/Cargo.toml
+COPY packages/ciphernode/keyshare/Cargo.toml packages/ciphernode/keyshare/Cargo.toml
+COPY packages/ciphernode/logger/Cargo.toml packages/ciphernode/logger/Cargo.toml
+COPY packages/ciphernode/net/Cargo.toml packages/ciphernode/net/Cargo.toml
+COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/Cargo.toml
+COPY packages/ciphernode/sortition/Cargo.toml packages/ciphernode/sortition/Cargo.toml
+COPY packages/ciphernode/test_helpers/Cargo.toml packages/ciphernode/test_helpers/Cargo.toml
+COPY packages/ciphernode/tests/Cargo.toml packages/ciphernode/tests/Cargo.toml
 
 COPY packages/compute_provider/Cargo.toml packages/compute_provider/
 
@@ -115,30 +115,31 @@ WORKDIR /app
 COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
 COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
 
-#  find ./packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n"
-COPY ./packages/ciphernode/aggregator/Cargo.toml ./packages/ciphernode/aggregator/Cargo.toml
-COPY ./packages/ciphernode/bfv-helpers/Cargo.toml ./packages/ciphernode/bfv-helpers/Cargo.toml
-COPY ./packages/ciphernode/Cargo.lock ./packages/ciphernode/Cargo.lock
-COPY ./packages/ciphernode/Cargo.toml ./packages/ciphernode/Cargo.toml
-COPY ./packages/ciphernode/config/Cargo.toml ./packages/ciphernode/config/Cargo.toml
-COPY ./packages/ciphernode/crypto/Cargo.toml ./packages/ciphernode/crypto/Cargo.toml
-COPY ./packages/ciphernode/data/Cargo.toml ./packages/ciphernode/data/Cargo.toml
-COPY ./packages/ciphernode/e3_request/Cargo.toml ./packages/ciphernode/e3_request/Cargo.toml
-COPY ./packages/ciphernode/enclave/Cargo.toml ./packages/ciphernode/enclave/Cargo.toml
-COPY ./packages/ciphernode/enclave_core/Cargo.toml ./packages/ciphernode/enclave_core/Cargo.toml
-COPY ./packages/ciphernode/events/Cargo.toml ./packages/ciphernode/events/Cargo.toml
-COPY ./packages/ciphernode/evm/Cargo.toml ./packages/ciphernode/evm/Cargo.toml
-COPY ./packages/ciphernode/evm-helpers/Cargo.toml ./packages/ciphernode/evm-helpers/Cargo.toml
-COPY ./packages/ciphernode/fhe/Cargo.toml ./packages/ciphernode/fhe/Cargo.toml
-COPY ./packages/ciphernode/indexer/Cargo.toml ./packages/ciphernode/indexer/Cargo.toml
-COPY ./packages/ciphernode/init/Cargo.toml ./packages/ciphernode/init/Cargo.toml
-COPY ./packages/ciphernode/keyshare/Cargo.toml ./packages/ciphernode/keyshare/Cargo.toml
-COPY ./packages/ciphernode/logger/Cargo.toml ./packages/ciphernode/logger/Cargo.toml
-COPY ./packages/ciphernode/net/Cargo.toml ./packages/ciphernode/net/Cargo.toml
-COPY ./packages/ciphernode/sdk/Cargo.toml ./packages/ciphernode/sdk/Cargo.toml
-COPY ./packages/ciphernode/sortition/Cargo.toml ./packages/ciphernode/sortition/Cargo.toml
-COPY ./packages/ciphernode/test_helpers/Cargo.toml ./packages/ciphernode/test_helpers/Cargo.toml
-COPY ./packages/ciphernode/tests/Cargo.toml ./packages/ciphernode/tests/Cargo.toml
+# find packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n"
+COPY packages/ciphernode/aggregator/Cargo.toml packages/ciphernode/aggregator/Cargo.toml
+COPY packages/ciphernode/bfv-helpers/Cargo.toml packages/ciphernode/bfv-helpers/Cargo.toml
+COPY packages/ciphernode/Cargo.lock packages/ciphernode/Cargo.lock
+COPY packages/ciphernode/Cargo.toml packages/ciphernode/Cargo.toml
+COPY packages/ciphernode/config/Cargo.toml packages/ciphernode/config/Cargo.toml
+COPY packages/ciphernode/crypto/Cargo.toml packages/ciphernode/crypto/Cargo.toml
+COPY packages/ciphernode/data/Cargo.toml packages/ciphernode/data/Cargo.toml
+COPY packages/ciphernode/e3_request/Cargo.toml packages/ciphernode/e3_request/Cargo.toml
+COPY packages/ciphernode/enclave/Cargo.toml packages/ciphernode/enclave/Cargo.toml
+COPY packages/ciphernode/enclave_core/Cargo.toml packages/ciphernode/enclave_core/Cargo.toml
+COPY packages/ciphernode/events/Cargo.toml packages/ciphernode/events/Cargo.toml
+COPY packages/ciphernode/evm/Cargo.toml packages/ciphernode/evm/Cargo.toml
+COPY packages/ciphernode/evm-helpers/Cargo.toml packages/ciphernode/evm-helpers/Cargo.toml
+COPY packages/ciphernode/fhe/Cargo.toml packages/ciphernode/fhe/Cargo.toml
+COPY packages/ciphernode/indexer/Cargo.toml packages/ciphernode/indexer/Cargo.toml
+COPY packages/ciphernode/init/Cargo.toml packages/ciphernode/init/Cargo.toml
+COPY packages/ciphernode/keyshare/Cargo.toml packages/ciphernode/keyshare/Cargo.toml
+COPY packages/ciphernode/logger/Cargo.toml packages/ciphernode/logger/Cargo.toml
+COPY packages/ciphernode/net/Cargo.toml packages/ciphernode/net/Cargo.toml
+COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/Cargo.toml
+COPY packages/ciphernode/sortition/Cargo.toml packages/ciphernode/sortition/Cargo.toml
+COPY packages/ciphernode/test_helpers/Cargo.toml packages/ciphernode/test_helpers/Cargo.toml
+COPY packages/ciphernode/tests/Cargo.toml packages/ciphernode/tests/Cargo.toml
+
 
 COPY packages/compute_provider/     packages/compute_provider/
 
