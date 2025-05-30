@@ -23,6 +23,9 @@ members = [
   "packages/ciphernode/test_helpers",
   "packages/ciphernode/tests",
 ]
+exclude = [
+    "examples/**/*"
+]
 resolver = "2"
 
 [workspace.package]
