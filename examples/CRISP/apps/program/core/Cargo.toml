@@ -7,4 +7,4 @@ edition = { workspace = true }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 compute-provider = { path = "../../../../../packages/compute_provider" }
-enclave-sdk = { path = "../../../../../packages/enclave-sdk", default-features = false, features = ["risc0"] }
+e3-bfv-helpers = { path = "../../../../../packages/ciphernode/bfv-helpers" }

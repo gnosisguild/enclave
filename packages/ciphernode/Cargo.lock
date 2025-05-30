@@ -2344,6 +2344,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "e3-bfv-helpers"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "fhe 0.1.0-beta.7",
+ "fhe-traits",
+]
+
+[[package]]
 name = "e3_request"
 version = "0.1.0"
 dependencies = [
@@ -2635,6 +2644,18 @@ dependencies = [
  "tracing",
  "url",
  "zeroize",
+]
+
+[[package]]
+name = "evm-helpers"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "async-trait",
+ "eyre",
+ "futures",
+ "futures-util",
+ "tokio",
 ]
 
 [[package]]
@@ -3716,6 +3737,20 @@ name = "indenter"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce23b50ad8242c51a442f3ff322d56b02f08852c77e4c0b4d3fd684abc89c683"
+
+[[package]]
+name = "indexer"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "async-trait",
+ "bincode",
+ "evm-helpers",
+ "eyre",
+ "serde",
+ "thiserror 1.0.69",
+ "tokio",
+]
 
 [[package]]
 name = "indexmap"
@@ -6183,6 +6218,10 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "sdk"
+version = "0.1.0"
 
 [[package]]
 name = "sec1"
