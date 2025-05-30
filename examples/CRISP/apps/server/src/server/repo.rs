@@ -3,7 +3,7 @@ use super::{
     models::{CurrentRound, E3Crisp, E3StateLite, WebResultRequest},
 };
 use chrono::Utc;
-use enclave_sdk::indexer::{models::E3 as EnclaveE3, DataStore, E3Repository, SharedStore};
+use e3_sdk::indexer::{models::E3 as EnclaveE3, DataStore, E3Repository, SharedStore};
 use eyre::Result;
 use log::info;
 

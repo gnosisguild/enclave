@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use enclave_sdk::indexer::SharedStore;
+use e3_sdk::indexer::SharedStore;
 use tokio::sync::RwLock;
 
 use super::{

@@ -1,5 +1,5 @@
 use super::SharedRng;
-use enclave_sdk::bfv::build_bfv_params_arc;
+use e3_bfv_helpers::build_bfv_params_arc;
 use fhe_rs::bfv::BfvParameters;
 use fhe_rs::mbfv::CommonRandomPoly;
 use fhe_traits::Serialize;

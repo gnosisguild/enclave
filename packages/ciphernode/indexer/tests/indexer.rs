@@ -3,7 +3,7 @@ use alloy::{
     primitives::{Bytes, Uint},
     sol,
 };
-use enclave_sdk::indexer::{DataStore, EnclaveIndexer, InMemoryStore};
+use e3_indexer::{DataStore, EnclaveIndexer, InMemoryStore};
 use eyre::Result;
 use helpers::setup_fake_enclave;
 use std::time::Duration;

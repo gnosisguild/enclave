@@ -49,12 +49,6 @@ jobs:
       - name: "Compile the contracts and generate the TypeChain bindings"
         run: "pnpm typechain"
 
-      - name: Checking code format sdk
-        run: pnpm sdk:lint
-
-      - name: Run tests
-        run: "pnpm sdk:test"
-
       - name: Checking code format ciphernode
         run: pnpm ciphernode:lint
 

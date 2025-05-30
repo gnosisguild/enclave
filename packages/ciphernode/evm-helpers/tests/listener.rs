@@ -1,6 +1,6 @@
 mod helpers;
 use alloy::sol;
-use enclave_sdk::evm::listener::EventListener;
+use e3_evm_helpers::listener::EventListener;
 use eyre::Result;
 use helpers::setup_logs_contract;
 use std::time::Duration;

@@ -14,4 +14,4 @@ fhe-traits = { workspace = true }
 rand_chacha = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
-enclave-sdk = { path = "../../enclave-sdk" }
+e3-sdk = { workspace = true }

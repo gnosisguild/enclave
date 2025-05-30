@@ -3,8 +3,8 @@ use crate::server::{
     repo::{CrispE3Repository, CurrentRoundRepository},
 };
 use compute_provider::FHEInputs;
-use enclave_sdk::{
-    evm::{
+use e3_sdk::{
+    evm_helpers::{
         contracts::{
             EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveWrite, ReadWrite,
         },

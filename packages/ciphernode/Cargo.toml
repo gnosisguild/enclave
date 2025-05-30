@@ -1,19 +1,23 @@
 [workspace]
 members = [
-  "aggregator",
+  "aggregator", 
   "config",
   "crypto",
   "data",
+  "bfv-helpers",
+  "evm-helpers",
+  "indexer",
   "e3_request",
   "enclave",
   "enclave_core",
   "events",
-  "evm",
-  "fhe",
+  "evm", 
+  "fhe", 
   "init", 
   "keyshare",
   "logger",
-  "net",
+  "net", 
+  "sdk",
   "sortition",
   "test_helpers",
   "tests",
@@ -26,16 +30,20 @@ edition = "2021"
 
 [workspace.dependencies]
 aggregator = { path = "./aggregator" }
+e3-bfv-helpers = { path = "./bfv-helpers" }
 config = { path = "./config" }
 crypto = { path = "./crypto" }
 data = { path = "./data" }
 e3_request = { path = "./e3_request" }
+e3-sdk = { path = "./sdk" }
 enclave = { path = "./enclave" }
 enclave_core = { path = "./enclave_core" }
 enclave-init = { path = "./init" }
 events = { path = "./events" }
 evm = { path = "./evm" }
+e3-evm-helpers = { path = "./evm-helpers" }
 fhe = { path = "./fhe" }
+e3-indexer = { path = "./indexer" }
 keyshare = { path = "./keyshare" }
 logger = { path = "./logger" }
 net = { path = "./net" }
@@ -67,6 +75,7 @@ clap = { version = "4.5.17", features = ["derive"] }
 compile-time = "0.2.0"
 dirs = "5.0.1"
 dialoguer = "0.11.0"
+eyre = { version = "0.6.12" }
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
@@ -98,6 +107,7 @@ serde_yaml = "0.9.34"
 sha2 = "0.10.8"
 shellexpand = "3.1.0"
 tempfile = "3.14.0"
+thiserror =  { version = "1.0.58" }
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"
 tracing-opentelemetry = "0.30.0"

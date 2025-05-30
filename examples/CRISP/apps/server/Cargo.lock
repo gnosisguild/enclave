@@ -1706,7 +1706,7 @@ dependencies = [
  "config",
  "dialoguer",
  "dotenvy",
- "enclave-sdk",
+ "e3-sdk",
  "env_logger",
  "eyre",
  "fhe",
@@ -1954,6 +1954,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "e3-bfv-helpers"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "fhe",
+ "fhe-traits",
+]
+
+[[package]]
+name = "e3-evm-helpers"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "async-trait",
+ "eyre",
+ "futures",
+ "futures-util",
+ "tokio",
+]
+
+[[package]]
+name = "e3-indexer"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "async-trait",
+ "bincode",
+ "e3-evm-helpers",
+ "eyre",
+ "serde",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "e3-sdk"
+version = "0.1.0"
+dependencies = [
+ "e3-bfv-helpers",
+ "e3-evm-helpers",
+ "e3-indexer",
+]
+
+[[package]]
 name = "ecdsa"
 version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1990,25 +2034,6 @@ dependencies = [
  "sec1",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "enclave-sdk"
-version = "0.1.0"
-dependencies = [
- "alloy",
- "anyhow",
- "async-trait",
- "bincode",
- "chrono",
- "eyre",
- "fhe",
- "fhe-traits",
- "futures",
- "futures-util",
- "serde",
- "thiserror 1.0.69",
- "tokio",
 ]
 
 [[package]]

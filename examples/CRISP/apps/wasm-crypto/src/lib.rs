@@ -2,7 +2,7 @@ mod greco;
 mod util;
 
 use console_log;
-use enclave_sdk::bfv::{build_bfv_params_arc, params::SET_2048_1032193_1};
+use e3_bfv_helpers::{build_bfv_params_arc, params::SET_2048_1032193_1};
 use fhe_rs::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, FheDecrypter, FheEncoder, Serialize};
 use rand::thread_rng;

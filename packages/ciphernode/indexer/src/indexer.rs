@@ -1,18 +1,15 @@
+use crate::E3Repository;
+
 use super::{models::E3, DataStore};
-use crate::{
-    evm::{
-        contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
-        events::{
-            CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished,
-        },
-        listener::EventListener,
-    },
-    indexer::E3Repository,
-};
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
 use alloy::sol_types::SolEvent;
 use async_trait::async_trait;
+use e3_evm_helpers::{
+    contracts::{EnclaveContract, EnclaveContractFactory, EnclaveRead, ReadOnly},
+    events::{CiphertextOutputPublished, E3Activated, InputPublished, PlaintextOutputPublished},
+    listener::EventListener,
+};
 use eyre::eyre;
 use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};

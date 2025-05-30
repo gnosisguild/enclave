@@ -38,7 +38,7 @@ sha2 = "0.10.8"
 
 # Local dependencies
 compute-provider = { path = "../../../../packages/compute_provider" }
-enclave-sdk = { path = "../../../../packages/enclave-sdk" }
+e3-sdk = { path = "../../../../packages/ciphernode/sdk" }
 program-client = { path = "../program/client" }
 
 # CLI and user interaction
