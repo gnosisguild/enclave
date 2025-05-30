@@ -37,7 +37,7 @@ jwt = "0.16.0"
 sha2 = "0.10.8"
 
 # Local dependencies
-compute-provider = { path = "../../../../packages/ciphernode/compute-provider" }
+e3-compute-provider = { path = "../../../../packages/ciphernode/compute-provider" }
 e3-sdk = { path = "../../../../packages/ciphernode/sdk" }
 program-client = { path = "../program/client" }
 

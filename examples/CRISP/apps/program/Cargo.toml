@@ -37,7 +37,7 @@ serde_json = "1.0.133"
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
-compute-provider = { path = "../../../../packages/ciphernode/compute-provider" }
+e3-compute-provider = { path = "../../../../packages/ciphernode/compute-provider" }
 tokio = { version = "1.38", features = ["full"] }
 rand = { version = "0.8.5" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
