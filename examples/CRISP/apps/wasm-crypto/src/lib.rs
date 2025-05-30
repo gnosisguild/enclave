@@ -8,7 +8,6 @@ use fhe_traits::{DeserializeParametrized, FheDecrypter, FheEncoder, Serialize};
 use greco::greco::InputValidationVectors;
 use rand::thread_rng;
 use wasm_bindgen::prelude::*;
-pub use wasm_bindgen_rayon::init_thread_pool;
 use wasm_bindgen_test::*; // For setting up logging to the browser console
 
 #[wasm_bindgen]

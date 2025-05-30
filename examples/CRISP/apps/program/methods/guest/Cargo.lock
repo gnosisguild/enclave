@@ -38,6 +38,7 @@ dependencies = [
  "alloy-consensus",
  "alloy-core",
  "alloy-eips",
+ "alloy-genesis",
  "alloy-serde",
 ]
 
@@ -50,11 +51,10 @@ dependencies = [
  "alloy-eips",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde",
  "alloy-trie",
  "auto_impl",
+ "c-kzg",
  "derive_more 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -64,6 +64,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d8bcce99ad10fe02640cfaec1c6bc809b837c783c1d52906aa5af66e2a196f6"
 dependencies = [
  "alloy-dyn-abi",
+ "alloy-json-abi",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-sol-types",
@@ -81,6 +82,8 @@ dependencies = [
  "alloy-sol-types",
  "const-hex",
  "itoa",
+ "serde",
+ "serde_json",
  "winnow 0.7.10",
 ]
 
@@ -92,7 +95,6 @@ checksum = "0069cf0642457f87a01a014f6dc29d5d893cd4fd8fddf0c3cdfad1bb3ebafc41"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
- "serde",
 ]
 
 [[package]]
@@ -104,7 +106,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "derive_more 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -117,11 +118,23 @@ dependencies = [
  "alloy-eip7702",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde",
  "c-kzg",
  "derive_more 1.0.0",
+ "once_cell",
  "serde",
  "sha2",
+]
+
+[[package]]
+name = "alloy-genesis"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b2a4cf7b70f3495788e74ce1c765260ffe38820a2a774ff4aacb62e31ea73f9"
+dependencies = [
+ "alloy-primitives",
+ "alloy-serde",
+ "alloy-trie",
+ "serde",
 ]
 
 [[package]]
@@ -685,9 +698,6 @@ name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "auto_impl"
@@ -877,6 +887,7 @@ dependencies = [
  "glob",
  "hex",
  "libc",
+ "once_cell",
  "serde",
 ]
 
@@ -1880,7 +1891,9 @@ version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8983bb634df7248924ee0c4c3a749609b5abcb082c28fffe3254b3eb3602b307"
 dependencies = [
+ "alloy-rlp",
  "const-hex",
+ "proptest",
  "serde",
  "smallvec",
 ]
@@ -2673,9 +2686,6 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "spin"

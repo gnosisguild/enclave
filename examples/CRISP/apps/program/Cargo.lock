@@ -251,6 +251,7 @@ dependencies = [
  "alloy-consensus 0.8.3",
  "alloy-core",
  "alloy-eips 0.8.3",
+ "alloy-genesis 0.8.3",
  "alloy-serde 0.8.3",
 ]
 
@@ -264,7 +265,7 @@ dependencies = [
  "alloy-contract",
  "alloy-core",
  "alloy-eips 0.12.6",
- "alloy-genesis",
+ "alloy-genesis 0.12.6",
  "alloy-network",
  "alloy-provider",
  "alloy-rpc-client",
@@ -296,11 +297,10 @@ dependencies = [
  "alloy-eips 0.8.3",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 0.8.3",
  "alloy-trie",
  "auto_impl",
+ "c-kzg",
  "derive_more 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -424,7 +424,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "derive_more 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -449,9 +448,9 @@ dependencies = [
  "alloy-eip7702 0.4.2",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 0.8.3",
  "c-kzg",
  "derive_more 1.0.0",
+ "once_cell",
  "serde",
  "sha2",
 ]
@@ -475,6 +474,18 @@ dependencies = [
  "once_cell",
  "serde",
  "sha2",
+]
+
+[[package]]
+name = "alloy-genesis"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b2a4cf7b70f3495788e74ce1c765260ffe38820a2a774ff4aacb62e31ea73f9"
+dependencies = [
+ "alloy-primitives",
+ "alloy-serde 0.8.3",
+ "alloy-trie",
+ "serde",
 ]
 
 [[package]]
