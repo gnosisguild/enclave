@@ -1,27 +1,27 @@
 [workspace]
 members = [
-  "aggregator", 
-  "config",
-  "crypto",
-  "compute-provider",
-  "data",
-  "bfv-helpers",
-  "evm-helpers",
-  "indexer",
-  "e3_request",
-  "enclave",
-  "enclave_core",
-  "events",
-  "evm", 
-  "fhe", 
-  "init", 
-  "keyshare",
-  "logger",
-  "net", 
-  "sdk",
-  "sortition",
-  "test_helpers",
-  "tests",
+  "packages/ciphernode/aggregator", 
+  "packages/ciphernode/config",
+  "packages/ciphernode/crypto",
+  "packages/ciphernode/compute-provider",
+  "packages/ciphernode/data",
+  "packages/ciphernode/bfv-helpers",
+  "packages/ciphernode/evm-helpers",
+  "packages/ciphernode/indexer",
+  "packages/ciphernode/e3_request",
+  "packages/ciphernode/enclave",
+  "packages/ciphernode/enclave_core",
+  "packages/ciphernode/events",
+  "packages/ciphernode/evm", 
+  "packages/ciphernode/fhe", 
+  "packages/ciphernode/init", 
+  "packages/ciphernode/keyshare",
+  "packages/ciphernode/logger",
+  "packages/ciphernode/net", 
+  "packages/ciphernode/sdk",
+  "packages/ciphernode/sortition",
+  "packages/ciphernode/test_helpers",
+  "packages/ciphernode/tests",
 ]
 resolver = "2"
 
@@ -30,27 +30,27 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-aggregator = { path = "./aggregator" }
-e3-bfv-helpers = { path = "./bfv-helpers" }
-config = { path = "./config" }
-crypto = { path = "./crypto" }
-data = { path = "./data" }
-e3_request = { path = "./e3_request" }
-e3-sdk = { path = "./sdk" }
-enclave = { path = "./enclave" }
-enclave_core = { path = "./enclave_core" }
-enclave-init = { path = "./init" }
-events = { path = "./events" }
-evm = { path = "./evm" }
-e3-evm-helpers = { path = "./evm-helpers" }
-fhe = { path = "./fhe" }
-e3-indexer = { path = "./indexer" }
-keyshare = { path = "./keyshare" }
-logger = { path = "./logger" }
-net = { path = "./net" }
-sortition = { path = "./sortition" }
-test_helpers = { package = "test-helpers", path = "./test_helpers" }
-tests = { path = "./tests" }
+aggregator = { path = "./packages/ciphernode/aggregator" }
+e3-bfv-helpers = { path = "./packages/ciphernode/bfv-helpers" }
+config = { path = "./packages/ciphernode/config" }
+crypto = { path = "./packages/ciphernode/crypto" }
+data = { path = "./packages/ciphernode/data" }
+e3_request = { path = "./packages/ciphernode/e3_request" }
+e3-sdk = { path = "./packages/ciphernode/sdk" }
+enclave = { path = "./packages/ciphernode/enclave" }
+enclave_core = { path = "./packages/ciphernode/enclave_core" }
+enclave-init = { path = "./packages/ciphernode/init" }
+events = { path = "./packages/ciphernode/events" }
+evm = { path = "./packages/ciphernode/evm" }
+e3-evm-helpers = { path = "./packages/ciphernode/evm-helpers" }
+fhe = { path = "./packages/ciphernode/fhe" }
+e3-indexer = { path = "./packages/ciphernode/indexer" }
+keyshare = { path = "./packages/ciphernode/keyshare" }
+logger = { path = "./packages/ciphernode/logger" }
+net = { path = "./packages/ciphernode/net" }
+sortition = { path = "./packages/ciphernode/sortition" }
+test_helpers = { package = "test-helpers", path = "./packages/ciphernode/test_helpers" }
+tests = { path = "./packages/ciphernode/tests" }
 
 actix = "0.13.5"
 actix-web = "4.10.2"

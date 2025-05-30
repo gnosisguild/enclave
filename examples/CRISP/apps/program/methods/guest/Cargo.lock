@@ -1223,22 +1223,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67ba02a97a2bd10f4b59b25c7973101c79642302776489e030cd13cdab09ed15"
 
 [[package]]
-name = "compute-provider"
-version = "0.1.0"
-dependencies = [
- "ark-bn254 0.4.0",
- "ark-ff 0.4.2",
- "hex",
- "lean-imt",
- "light-poseidon",
- "num-bigint",
- "num-traits",
- "rayon",
- "serde",
- "sha3",
-]
-
-[[package]]
 name = "const-hex"
 version = "1.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1480,6 +1464,22 @@ dependencies = [
  "alloy",
  "fhe",
  "fhe-traits",
+]
+
+[[package]]
+name = "e3-compute-provider"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254 0.4.0",
+ "ark-ff 0.4.2",
+ "hex",
+ "lean-imt",
+ "light-poseidon",
+ "num-bigint",
+ "num-traits",
+ "rayon",
+ "serde",
+ "sha3",
 ]
 
 [[package]]
@@ -1932,7 +1932,7 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "bincode",
- "compute-provider",
+ "e3-compute-provider",
  "risc0-zkvm",
  "voting-core",
 ]
@@ -4192,8 +4192,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "voting-core"
 version = "0.1.0"
 dependencies = [
- "compute-provider",
  "e3-bfv-helpers",
+ "e3-compute-provider",
  "fhe",
  "fhe-traits",
 ]

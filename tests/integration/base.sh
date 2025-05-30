@@ -24,7 +24,7 @@ enclave_nodes_up
 
 echo "waiting on binaries and utilities..."
 
-waiton-files "$ROOT_DIR/packages/ciphernode/target/debug/enclave" "$ROOT_DIR/packages/ciphernode/target/debug/fake_encrypt"
+waiton-files "$ROOT_DIR/target/debug/enclave" "$ROOT_DIR/target/debug/fake_encrypt"
 
 sleep 4
 
