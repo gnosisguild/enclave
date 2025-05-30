@@ -21,6 +21,7 @@ ENV CARGO_BUILD_JOBS=8
 WORKDIR /build
 COPY Cargo.lock ./Cargo.lock
 COPY Cargo.toml ./Cargo.toml
+COPY ./rust-toolchain.toml .
 
 WORKDIR /build/packages/ciphernode
 COPY --from=evm-builder /build/packages/evm/artifacts ../evm/artifacts
@@ -51,7 +52,6 @@ COPY packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
 COPY packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
 
 COPY ./packages/ciphernode/enclave_core/build.rs ./enclave_core/build.rs
-COPY ./packages/ciphernode/rust-toolchain.toml .
 
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
