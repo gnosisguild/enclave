@@ -16,16 +16,16 @@ pub struct Encrypt {
 }
 
 #[wasm_bindgen]
-pub struct EncryptResult {
-    vote: Vec<u8>,
+pub struct EncryptedVote {
+    encrypted_vote: Vec<u8>,
     circuit_inputs: String,
 }
 
 #[wasm_bindgen]
-impl EncryptResult {
+impl EncryptedVote {
     #[wasm_bindgen(getter)]
-    pub fn vote(&self) -> Vec<u8> {
-        self.vote.clone()
+    pub fn encrypted_vote(&self) -> Vec<u8> {
+        self.encrypted_vote.clone()
     }
 
     #[wasm_bindgen(getter)]
@@ -36,9 +36,10 @@ impl EncryptResult {
 
 #[wasm_bindgen]
 impl Encrypt {
-    pub fn new() -> Self {
-        Self {
-            encrypted_vote: vec![],
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Encrypt {
+        Encrypt {
+            encrypted_vote: Vec::new(),
         }
     }
 
@@ -46,7 +47,7 @@ impl Encrypt {
         &mut self,
         vote: u64,
         public_key: Vec<u8>,
-    ) -> Result<EncryptResult, JsValue> {
+    ) -> Result<EncryptedVote, JsValue> {
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
         let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
 
@@ -61,19 +62,16 @@ impl Encrypt {
             .try_encrypt_extended(&pt, &mut thread_rng())
             .map_err(|e| JsValue::from_str(&format!("Error encrypting vote: {}", e)))?;
 
-        // Create Greco ZK Circuit input
-        let circuit_inputs =
+        // Create Greco input validation ZKP proof
+        let input_val_vectors =
             InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk).map_err(
                 |e| JsValue::from_str(&format!("Error computing input validation vectors: {}", e)),
             )?;
 
-        let encrypted_vote = ct.to_bytes();
-        self.encrypted_vote = encrypted_vote.clone();
-
-        let circuit_inputs_json = circuit_inputs.to_json().to_string();
-        Ok(EncryptResult {
-            vote: encrypted_vote,
-            circuit_inputs: circuit_inputs_json,
+        self.encrypted_vote = ct.to_bytes();
+        Ok(EncryptedVote {
+            encrypted_vote: self.encrypted_vote.clone(),
+            circuit_inputs: input_val_vectors.to_json().to_string(),
         })
     }
 

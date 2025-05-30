@@ -2,9 +2,9 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const __wbg_encrypt_free: (a: number, b: number) => void;
-export const __wbg_encryptresult_free: (a: number, b: number) => void;
-export const encryptresult_vote: (a: number) => [number, number];
-export const encryptresult_circuit_inputs: (a: number) => [number, number];
+export const __wbg_encryptedvote_free: (a: number, b: number) => void;
+export const encryptedvote_encrypted_vote: (a: number) => [number, number];
+export const encryptedvote_circuit_inputs: (a: number) => [number, number];
 export const encrypt_new: () => number;
 export const encrypt_encrypt_vote: (a: number, b: bigint, c: number, d: number) => [number, number, number];
 export const __wbgt__crisp_wasm_crypto::test_encrypt_vote: (a: number) => void;
