@@ -55,8 +55,11 @@ dependencies = [
  "alloy-core",
  "alloy-eips",
  "alloy-genesis",
+<<<<<<< HEAD
  "alloy-provider",
  "alloy-rpc-client",
+=======
+>>>>>>> cd546489 (Update Wasm-Crypto [skip ci])
  "alloy-serde",
  "alloy-transport-http",
 ]
@@ -81,12 +84,10 @@ dependencies = [
  "alloy-eips",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde",
  "alloy-trie",
  "auto_impl",
  "c-kzg",
  "derive_more 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -141,7 +142,6 @@ checksum = "0069cf0642457f87a01a014f6dc29d5d893cd4fd8fddf0c3cdfad1bb3ebafc41"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
- "serde",
 ]
 
 [[package]]
@@ -153,7 +153,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "derive_more 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -166,7 +165,6 @@ dependencies = [
  "alloy-eip7702",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde",
  "c-kzg",
  "derive_more 1.0.0",
  "once_cell",
@@ -939,9 +937,6 @@ name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "async-stream"
@@ -3723,9 +3718,6 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "socket2"

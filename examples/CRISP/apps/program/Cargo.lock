@@ -253,8 +253,11 @@ dependencies = [
  "alloy-core",
  "alloy-eips 0.8.3",
  "alloy-genesis 0.8.3",
+<<<<<<< HEAD
  "alloy-provider 0.8.3",
  "alloy-rpc-client 0.8.3",
+=======
+>>>>>>> cd546489 (Update Wasm-Crypto [skip ci])
  "alloy-serde 0.8.3",
  "alloy-transport-http 0.8.3",
 ]
@@ -270,9 +273,15 @@ dependencies = [
  "alloy-core",
  "alloy-eips 0.12.6",
  "alloy-genesis 0.12.6",
+<<<<<<< HEAD
  "alloy-network 0.12.6",
  "alloy-provider 0.12.6",
  "alloy-rpc-client 0.12.6",
+=======
+ "alloy-network",
+ "alloy-provider",
+ "alloy-rpc-client",
+>>>>>>> cd546489 (Update Wasm-Crypto [skip ci])
  "alloy-rpc-types",
  "alloy-serde 0.12.6",
  "alloy-signer 0.12.6",
@@ -301,12 +310,10 @@ dependencies = [
  "alloy-eips 0.8.3",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 0.8.3",
  "alloy-trie",
  "auto_impl",
  "c-kzg",
  "derive_more 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -444,7 +451,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "derive_more 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -469,7 +475,6 @@ dependencies = [
  "alloy-eip7702 0.4.2",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 0.8.3",
  "c-kzg",
  "derive_more 1.0.0",
  "once_cell",

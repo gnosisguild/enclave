@@ -26,8 +26,6 @@ export function __wbgtest_console_warn(args: Array<any>): void;
  */
 export function __wbgtest_console_error(args: Array<any>): void;
 export function __wbgtest_cov_dump(): Uint8Array | undefined;
-export function initThreadPool(num_threads: number): Promise<any>;
-export function wbg_rayon_start_worker(receiver: number): void;
 export class Encrypt {
   private constructor();
   free(): void;
@@ -78,17 +76,11 @@ export class WasmBindgenTestContext {
    */
   run(tests: any[]): Promise<any>;
 }
-export class wbg_rayon_PoolBuilder {
-  private constructor();
-  free(): void;
-  numThreads(): number;
-  receiver(): number;
-  build(): void;
-}
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
+  readonly memory: WebAssembly.Memory;
   readonly __wbg_encrypt_free: (a: number, b: number) => void;
   readonly __wbg_encryptresult_free: (a: number, b: number) => void;
   readonly encryptresult_vote: (a: number) => [number, number];
@@ -108,27 +100,19 @@ export interface InitOutput {
   readonly __wbgtest_console_warn: (a: any) => void;
   readonly __wbgtest_console_error: (a: any) => void;
   readonly __wbgtest_cov_dump: () => [number, number];
-  readonly __wbg_wbg_rayon_poolbuilder_free: (a: number, b: number) => void;
-  readonly wbg_rayon_poolbuilder_numThreads: (a: number) => number;
-  readonly wbg_rayon_poolbuilder_receiver: (a: number) => number;
-  readonly wbg_rayon_poolbuilder_build: (a: number) => void;
-  readonly initThreadPool: (a: number) => any;
-  readonly wbg_rayon_start_worker: (a: number) => void;
   readonly __externref_table_alloc: () => number;
   readonly __wbindgen_export_1: WebAssembly.Table;
-  readonly memory: WebAssembly.Memory;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;
-  readonly __wbindgen_export_6: WebAssembly.Table;
+  readonly __wbindgen_export_5: WebAssembly.Table;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __externref_table_dealloc: (a: number) => void;
-  readonly closure118_externref_shim: (a: number, b: number, c: any) => void;
-  readonly wasm_bindgen__convert__closures__invoke0_mut__h8bd37bc3a598f9c4: (a: number, b: number) => void;
-  readonly closure293_externref_shim: (a: number, b: number, c: any, d: number, e: any) => void;
-  readonly closure297_externref_shim: (a: number, b: number, c: any, d: any) => void;
-  readonly __wbindgen_thread_destroy: (a?: number, b?: number, c?: number) => void;
-  readonly __wbindgen_start: (a: number) => void;
+  readonly closure107_externref_shim: (a: number, b: number, c: any) => void;
+  readonly wasm_bindgen__convert__closures__invoke0_mut__h72edff75341aebe2: (a: number, b: number) => void;
+  readonly closure279_externref_shim: (a: number, b: number, c: any, d: number, e: any) => void;
+  readonly closure283_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly __wbindgen_start: () => void;
 }
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;
@@ -136,20 +120,18 @@ export type SyncInitInput = BufferSource | WebAssembly.Module;
 * Instantiates the given `module`, which can either be bytes or
 * a precompiled `WebAssembly.Module`.
 *
-* @param {{ module: SyncInitInput, memory?: WebAssembly.Memory, thread_stack_size?: number }} module - Passing `SyncInitInput` directly is deprecated.
-* @param {WebAssembly.Memory} memory - Deprecated.
+* @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
 *
 * @returns {InitOutput}
 */
-export function initSync(module: { module: SyncInitInput, memory?: WebAssembly.Memory, thread_stack_size?: number } | SyncInitInput, memory?: WebAssembly.Memory): InitOutput;
+export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;
 
 /**
 * If `module_or_path` is {RequestInfo} or {URL}, makes a request and
 * for everything else, calls `WebAssembly.instantiate` directly.
 *
-* @param {{ module_or_path: InitInput | Promise<InitInput>, memory?: WebAssembly.Memory, thread_stack_size?: number }} module_or_path - Passing `InitInput` directly is deprecated.
-* @param {WebAssembly.Memory} memory - Deprecated.
+* @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
 *
 * @returns {Promise<InitOutput>}
 */
-export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput>, memory?: WebAssembly.Memory, thread_stack_size?: number } | InitInput | Promise<InitInput>, memory?: WebAssembly.Memory): Promise<InitOutput>;
+export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;
