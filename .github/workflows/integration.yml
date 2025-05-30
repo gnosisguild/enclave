@@ -53,7 +53,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: 1.85.0
-          override: true
 
       - name: Cache node modules
         uses: actions/cache@v4
@@ -111,7 +110,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: 1.85.0
-          override: true
 
       - name: Cache node modules
         uses: actions/cache@v4

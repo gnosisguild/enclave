@@ -17,7 +17,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: 1.85.0
-          override: true
 
         # We must install foundry in order to be able to test anvil
       - name: Install Foundry
