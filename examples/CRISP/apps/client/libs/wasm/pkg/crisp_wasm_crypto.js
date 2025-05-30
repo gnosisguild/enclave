@@ -305,14 +305,6 @@ const EncryptFinalization = (typeof FinalizationRegistry === 'undefined')
 
 export class Encrypt {
 
-    static __wrap(ptr) {
-        ptr = ptr >>> 0;
-        const obj = Object.create(Encrypt.prototype);
-        obj.__wbg_ptr = ptr;
-        EncryptFinalization.register(obj, obj.__wbg_ptr, obj);
-        return obj;
-    }
-
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
@@ -324,17 +316,16 @@ export class Encrypt {
         const ptr = this.__destroy_into_raw();
         wasm.__wbg_encrypt_free(ptr, 0);
     }
-    /**
-     * @returns {Encrypt}
-     */
-    static new() {
+    constructor() {
         const ret = wasm.encrypt_new();
-        return Encrypt.__wrap(ret);
+        this.__wbg_ptr = ret >>> 0;
+        EncryptFinalization.register(this, this.__wbg_ptr, this);
+        return this;
     }
     /**
      * @param {bigint} vote
      * @param {Uint8Array} public_key
-     * @returns {EncryptResult}
+     * @returns {EncryptedVote}
      */
     encrypt_vote(vote, public_key) {
         const ptr0 = passArray8ToWasm0(public_key, wasm.__wbindgen_malloc);
@@ -343,43 +334,43 @@ export class Encrypt {
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
-        return EncryptResult.__wrap(ret[0]);
+        return EncryptedVote.__wrap(ret[0]);
     }
     static test() {
         wasm.encrypt_test();
     }
 }
 
-const EncryptResultFinalization = (typeof FinalizationRegistry === 'undefined')
+const EncryptedVoteFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_encryptresult_free(ptr >>> 0, 1));
+    : new FinalizationRegistry(ptr => wasm.__wbg_encryptedvote_free(ptr >>> 0, 1));
 
-export class EncryptResult {
+export class EncryptedVote {
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
-        const obj = Object.create(EncryptResult.prototype);
+        const obj = Object.create(EncryptedVote.prototype);
         obj.__wbg_ptr = ptr;
-        EncryptResultFinalization.register(obj, obj.__wbg_ptr, obj);
+        EncryptedVoteFinalization.register(obj, obj.__wbg_ptr, obj);
         return obj;
     }
 
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
-        EncryptResultFinalization.unregister(this);
+        EncryptedVoteFinalization.unregister(this);
         return ptr;
     }
 
     free() {
         const ptr = this.__destroy_into_raw();
-        wasm.__wbg_encryptresult_free(ptr, 0);
+        wasm.__wbg_encryptedvote_free(ptr, 0);
     }
     /**
      * @returns {Uint8Array}
      */
-    get vote() {
-        const ret = wasm.encryptresult_vote(this.__wbg_ptr);
+    get encrypted_vote() {
+        const ret = wasm.encryptedvote_encrypted_vote(this.__wbg_ptr);
         var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
         return v1;
@@ -391,7 +382,7 @@ export class EncryptResult {
         let deferred1_0;
         let deferred1_1;
         try {
-            const ret = wasm.encryptresult_circuit_inputs(this.__wbg_ptr);
+            const ret = wasm.encryptedvote_circuit_inputs(this.__wbg_ptr);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);

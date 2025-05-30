@@ -27,16 +27,15 @@ export function __wbgtest_console_warn(args: Array<any>): void;
 export function __wbgtest_console_error(args: Array<any>): void;
 export function __wbgtest_cov_dump(): Uint8Array | undefined;
 export class Encrypt {
-  private constructor();
   free(): void;
-  static new(): Encrypt;
-  encrypt_vote(vote: bigint, public_key: Uint8Array): EncryptResult;
+  constructor();
+  encrypt_vote(vote: bigint, public_key: Uint8Array): EncryptedVote;
   static test(): void;
 }
-export class EncryptResult {
+export class EncryptedVote {
   private constructor();
   free(): void;
-  readonly vote: Uint8Array;
+  readonly encrypted_vote: Uint8Array;
   readonly circuit_inputs: string;
 }
 /**
@@ -82,9 +81,9 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly __wbg_encrypt_free: (a: number, b: number) => void;
-  readonly __wbg_encryptresult_free: (a: number, b: number) => void;
-  readonly encryptresult_vote: (a: number) => [number, number];
-  readonly encryptresult_circuit_inputs: (a: number) => [number, number];
+  readonly __wbg_encryptedvote_free: (a: number, b: number) => void;
+  readonly encryptedvote_encrypted_vote: (a: number) => [number, number];
+  readonly encryptedvote_circuit_inputs: (a: number) => [number, number];
   readonly encrypt_new: () => number;
   readonly encrypt_encrypt_vote: (a: number, b: bigint, c: number, d: number) => [number, number, number];
   readonly __wbgt__crisp_wasm_crypto::test_encrypt_vote: (a: number) => void;
