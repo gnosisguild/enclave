@@ -3,6 +3,7 @@ members = [
   "aggregator", 
   "config",
   "crypto",
+  "compute-provider",
   "data",
   "bfv-helpers",
   "evm-helpers",

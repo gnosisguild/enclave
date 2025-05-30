@@ -27,6 +27,7 @@ COPY packages/ciphernode/aggregator/Cargo.toml ./aggregator/Cargo.toml
 COPY packages/ciphernode/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
 COPY packages/ciphernode/Cargo.lock ./Cargo.lock
 COPY packages/ciphernode/Cargo.toml ./Cargo.toml
+COPY packages/ciphernode/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
 COPY packages/ciphernode/config/Cargo.toml ./config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml ./crypto/Cargo.toml
 COPY packages/ciphernode/data/Cargo.toml ./data/Cargo.toml

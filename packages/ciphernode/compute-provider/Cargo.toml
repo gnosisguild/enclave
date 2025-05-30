@@ -1,10 +1,10 @@
 [package]
-name = "compute-provider"
+name = "e3-compute-provider"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = { version = "1.0.208", features = ["derive", "std"] }
+serde = { workspace = true, features = ["derive", "std"] }
 lean-imt = "0.1.2"
 sha3 = "0.10.8"
 num-bigint = "0.4.6"

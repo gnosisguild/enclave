@@ -1,5 +1,5 @@
-use compute_provider::FHEInputs;
 use e3_bfv_helpers::decode_bfv_params_arc;
+use e3_compute_provider::FHEInputs;
 use fhe_rs::bfv::Ciphertext;
 use fhe_traits::{DeserializeParametrized, Serialize};
 

@@ -1,5 +1,5 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
-use compute_provider::FHEInputs;
+use e3_compute_provider::FHEInputs;
 use program_client::{ComputeRequest, ComputeResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::json;

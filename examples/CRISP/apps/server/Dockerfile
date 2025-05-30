@@ -33,7 +33,7 @@ COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/cor
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
 COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/
 COPY packages/ciphernode/Cargo.toml packages/ciphernode/Cargo.lock packages/ciphernode/
-COPY packages/compute_provider/Cargo.toml packages/compute_provider/
+COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN cargo chef prepare --recipe-path recipe.json
@@ -59,6 +59,7 @@ COPY packages/ciphernode/aggregator/Cargo.toml packages/ciphernode/aggregator/Ca
 COPY packages/ciphernode/bfv-helpers/Cargo.toml packages/ciphernode/bfv-helpers/Cargo.toml
 COPY packages/ciphernode/Cargo.lock packages/ciphernode/Cargo.lock
 COPY packages/ciphernode/Cargo.toml packages/ciphernode/Cargo.toml
+COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/Cargo.toml
 COPY packages/ciphernode/config/Cargo.toml packages/ciphernode/config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml packages/ciphernode/crypto/Cargo.toml
 COPY packages/ciphernode/data/Cargo.toml packages/ciphernode/data/Cargo.toml
@@ -79,13 +80,13 @@ COPY packages/ciphernode/sortition/Cargo.toml packages/ciphernode/sortition/Carg
 COPY packages/ciphernode/test_helpers/Cargo.toml packages/ciphernode/test_helpers/Cargo.toml
 COPY packages/ciphernode/tests/Cargo.toml packages/ciphernode/tests/Cargo.toml
 
-COPY packages/compute_provider/Cargo.toml packages/compute_provider/
+
+COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/
 
 RUN set -eux; \
     find \
     examples/CRISP/apps/program \
     packages/ciphernode \
-    packages/compute_provider \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
     | while IFS= read -r -d '' manifest_path; do \
         crate_dir="$(dirname "$manifest_path")"; \
@@ -115,7 +116,7 @@ WORKDIR /app
 COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
 COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
 COPY packages/ciphernode/           packages/ciphernode/
-COPY packages/compute_provider/     packages/compute_provider/
+COPY packages/ciphernode/compute-provider/     packages/ciphernode/compute-provider/
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \

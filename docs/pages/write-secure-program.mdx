@@ -8,7 +8,7 @@ description: ''
 The Secure Process is the core FHE logic for your E3 Program. It runs within your selected Compute
 Provider's environment, ultimately producing and publishing a ciphertext output that is decrypted by
 your Ciphernode Committee. To facilitate this, Enclave provides a
-[Compute Provider package](https://github.com/gnosisguild/enclave/tree/main/packages/compute_provider)
+[Compute Provider package](https://github.com/gnosisguild/enclave/tree/main/packages/ciphernode/compute-provider)
 to simplify writing the Secure Process with any Compute Provider.
 
 ### Using the Compute Provider Package
@@ -30,7 +30,7 @@ To simplify integration with Enclave, use the provided Compute Provider package.
 **Example:**
 
 ```rust
-use compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
+use e3_compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
 
 // Implement ComputeProvider trait for your chosen provider
 pub struct Risc0Provider;
