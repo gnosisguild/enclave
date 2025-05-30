@@ -17,16 +17,19 @@ ENV RUSTC_FORCE_INCREMENTAL=1
 ENV CARGO_BUILD_JOBS=8
 
 # Create build directory
+
+WORKDIR /build
+COPY Cargo.lock ./Cargo.lock
+COPY Cargo.toml ./Cargo.toml
+COPY ./rust-toolchain.toml .
+
 WORKDIR /build/packages/ciphernode
 COPY --from=evm-builder /build/packages/evm/artifacts ../evm/artifacts
 COPY --from=evm-builder /build/packages/evm/deployments ../evm/deployments
 
-
 # find packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) packages/ciphernode/|COPY \1 ./|'
 COPY packages/ciphernode/aggregator/Cargo.toml ./aggregator/Cargo.toml
 COPY packages/ciphernode/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
-COPY packages/ciphernode/Cargo.lock ./Cargo.lock
-COPY packages/ciphernode/Cargo.toml ./Cargo.toml
 COPY packages/ciphernode/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
 COPY packages/ciphernode/config/Cargo.toml ./config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml ./crypto/Cargo.toml
@@ -49,7 +52,6 @@ COPY packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
 COPY packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
 
 COPY ./packages/ciphernode/enclave_core/build.rs ./enclave_core/build.rs
-COPY ./packages/ciphernode/rust-toolchain.toml .
 
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
@@ -86,7 +88,7 @@ USER ciphernode
 WORKDIR /home/ciphernode
 
 # Copy binary from builder
-COPY --from=ciphernode-builder --chown=ciphernode:ciphernode /build/packages/ciphernode/target/release/enclave /usr/local/bin/
+COPY --from=ciphernode-builder --chown=ciphernode:ciphernode /build/target/release/enclave /usr/local/bin/
 COPY --from=ciphernode-builder --chmod=755 --chown=ciphernode:ciphernode /build/packages/ciphernode/ciphernode-entrypoint.sh /usr/local/bin/
 
 # Environment variables for configuration

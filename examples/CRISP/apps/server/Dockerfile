@@ -32,7 +32,7 @@ COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/hos
 COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
 COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/
-COPY packages/ciphernode/Cargo.toml packages/ciphernode/Cargo.lock packages/ciphernode/
+COPY Cargo.toml Cargo.lock ./
 COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/
 
 WORKDIR /app/examples/CRISP/apps/server
@@ -54,11 +54,12 @@ COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/hos
 COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
 
+COPY Cargo.lock ./Cargo.lock
+COPY Cargo.toml ./Cargo.toml
+
 # find packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n"
 COPY packages/ciphernode/aggregator/Cargo.toml packages/ciphernode/aggregator/Cargo.toml
 COPY packages/ciphernode/bfv-helpers/Cargo.toml packages/ciphernode/bfv-helpers/Cargo.toml
-COPY packages/ciphernode/Cargo.lock packages/ciphernode/Cargo.lock
-COPY packages/ciphernode/Cargo.toml packages/ciphernode/Cargo.toml
 COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/Cargo.toml
 COPY packages/ciphernode/config/Cargo.toml packages/ciphernode/config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml packages/ciphernode/crypto/Cargo.toml
@@ -79,9 +80,6 @@ COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/Cargo.toml
 COPY packages/ciphernode/sortition/Cargo.toml packages/ciphernode/sortition/Cargo.toml
 COPY packages/ciphernode/test_helpers/Cargo.toml packages/ciphernode/test_helpers/Cargo.toml
 COPY packages/ciphernode/tests/Cargo.toml packages/ciphernode/tests/Cargo.toml
-
-
-COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/
 
 RUN set -eux; \
     find \
@@ -115,6 +113,7 @@ WORKDIR /app
 
 COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
 COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
+COPY Cargo.*                        ./
 COPY packages/ciphernode/           packages/ciphernode/
 COPY packages/ciphernode/compute-provider/     packages/ciphernode/compute-provider/
 
