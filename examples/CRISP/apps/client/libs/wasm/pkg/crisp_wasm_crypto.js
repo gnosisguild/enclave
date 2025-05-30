@@ -284,7 +284,7 @@ export function __wbgtest_cov_dump() {
 }
 
 function __wbg_adapter_30(arg0, arg1, arg2) {
-    wasm.closure107_externref_shim(arg0, arg1, arg2);
+    wasm.closure109_externref_shim(arg0, arg1, arg2);
 }
 
 function __wbg_adapter_57(arg0, arg1) {
@@ -292,11 +292,11 @@ function __wbg_adapter_57(arg0, arg1) {
 }
 
 function __wbg_adapter_117(arg0, arg1, arg2, arg3, arg4) {
-    wasm.closure279_externref_shim(arg0, arg1, arg2, arg3, arg4);
+    wasm.closure281_externref_shim(arg0, arg1, arg2, arg3, arg4);
 }
 
 function __wbg_adapter_130(arg0, arg1, arg2, arg3) {
-    wasm.closure283_externref_shim(arg0, arg1, arg2, arg3);
+    wasm.closure285_externref_shim(arg0, arg1, arg2, arg3);
 }
 
 const EncryptFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -763,8 +763,8 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper329 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 108, __wbg_adapter_30);
+    imports.wbg.__wbindgen_closure_wrapper336 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 110, __wbg_adapter_30);
         return ret;
     };
     imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {

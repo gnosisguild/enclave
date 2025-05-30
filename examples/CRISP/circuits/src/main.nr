@@ -1,7 +1,7 @@
 /// `N` is the degree of the cyclotomic polynomial defining the ring `Rq = Zq[X]/(X^N + 1)`.
-pub global N: u32 = 128;
+pub global N: u32 = 2048;
 /// `L` is the dimension size of the polynomials.
-pub global L: u32 = 2;
+pub global L: u32 = 1;
 /// Polynomial structure
 pub struct Polynomial<let N: u32> {
     // Coefficients of the polynomial (Biggest degree at the first index)
