@@ -52,7 +52,11 @@
     "typescript": "^5.3.3"
   },
   "files": [
-    "contracts"
+    "contracts",
+    "deploy",
+    "tasks",
+    "hardhat.config.ts",
+    "tsconfig.json"
   ],
   "keywords": [
     "blockchain",
