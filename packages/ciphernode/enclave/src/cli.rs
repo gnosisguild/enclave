@@ -134,7 +134,14 @@ impl Cli {
                 bail!("Cannot run `enclave wizard` when a configuration exists.");
             }
             Commands::Nodes { command } => {
-                nodes::execute(command, &config, self.verbose, self.config).await?
+                nodes::execute(
+                    command,
+                    &config,
+                    self.verbose,
+                    self.config,
+                    self.otel.clone().map(Into::into),
+                )
+                .await?
             }
             Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
