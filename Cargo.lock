@@ -2551,6 +2551,8 @@ dependencies = [
  "anyhow",
  "async-recursion",
  "git2",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
