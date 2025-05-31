@@ -1,7 +1,7 @@
 {
   "name": "@gnosis-guild/enclave",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
-  "version": "0.0.5",
+  "version": "0.0.5-test.1",
   "license": "LGPL-3.0-only",
   "author": {
     "name": "gnosisguild",
