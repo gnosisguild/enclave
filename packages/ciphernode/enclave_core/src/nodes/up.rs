@@ -12,6 +12,7 @@ pub async fn execute(
     exclude: Vec<String>,
     verbose: u8,
     maybe_config_string: Option<String>,
+    maybe_otel: Option<String>,
 ) -> Result<()> {
     if client::is_ready().await? {
         bail!("Swarm is already running!");
@@ -23,7 +24,7 @@ pub async fn execute(
     }
 
     //  run the swarm_daemon process locally forwarding args
-    daemon::execute(config, exclude, verbose, maybe_config_string).await?;
+    daemon::execute(config, exclude, verbose, maybe_config_string, maybe_otel).await?;
 
     Ok(())
 }

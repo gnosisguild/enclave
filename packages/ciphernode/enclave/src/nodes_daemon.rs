@@ -7,6 +7,7 @@ pub async fn execute(
     exclude: Vec<String>,
     verbose: u8,
     config_string: Option<String>,
+    otel: Option<String>,
 ) -> Result<()> {
-    daemon::execute(config, exclude, verbose, config_string).await
+    daemon::execute(config, exclude, verbose, config_string, otel).await
 }

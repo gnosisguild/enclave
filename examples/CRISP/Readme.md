@@ -9,42 +9,26 @@ CRISP
 ├── Dockerfile - Dockerfile for a local development environment
 ├── apps
 │   ├── client
-│   │   ├── libs/wasm/pkg - WebAssembly library package
-│   │   ├── public - Static files
-│   │   ├── src - React components and source code
-│   │   └── [configuration files and README]
 │   ├── program
-│   │   ├── core - Core logic for the RISC Zero zkVM
-│   │   ├── host - Host logic for the RISC Zero zkVM
-│   │   ├── methods - Guest programs to run on the RISC Zero zkVM
 │   ├── server
-│   │   ├── src
-│   │   │   ├── cli - CLI for interacting with the CRISP server
-│   │   │   └── server - Server for interacting with the enclave contracts and the client
 │   └── wasm-crypto
 ├── contracts - Contracts for the CRISP protocol
 ├── deploy - Deployment scripts
 ├── docker-compose.yaml
-└── scripts
+└── scripts 
     └── tasks - Scripts for tasks to be run inside the docker container
 ```
 
 ## Docker Development
 
-To start the development environment, run the following command:
+There is a Dockerfile for easy local development which has all the tools you need preinstalled. To start the development environment, run the following command:
 
 ```sh
-pnpm dev:setup
-pnpm dev:start
+pnpm dev:setup # build the devcontainer
+pnpm dev:up # run the services 
 ```
 
-To stop the development environment, run the following command:
-
-```sh
-pnpm dev:stop
-```
-
-## Prerequisites
+## Prerequisites for running without Docker
 
 Before getting started, make sure you have the following tools installed:
 

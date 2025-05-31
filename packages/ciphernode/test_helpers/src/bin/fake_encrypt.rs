@@ -1,6 +1,6 @@
 // This is a test script designed to encrypt some fixed data to a fhe public key
 use clap::Parser;
-use commons::bfv::{build_bfv_params_arc, params::SET_2048_1032193_1};
+use e3_sdk::bfv_helpers::{build_bfv_params_arc, params::SET_2048_1032193_1};
 use fhe_rs::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use rand::SeedableRng;

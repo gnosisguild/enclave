@@ -8,6 +8,7 @@ pub async fn execute(
     exclude: Vec<String>,
     verbose: u8,
     config_string: Option<String>,
+    otel: Option<String>,
 ) -> Result<()> {
-    up::execute(config, detach, exclude, verbose, config_string).await
+    up::execute(config, detach, exclude, verbose, config_string, otel).await
 }

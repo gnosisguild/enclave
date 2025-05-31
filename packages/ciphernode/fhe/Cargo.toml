@@ -18,4 +18,4 @@ rand = { workspace = true }
 rand_chacha = { workspace = true }
 e3_request = { workspace = true }
 serde = { workspace = true }
-commons = { path = "../../commons" }
+e3-bfv-helpers = { workspace = true }

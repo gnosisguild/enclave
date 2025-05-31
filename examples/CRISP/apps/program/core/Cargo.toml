@@ -6,5 +6,5 @@ edition = { workspace = true }
 [dependencies]
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
-compute-provider = { path = "../../../../../packages/compute_provider" }
-commons = { path = "../../../../../packages/commons" }
+e3-compute-provider = { path = "../../../../../packages/ciphernode/compute-provider" }
+e3-bfv-helpers = { path = "../../../../../packages/ciphernode/bfv-helpers" }

@@ -46,6 +46,7 @@ where
     start_block: Option<u64>,
     bus: Addr<EventBus<EnclaveEvent>>,
     state: Persistable<EvmEventReaderState>,
+    rpc_url: String,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize, Clone)]
@@ -77,6 +78,8 @@ where
     bus: Addr<EventBus<EnclaveEvent>>,
     /// The auto persistable state of the event reader
     state: Persistable<EvmEventReaderState>,
+    /// The RPC URL for the provider
+    rpc_url: String,
 }
 
 impl<P, T> EvmEventReader<P, T>
@@ -95,6 +98,7 @@ where
             start_block: params.start_block,
             bus: params.bus,
             state: params.state,
+            rpc_url: params.rpc_url,
         }
     }
 
@@ -105,6 +109,7 @@ where
         start_block: Option<u64>,
         bus: &Addr<EventBus<EnclaveEvent>>,
         repository: &Repository<EvmEventReaderState>,
+        rpc_url: String,
     ) -> Result<Addr<Self>> {
         let sync_state = repository
             .clone()
@@ -118,6 +123,7 @@ where
             start_block,
             bus: bus.clone(),
             state: sync_state,
+            rpc_url,
         };
         let addr = EvmEventReader::new(params).start();
 
@@ -149,6 +155,7 @@ where
 
         let contract_address = self.contract_address;
         let start_block = self.start_block;
+        let rpc_url = self.rpc_url.clone();
         ctx.spawn(
             async move {
                 stream_from_evm(
@@ -159,6 +166,7 @@ where
                     shutdown,
                     start_block,
                     &bus,
+                    rpc_url,
                 )
                 .await
             }
@@ -176,9 +184,24 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     mut shutdown: oneshot::Receiver<()>,
     start_block: Option<u64>,
     bus: &Addr<EventBus<EnclaveEvent>>,
+    rpc_url: String,
 ) {
     let chain_id = provider.get_chain_id();
     let provider = provider.get_provider();
+
+    if start_block.unwrap_or(0) == 0 && !is_local_node(&rpc_url) {
+        error!(
+            "Querying from block 0 on a non-local node ({}) without a specific start_block is not allowed.",
+            rpc_url
+        );
+        bus.err(
+            EnclaveErrorType::Evm,
+            anyhow!(
+                "Misconfiguration: Attempted to query historical events from genesis on a non-local node. Please specify a `start_block` for contract address {contract_address} on chain {chain_id} using rpc {rpc_url}"
+            )
+        );
+        return;
+    }
 
     let historical_filter = Filter::new()
         .address(contract_address.clone())
@@ -250,6 +273,10 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
         }
     };
     info!("Exiting stream loop");
+}
+
+fn is_local_node(rpc_url: &str) -> bool {
+    rpc_url.contains("localhost") || rpc_url.contains("127.0.0.1")
 }
 
 impl<P, T> Handler<EnclaveEvent> for EvmEventReader<P, T>

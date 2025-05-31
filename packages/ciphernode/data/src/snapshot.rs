@@ -2,7 +2,7 @@ use crate::Repository;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
-use tracing::{error, info, trace};
+use tracing::trace;
 
 /// This trait enables the self type to report their state snapshot
 pub trait Snapshot

@@ -46,6 +46,7 @@ impl LaunchCommand {
         &self,
         verbose: u8,
         maybe_config_string: &Option<String>,
+        maybe_otel: &Option<String>,
     ) -> Result<CommandParams> {
         let enclave_bin = env::current_exe()?.display().to_string();
         let mut args = vec![];
@@ -63,6 +64,11 @@ impl LaunchCommand {
             args.push(format!("-{}", "v".repeat(verbose as usize))); // -vvv
         }
 
+        if let Some(otel) = maybe_otel {
+            args.push("--otel".to_string());
+            args.push(otel.to_string());
+        }
+
         for peer in self.peers.iter() {
             args.push("--peer".to_string());
             args.push(peer.to_string());
@@ -78,6 +84,7 @@ fn extract_commands(
     exclude: Vec<String>,
     verbose: u8,
     maybe_config_string: Option<String>,
+    maybe_otel: Option<String>,
 ) -> Result<CommandMap> {
     let mut exclude_list = exclude.clone();
 
@@ -98,7 +105,7 @@ fn extract_commands(
 
     let mut cmds = HashMap::new();
     for item in filtered.iter() {
-        let params = item.to_params(verbose, &maybe_config_string)?;
+        let params = item.to_params(verbose, &maybe_config_string, &maybe_otel)?;
         cmds.insert(item.name.clone(), params);
     }
 
@@ -111,6 +118,7 @@ pub async fn execute(
     exclude: Vec<String>,
     verbose: u8,
     maybe_config_string: Option<String>,
+    maybe_otel: Option<String>,
 ) -> Result<()> {
     let command_map = extract_commands(
         config.nodes(),
@@ -118,6 +126,7 @@ pub async fn execute(
         exclude,
         verbose,
         maybe_config_string,
+        maybe_otel,
     )?;
 
     let process_manager = Arc::new(Mutex::new(ProcessManager::from(command_map)));
