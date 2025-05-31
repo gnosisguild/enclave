@@ -8,7 +8,7 @@ use tokio::process::Command as TokioCommand;
 pub async fn execute() -> Result<()> {
     let github_repo = "https://github.com/gnosisguild/enclave.git";
     let template_folder = "examples/basic";
-    let branch = "ry/389-enclave-init-2";
+    let branch = "ry/389-enclave-init-3";
     let temp_dir = "/tmp/enclave-basic-example";
     let cwd = env::current_dir()?;
     check_empty_folder(&cwd)?;
