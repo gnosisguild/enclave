@@ -90,7 +90,7 @@
     "test": "hardhat test",
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
     "prerelease": "pnpm clean && pnpm compile && pnpm compile:scripts && pnpm typechain",
-    "release": "pnpm publish --non-interactive"
+    "release": "pnpm publish"
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
