@@ -55,7 +55,7 @@ e3-logger = { path = "./packages/ciphernode/logger" }
 e3-net = { path = "./packages/ciphernode/net" }
 e3-sortition = { path = "./packages/ciphernode/sortition" }
 e3-test-helpers = { path = "./packages/ciphernode/test-helpers" }
-tests = { path = "./packages/ciphernode/tests" }
+e3-tests = { path = "./packages/ciphernode/tests" }
 
 actix = "0.13.5"
 actix-web = "4.10.2"
