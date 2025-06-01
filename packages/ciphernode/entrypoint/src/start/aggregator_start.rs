@@ -15,13 +15,13 @@ use e3_net::{NetRepositoryFactory, NetworkManager};
 use e3_request::E3Router;
 use e3_sortition::Sortition;
 use e3_sortition::SortitionRepositoryFactory;
+use e3_test_helpers::{PlaintextWriter, PublicKeyWriter};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-use test_helpers::{PlaintextWriter, PublicKeyWriter};
 use tokio::task::JoinHandle;
 
 use crate::helpers::datastore::setup_datastore;

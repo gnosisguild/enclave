@@ -20,7 +20,7 @@ members = [
   "packages/ciphernode/net", 
   "packages/ciphernode/sdk",
   "packages/ciphernode/sortition",
-  "packages/ciphernode/test_helpers",
+  "packages/ciphernode/test-helpers",
   "packages/ciphernode/tests",
 ]
 exclude = [
@@ -54,7 +54,7 @@ e3-keyshare = { path = "./packages/ciphernode/keyshare" }
 e3-logger = { path = "./packages/ciphernode/logger" }
 e3-net = { path = "./packages/ciphernode/net" }
 e3-sortition = { path = "./packages/ciphernode/sortition" }
-test_helpers = { package = "test-helpers", path = "./packages/ciphernode/test_helpers" }
+e3-test-helpers = { path = "./packages/ciphernode/test-helpers" }
 tests = { path = "./packages/ciphernode/tests" }
 
 actix = "0.13.5"

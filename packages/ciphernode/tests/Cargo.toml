@@ -15,7 +15,7 @@ e3-data = { workspace = true }
 e3-keyshare = { workspace = true }
 e3-aggregator = { workspace = true }
 e3-request = { workspace = true }
-test_helpers = { workspace = true }
+e3-test-helpers = { workspace = true }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }

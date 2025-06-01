@@ -48,7 +48,7 @@ COPY packages/ciphernode/net/Cargo.toml ./net/Cargo.toml
 COPY packages/ciphernode/request/Cargo.toml ./request/Cargo.toml
 COPY packages/ciphernode/sdk/Cargo.toml ./sdk/Cargo.toml
 COPY packages/ciphernode/sortition/Cargo.toml ./sortition/Cargo.toml
-COPY packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
+COPY packages/ciphernode/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
 
 COPY ./packages/ciphernode/entrypoint/build.rs ./entrypoint/build.rs

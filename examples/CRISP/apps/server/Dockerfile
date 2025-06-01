@@ -78,7 +78,7 @@ COPY packages/ciphernode/net/Cargo.toml packages/ciphernode/net/Cargo.toml
 COPY packages/ciphernode/request/Cargo.toml packages/ciphernode/request/Cargo.toml
 COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/Cargo.toml
 COPY packages/ciphernode/sortition/Cargo.toml packages/ciphernode/sortition/Cargo.toml
-COPY packages/ciphernode/test_helpers/Cargo.toml packages/ciphernode/test_helpers/Cargo.toml
+COPY packages/ciphernode/test-helpers/Cargo.toml packages/ciphernode/test-helpers/Cargo.toml
 COPY packages/ciphernode/tests/Cargo.toml packages/ciphernode/tests/Cargo.toml
 
 RUN set -eux; \

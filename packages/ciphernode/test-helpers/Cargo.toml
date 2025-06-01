@@ -1,5 +1,5 @@
 [package]
-name = "test-helpers"
+name = "e3-test-helpers"
 version.workspace = true
 edition.workspace = true
 
