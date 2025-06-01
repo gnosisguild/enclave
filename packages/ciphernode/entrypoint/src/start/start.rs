@@ -11,8 +11,8 @@ use e3_evm::{
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
 };
 use e3_fhe::ext::FheExtension;
+use e3_keyshare::ext::KeyshareExtension;
 use e3_request::E3Router;
-use keyshare::ext::KeyshareExtension;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;

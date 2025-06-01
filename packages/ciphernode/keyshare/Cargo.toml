@@ -1,5 +1,5 @@
 [package]
-name = "keyshare"
+name = "e3-keyshare"
 version.workspace = true
 edition.workspace = true
 
