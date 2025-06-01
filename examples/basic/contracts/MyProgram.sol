@@ -20,35 +20,22 @@ contract MyProgram is IE3Program, Ownable {
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
 
-    // Events
-    event InputValidatorUpdated(address indexed newValidator);
-
     // Errors
     error CallerNotAuthorized();
     error E3AlreadyInitialized();
     error E3DoesNotExist();
-    error EnclaveAddressZero();
     error VerifierAddressZero();
-    error SemaphoreAddressZero();
-    error InvalidPolicyFactory();
-    error InvalidCheckerFactory();
-    error InvalidInputValidatorFactory();
-    error GroupDoesNotExist();
     error AlreadyRegistered();
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
-    /// @param _enclave The enclave address
     /// @param _verifier The RISC Zero verifier address
     /// @param _imageId The image ID for the guest program
     constructor(
-        IEnclave _enclave,
         IRiscZeroVerifier _verifier,
         bytes32 _imageId
     ) Ownable(msg.sender) {
-        require(address(_enclave) != address(0), EnclaveAddressZero());
         require(address(_verifier) != address(0), VerifierAddressZero());
 
-        enclave = _enclave;
         verifier = _verifier;
         imageId = _imageId;
     }
