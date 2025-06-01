@@ -6,11 +6,11 @@ use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_events::get_enclave_event_bus;
 use e3_events::{EnclaveEvent, EventBus};
-use e3_request::E3Router;
-use evm::{
+use e3_evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
 };
+use e3_request::E3Router;
 use fhe::ext::FheExtension;
 use keyshare::ext::KeyshareExtension;
 use net::{NetRepositoryFactory, NetworkManager};

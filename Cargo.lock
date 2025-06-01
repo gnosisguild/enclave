@@ -2447,8 +2447,8 @@ dependencies = [
  "e3-crypto",
  "e3-data",
  "e3-events",
+ "e3-evm",
  "e3-request",
- "evm",
  "fhe 0.1.0",
  "hex",
  "keyshare",
@@ -2485,6 +2485,30 @@ dependencies = [
  "serde",
  "sha2",
  "tracing",
+]
+
+[[package]]
+name = "e3-evm"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "alloy",
+ "alloy-primitives",
+ "anyhow",
+ "async-trait",
+ "base64",
+ "e3-config",
+ "e3-crypto",
+ "e3-data",
+ "e3-entrypoint",
+ "e3-events",
+ "futures-util",
+ "serde",
+ "sortition",
+ "tokio",
+ "tracing",
+ "url",
+ "zeroize",
 ]
 
 [[package]]
@@ -2685,30 +2709,6 @@ checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener 5.4.0",
  "pin-project-lite",
-]
-
-[[package]]
-name = "evm"
-version = "0.1.0"
-dependencies = [
- "actix",
- "alloy",
- "alloy-primitives",
- "anyhow",
- "async-trait",
- "base64",
- "e3-config",
- "e3-crypto",
- "e3-data",
- "e3-entrypoint",
- "e3-events",
- "futures-util",
- "serde",
- "sortition",
- "tokio",
- "tracing",
- "url",
- "zeroize",
 ]
 
 [[package]]
@@ -6757,9 +6757,9 @@ dependencies = [
  "e3-crypto",
  "e3-data",
  "e3-events",
+ "e3-evm",
  "e3-request",
  "e3-sdk",
- "evm",
  "fhe 0.1.0",
  "fhe 0.1.0-beta.7",
  "fhe-traits",

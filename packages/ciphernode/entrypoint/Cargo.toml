@@ -19,7 +19,7 @@ e3-crypto = { workspace = true }
 e3-data = { workspace = true }
 dirs = { workspace = true }
 e3-events = { workspace = true }
-evm = { workspace = true }
+e3-evm = { workspace = true }
 fhe = { workspace = true }
 hex = { workspace = true }
 keyshare = { workspace = true }

@@ -5,12 +5,12 @@ use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_events::{get_enclave_event_bus, EnclaveEvent, EventBus};
-use e3_request::E3Router;
-use evm::{
+use e3_evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
+use e3_request::E3Router;
 use fhe::ext::FheExtension;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;

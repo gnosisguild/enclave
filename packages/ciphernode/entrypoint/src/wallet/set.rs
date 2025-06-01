@@ -2,7 +2,7 @@ use alloy::{hex::FromHex, primitives::FixedBytes, signers::local::PrivateKeySign
 use anyhow::{anyhow, Result};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
-use evm::EthPrivateKeyRepositoryFactory;
+use e3_evm::EthPrivateKeyRepositoryFactory;
 
 use crate::helpers::{datastore::get_repositories, rand::generate_random_bytes};
 

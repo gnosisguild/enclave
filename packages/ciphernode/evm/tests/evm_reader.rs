@@ -12,7 +12,7 @@ use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
     new_event_bus_with_history, EnclaveEvent, GetHistory, HistoryCollector, Shutdown, TestEvent,
 };
-use evm::{helpers::WithChainId, EvmEventReader};
+use e3_evm::{helpers::WithChainId, EvmEventReader};
 use std::time::Duration;
 use tokio::time::sleep;
 
