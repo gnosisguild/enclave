@@ -23,35 +23,35 @@ COPY Cargo.lock ./Cargo.lock
 COPY Cargo.toml ./Cargo.toml
 COPY ./rust-toolchain.toml .
 
-WORKDIR /build/packages/ciphernode
+WORKDIR /build/crates
 COPY --from=evm-builder /build/packages/evm/artifacts ../evm/artifacts
 COPY --from=evm-builder /build/packages/evm/deployments ../evm/deployments
 
-# find packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) packages/ciphernode/|COPY \1 ./|'
-COPY packages/ciphernode/aggregator/Cargo.toml ./aggregator/Cargo.toml
-COPY packages/ciphernode/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
-COPY packages/ciphernode/cli/Cargo.toml ./cli/Cargo.toml
-COPY packages/ciphernode/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
-COPY packages/ciphernode/config/Cargo.toml ./config/Cargo.toml
-COPY packages/ciphernode/crypto/Cargo.toml ./crypto/Cargo.toml
-COPY packages/ciphernode/data/Cargo.toml ./data/Cargo.toml
-COPY packages/ciphernode/entrypoint/Cargo.toml ./entrypoint/Cargo.toml
-COPY packages/ciphernode/events/Cargo.toml ./events/Cargo.toml
-COPY packages/ciphernode/evm/Cargo.toml ./evm/Cargo.toml
-COPY packages/ciphernode/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
-COPY packages/ciphernode/fhe/Cargo.toml ./fhe/Cargo.toml
-COPY packages/ciphernode/indexer/Cargo.toml ./indexer/Cargo.toml
-COPY packages/ciphernode/init/Cargo.toml ./init/Cargo.toml
-COPY packages/ciphernode/keyshare/Cargo.toml ./keyshare/Cargo.toml
-COPY packages/ciphernode/logger/Cargo.toml ./logger/Cargo.toml
-COPY packages/ciphernode/net/Cargo.toml ./net/Cargo.toml
-COPY packages/ciphernode/request/Cargo.toml ./request/Cargo.toml
-COPY packages/ciphernode/sdk/Cargo.toml ./sdk/Cargo.toml
-COPY packages/ciphernode/sortition/Cargo.toml ./sortition/Cargo.toml
-COPY packages/ciphernode/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
-COPY packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
+# find crates/* -name "Cargo.*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'
+COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
+COPY crates/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
+COPY crates/cli/Cargo.toml ./cli/Cargo.toml
+COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
+COPY crates/config/Cargo.toml ./config/Cargo.toml
+COPY crates/crypto/Cargo.toml ./crypto/Cargo.toml
+COPY crates/data/Cargo.toml ./data/Cargo.toml
+COPY crates/entrypoint/Cargo.toml ./entrypoint/Cargo.toml
+COPY crates/events/Cargo.toml ./events/Cargo.toml
+COPY crates/evm/Cargo.toml ./evm/Cargo.toml
+COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
+COPY crates/fhe/Cargo.toml ./fhe/Cargo.toml
+COPY crates/indexer/Cargo.toml ./indexer/Cargo.toml
+COPY crates/init/Cargo.toml ./init/Cargo.toml
+COPY crates/keyshare/Cargo.toml ./keyshare/Cargo.toml
+COPY crates/logger/Cargo.toml ./logger/Cargo.toml
+COPY crates/net/Cargo.toml ./net/Cargo.toml
+COPY crates/request/Cargo.toml ./request/Cargo.toml
+COPY crates/sdk/Cargo.toml ./sdk/Cargo.toml
+COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
+COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
+COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 
-COPY ./packages/ciphernode/entrypoint/build.rs ./entrypoint/build.rs
+COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
 
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
@@ -62,7 +62,7 @@ RUN for d in ./*/ ; do \
 
 RUN cargo build --release
 
-COPY ./packages/ciphernode .
+COPY ./crates .
 
 RUN find . -name "*.rs" -exec touch {} +
 RUN cargo build --release -p e3-cli
@@ -89,7 +89,7 @@ WORKDIR /home/ciphernode
 
 # Copy binary from builder
 COPY --from=ciphernode-builder --chown=ciphernode:ciphernode /build/target/release/enclave /usr/local/bin/
-COPY --from=ciphernode-builder --chmod=755 --chown=ciphernode:ciphernode /build/packages/ciphernode/ciphernode-entrypoint.sh /usr/local/bin/
+COPY --from=ciphernode-builder --chmod=755 --chown=ciphernode:ciphernode /build/crates/ciphernode-entrypoint.sh /usr/local/bin/
 
 # Environment variables for configuration
 ENV CONFIG_DIR=/home/ciphernode/.config/enclave

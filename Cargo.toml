@@ -1,27 +1,27 @@
 [workspace]
 members = [
-  "packages/ciphernode/aggregator", 
-  "packages/ciphernode/config",
-  "packages/ciphernode/crypto",
-  "packages/ciphernode/compute-provider",
-  "packages/ciphernode/data",
-  "packages/ciphernode/bfv-helpers",
-  "packages/ciphernode/evm-helpers",
-  "packages/ciphernode/indexer",
-  "packages/ciphernode/request",
-  "packages/ciphernode/cli",
-  "packages/ciphernode/entrypoint",
-  "packages/ciphernode/events",
-  "packages/ciphernode/evm", 
-  "packages/ciphernode/fhe", 
-  "packages/ciphernode/init", 
-  "packages/ciphernode/keyshare",
-  "packages/ciphernode/logger",
-  "packages/ciphernode/net", 
-  "packages/ciphernode/sdk",
-  "packages/ciphernode/sortition",
-  "packages/ciphernode/test-helpers",
-  "packages/ciphernode/tests",
+  "crates/aggregator", 
+  "crates/config",
+  "crates/crypto",
+  "crates/compute-provider",
+  "crates/data",
+  "crates/bfv-helpers",
+  "crates/evm-helpers",
+  "crates/indexer",
+  "crates/request",
+  "crates/cli",
+  "crates/entrypoint",
+  "crates/events",
+  "crates/evm", 
+  "crates/fhe", 
+  "crates/init", 
+  "crates/keyshare",
+  "crates/logger",
+  "crates/net", 
+  "crates/sdk",
+  "crates/sortition",
+  "crates/test-helpers",
+  "crates/tests",
 ]
 exclude = [
   "examples/CRISP/apps/server",
@@ -35,27 +35,27 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-e3-aggregator = { path = "./packages/ciphernode/aggregator" }
-e3-bfv-helpers = { path = "./packages/ciphernode/bfv-helpers" }
-e3-config = { path = "./packages/ciphernode/config" }
-e3-crypto = { path = "./packages/ciphernode/crypto" }
-e3-data = { path = "./packages/ciphernode/data" }
-e3-request = { path = "./packages/ciphernode/request" }
-e3-sdk = { path = "./packages/ciphernode/sdk" }
-e3-cli = { path = "./packages/ciphernode/cli" }
-e3-entrypoint = { path = "./packages/ciphernode/entrypoint" }
-e3-init = { path = "./packages/ciphernode/init" }
-e3-events = { path = "./packages/ciphernode/events" }
-e3-evm = { path = "./packages/ciphernode/evm" }
-e3-evm-helpers = { path = "./packages/ciphernode/evm-helpers" }
-e3-fhe = { path = "./packages/ciphernode/fhe" }
-e3-indexer = { path = "./packages/ciphernode/indexer" }
-e3-keyshare = { path = "./packages/ciphernode/keyshare" }
-e3-logger = { path = "./packages/ciphernode/logger" }
-e3-net = { path = "./packages/ciphernode/net" }
-e3-sortition = { path = "./packages/ciphernode/sortition" }
-e3-test-helpers = { path = "./packages/ciphernode/test-helpers" }
-e3-tests = { path = "./packages/ciphernode/tests" }
+e3-aggregator = { path = "./crates/aggregator" }
+e3-bfv-helpers = { path = "./crates/bfv-helpers" }
+e3-config = { path = "./crates/config" }
+e3-crypto = { path = "./crates/crypto" }
+e3-data = { path = "./crates/data" }
+e3-request = { path = "./crates/request" }
+e3-sdk = { path = "./crates/sdk" }
+e3-cli = { path = "./crates/cli" }
+e3-entrypoint = { path = "./crates/entrypoint" }
+e3-init = { path = "./crates/init" }
+e3-events = { path = "./crates/events" }
+e3-evm = { path = "./crates/evm" }
+e3-evm-helpers = { path = "./crates/evm-helpers" }
+e3-fhe = { path = "./crates/fhe" }
+e3-indexer = { path = "./crates/indexer" }
+e3-keyshare = { path = "./crates/keyshare" }
+e3-logger = { path = "./crates/logger" }
+e3-net = { path = "./crates/net" }
+e3-sortition = { path = "./crates/sortition" }
+e3-test-helpers = { path = "./crates/test-helpers" }
+e3-tests = { path = "./crates/tests" }
 
 actix = "0.13.5"
 actix-web = "4.10.2"

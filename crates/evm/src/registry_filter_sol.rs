@@ -15,7 +15,7 @@ use tracing::info;
 sol!(
     #[sol(rpc)]
     NaiveRegistryFilter,
-    "../../evm/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json"
+    "../../packages/evm/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json"
 );
 
 pub struct RegistryFilterSolWriter {

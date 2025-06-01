@@ -15,7 +15,7 @@ methods = { workspace = true }
 risc0-ethereum-contracts = { workspace = true }
 risc0-zkvm = { workspace = true }
 tokio = { workspace = true }
-e3-compute-provider = { path = "../../../../../packages/ciphernode/compute-provider" }
+e3-compute-provider = { path = "../../../../../crates/compute-provider" }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }

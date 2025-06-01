@@ -15,7 +15,7 @@ To use this library, add it to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-e3-compute-provider = { git = "https://github.com/gnosisguild/enclave.git", path = "packages/ciphernode/compute-provider"}
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave.git", path = "crates/compute-provider"}
 ```
 
 ## Usage

@@ -12,8 +12,9 @@ fn main() -> std::io::Result<()> {
 
     // Path to deployment artifacts
     let deployments_path = Path::new(&manifest_dir)
-        .join("..") // Adjust based on your actual path structure
         .join("..")
+        .join("..")
+        .join("packages")
         .join("evm")
         .join("deployments")
         .join("sepolia");
