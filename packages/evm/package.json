@@ -7,10 +7,10 @@
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
   },
-  "type": "module",
   "exports": {
     "./deploy/enclave": "./dist/deploy/enclave.js",
-    "./contracts/*": "./contracts/*"
+    "./contracts/*": "./contracts/*",
+    "./artifacts/*": "./artifacts/*"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
@@ -58,7 +58,8 @@
   },
   "files": [
     "contracts",
-    "dist"
+    "dist",
+    "artifacts"
   ],
   "keywords": [
     "blockchain",
@@ -76,7 +77,7 @@
   },
   "scripts": {
     "clean": "rimraf ./artifacts ./cache ./coverage ./types ./coverage.json && pnpm typechain",
-    "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
+    "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile && pnpm compile:scripts",
     "compile:scripts": "tsc --noEmitOnError false --noCheck",
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
@@ -94,7 +95,7 @@
     "task:withdraw": "hardhat task:withdraw",
     "test": "hardhat test",
     "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
-    "prerelease": "pnpm clean && pnpm compile && pnpm compile:scripts && pnpm typechain",
+    "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
     "release": "pnpm publish"
   },
   "dependencies": {

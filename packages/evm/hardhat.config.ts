@@ -1,13 +1,12 @@
+import "./tasks/accounts";
+import "./tasks/ciphernode";
+import "./tasks/enclave";
 import "@nomicfoundation/hardhat-toolbox";
 import dotenv from "dotenv";
 import "hardhat-deploy";
 import type { HardhatUserConfig } from "hardhat/config";
 import { vars } from "hardhat/config";
 import type { NetworkUserConfig } from "hardhat/types";
-
-import "./tasks/accounts";
-import "./tasks/ciphernode";
-import "./tasks/enclave";
 
 dotenv.config();
 

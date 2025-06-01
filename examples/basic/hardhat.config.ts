@@ -18,6 +18,18 @@ const config: HardhatUserConfig = {
       },
     },
   },
+  external: {
+    contracts: [
+      {
+        artifacts: "node_modules/@gnosis-guild/enclave/artifacts",
+      },
+    ],
+  },
+  namedAccounts: {
+    deployer: {
+      default: 0, // Use the first account as deployer
+    },
+  },
 };
 
 export default config;
