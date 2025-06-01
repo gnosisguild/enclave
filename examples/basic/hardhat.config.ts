@@ -1,7 +1,7 @@
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-deploy";
 import type { HardhatUserConfig } from "hardhat/config";
-import "@gnosis-guild/enclave/deploy";
+import "@gnosis-guild/enclave/deploy/enclave";
 
 const config: HardhatUserConfig = {
   defaultNetwork: "localhost",
