@@ -66,3 +66,28 @@ pub async fn commit(path: impl AsRef<Path>, message: &str) -> Result<()> {
         })?;
     Ok(())
 }
+
+pub async fn add_submodule(
+    repo_path: impl AsRef<Path>,
+    submodule_url: &str,
+    submodule_path: &str,
+) -> Result<()> {
+    let repo_path = repo_path.as_ref();
+    Command::new("git")
+        .arg("submodule")
+        .arg("add")
+        .arg(submodule_url)
+        .arg(submodule_path)
+        .current_dir(repo_path)
+        .output()
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to add git submodule '{}' at '{}' in directory: {}",
+                submodule_url,
+                submodule_path,
+                repo_path.display()
+            )
+        })?;
+    Ok(())
+}

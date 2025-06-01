@@ -1,19 +1,15 @@
 mod copy;
 mod file_utils;
 mod git;
-mod node_utils;
+mod package_json;
 mod pkgman;
 
-use anyhow::{bail, Result};
-use async_recursion::async_recursion;
+use anyhow::Result;
 use copy::Filter;
-use git::shallow_clone;
-use node_utils::get_version_from_package_json;
+use package_json::DependencyType;
 use pkgman::PkgMan;
-use serde_json::Value;
-use std::collections::HashMap;
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::fs;
 
 // Updated execute function to include workspace dependency substitution
@@ -31,7 +27,7 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     file_utils::ensure_empty_folder(&cwd).await?;
     git::shallow_clone(github_repo, branch, temp_dir).await?;
 
-    let version = node_utils::get_version_from_package_json(
+    let version = package_json::get_version_from_package_json(
         &PathBuf::from(temp_dir).join("packages/evm/package.json"),
     )
     .await?;
@@ -50,6 +46,21 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
         &PathBuf::from(temp_dir).join("packages/ciphernode/init/templates/support"),
         &cwd.join(".enclave/support"),
         &vec![],
+    )
+    .await?;
+
+    git::add_submodule(
+        &cwd,
+        "https://github.com/risc0/risc0-ethereum",
+        "lib/risc0-ethereum",
+    )
+    .await?;
+
+    package_json::add_package_to_json(
+        &cwd.join("package.json"),
+        "@risc0/ethereum",
+        "file:lib/risc0-ethereum",
+        DependencyType::DevDependencies,
     )
     .await?;
 
