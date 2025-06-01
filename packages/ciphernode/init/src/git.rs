@@ -24,6 +24,8 @@ pub async fn init(path: impl AsRef<Path>) -> Result<()> {
 
     Command::new("git")
         .arg("init")
+        .arg("-b")
+        .arg("main")
         .current_dir(path)
         .output()
         .await
