@@ -13,7 +13,7 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 e3-crypto = { workspace = true }
 e3-config = { workspace = true }
-data = { workspace = true }
+e3-data = { workspace = true }
 libp2p = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

@@ -7,7 +7,7 @@ use alloy::{
     sol_types::SolEvent,
 };
 use anyhow::Result;
-use data::Repository;
+use e3_data::Repository;
 use enclave_core::helpers::datastore::get_in_mem_store;
 use events::{
     new_event_bus_with_history, EnclaveEvent, GetHistory, HistoryCollector, Shutdown, TestEvent,

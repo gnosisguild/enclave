@@ -11,7 +11,7 @@ evm = { workspace = true }
 logger = { workspace = true }
 fhe = { workspace = true }
 e3-crypto = { workspace = true }
-data = { workspace = true }
+e3-data = { workspace = true }
 keyshare = { workspace = true }
 e3-aggregator = { workspace = true }
 e3_request = { workspace = true }

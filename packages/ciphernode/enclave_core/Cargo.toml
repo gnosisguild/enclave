@@ -16,7 +16,7 @@ bincode = { workspace = true }
 e3-config = { workspace = true }
 clap = { workspace = true }
 e3-crypto = { workspace = true }
-data = { workspace = true }
+e3-data = { workspace = true }
 dirs = { workspace = true }
 events = { workspace = true }
 evm = { workspace = true }

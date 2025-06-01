@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use anyhow::Result;
-use data::Persistable;
+use e3_data::Persistable;
 use events::{
     DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
     Seed,

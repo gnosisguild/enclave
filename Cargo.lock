@@ -2086,22 +2086,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "data"
-version = "0.1.0"
-dependencies = [
- "actix",
- "anyhow",
- "async-trait",
- "bincode",
- "events",
- "once_cell",
- "serde",
- "sled",
- "tempfile",
- "tracing",
-]
-
-[[package]]
 name = "data-encoding"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2332,8 +2316,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "data",
  "e3-config",
+ "e3-data",
  "e3_request",
  "events",
  "fhe 0.1.0",
@@ -2402,6 +2386,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-data"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "events",
+ "once_cell",
+ "serde",
+ "sled",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "e3-evm-helpers"
 version = "0.1.0"
 dependencies = [
@@ -2444,8 +2444,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "data",
  "e3-config",
+ "e3-data",
  "events",
  "serde",
  "tracing",
@@ -2565,11 +2565,11 @@ dependencies = [
  "anyhow",
  "bincode",
  "clap",
- "data",
  "dirs 5.0.1",
  "e3-aggregator",
  "e3-config",
  "e3-crypto",
+ "e3-data",
  "e3_request",
  "events",
  "evm",
@@ -2697,9 +2697,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
- "data",
  "e3-config",
  "e3-crypto",
+ "e3-data",
  "enclave_core",
  "events",
  "futures-util",
@@ -2790,9 +2790,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "data",
  "e3-bfv-helpers",
  "e3-config",
+ "e3-data",
  "e3_request",
  "events",
  "fhe 0.1.0-beta.7",
@@ -3949,9 +3949,9 @@ dependencies = [
  "actix",
  "anyhow",
  "async-trait",
- "data",
  "e3-config",
  "e3-crypto",
+ "e3-data",
  "e3_request",
  "events",
  "fhe 0.1.0",
@@ -4692,9 +4692,9 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-trait",
- "data",
  "e3-config",
  "e3-crypto",
+ "e3-data",
  "events",
  "futures",
  "libp2p",
@@ -6531,8 +6531,8 @@ dependencies = [
  "alloy",
  "anyhow",
  "async-trait",
- "data",
  "e3-config",
+ "e3-data",
  "events",
  "num",
  "rand 0.8.5",
@@ -6753,9 +6753,9 @@ dependencies = [
  "base64",
  "bincode",
  "clap",
- "data",
  "e3-aggregator",
  "e3-crypto",
+ "e3-data",
  "e3-sdk",
  "e3_request",
  "events",

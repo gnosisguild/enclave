@@ -2,7 +2,7 @@ use crate::{E3Extension, EventBuffer, HetrogenousMap, TypedKey};
 use actix::Recipient;
 use anyhow::Result;
 use async_trait::async_trait;
-use data::{
+use e3_data::{
     Checkpoint, FromSnapshotWithParams, Repositories, RepositoriesFactory, Repository, Snapshot,
 };
 use events::{E3id, EnclaveEvent};

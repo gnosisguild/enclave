@@ -1,8 +1,8 @@
 use super::set_up_crp;
 use anyhow::*;
 use async_trait::async_trait;
-use data::{FromSnapshotWithParams, Snapshot};
 use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
+use e3_data::{FromSnapshotWithParams, Snapshot};
 use events::{OrderedSet, Seed};
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},

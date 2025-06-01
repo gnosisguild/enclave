@@ -14,5 +14,5 @@ events = { workspace = true }
 fhe = { workspace = true }
 sortition = {  workspace = true }
 e3_request = { workspace = true }
-data = { workspace = true }
+e3-data = { workspace = true }
 tracing = { workspace = true }

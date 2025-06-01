@@ -11,7 +11,7 @@ use alloy::{
     transports::BoxTransport,
 };
 use anyhow::Result;
-use data::Repository;
+use e3_data::Repository;
 use events::{EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 

@@ -1,10 +1,10 @@
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::*;
-use data::RepositoriesFactory;
-use data::{DataStore, InMemStore};
 use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use e3_crypto::Cipher;
+use e3_data::RepositoriesFactory;
+use e3_data::{DataStore, InMemStore};
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
 use events::{

@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
-use data::Persistable;
 use e3_crypto::Cipher;
+use e3_data::Persistable;
 use events::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
     E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,

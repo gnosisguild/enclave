@@ -1,5 +1,5 @@
 [package]
-name = "data"
+name = "e3-data"
 version.workspace = true
 edition.workspace = true
 description = "Data persistence for enclave"

@@ -6,7 +6,7 @@ use alloy::primitives::{LogData, B256};
 use alloy::transports::BoxTransport;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
-use data::Repository;
+use e3_data::Repository;
 use events::{E3id, EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 

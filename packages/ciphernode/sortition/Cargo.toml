@@ -14,7 +14,7 @@ alloy = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 e3-config = { workspace = true }
-data = { workspace = true }
+e3-data = { workspace = true }
 events = { workspace = true }
 num = { workspace = true }
 rand = { workspace = true }

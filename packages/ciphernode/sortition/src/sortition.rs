@@ -2,7 +2,7 @@ use crate::DistanceSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::{anyhow, Result};
-use data::{AutoPersist, Persistable, Repository};
+use e3_data::{AutoPersist, Persistable, Repository};
 use events::{
     BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
     Subscribe,

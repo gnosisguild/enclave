@@ -140,8 +140,8 @@ impl DataStore {
     /// Changes the scope for the data store.
     /// Note that if the scope does not start with a slash one is appended.
     /// ```
-    /// use data::DataStore;
-    /// use data::InMemStore;
+    /// use e3_data::DataStore;
+    /// use e3_data::InMemStore;
     /// use actix::Actor;
     /// use anyhow::Result;
     ///

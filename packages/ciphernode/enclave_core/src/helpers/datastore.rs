@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use actix::{Actor, Addr};
 use anyhow::Result;
-use data::{DataStore, InMemStore, SledDb, SledStore};
-use data::{Repositories, RepositoriesFactory};
 use e3_config::AppConfig;
+use e3_data::{DataStore, InMemStore, SledDb, SledStore};
+use e3_data::{Repositories, RepositoriesFactory};
 use events::{get_enclave_event_bus, EnclaveEvent, EventBus};
 
 pub fn get_sled_store(bus: &Addr<EventBus<EnclaveEvent>>, db_file: &PathBuf) -> Result<DataStore> {
