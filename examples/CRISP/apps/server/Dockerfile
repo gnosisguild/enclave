@@ -31,9 +31,9 @@ COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
 COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
 COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
 COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
-COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/
+COPY crates/sdk/Cargo.toml crates/sdk/
 COPY Cargo.toml Cargo.lock ./
-COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/
+COPY crates/compute-provider/Cargo.toml crates/compute-provider/
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN cargo chef prepare --recipe-path recipe.json
@@ -57,34 +57,34 @@ COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/
 COPY Cargo.lock ./Cargo.lock
 COPY Cargo.toml ./Cargo.toml
 
-# find packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n"
-COPY packages/ciphernode/aggregator/Cargo.toml packages/ciphernode/aggregator/Cargo.toml
-COPY packages/ciphernode/bfv-helpers/Cargo.toml packages/ciphernode/bfv-helpers/Cargo.toml
-COPY packages/ciphernode/cli/Cargo.toml packages/ciphernode/cli/Cargo.toml
-COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/Cargo.toml
-COPY packages/ciphernode/config/Cargo.toml packages/ciphernode/config/Cargo.toml
-COPY packages/ciphernode/crypto/Cargo.toml packages/ciphernode/crypto/Cargo.toml
-COPY packages/ciphernode/data/Cargo.toml packages/ciphernode/data/Cargo.toml
-COPY packages/ciphernode/entrypoint/Cargo.toml packages/ciphernode/entrypoint/Cargo.toml
-COPY packages/ciphernode/events/Cargo.toml packages/ciphernode/events/Cargo.toml
-COPY packages/ciphernode/evm/Cargo.toml packages/ciphernode/evm/Cargo.toml
-COPY packages/ciphernode/evm-helpers/Cargo.toml packages/ciphernode/evm-helpers/Cargo.toml
-COPY packages/ciphernode/fhe/Cargo.toml packages/ciphernode/fhe/Cargo.toml
-COPY packages/ciphernode/indexer/Cargo.toml packages/ciphernode/indexer/Cargo.toml
-COPY packages/ciphernode/init/Cargo.toml packages/ciphernode/init/Cargo.toml
-COPY packages/ciphernode/keyshare/Cargo.toml packages/ciphernode/keyshare/Cargo.toml
-COPY packages/ciphernode/logger/Cargo.toml packages/ciphernode/logger/Cargo.toml
-COPY packages/ciphernode/net/Cargo.toml packages/ciphernode/net/Cargo.toml
-COPY packages/ciphernode/request/Cargo.toml packages/ciphernode/request/Cargo.toml
-COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/Cargo.toml
-COPY packages/ciphernode/sortition/Cargo.toml packages/ciphernode/sortition/Cargo.toml
-COPY packages/ciphernode/test-helpers/Cargo.toml packages/ciphernode/test-helpers/Cargo.toml
-COPY packages/ciphernode/tests/Cargo.toml packages/ciphernode/tests/Cargo.toml
+# find crates/* -name "Cargo.*" -printf "COPY %p %p\n"
+COPY crates/aggregator/Cargo.toml crates/aggregator/Cargo.toml
+COPY crates/bfv-helpers/Cargo.toml crates/bfv-helpers/Cargo.toml
+COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
+COPY crates/compute-provider/Cargo.toml crates/compute-provider/Cargo.toml
+COPY crates/config/Cargo.toml crates/config/Cargo.toml
+COPY crates/crypto/Cargo.toml crates/crypto/Cargo.toml
+COPY crates/data/Cargo.toml crates/data/Cargo.toml
+COPY crates/entrypoint/Cargo.toml crates/entrypoint/Cargo.toml
+COPY crates/events/Cargo.toml crates/events/Cargo.toml
+COPY crates/evm/Cargo.toml crates/evm/Cargo.toml
+COPY crates/evm-helpers/Cargo.toml crates/evm-helpers/Cargo.toml
+COPY crates/fhe/Cargo.toml crates/fhe/Cargo.toml
+COPY crates/indexer/Cargo.toml crates/indexer/Cargo.toml
+COPY crates/init/Cargo.toml crates/init/Cargo.toml
+COPY crates/keyshare/Cargo.toml crates/keyshare/Cargo.toml
+COPY crates/logger/Cargo.toml crates/logger/Cargo.toml
+COPY crates/net/Cargo.toml crates/net/Cargo.toml
+COPY crates/request/Cargo.toml crates/request/Cargo.toml
+COPY crates/sdk/Cargo.toml crates/sdk/Cargo.toml
+COPY crates/sortition/Cargo.toml crates/sortition/Cargo.toml
+COPY crates/test-helpers/Cargo.toml crates/test-helpers/Cargo.toml
+COPY crates/tests/Cargo.toml crates/tests/Cargo.toml
 
 RUN set -eux; \
     find \
     examples/CRISP/apps/program \
-    packages/ciphernode \
+    crates \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
     | while IFS= read -r -d '' manifest_path; do \
         crate_dir="$(dirname "$manifest_path")"; \
@@ -114,8 +114,8 @@ WORKDIR /app
 COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
 COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
 COPY Cargo.*                        ./
-COPY packages/ciphernode/           packages/ciphernode/
-COPY packages/ciphernode/compute-provider/     packages/ciphernode/compute-provider/
+COPY crates/           crates/
+COPY crates/compute-provider/     crates/compute-provider/
 
 WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \

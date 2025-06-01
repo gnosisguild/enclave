@@ -12,8 +12,9 @@ fn main() -> std::io::Result<()> {
 
     // Path to deployment artifacts
     let deployments_path = Path::new(&manifest_dir)
-        .join("..") // Adjust based on your actual path structure
         .join("..")
+        .join("..")
+        .join("packages")
         .join("evm")
         .join("deployments")
         .join("sepolia");
@@ -56,8 +57,7 @@ fn main() -> std::io::Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("contract_deployments.rs");
     fs::write(dest_path, contract_info)?;
-
-    println!("cargo:rerun-if-changed=../packages/evm/deployments/sepolia");
+    println!("cargo:rerun-if-changed=../../packages/evm/deployments/sepolia");
 
     Ok(())
 }

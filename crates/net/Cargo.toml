@@ -3,7 +3,7 @@ name = "e3-net"
 version.workspace = true
 edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
-repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
+repository = "https://github.com/gnosisguild/enclave"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

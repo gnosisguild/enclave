@@ -1,8 +1,8 @@
 services:
   alice:
     build:
-      dockerfile: packages/ciphernode/net/tests/Dockerfile
-      context: ../../../..
+      dockerfile: crates/net/tests/Dockerfile
+      context: ../../..
     command: ["/app/p2p_test", "alice"]
     environment:
       QUIC_PORT: 9091
@@ -13,8 +13,8 @@ services:
 
   bob:
     build:
-      dockerfile: packages/ciphernode/net/tests/Dockerfile
-      context: ../../../..
+      dockerfile: crates/net/tests/Dockerfile
+      context: ../../..
     command: ["/app/p2p_test", "bob"]
     environment:
       QUIC_PORT: 9091
@@ -25,8 +25,8 @@ services:
 
   charlie:
     build:
-      dockerfile: packages/ciphernode/net/tests/Dockerfile
-      context: ../../../..
+      dockerfile: crates/net/tests/Dockerfile
+      context: ../../..
     command: ["/app/p2p_test", "charlie"]
     environment:
       QUIC_PORT: 9091

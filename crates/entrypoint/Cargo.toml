@@ -3,7 +3,7 @@ name = "e3-entrypoint"
 version.workspace = true
 edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
-repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
+repository = "https://github.com/gnosisguild/enclave"
 build = "build.rs"
 
 [dependencies]

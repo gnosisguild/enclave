@@ -7,7 +7,7 @@ on:
       - hacknet
     paths:
       - "Cargo.*"
-      - "packages/ciphernode/**"
+      - "crates/**"
       - "packages/evm/contracts/**"
   pull_request:
     branches:
@@ -16,11 +16,11 @@ on:
       - hacknet
     paths:
       - "Cargo.*"
-      - "packages/ciphernode/**"
+      - "crates/**"
       - "packages/evm/contracts/**"
 
 env:
-  DOCKERFILE_PATH: packages/ciphernode/Dockerfile
+  DOCKERFILE_PATH: crates/Dockerfile
   IMAGE_NAME: ghcr.io/gnosisguild/ciphernode
 
 permissions:

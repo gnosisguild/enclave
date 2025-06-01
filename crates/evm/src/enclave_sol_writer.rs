@@ -15,7 +15,7 @@ use tracing::info;
 sol!(
     #[sol(rpc)]
     IEnclave,
-    "../../evm/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
+    "../../packages/evm/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
 );
 
 /// Consumes events from the event bus and calls EVM methods on the Enclave.sol contract
