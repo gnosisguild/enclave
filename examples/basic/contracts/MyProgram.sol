@@ -7,7 +7,7 @@ import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInput
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CRISPProgram is IE3Program, Ownable {
+contract MyProgram is IE3Program, Ownable {
     // Constants
     bytes32 public constant ENCRYPTION_SCHEME_ID = keccak256("fhe.rs:BFV");
 
