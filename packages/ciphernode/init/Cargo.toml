@@ -10,3 +10,4 @@ git2.workspace = true
 async-recursion.workspace = true 
 serde_json.workspace = true
 serde.workspace = true
+async-trait.workspace = true
