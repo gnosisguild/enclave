@@ -1,5 +1,5 @@
 [package]
-name = "net"
+name = "e3-net"
 version.workspace = true
 edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"

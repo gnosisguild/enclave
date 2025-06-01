@@ -1,7 +1,7 @@
 use anyhow::Result;
-use net::correlation_id::CorrelationId;
-use net::events::{NetworkPeerCommand, NetworkPeerEvent};
-use net::NetworkPeer;
+use e3_net::correlation_id::CorrelationId;
+use e3_net::events::{NetworkPeerCommand, NetworkPeerEvent};
+use e3_net::NetworkPeer;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::time::{sleep, timeout};

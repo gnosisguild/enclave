@@ -1,8 +1,8 @@
 use anyhow::Result;
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
+use e3_net::NetRepositoryFactory;
 use libp2p::{identity::Keypair, PeerId};
-use net::NetRepositoryFactory;
 use zeroize::Zeroize;
 
 use crate::helpers::datastore::get_repositories;

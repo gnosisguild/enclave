@@ -11,8 +11,8 @@ use e3_evm::{
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
 use e3_fhe::ext::FheExtension;
+use e3_net::{NetRepositoryFactory, NetworkManager};
 use e3_request::E3Router;
-use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
 use sortition::Sortition;

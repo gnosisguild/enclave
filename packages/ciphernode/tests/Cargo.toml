@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-net = { workspace = true }
+e3-net = { workspace = true }
 sortition = { workspace = true }
 e3-events = { workspace = true }
 e3-evm = { workspace = true }

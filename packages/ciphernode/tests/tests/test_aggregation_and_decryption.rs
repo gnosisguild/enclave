@@ -15,6 +15,7 @@ use e3_fhe::ext::FheExtension;
 use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_keyshare::ext::KeyshareExtension;
 use e3_logger::SimpleLogger;
+use e3_net::{events::NetworkPeerEvent, NetworkManager};
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
 use fhe_rs::{
@@ -22,7 +23,6 @@ use fhe_rs::{
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
 use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
-use net::{events::NetworkPeerEvent, NetworkManager};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -508,7 +508,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
             // the event bus as if it was gossiped from the network and ended up as an external
             // message this simulates a rebroadcast message
             if let Some(msg) = match cmd {
-                net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
+                e3_net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
                 _ => None,
             } {
                 msgs_loop.lock().await.push(msg.clone());

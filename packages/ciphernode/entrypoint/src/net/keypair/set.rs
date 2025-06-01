@@ -2,8 +2,8 @@ use alloy::primitives::hex;
 use anyhow::Result;
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
+use e3_net::NetRepositoryFactory;
 use libp2p::identity::Keypair;
-use net::NetRepositoryFactory;
 
 use crate::helpers::datastore::get_repositories;
 
