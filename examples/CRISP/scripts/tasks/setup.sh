@@ -12,7 +12,7 @@ echo "pnpm install"
 echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"
-(cd /app && cargo build --bin enclave && cargo install --bin enclave --force)
+(cd /app && cargo build -p e3-cli && cargo install --path packages/ciphernode/cli)
 echo "program"
 (cd ./apps/program && cargo build --bin crisp-program)
 echo "server"
