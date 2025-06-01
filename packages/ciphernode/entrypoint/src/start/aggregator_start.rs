@@ -10,8 +10,8 @@ use e3_evm::{
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
+use e3_fhe::ext::FheExtension;
 use e3_request::E3Router;
-use fhe::ext::FheExtension;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};

@@ -10,8 +10,8 @@ use e3_evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
 };
+use e3_fhe::ext::FheExtension;
 use e3_request::E3Router;
-use fhe::ext::FheExtension;
 use keyshare::ext::KeyshareExtension;
 use net::{NetRepositoryFactory, NetworkManager};
 use rand::SeedableRng;

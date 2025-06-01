@@ -1,5 +1,5 @@
 [package]
-name = "fhe"
+name = "e3-fhe"
 version.workspace = true
 edition.workspace = true
 

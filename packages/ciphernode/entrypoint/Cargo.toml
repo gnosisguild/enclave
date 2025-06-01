@@ -20,7 +20,7 @@ e3-data = { workspace = true }
 dirs = { workspace = true }
 e3-events = { workspace = true }
 e3-evm = { workspace = true }
-fhe = { workspace = true }
+e3-fhe = { workspace = true }
 hex = { workspace = true }
 keyshare = { workspace = true }
 logger = { workspace = true }

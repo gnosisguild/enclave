@@ -48,7 +48,7 @@ enclave-init = { path = "./packages/ciphernode/init" }
 e3-events = { path = "./packages/ciphernode/events" }
 e3-evm = { path = "./packages/ciphernode/evm" }
 e3-evm-helpers = { path = "./packages/ciphernode/evm-helpers" }
-fhe = { path = "./packages/ciphernode/fhe" }
+e3-fhe = { path = "./packages/ciphernode/fhe" }
 e3-indexer = { path = "./packages/ciphernode/indexer" }
 keyshare = { path = "./packages/ciphernode/keyshare" }
 logger = { path = "./packages/ciphernode/logger" }

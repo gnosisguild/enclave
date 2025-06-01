@@ -11,10 +11,10 @@ use e3_events::{
     GetErrors, GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
     PublicKeyAggregated, ResetHistory, Seed, Shutdown, Subscribe,
 };
+use e3_fhe::ext::FheExtension;
+use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
-use fhe::ext::FheExtension;
-use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
