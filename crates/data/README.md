@@ -79,7 +79,7 @@ graph LR
 We had a way to save bytes data with the `DataStore` and had a way to specify where that could be saved but actors need to be restartable and be able to be hydrated and we needed a standard way to accomplish this. To do this in typical Rust fashion we created a set of traits:
 
 - [`Snapshot`](https://github.com/gnosisguild/enclave/blob/main/crates/data/src/snapshot.rs) for defining how an object can create a snapshot of it's state
-- [`Checkpoint`](https://github.com/gnosisguild/enclave/blob/main/packages/ciphernode/data/src/snapshot.rs) for defining how to save that snapshot to a repository
+- [`Checkpoint`](https://github.com/gnosisguild/enclave/blob/main/crates/data/src/snapshot.rs) for defining how to save that snapshot to a repository
 - [`FromSnapshot`](https://github.com/gnosisguild/enclave/blob/main/crates/data/src/snapshot.rs) and [`FromSnapshotWithParams`](https://github.com/gnosisguild/enclave/blob/main/crates/data/src/snapshot.rs) for defining how an object could be reconstituted from a snapshot
 
 This worked well especially for objects who's persistable state needs to be derived from a subset of the saved state however there are a couple of problems:
