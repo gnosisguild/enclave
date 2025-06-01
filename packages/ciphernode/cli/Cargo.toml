@@ -1,9 +1,13 @@
 [package]
-name = "enclave"
+name = "e3-cli"
 version.workspace = true
 edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
 repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
+
+[[bin]]
+name = "enclave"
+path = "src/main.rs"
 
 [dependencies]
 actix = { workspace = true }
