@@ -1,6 +1,6 @@
 use anyhow::*;
-use config::AppConfig;
 use crypto::{FilePasswordManager, PasswordManager};
+use e3_config::AppConfig;
 use zeroize::Zeroizing;
 
 pub async fn get_current_password(config: &AppConfig) -> Result<Zeroizing<String>> {

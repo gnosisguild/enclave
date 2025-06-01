@@ -37,7 +37,7 @@ edition = "2021"
 [workspace.dependencies]
 e3-aggregator = { path = "./packages/ciphernode/aggregator" }
 e3-bfv-helpers = { path = "./packages/ciphernode/bfv-helpers" }
-config = { path = "./packages/ciphernode/config" }
+e3-config = { path = "./packages/ciphernode/config" }
 crypto = { path = "./packages/ciphernode/crypto" }
 data = { path = "./packages/ciphernode/data" }
 e3_request = { path = "./packages/ciphernode/e3_request" }

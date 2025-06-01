@@ -1,6 +1,6 @@
 use anyhow::*;
 use clap::Subcommand;
-use config::AppConfig;
+use e3_config::AppConfig;
 
 use crate::{net_generate, net_purge, net_set};
 

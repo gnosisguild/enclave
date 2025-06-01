@@ -1,5 +1,5 @@
 use anyhow::*;
-use config::AppConfig;
+use e3_config::AppConfig;
 use enclave_core::net;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {

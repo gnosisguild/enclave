@@ -1,6 +1,6 @@
 use crate::nodes::daemon;
 use anyhow::*;
-use config::AppConfig;
+use e3_config::AppConfig;
 use tracing::instrument;
 
 use super::client;

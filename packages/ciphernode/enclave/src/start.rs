@@ -1,6 +1,6 @@
 use crate::owo;
 use anyhow::{anyhow, Result};
-use config::{AppConfig, NodeRole};
+use e3_config::{AppConfig, NodeRole};
 use enclave_core::helpers::listen_for_shutdown;
 use tracing::{info, instrument};
 

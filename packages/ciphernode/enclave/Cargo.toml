@@ -10,7 +10,7 @@ actix = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 compile-time = { workspace = true }
-config = { workspace = true }
+e3-config = { workspace = true }
 crypto = { workspace = true }
 dialoguer = { workspace = true }
 enclave_core = { workspace = true }

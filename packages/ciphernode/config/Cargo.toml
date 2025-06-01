@@ -1,5 +1,5 @@
 [package]
-name = "config"
+name = "e3-config"
 version.workspace = true
 edition.workspace = true
 

@@ -1,6 +1,6 @@
 use anyhow::Result;
-use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Password};
+use e3_config::AppConfig;
 use enclave_core::wallet::set::validate_private_key;
 
 pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<()> {

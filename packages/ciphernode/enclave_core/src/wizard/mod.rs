@@ -1,8 +1,8 @@
 use alloy::primitives::Address;
 use anyhow::{anyhow, bail, Result};
-use config::load_config;
-use config::AppConfig;
-use config::RPC;
+use e3_config::load_config;
+use e3_config::AppConfig;
+use e3_config::RPC;
 use std::fs;
 use tracing::instrument;
 

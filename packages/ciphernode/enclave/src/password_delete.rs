@@ -1,7 +1,7 @@
 use crate::helpers::prompt_password::prompt_password;
 use anyhow::Result;
-use config::AppConfig;
 use dialoguer::{theme::ColorfulTheme, Confirm};
+use e3_config::AppConfig;
 use zeroize::Zeroize;
 
 pub async fn prompt_delete(config: &AppConfig) -> Result<bool> {

@@ -1,5 +1,5 @@
 use anyhow::*;
-use config::{combine_unique, AppConfig, NodeDefinition};
+use e3_config::{combine_unique, AppConfig, NodeDefinition};
 use std::sync::Arc;
 use std::{collections::HashMap, env};
 use tokio::sync::Mutex;

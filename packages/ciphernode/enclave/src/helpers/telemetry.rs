@@ -1,5 +1,5 @@
 use anyhow::Result;
-use config::AppConfig;
+use e3_config::AppConfig;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry_otlp::{Protocol, WithExportConfig};
 use opentelemetry_sdk::trace::SdkTracerProvider;

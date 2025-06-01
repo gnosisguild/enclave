@@ -1,6 +1,6 @@
 use crate::helpers::datastore::get_repositories;
 use anyhow::*;
-use config::AppConfig;
+use e3_config::AppConfig;
 use net::NetRepositoryFactory;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {

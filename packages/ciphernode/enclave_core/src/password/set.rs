@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
-use config::AppConfig;
 use crypto::{FilePasswordManager, PasswordManager};
+use e3_config::AppConfig;
 use zeroize::Zeroizing;
 
 use crate::helpers::rand::generate_random_bytes;

@@ -1,6 +1,6 @@
 use anyhow::*;
 use clap::Subcommand;
-use config::AppConfig;
+use e3_config::AppConfig;
 
 use crate::{
     nodes_daemon, nodes_down, nodes_ps, nodes_restart, nodes_start, nodes_status, nodes_stop,

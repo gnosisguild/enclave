@@ -1867,26 +1867,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "config"
-version = "0.1.0"
-dependencies = [
- "alloy",
- "anyhow",
- "dirs 5.0.1",
- "events",
- "figment",
- "path-clean",
- "petname",
- "rand 0.8.5",
- "serde",
- "serde_yaml",
- "shellexpand",
- "tempfile",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "console"
 version = "0.15.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2040,7 +2020,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "async-trait",
- "config",
+ "e3-config",
  "rand 0.8.5",
  "tokio",
  "zeroize",
@@ -2366,8 +2346,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "config",
  "data",
+ "e3-config",
  "e3_request",
  "events",
  "fhe 0.1.0",
@@ -2399,6 +2379,26 @@ dependencies = [
  "rayon",
  "serde",
  "sha3",
+]
+
+[[package]]
+name = "e3-config"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "anyhow",
+ "dirs 5.0.1",
+ "events",
+ "figment",
+ "path-clean",
+ "petname",
+ "rand 0.8.5",
+ "serde",
+ "serde_yaml",
+ "shellexpand",
+ "tempfile",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -2444,8 +2444,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "config",
  "data",
+ "e3-config",
  "events",
  "serde",
  "tracing",
@@ -2523,9 +2523,9 @@ dependencies = [
  "anyhow",
  "clap",
  "compile-time",
- "config",
  "crypto",
  "dialoguer",
+ "e3-config",
  "enclave-init",
  "enclave_core",
  "events",
@@ -2565,11 +2565,11 @@ dependencies = [
  "anyhow",
  "bincode",
  "clap",
- "config",
  "crypto",
  "data",
  "dirs 5.0.1",
  "e3-aggregator",
+ "e3-config",
  "e3_request",
  "events",
  "evm",
@@ -2697,9 +2697,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
- "config",
  "crypto",
  "data",
+ "e3-config",
  "enclave_core",
  "events",
  "futures-util",
@@ -2790,9 +2790,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "config",
  "data",
  "e3-bfv-helpers",
+ "e3-config",
  "e3_request",
  "events",
  "fhe 0.1.0-beta.7",
@@ -3949,9 +3949,9 @@ dependencies = [
  "actix",
  "anyhow",
  "async-trait",
- "config",
  "crypto",
  "data",
+ "e3-config",
  "e3_request",
  "events",
  "fhe 0.1.0",
@@ -4692,9 +4692,9 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-trait",
- "config",
  "crypto",
  "data",
+ "e3-config",
  "events",
  "futures",
  "libp2p",
@@ -6531,8 +6531,8 @@ dependencies = [
  "alloy",
  "anyhow",
  "async-trait",
- "config",
  "data",
+ "e3-config",
  "events",
  "num",
  "rand 0.8.5",

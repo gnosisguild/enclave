@@ -13,7 +13,7 @@ actix = { workspace = true }
 alloy = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-config = { workspace = true }
+e3-config = { workspace = true }
 data = { workspace = true }
 events = { workspace = true }
 num = { workspace = true }

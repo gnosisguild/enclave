@@ -1,9 +1,9 @@
 use actix::Addr;
 use alloy::primitives::Address;
 use anyhow::Result;
-use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
+use e3_config::AppConfig;
 use e3_request::E3Router;
 use events::get_enclave_event_bus;
 use events::{EnclaveEvent, EventBus};

@@ -1,5 +1,5 @@
 use anyhow::*;
-use config::AppConfig;
+use e3_config::AppConfig;
 use enclave_core::nodes::daemon;
 
 pub async fn execute(

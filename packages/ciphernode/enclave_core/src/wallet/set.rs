@@ -1,7 +1,7 @@
 use alloy::{hex::FromHex, primitives::FixedBytes, signers::local::PrivateKeySigner};
 use anyhow::{anyhow, Result};
-use config::AppConfig;
 use crypto::Cipher;
+use e3_config::AppConfig;
 use evm::EthPrivateKeyRepositoryFactory;
 
 use crate::helpers::{datastore::get_repositories, rand::generate_random_bytes};

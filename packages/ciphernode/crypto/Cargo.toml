@@ -10,5 +10,5 @@ rand = { workspace = true }
 zeroize = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
-config = { workspace = true }
+e3-config = { workspace = true }
 async-trait = { workspace = true }

@@ -1,5 +1,5 @@
-use config::StoreKeys;
 use data::{Repositories, Repository};
+use e3_config::StoreKeys;
 use events::E3id;
 
 use crate::{PlaintextAggregatorState, PublicKeyAggregatorState};

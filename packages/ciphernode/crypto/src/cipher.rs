@@ -6,7 +6,7 @@ use aes_gcm::{
 };
 use anyhow::{anyhow, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
-use config::AppConfig;
+use e3_config::AppConfig;
 use rand::{rngs::OsRng, RngCore};
 use zeroize::{Zeroize, Zeroizing};
 

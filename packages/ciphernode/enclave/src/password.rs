@@ -1,6 +1,6 @@
 use anyhow::*;
 use clap::Subcommand;
-use config::AppConfig;
+use e3_config::AppConfig;
 
 use crate::{password_delete, password_set};
 

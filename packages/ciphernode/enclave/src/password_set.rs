@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use config::AppConfig;
+use e3_config::AppConfig;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::helpers::prompt_password::prompt_password;

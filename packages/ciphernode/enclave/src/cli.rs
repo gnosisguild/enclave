@@ -7,8 +7,8 @@ use crate::wallet::WalletCommands;
 use crate::{init, net, password, wallet, wizard};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
-use config::validation::ValidUrl;
-use config::{load_config, AppConfig};
+use e3_config::validation::ValidUrl;
+use e3_config::{load_config, AppConfig};
 use enclave_core::helpers::datastore::close_all_connections;
 use tracing::{info, instrument, Level};
 
