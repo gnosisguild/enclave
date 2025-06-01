@@ -1,7 +1,7 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Password};
 use e3_config::AppConfig;
-use enclave_core::wallet::set::validate_private_key;
+use e3_entrypoint::wallet::set::validate_private_key;
 
 pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<()> {
     let input = if let Some(private_key) = private_key {
@@ -16,7 +16,7 @@ pub async fn execute(config: &AppConfig, private_key: Option<String>) -> Result<
             .to_string()
     };
 
-    enclave_core::wallet::set::execute(config, input).await?;
+    e3_entrypoint::wallet::set::execute(config, input).await?;
 
     println!("WalletKey key has been successfully stored and encrypted.");
 

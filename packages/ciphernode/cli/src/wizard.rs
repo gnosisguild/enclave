@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input};
-use enclave_core::wizard;
+use e3_entrypoint::wizard;
 use tracing::instrument;
 
 use crate::net;

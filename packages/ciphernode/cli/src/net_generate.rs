@@ -1,6 +1,6 @@
 use anyhow::Result;
 use e3_config::AppConfig;
-use enclave_core::net;
+use e3_entrypoint::net;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     let peer_id = net::keypair::generate::execute(config).await?;

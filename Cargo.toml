@@ -10,7 +10,7 @@ members = [
   "packages/ciphernode/indexer",
   "packages/ciphernode/request",
   "packages/ciphernode/cli",
-  "packages/ciphernode/enclave_core",
+  "packages/ciphernode/entrypoint",
   "packages/ciphernode/events",
   "packages/ciphernode/evm", 
   "packages/ciphernode/fhe", 
@@ -43,7 +43,7 @@ e3-data = { path = "./packages/ciphernode/data" }
 e3-request = { path = "./packages/ciphernode/request" }
 e3-sdk = { path = "./packages/ciphernode/sdk" }
 e3-cli = { path = "./packages/ciphernode/cli" }
-enclave_core = { path = "./packages/ciphernode/enclave_core" }
+e3-entrypoint = { path = "./packages/ciphernode/entrypoint" }
 enclave-init = { path = "./packages/ciphernode/init" }
 events = { path = "./packages/ciphernode/events" }
 evm = { path = "./packages/ciphernode/evm" }

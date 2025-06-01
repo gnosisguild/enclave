@@ -1,6 +1,6 @@
 use anyhow::*;
 use e3_config::AppConfig;
-use enclave_core::nodes::daemon;
+use e3_entrypoint::nodes::daemon;
 
 pub async fn execute(
     config: &AppConfig,

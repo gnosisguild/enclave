@@ -1,5 +1,5 @@
 use anyhow::*;
-use enclave_core::nodes::ps;
+use e3_entrypoint::nodes::ps;
 
 pub async fn execute() -> Result<()> {
     ps::execute().await?;

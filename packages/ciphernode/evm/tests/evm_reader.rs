@@ -8,7 +8,7 @@ use alloy::{
 };
 use anyhow::Result;
 use e3_data::Repository;
-use enclave_core::helpers::datastore::get_in_mem_store;
+use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use events::{
     new_event_bus_with_history, EnclaveEvent, GetHistory, HistoryCollector, Shutdown, TestEvent,
 };

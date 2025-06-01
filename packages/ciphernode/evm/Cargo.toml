@@ -23,5 +23,5 @@ url = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
-enclave_core = { workspace = true }
+e3-entrypoint = { workspace = true }
 

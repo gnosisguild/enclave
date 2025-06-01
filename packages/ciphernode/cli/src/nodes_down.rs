@@ -1,5 +1,5 @@
 use anyhow::*;
-use enclave_core::nodes::down;
+use e3_entrypoint::nodes::down;
 
 pub async fn execute() -> Result<()> {
     down::execute().await?;

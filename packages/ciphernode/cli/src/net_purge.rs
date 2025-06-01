@@ -1,6 +1,6 @@
 use anyhow::*;
 use e3_config::AppConfig;
-use enclave_core::net;
+use e3_entrypoint::net;
 
 pub async fn execute(config: &AppConfig) -> Result<()> {
     net::peer_id::purge::execute(config).await?;

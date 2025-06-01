@@ -1,7 +1,7 @@
 use crate::owo;
 use anyhow::{anyhow, Result};
 use e3_config::{AppConfig, NodeRole};
-use enclave_core::helpers::listen_for_shutdown;
+use e3_entrypoint::helpers::listen_for_shutdown;
 use tracing::{info, instrument};
 
 #[instrument(skip_all)]
@@ -21,7 +21,7 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
             pubkey_write_path,
             plaintext_write_path,
         } => {
-            enclave_core::start::aggregator_start::execute(
+            e3_entrypoint::start::aggregator_start::execute(
                 &config,
                 pubkey_write_path,
                 plaintext_write_path,
@@ -30,7 +30,7 @@ pub async fn execute(mut config: AppConfig, peers: Vec<String>) -> Result<()> {
         }
 
         // Launch in ciphernode configuration
-        NodeRole::Ciphernode => enclave_core::start::start::execute(&config, address).await?,
+        NodeRole::Ciphernode => e3_entrypoint::start::start::execute(&config, address).await?,
     };
 
     info!(
