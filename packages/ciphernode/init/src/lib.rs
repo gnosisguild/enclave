@@ -53,7 +53,7 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
 
     git::add_submodule(
         &cwd,
-        "https://github.com/risc0/risc0-ethereum",
+        "https://github.com/gnosisguild/risc0-ethereum",
         "lib/risc0-ethereum",
     )
     .await?;
