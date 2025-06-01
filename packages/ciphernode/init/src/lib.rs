@@ -39,7 +39,10 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     copy::copy_with_filters(
         &PathBuf::from(temp_dir).join(template_folder),
         &cwd,
-        &vec![Filter::new("package.json", "workspace:\\*", &version)],
+        &vec![
+            Filter::new(".gitignore", "\\/deployments$", ""),
+            Filter::new("package.json", "workspace:\\*", &version),
+        ],
     )
     .await?;
 
