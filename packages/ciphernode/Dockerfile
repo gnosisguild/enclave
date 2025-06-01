@@ -35,7 +35,7 @@ COPY packages/ciphernode/compute-provider/Cargo.toml ./compute-provider/Cargo.to
 COPY packages/ciphernode/config/Cargo.toml ./config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml ./crypto/Cargo.toml
 COPY packages/ciphernode/data/Cargo.toml ./data/Cargo.toml
-COPY packages/ciphernode/enclave_core/Cargo.toml ./enclave_core/Cargo.toml
+COPY packages/ciphernode/entrypoint/Cargo.toml ./entrypoint/Cargo.toml
 COPY packages/ciphernode/events/Cargo.toml ./events/Cargo.toml
 COPY packages/ciphernode/evm/Cargo.toml ./evm/Cargo.toml
 COPY packages/ciphernode/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
@@ -51,7 +51,7 @@ COPY packages/ciphernode/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
 COPY packages/ciphernode/tests/Cargo.toml ./tests/Cargo.toml
 
-COPY ./packages/ciphernode/enclave_core/build.rs ./enclave_core/build.rs
+COPY ./packages/ciphernode/entrypoint/build.rs ./entrypoint/build.rs
 
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \

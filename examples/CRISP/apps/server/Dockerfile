@@ -65,7 +65,7 @@ COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute
 COPY packages/ciphernode/config/Cargo.toml packages/ciphernode/config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml packages/ciphernode/crypto/Cargo.toml
 COPY packages/ciphernode/data/Cargo.toml packages/ciphernode/data/Cargo.toml
-COPY packages/ciphernode/enclave_core/Cargo.toml packages/ciphernode/enclave_core/Cargo.toml
+COPY packages/ciphernode/entrypoint/Cargo.toml packages/ciphernode/entrypoint/Cargo.toml
 COPY packages/ciphernode/events/Cargo.toml packages/ciphernode/events/Cargo.toml
 COPY packages/ciphernode/evm/Cargo.toml packages/ciphernode/evm/Cargo.toml
 COPY packages/ciphernode/evm-helpers/Cargo.toml packages/ciphernode/evm-helpers/Cargo.toml
