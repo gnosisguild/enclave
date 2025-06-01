@@ -2013,20 +2013,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43da5946c66ffcc7745f48db692ffbb10a83bfe0afd96235c5c2a4fb23994929"
 
 [[package]]
-name = "crypto"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "argon2",
- "async-trait",
- "e3-config",
- "rand 0.8.5",
- "tokio",
- "zeroize",
-]
-
-[[package]]
 name = "crypto-bigint"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2402,6 +2388,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-crypto"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "argon2",
+ "async-trait",
+ "e3-config",
+ "rand 0.8.5",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "e3-evm-helpers"
 version = "0.1.0"
 dependencies = [
@@ -2523,9 +2523,9 @@ dependencies = [
  "anyhow",
  "clap",
  "compile-time",
- "crypto",
  "dialoguer",
  "e3-config",
+ "e3-crypto",
  "enclave-init",
  "enclave_core",
  "events",
@@ -2565,11 +2565,11 @@ dependencies = [
  "anyhow",
  "bincode",
  "clap",
- "crypto",
  "data",
  "dirs 5.0.1",
  "e3-aggregator",
  "e3-config",
+ "e3-crypto",
  "e3_request",
  "events",
  "evm",
@@ -2697,9 +2697,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64",
- "crypto",
  "data",
  "e3-config",
+ "e3-crypto",
  "enclave_core",
  "events",
  "futures-util",
@@ -3949,9 +3949,9 @@ dependencies = [
  "actix",
  "anyhow",
  "async-trait",
- "crypto",
  "data",
  "e3-config",
+ "e3-crypto",
  "e3_request",
  "events",
  "fhe 0.1.0",
@@ -4692,9 +4692,9 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-trait",
- "crypto",
  "data",
  "e3-config",
+ "e3-crypto",
  "events",
  "futures",
  "libp2p",
@@ -6753,9 +6753,9 @@ dependencies = [
  "base64",
  "bincode",
  "clap",
- "crypto",
  "data",
  "e3-aggregator",
+ "e3-crypto",
  "e3-sdk",
  "e3_request",
  "events",

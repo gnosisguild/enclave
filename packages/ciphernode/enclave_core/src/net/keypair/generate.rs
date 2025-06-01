@@ -1,6 +1,6 @@
 use anyhow::Result;
-use crypto::Cipher;
 use e3_config::AppConfig;
+use e3_crypto::Cipher;
 use libp2p::{identity::Keypair, PeerId};
 use net::NetRepositoryFactory;
 use zeroize::Zeroize;

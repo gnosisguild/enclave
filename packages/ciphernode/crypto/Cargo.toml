@@ -1,5 +1,5 @@
 [package]
-name = "crypto"
+name = "e3-crypto"
 version.workspace = true
 edition.workspace = true
 

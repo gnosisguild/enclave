@@ -24,9 +24,9 @@ use alloy::{
 };
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
-use crypto::Cipher;
 use data::Repository;
 use e3_config::{RpcAuth, RPC};
+use e3_crypto::Cipher;
 use std::{env, io, marker::PhantomData, sync::Arc};
 use zeroize::Zeroizing;
 pub trait AuthConversions {

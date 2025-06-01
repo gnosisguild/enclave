@@ -10,7 +10,7 @@ events = { workspace = true }
 evm = { workspace = true }
 logger = { workspace = true }
 fhe = { workspace = true }
-crypto = { workspace = true }
+e3-crypto = { workspace = true }
 data = { workspace = true }
 keyshare = { workspace = true }
 e3-aggregator = { workspace = true }

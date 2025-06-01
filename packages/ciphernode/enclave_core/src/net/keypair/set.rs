@@ -1,7 +1,7 @@
 use alloy::primitives::hex;
 use anyhow::Result;
-use crypto::Cipher;
 use e3_config::AppConfig;
+use e3_crypto::Cipher;
 use libp2p::identity::Keypair;
 use net::NetRepositoryFactory;
 
