@@ -2318,8 +2318,8 @@ dependencies = [
  "bincode",
  "e3-config",
  "e3-data",
+ "e3-events",
  "e3-request",
- "events",
  "fhe 0.1.0",
  "serde",
  "sortition",
@@ -2347,8 +2347,8 @@ dependencies = [
  "e3-config",
  "e3-crypto",
  "e3-entrypoint",
+ "e3-events",
  "enclave-init",
- "events",
  "hex",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -2387,7 +2387,7 @@ dependencies = [
  "alloy",
  "anyhow",
  "dirs 5.0.1",
- "events",
+ "e3-events",
  "figment",
  "path-clean",
  "petname",
@@ -2422,7 +2422,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "events",
+ "e3-events",
  "once_cell",
  "serde",
  "sled",
@@ -2446,8 +2446,8 @@ dependencies = [
  "e3-config",
  "e3-crypto",
  "e3-data",
+ "e3-events",
  "e3-request",
- "events",
  "evm",
  "fhe 0.1.0",
  "hex",
@@ -2466,6 +2466,25 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "e3-events"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "alloy",
+ "alloy-primitives",
+ "alloy-sol-types",
+ "anyhow",
+ "bincode",
+ "bloom",
+ "bs58",
+ "futures-util",
+ "once_cell",
+ "serde",
+ "sha2",
+ "tracing",
 ]
 
 [[package]]
@@ -2504,7 +2523,7 @@ dependencies = [
  "bincode",
  "e3-config",
  "e3-data",
- "events",
+ "e3-events",
  "serde",
  "tracing",
 ]
@@ -2669,25 +2688,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "events"
-version = "0.1.0"
-dependencies = [
- "actix",
- "alloy",
- "alloy-primitives",
- "alloy-sol-types",
- "anyhow",
- "bincode",
- "bloom",
- "bs58",
- "futures-util",
- "once_cell",
- "serde",
- "sha2",
- "tracing",
-]
-
-[[package]]
 name = "evm"
 version = "0.1.0"
 dependencies = [
@@ -2701,7 +2701,7 @@ dependencies = [
  "e3-crypto",
  "e3-data",
  "e3-entrypoint",
- "events",
+ "e3-events",
  "futures-util",
  "serde",
  "sortition",
@@ -2793,8 +2793,8 @@ dependencies = [
  "e3-bfv-helpers",
  "e3-config",
  "e3-data",
+ "e3-events",
  "e3-request",
- "events",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
  "fhe-util",
@@ -3952,8 +3952,8 @@ dependencies = [
  "e3-config",
  "e3-crypto",
  "e3-data",
+ "e3-events",
  "e3-request",
- "events",
  "fhe 0.1.0",
  "serde",
  "tracing",
@@ -4503,7 +4503,7 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "base64",
- "events",
+ "e3-events",
  "tracing",
 ]
 
@@ -4695,7 +4695,7 @@ dependencies = [
  "e3-config",
  "e3-crypto",
  "e3-data",
- "events",
+ "e3-events",
  "futures",
  "libp2p",
  "tokio",
@@ -6533,7 +6533,7 @@ dependencies = [
  "async-trait",
  "e3-config",
  "e3-data",
- "events",
+ "e3-events",
  "num",
  "rand 0.8.5",
  "serde",
@@ -6731,8 +6731,8 @@ dependencies = [
  "actix",
  "bincode",
  "clap",
+ "e3-events",
  "e3-sdk",
- "events",
  "fhe 0.1.0",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
@@ -6756,9 +6756,9 @@ dependencies = [
  "e3-aggregator",
  "e3-crypto",
  "e3-data",
+ "e3-events",
  "e3-request",
  "e3-sdk",
- "events",
  "evm",
  "fhe 0.1.0",
  "fhe 0.1.0-beta.7",

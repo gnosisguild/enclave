@@ -1,6 +1,6 @@
 use actix::Recipient;
 use anyhow::Result;
-use events::{EnclaveEvent, Shutdown};
+use e3_events::{EnclaveEvent, Shutdown};
 use std::time::Duration;
 use tokio::{
     signal::unix::{signal, SignalKind},

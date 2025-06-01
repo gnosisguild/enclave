@@ -1,6 +1,6 @@
 [package]
 # we have to name this other than core for disambiguation
-name = "events"
+name = "e3-events"
 version.workspace = true
 edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"

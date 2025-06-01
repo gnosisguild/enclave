@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
-use events::{EnclaveEvent, EventBus, Subscribe};
+use e3_events::{EnclaveEvent, EventBus, Subscribe};
 use tracing::info;
 
 pub struct PublicKeyWriter {

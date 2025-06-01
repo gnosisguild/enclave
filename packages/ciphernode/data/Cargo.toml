@@ -7,7 +7,7 @@ repository = "https://github.com/gnosisguild/enclave/packages/ciphernode"
 
 [dependencies]
 actix = { workspace = true }
-events = { workspace = true }
+e3-events = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 sled = { workspace = true }

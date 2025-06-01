@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use e3_data::{
     Checkpoint, FromSnapshotWithParams, Repositories, RepositoriesFactory, Repository, Snapshot,
 };
-use events::{E3id, EnclaveEvent};
+use e3_events::{E3id, EnclaveEvent};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 

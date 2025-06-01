@@ -7,7 +7,7 @@ use alloy::transports::BoxTransport;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use e3_data::Repository;
-use events::{E3id, EnclaveEvent, EventBus};
+use e3_events::{E3id, EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 
 sol!(
@@ -18,9 +18,9 @@ sol!(
 
 struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 
-impl From<E3RequestedWithChainId> for events::E3Requested {
+impl From<E3RequestedWithChainId> for e3_events::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
-        events::E3Requested {
+        e3_events::E3Requested {
             params: value.0.e3.e3ProgramParams.to_vec(),
             threshold_m: value.0.e3.threshold[0] as usize,
             seed: value.0.e3.seed.into(),
@@ -31,16 +31,16 @@ impl From<E3RequestedWithChainId> for events::E3Requested {
 
 impl From<E3RequestedWithChainId> for EnclaveEvent {
     fn from(value: E3RequestedWithChainId) -> Self {
-        let payload: events::E3Requested = value.into();
+        let payload: e3_events::E3Requested = value.into();
         EnclaveEvent::from(payload)
     }
 }
 
 struct CiphertextOutputPublishedWithChainId(pub IEnclave::CiphertextOutputPublished, pub u64);
 
-impl From<CiphertextOutputPublishedWithChainId> for events::CiphertextOutputPublished {
+impl From<CiphertextOutputPublishedWithChainId> for e3_events::CiphertextOutputPublished {
     fn from(value: CiphertextOutputPublishedWithChainId) -> Self {
-        events::CiphertextOutputPublished {
+        e3_events::CiphertextOutputPublished {
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
             ciphertext_output: value.0.ciphertextOutput.to_vec(),
         }
@@ -49,7 +49,7 @@ impl From<CiphertextOutputPublishedWithChainId> for events::CiphertextOutputPubl
 
 impl From<CiphertextOutputPublishedWithChainId> for EnclaveEvent {
     fn from(value: CiphertextOutputPublishedWithChainId) -> Self {
-        let payload: events::CiphertextOutputPublished = value.into();
+        let payload: e3_events::CiphertextOutputPublished = value.into();
         EnclaveEvent::from(payload)
     }
 }

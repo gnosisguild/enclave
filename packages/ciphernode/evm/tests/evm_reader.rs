@@ -9,7 +9,7 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_entrypoint::helpers::datastore::get_in_mem_store;
-use events::{
+use e3_events::{
     new_event_bus_with_history, EnclaveEvent, GetHistory, HistoryCollector, Shutdown, TestEvent,
 };
 use evm::{helpers::WithChainId, EvmEventReader};

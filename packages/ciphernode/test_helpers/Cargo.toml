@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 actix = { workspace = true }
-events = { workspace = true }
+e3-events = { workspace = true }
 fhe = { workspace = true }
 bincode = { workspace = true }
 clap = { workspace = true }

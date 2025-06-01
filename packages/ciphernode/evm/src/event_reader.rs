@@ -9,7 +9,7 @@ use alloy::rpc::types::Filter;
 use alloy::transports::{BoxTransport, Transport};
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
-use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
+use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
 use futures_util::stream::StreamExt;
 use std::collections::HashSet;
 use tokio::select;

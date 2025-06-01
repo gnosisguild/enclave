@@ -5,14 +5,14 @@ use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtens
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_data::{DataStore, InMemStore};
-use e3_request::E3Router;
-use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
-use events::{
+use e3_events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig,
     GetErrors, GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
     PublicKeyAggregated, ResetHistory, Seed, Shutdown, Subscribe,
 };
+use e3_request::E3Router;
+use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
 use fhe::ext::FheExtension;
 use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use fhe_rs::{

@@ -3,7 +3,7 @@ use anyhow::*;
 use async_trait::async_trait;
 use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
 use e3_data::{FromSnapshotWithParams, Snapshot};
-use events::{OrderedSet, Seed};
+use e3_events::{OrderedSet, Seed};
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},

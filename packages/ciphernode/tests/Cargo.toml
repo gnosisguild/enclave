@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 net = { workspace = true }
 sortition = { workspace = true }
-events = { workspace = true }
+e3-events = { workspace = true }
 evm = { workspace = true }
 logger = { workspace = true }
 fhe = { workspace = true }

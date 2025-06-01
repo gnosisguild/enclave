@@ -1,5 +1,5 @@
 use actix::{Actor, Addr, Context, Handler};
-use events::{EnclaveEvent, Event, EventBus, Subscribe};
+use e3_events::{EnclaveEvent, Event, EventBus, Subscribe};
 use std::marker::PhantomData;
 use tracing::{error, info};
 

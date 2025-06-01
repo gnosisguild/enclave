@@ -8,7 +8,7 @@ use actix::prelude::*;
 use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
-use events::{EnclaveEvent, EventBus, EventId, Subscribe};
+use e3_events::{EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
 use std::sync::Arc;

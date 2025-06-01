@@ -19,7 +19,7 @@ e3-crypto = { workspace = true }
 dialoguer = { workspace = true }
 e3-entrypoint = { workspace = true }
 enclave-init = { workspace = true }
-events = { workspace = true }
+e3-events = { workspace = true }
 hex = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry-otlp = { workspace = true }

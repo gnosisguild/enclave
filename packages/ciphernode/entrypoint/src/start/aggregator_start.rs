@@ -4,8 +4,8 @@ use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtens
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
+use e3_events::{get_enclave_event_bus, EnclaveEvent, EventBus};
 use e3_request::E3Router;
-use events::{get_enclave_event_bus, EnclaveEvent, EventBus};
 use evm::{
     helpers::{get_signer_from_repository, ProviderConfig},
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,

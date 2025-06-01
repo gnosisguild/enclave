@@ -7,8 +7,8 @@ use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use e3_data::{AutoPersist, RepositoriesFactory};
+use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
-use events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use fhe::ext::FHE_KEY;
 use sortition::Sortition;
 

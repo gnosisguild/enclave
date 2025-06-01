@@ -4,9 +4,9 @@ use anyhow::Result;
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
+use e3_events::get_enclave_event_bus;
+use e3_events::{EnclaveEvent, EventBus};
 use e3_request::E3Router;
-use events::get_enclave_event_bus;
-use events::{EnclaveEvent, EventBus};
 use evm::{
     helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
     EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
