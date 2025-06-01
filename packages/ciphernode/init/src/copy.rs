@@ -33,7 +33,7 @@ where
 
     // Create destination directory and copy contents in one shell command
     let combined_command = format!(
-        "mkdir -p {} && cp -r {}/* {}",
+        "mkdir -p {} && cp -r {}/. {}",
         dest_path.to_string_lossy(),
         src_path.to_string_lossy(),
         dest_path.to_string_lossy()
@@ -79,13 +79,15 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
 
     // Apply sed replacement to each matching file
     for file_path in files.lines().filter(|line| !line.is_empty()) {
+        let sed_cmd = format!(
+            "s/{}/{}/g",
+            escape_sed_pattern(&filter.search_pattern),
+            escape_sed_replacement(&filter.replacement)
+        );
+        println!("{}", sed_cmd);
         let sed_output = Command::new("sed")
             .arg("-i")
-            .arg(format!(
-                "s/{}/{}/g",
-                escape_sed_pattern(&filter.search_pattern),
-                escape_sed_replacement(&filter.replacement)
-            ))
+            .arg(sed_cmd)
             .arg(file_path)
             .output()
             .await
@@ -103,15 +105,15 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
 fn escape_sed_pattern(pattern: &str) -> String {
     // Escape special sed characters in the search pattern
     pattern
+        .replace('\\', r"\\")
         .replace('/', r"\/")
         .replace('&', r"\&")
-        .replace('\\', r"\\")
 }
 
 fn escape_sed_replacement(replacement: &str) -> String {
     // Escape special sed characters in the replacement string
     replacement
+        .replace('\\', r"\\")
         .replace('/', r"\/")
         .replace('&', r"\&")
-        .replace('\\', r"\\")
 }

@@ -40,7 +40,7 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
         &PathBuf::from(temp_dir).join(template_folder),
         &cwd,
         &vec![
-            Filter::new(".gitignore", "\\/deployments$", ""),
+            Filter::new(".gitignore", "/deployments$", ""),
             Filter::new("package.json", "workspace:\\*", &version),
         ],
     )
@@ -58,6 +58,8 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     npm.run(&["install"]).await?;
 
     git::init(&cwd).await?;
+    git::add_all(&cwd).await?;
+    git::commit(&cwd, "Initial Commit").await?;
 
     Ok(())
 }

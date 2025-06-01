@@ -21,7 +21,6 @@ pub async fn shallow_clone(git_repo: &str, branch: &str, target_folder: &str) ->
 
 pub async fn init(path: impl AsRef<Path>) -> Result<()> {
     let path = path.as_ref();
-
     Command::new("git")
         .arg("init")
         .arg("-b")
@@ -35,6 +34,35 @@ pub async fn init(path: impl AsRef<Path>) -> Result<()> {
                 path.display()
             )
         })?;
+    Ok(())
+}
 
+pub async fn add_all(path: impl AsRef<Path>) -> Result<()> {
+    let path = path.as_ref();
+    Command::new("git")
+        .arg("add")
+        .arg(".")
+        .current_dir(path)
+        .output()
+        .await
+        .with_context(|| format!("Failed to execute git add in directory: {}", path.display()))?;
+    Ok(())
+}
+
+pub async fn commit(path: impl AsRef<Path>, message: &str) -> Result<()> {
+    let path = path.as_ref();
+    Command::new("git")
+        .arg("commit")
+        .arg("-m")
+        .arg(message)
+        .current_dir(path)
+        .output()
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to execute git commit in directory: {}",
+                path.display()
+            )
+        })?;
     Ok(())
 }
