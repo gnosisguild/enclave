@@ -1,12 +1,12 @@
 use actix::prelude::*;
 use anyhow::Result;
-use data::Persistable;
-use events::{
+use e3_data::Persistable;
+use e3_events::{
     DecryptionshareCreated, Die, E3id, EnclaveEvent, EventBus, OrderedSet, PlaintextAggregated,
     Seed,
 };
-use fhe::{Fhe, GetAggregatePlaintext};
-use sortition::{GetHasNode, Sortition};
+use e3_fhe::{Fhe, GetAggregatePlaintext};
+use e3_sortition::{GetHasNode, Sortition};
 use std::sync::Arc;
 use tracing::error;
 

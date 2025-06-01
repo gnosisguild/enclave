@@ -1,6 +1,3 @@
-#![crate_name = "net"]
-#![crate_type = "lib"]
-
 pub mod correlation_id;
 mod dialer;
 pub mod events;

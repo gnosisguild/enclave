@@ -1,33 +1,33 @@
 use actix::prelude::*;
-use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use alloy::primitives::Address;
 use anyhow::*;
-use crypto::Cipher;
-use data::RepositoriesFactory;
-use data::{DataStore, InMemStore};
-use e3_request::E3Router;
-use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
-use events::{
+use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
+use e3_crypto::Cipher;
+use e3_data::RepositoriesFactory;
+use e3_data::{DataStore, InMemStore};
+use e3_events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3RequestComplete, E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig,
     GetErrors, GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
     PublicKeyAggregated, ResetHistory, Seed, Shutdown, Subscribe,
 };
-use fhe::ext::FheExtension;
-use fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use e3_fhe::ext::FheExtension;
+use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use e3_keyshare::ext::KeyshareExtension;
+use e3_logger::SimpleLogger;
+use e3_net::{events::NetworkPeerEvent, NetworkManager};
+use e3_request::E3Router;
+use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
+use e3_sortition::SortitionRepositoryFactory;
+use e3_sortition::{CiphernodeSelector, Sortition};
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
 use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
-use keyshare::ext::KeyshareExtension;
-use logger::SimpleLogger;
-use net::{events::NetworkPeerEvent, NetworkManager};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use sortition::SortitionRepositoryFactory;
-use sortition::{CiphernodeSelector, Sortition};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 use tokio::{sync::mpsc, time::sleep};
@@ -508,7 +508,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
             // the event bus as if it was gossiped from the network and ended up as an external
             // message this simulates a rebroadcast message
             if let Some(msg) = match cmd {
-                net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
+                e3_net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
                 _ => None,
             } {
                 msgs_loop.lock().await.push(msg.clone());

@@ -1,5 +1,5 @@
 [package]
-name = "fhe"
+name = "e3-fhe"
 version.workspace = true
 edition.workspace = true
 
@@ -8,14 +8,14 @@ actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
-config = { workspace = true }
-data = { workspace = true }
-events = { workspace = true }
+e3-config = { workspace = true }
+e3-data = { workspace = true }
+e3-events = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 fhe_rs = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
-e3_request = { workspace = true }
+e3-request = { workspace = true }
 serde = { workspace = true }
 e3-bfv-helpers = { workspace = true }

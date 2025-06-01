@@ -1,7 +1,3 @@
-#![crate_name = "sortition"]
-#![crate_type = "lib"]
-// #![warn(missing_docs, unused_imports)]
-
 mod ciphernode_selector;
 mod distance;
 mod index;

@@ -1,5 +1,5 @@
 [package]
-name = "sortition"
+name = "e3-sortition"
 version.workspace = true
 edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"
@@ -13,9 +13,9 @@ actix = { workspace = true }
 alloy = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-config = { workspace = true }
-data = { workspace = true }
-events = { workspace = true }
+e3-config = { workspace = true }
+e3-data = { workspace = true }
+e3-events = { workspace = true }
 num = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

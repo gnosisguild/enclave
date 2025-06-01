@@ -11,8 +11,8 @@ use alloy::{
     transports::BoxTransport,
 };
 use anyhow::Result;
-use data::Repository;
-use events::{EnclaveEvent, EventBus};
+use e3_data::Repository;
+use e3_events::{EnclaveEvent, EventBus};
 use tracing::{error, info, trace};
 
 sol!(
@@ -24,9 +24,9 @@ sol!(
 
 struct CiphernodeAddedWithChainId(pub ICiphernodeRegistry::CiphernodeAdded, pub u64);
 
-impl From<CiphernodeAddedWithChainId> for events::CiphernodeAdded {
+impl From<CiphernodeAddedWithChainId> for e3_events::CiphernodeAdded {
     fn from(value: CiphernodeAddedWithChainId) -> Self {
-        events::CiphernodeAdded {
+        e3_events::CiphernodeAdded {
             address: value.0.node.to_string(),
             // TODO: limit index and numNodes to uint32 at the solidity level
             index: value
@@ -46,15 +46,15 @@ impl From<CiphernodeAddedWithChainId> for events::CiphernodeAdded {
 
 impl From<CiphernodeAddedWithChainId> for EnclaveEvent {
     fn from(value: CiphernodeAddedWithChainId) -> Self {
-        let payload: events::CiphernodeAdded = value.into();
+        let payload: e3_events::CiphernodeAdded = value.into();
         EnclaveEvent::from(payload)
     }
 }
 
 struct CiphernodeRemovedWithChainId(pub ICiphernodeRegistry::CiphernodeRemoved, pub u64);
-impl From<CiphernodeRemovedWithChainId> for events::CiphernodeRemoved {
+impl From<CiphernodeRemovedWithChainId> for e3_events::CiphernodeRemoved {
     fn from(value: CiphernodeRemovedWithChainId) -> Self {
-        events::CiphernodeRemoved {
+        e3_events::CiphernodeRemoved {
             address: value.0.node.to_string(),
             index: value
                 .0
@@ -73,7 +73,7 @@ impl From<CiphernodeRemovedWithChainId> for events::CiphernodeRemoved {
 
 impl From<CiphernodeRemovedWithChainId> for EnclaveEvent {
     fn from(value: CiphernodeRemovedWithChainId) -> Self {
-        let payload: events::CiphernodeRemoved = value.into();
+        let payload: e3_events::CiphernodeRemoved = value.into();
         EnclaveEvent::from(payload)
     }
 }

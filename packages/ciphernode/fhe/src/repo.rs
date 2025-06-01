@@ -1,6 +1,6 @@
-use config::StoreKeys;
-use data::{Repositories, Repository};
-use events::E3id;
+use e3_config::StoreKeys;
+use e3_data::{Repositories, Repository};
+use e3_events::E3id;
 
 use crate::FheSnapshot;
 

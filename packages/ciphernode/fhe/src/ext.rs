@@ -2,9 +2,9 @@ use crate::{Fhe, FheRepositoryFactory, SharedRng};
 use actix::Addr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
+use e3_data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
+use e3_events::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey};
-use events::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use std::sync::Arc;
 
 pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");

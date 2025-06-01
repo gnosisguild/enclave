@@ -7,9 +7,9 @@ use alloy::{
     rpc::types::TransactionReceipt,
 };
 use anyhow::Result;
-use events::Shutdown;
-use events::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
-use events::{EnclaveEvent, EventBus};
+use e3_events::Shutdown;
+use e3_events::{BusError, E3id, EnclaveErrorType, PlaintextAggregated, Subscribe};
+use e3_events::{EnclaveEvent, EventBus};
 use tracing::info;
 
 sol!(

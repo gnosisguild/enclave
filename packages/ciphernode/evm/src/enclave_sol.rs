@@ -7,8 +7,8 @@ use crate::{
 use actix::Addr;
 use alloy::transports::BoxTransport;
 use anyhow::Result;
-use data::Repository;
-use events::{EnclaveEvent, EventBus};
+use e3_data::Repository;
+use e3_events::{EnclaveEvent, EventBus};
 
 pub struct EnclaveSol;
 impl EnclaveSol {

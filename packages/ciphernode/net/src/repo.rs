@@ -1,5 +1,5 @@
-use config::StoreKeys;
-use data::{Repositories, Repository};
+use e3_config::StoreKeys;
+use e3_data::{Repositories, Repository};
 
 pub trait NetRepositoryFactory {
     fn libp2p_keypair(&self) -> Repository<Vec<u8>>;

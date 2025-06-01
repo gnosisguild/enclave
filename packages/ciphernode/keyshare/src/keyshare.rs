@@ -1,12 +1,12 @@
 use actix::prelude::*;
 use anyhow::{anyhow, Result};
-use crypto::Cipher;
-use data::Persistable;
-use events::{
+use e3_crypto::Cipher;
+use e3_data::Persistable;
+use e3_events::{
     BusError, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated, Die,
     E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
-use fhe::{DecryptCiphertext, Fhe};
+use e3_fhe::{DecryptCiphertext, Fhe};
 use std::sync::Arc;
 use tracing::warn;
 

@@ -1,5 +1,5 @@
 [package]
-name = "config"
+name = "e3-config"
 version.workspace = true
 edition.workspace = true
 
@@ -7,7 +7,7 @@ edition.workspace = true
 alloy = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
-events = { workspace = true }
+e3-events = { workspace = true }
 figment = { workspace = true }
 path-clean = { workspace = true }
 petname = { workspace = true }
