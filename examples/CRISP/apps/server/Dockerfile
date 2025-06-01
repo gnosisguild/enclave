@@ -60,22 +60,22 @@ COPY Cargo.toml ./Cargo.toml
 # find packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n"
 COPY packages/ciphernode/aggregator/Cargo.toml packages/ciphernode/aggregator/Cargo.toml
 COPY packages/ciphernode/bfv-helpers/Cargo.toml packages/ciphernode/bfv-helpers/Cargo.toml
+COPY packages/ciphernode/cli/Cargo.toml packages/ciphernode/cli/Cargo.toml
 COPY packages/ciphernode/compute-provider/Cargo.toml packages/ciphernode/compute-provider/Cargo.toml
 COPY packages/ciphernode/config/Cargo.toml packages/ciphernode/config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml packages/ciphernode/crypto/Cargo.toml
 COPY packages/ciphernode/data/Cargo.toml packages/ciphernode/data/Cargo.toml
-COPY packages/ciphernode/e3_request/Cargo.toml packages/ciphernode/e3_request/Cargo.toml
-COPY packages/ciphernode/enclave/Cargo.toml packages/ciphernode/enclave/Cargo.toml
 COPY packages/ciphernode/enclave_core/Cargo.toml packages/ciphernode/enclave_core/Cargo.toml
 COPY packages/ciphernode/events/Cargo.toml packages/ciphernode/events/Cargo.toml
-COPY packages/ciphernode/evm/Cargo.toml packages/ciphernode/evm/Cargo.toml
 COPY packages/ciphernode/evm-helpers/Cargo.toml packages/ciphernode/evm-helpers/Cargo.toml
+COPY packages/ciphernode/evm/Cargo.toml packages/ciphernode/evm/Cargo.toml
 COPY packages/ciphernode/fhe/Cargo.toml packages/ciphernode/fhe/Cargo.toml
 COPY packages/ciphernode/indexer/Cargo.toml packages/ciphernode/indexer/Cargo.toml
 COPY packages/ciphernode/init/Cargo.toml packages/ciphernode/init/Cargo.toml
 COPY packages/ciphernode/keyshare/Cargo.toml packages/ciphernode/keyshare/Cargo.toml
 COPY packages/ciphernode/logger/Cargo.toml packages/ciphernode/logger/Cargo.toml
 COPY packages/ciphernode/net/Cargo.toml packages/ciphernode/net/Cargo.toml
+COPY packages/ciphernode/request/Cargo.toml packages/ciphernode/request/Cargo.toml
 COPY packages/ciphernode/sdk/Cargo.toml packages/ciphernode/sdk/Cargo.toml
 COPY packages/ciphernode/sortition/Cargo.toml packages/ciphernode/sortition/Cargo.toml
 COPY packages/ciphernode/test_helpers/Cargo.toml packages/ciphernode/test_helpers/Cargo.toml

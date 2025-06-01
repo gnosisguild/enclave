@@ -30,22 +30,22 @@ COPY --from=evm-builder /build/packages/evm/deployments ../evm/deployments
 # find packages/ciphernode/* -name "Cargo.*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) packages/ciphernode/|COPY \1 ./|'
 COPY packages/ciphernode/aggregator/Cargo.toml ./aggregator/Cargo.toml
 COPY packages/ciphernode/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
+COPY packages/ciphernode/cli/Cargo.toml ./cli/Cargo.toml
 COPY packages/ciphernode/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
 COPY packages/ciphernode/config/Cargo.toml ./config/Cargo.toml
 COPY packages/ciphernode/crypto/Cargo.toml ./crypto/Cargo.toml
 COPY packages/ciphernode/data/Cargo.toml ./data/Cargo.toml
-COPY packages/ciphernode/e3_request/Cargo.toml ./e3_request/Cargo.toml
-COPY packages/ciphernode/enclave/Cargo.toml ./enclave/Cargo.toml
 COPY packages/ciphernode/enclave_core/Cargo.toml ./enclave_core/Cargo.toml
 COPY packages/ciphernode/events/Cargo.toml ./events/Cargo.toml
-COPY packages/ciphernode/evm/Cargo.toml ./evm/Cargo.toml
 COPY packages/ciphernode/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
+COPY packages/ciphernode/evm/Cargo.toml ./evm/Cargo.toml
 COPY packages/ciphernode/fhe/Cargo.toml ./fhe/Cargo.toml
 COPY packages/ciphernode/indexer/Cargo.toml ./indexer/Cargo.toml
 COPY packages/ciphernode/init/Cargo.toml ./init/Cargo.toml
 COPY packages/ciphernode/keyshare/Cargo.toml ./keyshare/Cargo.toml
 COPY packages/ciphernode/logger/Cargo.toml ./logger/Cargo.toml
 COPY packages/ciphernode/net/Cargo.toml ./net/Cargo.toml
+COPY packages/ciphernode/request/Cargo.toml ./request/Cargo.toml
 COPY packages/ciphernode/sdk/Cargo.toml ./sdk/Cargo.toml
 COPY packages/ciphernode/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY packages/ciphernode/test_helpers/Cargo.toml ./test_helpers/Cargo.toml
