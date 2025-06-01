@@ -1,5 +1,5 @@
 [package]
-name = "aggregator"
+name = "e3-aggregator"
 version.workspace = true
 edition.workspace = true
 

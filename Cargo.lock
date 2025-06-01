@@ -272,24 +272,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aggregator"
-version = "0.1.0"
-dependencies = [
- "actix",
- "anyhow",
- "async-trait",
- "bincode",
- "config",
- "data",
- "e3_request",
- "events",
- "fhe 0.1.0",
- "serde",
- "sortition",
- "tracing",
-]
-
-[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2377,6 +2359,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "e3-aggregator"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "config",
+ "data",
+ "e3_request",
+ "events",
+ "fhe 0.1.0",
+ "serde",
+ "sortition",
+ "tracing",
+]
+
+[[package]]
 name = "e3-bfv-helpers"
 version = "0.1.0"
 dependencies = [
@@ -2560,7 +2560,6 @@ version = "0.1.0"
 dependencies = [
  "actix",
  "actix-web",
- "aggregator",
  "alloy",
  "alloy-primitives",
  "anyhow",
@@ -2570,6 +2569,7 @@ dependencies = [
  "crypto",
  "data",
  "dirs 5.0.1",
+ "e3-aggregator",
  "e3_request",
  "events",
  "evm",
@@ -6746,7 +6746,6 @@ name = "tests"
 version = "0.1.0"
 dependencies = [
  "actix",
- "aggregator",
  "alloy",
  "alloy-primitives",
  "anyhow",
@@ -6756,6 +6755,7 @@ dependencies = [
  "clap",
  "crypto",
  "data",
+ "e3-aggregator",
  "e3-sdk",
  "e3_request",
  "events",

@@ -13,7 +13,7 @@ fhe = { workspace = true }
 crypto = { workspace = true }
 data = { workspace = true }
 keyshare = { workspace = true }
-aggregator = { workspace = true }
+e3-aggregator = { workspace = true }
 e3_request = { workspace = true }
 test_helpers = { workspace = true }
 fhe_rs = { workspace = true }

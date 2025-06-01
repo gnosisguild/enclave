@@ -1,9 +1,9 @@
 use actix::Addr;
-use aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use anyhow::Result;
 use config::AppConfig;
 use crypto::Cipher;
 use data::RepositoriesFactory;
+use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use e3_request::E3Router;
 use events::{get_enclave_event_bus, EnclaveEvent, EventBus};
 use evm::{

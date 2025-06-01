@@ -8,7 +8,7 @@ build = "build.rs"
 
 [dependencies]
 actix = { workspace = true }
-aggregator = { workspace = true }
+e3-aggregator = { workspace = true }
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
