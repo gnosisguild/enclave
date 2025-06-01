@@ -37,8 +37,8 @@ COPY packages/ciphernode/crypto/Cargo.toml ./crypto/Cargo.toml
 COPY packages/ciphernode/data/Cargo.toml ./data/Cargo.toml
 COPY packages/ciphernode/enclave_core/Cargo.toml ./enclave_core/Cargo.toml
 COPY packages/ciphernode/events/Cargo.toml ./events/Cargo.toml
-COPY packages/ciphernode/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY packages/ciphernode/evm/Cargo.toml ./evm/Cargo.toml
+COPY packages/ciphernode/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY packages/ciphernode/fhe/Cargo.toml ./fhe/Cargo.toml
 COPY packages/ciphernode/indexer/Cargo.toml ./indexer/Cargo.toml
 COPY packages/ciphernode/init/Cargo.toml ./init/Cargo.toml
