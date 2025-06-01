@@ -23,7 +23,7 @@ e3-evm = { workspace = true }
 e3-fhe = { workspace = true }
 hex = { workspace = true }
 e3-keyshare = { workspace = true }
-logger = { workspace = true }
+e3-logger = { workspace = true }
 libp2p = { workspace = true }
 net = { workspace = true }
 phf = { workspace = true }

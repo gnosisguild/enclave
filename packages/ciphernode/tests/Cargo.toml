@@ -8,7 +8,7 @@ net = { workspace = true }
 sortition = { workspace = true }
 e3-events = { workspace = true }
 e3-evm = { workspace = true }
-logger = { workspace = true }
+e3-logger = { workspace = true }
 e3-fhe = { workspace = true }
 e3-crypto = { workspace = true }
 e3-data = { workspace = true }

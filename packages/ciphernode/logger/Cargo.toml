@@ -1,5 +1,5 @@
 [package]
-name = "logger"
+name = "e3-logger"
 version.workspace = true
 edition.workspace = true
 
