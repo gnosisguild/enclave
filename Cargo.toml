@@ -44,7 +44,7 @@ e3-request = { path = "./packages/ciphernode/request" }
 e3-sdk = { path = "./packages/ciphernode/sdk" }
 e3-cli = { path = "./packages/ciphernode/cli" }
 e3-entrypoint = { path = "./packages/ciphernode/entrypoint" }
-enclave-init = { path = "./packages/ciphernode/init" }
+e3-init = { path = "./packages/ciphernode/init" }
 e3-events = { path = "./packages/ciphernode/events" }
 e3-evm = { path = "./packages/ciphernode/evm" }
 e3-evm-helpers = { path = "./packages/ciphernode/evm-helpers" }

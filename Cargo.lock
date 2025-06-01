@@ -2348,7 +2348,7 @@ dependencies = [
  "e3-crypto",
  "e3-entrypoint",
  "e3-events",
- "enclave-init",
+ "e3-init",
  "hex",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -2559,6 +2559,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-init"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-recursion",
+ "git2",
+ "tokio",
+]
+
+[[package]]
 name = "e3-request"
 version = "0.1.0"
 dependencies = [
@@ -2644,16 +2654,6 @@ dependencies = [
  "sec1",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "enclave-init"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-recursion",
- "git2",
- "tokio",
 ]
 
 [[package]]
