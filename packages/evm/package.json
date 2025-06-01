@@ -7,6 +7,7 @@
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
   },
+  "type": "module",
   "exports": {
     "./deploy/enclave": "./dist/deploy/enclave.js",
     "./contracts/*": "./contracts/*"
