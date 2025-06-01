@@ -18,6 +18,8 @@ use e3_logger::SimpleLogger;
 use e3_net::{events::NetworkPeerEvent, NetworkManager};
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
+use e3_sortition::SortitionRepositoryFactory;
+use e3_sortition::{CiphernodeSelector, Sortition};
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
@@ -26,8 +28,6 @@ use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use sortition::SortitionRepositoryFactory;
-use sortition::{CiphernodeSelector, Sortition};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, Mutex};
 use tokio::{sync::mpsc, time::sleep};

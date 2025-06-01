@@ -32,7 +32,7 @@ rand_chacha = { workspace = true }
 e3-request = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sortition = { workspace = true }
+e3-sortition = { workspace = true }
 test_helpers = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

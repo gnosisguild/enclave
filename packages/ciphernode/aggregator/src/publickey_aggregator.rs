@@ -5,7 +5,7 @@ use e3_events::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
-use sortition::{GetHasNode, GetNodes, Sortition};
+use e3_sortition::{GetHasNode, GetNodes, Sortition};
 use std::sync::Arc;
 use tracing::error;
 

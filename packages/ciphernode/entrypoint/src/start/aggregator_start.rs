@@ -13,10 +13,10 @@ use e3_evm::{
 use e3_fhe::ext::FheExtension;
 use e3_net::{NetRepositoryFactory, NetworkManager};
 use e3_request::E3Router;
+use e3_sortition::Sortition;
+use e3_sortition::SortitionRepositoryFactory;
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
-use sortition::Sortition;
-use sortition::SortitionRepositoryFactory;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},

@@ -6,7 +6,7 @@ use e3_events::{
     Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};
-use sortition::{GetHasNode, Sortition};
+use e3_sortition::{GetHasNode, Sortition};
 use std::sync::Arc;
 use tracing::error;
 

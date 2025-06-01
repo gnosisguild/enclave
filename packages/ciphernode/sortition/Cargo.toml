@@ -1,5 +1,5 @@
 [package]
-name = "sortition"
+name = "e3-sortition"
 version.workspace = true
 edition.workspace = true
 description = ": coordinates the encryption and decryption of enclave computations"

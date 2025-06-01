@@ -53,7 +53,7 @@ e3-indexer = { path = "./packages/ciphernode/indexer" }
 e3-keyshare = { path = "./packages/ciphernode/keyshare" }
 e3-logger = { path = "./packages/ciphernode/logger" }
 e3-net = { path = "./packages/ciphernode/net" }
-sortition = { path = "./packages/ciphernode/sortition" }
+e3-sortition = { path = "./packages/ciphernode/sortition" }
 test_helpers = { package = "test-helpers", path = "./packages/ciphernode/test_helpers" }
 tests = { path = "./packages/ciphernode/tests" }
 
