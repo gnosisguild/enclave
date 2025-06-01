@@ -84,7 +84,6 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
             escape_sed_pattern(&filter.search_pattern),
             escape_sed_replacement(&filter.replacement)
         );
-        println!("{}", sed_cmd);
         let sed_output = Command::new("sed")
             .arg("-i")
             .arg(sed_cmd)
