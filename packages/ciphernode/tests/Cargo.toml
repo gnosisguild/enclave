@@ -14,7 +14,7 @@ e3-crypto = { workspace = true }
 e3-data = { workspace = true }
 keyshare = { workspace = true }
 e3-aggregator = { workspace = true }
-e3_request = { workspace = true }
+e3-request = { workspace = true }
 test_helpers = { workspace = true }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }

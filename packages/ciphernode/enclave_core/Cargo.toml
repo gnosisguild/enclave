@@ -29,7 +29,7 @@ net = { workspace = true }
 phf = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
-e3_request = { workspace = true }
+e3-request = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sortition = { workspace = true }

@@ -2318,7 +2318,7 @@ dependencies = [
  "bincode",
  "e3-config",
  "e3-data",
- "e3_request",
+ "e3-request",
  "events",
  "fhe 0.1.0",
  "serde",
@@ -2428,16 +2428,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-sdk"
-version = "0.1.0"
-dependencies = [
- "e3-bfv-helpers",
- "e3-evm-helpers",
- "e3-indexer",
-]
-
-[[package]]
-name = "e3_request"
+name = "e3-request"
 version = "0.1.0"
 dependencies = [
  "actix",
@@ -2449,6 +2440,15 @@ dependencies = [
  "events",
  "serde",
  "tracing",
+]
+
+[[package]]
+name = "e3-sdk"
+version = "0.1.0"
+dependencies = [
+ "e3-bfv-helpers",
+ "e3-evm-helpers",
+ "e3-indexer",
 ]
 
 [[package]]
@@ -2570,7 +2570,7 @@ dependencies = [
  "e3-config",
  "e3-crypto",
  "e3-data",
- "e3_request",
+ "e3-request",
  "events",
  "evm",
  "fhe 0.1.0",
@@ -2793,7 +2793,7 @@ dependencies = [
  "e3-bfv-helpers",
  "e3-config",
  "e3-data",
- "e3_request",
+ "e3-request",
  "events",
  "fhe 0.1.0-beta.7",
  "fhe-traits",
@@ -3952,7 +3952,7 @@ dependencies = [
  "e3-config",
  "e3-crypto",
  "e3-data",
- "e3_request",
+ "e3-request",
  "events",
  "fhe 0.1.0",
  "serde",
@@ -6756,8 +6756,8 @@ dependencies = [
  "e3-aggregator",
  "e3-crypto",
  "e3-data",
+ "e3-request",
  "e3-sdk",
- "e3_request",
  "events",
  "evm",
  "fhe 0.1.0",

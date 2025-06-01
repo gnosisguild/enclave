@@ -8,7 +8,7 @@ members = [
   "packages/ciphernode/bfv-helpers",
   "packages/ciphernode/evm-helpers",
   "packages/ciphernode/indexer",
-  "packages/ciphernode/e3_request",
+  "packages/ciphernode/request",
   "packages/ciphernode/enclave",
   "packages/ciphernode/enclave_core",
   "packages/ciphernode/events",
@@ -40,7 +40,7 @@ e3-bfv-helpers = { path = "./packages/ciphernode/bfv-helpers" }
 e3-config = { path = "./packages/ciphernode/config" }
 e3-crypto = { path = "./packages/ciphernode/crypto" }
 e3-data = { path = "./packages/ciphernode/data" }
-e3_request = { path = "./packages/ciphernode/e3_request" }
+e3-request = { path = "./packages/ciphernode/request" }
 e3-sdk = { path = "./packages/ciphernode/sdk" }
 enclave = { path = "./packages/ciphernode/enclave" }
 enclave_core = { path = "./packages/ciphernode/enclave_core" }

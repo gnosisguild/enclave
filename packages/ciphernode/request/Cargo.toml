@@ -1,5 +1,5 @@
 [package]
-name = "e3_request"
+name = "e3-request"
 version.workspace = true
 edition.workspace = true
 
