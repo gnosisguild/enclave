@@ -8,7 +8,7 @@
     "url": "https://github.com/gnosisguild"
   },
   "exports": {
-    "./deploy": "./dist/deploy.js",
+    "./deploy/*": "./dist/deploy/*",
     "./contracts/*": "./contracts/*"
   },
   "devDependencies": {
