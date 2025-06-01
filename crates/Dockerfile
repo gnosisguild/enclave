@@ -51,12 +51,18 @@ COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 
-COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
+# COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
+RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
 
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
+          if [ "$d" == "./cli/" ]; then \
             mkdir -p "$d/src" && \
             echo "fn main() {}" > "$d/src/main.rs"; \
+          else \
+            mkdir -p "$d/src" && \
+            echo "pub fn main() {}" > "$d/src/lib.rs"; \
+          fi \
         fi \
     done
 
