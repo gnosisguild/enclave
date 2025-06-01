@@ -24,8 +24,8 @@ COPY Cargo.toml ./Cargo.toml
 COPY ./rust-toolchain.toml .
 
 WORKDIR /build/crates
-COPY --from=evm-builder /build/packages/evm/artifacts ../evm/artifacts
-COPY --from=evm-builder /build/packages/evm/deployments ../evm/deployments
+COPY --from=evm-builder /build/packages/evm/artifacts ../packages/evm/artifacts
+COPY --from=evm-builder /build/packages/evm/deployments ../packages/evm/deployments
 
 # find crates/* -name "Cargo.*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'
 COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
@@ -53,10 +53,9 @@ COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 
 # COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
-
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
-          if [ "$d" == "./cli/" ]; then \
+          if [ "$d" = "./cli/" ]; then \
             mkdir -p "$d/src" && \
             echo "fn main() {}" > "$d/src/main.rs"; \
           else \
