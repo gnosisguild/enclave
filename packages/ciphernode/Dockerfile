@@ -56,7 +56,7 @@ COPY ./packages/ciphernode/entrypoint/build.rs ./entrypoint/build.rs
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
             mkdir -p "$d/src" && \
-            echo "fn main() {}" > "$d/src/lib.rs"; \
+            echo "fn main() {}" > "$d/src/main.rs"; \
         fi \
     done
 
@@ -65,7 +65,7 @@ RUN cargo build --release
 COPY ./packages/ciphernode .
 
 RUN find . -name "*.rs" -exec touch {} +
-RUN cargo build --release
+RUN cargo build --release -p e3-cli
 
 # Runtime stage
 FROM debian:stable-slim
