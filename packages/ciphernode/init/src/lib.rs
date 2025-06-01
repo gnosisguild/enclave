@@ -49,6 +49,8 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     )
     .await?;
 
+    git::init(&cwd).await?;
+
     git::add_submodule(
         &cwd,
         "https://github.com/risc0/risc0-ethereum",
@@ -65,10 +67,8 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     .await?;
 
     let npm = PkgMan::new(pkgman::PkgManKind::PNPM)?.with_cwd(&cwd);
-
     npm.run(&["install"]).await?;
 
-    git::init(&cwd).await?;
     git::add_all(&cwd).await?;
     git::commit(&cwd, "Initial Commit").await?;
 
