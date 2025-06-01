@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.27;
 
-import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
+import {IRiscZeroVerifier} from "@risc0/ethereum/contracts/src/IRiscZeroVerifier.sol";
 import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
 import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
@@ -14,19 +14,11 @@ contract CRISPProgram is IE3Program, Ownable {
     // State variables
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
-    ISemaphore public semaphore;
-    CRISPCheckerFactory private immutable CHECKER_FACTORY;
-    CRISPPolicyFactory private immutable POLICY_FACTORY;
-    CRISPInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
-    uint8 public constant INPUT_LIMIT = 100;
     bytes32 public imageId;
 
     // Mappings
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
-    mapping(uint256 e3Id => uint256 groupId) public groupIds;
-    mapping(uint256 groupId => mapping(uint256 identityCommitment => bool))
-        public committed;
 
     // Events
     event InputValidatorUpdated(address indexed newValidator);
@@ -76,24 +68,6 @@ contract CRISPProgram is IE3Program, Ownable {
         );
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
-
-        // Create a new group
-        uint256 groupId = semaphore.createGroup(address(this));
-        groupIds[e3Id] = groupId;
-
-        // Deploy a new checker
-        address checker = CHECKER_FACTORY.deploy(address(semaphore), groupId);
-
-        // Deploy a new policy
-        IBasePolicy policy = IBasePolicy(
-            POLICY_FACTORY.deploy(checker, INPUT_LIMIT)
-        );
-
-        // Deploy a new input validator
-        inputValidator = IInputValidator(
-            INPUT_VALIDATOR_FACTORY.deploy(address(policy))
-        );
-        policy.setTarget(address(inputValidator));
 
         return (ENCRYPTION_SCHEME_ID, inputValidator);
     }
