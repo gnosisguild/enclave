@@ -1,4 +1,4 @@
-import { UltraHonkBackend } from '@aztec/bb.js';
+import { UltraHonkBackend, ProofData } from '@aztec/bb.js';
 import { Noir } from '@noir-lang/noir_js';
 import crisp_circuit from 'libs/noir/crisp_circuit.json';
 
@@ -35,9 +35,8 @@ export const convertToPolynomialArray = (
     return stringArrays.map(convertToPolynomial);
 };
 
-export const generateProof = async (circuitInputs: CircuitInputs) => {
+export const generateProof = async (circuitInputs: CircuitInputs): Promise<ProofData> => {
     const noir = new Noir(crisp_circuit as any);
-    console.log("Starting execution");
     const backend = new UltraHonkBackend(crisp_circuit.bytecode, { threads: 4 });
 
     const pk0is_poly = convertToPolynomialArray(circuitInputs.pk0is);
@@ -67,10 +66,6 @@ export const generateProof = async (circuitInputs: CircuitInputs) => {
         p1is: p1is_poly,
         p2is: p2is_poly,
     });
-    console.log("Witness", witness);
-    console.log("Generating proof");
 
-    const { proof } = await backend.generateProof(witness);
-    console.log("Proof", proof);
-    return proof;
+    return await backend.generateProof(witness, { keccak: true });
 }; 

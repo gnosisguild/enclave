@@ -36,11 +36,11 @@ export const useWebAssemblyHook = () => {
         if (type === 'encrypt_vote') {
           if (success) {
             const { vote, circuitInputs } = encryptedVote;
-            const proof = await generateProof(circuitInputs as CircuitInputs);
+            const { proof, publicInputs } = await generateProof(circuitInputs as CircuitInputs);
             resolve({
               vote: vote,
               proof: proof,
-              public_inputs: [],
+              public_inputs: publicInputs,
             })
           } else {
             showToast({
