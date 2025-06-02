@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 CONTAINER_NAME="e3-support.1"
-IMAGE="ghcr.io/gnosisguild/e3-support:cbd7754a"
+IMAGE="ghcr.io/gnosisguild/e3-support:55b85711"
 CACHE_PREFIX="e3-support"
 
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
@@ -12,6 +12,6 @@ else
         -v "$(pwd)/tests:/app/tests" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
         -v "${CACHE_PREFIX}-target-cache:/app/target" \
-        -p 13151:4001 \
+        -p 13151:13151 \
         "$IMAGE" bash -c "$*"
 fi

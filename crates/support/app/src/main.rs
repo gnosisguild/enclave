@@ -1,8 +1,6 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
 use e3_compute_provider::FHEInputs;
 use e3_program_client::{ComputeRequest, ComputeResponse};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 // Run compute handler
 async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
@@ -31,7 +29,7 @@ async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
-    let bind_addr = "0.0.0.0:4001";
+    let bind_addr = "0.0.0.0:13151";
     let server = HttpServer::new(|| {
         App::new()
             .wrap(Logger::default())
