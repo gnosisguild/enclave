@@ -2436,31 +2436,18 @@ dependencies = [
  "bincode",
  "bytemuck",
  "e3-compute-provider",
- "e3-support-methods",
  "e3-user-program",
  "fhe",
  "fhe-traits",
  "fhe-util",
  "log",
+ "methods",
  "rand 0.8.5",
  "risc0-ethereum-contracts",
  "risc0-zkvm",
  "serde",
  "tokio",
  "tracing-subscriber 0.3.19",
-]
-
-[[package]]
-name = "e3-support-methods"
-version = "0.1.0"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "hex",
- "risc0-build",
- "risc0-build-ethereum",
- "risc0-zkp",
- "risc0-zkvm",
 ]
 
 [[package]]
@@ -3802,6 +3789,19 @@ dependencies = [
  "log",
  "objc",
  "paste",
+]
+
+[[package]]
+name = "methods"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "hex",
+ "risc0-build",
+ "risc0-build-ethereum",
+ "risc0-zkp",
+ "risc0-zkvm",
 ]
 
 [[package]]

@@ -1,9 +1,9 @@
 use anyhow::{Error, Result};
 use bincode::deserialize;
 use e3_compute_provider::{ComputeInput, ComputeResult};
+use e3_user_program::fhe_processor;
 use risc0_zkvm::guest::env;
 use std::io::Read;
-use voting_core::fhe_processor;
 
 fn decode_input(input: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(risc0_zkvm::serde::from_slice(input)?)

@@ -11,8 +11,7 @@ edition = "2021"
 e3-support-app = { path = "./app" }
 e3-support-host = { path = "./host" }
 e3-user-program = { path = "./program" }
-e3-support-methods = { path = "./methods" }
-
+methods = { path = "./methods" }
 alloy-primitives = { version = "0.8", default-features = false, features = [
     "rlp",
     "serde",

@@ -1,6 +1,6 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
-use compute_provider::FHEInputs;
-use program_client::{ComputeRequest, ComputeResponse};
+use e3_compute_provider::FHEInputs;
+use e3_program_client::{ComputeRequest, ComputeResponse};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -11,7 +11,7 @@ async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
         ciphertexts: req.ciphertext_inputs.clone(),
     };
     let (risc0_output, ciphertext) =
-        tokio::task::spawn_blocking(move || voting_host::run_compute(fhe_inputs))
+        tokio::task::spawn_blocking(move || e3_support_host::run_compute(fhe_inputs))
             .await
             .map_err(|e| {
                 eprintln!("Task spawn error: {:?}", e);

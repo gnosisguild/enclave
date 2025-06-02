@@ -1460,6 +1460,7 @@ checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 [[package]]
 name = "e3-bfv-helpers"
 version = "0.1.0"
+source = "git+https://github.com/gnosisguild/enclave?branch=hacknet#2ee401f759f530b14ddf6875cc055f4dffd83ea1"
 dependencies = [
  "alloy",
  "fhe",
@@ -1469,6 +1470,7 @@ dependencies = [
 [[package]]
 name = "e3-compute-provider"
 version = "0.1.0"
+source = "git+https://github.com/gnosisguild/enclave?branch=hacknet#2ee401f759f530b14ddf6875cc055f4dffd83ea1"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -1480,6 +1482,16 @@ dependencies = [
  "rayon",
  "serde",
  "sha3",
+]
+
+[[package]]
+name = "e3-user-program"
+version = "0.1.0"
+dependencies = [
+ "e3-bfv-helpers",
+ "e3-compute-provider",
+ "fhe",
+ "fhe-traits",
 ]
 
 [[package]]
@@ -1933,8 +1945,8 @@ dependencies = [
  "anyhow",
  "bincode",
  "e3-compute-provider",
+ "e3-user-program",
  "risc0-zkvm",
- "voting-core",
 ]
 
 [[package]]
@@ -4187,16 +4199,6 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
-
-[[package]]
-name = "voting-core"
-version = "0.1.0"
-dependencies = [
- "e3-bfv-helpers",
- "e3-compute-provider",
- "fhe",
- "fhe-traits",
-]
 
 [[package]]
 name = "wait-timeout"

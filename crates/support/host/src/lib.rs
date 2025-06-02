@@ -3,8 +3,8 @@ use bincode::serialize;
 use e3_compute_provider::{
     ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs,
 };
-use e3_support_methods::VOTING_ELF;
 use e3_user_program::fhe_processor;
+use methods::PROGRAM_ELF;
 use risc0_ethereum_contracts::groth16;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};
 use serde::{Deserialize, Serialize};
@@ -39,7 +39,7 @@ impl ComputeProvider for Risc0Provider {
             .prove_with_ctx(
                 env,
                 &VerifierContext::default(),
-                VOTING_ELF,
+                PROGRAM_ELF,
                 &ProverOpts::groth16(),
             )
             .unwrap()
