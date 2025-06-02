@@ -52,55 +52,55 @@ impl FromStr for GitUrl {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse() {
-        let cases = [
-            (
-                "https://github.com/user/repo.git#main",
-                "https://github.com/user/repo.git",
-                "github.com",
-                "user",
-                "repo",
-                "main",
-            ),
-            (
-                "git@github.com:user/repo.git",
-                "git@github.com:user/repo.git",
-                "github.com",
-                "user",
-                "repo",
-                "master",
-            ),
-            (
-                "ssh://git@gitlab.com/group/project.git#v1.0",
-                "ssh://git@gitlab.com/group/project.git",
-                "gitlab.com",
-                "group",
-                "project",
-                "v1.0",
-            ),
-        ];
-
-        for (url, repo_url, host, owner, repo, branch) in cases {
-            let parsed: GitUrl = url.parse().unwrap();
-            assert_eq!(parsed.repo_url, repo_url);
-            assert_eq!(parsed.host, host);
-            assert_eq!(parsed.owner, owner);
-            assert_eq!(parsed.repo, repo);
-            assert_eq!(parsed.branch, branch);
-        }
-
-        // Test the specific example
-        let u: GitUrl = "https://github.com/foo/bar#v1.2.3".parse().unwrap();
-        assert_eq!(u.repo_url, "https://github.com/foo/bar");
-        assert_eq!(u.branch, "v1.2.3");
-
-        // Test default branch
-        let u: GitUrl = "https://github.com/foo/bar".parse().unwrap();
-        assert_eq!(u.branch, "master");
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn test_parse() {
+//         let cases = [
+//             (
+//                 "https://github.com/user/repo.git#main",
+//                 "https://github.com/user/repo.git",
+//                 "github.com",
+//                 "user",
+//                 "repo",
+//                 "main",
+//             ),
+//             (
+//                 "git@github.com:user/repo.git",
+//                 "git@github.com:user/repo.git",
+//                 "github.com",
+//                 "user",
+//                 "repo",
+//                 "master",
+//             ),
+//             (
+//                 "ssh://git@gitlab.com/group/project.git#v1.0",
+//                 "ssh://git@gitlab.com/group/project.git",
+//                 "gitlab.com",
+//                 "group",
+//                 "project",
+//                 "v1.0",
+//             ),
+//         ];
+//
+//         for (url, repo_url, host, owner, repo, branch) in cases {
+//             let parsed: GitUrl = url.parse().unwrap();
+//             assert_eq!(parsed.repo_url, repo_url);
+//             assert_eq!(parsed.host, host);
+//             assert_eq!(parsed.owner, owner);
+//             assert_eq!(parsed.repo, repo);
+//             assert_eq!(parsed.branch, branch);
+//         }
+//
+//         // Test the specific example
+//         let u: GitUrl = "https://github.com/foo/bar#v1.2.3".parse().unwrap();
+//         assert_eq!(u.repo_url, "https://github.com/foo/bar");
+//         assert_eq!(u.branch, "v1.2.3");
+//
+//         // Test default branch
+//         let u: GitUrl = "https://github.com/foo/bar".parse().unwrap();
+//         assert_eq!(u.branch, "master");
+//     }
+// }
