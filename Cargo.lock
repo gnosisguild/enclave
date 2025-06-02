@@ -2619,6 +2619,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-program-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest",
+ "serde",
+]
+
+[[package]]
 name = "e3-request"
 version = "0.1.0"
 dependencies = [
