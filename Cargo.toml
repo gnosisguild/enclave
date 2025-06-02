@@ -27,7 +27,8 @@ members = [
 exclude = [
   "examples/CRISP/apps/server",
   "examples/CRISP/apps/program",
-  "examples/CRISP/apps/wasm-crypto"
+  "examples/CRISP/apps/wasm-crypto",
+  "crates/support" # client needs to be able to build this independently
 ]
 resolver = "2"
 shared-version = true
