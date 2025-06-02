@@ -9,9 +9,9 @@ use crate::wallet::WalletCommands;
 use crate::{init, net, password, wallet, wizard};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
-use config::validation::ValidUrl;
-use config::{load_config, AppConfig};
-use enclave_core::helpers::datastore::close_all_connections;
+use e3_config::validation::ValidUrl;
+use e3_config::{load_config, AppConfig};
+use e3_entrypoint::helpers::datastore::close_all_connections;
 use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
@@ -116,15 +116,15 @@ impl Cli {
         info!("Config loaded from: {:?}", config.config_file());
 
         if config.autopassword() {
-            enclave_core::password::set::autopassword(&config).await?;
+            e3_entrypoint::password::set::autopassword(&config).await?;
         }
 
         if config.autonetkey() {
-            enclave_core::net::keypair::generate::autonetkey(&config).await?;
+            e3_entrypoint::net::keypair::generate::autonetkey(&config).await?;
         }
 
         if config.autowallet() {
-            enclave_core::wallet::set::autowallet(&config).await?;
+            e3_entrypoint::wallet::set::autowallet(&config).await?;
         }
 
         match self.command {
