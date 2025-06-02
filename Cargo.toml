@@ -40,11 +40,6 @@ sign-tag = true
 push-remote = "origin"
 publish = true
 
-[[workspace.metadata.release.pre-release-replacements]]
-file = "README.md"
-search = 'version = "[^"]*"'
-replace = 'version = "{{version}}"'
-
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
