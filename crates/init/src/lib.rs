@@ -1,39 +1,44 @@
 mod copy;
 mod file_utils;
 mod git;
+mod git_url;
 mod package_json;
 mod pkgman;
 
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use copy::Filter;
+use git_url::GitUrl;
 use package_json::DependencyType;
 use pkgman::PkgMan;
 use std::env;
 use std::path::PathBuf;
+use std::str::FromStr;
 use tokio::fs;
+
+const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#hacknet";
+const TEMPLATE_FOLDER: &str = "examples/basic";
+const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 
 // Updated execute function to include workspace dependency substitution
 pub async fn execute(location: Option<PathBuf>) -> Result<()> {
-    let github_repo = "https://github.com/gnosisguild/enclave.git";
-    let template_folder = "examples/basic";
-    let branch = "ry/389-enclave-init-3";
-    let temp_dir = "/tmp/enclave-basic-example";
+    let repo = GitUrl::from_str(GIT_URL)?;
 
     let cwd = match location {
         Some(loc) => loc,
         None => env::current_dir()?,
     };
-    fs::remove_dir_all(temp_dir).await?;
+
+    fs::remove_dir_all(TEMP_DIR).await?;
     file_utils::ensure_empty_folder(&cwd).await?;
-    git::shallow_clone(github_repo, branch, temp_dir).await?;
+    git::shallow_clone(&repo.repo_url, &repo.branch, TEMP_DIR).await?;
 
     let version = package_json::get_version_from_package_json(
-        &PathBuf::from(temp_dir).join("packages/evm/package.json"),
+        &PathBuf::from(TEMP_DIR).join("packages/evm/package.json"),
     )
     .await?;
 
     copy::copy_with_filters(
-        &PathBuf::from(temp_dir).join(template_folder),
+        &PathBuf::from(TEMP_DIR).join(TEMPLATE_FOLDER),
         &cwd,
         &vec![
             Filter::new(".gitignore", "/deployments$", ""),
@@ -43,8 +48,8 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     .await?;
 
     copy::copy_with_filters(
-        &PathBuf::from(temp_dir).join("packages/ciphernode/init/templates/support"),
-        &cwd.join(".enclave/support"),
+        &PathBuf::from(TEMP_DIR).join("crates/support/ctl"),
+        &cwd.join(".enclave/support/ctl"),
         &vec![],
     )
     .await?;
