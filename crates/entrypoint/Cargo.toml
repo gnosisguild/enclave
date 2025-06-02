@@ -2,8 +2,9 @@
 name = "e3-entrypoint"
 version.workspace = true
 edition.workspace = true
-description = ": coordinates the encryption and decryption of enclave computations"
-repository = "https://github.com/gnosisguild/enclave"
+license.workspace = true
+description = "E3 - CLI Entrypoints"
+repository = "https://github.com/gnosisguild/enclave/crates/entrypoint"
 build = "build.rs"
 
 [dependencies]

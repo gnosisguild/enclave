@@ -2,8 +2,9 @@
 name = "e3-cli"
 version.workspace = true
 edition.workspace = true
-description = ": coordinates the encryption and decryption of enclave computations"
-repository = "https://github.com/gnosisguild/enclave"
+license.workspace = true
+description = "E3 - Enclave CLI"
+repository = "https://github.com/gnosisguild/enclave/crates/cli"
 
 [[bin]]
 name = "enclave"

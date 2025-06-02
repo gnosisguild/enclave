@@ -2,6 +2,9 @@
 name = "e3-fhe"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave Ciphernode FHE Actors"
+repository = "https://github.com/gnosisguild/enclave/crates/fhe"
 
 [dependencies]
 actix = { workspace = true }

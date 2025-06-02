@@ -29,10 +29,28 @@ exclude = [
   "examples/CRISP/apps/wasm-crypto"
 ]
 resolver = "2"
+shared-version = true
+pre-release-commit-message = "chore: Release {{crate_name}} v{{version}}"
+pre-release-replacements = [
+  {file="CHANGELOG.md", search="## \\[Unreleased\\]", replace="## [Unreleased]\n\n## [{{version}}] - {{date}}", min=1},
+]
+post-release-commit-message = "chore: Bump {{crate_name}} to {{next_version}}"
+sign-commit = true
+sign-tag = true
+push-remote = "origin"
+publish = true
+
+[[workspace.metadata.release.pre-release-replacements]]
+file = "README.md"
+search = 'version = "[^"]*"'
+replace = 'version = "{{version}}"'
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+license = "LGPL-3.0-only"
+description = "E3 — Encrypted Execution Environments"
+repository = "https://github.com/gnosisguild/enclave"
 
 [workspace.dependencies]
 e3-aggregator = { path = "./crates/aggregator" }

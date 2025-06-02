@@ -2,6 +2,9 @@
 name = "e3-request"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave Ciphernode E3Request Handling Components"
+repository = "https://github.com/gnosisguild/enclave/crates/request"
 
 [dependencies]
 actix = { workspace = true }

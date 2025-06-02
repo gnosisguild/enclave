@@ -2,6 +2,9 @@
 name = "e3-indexer"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+description = "E3 - A indexer for Enclave"
+repository = "https://github.com/gnosisguild/enclave/crates/indexer"
 
 [dependencies]
 alloy.workspace = true
