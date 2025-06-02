@@ -1,23 +1,24 @@
 [workspace]
 members = [
   "crates/aggregator", 
+  "crates/bfv-helpers",
+  "crates/cli",
+  "crates/compute-provider",
   "crates/config",
   "crates/crypto",
-  "crates/compute-provider",
   "crates/data",
-  "crates/bfv-helpers",
-  "crates/evm-helpers",
-  "crates/indexer",
-  "crates/request",
-  "crates/cli",
   "crates/entrypoint",
   "crates/events",
   "crates/evm", 
+  "crates/evm-helpers",
   "crates/fhe", 
+  "crates/indexer",
   "crates/init", 
   "crates/keyshare",
   "crates/logger",
   "crates/net", 
+  "crates/program-client", 
+  "crates/request",
   "crates/sdk",
   "crates/sortition",
   "crates/test-helpers",
@@ -66,6 +67,7 @@ e3-indexer = { version = "0.1.0", path = "./crates/indexer" }
 e3-keyshare = { version = "0.1.0", path = "./crates/keyshare" }
 e3-logger = { version = "0.1.0", path = "./crates/logger" }
 e3-net = { version = "0.1.0", path = "./crates/net" }
+e3-program-client = { version = "0.1.0", path = "./crates/program-client" }
 e3-sortition = { version = "0.1.0", path = "./crates/sortition" }
 e3-test-helpers = { version = "0.1.0", path = "./crates/test-helpers" }
 e3-tests = { version = "0.1.0", path = "./crates/tests" }
