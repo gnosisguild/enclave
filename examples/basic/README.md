@@ -4,7 +4,49 @@ This template allows you to deploy and interact with the Enclave protocol locall
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
+
+Tested with the following:
+
+```
+docker --version
+Docker version 25.0.6, build v25.0.6
+```
+
+```
+pnpm --version
+10.7.1
+```
+
+```
+node --version
+v22.10.0
+```
+
+```
+rustc --version
+rustc 1.85.1 (4eb161250 2025-03-15)
+```
+
+Linux/POSIX environment
+
+### Install Enclave
+
+```
+cargo install --git https://github.com/gnosisguild/enclave e3-cli
+```
+
+### Generate Template
+
+```
+enclave init ./myproj
+```
+
+```
+cd ./myproj
+```
+
+### Install Dependencies
 
 ```bash
 pnpm install

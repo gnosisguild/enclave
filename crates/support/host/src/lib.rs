@@ -1,12 +1,14 @@
 use anyhow::{Error, Result};
 use bincode::serialize;
-use compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
-use methods::VOTING_ELF;
+use e3_compute_provider::{
+    ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs,
+};
+use e3_user_program::fhe_processor;
+use methods::PROGRAM_ELF;
 use risc0_ethereum_contracts::groth16;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use voting_core::fhe_processor;
 
 fn encode_input(input: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(bytemuck::pod_collect_to_vec(&risc0_zkvm::serde::to_vec(
@@ -37,7 +39,7 @@ impl ComputeProvider for Risc0Provider {
             .prove_with_ctx(
                 env,
                 &VerifierContext::default(),
-                VOTING_ELF,
+                PROGRAM_ELF,
                 &ProverOpts::groth16(),
             )
             .unwrap()

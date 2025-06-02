@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+CONTAINER_NAME="e3-support.1"
+IMAGE="ghcr.io/gnosisguild/e3-support:next"
+CACHE_PREFIX="e3-support"
+
+if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
+    docker exec -it "$CONTAINER_NAME" bash -c "$*"
+else
+    docker run -it --rm \
+        --name "$CONTAINER_NAME" \
+        -v "$(pwd)/contracts:/app/contracts" \
+        -v "$(pwd)/tests:/app/tests" \
+        -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
+        -v "${CACHE_PREFIX}-target-cache:/app/target" \
+        -p 13151:13151 \
+        "$IMAGE" bash -c "$*"
+fi
