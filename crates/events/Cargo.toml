@@ -1,12 +1,10 @@
 [package]
-# we have to name this other than core for disambiguation
 name = "e3-events"
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
-description = ": coordinates the encryption and decryption of enclave computations"
-repository = "https://github.com/gnosisguild/enclave/crates"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license.workspace = true
+description = "Event management for E3 Ciphernodes"
+repository = "https://github.com/gnosisguild/enclave/crates/events"
 
 [dependencies]
 actix = { workspace = true }

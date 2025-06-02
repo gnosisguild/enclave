@@ -1,7 +1,10 @@
 [package]
 name = "e3-logger"
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave Ciphernode Logger"
+repository = "https://github.com/gnosisguild/enclave/crates/logger"
 
 [dependencies]
 e3-events = { workspace = true }

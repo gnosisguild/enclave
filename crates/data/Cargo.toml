@@ -1,9 +1,10 @@
 [package]
 name = "e3-data"
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
-description = "Data persistence for enclave"
-repository = "https://github.com/gnosisguild/enclave/crates"
+license.workspace = true
+description = "E3 - Ciphernode Data persistence"
+repository = "https://github.com/gnosisguild/enclave/crates/data"
 
 [dependencies]
 actix = { workspace = true }

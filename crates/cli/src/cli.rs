@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::helpers::telemetry::setup_tracing;
 use crate::net::NetCommands;
 use crate::nodes::{self, NodeCommands};
@@ -81,7 +83,7 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
-                    Commands::Init  => init::execute().await?,
+                    Commands::Init {path} => init::execute(path).await?,
                     Commands::Wizard {
                         rpc_url,
                         eth_address,
@@ -182,7 +184,10 @@ pub enum Commands {
     },
 
     /// Initialize an enclave project
-    Init,
+    Init {
+        /// Path to the location where the project should be initialized
+        path: Option<PathBuf>,
+    },
 
     /// Password management commands
     Password {

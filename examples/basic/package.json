@@ -1,6 +1,16 @@
 {
   "name": "hardhat-project",
+  "scripts": {
+    "node": "hardhat node",
+    "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
+    "deploy:dev": "hardhat run scripts/deploy-local.ts",
+    "add-ciphernode": "hardhat run scripts/interact.ts -- add-ciphernode",
+    "remove-ciphernode": "hardhat run scripts/interact.ts -- remove-ciphernode",
+    "compile": "hardhat compile",
+    "test": "hardhat test"
+  },
   "devDependencies": {
+    "@gnosis-guild/enclave": "workspace:*",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-ignition": "^0.15.0",
@@ -8,6 +18,7 @@
     "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@openzeppelin/contracts": "5.3.0",
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",
     "@types/chai": "^4.2.0",
@@ -16,6 +27,7 @@
     "chai": "^4.2.0",
     "ethers": "^6.4.0",
     "hardhat": "^2.14.0",
+    "hardhat-deploy": "^0.12.1",
     "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.8.0",
     "ts-node": ">=8.0.0",

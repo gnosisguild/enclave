@@ -1,7 +1,10 @@
 [package]
 name = "e3-aggregator"
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave Ciphernode Aggregators"
+repository = "https://github.com/gnosisguild/enclave/crates/aggregator"
 
 [dependencies]
 actix = { workspace = true }

@@ -1,10 +1,16 @@
 [package]
 name = "e3-init"
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave Init Function"
+repository = "https://github.com/gnosisguild/enclave/crates/init"
 
 [dependencies]
 anyhow.workspace = true
 tokio.workspace = true
 git2.workspace = true
 async-recursion.workspace = true 
+serde_json.workspace = true
+serde.workspace = true
+async-trait.workspace = true

@@ -1,13 +1,38 @@
-# Sample Hardhat Project
+# Enclave Protocol Template Setup
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+This template allows you to deploy and interact with the Enclave protocol locally without copying the core contracts.
 
-Try running some of the following tasks:
+## Quick Start
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.ts
+### 1. Install Dependencies
+
+```bash
+pnpm install
+```
+
+### 2. Start Local Hardhat Node
+
+```bash
+# Terminal 1
+pnpm node
+```
+
+Enclave contracts should be automatically deployed.
+
+## Usage Commands
+
+### Ciphernode Management
+
+```bash
+# Add a ciphernode
+pnpm add-ciphernode 0x1234567890123456789012345678901234567890
+```
+
+## Alternative: Direct Script Usage
+
+You can also run the scripts directly with custom parameters:
+
+```bash
+# Add ciphernode
+npx hardhat run scripts/interact.ts -- add-ciphernode 0x1234567890123456789012345678901234567890
 ```

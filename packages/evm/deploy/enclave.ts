@@ -85,9 +85,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   console.log(`NaiveRegistryFilter contract: `, naiveRegistryFilter.address);
 
   // set registry in enclave
-  const enclaveContract = await hre.ethers.getContractAt(
-    "Enclave",
+  const enclaveArtifact = await hre.deployments.getArtifact("Enclave");
+  const enclaveContract = new hre.ethers.Contract(
     enclave.address,
+    enclaveArtifact.abi,
+    await hre.ethers.getSigner(deployer),
   );
 
   const registryAddress = await enclaveContract.ciphernodeRegistry();
