@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { List } from '@phosphor-icons/react'
 //Icons
-import { CalendarCheck, CheckFat, Notebook } from '@phosphor-icons/react'
+import { CalendarCheck, CheckFat, Notebook, Lock } from '@phosphor-icons/react'
 
 interface NavMenuProps { }
 
@@ -17,6 +17,11 @@ const NAV_MENU_OPTIONS = [
     name: 'Historic Polls',
     icon: <CheckFat />,
     path: '/historic',
+  },
+  {
+    name: 'Encrypted Computation',
+    icon: <Lock />,
+    path: '/wizard',
   },
   {
     name: 'About',

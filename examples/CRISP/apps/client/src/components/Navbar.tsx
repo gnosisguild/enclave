@@ -13,6 +13,10 @@ const PAGES = [
     label: 'Historic Polls',
     path: '/historic',
   },
+  {
+    label: 'Encrypted Computation',
+    path: '/wizard',
+  },
 ]
 
 const Navbar: React.FC = () => {
