@@ -1,5 +1,7 @@
 [![Github Actions][gha-badge]][gha] [![Hardhat][hardhat-badge]][hardhat] [![License: MIT][license-badge]][license]
 
+## ⚠️ Warning: Experimental software - things may not work or be broken
+
 # Enclave
 
 [gha]: https://github.com/gnosisguild/enclave/actions

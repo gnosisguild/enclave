@@ -1,5 +1,7 @@
 # FHE Compute Manager
 
+## ⚠️ Warning: Experimental software - things may not work or be broken
+
 This project provides a flexible and efficient framework for managing Secure Programs (SP) of the [Enclave Protocol](enclave.gg). It supports both sequential and parallel processing, with the ability to integrate various compute providers.
 
 ## Features
