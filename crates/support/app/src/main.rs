@@ -39,7 +39,7 @@ async fn main() -> std::io::Result<()> {
     })
     .bind(bind_addr)?;
 
-    println!("'crisp-program' listening on http://{}", bind_addr);
+    println!("'program' listening on http://{}", bind_addr);
 
     server.run().await
 }
