@@ -1,5 +1,5 @@
 [package]
-name = "voting-host"
+name = "e3-support-host"
 version = { workspace = true }
 edition = { workspace = true }
 
@@ -15,10 +15,10 @@ methods = { workspace = true }
 risc0-ethereum-contracts = { workspace = true }
 risc0-zkvm = { workspace = true }
 tokio = { workspace = true }
-compute-provider = { path = "../../../../../packages/compute_provider" }
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", branch = "hacknet" }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
-voting-core = { workspace = true }
+e3-user-program = { workspace = true }
 rand = { workspace = true }
 tracing-subscriber = { workspace = true }

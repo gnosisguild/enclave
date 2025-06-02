@@ -1,8 +1,6 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
-use compute_provider::FHEInputs;
-use program_client::{ComputeRequest, ComputeResponse};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+use e3_compute_provider::FHEInputs;
+use e3_program_client::{ComputeRequest, ComputeResponse};
 
 // Run compute handler
 async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
@@ -11,7 +9,7 @@ async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
         ciphertexts: req.ciphertext_inputs.clone(),
     };
     let (risc0_output, ciphertext) =
-        tokio::task::spawn_blocking(move || voting_host::run_compute(fhe_inputs))
+        tokio::task::spawn_blocking(move || e3_support_host::run_compute(fhe_inputs))
             .await
             .map_err(|e| {
                 eprintln!("Task spawn error: {:?}", e);
@@ -31,7 +29,7 @@ async fn run_compute(req: web::Json<ComputeRequest>) -> Result<HttpResponse> {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
-    let bind_addr = "0.0.0.0:4001";
+    let bind_addr = "0.0.0.0:13151";
     let server = HttpServer::new(|| {
         App::new()
             .wrap(Logger::default())
@@ -39,7 +37,7 @@ async fn main() -> std::io::Result<()> {
     })
     .bind(bind_addr)?;
 
-    println!("'crisp-program' listening on http://{}", bind_addr);
+    println!("'program' listening on http://{}", bind_addr);
 
     server.run().await
 }
