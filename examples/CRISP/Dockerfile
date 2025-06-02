@@ -5,7 +5,6 @@ FROM ubuntu:24.04
 
 ARG NOIR_VERSION=1.0.0-beta.3
 ARG BB_VERSION=0.82.2
-ARG FOUNDRY_VERSION=0.1.0
 ARG RISCZERO_VERSION=2.0.0
 ARG CPP_VERSION=2024.1.5
 ARG RUST_VERSION=1.85.0
@@ -74,7 +73,7 @@ RUN curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/
 # ────────────────────────────────────────────────────────────────────────────────
 ENV PATH="/home/${USERNAME}/.foundry/bin:${PATH}"
 RUN curl -L https://foundry.paradigm.xyz | bash \
- && foundryup --version ${FOUNDRY_VERSION}
+ && foundryup
 
 # ────────────────────────────────────────────────────────────────────────────────
 #   Risc Zero tool-chain
