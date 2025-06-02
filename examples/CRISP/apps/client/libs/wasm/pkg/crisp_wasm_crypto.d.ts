@@ -1,5 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
+export function __wbgtest_cov_dump(): Uint8Array | undefined;
 /**
  * Handler for `console.log` invocations.
  *
@@ -25,7 +26,6 @@ export function __wbgtest_console_warn(args: Array<any>): void;
  * Handler for `console.error` invocations. See above.
  */
 export function __wbgtest_console_error(args: Array<any>): void;
-export function __wbgtest_cov_dump(): Uint8Array | undefined;
 export class Encrypt {
   free(): void;
   constructor();
@@ -86,7 +86,6 @@ export interface InitOutput {
   readonly encryptedvote_circuit_inputs: (a: number) => [number, number];
   readonly encrypt_new: () => number;
   readonly encrypt_encrypt_vote: (a: number, b: bigint, c: number, d: number) => [number, number, number];
-  readonly __wbgt__crisp_wasm_crypto::test_encrypt_vote: (a: number) => void;
   readonly encrypt_test: () => void;
   readonly __wbg_wasmbindgentestcontext_free: (a: number, b: number) => void;
   readonly wasmbindgentestcontext_new: () => number;
@@ -107,10 +106,9 @@ export interface InitOutput {
   readonly __wbindgen_export_5: WebAssembly.Table;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __externref_table_dealloc: (a: number) => void;
-  readonly closure109_externref_shim: (a: number, b: number, c: any) => void;
-  readonly wasm_bindgen__convert__closures__invoke0_mut__h72edff75341aebe2: (a: number, b: number) => void;
-  readonly closure281_externref_shim: (a: number, b: number, c: any, d: number, e: any) => void;
-  readonly closure285_externref_shim: (a: number, b: number, c: any, d: any) => void;
+  readonly closure281_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure197_externref_shim: (a: number, b: number, c: any, d: number, e: any) => void;
+  readonly closure201_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_start: () => void;
 }
 

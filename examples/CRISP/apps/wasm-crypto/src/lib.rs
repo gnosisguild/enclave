@@ -94,24 +94,29 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-// Tests
-#[wasm_bindgen_test]
-fn test_encrypt_vote() {
-    // Initialize the logger to print to the browser's console
-    console_log::init_with_level(log::Level::Info).expect("Error initializing logger");
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::*;
 
-    let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-    let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
-    let mut rng = thread_rng();
-    let sk = SecretKey::random(&params, &mut rng);
-    let pk = PublicKey::new(&sk, &mut rng);
+    #[wasm_bindgen_test]
+    fn test_encrypt_vote() {
+        // Initialize the logger to print to the browser's console
+        console_log::init_with_level(log::Level::Info).expect("Error initializing logger");
 
-    let mut test = Encrypt::new();
-    let vote = 10;
-    test.encrypt_vote(vote, pk.to_bytes()).unwrap();
+        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+        let mut rng = thread_rng();
+        let sk = SecretKey::random(&params, &mut rng);
+        let pk = PublicKey::new(&sk, &mut rng);
 
-    let ct = Ciphertext::from_bytes(&test.encrypted_vote, &params).unwrap();
-    let pt = sk.try_decrypt(&ct).unwrap();
+        let mut test = Encrypt::new();
+        let vote = 10;
+        test.encrypt_vote(vote, pk.to_bytes()).unwrap();
 
-    assert_eq!(pt.value[0], vote);
+        let ct = Ciphertext::from_bytes(&test.encrypted_vote, &params).unwrap();
+        let pt = sk.try_decrypt(&ct).unwrap();
+
+        assert_eq!(pt.value[0], vote);
+    }
 }
