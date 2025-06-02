@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 CONTAINER_NAME="e3-support.1"
-IMAGE="ghcr.io/gnosisguild/e3-support:55b85711"
+IMAGE="ghcr.io/gnosisguild/e3-support:next"
 CACHE_PREFIX="e3-support"
 
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
