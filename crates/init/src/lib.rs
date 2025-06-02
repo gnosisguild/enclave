@@ -5,7 +5,7 @@ mod git_url;
 mod package_json;
 mod pkgman;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use copy::Filter;
 use git_url::GitUrl;
 use package_json::DependencyType;
@@ -27,8 +27,9 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
         Some(loc) => loc,
         None => env::current_dir()?,
     };
-
-    fs::remove_dir_all(TEMP_DIR).await?;
+    if fs::try_exists(TEMP_DIR).await? {
+        fs::remove_dir_all(TEMP_DIR).await?;
+    }
     file_utils::ensure_empty_folder(&cwd).await?;
     git::shallow_clone(&repo.repo_url, &repo.branch, TEMP_DIR).await?;
 
