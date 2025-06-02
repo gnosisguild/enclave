@@ -1,0 +1,9 @@
+[package]
+name = "e3-user-program"
+version = "0.1.0"
+
+[dependencies]
+fhe_rs = { workspace = true }
+fhe-traits = { workspace = true }
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "hacknet" }
+e3-bfv-helpers = { git = "https://github.com/gnosisguild/enclave", rev = "hacknet" }
