@@ -1,0 +1,24 @@
+[package]
+name = "voting-host"
+version = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+bincode = { workspace = true }
+bytemuck = { workspace = true }
+serde = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+methods = { workspace = true }
+risc0-ethereum-contracts = { workspace = true }
+risc0-zkvm = { workspace = true }
+tokio = { workspace = true }
+compute-provider = { path = "../../../../../packages/compute_provider" }
+fhe_rs = { workspace = true }
+fhe-traits = { workspace = true }
+fhe-util = { workspace = true }
+voting-core = { workspace = true }
+rand = { workspace = true }
+tracing-subscriber = { workspace = true }

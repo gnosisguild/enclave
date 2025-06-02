@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::helpers::telemetry::setup_tracing;
 use crate::net::NetCommands;
 use crate::nodes::{self, NodeCommands};
@@ -7,9 +9,9 @@ use crate::wallet::WalletCommands;
 use crate::{init, net, password, wallet, wizard};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
-use e3_config::validation::ValidUrl;
-use e3_config::{load_config, AppConfig};
-use e3_entrypoint::helpers::datastore::close_all_connections;
+use config::validation::ValidUrl;
+use config::{load_config, AppConfig};
+use enclave_core::helpers::datastore::close_all_connections;
 use tracing::{info, instrument, Level};
 
 #[derive(Parser, Debug)]
@@ -81,7 +83,7 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
-                    Commands::Init  => init::execute().await?,
+                    Commands::Init {path} => init::execute(path).await?,
                     Commands::Wizard {
                         rpc_url,
                         eth_address,
@@ -114,15 +116,15 @@ impl Cli {
         info!("Config loaded from: {:?}", config.config_file());
 
         if config.autopassword() {
-            e3_entrypoint::password::set::autopassword(&config).await?;
+            enclave_core::password::set::autopassword(&config).await?;
         }
 
         if config.autonetkey() {
-            e3_entrypoint::net::keypair::generate::autonetkey(&config).await?;
+            enclave_core::net::keypair::generate::autonetkey(&config).await?;
         }
 
         if config.autowallet() {
-            e3_entrypoint::wallet::set::autowallet(&config).await?;
+            enclave_core::wallet::set::autowallet(&config).await?;
         }
 
         match self.command {
@@ -182,7 +184,10 @@ pub enum Commands {
     },
 
     /// Initialize an enclave project
-    Init,
+    Init {
+        /// Path to the location where the project should be initialized
+        path: Option<PathBuf>,
+    },
 
     /// Password management commands
     Password {
