@@ -1,6 +1,6 @@
 services:
   enclave-dev:
-    user: ubuntu
+    user: "1000:1000"
     platform: linux/amd64
     build:
       context: .
@@ -19,6 +19,9 @@ services:
       - client-node-modules:/app/examples/CRISP/apps/client/node_modules
       - crisp-node-modules:/app/examples/CRISP/node_modules
       - crisp-foundry-cache:/app/examples/CRISP/out
+      - synpress-cache:/home/ubuntu/.cache-synpress
+    environment:
+      SYNPRESS_CACHE_DIR: /home/ubuntu/.cache-synpress
     entrypoint:
       - ""
     ports:
@@ -41,4 +44,6 @@ volumes:
   client-node-modules:
   crisp-node-modules:
   crisp-foundry-cache:
+  synpress-cache:
   git-folder:
+  
