@@ -94,7 +94,7 @@ RUN sudo wget -qO- https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_
  | sudo tar xz -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
 
 RUN sudo mkdir -p /app && sudo chown -R $USERNAME:$USERNAME /app
-WORKDIR /app
+WORKDIR /app/examples/CRISP
 
 # Pre-set pnpm store path (speeds up mounts)
 RUN pnpm config set store-dir "/home/${USERNAME}/.pnpm-store" \
