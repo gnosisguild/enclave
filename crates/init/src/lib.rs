@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use tokio::fs;
 
-const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#hacknet";
+const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#ry/support-draft";
 const TEMPLATE_FOLDER: &str = "examples/basic";
 const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 
