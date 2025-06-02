@@ -58,7 +58,7 @@ ENV NARGO_HOME="/home/${USERNAME}/.nargo"
 ENV PATH="${PATH}:${NARGO_HOME}/bin"
 
 RUN curl -L https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash \
- && noirup --tag ${NOIR_VERSION}    # installs nargo + backends for requested tag
+ && "$HOME/.nargo/bin/noirup" -v ${NOIR_VERSION}
 
 # ────────────────────────────────────────────────────────────────────────────────
 #   Barretenberg CLI (bbup)
