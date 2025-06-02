@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use tokio::fs;
+use tokio::{fs, process::Command};
 
 pub async fn ensure_empty_folder<P: AsRef<Path>>(path: P) -> Result<()> {
     let path = path.as_ref();
@@ -33,5 +33,15 @@ pub async fn delete_path<P: AsRef<Path>>(path: P) -> Result<()> {
         fs::remove_file(path).await?;
     }
 
+    Ok(())
+}
+
+pub async fn chmod_recursive<P: AsRef<Path>>(path: P, mode: &str) -> Result<()> {
+    Command::new("chmod")
+        .arg("-R")
+        .arg(mode)
+        .arg(path.as_ref())
+        .status()
+        .await?;
     Ok(())
 }

@@ -7,6 +7,7 @@ mod pkgman;
 
 use anyhow::Result;
 use copy::Filter;
+use file_utils::chmod_recursive;
 use git_url::GitUrl;
 use package_json::DependencyType;
 use pkgman::PkgMan;
@@ -54,6 +55,9 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
         &vec![],
     )
     .await?;
+
+    chmod_recursive(&cwd.join("contracts"), "777").await?;
+    chmod_recursive(&cwd.join("tests"), "777").await?;
 
     git::init(&cwd).await?;
 
