@@ -21,7 +21,7 @@ services:
       - crisp-foundry-cache:/app/examples/CRISP/out
       - synpress-cache:/home/ubuntu/.cache-synpress
     environment:
-      SYNPRESS_CACHE_DIR: /home/ubuntu/.cache-synpress
+      CACHE_DIR: /home/ubuntu/.cache-synpress
     entrypoint:
       - ""
     ports:
