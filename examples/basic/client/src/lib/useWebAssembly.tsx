@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import init, { Encrypt } from '../../libs/wasm/pkg/crisp_wasm_crypto'
+import init, { Encrypt } from 'libs/wasm/pkg/crisp_wasm_crypto'
 
 export const useWebAssemblyHook = () => {
     const [isLoaded, setIsLoaded] = useState(false)
