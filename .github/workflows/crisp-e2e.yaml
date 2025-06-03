@@ -30,7 +30,16 @@ jobs:
           submodules: recursive
 
       - name: Prepare test environment
-        run: mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results && sudo chmod 777 $GITHUB_WORKSPACE/examples/CRISP/test-results && mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report && chmod 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report && mkdir -p $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress && chmod 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE/examples/CRISP/test-results
+          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          chmod 755 $GITHUB_WORKSPACE/examples/CRISP/test-results
+          chmod 755 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          chmod 755 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -64,6 +73,13 @@ jobs:
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
         run: pnpm exec playwright install chromium
+
+      - name: Clean previous test artifacts
+        working-directory: ./examples/CRISP
+        run: |
+          rm -rf test-results || true
+          rm -rf playwright-report || true
+          rm -rf .cache-synpress || true
 
       - name: Run Playwright tests
         working-directory: ./examples/CRISP

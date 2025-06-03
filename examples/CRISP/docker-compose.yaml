@@ -19,6 +19,8 @@ services:
       - crisp-node-modules:/app/examples/CRISP/node_modules
       - crisp-foundry-cache:/app/examples/CRISP/out
       - synpress-cache:/app/examples/CRISP/.cache-synpress
+      - test-results:/app/examples/CRISP/test-results
+      - playwright-report:/app/examples/CRISP/playwright-report
     entrypoint:
       - ""
     ports:
@@ -31,6 +33,10 @@ services:
       sudo chown -R ubuntu:ubuntu /home/ubuntu &&
       sudo mkdir -p /app/examples/CRISP/.cache-synpress &&
       sudo chown -R ubuntu:ubuntu /app/examples/CRISP/.cache-synpress &&
+      sudo mkdir -p /app/examples/CRISP/test-results &&
+      sudo chown -R ubuntu:ubuntu /app/examples/CRISP/test-results &&
+      sudo mkdir -p /app/examples/CRISP/playwright-report &&
+      sudo chown -R ubuntu:ubuntu /app/examples/CRISP/playwright-report &&
       tail -f /dev/null
       '
 
@@ -45,4 +51,6 @@ volumes:
   crisp-foundry-cache:
   git-folder:
   synpress-cache:
+  test-results:
+  playwright-report:
   
