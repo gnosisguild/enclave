@@ -1,8 +1,7 @@
 use alloy::dyn_abi::{DynSolType, DynSolValue};
+use alloy::primitives::U256;
 use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
-use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
-
 /// Predefined BFV parameters for common use cases
 pub mod params {
     /// Standard BFV parameters sets
@@ -80,10 +79,11 @@ pub fn build_bfv_params_arc(
     }
 }
 
-/// Serializes BFV parameters into raw bytes.
+/// Serializes BFV parameters into ABI-encoded bytes.
 ///
-/// This function converts BFV parameters into a raw byte representation
-/// without any specific encoding format.
+/// This function converts BFV parameters into a tuple structure of (degree, plaintext_modulus, moduli[])
+/// and then ABI-encodes the tuple using Solidity ABI format. The resulting bytes can be used
+/// in smart contracts or for cross-platform serialization.
 ///
 /// # Arguments
 ///
@@ -91,19 +91,31 @@ pub fn build_bfv_params_arc(
 ///
 /// # Returns
 ///
-/// Returns a `Vec<u8>` containing the raw serialized parameters.
+/// Returns a `Vec<u8>` containing the ABI-encoded parameters as a tuple (uint256, uint256, uint256[]).
 pub fn serialize_bfv_params(params: &BfvParameters) -> Vec<u8> {
-    params.to_bytes()
+    let value = DynSolValue::Tuple(vec![
+        DynSolValue::Uint(U256::from(params.degree()), 256),
+        DynSolValue::Uint(U256::from(params.plaintext()), 256),
+        DynSolValue::Array(
+            params
+                .moduli()
+                .iter()
+                .map(|val| DynSolValue::Uint(U256::from(*val), 256))
+                .collect(),
+        ),
+    ]);
+    value.abi_encode()
 }
 
-/// Deserializes BFV parameters from raw bytes.
+/// Deserializes BFV parameters from ABI-encoded bytes.
 ///
-/// This function converts raw bytes back into BFV parameters.
-/// The bytes should be in the raw format produced by `serialize_bfv_params`.
+/// This function converts ABI-encoded bytes back into BFV parameters.
+/// The bytes should represent a tuple (uint256, uint256, uint256[]) containing
+/// (degree, plaintext_modulus, moduli[]) as produced by `serialize_bfv_params`.
 ///
 /// # Arguments
 ///
-/// * `bytes` - The raw bytes containing the serialized parameters
+/// * `bytes` - The ABI-encoded bytes containing the serialized parameters
 ///
 /// # Returns
 ///
@@ -111,22 +123,74 @@ pub fn serialize_bfv_params(params: &BfvParameters) -> Vec<u8> {
 ///
 /// # Panics
 ///
-/// Panics if the deserialization fails.
+/// Panics if the deserialization fails due to invalid format or parameter values.
 pub fn deserialize_bfv_params(bytes: &[u8]) -> BfvParameters {
-    match BfvParameters::try_deserialize(bytes) {
-        Ok(params) => params,
-        Err(e) => panic!("Failed to deserialize BFV Parameters: {}", e),
+    // Define the expected tuple type: (uint256, uint256, uint256[])
+    let tuple_type = DynSolType::Tuple(vec![
+        DynSolType::Uint(256),                              // degree
+        DynSolType::Uint(256),                              // plaintext_modulus
+        DynSolType::Array(Box::new(DynSolType::Uint(256))), // moduli array
+    ]);
+
+    let decoded = tuple_type
+        .abi_decode(bytes)
+        .expect("Failed to ABI decode bytes");
+
+    match decoded {
+        DynSolValue::Tuple(inner_values) => {
+            // Extract degree (first element)
+            let degree: u64 = match &inner_values[0] {
+                DynSolValue::Uint(val, _) => {
+                    (*val).try_into().expect("Failed to convert degree to u64")
+                }
+                _ => panic!("Expected uint256 for degree"),
+            };
+
+            // Extract plaintext modulus (second element)
+            let plaintext: u64 = match &inner_values[1] {
+                DynSolValue::Uint(val, _) => (*val)
+                    .try_into()
+                    .expect("Failed to convert plaintext to u64"),
+                _ => panic!("Expected uint256 for plaintext modulus"),
+            };
+
+            // Extract moduli array (third element)
+            let moduli: Vec<u64> = match &inner_values[2] {
+                DynSolValue::Array(moduli_array) => moduli_array
+                    .iter()
+                    .map(|val| match val {
+                        DynSolValue::Uint(modulus, _) => (*modulus)
+                            .try_into()
+                            .expect("Failed to convert modulus to u64"),
+                        _ => panic!("Expected uint256 for modulus value"),
+                    })
+                    .collect::<Vec<_>>(),
+                _ => panic!("Expected array for moduli"),
+            };
+
+            let params = BfvParametersBuilder::new()
+                .set_degree(degree as usize)
+                .set_plaintext_modulus(plaintext)
+                .set_moduli(&moduli)
+                .build()
+                .expect("Failed to build BFV Parameters");
+
+            params
+        }
+        _ => panic!("Expected tuple value in ABI encoding"),
     }
 }
 
-/// Deserializes BFV parameters from raw bytes and wraps them in an `Arc`.
+/// Deserializes BFV parameters from ABI-encoded bytes and wraps them in an `Arc`.
 ///
 /// This is a convenience function that combines `deserialize_bfv_params` with `Arc::new`
 /// to provide thread-safe shared ownership of the deserialized parameters.
+/// The input bytes should represent a tuple (uint256, uint256, uint256[]) containing
+/// (degree, plaintext_modulus, moduli[]) in ABI-encoded format.
 ///
 /// # Arguments
 ///
-/// * `bytes` - The raw bytes containing the serialized parameters
+/// * `bytes` - The ABI-encoded bytes containing the serialized parameters
 ///
 /// # Returns
 ///
@@ -139,10 +203,12 @@ pub fn deserialize_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
     Arc::new(deserialize_bfv_params(bytes))
 }
 
-/// ABI-encodes BFV parameters using the Solidity ABI format.
+/// ABI-encodes BFV parameters as bytes using the Solidity ABI format.
 ///
-/// This function takes BFV parameters, serializes them to raw bytes,
-/// and then ABI-encodes those bytes using the Solidity ABI format.
+/// This function takes BFV parameters, converts them to a tuple structure,
+/// and then wraps the result in a DynSolValue::Bytes before ABI-encoding.
+/// This creates a double-encoded structure: the outer layer is bytes,
+/// and the inner layer is the tuple (uint256, uint256, uint256[]).
 ///
 /// # Arguments
 ///
@@ -150,19 +216,20 @@ pub fn deserialize_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
 ///
 /// # Returns
 ///
-/// Returns a `Vec<u8>` containing the ABI-encoded parameters.
+/// Returns a `Vec<u8>` containing the ABI-encoded parameters wrapped as bytes.
 pub fn encode_bfv_params(params: &BfvParameters) -> Vec<u8> {
-    DynSolValue::Bytes(serialize_bfv_params(params)).abi_encode_params()
+    DynSolValue::Bytes(serialize_bfv_params(params)).abi_encode()
 }
 
-/// ABI-decodes BFV parameters from Solidity ABI format.
+/// ABI-decodes BFV parameters from double-encoded Solidity ABI format.
 ///
-/// This function takes ABI-encoded bytes, decodes them using the Solidity ABI format,
-/// and then deserializes the resulting bytes into BFV parameters.
+/// This function takes ABI-encoded bytes where the outer layer is bytes type,
+/// and the inner layer contains the serialized BFV parameters. It first decodes
+/// the outer bytes layer, then uses the native BFV deserialization on the inner bytes.
 ///
 /// # Arguments
 ///
-/// * `bytes` - The ABI-encoded bytes containing the parameters
+/// * `bytes` - The double ABI-encoded bytes containing the parameters
 ///
 /// # Returns
 ///
@@ -178,21 +245,19 @@ pub fn decode_bfv_params(bytes: &[u8]) -> BfvParameters {
         .expect("Failed to ABI decode bytes");
 
     match decoded {
-        DynSolValue::Bytes(inner_bytes) => {
-            BfvParameters::try_deserialize(&inner_bytes).expect("Could not decode Bfv Params")
-        }
+        DynSolValue::Bytes(inner_bytes) => deserialize_bfv_params(&inner_bytes),
         _ => panic!("Expected bytes value in ABI encoding"),
     }
 }
 
-/// ABI-decodes BFV parameters from Solidity ABI format and wraps them in an `Arc`.
+/// ABI-decodes BFV parameters from double-encoded Solidity ABI format and wraps them in an `Arc`.
 ///
 /// This function is similar to `decode_bfv_params` but returns the parameters
 /// wrapped in an `Arc` for thread-safe shared ownership.
 ///
 /// # Arguments
 ///
-/// * `bytes` - The ABI-encoded bytes containing the parameters
+/// * `bytes` - The double ABI-encoded bytes containing the parameters
 ///
 /// # Returns
 ///
