@@ -2629,6 +2629,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-program-listener"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "e3-config",
+ "e3-indexer",
+]
+
+[[package]]
 name = "e3-request"
 version = "0.1.0"
 dependencies = [

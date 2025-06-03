@@ -4,8 +4,8 @@ services:
     build:
       context: .
       args:
-        USER_UID: ${USER_UID:-1001}
-        USER_GID: ${USER_GID:-118}
+        USER_UID: ${UID:-1000}
+        USER_GID: ${GID:-100}
         USERNAME: ubuntu
     volumes:
       - ../..:/app
@@ -48,4 +48,3 @@ volumes:
   synpress-cache:
   test-results:
   playwright-report:
-  

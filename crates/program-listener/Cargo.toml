@@ -7,3 +7,6 @@ description.workspace = true
 repository.workspace = true
 
 [dependencies]
+e3-config.workspace = true
+e3-indexer.workspace = true
+anyhow.workspace = true

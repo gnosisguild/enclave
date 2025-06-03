@@ -21,7 +21,7 @@ async fn test_indexer() -> Result<()> {
     let (contract, address, endpoint, _anvil) = setup_fake_enclave().await?;
 
     let mut indexer =
-        EnclaveIndexer::from_strings(&endpoint, &address, InMemoryStore::new()).await?;
+        EnclaveIndexer::<InMemoryStore>::from_endpoint_address_in_mem(&endpoint, &address).await?;
 
     indexer
         .add_event_handler(move |_: InputPublished, mut store| async move {

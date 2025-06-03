@@ -1,14 +1,25 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use anyhow::{anyhow, Context};
+use e3_config::{chain_config::ChainConfig, AppConfig, ContractAddresses};
+use e3_indexer::{EnclaveIndexer, InMemoryStore};
+pub async fn execute(config: &AppConfig, chain_name: &str) -> anyhow::Result<()> {
+    let Some(chain) = config.chains().iter().find(|c| c.name == chain_name) else {
+        anyhow::bail!("No chain '{chain_name}' found in config.");
+    };
+    let ChainConfig {
+        rpc_url,
+        contracts:
+            ContractAddresses {
+                enclave: contract_address,
+                ..
+            },
+        ..
+    } = chain;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+    let indexer = EnclaveIndexer::<InMemoryStore>::from_endpoint_address_in_mem(
+        &rpc_url,
+        &contract_address.address(),
+    )
+    .await
+    .map_err(|e| anyhow!(e))?;
+    Ok(())
 }
