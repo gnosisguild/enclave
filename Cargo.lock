@@ -2349,6 +2349,7 @@ dependencies = [
  "e3-entrypoint",
  "e3-events",
  "e3-init",
+ "e3-support-scripts",
  "hex",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -2666,6 +2667,14 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "tracing",
+]
+
+[[package]]
+name = "e3-support-scripts"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tokio",
 ]
 
 [[package]]

@@ -132,6 +132,7 @@ impl Cli {
             Commands::Init { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }
+            Commands::Compile => e3_support_scripts::program_compile().await?,
             Commands::Wizard { .. } => {
                 bail!("Cannot run `enclave wizard` when a configuration exists.");
             }
@@ -188,6 +189,9 @@ pub enum Commands {
         /// Path to the location where the project should be initialized
         path: Option<PathBuf>,
     },
+
+    /// Compile an Enclave project
+    Compile,
 
     /// Password management commands
     Password {

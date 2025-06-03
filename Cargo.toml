@@ -21,6 +21,7 @@ members = [
   "crates/request",
   "crates/sdk",
   "crates/sortition",
+  "crates/support-scripts",
   "crates/test-helpers",
   "crates/tests",
 ]
@@ -70,6 +71,7 @@ e3-logger = { version = "0.1.0", path = "./crates/logger" }
 e3-net = { version = "0.1.0", path = "./crates/net" }
 e3-program-client = { version = "0.1.0", path = "./crates/program-client" }
 e3-sortition = { version = "0.1.0", path = "./crates/sortition" }
+e3-support-scripts = { version = "0.1.0", path = "./crates/support-scripts" }
 e3-test-helpers = { version = "0.1.0", path = "./crates/test-helpers" }
 e3-tests = { version = "0.1.0", path = "./crates/tests" }
 
