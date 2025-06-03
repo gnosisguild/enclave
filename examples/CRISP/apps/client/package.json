@@ -26,6 +26,7 @@
     "@semaphore-protocol/data": "^4.9.2",
     "@svgr/rollup": "^8.1.0",
     "@tanstack/react-query": "^5.74.3",
+    "@wagmi/core": "^2.17.2",
     "axios": "^1.6.8",
     "connectkit": "^1.9.0",
     "ethers": "^6.12.0",
@@ -34,11 +35,11 @@
     "react-markdown": "^9.0.1",
     "react-router-dom": "^6.22.3",
     "react-syntax-highlighter": "^15.5.0",
-    "viem": "^2.27.0",
+    "viem": "^2.30.6",
     "vite-plugin-node-polyfills": "^0.22.0",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-tsconfig-paths": "^4.3.2",
-    "wagmi": "^2.14.16"
+    "wagmi": "^2.15.4"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.12",

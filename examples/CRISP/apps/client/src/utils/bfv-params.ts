@@ -31,37 +31,42 @@ export const DEFAULT_E3_CONFIG = {
 } as const
 
 /**
- * Encode BFV parameters to bytes for the smart contract
- * This matches the Rust implementation: encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli))
+ * Encode BFV parameters for the smart contract
+ * BFV (Brakerski-Fan-Vercauteren) is a type of fully homomorphic encryption
  */
 export function encodeBfvParams(
     degree: number = BFV_PARAMS_SET.degree,
     plaintext_modulus: number = BFV_PARAMS_SET.plaintext_modulus,
     moduli: readonly bigint[] = BFV_PARAMS_SET.moduli
 ): `0x${string}` {
-    // Encode as (uint256, uint256, uint256[]) - matching the Solidity struct
     return encodeAbiParameters(
         [
-            { name: 'degree', type: 'uint256' },
-            { name: 'plaintext_modulus', type: 'uint256' },
-            { name: 'moduli', type: 'uint256[]' }
+            {
+                name: 'bfvParams',
+                type: 'tuple',
+                components: [
+                    { name: 'degree', type: 'uint256' },
+                    { name: 'plaintext_modulus', type: 'uint256' },
+                    { name: 'moduli', type: 'uint256[]' }
+                ]
+            }
         ],
-        [BigInt(degree), BigInt(plaintext_modulus), [...moduli]]
+        [{
+            degree: BigInt(degree),
+            plaintext_modulus: BigInt(plaintext_modulus),
+            moduli: [...moduli]
+        }]
     )
 }
 
 /**
- * Encode compute provider parameters to bytes
- * This simulates the Rust bincode::serialize(&compute_provider_params)
+ * Encode compute provider parameters for the smart contract
  */
 export function encodeComputeProviderParams(params: ComputeProviderParams): `0x${string}` {
-    // For simplicity, we'll encode as a JSON string and then as bytes
-    // In a real implementation, this might need to match the exact Rust bincode format
     const jsonString = JSON.stringify(params)
     const encoder = new TextEncoder()
     const bytes = encoder.encode(jsonString)
 
-    // Convert to hex string
     return `0x${Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')}`
 }
 
