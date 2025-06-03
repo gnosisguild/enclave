@@ -31,7 +31,7 @@ services:
       /bin/bash -c '
       sudo chown -R ubuntu:ubuntu /app &&
       sudo chown -R ubuntu:ubuntu /home/ubuntu &&
-      sudo chmod 755 /app/examples/CRISP &&
+      sudo chmod -R 777 /app/examples/CRISP &&
       tail -f /dev/null
       '
 

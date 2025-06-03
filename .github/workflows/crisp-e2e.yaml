@@ -31,9 +31,8 @@ jobs:
 
       - name: Prepare test environment
         run: |
-          # Clean previous test artifacts and set parent directory permissions
           rm -rf ./examples/CRISP/{test-results,playwright-report,.cache-synpress} || true
-          chmod 755 ./examples/CRISP
+          chmod -R 777 ./examples/CRISP
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
