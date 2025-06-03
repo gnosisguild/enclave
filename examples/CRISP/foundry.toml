@@ -5,7 +5,7 @@ libs = ["lib"]
 test = "tests"
 ffi = true
 fs_permissions = [{ access = "read-write", path = "./"}]
-via_ir = true
+via_ir = false
 optimizer = true
 optimizer-runs = 10_000_000
 

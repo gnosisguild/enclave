@@ -1,68 +1,105 @@
-FROM ubuntu:22.04
+# ────────────────────────────────────────────────────────────────────────────────
+#   Base image & build-time versions
+# ────────────────────────────────────────────────────────────────────────────────
+FROM ubuntu:24.04
 
-# Set environment variables
-ENV RUST_VERSION=1.85.0 \
-    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ARG NOIR_VERSION=1.0.0-beta.3
+ARG BB_VERSION=0.82.2
+ARG RISCZERO_VERSION=2.0.0
+ARG CPP_VERSION=2024.1.5
+ARG RUST_VERSION=1.85.0
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
-    curl \
-    git \
-    libssl-dev \
-    pkg-config \
-    python3 \
-    python3-pip \
-    sudo \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+# ────────────────────────────────────────────────────────────────────────────────
+#   OS packages
+# ────────────────────────────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake curl git libssl-dev pkg-config \
+    python3 python3-pip sudo wget jq \
+ && rm -rf /var/lib/apt/lists/*
 
+# Node 18 / 22 + pnpm
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g corepack concurrently wait-on \
-    && corepack enable \
-    && corepack prepare pnpm@10.7.1 --activate
+ && apt-get install -y nodejs \
+ && npm install -g corepack concurrently wait-on \
+ && corepack enable \
+ && corepack prepare pnpm@10.7.1 --activate
 
-# Create user
-ENV USERNAME=devuser
-ARG USER_UID=1000
-ARG USER_GID=1000
+# ────────────────────────────────────────────────────────────────────────────────
+#  Non-root user (skip if it already exists)
+# ────────────────────────────────────────────────────────────────────────────────
+ARG USERNAME=ubuntu
+ARG USER_UID=1001
+ARG USER_GID=118          # use any free GID you like
 
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+RUN set -eux; \
+    if ! id -u "${USERNAME}" 2>/dev/null; then \
+        groupadd --gid "${USER_GID}" "${USERNAME}"; \
+        useradd  --uid "${USER_UID}" --gid "${USER_GID}" -m "${USERNAME}"; \
+    fi && \
+    echo "${USERNAME} ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} && \
+    chmod 0440 /etc/sudoers.d/${USERNAME}
 
 USER $USERNAME
 WORKDIR /home/$USERNAME
 
-# Install Rust and add it to PATH
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${RUST_VERSION}
+# ────────────────────────────────────────────────────────────────────────────────
+#   Rust toolchain
+# ────────────────────────────────────────────────────────────────────────────────
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+ | sh -s -- -y --default-toolchain ${RUST_VERSION}
 ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 RUN rustup component add rustfmt clippy
 
-ENV SHELL=/bin/bash
+# ────────────────────────────────────────────────────────────────────────────────
+#   Noir / Nargo
+# ────────────────────────────────────────────────────────────────────────────────
+ENV NARGO_HOME="/home/${USERNAME}/.nargo"
+ENV PATH="${PATH}:${NARGO_HOME}/bin"
 
+RUN curl -L https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash \
+ && "$HOME/.nargo/bin/noirup" -v ${NOIR_VERSION}
+
+# ────────────────────────────────────────────────────────────────────────────────
+#   Barretenberg CLI (bbup)
+# ────────────────────────────────────────────────────────────────────────────────
+ENV BB_HOME="/home/${USERNAME}/.bb"
+ENV PATH="${PATH}:${BB_HOME}"
+
+RUN curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/master/barretenberg/bbup/install | bash \
+ && bbup -v ${BB_VERSION}
+
+# ────────────────────────────────────────────────────────────────────────────────
+#   Foundry
+# ────────────────────────────────────────────────────────────────────────────────
 ENV PATH="/home/${USERNAME}/.foundry/bin:${PATH}"
-RUN curl -L https://foundry.paradigm.xyz | bash
-RUN foundryup
+RUN curl -L https://foundry.paradigm.xyz | bash \
+ && foundryup
 
+# ────────────────────────────────────────────────────────────────────────────────
+#   Risc Zero tool-chain
+# ────────────────────────────────────────────────────────────────────────────────
 ENV PATH="/home/${USERNAME}/.risc0/bin:${PATH}"
-RUN curl -L https://risczero.com/install | bash
-RUN rzup install rust 1.85.0 
-RUN rzup install cpp 2024.1.5 
-RUN rzup install r0vm 2.0.0
-RUN rzup install cargo-risczero 2.0.0
 
-RUN sudo wget https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz -O - |\
-  tar xz && sudo mv yq_linux_amd64 /usr/bin/yq
+RUN curl -L https://risczero.com/install | bash \
+ && rzup install rust ${RUST_VERSION} \
+ && rzup install cpp  ${CPP_VERSION} \
+ && rzup install r0vm ${RISCZERO_VERSION} \
+ && rzup install cargo-risczero ${RISCZERO_VERSION}
+
+# ────────────────────────────────────────────────────────────────────────────────
+#   Helpers (yq)  & workspace dir
+# ────────────────────────────────────────────────────────────────────────────────
+RUN sudo wget -qO- https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz \
+ | sudo tar xz -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
 
 RUN sudo mkdir -p /app && sudo chown -R $USERNAME:$USERNAME /app
-
 WORKDIR /app/examples/CRISP
 
-RUN pnpm config set store-dir "/home/${USERNAME}/.pnpm-store"
-RUN pnpm --version
+# Pre-set pnpm store path (speeds up mounts)
+RUN pnpm config set store-dir "/home/${USERNAME}/.pnpm-store" \
+ && pnpm --version
 
-ENTRYPOINT ["/bin/bash"]
+# ────────────────────────────────────────────────────────────────────────────────
+#   Default entrypoint
+# ────────────────────────────────────────────────────────────────────────────────
+ENTRYPOINT ["bash", "-l"]

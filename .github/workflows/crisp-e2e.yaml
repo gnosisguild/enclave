@@ -30,7 +30,14 @@ jobs:
           submodules: recursive
 
       - name: Prepare test environment
-        run: mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results && sudo chmod 777 $GITHUB_WORKSPACE/examples/CRISP/test-results && mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report && chmod 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/test-results
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          sudo chown -R $USER_UID:$USER_GID $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -68,6 +75,8 @@ jobs:
       - name: Run Playwright tests
         working-directory: ./examples/CRISP
         run: pnpm test:e2e
+        env:
+          PLAYWRIGHT_WORKERS: 4
 
       - name: Upload test results
         if: always()

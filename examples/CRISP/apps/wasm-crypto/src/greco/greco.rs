@@ -1,7 +1,4 @@
-use std::fs::File;
-use std::io::Write;
 use std::ops::Deref;
-use std::path::Path;
 use std::sync::Arc;
 
 use fhe_math::rq::{Poly, Representation};
@@ -50,10 +47,10 @@ impl InputValidationVectors {
             pk1is: vec![vec![BigInt::zero(); degree]; num_moduli],
             ct0is: vec![vec![BigInt::zero(); degree]; num_moduli],
             ct1is: vec![vec![BigInt::zero(); degree]; num_moduli],
-            r1is: vec![vec![BigInt::zero(); 2 * (degree - 1)]; num_moduli],
-            r2is: vec![vec![BigInt::zero(); degree - 2]; num_moduli],
-            p1is: vec![vec![BigInt::zero(); 2 * (degree - 1)]; num_moduli],
-            p2is: vec![vec![BigInt::zero(); degree - 2]; num_moduli],
+            r1is: vec![vec![BigInt::zero(); 2 * (degree - 1) + 1]; num_moduli],
+            r2is: vec![vec![BigInt::zero(); degree - 1]; num_moduli],
+            p1is: vec![vec![BigInt::zero(); 2 * (degree - 1) + 1]; num_moduli],
+            p2is: vec![vec![BigInt::zero(); degree - 1]; num_moduli],
             k0is: vec![BigInt::zero(); num_moduli],
             u: vec![BigInt::zero(); degree],
             e0: vec![BigInt::zero(); degree],
@@ -96,8 +93,8 @@ impl InputValidationVectors {
     /// Returns a `serde_json::Value` representing the JSON serialization of the `InputValidationVectors`.
     pub fn to_json(&self) -> serde_json::Value {
         json!({
-            "pk0i": to_string_2d_vec(&self.pk0is),
-            "pk1i": to_string_2d_vec(&self.pk1is),
+            "pk0is": to_string_2d_vec(&self.pk0is),
+            "pk1is": to_string_2d_vec(&self.pk1is),
             "u": to_string_1d_vec(&self.u),
             "e0": to_string_1d_vec(&self.e0),
             "e1": to_string_1d_vec(&self.e1),
@@ -183,7 +180,9 @@ impl InputValidationVectors {
             .to_u64()
             .ok_or_else(|| "Cannot convert BigInt to u64.".to_string())?; // [q]_t
         let mut k1_u64 = pt.value.deref().to_vec(); // m
+
         t.scalar_mul_vec(&mut k1_u64, q_mod_t); // k1 = [q*m]_t
+
         let mut k1: Vec<BigInt> = k1_u64.iter().map(|&x| BigInt::from(x)).rev().collect();
         reduce_and_center_coefficients_mut(&mut k1, &BigInt::from(t.modulus()));
 
@@ -254,17 +253,9 @@ impl InputValidationVectors {
 
         // Create cyclotomic polynomial x^N + 1
         let mut cyclo = vec![BigInt::from(0u64); (N + 1) as usize];
+
         cyclo[0] = BigInt::from(1u64); // x^N term
         cyclo[N as usize] = BigInt::from(1u64); // x^0 term
-
-        // Print
-        /*
-        println!("m = {:?}\n", &m);
-        println!("k1 = {:?}\n", &k1);
-        println!("u = {:?}\n", &u);
-        println!("e0 = {:?}\n", &e0);
-        println!("e1 = {:?}\n", &e1);
-         */
 
         // Initialize matrices to store results
         let num_moduli = ctx.moduli().len();
@@ -313,6 +304,7 @@ impl InputValidationVectors {
                 reduce_and_center_coefficients_mut(&mut pk1i, &qi_bigint);
 
                 // k0qi = -t^{-1} mod qi
+
                 let koqi_u64 = qi.inv(qi.neg(t.modulus())).unwrap();
                 let k0qi = BigInt::from(koqi_u64); // Do not need to center this
 
@@ -323,7 +315,6 @@ impl InputValidationVectors {
                 let ct0i_hat = {
                     let pk0i_times_u = poly_mul(&pk0i, &u);
                     assert_eq!((pk0i_times_u.len() as u64) - 1, 2 * (N - 1));
-
                     let e0_plus_ki = poly_add(&e0, &ki);
                     assert_eq!((e0_plus_ki.len() as u64) - 1, N - 1);
 
@@ -430,23 +421,10 @@ impl InputValidationVectors {
                 }
 
                 assert_eq!(&ct1i, &ct1i_calculated);
-
-                /*
-                println!("qi = {:?}\n", &qi_bigint);
-                println!("ct0i = {:?}\n", &ct0i);
-                println!("k0qi = {:?}\n", &k0qi);
-                println!("pk0 = Polynomial({:?})\n", &pk0i);
-                println!("pk1 = Polynomial({:?})\n", &pk1i);
-                println!("ki = {:?}\n", &ki);
-                println!("ct0i_hat_mod_rqi = {:?}\n", &ct0i_hat_mod_rqi);
-                */
-
                 (i, r2i, r1i, k0qi, ct0i, ct1i, pk0i, pk1i, p1i, p2i)
             },
         )
         .collect();
-
-        // println!("Completed creation of polynomials!");
 
         // Merge results into the `res` structure after parallel execution
         for (i, r2i, r1i, k0i, ct0i, ct1i, pk0i, pk1i, p1i, p2i) in results.into_iter() {
@@ -478,10 +456,11 @@ impl InputValidationVectors {
 pub struct InputValidationBounds {
     u: BigInt,
     e: BigInt,
-    t: BigInt,
-    k1: BigInt,
+    k1_low: BigInt,
+    k1_up: BigInt,
     pk: Vec<BigInt>,
-    r1: Vec<BigInt>,
+    r1_low: Vec<BigInt>,
+    r1_up: Vec<BigInt>,
     r2: Vec<BigInt>,
     p1: Vec<BigInt>,
     p2: Vec<BigInt>,
@@ -510,9 +489,14 @@ impl InputValidationBounds {
         assert!(range_check_standard(&vecs_std.e0, &self.e, &p));
         assert!(range_check_standard(&vecs_std.e1, &self.e, &p));
 
-        // constraint. The coefficients of k1 should be in the range [-(t-1)/2, (t-1)/2]
-        assert!(range_check_centered(&vecs.k1, &-&self.k1, &self.k1));
-        assert!(range_check_standard(&vecs_std.k1, &self.k1, &p));
+        // constraint. The coefficients of k1 should be in the range [-(t-1)]/2, (t-1)/2]
+        assert!(range_check_centered(&vecs.k1, &self.k1_low, &self.k1_up));
+        assert!(range_check_standard_2bounds(
+            &vecs_std.k1,
+            &self.k1_low,
+            &self.k1_up,
+            &p
+        ));
 
         // Perform asserts for polynomials depending on each qi
         for i in 0..self.r2.len() {
@@ -552,15 +536,20 @@ impl InputValidationBounds {
 
             // constraint. The coefficients of (ct0i - ct0i_hat - r2i * cyclo) / qi = r1i should be in the range
             // $[
-            //      \frac{- ((N+2) \cdot \frac{q_i - 1}{2} + B + \frac{t - 1}{2} \cdot |K_{0,i}|)}{q_i},
-            //      \frac{   (N+2) \cdot \frac{q_i - 1}{2} + B + \frac{t - 1}{2} \cdot |K_{0,i}| }{q_i}
+            //      \frac{ \frac{-(t - 1)}{2} \cdot |K_{0,i}| - ((N \cdot B +2) \cdot \frac{q_i - 1}{2} + B )}{q_i},
+            //      \frac{ \frac{t - 1}{2} \cdot |K_{0,i}| +  (N \cdot B+2) \cdot \frac{q_i - 1}{2} + B }{q_i}
             // ]$
             assert!(range_check_centered(
                 &vecs.r1is[i],
-                &-&self.r1[i],
-                &self.r1[i]
+                &self.r1_low[i],
+                &self.r1_up[i]
             ));
-            assert!(range_check_standard(&vecs_std.r1is[i], &self.r1[i], &p));
+            assert!(range_check_standard_2bounds(
+                &vecs_std.r1is[i],
+                &self.r1_low[i],
+                &self.r1_up[i],
+                &p
+            ));
 
             // constraint. The coefficients of p2 should be in the range [-(qi-1)/2, (qi-1)/2]
             assert!(range_check_centered(
@@ -572,8 +561,8 @@ impl InputValidationBounds {
 
             // constraint. The coefficients of (ct0i - ct0i_hat - p2i * cyclo) / qi = p1i should be in the range
             // $[
-            //      \frac{- ((N+2) \cdot \frac{q_i - 1}{2} + B)}{q_i},
-            //      \frac{   (N+2) \cdot \frac{q_i - 1}{2} + B }{q_i}
+            //      \frac{- ((N \cdot B +2) \cdot \frac{q_i - 1}{2} + B)}{q_i},
+            //      \frac{   (N \cdot B +2) \cdot \frac{q_i - 1}{2} + B }{q_i}
             // ]$
             assert!(range_check_centered(
                 &vecs.p1is[i],
@@ -613,14 +602,27 @@ impl InputValidationBounds {
         );
         let u_bound = gauss_bound.clone();
         let e_bound = gauss_bound.clone();
-        let ptxt_bound = (t - BigInt::from(1)) / BigInt::from(2);
-        let k1_bound = ptxt_bound.clone();
+
+        //Note we have two different variables for lower bound and upper bound, as in the case
+        //where the plaintext modulus is even, the lower bound cannot be calculated by just
+        //negating the upper bound. For instance, if t = 8, then the lower bound will be -4 and the
+        //upper bound will be 3
+        let ptxt_up_bound = (t.clone() - BigInt::from(1)) / BigInt::from(2);
+        let ptxt_low_bound = if (t.clone() % BigInt::from(2)) == BigInt::from(1) {
+            (-&(t.clone() - BigInt::from(1))) / BigInt::from(2)
+        } else {
+            ((-&(t.clone() - BigInt::from(1))) / BigInt::from(2)) - BigInt::from(1)
+        };
+
+        let k1_low_bound = ptxt_low_bound.clone();
+        let k1_up_bound = ptxt_up_bound.clone();
 
         // Calculate qi-based bounds
         let num_moduli = ctx.moduli().len();
         let mut pk_bounds: Vec<BigInt> = vec![BigInt::zero(); num_moduli];
         let mut r2_bounds: Vec<BigInt> = vec![BigInt::zero(); num_moduli];
-        let mut r1_bounds: Vec<BigInt> = vec![BigInt::zero(); num_moduli];
+        let mut r1_low_bounds: Vec<BigInt> = vec![BigInt::zero(); num_moduli];
+        let mut r1_up_bounds: Vec<BigInt> = vec![BigInt::zero(); num_moduli];
         let mut p2_bounds: Vec<BigInt> = vec![BigInt::zero(); num_moduli];
         let mut p1_bounds: Vec<BigInt> = vec![BigInt::zero(); num_moduli];
         for (i, qi) in ctx.moduli_operators().iter().enumerate() {
@@ -635,176 +637,30 @@ impl InputValidationBounds {
 
             pk_bounds[i] = qi_bound.clone();
             r2_bounds[i] = qi_bound.clone();
-            r1_bounds[i] = ((&N + 2) * &qi_bound + &gauss_bound + &ptxt_bound * BigInt::abs(&k0qi))
+
+            r1_low_bounds[i] = (&ptxt_low_bound * BigInt::abs(&k0qi)
+                - &((&N * &gauss_bound + 2) * &qi_bound + &gauss_bound))
                 / &qi_bigint;
+            r1_up_bounds[i] = (&ptxt_up_bound * BigInt::abs(&k0qi)
+                + ((&N * &gauss_bound + 2) * &qi_bound + &gauss_bound))
+                / &qi_bigint;
+
             p2_bounds[i] = qi_bound.clone();
-            p1_bounds[i] = ((&N + 2) * &qi_bound + &gauss_bound) / &qi_bigint;
+            p1_bounds[i] = ((&N * &gauss_bound + 2) * &qi_bound + &gauss_bound) / &qi_bigint;
         }
 
         Ok(InputValidationBounds {
             u: u_bound,
             e: e_bound,
-            t: ptxt_bound,
-            k1: k1_bound,
+            k1_low: k1_low_bound,
+            k1_up: k1_up_bound,
             pk: pk_bounds,
-            r1: r1_bounds,
+            r1_low: r1_low_bounds,
+            r1_up: r1_up_bounds,
             r2: r2_bounds,
             p1: p1_bounds,
             p2: p2_bounds,
         })
-    }
-
-    /// Writes the input validation bounds to a file that can be imported as a Rust module.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Reference to BFV parameters to extract context information.
-    /// * `output_file` - The path where the output constants should be saved.
-    ///
-    /// This function calculates certain constants like `k0i` values for each modulus `qi` and writes the bounds and other
-    /// relevant constants in a Rust-friendly format to the file specified by `output_file`.
-    fn to_file(
-        &self,
-        params: &Arc<BfvParameters>,
-        output_file: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let level = params.moduli().len() - self.r2.len();
-        let ctx = params.ctx_at_level(level)?;
-
-        // Calculate k0i constants
-        let k0i_constants = ctx
-            .moduli_operators()
-            .iter()
-            .map(|qi| {
-                // Use the ? operator to propagate errors
-                let k0qi_value = qi
-                    .inv(qi.neg(params.plaintext()))
-                    .ok_or_else(|| "Failed to calculate modulus inverse for k0qi".to_string())?;
-                Ok(BigInt::from(k0qi_value))
-            })
-            .collect::<Result<Vec<BigInt>, String>>()?;
-
-        // Set the output file path
-        let output_path = Path::new("src")
-            .join("constants")
-            .join("pk_enc_constants")
-            .join(output_file);
-
-        let mut file = File::create(output_path)?;
-
-        // Writing the constants to the file
-        writeln!(file, "/// `N` is the degree of the cyclotomic polynomial defining the ring `Rq = Zq[X]/(X^N + 1)`.")?;
-        writeln!(file, "pub const N: usize = {};", params.degree())?;
-
-        let pk_bound_str = self
-            .pk
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        writeln!(file, "/// The coefficients of the polynomial `pk0is` and `pk1is` should exist in the interval `[-PK_BOUND, PK_BOUND]`.")?;
-        writeln!(
-            file,
-            "pub const PK_BOUND: [u64; {}] = [{}];",
-            self.pk.len(),
-            pk_bound_str
-        )?;
-
-        writeln!(file, "/// The coefficients of the polynomial `pk1is` should exist in the interval `[-PK0_BOUND, PK0_BOUND]`.")?;
-
-        writeln!(file, "/// The coefficients of the polynomial `e` should exist in the interval `[-E_BOUND, E_BOUND]` where `E_BOUND` is the upper bound of the gaussian distribution with 𝜎 = 3.2.")?;
-        writeln!(file, "pub const E_BOUND: u64 = {};", self.e)?;
-
-        writeln!(file, "/// The coefficients of the polynomial `s` should exist in the interval `[-S_BOUND, S_BOUND]`.")?;
-        writeln!(file, "pub const U_BOUND: u64 = {};", self.u)?;
-
-        let r1_bounds_str = self
-            .r1
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        writeln!(file, "/// The coefficients of the polynomials `r1is` should exist in the interval `[-R1_BOUND[i], R1_BOUND[i]]` where `R1_BOUND[i]` is equal to `(qi-1)/2`.")?;
-        writeln!(
-            file,
-            "pub const R1_BOUNDS: [u64; {}] = [{}];",
-            self.r1.len(),
-            r1_bounds_str
-        )?;
-
-        let r2_bounds_str = self
-            .r2
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        writeln!(file, "/// The coefficients of the polynomials `r2is` should exist in the interval `[-R2_BOUND[i], R2_BOUND[i]]` where `R2_BOUND[i]` is equal to $\\frac{{(N+2) \\cdot \\frac{{q_i - 1}}{{2}} + B + \\frac{{t - 1}}{{2}} \\cdot |K_{{0,i}}|}}{{q_i}}`.")?;
-        writeln!(
-            file,
-            "pub const R2_BOUNDS: [u64; {}] = [{}];",
-            self.r2.len(),
-            r2_bounds_str
-        )?;
-
-        let p1_bounds_str = self
-            .p1
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        writeln!(file, "/// The coefficients of the polynomials `p1is` should exist in the interval `[-P1_BOUND[i], P1_BOUND[i]]` where `P1_BOUND[i]` is equal to (((qis[i] - 1) / 2) * (n + 2) + b ) / qis[i].")?;
-        writeln!(
-            file,
-            "pub const P1_BOUNDS: [u64; {}] = [{}];",
-            self.p1.len(),
-            p1_bounds_str
-        )?;
-
-        let p2_bounds_str = self
-            .p2
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ");
-        writeln!(file, "/// The coefficients of the polynomials `p2is` should exist in the interval `[-P2_BOUND[i], P2_BOUND[i]]` where `P2_BOUND[i]` is equal to (qis[i] - 1) / 2.")?;
-        writeln!(
-            file,
-            "pub const P2_BOUNDS: [u64; {}] = [{}];",
-            self.p2.len(),
-            p2_bounds_str
-        )?;
-
-        writeln!(file, "/// The coefficients of `k1` should exist in the interval `[-K1_BOUND, K1_BOUND]` where `K1_BOUND` is equal to `(t-1)/2`.")?;
-        writeln!(file, "pub const K1_BOUND: u64 = {};", self.k1)?;
-
-        let qis_str = ctx
-            .moduli()
-            .iter()
-            .map(|x| format!("\"{}\"", x))
-            .collect::<Vec<String>>()
-            .join(", ");
-        writeln!(file, "/// List of scalars `qis` such that `qis[i]` is the modulus of the i-th CRT basis of `q` (ciphertext space modulus).")?;
-        writeln!(
-            file,
-            "pub const QIS: [&str; {}] = [{}];",
-            ctx.moduli().len(),
-            qis_str
-        )?;
-
-        let k0is_str = k0i_constants
-            .iter()
-            .map(|x| format!("\"{}\"", x))
-            .collect::<Vec<String>>()
-            .join(", ");
-        writeln!(file, "/// List of scalars `k0is` such that `k0i[i]` is equal to the negative of the multiplicative inverses of t mod qi.")?;
-        writeln!(
-            file,
-            "pub const K0IS: [&str; {}] = [{}];",
-            k0i_constants.len(),
-            k0is_str
-        )?;
-
-        Ok(())
     }
 }
 
@@ -814,22 +670,4 @@ fn to_string_1d_vec(poly: &Vec<BigInt>) -> Vec<String> {
 
 fn to_string_2d_vec(poly: &Vec<Vec<BigInt>>) -> Vec<Vec<String>> {
     poly.iter().map(|row| to_string_1d_vec(row)).collect()
-}
-
-/// Writes the given JSON data to a file in the specified output path.
-///
-/// # Arguments
-///
-/// * `output_path` - A reference to the base directory path where the file will be created.
-/// * `filename` - The name of the file to create.
-/// * `json_data` - A reference to the JSON data to be written into the file.
-///
-/// # Panics
-///
-/// This function will panic if the file cannot be created or if writing to the file fails.
-fn write_json_to_file(output_path: &Path, filename: &str, json_data: &serde_json::Value) {
-    let file_path = output_path.join(filename);
-    let mut file = File::create(file_path).expect("Unable to create file");
-    file.write_all(serde_json::to_string_pretty(json_data).unwrap().as_bytes())
-        .expect("Unable to write data");
 }

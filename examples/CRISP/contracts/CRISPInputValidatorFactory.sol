@@ -12,8 +12,12 @@ contract CRISPInputValidatorFactory is Factory {
 
     /// @notice Deploys a new CRISPInputValidator clone.
     /// @param _policyAddr Address of the associated policy contract.
-    function deploy(address _policyAddr) public returns (address clone) {
-        bytes memory data = abi.encode(_policyAddr);
+    /// @param _verifierAddr Address of the associated verifier contract.
+    function deploy(
+        address _policyAddr,
+        address _verifierAddr
+    ) public returns (address clone) {
+        bytes memory data = abi.encode(_policyAddr, _verifierAddr);
 
         clone = super._deploy(data);
         CRISPInputValidator(clone).initialize();

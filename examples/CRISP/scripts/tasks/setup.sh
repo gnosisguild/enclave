@@ -21,3 +21,5 @@ echo "crisp-wasm-crypto"
 (cd ./apps/wasm-crypto && cargo check)
 echo "client"
 (cd ./apps/client && if [[ ! -f .env ]]; then cp .env.example .env; fi)
+echo "noir"
+./scripts/tasks/compile_circuits.sh
