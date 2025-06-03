@@ -1,12 +1,11 @@
 services:
   enclave-dev:
-    user: "1000:1000"
     platform: linux/amd64
     build:
       context: .
       args:
-        USER_UID: ${USER_UID:-1000}
-        USER_GID: ${USER_GID:-1000}
+        USER_UID: ${USER_UID:-1001}
+        USER_GID: ${USER_GID:-118}
         USERNAME: ubuntu
     volumes:
       - ../..:/app
@@ -19,6 +18,7 @@ services:
       - client-node-modules:/app/examples/CRISP/apps/client/node_modules
       - crisp-node-modules:/app/examples/CRISP/node_modules
       - crisp-foundry-cache:/app/examples/CRISP/out
+      - synpress-cache:/app/examples/CRISP/.cache-synpress
     entrypoint:
       - ""
     ports:
@@ -29,6 +29,8 @@ services:
       /bin/bash -c '
       sudo chown -R ubuntu:ubuntu /app &&
       sudo chown -R ubuntu:ubuntu /home/ubuntu &&
+      sudo mkdir -p /app/examples/CRISP/.cache-synpress &&
+      sudo chown -R ubuntu:ubuntu /app/examples/CRISP/.cache-synpress &&
       tail -f /dev/null
       '
 
@@ -42,4 +44,5 @@ volumes:
   crisp-node-modules:
   crisp-foundry-cache:
   git-folder:
+  synpress-cache:
   
