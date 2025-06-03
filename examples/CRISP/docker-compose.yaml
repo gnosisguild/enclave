@@ -31,12 +31,7 @@ services:
       /bin/bash -c '
       sudo chown -R ubuntu:ubuntu /app &&
       sudo chown -R ubuntu:ubuntu /home/ubuntu &&
-      sudo mkdir -p /app/examples/CRISP/.cache-synpress &&
-      sudo chown -R ubuntu:ubuntu /app/examples/CRISP/.cache-synpress &&
-      sudo mkdir -p /app/examples/CRISP/test-results &&
-      sudo chown -R ubuntu:ubuntu /app/examples/CRISP/test-results &&
-      sudo mkdir -p /app/examples/CRISP/playwright-report &&
-      sudo chown -R ubuntu:ubuntu /app/examples/CRISP/playwright-report &&
+      sudo chmod 755 /app/examples/CRISP &&
       tail -f /dev/null
       '
 
