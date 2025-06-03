@@ -50,7 +50,7 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     .await?;
 
     copy::copy_with_filters(
-        &PathBuf::from(TEMP_DIR).join("crates/support/ctl"),
+        &PathBuf::from(TEMP_DIR).join("crates/support-scripts/ctl"),
         &cwd.join(".enclave/support/ctl"),
         &vec![],
     )
