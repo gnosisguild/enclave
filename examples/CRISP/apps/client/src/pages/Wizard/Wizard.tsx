@@ -1,25 +1,26 @@
 import React, { useState, useEffect } from 'react'
 import { useAccount } from 'wagmi'
 import { ConnectKitButton } from 'connectkit'
+import { hexToBytes } from 'viem'
 import CardContent from '@/components/Cards/CardContent'
 import CircularTiles from '@/components/CircularTiles'
 import LoadingAnimation from '@/components/LoadingAnimation'
 import EnvironmentError from '@/components/EnvironmentError'
 import { useEnclaveContract } from '@/hooks/enclave/useEnclaveContract'
 import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS } from '@/config/Enclave.abi'
-import { Wallet, Calculator, Lock, CheckCircle, NumberSquareOne, NumberSquareTwo, NumberSquareThree, NumberSquareFour, NumberSquareFive } from '@phosphor-icons/react'
+import { WalletIcon, CalculatorIcon, LockIcon, CheckCircleIcon, NumberSquareOneIcon, NumberSquareTwoIcon, NumberSquareThreeIcon, NumberSquareFourIcon, NumberSquareFiveIcon, NumberSquareTwo } from '@phosphor-icons/react'
 import { useWebAssemblyHook } from '@/hooks/wasm/useWebAssembly';
 
 enum WizardStep {
     CONNECT_WALLET = 1,
     REQUEST_COMPUTATION = 2,
-    ENTER_INPUTS = 3,
-    ENCRYPT_SUBMIT = 4,
-    RESULTS = 5,
+    ACTIVATE_E3 = 3,
+    ENTER_INPUTS = 4,
+    ENCRYPT_SUBMIT = 5,
+    RESULTS = 6,
 }
 
 const Wizard: React.FC = () => {
-    // Check for missing environment variables first
     if (HAS_MISSING_ENV_VARS) {
         return <EnvironmentError missingVars={MISSING_ENV_VARS} />
     }
@@ -35,13 +36,7 @@ const Wizard: React.FC = () => {
     const { isConnected } = useAccount()
 
     // Enclave contract integration
-    const { requestComputation, e3State, isRequesting, isSuccess, error, transactionHash } = useEnclaveContract()
-
-    console.log('e3State', e3State)
-    console.log('isRequesting', isRequesting)
-    console.log('isSuccess', isSuccess)
-    console.log('error', error)
-    console.log('transactionHash', transactionHash)
+    const { requestComputation, activateE3, publishInput, e3State, isRequesting, isSuccess, error, transactionHash } = useEnclaveContract()
 
     // Auto-advance from step 1 when wallet connects
     useEffect(() => {
@@ -59,10 +54,19 @@ const Wizard: React.FC = () => {
 
     // Handle E3 lifecycle progression
     useEffect(() => {
-        if (e3State.isActivated && e3State.publicKey && currentStep === WizardStep.REQUEST_COMPUTATION) {
+        if (e3State.isCommitteePublished && e3State.publicKey && currentStep === WizardStep.REQUEST_COMPUTATION) {
+            console.log('🔄 Committee ready - advancing to ACTIVATE_E3 step')
+            setCurrentStep(WizardStep.ACTIVATE_E3)
+        }
+    }, [e3State.isCommitteePublished, e3State.publicKey, currentStep])
+
+    // Auto-advance to input step when E3 is activated
+    useEffect(() => {
+        if (e3State.isActivated && currentStep === WizardStep.ACTIVATE_E3) {
+            console.log('🔄 E3 activated - advancing to ENTER_INPUTS step')
             setCurrentStep(WizardStep.ENTER_INPUTS)
         }
-    }, [e3State.isActivated, e3State.publicKey, currentStep])
+    }, [e3State.isActivated, currentStep])
 
     const handleRequestComputation = async () => {
         try {
@@ -71,6 +75,14 @@ const Wizard: React.FC = () => {
             })
         } catch (error) {
             console.error('Failed to request computation:', error)
+        }
+    }
+
+    const handleActivateE3 = async () => {
+        try {
+            await activateE3()
+        } catch (error) {
+            console.error('Failed to activate E3:', error)
         }
     }
 
@@ -84,13 +96,28 @@ const Wizard: React.FC = () => {
         try {
             await new Promise(resolve => setTimeout(resolve, 1500))
 
-            const encryptedInput1 = await encryptInput(BigInt(input1), e3State.publicKey as Uint8Array)
-            const encryptedInput2 = await encryptInput(BigInt(input2), e3State.publicKey as Uint8Array)
+            const publicKeyBytes = hexToBytes(e3State.publicKey as `0x${string}`)
+            console.log('publicKeyBytes', publicKeyBytes)
+            console.log('input1', input1)
+            console.log('input2', input2)
+            const encryptedInput1 = await encryptInput(BigInt(input1), publicKeyBytes)
+            console.log('encryptedInput1', encryptedInput1)
+            const encryptedInput2 = await encryptInput(BigInt(input2), publicKeyBytes)
+            console.log('encryptedInput2', encryptedInput2)
+
+            if (!encryptedInput1 || !encryptedInput2) {
+                throw new Error('Encryption failed')
+            }
 
             setEncryptedInputs({
                 input1: encryptedInput1,
                 input2: encryptedInput2
             })
+
+            // Publish the encrypted inputs to the Enclave contract
+            await publishInput(encryptedInput1)
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            await publishInput(encryptedInput2)
 
             // Simulate computation result - sum of the inputs
             const sum = parseInt(input1) + parseInt(input2)
@@ -102,7 +129,7 @@ const Wizard: React.FC = () => {
             setIsLoading(false)
             setCurrentStep(WizardStep.RESULTS)
         } catch (error) {
-            console.error('Encryption failed:', error)
+            console.error('Encryption or publishing failed:', error)
             setIsLoading(false)
         }
     }
@@ -111,24 +138,25 @@ const Wizard: React.FC = () => {
         setCurrentStep(WizardStep.REQUEST_COMPUTATION)
         setInput1('')
         setInput2('')
-        setEncryptedInputs(null)
+        setEncryptedInputs(undefined)
         setResult(null)
     }
 
     const getStepIcon = (step: WizardStep) => {
         const iconProps = { size: 20, weight: 'bold' as const }
         switch (step) {
-            case WizardStep.CONNECT_WALLET: return <NumberSquareOne {...iconProps} />
-            case WizardStep.REQUEST_COMPUTATION: return <NumberSquareTwo {...iconProps} />
-            case WizardStep.ENTER_INPUTS: return <NumberSquareThree {...iconProps} />
-            case WizardStep.ENCRYPT_SUBMIT: return <NumberSquareFour {...iconProps} />
-            case WizardStep.RESULTS: return <NumberSquareFive {...iconProps} />
+            case WizardStep.CONNECT_WALLET: return <NumberSquareOneIcon {...iconProps} />
+            case WizardStep.REQUEST_COMPUTATION: return <NumberSquareTwoIcon {...iconProps} />
+            case WizardStep.ACTIVATE_E3: return <NumberSquareThreeIcon {...iconProps} />
+            case WizardStep.ENTER_INPUTS: return <NumberSquareFourIcon {...iconProps} />
+            case WizardStep.ENCRYPT_SUBMIT: return <NumberSquareFiveIcon {...iconProps} />
+            case WizardStep.RESULTS: return <NumberSquareFiveIcon {...iconProps} />
         }
     }
 
     const renderStepIndicator = () => (
         <div className="flex items-center justify-center space-x-2 mb-8">
-            {[1, 2, 3, 4, 5].map((step) => (
+            {[1, 2, 3, 4, 5, 6].map((step) => (
                 <div key={step} className="flex items-center">
                     <div
                         className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${step <= currentStep
@@ -138,7 +166,7 @@ const Wizard: React.FC = () => {
                     >
                         {getStepIcon(step as WizardStep)}
                     </div>
-                    {step < 5 && (
+                    {step < 6 && (
                         <div
                             className={`w-12 h-0.5 mx-2 transition-all duration-300 ${step < currentStep ? 'bg-lime-400' : 'bg-slate-300'
                                 }`}
@@ -156,7 +184,7 @@ const Wizard: React.FC = () => {
                     <CardContent>
                         <div className='space-y-6 text-center'>
                             <div className="flex justify-center">
-                                <Wallet size={48} className="text-lime-400" />
+                                <WalletIcon size={48} className="text-lime-400" />
                             </div>
                             <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 1: Connect Your Wallet</p>
                             <div className="space-y-4">
@@ -168,11 +196,12 @@ const Wizard: React.FC = () => {
                                 <div className="bg-lime-50 border border-lime-200 rounded-lg p-4">
                                     <p className="text-sm text-slate-600">
                                         <strong>What happens next:</strong> After connecting, you'll request a computation session,
-                                        enter two numbers, and see them encrypted using homomorphic encryption before computation.
+                                        wait for committee activation, activate the E3, enter two numbers, and see them encrypted
+                                        before being published to the secure computation environment.
                                     </p>
                                 </div>
                             </div>
-                            <div className="pt-4">
+                            <div className="pt-4 flex justify-center">
                                 <ConnectKitButton />
                             </div>
                         </div>
@@ -184,18 +213,18 @@ const Wizard: React.FC = () => {
                     <CardContent>
                         <div className='space-y-6 text-center'>
                             <div className="flex justify-center">
-                                <Calculator size={48} className="text-lime-400" />
+                                <CalculatorIcon size={48} className="text-lime-400" />
                             </div>
                             <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 2: Request Computation</p>
                             <div className="space-y-4">
-                                <h3 className="text-lg font-semibold text-slate-700">Initialize Secure Computing Environment</h3>
+                                <h3 className="text-lg font-semibold text-slate-700">Initialize Encrypted Execution Environment</h3>
                                 <p className="text-slate-600 leading-relaxed">
                                     Request an E3 computation from the Enclave network. This will create a secure
                                     computation environment and wait for the committee to activate it with a public key.
                                 </p>
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <p className="text-sm text-slate-600">
-                                        <strong>What happens:</strong> Request → Committee Selection → Environment Activation → Ready for Encryption
+                                        <strong>What happens:</strong> Request → Committee Selection → Public Key → Ready for Activation
                                     </p>
                                 </div>
 
@@ -210,26 +239,22 @@ const Wizard: React.FC = () => {
                                             </p>
                                         </div>
 
-                                        {e3State.isActivated && e3State.publicKey ? (
+                                        {e3State.isCommitteePublished && e3State.publicKey ? (
                                             <div className="bg-lime-50 border border-lime-200 rounded-lg p-4">
                                                 <p className="text-sm text-slate-600">
-                                                    <strong>🔑 Environment Activated!</strong>
+                                                    <strong>🔑 Committee Published Public Key!</strong>
                                                     <br />
                                                     <strong>Public Key:</strong> {e3State.publicKey.slice(0, 20)}...{e3State.publicKey.slice(-10)}
                                                     <br />
-                                                    {e3State.expiresAt !== null && (
-                                                        <>
-                                                            <strong>Expires:</strong> {new Date(Number(e3State.expiresAt) * 1000).toLocaleString()}
-                                                        </>
-                                                    )}
+                                                    Ready to activate E3 environment.
                                                 </p>
                                             </div>
-                                        ) : e3State.isRequested && (
+                                        ) : (
                                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                                <div className="flex items-center space-x-2">
-                                                    <LoadingAnimation isLoading={true} className="!h-4 !w-4" />
+                                                <div className="flex flex-col items-center space-x-2">
+                                                    <LoadingAnimation isLoading={true} className="!h-6 !w-6" />
                                                     <p className="text-sm text-slate-600">
-                                                        <strong>⏳ Waiting for committee activation...</strong>
+                                                        <strong>⏳ Waiting for committee to publish public key...</strong>
                                                         <br />
                                                         The computation committee is being selected and will provide the public key shortly.
                                                     </p>
@@ -263,11 +288,11 @@ const Wizard: React.FC = () => {
                             >
                                 {isRequesting
                                     ? 'Requesting Computation...'
-                                    : e3State.isActivated
-                                        ? 'Environment Ready!'
-                                        : e3State.isRequested
-                                            ? 'Waiting for Activation...'
-                                            : 'Request E3 Computation (0.001 ETH)'}
+                                    : e3State.isRequested
+                                        ? e3State.isCommitteePublished
+                                            ? 'Committee Ready - Proceeding to Activation!'
+                                            : 'Waiting for Committee...'
+                                        : 'Request E3 Computation (0.001 ETH)'}
                             </button>
 
                             {isRequesting && (
@@ -280,18 +305,74 @@ const Wizard: React.FC = () => {
                     </CardContent>
                 )
 
+            case WizardStep.ACTIVATE_E3:
+                return (
+                    <CardContent>
+                        <div className='space-y-6 text-center'>
+                            <div className="flex justify-center">
+                                <LockIcon size={48} className="text-lime-400" />
+                            </div>
+                            <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 3: Activate E3</p>
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold text-slate-700">Activate the Computation Environment</h3>
+                                <p className="text-slate-600 leading-relaxed">
+                                    The committee has published their public key. Now you need to activate the E3 environment
+                                    which will allow it to accept encrypted inputs until it expires.
+                                </p>
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <h4 className="font-medium text-slate-700 mb-2">🔒 Committee Ready</h4>
+                                    <div className="text-sm text-slate-600 space-y-1">
+                                        <p><strong>E3 ID:</strong> {e3State.id !== null ? String(e3State.id) : 'N/A'}</p>
+                                        {e3State.publicKey && (
+                                            <p><strong>Public Key:</strong> {e3State.publicKey.slice(0, 16)}...{e3State.publicKey.slice(-8)}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <p className="text-sm text-slate-600">
+                                        <strong>What activation does:</strong> Activating the E3 sets an expiration time and
+                                        enables the environment to accept encrypted inputs from authorized users.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={handleActivateE3}
+                                disabled={isRequesting || e3State.isActivated || !e3State.publicKey}
+                                className="w-full rounded-lg bg-lime-400 px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:bg-lime-300 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                            >
+                                {isRequesting
+                                    ? 'Activating E3...'
+                                    : e3State.isActivated
+                                        ? 'E3 Activated!'
+                                        : !e3State.publicKey
+                                            ? 'Waiting for Public Key...'
+                                            : 'Activate E3 Environment'}
+                            </button>
+
+                            {isRequesting && (
+                                <div className="mt-4">
+                                    <LoadingAnimation isLoading={isRequesting} />
+                                    <p className="text-sm text-slate-500 mt-2">Activating E3...</p>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                )
+
             case WizardStep.ENTER_INPUTS:
                 return (
                     <CardContent>
                         <div className='space-y-6'>
                             <div className="text-center">
                                 <div className="flex justify-center mb-4">
-                                    <Lock size={48} className="text-lime-400" />
+                                    <LockIcon size={48} className="text-lime-400" />
                                 </div>
-                                <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 3: Enter Your Numbers</p>
+                                <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 4: Enter Your Numbers</p>
                                 <h3 className="text-lg font-semibold text-slate-700 mt-2">Input Data for Encrypted Computation</h3>
                                 <p className="text-slate-600 mt-2">
-                                    Enter two numbers that will be encrypted using the committee's public key and computed securely in the E3 environment.
+                                    Enter two numbers that will be encrypted using the committee's public key and published to the E3 environment.
                                 </p>
                             </div>
 
@@ -306,6 +387,7 @@ const Wizard: React.FC = () => {
                                     {e3State.expiresAt !== null && (
                                         <p><strong>Valid Until:</strong> {new Date(Number(e3State.expiresAt) * 1000).toLocaleString()}</p>
                                     )}
+                                    <p><strong>Status:</strong> {e3State.isActivated ? '✅ Activated & Ready for Inputs' : '⏳ Activating...'}</p>
                                 </div>
                             </div>
 
@@ -348,16 +430,16 @@ const Wizard: React.FC = () => {
                                     <p className="text-sm text-slate-600">
                                         <strong>Privacy Guarantee:</strong> These numbers will be encrypted using the committee's public key
                                         from E3 ID {e3State.id !== null ? String(e3State.id) : 'N/A'}, ensuring they remain completely private
-                                        throughout the homomorphic computation process.
+                                        throughout the homomorphic computation process and will be published to the blockchain.
                                     </p>
                                 </div>
 
                                 <button
                                     type='submit'
-                                    disabled={!input1.trim() || !input2.trim() || !e3State.publicKey}
+                                    disabled={!input1.trim() || !input2.trim() || !e3State.isActivated}
                                     className='w-full rounded-lg bg-lime-400 px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:bg-lime-300 hover:shadow-md hover:scale-[1.02] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:transform-none'
                                 >
-                                    {!e3State.publicKey ? 'Waiting for Public Key...' : 'Encrypt & Submit Numbers'}
+                                    {!e3State.isActivated ? 'Waiting for E3 Activation...' : 'Encrypt & Publish Numbers'}
                                 </button>
                             </form>
                         </div>
@@ -369,20 +451,21 @@ const Wizard: React.FC = () => {
                     <CardContent>
                         <div className='space-y-6 text-center'>
                             <div className="flex justify-center">
-                                <Lock size={48} className="text-lime-400 animate-pulse" />
+                                <LockIcon size={48} className="text-lime-400 animate-pulse" />
                             </div>
-                            <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 4: Encrypting & Computing</p>
+                            <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 5: Encrypting & Publishing</p>
                             <div className="space-y-4">
                                 <h3 className="text-lg font-semibold text-slate-700">Processing Your Encrypted Data</h3>
                                 <p className="text-slate-600 leading-relaxed">
-                                    Your numbers are being encrypted using homomorphic encryption and sent to the secure computation environment.
-                                    The computation is being performed on the encrypted data without decrypting it.
+                                    Your numbers are being encrypted using homomorphic encryption and published to the secure computation environment.
+                                    Each input is published as a separate transaction to the blockchain.
                                 </p>
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                                     <p className="text-sm text-slate-600">
                                         <strong>Processing Steps:</strong>
                                         <br />• Encrypting your inputs with FHE
-                                        <br />• Performing encrypted addition
+                                        <br />• Publishing encrypted input 1 to blockchain
+                                        <br />• Publishing encrypted input 2 to blockchain
                                         <br />• Preparing secure result
                                     </p>
                                 </div>
@@ -400,9 +483,9 @@ const Wizard: React.FC = () => {
                     <CardContent>
                         <div className='space-y-6 text-center'>
                             <div className="flex justify-center">
-                                <CheckCircle size={48} className="text-green-500" />
+                                <CheckCircleIcon size={48} className="text-green-500" />
                             </div>
-                            <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 5: Computation Complete</p>
+                            <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 6: Computation Complete</p>
 
                             <div className="space-y-6">
                                 <h3 className="text-lg font-semibold text-slate-700">Encrypted Computation Results</h3>
@@ -432,6 +515,7 @@ const Wizard: React.FC = () => {
                                         {transactionHash && (
                                             <p><strong>Request Transaction:</strong> {transactionHash.slice(0, 10)}...{transactionHash.slice(-8)}</p>
                                         )}
+                                        <p><strong>Status:</strong> ✅ Inputs Published to Blockchain</p>
                                     </div>
                                 </div>
 
@@ -439,8 +523,8 @@ const Wizard: React.FC = () => {
                                     <h4 className="font-medium text-slate-700 mb-2">What Just Happened?</h4>
                                     <p className="text-sm text-slate-600 leading-relaxed">
                                         Your numbers were encrypted using the committee's public key from E3 environment {e3State.id !== null ? String(e3State.id) : 'N/A'},
-                                        sent to the secure computation network, added together while remaining encrypted,
-                                        and the result was computed without ever revealing your original numbers to the computing system.
+                                        published as encrypted inputs to the blockchain, and are now ready for secure computation by the committee
+                                        without ever revealing your original numbers to the computing system.
                                     </p>
                                 </div>
 
