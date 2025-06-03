@@ -28,8 +28,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 #  Non-root user (skip if it already exists)
 # ────────────────────────────────────────────────────────────────────────────────
 ARG USERNAME=ubuntu
-ARG USER_UID=1001
-ARG USER_GID=118          # use any free GID you like
+ARG USER_UID=1000
+ARG USER_GID=100         # use any free GID you like
 
 RUN set -eux; \
     if ! id -u "${USERNAME}" 2>/dev/null; then \
