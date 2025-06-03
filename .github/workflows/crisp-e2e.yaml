@@ -31,8 +31,13 @@ jobs:
 
       - name: Prepare test environment
         run: |
-          rm -rf ./examples/CRISP/{test-results,playwright-report,.cache-synpress} || true
-          chmod -R 777 ./examples/CRISP
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/test-results
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          sudo chown -R $USER_UID:$USER_GID $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
