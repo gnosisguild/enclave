@@ -33,16 +33,21 @@ async fn ensure_script_exists(script_path: &PathBuf) -> Result<()> {
 
 pub async fn program_compile() -> Result<()> {
     let cwd = env::current_dir()?;
-    let script = cwd.join(".enclave/support/ctl/compile.sh");
+    let script = cwd.join(".enclave/support/ctl/compile");
+    ensure_script_exists(&script).await?;
+    run_bash_script(&cwd, &script, &[]).await?;
+    Ok(())
+}
+
+async fn ctl_run() -> Result<()> {
+    let cwd = env::current_dir()?;
+    let script = cwd.join(".enclave/support/ctl/run");
     ensure_script_exists(&script).await?;
     run_bash_script(&cwd, &script, &[]).await?;
     Ok(())
 }
 
 pub async fn program_listen() -> Result<()> {
-    let cwd = env::current_dir()?;
-    let script = cwd.join(".enclave/support/ctl/run.sh");
-    ensure_script_exists(&script).await?;
-    run_bash_script(&cwd, &script, &[]).await?;
+    ctl_run().await?;
     Ok(())
 }

@@ -4,6 +4,7 @@ use crate::helpers::telemetry::setup_tracing;
 use crate::net::NetCommands;
 use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
+use crate::program::{self, ProgramCommands};
 use crate::start;
 use crate::wallet::WalletCommands;
 use crate::{init, net, password, wallet, wizard};
@@ -133,6 +134,7 @@ impl Cli {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }
             Commands::Compile => e3_support_scripts::program_compile().await?,
+            Commands::Program { command } => program::execute(command, &config).await?,
             Commands::Wizard { .. } => {
                 bail!("Cannot run `enclave wizard` when a configuration exists.");
             }
@@ -192,6 +194,12 @@ pub enum Commands {
 
     /// Compile an Enclave project
     Compile,
+
+    /// Program management commands
+    Program {
+        #[command(subcommand)]
+        command: ProgramCommands,
+    },
 
     /// Password management commands
     Password {

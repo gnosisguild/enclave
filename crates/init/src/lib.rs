@@ -56,6 +56,9 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     )
     .await?;
 
+    // We need to make these chmod 777 because the dockerfile needs to be able to successfully
+    // write to them. There are better ways to do this but right now this is the most efficient.
+    // PRs/Ideas welcome.
     chmod_recursive(&cwd.join("contracts"), "777").await?;
     chmod_recursive(&cwd.join("tests"), "777").await?;
 
