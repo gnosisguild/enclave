@@ -1,7 +1,6 @@
 use alloy::dyn_abi::{DynSolType, DynSolValue};
 use alloy::primitives::U256;
 use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
-use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
 /// Predefined BFV parameters for common use cases
 pub mod params {
@@ -105,7 +104,7 @@ pub fn serialize_bfv_params(params: &BfvParameters) -> Vec<u8> {
                 .collect(),
         ),
     ]);
-    value.abi_encode_params()
+    value.abi_encode()
 }
 
 /// Deserializes BFV parameters from ABI-encoded bytes.
@@ -219,7 +218,7 @@ pub fn deserialize_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
 ///
 /// Returns a `Vec<u8>` containing the ABI-encoded parameters wrapped as bytes.
 pub fn encode_bfv_params(params: &BfvParameters) -> Vec<u8> {
-    DynSolValue::Bytes(serialize_bfv_params(params)).abi_encode_params()
+    DynSolValue::Bytes(serialize_bfv_params(params)).abi_encode()
 }
 
 /// ABI-decodes BFV parameters from double-encoded Solidity ABI format.
@@ -246,9 +245,7 @@ pub fn decode_bfv_params(bytes: &[u8]) -> BfvParameters {
         .expect("Failed to ABI decode bytes");
 
     match decoded {
-        DynSolValue::Bytes(inner_bytes) => {
-            BfvParameters::try_deserialize(&inner_bytes).expect("Could not decode Bfv Params")
-        }
+        DynSolValue::Bytes(inner_bytes) => deserialize_bfv_params(&inner_bytes),
         _ => panic!("Expected bytes value in ABI encoding"),
     }
 }
