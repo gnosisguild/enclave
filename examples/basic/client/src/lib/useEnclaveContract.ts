@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useWriteContract, useWaitForTransactionReceipt, useConfig } from 'wagmi'
 import { watchContractEvent } from '@wagmi/core'
-import { parseEther } from 'viem'
-import { ENCLAVE_ADDRESS, ENCLAVE_ABI, E3_PROGRAM_ADDRESS, REGISTRY_ADDRESS, FILTER_REGISTRY_ADDRESS, REGISTRY_ABI } from '@/config/Enclave.abi'
+import { parseEther, bytesToHex } from 'viem'
+import { ENCLAVE_ADDRESS, ENCLAVE_ABI, E3_PROGRAM_ADDRESS, REGISTRY_ADDRESS, FILTER_REGISTRY_ADDRESS, REGISTRY_ABI } from '@/lib/enclave.config'
 import {
     encodeBfvParams,
     encodeComputeProviderParams,
     calculateStartWindow,
     DEFAULT_COMPUTE_PROVIDER_PARAMS,
     DEFAULT_E3_CONFIG
-} from '@/utils/bfv-params'
+} from './bfv-params'
 
 export interface E3RequestParams {
     threshold?: [number, number]
@@ -25,6 +25,8 @@ export interface E3State {
     isActivated: boolean
     publicKey: `0x${string}` | null
     expiresAt: bigint | null
+    plaintextOutput: string | null
+    hasPlaintextOutput: boolean
 }
 
 export const useEnclaveContract = () => {
@@ -34,7 +36,9 @@ export const useEnclaveContract = () => {
         isCommitteePublished: false,
         isActivated: false,
         publicKey: null,
-        expiresAt: null
+        expiresAt: null,
+        plaintextOutput: null,
+        hasPlaintextOutput: false
     })
 
     const config = useConfig()
@@ -130,9 +134,31 @@ export const useEnclaveContract = () => {
             eventName: 'InputPublished',
             chainId: 31337,
             onLogs(logs) {
-                logs.forEach((log) => {
-                    const { e3Id } = (log as any).args
+                logs.forEach(() => {
                     // Event captured but no action needed for this tutorial
+                })
+            }
+        })
+
+        // Listen for PlaintextOutputPublished events
+        const plaintextOutputUnsubscribe = watchContractEvent(config, {
+            address: ENCLAVE_ADDRESS as `0x${string}`,
+            abi: ENCLAVE_ABI,
+            eventName: 'PlaintextOutputPublished',
+            chainId: 31337,
+            onLogs(logs) {
+                logs.forEach((log) => {
+                    const { e3Id, plaintextOutput } = (log as any).args
+                    setE3State(prevState => {
+                        if (e3Id && prevState.id && e3Id === prevState.id) {
+                            return {
+                                ...prevState,
+                                plaintextOutput: plaintextOutput as string,
+                                hasPlaintextOutput: true
+                            }
+                        }
+                        return prevState
+                    })
                 })
             }
         })
@@ -142,7 +168,8 @@ export const useEnclaveContract = () => {
             e3RequestedUnsubscribe,
             committeePublishedUnsubscribe,
             e3ActivatedUnsubscribe,
-            inputPublishedUnsubscribe
+            inputPublishedUnsubscribe,
+            plaintextOutputUnsubscribe
         ]
 
         // Cleanup on unmount
@@ -160,7 +187,9 @@ export const useEnclaveContract = () => {
             isCommitteePublished: false,
             isActivated: false,
             publicKey: null,
-            expiresAt: null
+            expiresAt: null,
+            plaintextOutput: null,
+            hasPlaintextOutput: false
         })
 
         try {
@@ -226,8 +255,7 @@ export const useEnclaveContract = () => {
         }
 
         try {
-            // Convert Uint8Array to hex string for the contract
-            const hexData = `0x${Array.from(encryptedData).map(b => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`
+            const hexData = bytesToHex(encryptedData)
 
             writeContract({
                 address: ENCLAVE_ADDRESS as `0x${string}`,

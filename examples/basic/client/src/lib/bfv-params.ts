@@ -1,4 +1,4 @@
-import { encodePacked, encodeAbiParameters } from 'viem'
+import { encodeAbiParameters } from 'viem'
 
 // BFV parameter set matching the Rust SET_2048_1032193_1 configuration
 export const BFV_PARAMS_SET = {

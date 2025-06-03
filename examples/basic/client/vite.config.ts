@@ -1,11 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import viteTsconfigPaths from 'vite-tsconfig-paths'
-import svgr from '@svgr/rollup'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import path from 'path'
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // const development: boolean = !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
 
@@ -16,8 +14,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
-    esbuildOptions: { target: "esnext" },
-    exclude: ['@rollup/browser', '@noir-lang/noirc_abi', '@noir-lang/acvm_js'],
+    exclude: ['@rollup/browser'],
   },
   resolve: {
     alias: {
@@ -29,19 +26,16 @@ export default defineConfig({
     // here is the main update
     wasm(),
     topLevelAwait(),
-    react({
-      jsxImportSource: '@emotion/react',
-      babel: {
-        plugins: ['@emotion/babel-plugin'],
-      },
-    }),
+    react(),
     viteTsconfigPaths(),
-    svgr(),
-    nodePolyfills({ include: ['buffer'] }),
   ],
   server: {
     open: true,
     // this sets a default port to 3000
     port: 3000,
+  },
+  preview: {
+    port: 3000,
+    open: true,
   },
 })

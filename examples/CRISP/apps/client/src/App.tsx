@@ -8,7 +8,6 @@ import DailyPoll from '@/pages/DailyPoll/DailyPoll'
 import HistoricPoll from '@/pages/HistoricPoll/HistoricPoll'
 import About from '@/pages/About/About'
 import PollResult from '@/pages/PollResult/PollResult'
-import Wizard from '@/pages/Wizard/Wizard'
 import useScrollToTop from '@/hooks/generic/useScrollToTop'
 import { useVoteManagementContext } from '@/context/voteManagement'
 
@@ -17,10 +16,10 @@ const App: React.FC = () => {
   const { initialLoad } = useVoteManagementContext()
 
   useEffect(() => {
-    async function loadWasm() {
-      await initialLoad()
-    }
-    loadWasm()
+      async function loadWasm() {
+        await initialLoad()
+      }
+      loadWasm()
   }, [])
 
   return (
@@ -33,7 +32,6 @@ const App: React.FC = () => {
             <Route path='/about' element={<About />} />
             <Route path='/current' element={<DailyPoll />} />
             <Route path='/historic' element={<HistoricPoll />} />
-            <Route path='/wizard' element={<Wizard />} />
             <Route path='/result/:roundId/:type?' element={<PollResult />} />
             <Route path='*' element={<Navigate to='/' replace />} />
           </Routes>

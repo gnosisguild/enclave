@@ -1,28 +1,10 @@
-import { Abi } from 'viem'
-import EnclaveArtifact from './Enclave.json'
+const E3_PROGRAM_ADDRESS_FROM_ENV = import.meta.env.VITE_E3_PROGRAM_ADDRESS;
 
-// Environment variables
-export const ENCLAVE_ADDRESS = import.meta.env.VITE_ENCLAVE_ADDRESS
-export const E3_PROGRAM_ADDRESS = import.meta.env.VITE_E3_PROGRAM_ADDRESS
-export const REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS
-export const FILTER_REGISTRY_ADDRESS = import.meta.env.VITE_FILTER_REGISTRY_ADDRESS
-
-// Check for missing environment variables
-const requiredEnvVars = {
-    VITE_ENCLAVE_ADDRESS: ENCLAVE_ADDRESS,
-    VITE_E3_PROGRAM_ADDRESS: E3_PROGRAM_ADDRESS,
-    VITE_REGISTRY_ADDRESS: REGISTRY_ADDRESS,
-    VITE_FILTER_REGISTRY_ADDRESS: FILTER_REGISTRY_ADDRESS,
+if (!E3_PROGRAM_ADDRESS_FROM_ENV) {
+    throw new Error("VITE_E3_PROGRAM_ADDRESS environment variable is not set.");
 }
 
-export const MISSING_ENV_VARS = Object.entries(requiredEnvVars)
-    .filter(([, value]) => !value)
-    .map(([key]) => key)
-
-export const HAS_MISSING_ENV_VARS = MISSING_ENV_VARS.length > 0
-
-// Use the correct ABI from the contract artifact
-export const ENCLAVE_ABI = EnclaveArtifact.abi as Abi
+export const E3_PROGRAM_ADDRESS = E3_PROGRAM_ADDRESS_FROM_ENV;
 
 export const E3_PROGRAM_ABI = [
     {
@@ -104,28 +86,5 @@ export const E3_PROGRAM_ABI = [
         ],
         "stateMutability": "view",
         "type": "function"
-    }
-] as const;
-
-// Registry contract ABI - only the CommitteePublished event
-export const REGISTRY_ABI = [
-    {
-        "anonymous": false,
-        "inputs": [
-            {
-                "indexed": true,
-                "internalType": "uint256",
-                "name": "e3Id",
-                "type": "uint256"
-            },
-            {
-                "indexed": false,
-                "internalType": "bytes",
-                "name": "publicKey",
-                "type": "bytes"
-            }
-        ],
-        "name": "CommitteePublished",
-        "type": "event"
     }
 ] as const;

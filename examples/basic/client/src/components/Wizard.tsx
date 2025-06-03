@@ -4,17 +4,15 @@ import { ConnectKitButton } from 'connectkit'
 import { hexToBytes } from 'viem'
 
 // Components
-import CardContent from '@/components/Cards/CardContent'
-import CircularTiles from '@/components/CircularTiles'
-import LoadingAnimation from '@/components/LoadingAnimation'
-import EnvironmentError from '@/components/EnvironmentError'
+import CardContent from './CardContent'
+import EnvironmentError from './EnvironmentError'
 
-// Hooks
-import { useEnclaveContract } from '@/hooks/enclave/useEnclaveContract'
-import { useWebAssemblyHook } from '@/hooks/wasm/useWebAssembly'
+// Hooks and utilities
+import { useEnclaveContract } from '@/lib/useEnclaveContract'
+import { useWebAssemblyHook } from '@/lib/useWebAssembly'
 
 // Config & Utils
-import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS } from '@/config/Enclave.abi'
+import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS } from '@/lib/enclave.config'
 
 // Icons
 import {
@@ -42,6 +40,19 @@ enum WizardStep {
     ENCRYPT_SUBMIT = 5,
     RESULTS = 6,
 }
+
+// ============================================================================
+// SIMPLE SPINNER
+// ============================================================================
+
+const Spinner: React.FC<{ size?: number; className?: string }> = ({ size = 18, className = "" }) => (
+    <div className={`inline-block ${className}`}>
+        <div
+            className={`animate-spin rounded-full border-2 border-lime-400 border-t-transparent`}
+            style={{ width: `${size}px`, height: `${size}px` }}
+        />
+    </div>
+)
 
 // ============================================================================
 // STEP COMPONENTS
@@ -134,7 +145,7 @@ const RequestComputationStep: React.FC<RequestComputationStepProps> = ({
                         ) : (
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                                 <div className="flex flex-col items-center space-x-2">
-                                    <LoadingAnimation isLoading={true} className="!h-6 !w-6" />
+                                    <Spinner size={20} />
                                     <p className="text-sm text-slate-600">
                                         <strong>⏳ Waiting for committee to publish public key...</strong>
                                         <br />
@@ -165,26 +176,25 @@ const RequestComputationStep: React.FC<RequestComputationStepProps> = ({
                 )}
             </div>
 
+            {isRequesting && (
+                <div className="flex justify-center mb-4">
+                    <Spinner />
+                </div>
+            )}
+
             <button
                 onClick={onRequestComputation}
                 disabled={isRequesting || e3State.isRequested}
                 className="w-full rounded-lg bg-lime-400 px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:bg-lime-300 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
             >
                 {isRequesting
-                    ? 'Requesting Computation...'
+                    ? 'Submitting to Blockchain...'
                     : e3State.isRequested
                         ? e3State.isCommitteePublished
                             ? 'Committee Ready - Proceeding to Activation!'
                             : 'Waiting for Committee...'
                         : 'Request E3 Computation (0.001 ETH)'}
             </button>
-
-            {isRequesting && (
-                <div className="mt-4">
-                    <LoadingAnimation isLoading={isRequesting} />
-                    <p className="text-sm text-slate-500 mt-2">Submitting to blockchain...</p>
-                </div>
-            )}
         </div>
     </CardContent>
 )
@@ -256,26 +266,25 @@ const ActivateE3Step: React.FC<ActivateE3StepProps> = ({
                 )}
             </div>
 
+            {isRequesting && (
+                <div className="flex justify-center mb-4">
+                    <Spinner />
+                </div>
+            )}
+
             <button
                 onClick={onActivateE3}
                 disabled={isRequesting || e3State.isActivated || !e3State.publicKey}
                 className="w-full rounded-lg bg-lime-400 px-6 py-3 font-semibold text-slate-800 transition-all duration-200 hover:bg-lime-300 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
             >
                 {isRequesting
-                    ? 'Activating E3...'
+                    ? 'Submitting to Blockchain...'
                     : e3State.isActivated
                         ? 'E3 Activated!'
                         : !e3State.publicKey
                             ? 'Waiting for Public Key...'
                             : 'Activate E3 Environment'}
             </button>
-
-            {isRequesting && (
-                <div className="mt-4">
-                    <LoadingAnimation isLoading={isRequesting} />
-                    <p className="text-sm text-slate-500 mt-2">Activating E3...</p>
-                </div>
-            )}
         </div>
     </CardContent>
 )
@@ -399,19 +408,42 @@ const EncryptSubmitStep: React.FC<EncryptSubmitStepProps> = ({
             <p className='text-base font-extrabold uppercase text-slate-600/50'>Step 5: Encrypting & Publishing</p>
             <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-slate-700">Processing Your Encrypted Data</h3>
-                <p className="text-slate-600 leading-relaxed">
-                    Your numbers are being encrypted using homomorphic encryption and published to the secure computation environment.
-                    Each input is published as a separate transaction to the blockchain.
-                </p>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-sm text-slate-600">
-                        <strong>Processing Steps:</strong>
-                        <br />• Encrypting your inputs with FHE
-                        <br />• Publishing encrypted input 1 to blockchain
-                        <br />• Publishing encrypted input 2 to blockchain
-                        <br />• Preparing secure result
+
+                {!inputPublishSuccess ? (
+                    <p className="text-slate-600 leading-relaxed">
+                        Your numbers are being encrypted using homomorphic encryption and published to the secure computation environment.
+                        Each input is published as a separate transaction to the blockchain.
                     </p>
-                </div>
+                ) : (
+                    <p className="text-slate-600 leading-relaxed">
+                        Your encrypted inputs have been successfully published to the blockchain.
+                        The committee is now performing the homomorphic computation and will publish the decrypted result.
+                    </p>
+                )}
+
+                {!inputPublishSuccess && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <p className="text-sm text-slate-600">
+                            <strong>Processing Steps:</strong>
+                            <br />• Encrypting your inputs with FHE
+                            <br />• Publishing encrypted input 1 to blockchain
+                            <br />• Publishing encrypted input 2 to blockchain
+                            <br />• Preparing secure result
+                        </p>
+                    </div>
+                )}
+
+                {inputPublishSuccess && (
+                    <div className="bg-lime-50 border border-lime-200 rounded-lg p-4">
+                        <p className="text-sm text-slate-600">
+                            <strong>✅ Inputs Successfully Published!</strong>
+                            <br />
+                            Both encrypted inputs have been submitted to the blockchain.
+                            <br />
+                            <strong>⏳ Waiting for committee to process and decrypt the result...</strong>
+                        </p>
+                    </div>
+                )}
 
                 {inputPublishError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -422,20 +454,10 @@ const EncryptSubmitStep: React.FC<EncryptSubmitStepProps> = ({
                         </p>
                     </div>
                 )}
-
-                {inputPublishSuccess && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <p className="text-sm text-green-600">
-                            <strong>✅ Inputs Successfully Published!</strong>
-                            <br />
-                            Both encrypted inputs have been submitted to the blockchain.
-                        </p>
-                    </div>
-                )}
             </div>
-            <div className="pt-4">
-                <LoadingAnimation isLoading={true} />
-                <p className="text-sm text-slate-500 mt-4">This may take a moment...</p>
+
+            <div className="flex justify-center pt-4">
+                <Spinner />
             </div>
 
             {inputPublishError && (
@@ -488,10 +510,33 @@ const ResultsStep: React.FC<ResultsStepProps> = ({
 
                     <div className="bg-lime-50 border border-lime-200 rounded-lg p-4">
                         <h4 className="font-medium text-slate-700 mb-2">Computed Result</h4>
-                        <p className="text-2xl font-bold text-lime-600">{result}</p>
-                        <p className="text-sm text-slate-600">Sum of encrypted inputs</p>
+                        {e3State.hasPlaintextOutput ? (
+                            <>
+                                <p className="text-2xl font-bold text-lime-600">{e3State.plaintextOutput}</p>
+                                <p className="text-sm text-slate-600">✅ Decrypted by committee</p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-2xl font-bold text-amber-600">{result}</p>
+                                <p className="text-sm text-slate-600">⏳ Awaiting committee decryption...</p>
+                            </>
+                        )}
                     </div>
                 </div>
+
+                {/* Committee Processing Status */}
+                {!e3State.hasPlaintextOutput && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <div className="flex items-center justify-center space-x-2 mb-2">
+                            <Spinner size={16} />
+                            <h4 className="font-medium text-slate-700">Committee Processing</h4>
+                        </div>
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                            The encrypted inputs have been published to the blockchain. The committee is now performing
+                            the homomorphic computation and will publish the decrypted result once complete.
+                        </p>
+                    </div>
+                )}
 
                 {/* E3 Environment Details */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -504,7 +549,7 @@ const ResultsStep: React.FC<ResultsStepProps> = ({
                         {transactionHash && (
                             <p><strong>Request Transaction:</strong> {transactionHash.slice(0, 10)}...{transactionHash.slice(-8)}</p>
                         )}
-                        <p><strong>Status:</strong> ✅ Inputs Published to Blockchain</p>
+                        <p><strong>Status:</strong> {e3State.hasPlaintextOutput ? '✅ Computation Complete' : '⏳ Inputs Published, Awaiting Result'}</p>
                     </div>
                 </div>
 
@@ -512,8 +557,10 @@ const ResultsStep: React.FC<ResultsStepProps> = ({
                     <h4 className="font-medium text-slate-700 mb-2">What Just Happened?</h4>
                     <p className="text-sm text-slate-600 leading-relaxed">
                         Your numbers were encrypted using the committee's public key from E3 environment {e3State.id !== null ? String(e3State.id) : 'N/A'},
-                        published as encrypted inputs to the blockchain, and are now ready for secure computation by the committee
-                        without ever revealing your original numbers to the computing system.
+                        published as encrypted inputs to the blockchain{e3State.hasPlaintextOutput
+                            ? ', and the committee has successfully computed and published the decrypted result.'
+                            : ', and are now being processed by the committee for secure computation.'
+                        } Your original numbers remained completely private throughout the entire process.
                     </p>
                 </div>
 
@@ -552,8 +599,6 @@ const Wizard: React.FC = () => {
     const [input2, setInput2] = useState<string>('')
 
     // Processing state
-    const [isLoading, setIsLoading] = useState<boolean>(false)
-    const [encryptedInputs, setEncryptedInputs] = useState<{ input1: Uint8Array; input2: Uint8Array } | undefined>(undefined)
     const [result, setResult] = useState<number | null>(null)
 
     // Error and success state
@@ -604,6 +649,13 @@ const Wizard: React.FC = () => {
         }
     }, [e3State.isActivated, currentStep])
 
+    // Auto-advance to results when plaintext output is published by committee
+    useEffect(() => {
+        if (e3State.hasPlaintextOutput && currentStep === WizardStep.ENCRYPT_SUBMIT) {
+            setCurrentStep(WizardStep.RESULTS)
+        }
+    }, [e3State.hasPlaintextOutput, currentStep])
+
     // ========================================================================
     // EVENT HANDLERS
     // ========================================================================
@@ -631,7 +683,6 @@ const Wizard: React.FC = () => {
         if (!input1.trim() || !input2.trim()) return
 
         setCurrentStep(WizardStep.ENCRYPT_SUBMIT)
-        setIsLoading(true)
         setInputPublishError(null)
         setInputPublishSuccess(false)
 
@@ -648,27 +699,23 @@ const Wizard: React.FC = () => {
                 throw new Error('Encryption failed')
             }
 
-            setEncryptedInputs({ input1: encryptedInput1, input2: encryptedInput2 })
+            // Log encrypted values for debugging
+            console.log('Encrypted input 1:', encryptedInput1)
+            console.log('Encrypted input 2:', encryptedInput2)
 
             // Publish inputs
             await publishInput(encryptedInput1)
             await new Promise(resolve => setTimeout(resolve, 1000))
             await publishInput(encryptedInput2)
 
-            // Calculate result
+            // Calculate expected result for display until committee decrypts
             const sum = parseInt(input1) + parseInt(input2)
             setResult(sum)
 
-            // Final processing delay
-            await new Promise(resolve => setTimeout(resolve, 1000))
-
             setInputPublishSuccess(true)
-            setIsLoading(false)
-            setCurrentStep(WizardStep.RESULTS)
         } catch (error) {
             console.error('Encryption or publishing failed:', error)
             setInputPublishError(error instanceof Error ? error.message : 'Unknown error occurred')
-            setIsLoading(false)
         }
     }
 
@@ -676,7 +723,6 @@ const Wizard: React.FC = () => {
         setCurrentStep(WizardStep.REQUEST_COMPUTATION)
         setInput1('')
         setInput2('')
-        setEncryptedInputs(undefined)
         setResult(null)
         setInputPublishError(null)
         setInputPublishSuccess(false)
@@ -685,7 +731,6 @@ const Wizard: React.FC = () => {
     const handleTryAgain = () => {
         setCurrentStep(WizardStep.ENTER_INPUTS)
         setInputPublishError(null)
-        setIsLoading(false)
     }
 
     // ========================================================================
@@ -804,14 +849,11 @@ const Wizard: React.FC = () => {
 
     return (
         <div className='relative flex w-full flex-1 items-center justify-center px-6 py-16'>
-            <div className='absolute bottom-0 right-0 grid w-full grid-cols-2 gap-2 max-md:opacity-30 md:w-[70vh]'>
-                <CircularTiles count={4} />
-            </div>
             <div className='relative w-full max-w-2xl space-y-8'>
                 <div className="text-center">
-                    <h1 className='text-h1 font-bold text-slate-600 mb-4'>Enclave Tutorial</h1>
+                    <h1 className='text-h1 font-bold text-slate-600 mb-4'>Enclave E3</h1>
                     <p className="text-slate-500 max-w-lg mx-auto">
-                        Learn how to use Encrypted Execution Environments (E3) for secure computation
+                        Confidential computation with Enclave Encrypted Execution Environments
                     </p>
                 </div>
 
