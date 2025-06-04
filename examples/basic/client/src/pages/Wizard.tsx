@@ -4,15 +4,17 @@ import { ConnectKitButton } from 'connectkit'
 import { hexToBytes } from 'viem'
 
 // Components
-import CardContent from './CardContent'
-import EnvironmentError from './EnvironmentError'
+import CardContent from './components/CardContent'
+import EnvironmentError from './components/EnvironmentError'
+import Spinner from './components/Spinner'
 
 // Hooks and utilities
-import { useEnclaveContract } from '@/lib/useEnclaveContract'
-import { useWebAssemblyHook } from '@/lib/useWebAssembly'
+import { useEnclaveContract } from '@/hooks/useEnclaveContract'
+import { useWebAssemblyHook } from '@/hooks/useWebAssembly'
 
 // Config & Utils
-import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS } from '@/lib/enclave.config'
+import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS } from '@/utils/enclave.config'
+import { decodePlaintextOutput } from '@/utils/bfv'
 
 // Icons
 import {
@@ -41,18 +43,6 @@ enum WizardStep {
     RESULTS = 6,
 }
 
-// ============================================================================
-// SIMPLE SPINNER
-// ============================================================================
-
-const Spinner: React.FC<{ size?: number; className?: string }> = ({ size = 18, className = "" }) => (
-    <div className={`inline-block ${className}`}>
-        <div
-            className={`animate-spin rounded-full border-2 border-lime-400 border-t-transparent`}
-            style={{ width: `${size}px`, height: `${size}px` }}
-        />
-    </div>
-)
 
 // ============================================================================
 // STEP COMPONENTS
@@ -512,7 +502,9 @@ const ResultsStep: React.FC<ResultsStepProps> = ({
                         <h4 className="font-medium text-slate-700 mb-2">Computed Result</h4>
                         {e3State.hasPlaintextOutput ? (
                             <>
-                                <p className="text-2xl font-bold text-lime-600">{e3State.plaintextOutput}</p>
+                                <p className="text-2xl font-bold text-lime-600">
+                                    {decodePlaintextOutput(e3State.plaintextOutput!) ?? 'Decoding failed'}
+                                </p>
                                 <p className="text-sm text-slate-600">✅ Decrypted by committee</p>
                             </>
                         ) : (
@@ -703,9 +695,9 @@ const Wizard: React.FC = () => {
             console.log('Encrypted input 1:', encryptedInput1)
             console.log('Encrypted input 2:', encryptedInput2)
 
-            // Publish inputs
+            // Publish inputs sequentially - wait for first TX to complete before second
             await publishInput(encryptedInput1)
-            await new Promise(resolve => setTimeout(resolve, 1000))
+            // Now publish the second input after first is confirmed
             await publishInput(encryptedInput2)
 
             // Calculate expected result for display until committee decrypts

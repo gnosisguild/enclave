@@ -83,4 +83,32 @@ export function getCurrentTimestamp(): number {
 export function calculateStartWindow(windowSize: number = DEFAULT_E3_CONFIG.window_size): [bigint, bigint] {
     const now = getCurrentTimestamp()
     return [BigInt(now), BigInt(now + windowSize)]
-} 
+}
+
+
+/**
+ * Decode plaintextOutput bytes to get the actual result number
+ */
+export function decodePlaintextOutput(plaintextOutput: string): number | null {
+    try {
+        // Remove '0x' prefix if present
+        const hex = plaintextOutput.startsWith('0x') ? plaintextOutput.slice(2) : plaintextOutput
+
+        // Convert hex to bytes
+        const bytes = new Uint8Array(hex.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || [])
+
+        if (bytes.length < 8) {
+            console.warn('Plaintext output too short for u64 decoding')
+            return null
+        }
+
+        // Decode first u64 (8 bytes) as little-endian
+        const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+        const result = view.getBigUint64(0, true) // true for little-endian
+
+        return Number(result)
+    } catch (error) {
+        console.error('Failed to decode plaintext output:', error)
+        return null
+    }
+}

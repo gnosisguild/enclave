@@ -1,4 +1,4 @@
-import contractABI from '../abis/enclave.abi.json'
+import contractABI from '@/abis/enclave.abi.json'
 
 // Environment variables with validation
 export const ENCLAVE_ADDRESS = import.meta.env.VITE_ENCLAVE_ADDRESS
@@ -22,7 +22,6 @@ export const HAS_MISSING_ENV_VARS = MISSING_ENV_VARS.length > 0
 
 // Contract ABIs
 export const ENCLAVE_ABI = contractABI.abi
-
 export const REGISTRY_ABI = [
     {
         type: 'event',

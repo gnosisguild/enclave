@@ -2,14 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useWriteContract, useWaitForTransactionReceipt, useConfig } from 'wagmi'
 import { watchContractEvent } from '@wagmi/core'
 import { parseEther, bytesToHex } from 'viem'
-import { ENCLAVE_ADDRESS, ENCLAVE_ABI, E3_PROGRAM_ADDRESS, REGISTRY_ADDRESS, FILTER_REGISTRY_ADDRESS, REGISTRY_ABI } from '@/lib/enclave.config'
+import { ENCLAVE_ADDRESS, ENCLAVE_ABI, E3_PROGRAM_ADDRESS, REGISTRY_ADDRESS, FILTER_REGISTRY_ADDRESS, REGISTRY_ABI } from '@/utils/enclave.config'
 import {
     encodeBfvParams,
     encodeComputeProviderParams,
     calculateStartWindow,
     DEFAULT_COMPUTE_PROVIDER_PARAMS,
     DEFAULT_E3_CONFIG
-} from './bfv-params'
+} from '../utils/bfv-params'
 
 export interface E3RequestParams {
     threshold?: [number, number]
@@ -261,7 +261,8 @@ export const useEnclaveContract = () => {
                 address: ENCLAVE_ADDRESS as `0x${string}`,
                 abi: ENCLAVE_ABI,
                 functionName: 'publishInput',
-                args: [e3State.id, hexData]
+                args: [e3State.id, hexData],
+                gas: 2000000n
             })
         } catch (error: any) {
             console.error('Failed to publish input:', error)

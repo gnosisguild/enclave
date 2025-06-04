@@ -31,7 +31,11 @@ impl Handler<EnclaveEvent> for PlaintextWriter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::PlaintextAggregated { data, .. } = msg.clone() {
-            let output: Vec<u64> = bincode::deserialize(&data.decrypted_output).unwrap();
+            let output: Vec<u64> = data
+                .decrypted_output
+                .chunks_exact(8)
+                .map(|chunk| u64::from_le_bytes(chunk.try_into().unwrap()))
+                .collect();
 
             info!(path = ?&self.path, "Writing Plaintext To Path");
             let contents: Vec<String> = output.iter().map(|&num| num.to_string()).collect();

@@ -1197,34 +1197,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crisp-wasm-crypto"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "console",
- "console_log",
- "e3-bfv-helpers",
- "ethers",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "fhe-util",
- "getrandom 0.2.16",
- "itertools 0.13.0",
- "log",
- "ndarray",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-test",
- "web-sys",
-]
-
-[[package]]
 name = "crossbeam-deque"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5330,6 +5302,34 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.101",
+]
+
+[[package]]
+name = "wasm-crypto"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "console",
+ "console_log",
+ "e3-bfv-helpers",
+ "ethers",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "fhe-util",
+ "getrandom 0.2.16",
+ "itertools 0.13.0",
+ "log",
+ "ndarray",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "web-sys",
 ]
 
 [[package]]

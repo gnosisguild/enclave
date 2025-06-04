@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import init, { Encrypt } from 'libs/wasm/pkg/crisp_wasm_crypto'
+import init, { Encrypt } from 'libs/wasm/pkg/wasm_crypto'
 
 export const useWebAssemblyHook = () => {
     const [isLoaded, setIsLoaded] = useState(false)
@@ -9,6 +9,7 @@ export const useWebAssemblyHook = () => {
             try {
                 await init()
                 setIsLoaded(true)
+                console.log('WASM module loaded')
             } catch (error) {
                 console.error('Failed to load WASM module:', error)
             }
@@ -23,8 +24,9 @@ export const useWebAssemblyHook = () => {
         }
 
         try {
+            console.log('Encrypting input')
             const encryptor = new Encrypt()
-            const result = encryptor.encrypt_vote(value, publicKey)
+            const result = encryptor.encrypt(value, publicKey)
             return result
         } catch (error) {
             console.error('Error encrypting input:', error)
