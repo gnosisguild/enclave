@@ -1,8 +1,7 @@
 use alloy::dyn_abi::{DynSolType, DynSolValue};
+use alloy::primitives::U256;
 use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
-use fhe_traits::{Deserialize, Serialize};
 use std::sync::Arc;
-
 /// Predefined BFV parameters for common use cases
 pub mod params {
     /// Standard BFV parameters sets
@@ -80,69 +79,11 @@ pub fn build_bfv_params_arc(
     }
 }
 
-/// Serializes BFV parameters into raw bytes.
+/// Encodes BFV parameters into ABI-encoded bytes.
 ///
-/// This function converts BFV parameters into a raw byte representation
-/// without any specific encoding format.
-///
-/// # Arguments
-///
-/// * `params` - The BFV parameters to serialize
-///
-/// # Returns
-///
-/// Returns a `Vec<u8>` containing the raw serialized parameters.
-pub fn serialize_bfv_params(params: &BfvParameters) -> Vec<u8> {
-    params.to_bytes()
-}
-
-/// Deserializes BFV parameters from raw bytes.
-///
-/// This function converts raw bytes back into BFV parameters.
-/// The bytes should be in the raw format produced by `serialize_bfv_params`.
-///
-/// # Arguments
-///
-/// * `bytes` - The raw bytes containing the serialized parameters
-///
-/// # Returns
-///
-/// Returns a `BfvParameters` instance deserialized from the bytes.
-///
-/// # Panics
-///
-/// Panics if the deserialization fails.
-pub fn deserialize_bfv_params(bytes: &[u8]) -> BfvParameters {
-    match BfvParameters::try_deserialize(bytes) {
-        Ok(params) => params,
-        Err(e) => panic!("Failed to deserialize BFV Parameters: {}", e),
-    }
-}
-
-/// Deserializes BFV parameters from raw bytes and wraps them in an `Arc`.
-///
-/// This is a convenience function that combines `deserialize_bfv_params` with `Arc::new`
-/// to provide thread-safe shared ownership of the deserialized parameters.
-///
-/// # Arguments
-///
-/// * `bytes` - The raw bytes containing the serialized parameters
-///
-/// # Returns
-///
-/// Returns an `Arc<BfvParameters>` instance deserialized from the bytes.
-///
-/// # Panics
-///
-/// Panics if the deserialization fails (see `deserialize_bfv_params`).
-pub fn deserialize_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
-    Arc::new(deserialize_bfv_params(bytes))
-}
-
-/// ABI-encodes BFV parameters using the Solidity ABI format.
-///
-/// This function takes BFV parameters, serializes them to raw bytes,
-/// and then ABI-encodes those bytes using the Solidity ABI format.
+/// This function converts BFV parameters into a tuple structure of (degree, plaintext_modulus, moduli[])
+/// and then ABI-encodes the tuple using Solidity ABI format. The resulting bytes can be used
+/// in smart contracts or for cross-platform serialization.
 ///
 /// # Arguments
 ///
@@ -150,57 +91,114 @@ pub fn deserialize_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
 ///
 /// # Returns
 ///
-/// Returns a `Vec<u8>` containing the ABI-encoded parameters.
+/// Returns a `Vec<u8>` containing the ABI-encoded parameters as a tuple (uint256, uint256, uint256[]).
 pub fn encode_bfv_params(params: &BfvParameters) -> Vec<u8> {
-    DynSolValue::Bytes(serialize_bfv_params(params)).abi_encode_params()
+    let value = DynSolValue::Tuple(vec![
+        DynSolValue::Uint(U256::from(params.degree()), 256),
+        DynSolValue::Uint(U256::from(params.plaintext()), 256),
+        DynSolValue::Array(
+            params
+                .moduli()
+                .iter()
+                .map(|val| DynSolValue::Uint(U256::from(*val), 256))
+                .collect(),
+        ),
+    ]);
+    value.abi_encode()
 }
 
-/// ABI-decodes BFV parameters from Solidity ABI format.
+/// Decodes BFV parameters from ABI-encoded bytes.
 ///
-/// This function takes ABI-encoded bytes, decodes them using the Solidity ABI format,
-/// and then deserializes the resulting bytes into BFV parameters.
+/// This function converts ABI-encoded bytes back into BFV parameters.
+/// The bytes should represent a tuple (uint256, uint256, uint256[]) containing
+/// (degree, plaintext_modulus, moduli[]) as produced by `encode_bfv_params`.
 ///
 /// # Arguments
 ///
-/// * `bytes` - The ABI-encoded bytes containing the parameters
+/// * `bytes` - The ABI-encoded bytes containing the encoded parameters
 ///
 /// # Returns
 ///
-/// Returns a `BfvParameters` instance deserialized from the bytes.
+/// Returns a `BfvParameters` instance decoded from the bytes.
 ///
 /// # Panics
 ///
-/// Panics if the decoding/deserialization fails.
+/// Panics if the decoding fails due to invalid format or parameter values.
 pub fn decode_bfv_params(bytes: &[u8]) -> BfvParameters {
-    let bytes_type = DynSolType::Bytes;
-    let decoded = bytes_type
+    // Define the expected tuple type: (uint256, uint256, uint256[])
+    let tuple_type = DynSolType::Tuple(vec![
+        DynSolType::Uint(256),                              // degree
+        DynSolType::Uint(256),                              // plaintext_modulus
+        DynSolType::Array(Box::new(DynSolType::Uint(256))), // moduli array
+    ]);
+
+    let decoded = tuple_type
         .abi_decode(bytes)
         .expect("Failed to ABI decode bytes");
 
     match decoded {
-        DynSolValue::Bytes(inner_bytes) => {
-            BfvParameters::try_deserialize(&inner_bytes).expect("Could not decode Bfv Params")
+        DynSolValue::Tuple(inner_values) => {
+            // Extract degree (first element)
+            let degree: u64 = match &inner_values[0] {
+                DynSolValue::Uint(val, _) => {
+                    (*val).try_into().expect("Failed to convert degree to u64")
+                }
+                _ => panic!("Expected uint256 for degree"),
+            };
+
+            // Extract plaintext modulus (second element)
+            let plaintext: u64 = match &inner_values[1] {
+                DynSolValue::Uint(val, _) => (*val)
+                    .try_into()
+                    .expect("Failed to convert plaintext to u64"),
+                _ => panic!("Expected uint256 for plaintext modulus"),
+            };
+
+            // Extract moduli array (third element)
+            let moduli: Vec<u64> = match &inner_values[2] {
+                DynSolValue::Array(moduli_array) => moduli_array
+                    .iter()
+                    .map(|val| match val {
+                        DynSolValue::Uint(modulus, _) => (*modulus)
+                            .try_into()
+                            .expect("Failed to convert modulus to u64"),
+                        _ => panic!("Expected uint256 for modulus value"),
+                    })
+                    .collect::<Vec<_>>(),
+                _ => panic!("Expected array for moduli"),
+            };
+
+            let params = BfvParametersBuilder::new()
+                .set_degree(degree as usize)
+                .set_plaintext_modulus(plaintext)
+                .set_moduli(&moduli)
+                .build()
+                .expect("Failed to build BFV Parameters");
+
+            params
         }
-        _ => panic!("Expected bytes value in ABI encoding"),
+        _ => panic!("Expected tuple value in ABI encoding"),
     }
 }
 
-/// ABI-decodes BFV parameters from Solidity ABI format and wraps them in an `Arc`.
+/// Decodes BFV parameters from ABI-encoded bytes and wraps them in an `Arc`.
 ///
-/// This function is similar to `decode_bfv_params` but returns the parameters
-/// wrapped in an `Arc` for thread-safe shared ownership.
+/// This is a convenience function that combines `decode_bfv_params` with `Arc::new`
+/// to provide thread-safe shared ownership of the decoded parameters.
+/// The input bytes should represent a tuple (uint256, uint256, uint256[]) containing
+/// (degree, plaintext_modulus, moduli[]) in ABI-encoded format.
 ///
 /// # Arguments
 ///
-/// * `bytes` - The ABI-encoded bytes containing the parameters
+/// * `bytes` - The ABI-encoded bytes containing the encoded parameters
 ///
 /// # Returns
 ///
-/// Returns an `Arc<BfvParameters>` containing the deserialized parameters.
+/// Returns an `Arc<BfvParameters>` instance decoded from the bytes.
 ///
 /// # Panics
 ///
-/// Panics if the decoding/deserialization fails.
+/// Panics if the decoding fails (see `decode_bfv_params`).
 pub fn decode_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
     Arc::new(decode_bfv_params(bytes))
 }
@@ -234,56 +232,36 @@ mod tests {
     }
 
     #[test]
-    fn test_raw_serialization_roundtrip() {
+    fn test_encoding_roundtrip() {
         let degree = 2048;
         let plaintext_modulus = 1032193;
         let moduli = vec![0x3FFFFFFF000001];
 
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
-        let serialized = serialize_bfv_params(&params);
-        let deserialized = deserialize_bfv_params(&serialized);
-
-        assert_eq!(deserialized.degree(), degree);
-        assert_eq!(deserialized.plaintext(), plaintext_modulus);
-        assert_eq!(deserialized.moduli(), moduli.as_slice());
-    }
-
-    #[test]
-    fn test_abi_encoding_roundtrip() {
-        let degree = 2048;
-        let plaintext_modulus = 1032193;
-        let moduli = vec![0x3FFFFFFF000001];
-
-        let params = build_bfv_params(degree, plaintext_modulus, &moduli);
-
-        // First serialize to raw bytes
-        let serialized = serialize_bfv_params(&params);
-
-        // Then ABI encode the raw bytes
         let encoded = encode_bfv_params(&params);
-
-        // Verify the encoded result is deterministic
-        let encoded_again = encode_bfv_params(&params);
-        assert_eq!(
-            encoded, encoded_again,
-            "ABI encoding should be deterministic"
-        );
-
-        // Verify the ABI-encoded result is different from the raw serialized bytes
-        assert_ne!(
-            encoded, serialized,
-            "ABI-encoded result should be different from raw serialized bytes"
-        );
-
-        // Verify we can ABI-decode and deserialize back to the original parameters
         let decoded = decode_bfv_params(&encoded);
+
         assert_eq!(decoded.degree(), degree);
         assert_eq!(decoded.plaintext(), plaintext_modulus);
         assert_eq!(decoded.moduli(), moduli.as_slice());
     }
 
     #[test]
-    fn test_abi_encoding_roundtrip_arc() {
+    fn test_encoding_deterministic() {
+        let degree = 2048;
+        let plaintext_modulus = 1032193;
+        let moduli = vec![0x3FFFFFFF000001];
+
+        let params = build_bfv_params(degree, plaintext_modulus, &moduli);
+
+        // Verify the encoding result is deterministic
+        let encoded1 = encode_bfv_params(&params);
+        let encoded2 = encode_bfv_params(&params);
+        assert_eq!(encoded1, encoded2, "ABI encoding should be deterministic");
+    }
+
+    #[test]
+    fn test_encoding_roundtrip_arc() {
         let degree = 2048;
         let plaintext_modulus = 1032193;
         let moduli = vec![0x3FFFFFFF000001];
@@ -291,7 +269,7 @@ mod tests {
         let params = build_bfv_params(degree, plaintext_modulus, &moduli);
         let encoded = encode_bfv_params(&params);
 
-        // Verify we can ABI-decode and deserialize back to the original parameters with Arc
+        // Verify we can decode back to the original parameters with Arc
         let decoded = decode_bfv_params_arc(&encoded);
         assert_eq!(decoded.degree(), degree);
         assert_eq!(decoded.plaintext(), plaintext_modulus);
@@ -337,29 +315,29 @@ mod tests {
         }
 
         #[test]
-        fn test_params_serialization_roundtrip() {
+        fn test_params_encoding_roundtrip() {
             let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
             let params = build_bfv_params(degree, plaintext_modulus, &moduli);
-            let serialized = serialize_bfv_params(&params);
-            let deserialized = deserialize_bfv_params(&serialized);
+            let encoded = encode_bfv_params(&params);
+            let decoded = decode_bfv_params(&encoded);
 
             let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            assert_eq!(deserialized.degree(), degree);
-            assert_eq!(deserialized.plaintext(), plaintext_modulus);
-            assert_eq!(deserialized.moduli(), moduli);
+            assert_eq!(decoded.degree(), degree);
+            assert_eq!(decoded.plaintext(), plaintext_modulus);
+            assert_eq!(decoded.moduli(), moduli);
         }
 
         #[test]
-        fn test_params_arc_serialization_roundtrip() {
+        fn test_params_arc_encoding_roundtrip() {
             let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
             let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
-            let serialized = serialize_bfv_params(&params);
-            let deserialized = deserialize_bfv_params_arc(&serialized);
+            let encoded = encode_bfv_params(&params);
+            let decoded = decode_bfv_params_arc(&encoded);
 
             let (degree, plaintext_modulus, moduli) = params::SET_2048_1032193_1;
-            assert_eq!(deserialized.degree(), degree);
-            assert_eq!(deserialized.plaintext(), plaintext_modulus);
-            assert_eq!(deserialized.moduli(), moduli);
+            assert_eq!(decoded.degree(), degree);
+            assert_eq!(decoded.plaintext(), plaintext_modulus);
+            assert_eq!(decoded.moduli(), moduli);
         }
     }
 }
