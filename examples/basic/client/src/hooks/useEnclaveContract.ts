@@ -9,7 +9,7 @@ import {
     calculateStartWindow,
     DEFAULT_COMPUTE_PROVIDER_PARAMS,
     DEFAULT_E3_CONFIG
-} from '../utils/bfv-params'
+} from '@/utils/bfv'
 
 export interface E3RequestParams {
     threshold?: [number, number]
@@ -127,19 +127,6 @@ export const useEnclaveContract = () => {
             }
         })
 
-        // Listen for InputPublished events
-        const inputPublishedUnsubscribe = watchContractEvent(config, {
-            address: ENCLAVE_ADDRESS as `0x${string}`,
-            abi: ENCLAVE_ABI,
-            eventName: 'InputPublished',
-            chainId: 31337,
-            onLogs(logs) {
-                logs.forEach(() => {
-                    // Event captured but no action needed for this tutorial
-                })
-            }
-        })
-
         // Listen for PlaintextOutputPublished events
         const plaintextOutputUnsubscribe = watchContractEvent(config, {
             address: ENCLAVE_ADDRESS as `0x${string}`,
@@ -168,7 +155,6 @@ export const useEnclaveContract = () => {
             e3RequestedUnsubscribe,
             committeePublishedUnsubscribe,
             e3ActivatedUnsubscribe,
-            inputPublishedUnsubscribe,
             plaintextOutputUnsubscribe
         ]
 
