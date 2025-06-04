@@ -14,3 +14,4 @@ e3-compute-provider.workspace = true
 e3-evm-helpers.workspace = true
 anyhow.workspace = true
 eyre.workspace = true
+tokio.workspace = true
