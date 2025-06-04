@@ -119,7 +119,7 @@ impl Fhe {
         for value in decoded {
             bytes.extend_from_slice(&value.to_le_bytes());
         }
-        
+
         Ok(bytes)
     }
 }
