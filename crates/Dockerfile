@@ -27,7 +27,8 @@ WORKDIR /build/crates
 COPY --from=evm-builder /build/packages/evm/artifacts ../packages/evm/artifacts
 COPY --from=evm-builder /build/packages/evm/deployments ../packages/evm/deployments
 
-# find crates/* -name "Cargo.*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'
+
+# find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'
 COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
 COPY crates/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
 COPY crates/cli/Cargo.toml ./cli/Cargo.toml
@@ -46,11 +47,14 @@ COPY crates/keyshare/Cargo.toml ./keyshare/Cargo.toml
 COPY crates/logger/Cargo.toml ./logger/Cargo.toml
 COPY crates/net/Cargo.toml ./net/Cargo.toml
 COPY crates/program-client/Cargo.toml ./program-client/Cargo.toml
+COPY crates/program-listener/Cargo.toml ./program-listener/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/sdk/Cargo.toml ./sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
+COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
+
 
 # COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
