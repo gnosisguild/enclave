@@ -1,6 +1,7 @@
 use crate::E3Repository;
 
 use super::{models::E3, DataStore};
+use alloy::hex;
 use alloy::primitives::Uint;
 use alloy::providers::Provider;
 use alloy::sol_types::SolEvent;
@@ -198,7 +199,12 @@ impl<S: DataStore> EnclaveIndexer<S> {
                 let contract = contract.clone();
 
                 async move {
-                    println!("E3Activated:{:?}", e);
+                    println!(
+                        "E3Activated: id={}, expiration={}, pubkey=0x{}...",
+                        e.e3Id,
+                        e.expiration,
+                        hex::encode(&e.committeePublicKey[..8.min(e.committeePublicKey.len())])
+                    );
                     let e3_id = u64_try_from(e.e3Id)?;
                     let e3 = contract.get_e3(e.e3Id).await?;
                     let duration = u64_try_from(e3.duration)?;
@@ -245,7 +251,12 @@ impl<S: DataStore> EnclaveIndexer<S> {
             .add_event_handler(move |e: InputPublished| {
                 let store = SharedStore::new(store.clone());
                 async move {
-                    println!("InputPublished:{:?}", e);
+                    println!(
+                        "InputPublished: e3_id={}, index={}, data=0x{}...",
+                        e.e3Id,
+                        e.index,
+                        hex::encode(&e.data[..8.min(e.data.len())])
+                    );
                     let e3_id = u64_try_from(e.e3Id)?;
 
                     let mut repo = E3Repository::new(store, e3_id);
@@ -264,7 +275,11 @@ impl<S: DataStore> EnclaveIndexer<S> {
             .add_event_handler(move |e: CiphertextOutputPublished| {
                 let store = SharedStore::new(store.clone());
                 async move {
-                    println!("CiphertextOutputPublished:{:?}", e);
+                    println!(
+                        "CiphertextOutputPublished: e3_id={}, output=0x{}...",
+                        e.e3Id,
+                        hex::encode(&e.ciphertextOutput[..8.min(e.ciphertextOutput.len())])
+                    );
                     let e3_id = u64_try_from(e.e3Id)?;
 
                     let mut repo = E3Repository::new(store, e3_id);
@@ -284,7 +299,11 @@ impl<S: DataStore> EnclaveIndexer<S> {
             .add_event_handler(move |e: PlaintextOutputPublished| {
                 let store = SharedStore::new(store.clone());
                 async move {
-                    println!("PlaintextOutputPublished:{:?}", e);
+                    println!(
+                        "PlaintextOutputPublished: e3_id={}, output=0x{}...",
+                        e.e3Id,
+                        hex::encode(&e.plaintextOutput[..8.min(e.plaintextOutput.len())])
+                    );
                     let e3_id = u64_try_from(e.e3Id)?;
                     let mut repo = E3Repository::new(store, e3_id);
                     repo.set_plaintext_output(e.plaintextOutput.to_vec())
