@@ -57,7 +57,7 @@ COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/
 COPY Cargo.lock ./Cargo.lock
 COPY Cargo.toml ./Cargo.toml
 
-# find crates/* -name "Cargo.*" -printf "COPY %p %p\n"
+# find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n"
 COPY crates/aggregator/Cargo.toml crates/aggregator/Cargo.toml
 COPY crates/bfv-helpers/Cargo.toml crates/bfv-helpers/Cargo.toml
 COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
@@ -76,11 +76,14 @@ COPY crates/keyshare/Cargo.toml crates/keyshare/Cargo.toml
 COPY crates/logger/Cargo.toml crates/logger/Cargo.toml
 COPY crates/net/Cargo.toml crates/net/Cargo.toml
 COPY crates/program-client/Cargo.toml crates/program-client/Cargo.toml
+COPY crates/program-listener/Cargo.toml crates/program-listener/Cargo.toml
 COPY crates/request/Cargo.toml crates/request/Cargo.toml
 COPY crates/sdk/Cargo.toml crates/sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml crates/sortition/Cargo.toml
+COPY crates/support-scripts/Cargo.toml crates/support-scripts/Cargo.toml
 COPY crates/test-helpers/Cargo.toml crates/test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml crates/tests/Cargo.toml
+
 
 RUN set -eux; \
     find \

@@ -21,6 +21,7 @@ mod nodes_up;
 mod password;
 mod password_delete;
 mod password_set;
+mod program;
 mod start;
 mod wallet;
 mod wallet_set;

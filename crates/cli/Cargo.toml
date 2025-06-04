@@ -15,12 +15,14 @@ actix = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 compile-time = { workspace = true }
+dialoguer = { workspace = true }
 e3-config = { workspace = true }
 e3-crypto = { workspace = true }
-dialoguer = { workspace = true }
 e3-entrypoint = { workspace = true }
-e3-init = { workspace = true }
 e3-events = { workspace = true }
+e3-init = { workspace = true }
+e3-support-scripts = { workspace = true }
+e3-program-listener = { workspace = true }
 hex = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry-otlp = { workspace = true }

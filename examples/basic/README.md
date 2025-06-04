@@ -52,14 +52,55 @@ cd ./myproj
 pnpm install
 ```
 
-### 2. Start Local Hardhat Node
+### Start Local Hardhat Node
 
 ```bash
-# Terminal 1
 pnpm node
 ```
 
 Enclave contracts should be automatically deployed.
+
+
+### Your FHE program
+
+Your FHE program is a rust crate located under `./program`.
+
+### Run your program with enclave
+
+To verifiably run your program with FHE locally with enclave you first need to setup an RPC server to receive the computation output.
+
+You RPC server gets called by the enclave program listener when the FHE computation is complete.
+
+We have set one up in the template to run it you can use the following command:
+
+```bash
+pnpm rpc
+```
+
+Your RPC must provide the following methods:
+
+```ts
+type Capabilities = "processOutput" | "shouldCompute";
+
+interface RpcServer{
+    // Handle the FHE 
+    processOutput(e3Id: number, proof: string, ciphertext: string) : number;
+    capabilities() : Capabilities
+}
+```
+
+### Run a listener
+
+Next you can use the `enclave program listen` command to run your computation:
+
+```bash
+enclave program listen \
+  --json-rpc-server http://localhost:8080 \
+  --chain hardhat
+```
+
+This will listen to your local hardhat node and trigger computations when the E3 round has expired.
+
 
 ## Usage Commands
 

@@ -145,6 +145,26 @@ pub struct EnclaveIndexer<S: DataStore> {
     chain_id: u64,
 }
 
+impl EnclaveIndexer<InMemoryStore> {
+    pub async fn new_with_in_mem_store(
+        listener: EventListener,
+        contract: EnclaveContract<ReadOnly>,
+    ) -> Result<EnclaveIndexer<InMemoryStore>> {
+        let store = InMemoryStore::new();
+
+        EnclaveIndexer::new(listener, contract, store).await
+    }
+
+    pub async fn from_endpoint_address_in_mem(
+        ws_url: &str,
+        contract_address: &str,
+    ) -> Result<EnclaveIndexer<InMemoryStore>> {
+        let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
+        let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
+        EnclaveIndexer::<InMemoryStore>::new_with_in_mem_store(listener, contract).await
+    }
+}
+
 impl<S: DataStore> EnclaveIndexer<S> {
     pub async fn new(
         listener: EventListener,
@@ -164,7 +184,11 @@ impl<S: DataStore> EnclaveIndexer<S> {
         Ok(instance)
     }
 
-    pub async fn from_strings(ws_url: &str, contract_address: &str, store: S) -> Result<Self> {
+    pub async fn from_endpoint_address(
+        ws_url: &str,
+        contract_address: &str,
+        store: S,
+    ) -> Result<Self> {
         let listener = EventListener::create_contract_listener(ws_url, contract_address).await?;
         let contract = EnclaveContractFactory::create_read(ws_url, contract_address).await?;
         EnclaveIndexer::new(listener, contract, store).await
