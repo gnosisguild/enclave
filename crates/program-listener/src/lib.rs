@@ -44,13 +44,13 @@ impl RpcServer {
         Ok(result)
     }
 
-    async fn process_output(&self, proof: Vec<u8>, ciphertext: Vec<u8>) -> Result<()> {
+    async fn process_output(&self, e3_id: u64, proof: Vec<u8>, ciphertext: Vec<u8>) -> Result<()> {
         let proof = to_hex(proof);
         let ciphertext = to_hex(ciphertext);
 
         let _: u8 = self
             .client
-            .request("processOutput", rpc_params![proof, ciphertext])
+            .request("processOutput", rpc_params![e3_id, proof, ciphertext])
             .await?;
 
         Ok(())
@@ -133,7 +133,7 @@ pub async fn execute(config: &AppConfig, chain_name: &str, json_rpc_server: &str
                             .await
                             .map_err(|e| eyre::eyre!("Error running compute: {e}"))?;
 
-                    rpc.process_output(proof, ciphertext)
+                    rpc.process_output(e3_id, proof, ciphertext)
                         .await
                         .map_err(|e| eyre::eyre!("{e}"))?;
 

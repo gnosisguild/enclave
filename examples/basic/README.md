@@ -52,14 +52,29 @@ cd ./myproj
 pnpm install
 ```
 
-### 2. Start Local Hardhat Node
+### Start Local Hardhat Node
 
 ```bash
-# Terminal 1
 pnpm node
 ```
 
 Enclave contracts should be automatically deployed.
+
+
+### Run your RPC server
+
+You RPC server gets called by the enclave program listener when the FHE computation is complete
+
+```bash
+pnpm rpc
+```
+
+### Run a listener
+
+```bash
+enclave program listen --json-rpc-server http://localhost:8080 --chain hardhat
+```
+
 
 ## Usage Commands
 
