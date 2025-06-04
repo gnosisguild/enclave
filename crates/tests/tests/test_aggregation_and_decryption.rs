@@ -179,7 +179,11 @@ fn encrypt_ciphertext(
     raw_plaintext: Vec<u64>,
 ) -> Result<(Arc<Ciphertext>, Vec<u8>)> {
     let padded = &pad_end(&raw_plaintext, 0, 2048);
-    let expected = bincode::serialize(&padded)?;
+    let mut bytes = Vec::with_capacity(padded.len() * 8);
+    for value in padded {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    let expected = bytes;
     let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
     let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
     Ok((Arc::new(ciphertext), expected))

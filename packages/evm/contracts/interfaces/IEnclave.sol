@@ -173,6 +173,20 @@ interface IEnclave {
         uint256 _maxDuration
     ) external returns (bool success);
 
+    /// @notice This function should be called to enable an E3 Program.
+    /// @param e3Program The address of the E3 Program.
+    /// @return success True if the E3 Program was successfully enabled.
+    function enableE3Program(
+        IE3Program e3Program
+    ) external returns (bool success);
+
+    /// @notice This function should be called to disable an E3 Program.
+    /// @param e3Program The address of the E3 Program.
+    /// @return success True if the E3 Program was successfully disabled.
+    function disableE3Program(
+        IE3Program e3Program
+    ) external returns (bool success);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Get Functions                        //
