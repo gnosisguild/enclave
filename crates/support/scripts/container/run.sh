@@ -1,1 +1,3 @@
-cargo run --bin e3-support-app
+#!/usr/bin/env bash
+
+cargo run --bin e3-support-app "$@"
