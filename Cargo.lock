@@ -2633,8 +2633,13 @@ name = "e3-program-listener"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "e3-compute-provider",
  "e3-config",
+ "e3-evm-helpers",
  "e3-indexer",
+ "e3-program-client",
+ "eyre",
+ "tokio",
 ]
 
 [[package]]

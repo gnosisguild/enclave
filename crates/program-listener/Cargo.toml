@@ -9,4 +9,8 @@ repository.workspace = true
 [dependencies]
 e3-config.workspace = true
 e3-indexer.workspace = true
+e3-program-client.workspace = true
+e3-compute-provider.workspace = true
+e3-evm-helpers.workspace = true
 anyhow.workspace = true
+eyre.workspace = true
