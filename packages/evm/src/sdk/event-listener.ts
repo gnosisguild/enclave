@@ -1,0 +1,234 @@
+import { type PublicClient, type Log, type WatchContractEventParameters, type Abi } from 'viem';
+import {
+    type EventCallback,
+    type EventListenerConfig,
+    type SDKEventEmitter,
+    type AllEventTypes,
+    type EnclaveEvent,
+    EnclaveEventType,
+    RegistryEventType
+} from './types';
+import { formatEventName, generateEventId, sleep, SDKError } from './utils';
+
+export class EventListener implements SDKEventEmitter {
+    private listeners: Map<AllEventTypes, Set<EventCallback>> = new Map();
+    private activeWatchers: Map<string, () => void> = new Map();
+    private isPolling = false;
+    private lastBlockNumber: bigint = BigInt(0);
+
+    constructor(
+        private publicClient: PublicClient,
+        private config: EventListenerConfig = {}
+    ) { }
+
+    /**
+     * Listen to specific contract events
+     */
+    public async watchContractEvent<T extends AllEventTypes>(
+        address: `0x${string}`,
+        eventType: T,
+        abi: Abi,
+        callback: EventCallback<T>
+    ): Promise<void> {
+        const watcherKey = `${address}:${eventType}`;
+
+        if (!this.listeners.has(eventType)) {
+            this.listeners.set(eventType, new Set());
+        }
+
+        this.listeners.get(eventType)!.add(callback as EventCallback);
+
+        // If we don't have an active watcher for this event, create one
+        if (!this.activeWatchers.has(watcherKey)) {
+            try {
+                const unwatch = this.publicClient.watchContractEvent({
+                    address,
+                    abi,
+                    eventName: eventType as string,
+                    fromBlock: this.config.fromBlock,
+                    onLogs: (logs: any[]) => {
+                        logs.forEach((log: any) => {
+                            const event: EnclaveEvent<T> = {
+                                type: eventType,
+                                data: log.args,
+                                log,
+                                timestamp: new Date(),
+                                blockNumber: log.blockNumber,
+                                transactionHash: log.transactionHash
+                            };
+                            this.emit(event);
+                        });
+                    }
+                });
+
+                this.activeWatchers.set(watcherKey, unwatch);
+            } catch (error) {
+                throw new SDKError(
+                    `Failed to watch contract event ${eventType} on ${address}: ${error}`,
+                    'WATCH_EVENT_FAILED'
+                );
+            }
+        }
+    }
+
+    /**
+     * Listen to all logs from a specific address
+     */
+    public async watchLogs(
+        address: `0x${string}`,
+        callback: (log: Log) => void
+    ): Promise<void> {
+        const watcherKey = `logs:${address}`;
+
+        if (!this.activeWatchers.has(watcherKey)) {
+            try {
+                const unwatch = this.publicClient.watchEvent({
+                    address,
+                    onLogs: (logs: any[]) => {
+                        logs.forEach((log: any) => {
+                            callback(log);
+                        });
+                    }
+                });
+
+                this.activeWatchers.set(watcherKey, unwatch);
+            } catch (error) {
+                throw new SDKError(
+                    `Failed to watch logs for address ${address}: ${error}`,
+                    'WATCH_LOGS_FAILED'
+                );
+            }
+        }
+    }
+
+    /**
+     * Start polling for historical events
+     */
+    public async startPolling(): Promise<void> {
+        if (this.isPolling) return;
+
+        this.isPolling = true;
+
+        try {
+            this.lastBlockNumber = await this.publicClient.getBlockNumber();
+
+            this.pollForEvents();
+        } catch (error) {
+            this.isPolling = false;
+            throw new SDKError(
+                `Failed to start polling: ${error}`,
+                'POLLING_START_FAILED'
+            );
+        }
+    }
+
+    /**
+     * Stop polling for events
+     */
+    public stopPolling(): void {
+        this.isPolling = false;
+    }
+
+    /**
+     * Get historical events
+     */
+    public async getHistoricalEvents(
+        address: `0x${string}`,
+        eventType: AllEventTypes,
+        abi: Abi,
+        fromBlock?: bigint,
+        toBlock?: bigint
+    ): Promise<Log[]> {
+        try {
+            const logs = await this.publicClient.getContractEvents({
+                address,
+                abi,
+                eventName: eventType as string,
+                fromBlock: fromBlock || this.config.fromBlock,
+                toBlock: toBlock || this.config.toBlock
+            });
+
+            return logs;
+        } catch (error) {
+            throw new SDKError(
+                `Failed to get historical events: ${error}`,
+                'HISTORICAL_EVENTS_FAILED'
+            );
+        }
+    }
+
+    /**
+     * SDKEventEmitter implementation
+     */
+    public on<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): void {
+        if (!this.listeners.has(eventType)) {
+            this.listeners.set(eventType, new Set());
+        }
+        this.listeners.get(eventType)!.add(callback as EventCallback);
+    }
+
+    public off<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): void {
+        const callbacks = this.listeners.get(eventType);
+        if (callbacks) {
+            callbacks.delete(callback as EventCallback);
+            if (callbacks.size === 0) {
+                this.listeners.delete(eventType);
+                // Find and stop corresponding watchers
+                const watchersToRemove: string[] = [];
+                this.activeWatchers.forEach((unwatch, key) => {
+                    if (key.endsWith(`:${eventType}`)) {
+                        unwatch();
+                        watchersToRemove.push(key);
+                    }
+                });
+                watchersToRemove.forEach(key => this.activeWatchers.delete(key));
+            }
+        }
+    }
+
+    public emit<T extends AllEventTypes>(event: EnclaveEvent<T>): void {
+        const callbacks = this.listeners.get(event.type);
+        if (callbacks) {
+            callbacks.forEach(callback => {
+                try {
+                    (callback as EventCallback<T>)(event);
+                } catch (error) {
+                    console.error(`Error in event callback for ${event.type}:`, error);
+                }
+            });
+        }
+    }
+
+    /**
+     * Clean up all listeners and watchers
+     */
+    public cleanup(): void {
+        this.stopPolling();
+
+        // Stop all active watchers
+        this.activeWatchers.forEach(unwatch => unwatch());
+        this.activeWatchers.clear();
+
+        // Clear all listeners
+        this.listeners.clear();
+    }
+
+    private async pollForEvents(): Promise<void> {
+        while (this.isPolling) {
+            try {
+                const currentBlock = await this.publicClient.getBlockNumber();
+
+                if (currentBlock > this.lastBlockNumber) {
+                    // Check for new events in the new blocks
+                    // This is a simplified implementation
+                    this.lastBlockNumber = currentBlock;
+                }
+
+                await sleep(this.config.pollingInterval || 5000);
+            } catch (error) {
+                console.error('Error during polling:', error);
+                await sleep(this.config.pollingInterval || 5000);
+            }
+        }
+    }
+} 

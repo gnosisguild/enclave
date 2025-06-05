@@ -15,6 +15,13 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['@rollup/browser'],
+    include: ['@gnosis-guild/enclave/sdk'], // Include SDK for optimization
+    force: true, // Force re-optimization
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/, /packages\/evm/],
+    },
   },
   resolve: {
     alias: {

@@ -10,7 +10,9 @@
   "exports": {
     "./deploy/enclave": "./dist/deploy/enclave.js",
     "./contracts/*": "./contracts/*",
-    "./artifacts/*": "./artifacts/*"
+    "./artifacts/*": "./artifacts/*",
+    "./sdk": "./dist/src/sdk/index.js",
+    "./sdk/*": "./dist/src/sdk/*"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
@@ -100,7 +102,8 @@
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
-    "solady": "^0.1.13"
+    "solady": "^0.1.13",
+    "viem": "^2.30.6"
   },
   "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808"
 }
