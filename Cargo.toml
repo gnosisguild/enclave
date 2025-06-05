@@ -31,6 +31,8 @@ exclude = [
   "examples/CRISP/apps/program",
   "examples/CRISP/apps/wasm-crypto",
   "examples/basic/client/wasm",
+  "examples/default/client/wasm",
+  "examples/default",
   "crates/support" # client needs to be able to build this independently
 ]
 resolver = "2"

@@ -1,0 +1,51 @@
+{
+  "name": "enclave-client",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "author": {
+    "name": "gnosisguild",
+    "url": "https://github.com/gnosisguild"
+  },
+  "homepage": "https://github.com/gnosisguild/enclave",
+  "scripts": {
+    "build-wasm": "command -v wasm-pack >/dev/null 2>&1 || { echo 'Error: wasm-pack is not installed. Please install it by running: cargo install wasm-pack'; exit 1; }; [ ! -f libs/wasm/pkg/wasm_crypto.js ] && (cd wasm && wasm-pack build --target web --release --out-dir ../libs/wasm/pkg) || echo 'WASM package already exists'",
+    "dev": "npm run build-wasm && vite --no-open --host",
+    "build": "npm run build-wasm && tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@gnosis-guild/enclave": "0.0.5-test.8*",
+    "@gnosis-guild/enclave-react": "0.0.5-test.8*",
+    "@phosphor-icons/react": "^2.1.4",
+    "@tanstack/react-query": "^5.74.3",
+    "@wagmi/core": "^2.14.16",
+    "connectkit": "^1.9.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "viem": "^2.30.6",
+    "wagmi": "^2.14.16"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.12",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.6",
+    "prettier": "^3.2.5",
+    "prettier-plugin-tailwindcss": "^0.5.13",
+    "tailwindcss": "^3.4.2",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0",
+    "vite-plugin-wasm": "^3.3.0",
+    "vite-plugin-top-level-await": "^1.4.1",
+    "vite-tsconfig-paths": "^4.3.2"
+  },
+  "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808"
+}
