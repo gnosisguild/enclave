@@ -36,6 +36,12 @@ Linux/POSIX environment
 cargo install --git https://github.com/gnosisguild/enclave e3-cli
 ```
 
+### install wasm-pack
+
+```
+cargo install wasm-pack
+```
+
 ### Generate Template
 
 ```
@@ -60,7 +66,6 @@ pnpm node
 
 Enclave contracts should be automatically deployed.
 
-
 ### Your FHE program
 
 Your FHE program is a rust crate located under `./program`.
@@ -82,10 +87,10 @@ Your RPC must provide the following methods:
 ```ts
 type Capabilities = "processOutput" | "shouldCompute";
 
-interface RpcServer{
-    // Handle the FHE 
-    processOutput(e3Id: number, proof: string, ciphertext: string) : number;
-    capabilities() : Capabilities
+interface RpcServer {
+  // Handle the FHE
+  processOutput(e3Id: number, proof: string, ciphertext: string): number;
+  capabilities(): Capabilities;
 }
 ```
 
@@ -100,7 +105,6 @@ enclave program listen \
 ```
 
 This will listen to your local hardhat node and trigger computations when the E3 round has expired.
-
 
 ## Usage Commands
 
