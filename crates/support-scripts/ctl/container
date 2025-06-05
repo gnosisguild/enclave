@@ -3,6 +3,20 @@ CONTAINER_NAME="e3-support.1"
 IMAGE="ghcr.io/gnosisguild/e3-support:next"
 CACHE_PREFIX="e3-support"
 
+# Function to cleanup
+cleanup() {
+    echo "Stopping container and processes..."
+    # Try to gracefully stop the container first
+    docker exec "$CONTAINER_NAME" pkill -SIGTERM e3-support-app 2>/dev/null || true
+    sleep 2
+    # Force stop if still running
+    docker exec "$CONTAINER_NAME" pkill -SIGKILL e3-support-app 2>/dev/null || true
+    docker stop "$CONTAINER_NAME" 2>/dev/null || true
+}
+
+# Set trap for signals
+trap cleanup EXIT INT TERM
+
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
     docker exec -it "$CONTAINER_NAME" bash -c "$*"
 else

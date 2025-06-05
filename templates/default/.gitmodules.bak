@@ -1,0 +1,3 @@
+[submodule "lib/risc0-ethereum"]
+	path = lib/risc0-ethereum
+	url = https://github.com/gnosisguild/risc0-ethereum

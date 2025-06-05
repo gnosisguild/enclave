@@ -1,18 +1,6 @@
 {
-  "name": "hardhat-project",
-  "scripts": {
-    "node": "hardhat node",
-    "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
-    "deploy:dev": "hardhat run scripts/deploy-local.ts",
-    "add-ciphernode": "hardhat run scripts/interact.ts -- add-ciphernode",
-    "remove-ciphernode": "hardhat run scripts/interact.ts -- remove-ciphernode",
-    "compile": "hardhat compile",
-    "test": "hardhat test",
-    "rpc": "ts-node ./server",
-    "program": "concurrently \"pnpm rpc\" \"enclave program listen --json-rpc-server http://localhost:8080 --chain hardhat\""
-  },
   "devDependencies": {
-    "@gnosis-guild/enclave": "workspace:*",
+    "@gnosis-guild/enclave": "0.0.5-test.8*",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-ignition": "^0.15.0",
@@ -21,6 +9,7 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
     "@openzeppelin/contracts": "5.3.0",
+    "@risc0/ethereum": "file:lib/risc0-ethereum",
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",
     "@types/chai": "^4.2.0",
@@ -39,5 +28,17 @@
     "typechain": "^8.3.0",
     "typed-rpc": "^6.1.1",
     "typescript": ">=4.5.0"
+  },
+  "name": "enclave-example",
+  "scripts": {
+    "add-ciphernode": "hardhat run scripts/interact.ts -- add-ciphernode",
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
+    "deploy:dev": "hardhat run scripts/deploy-local.ts",
+    "node": "hardhat node",
+    "program": "concurrently \"pnpm rpc\" \"enclave program listen --json-rpc-server http://localhost:8080 --chain hardhat\"",
+    "remove-ciphernode": "hardhat run scripts/interact.ts -- remove-ciphernode",
+    "rpc": "ts-node ./server",
+    "test": "hardhat test"
   }
 }

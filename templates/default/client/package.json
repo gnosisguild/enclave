@@ -16,8 +16,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@gnosis-guild/enclave": "workspace:*",
-    "@gnosis-guild/enclave-react": "workspace:*",
+    "@gnosis-guild/enclave": "0.0.5-test.8*",
+    "@gnosis-guild/enclave-react": "0.0.5-test.8*",
     "@phosphor-icons/react": "^2.1.4",
     "@tanstack/react-query": "^5.74.3",
     "@wagmi/core": "^2.14.16",
