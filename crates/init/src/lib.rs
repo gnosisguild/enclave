@@ -16,7 +16,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use tokio::fs;
 
-const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#hacknet";
+const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#ry/support-alterations-1";
+// const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#hacknet";
 const TEMPLATE_FOLDER: &str = "templates/default";
 const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 
@@ -50,6 +51,7 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     )
     .await?;
 
+    delete_path(&cwd.join(".enclave")).await?;
     copy::copy_with_filters(
         &PathBuf::from(TEMP_DIR).join("crates/support-scripts/ctl"),
         &cwd.join(".enclave/support/ctl"),
@@ -57,7 +59,7 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     )
     .await?;
     delete_path(&cwd.join(".gitignore")).await?;
-    delete_path(&cwd.join(".gitignore.bak")).await?;
+    move_file(&cwd.join(".gitignore.bak"), &cwd.join(".gitignore")).await?;
     delete_path(&cwd.join("lib")).await?;
 
     // We need to make these chmod 777 because the dockerfile needs to be able to successfully
@@ -65,7 +67,6 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     // PRs/Ideas welcome.
     chmod_recursive(&cwd.join("contracts"), "777").await?;
     chmod_recursive(&cwd.join("tests"), "777").await?;
-    move_file(&cwd.join(".gitignore.bak"), &cwd.join(".gitignore")).await?;
 
     git::init(&cwd).await?;
 

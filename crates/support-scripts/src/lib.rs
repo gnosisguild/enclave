@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use std::process::Stdio;
 use std::{env, path::PathBuf};
 use tokio::signal;
 use tokio::{fs, process::Command};
@@ -6,7 +7,13 @@ use tokio::{fs, process::Command};
 async fn run_bash_script(cwd: &PathBuf, script: &PathBuf, args: &[&str]) -> Result<()> {
     println!("run_bash_script: {:?} {:?} {:?}", cwd, script, args);
     let mut cmd = Command::new("bash");
-    cmd.current_dir(cwd).arg(script).kill_on_drop(true);
+    cmd.current_dir(cwd)
+        .arg(script)
+        .kill_on_drop(true)
+        .kill_on_drop(true)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
 
     for arg in args {
         cmd.arg(arg);

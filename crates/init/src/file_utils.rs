@@ -26,11 +26,12 @@ pub async fn ensure_empty_folder<P: AsRef<Path>>(path: P) -> Result<()> {
 
 pub async fn delete_path<P: AsRef<Path>>(path: P) -> Result<()> {
     let path = path.as_ref();
-
-    if path.is_dir() {
-        fs::remove_dir_all(path).await?;
-    } else {
-        fs::remove_file(path).await?;
+    if path.exists() {
+        if path.is_dir() {
+            fs::remove_dir_all(path).await?;
+        } else {
+            fs::remove_file(path).await?;
+        }
     }
 
     Ok(())
