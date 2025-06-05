@@ -29,7 +29,7 @@
     "typed-rpc": "^6.1.1",
     "typescript": ">=4.5.0"
   },
-  "name": "hardhat-project",
+  "name": "enclave-example",
   "scripts": {
     "add-ciphernode": "hardhat run scripts/interact.ts -- add-ciphernode",
     "compile": "hardhat compile",
