@@ -60,6 +60,16 @@ pnpm node
 
 Enclave contracts should be automatically deployed.
 
+### Compiling your program
+
+Use the following command to compile your program:
+
+```
+enclave program compile
+```
+
+This should create an `ImageID.sol` contract within the `./contracts` folder.
+
 ### Your FHE program
 
 Your FHE program is a rust crate located under `./program`.

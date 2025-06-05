@@ -19,7 +19,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const e3Program = await deploy("MyProgram", {
     from: deployer,
-    args: [verifier, imageId],
+    args: [verifier.address, imageId.address],
     log: true,
   });
 };
