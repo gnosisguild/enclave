@@ -1,8 +1,7 @@
 packages:
-  - packages/evm
-  - packages/enclave-react
-  - examples/CRISP
-  - examples/basic
-  - examples/basic/client
-  - examples/CRISP/apps/client
   - docs
+  - examples/CRISP
+  - examples/CRISP/apps/client
+  - packages/enclave-react
+  - packages/evm
+  - templates/default

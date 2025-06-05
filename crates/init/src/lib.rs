@@ -35,19 +35,29 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     file_utils::ensure_empty_folder(&cwd).await?;
     git::shallow_clone(&repo.repo_url, &repo.branch, TEMP_DIR).await?;
 
-    let version = package_json::get_version_from_package_json(
+    let evm_version = package_json::get_version_from_package_json(
         &PathBuf::from(TEMP_DIR).join("packages/evm/package.json"),
     )
     .await?;
-
+    let react_version = package_json::get_version_from_package_json(
+        &PathBuf::from(TEMP_DIR).join("packages/enclave_react/package.json"),
+    )
+    .await?;
     copy::copy_with_filters(
         &PathBuf::from(TEMP_DIR).join(TEMPLATE_FOLDER),
         &cwd,
-        &vec![Filter::new(
-            "package.json",
-            "(\"@gnosis-guild\\/enclave\":\\s*\")[^\"]*\"",
-            &format!("\\1{}", version),
-        )],
+        &vec![
+            Filter::new(
+                "package.json",
+                "(\"@gnosis-guild\\/enclave\":\\s*\")[^\"]*\"",
+                &format!("\\1{}", evm_version),
+            ),
+            Filter::new(
+                "package.json",
+                "(\"@gnosis-guild\\/enclave_react\":\\s*\")[^\"]*\"",
+                &format!("\\1{}", react_version),
+            ),
+        ],
     )
     .await?;
 
