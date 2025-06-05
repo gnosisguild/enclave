@@ -1,0 +1,48 @@
+{
+    "name": "@gnosis-guild/enclave-react",
+    "version": "0.1.0",
+    "description": "React hooks and utilities for Enclave SDK",
+    "main": "dist/index.js",
+    "module": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "sideEffects": false,
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "clean": "rm -rf dist",
+        "prepublishOnly": "npm run clean && npm run build"
+    },
+    "keywords": [
+        "react",
+        "hooks",
+        "enclave",
+        "encryption",
+        "fhe",
+        "e3"
+    ],
+    "author": {
+        "name": "gnosisguild",
+        "url": "https://github.com/gnosisguild"
+    },
+    "license": "LGPL-3.0-only",
+    "peerDependencies": {
+        "react": "^18.2.0",
+        "wagmi": "^2.14.16",
+        "viem": "^2.30.6"
+    },
+    "dependencies": {
+        "@gnosis-guild/enclave": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/react": "^18.2.0",
+        "typescript": "^5.8.3"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/gnosisguild/enclave.git",
+        "directory": "packages/enclave-react"
+    }
+}

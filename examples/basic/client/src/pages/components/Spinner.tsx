@@ -2,13 +2,17 @@
 // SIMPLE SPINNER
 // ============================================================================
 
-const Spinner: React.FC<{ size?: number; className?: string }> = ({ size = 18, className = "" }) => (
-    <div className={`inline-block ${className}`}>
-        <div
-            className={`animate-spin rounded-full border-2 border-lime-400 border-t-transparent`}
-            style={{ width: `${size}px`, height: `${size}px` }}
-        />
-    </div>
+import React from 'react'
+
+interface SpinnerProps {
+    size?: number
+}
+
+const Spinner: React.FC<SpinnerProps> = ({ size = 24 }) => (
+    <div
+        className={`animate-spin rounded-full border-2 border-enclave-400 border-t-transparent`}
+        style={{ width: size, height: size }}
+    />
 )
 
 export default Spinner

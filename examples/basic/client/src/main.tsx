@@ -6,32 +6,25 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ConnectKitProvider, getDefaultConfig } from 'connectkit'
 import App from './App.tsx'
 
-// Web3 Configuration
-const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || ''
-if (!walletConnectProjectId) {
-  console.warn('VITE_WALLETCONNECT_PROJECT_ID is not set in .env file. WalletConnect will not function properly.')
-}
-
-const chains = import.meta.env.DEV ? ([sepolia, anvil] as const) : ([sepolia] as const)
-
-const config = createConfig(
+const wagmiConfig = createConfig(
   getDefaultConfig({
     appName: 'Enclave E3',
     enableFamily: false,
-    chains,
-    walletConnectProjectId: walletConnectProjectId,
+    chains: import.meta.env.DEV
+      ? ([sepolia, anvil] as const)
+      : ([sepolia] as const),
+    walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID!,
   }),
 )
 
 const queryClient = new QueryClient()
-
 const connectKitOptions = import.meta.env.DEV
   ? { initialChainId: 0 }
   : { initialChainId: sepolia.id }
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <WagmiProvider config={config}>
+    <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <ConnectKitProvider options={connectKitOptions} mode='light'>
           <App />

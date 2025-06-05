@@ -27,6 +27,7 @@ export const useWebAssemblyHook = () => {
             console.log('Encrypting input')
             const encryptor = new Encrypt()
             const result = encryptor.encrypt(value, publicKey)
+            console.log('Encrypted input:', result)
             return result
         } catch (error) {
             console.error('Error encrypting input:', error)
