@@ -6,7 +6,9 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - hacknet
     paths:
       - "Cargo.toml"
       - "package.json"
