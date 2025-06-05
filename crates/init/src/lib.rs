@@ -88,6 +88,13 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     println!("Using bak files for ignores...");
     move_file(&cwd.join(".gitignore.bak"), &cwd.join(".gitignore")).await?;
 
+    println!("Move bak files for workspace...");
+    move_file(
+        &cwd.join("pnpm-workspace.yaml.bak"),
+        &cwd.join("pnpm-workspace.yaml"),
+    )
+    .await?;
+
     println!("Remove lib folder...");
     delete_path(&cwd.join("lib")).await?;
 
