@@ -1,18 +1,20 @@
 import {
-    type PublicClient,
-    type WalletClient,
-    type Hash,
+    PublicClient,
+    WalletClient,
+    Hash,
+    Abi,
+    TransactionReceipt
 } from 'viem';
 import {
     Enclave__factory,
-    CiphernodeRegistryOwnable__factory,
+    CiphernodeRegistryOwnable__factory
 } from '../../types';
 import { SDKError, isValidAddress } from './utils';
 
 export class ContractClient {
     private contractInfo: {
-        enclave: { address: `0x${string}`; abi: any };
-        ciphernodeRegistry: { address: `0x${string}`; abi: any };
+        enclave: { address: `0x${string}`; abi: Abi };
+        ciphernodeRegistry: { address: `0x${string}`; abi: Abi };
     } | null = null;
 
     constructor(
@@ -199,7 +201,7 @@ export class ContractClient {
      * Get E3 information
      * Based on the contract: getE3(uint256 e3Id) returns (E3 memory e3)
      */
-    public async getE3(e3Id: bigint): Promise<any> {
+    public async getE3(e3Id: bigint): Promise<unknown> {
         if (!this.contractInfo) {
             await this.initialize();
         }
@@ -228,7 +230,7 @@ export class ContractClient {
         functionName: string,
         args: readonly unknown[],
         contractAddress: `0x${string}`,
-        abi: readonly unknown[],
+        abi: Abi,
         value?: bigint
     ): Promise<bigint> {
         if (!this.walletClient) {
@@ -241,17 +243,14 @@ export class ContractClient {
                 throw new SDKError('No account connected', 'NO_ACCOUNT');
             }
 
-            const estimateParams: any = {
+            const estimateParams = {
                 address: contractAddress,
                 abi,
                 functionName,
                 args,
                 account,
+                ...(value !== undefined && { value })
             };
-
-            if (value !== undefined) {
-                estimateParams.value = value;
-            }
 
             const gas = await this.publicClient.estimateContractGas(estimateParams);
 
@@ -267,7 +266,7 @@ export class ContractClient {
     /**
      * Wait for transaction confirmation
      */
-    public async waitForTransaction(hash: Hash): Promise<any> {
+    public async waitForTransaction(hash: Hash): Promise<TransactionReceipt> {
         try {
             const receipt = await this.publicClient.waitForTransactionReceipt({
                 hash,

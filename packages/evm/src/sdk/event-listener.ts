@@ -5,6 +5,10 @@ import {
     type SDKEventEmitter,
     type AllEventTypes,
     type EnclaveEvent,
+    type EnclaveEventType,
+    type RegistryEventType,
+    type EnclaveEventData,
+    type RegistryEventData,
 } from './types';
 import { sleep, SDKError } from './utils';
 
@@ -44,15 +48,15 @@ export class EventListener implements SDKEventEmitter {
                     abi,
                     eventName: eventType as string,
                     fromBlock: this.config.fromBlock,
-                    onLogs: (logs: any[]) => {
-                        logs.forEach((log: any) => {
+                    onLogs: (logs: Log[]) => {
+                        logs.forEach((log: Log) => {
                             const event: EnclaveEvent<T> = {
                                 type: eventType,
-                                data: log.args,
+                                data: (log as unknown as { args: unknown }).args as T extends EnclaveEventType ? EnclaveEventData[T] : T extends RegistryEventType ? RegistryEventData[T] : unknown,
                                 log,
                                 timestamp: new Date(),
-                                blockNumber: log.blockNumber,
-                                transactionHash: log.transactionHash
+                                blockNumber: log.blockNumber ?? BigInt(0),
+                                transactionHash: log.transactionHash ?? '0x'
                             };
                             this.emit(event);
                         });
@@ -82,8 +86,8 @@ export class EventListener implements SDKEventEmitter {
             try {
                 const unwatch = this.publicClient.watchEvent({
                     address,
-                    onLogs: (logs: any[]) => {
-                        logs.forEach((log: any) => {
+                    onLogs: (logs: Log[]) => {
+                        logs.forEach((log: Log) => {
                             callback(log);
                         });
                     }
@@ -110,7 +114,7 @@ export class EventListener implements SDKEventEmitter {
         try {
             this.lastBlockNumber = await this.publicClient.getBlockNumber();
 
-            this.pollForEvents();
+            void this.pollForEvents();
         } catch (error) {
             this.isPolling = false;
             throw new SDKError(
@@ -175,7 +179,11 @@ export class EventListener implements SDKEventEmitter {
                 const watchersToRemove: string[] = [];
                 this.activeWatchers.forEach((unwatch, key) => {
                     if (key.endsWith(`:${eventType}`)) {
-                        unwatch();
+                        try {
+                            unwatch();
+                        } catch (error) {
+                            console.error(`Error unwatching event ${eventType}:`, error);
+                        }
                         watchersToRemove.push(key);
                     }
                 });
@@ -189,7 +197,7 @@ export class EventListener implements SDKEventEmitter {
         if (callbacks) {
             callbacks.forEach(callback => {
                 try {
-                    (callback as EventCallback<T>)(event);
+                    void (callback as EventCallback<T>)(event);
                 } catch (error) {
                     console.error(`Error in event callback for ${event.type}:`, error);
                 }
@@ -204,7 +212,13 @@ export class EventListener implements SDKEventEmitter {
         this.stopPolling();
 
         // Stop all active watchers
-        this.activeWatchers.forEach(unwatch => unwatch());
+        this.activeWatchers.forEach(unwatch => {
+            try {
+                unwatch();
+            } catch (error) {
+                console.error('Error unwatching during cleanup:', error);
+            }
+        });
         this.activeWatchers.clear();
 
         // Clear all listeners

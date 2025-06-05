@@ -1,4 +1,4 @@
-import { type PublicClient, type WalletClient, type Hash, type Log } from 'viem';
+import { type Hash, type Log, type Abi } from 'viem';
 import { EventListener } from './event-listener';
 import { ContractClient } from './contract-client';
 import {
@@ -120,7 +120,7 @@ export class EnclaveSDK {
     /**
      * Get E3 information
      */
-    public async getE3(e3Id: bigint): Promise<any> {
+    public async getE3(e3Id: bigint): Promise<unknown> {
         if (!this.initialized) {
             await this.initialize();
         }
@@ -141,10 +141,10 @@ export class EnclaveSDK {
             ? this.config.contracts.enclave
             : this.config.contracts.ciphernodeRegistry;
         const abi = isEnclaveEvent
-            ? Enclave__factory.abi as any
-            : CiphernodeRegistryOwnable__factory.abi as any;
+            ? Enclave__factory.abi
+            : CiphernodeRegistryOwnable__factory.abi;
 
-        this.eventListener.watchContractEvent(
+        void this.eventListener.watchContractEvent(
             contractAddress,
             eventType,
             abi,
@@ -172,8 +172,8 @@ export class EnclaveSDK {
             ? this.config.contracts.enclave
             : this.config.contracts.ciphernodeRegistry;
         const abi = isEnclaveEvent
-            ? Enclave__factory.abi as any
-            : CiphernodeRegistryOwnable__factory.abi as any;
+            ? Enclave__factory.abi
+            : CiphernodeRegistryOwnable__factory.abi;
 
         return this.eventListener.getHistoricalEvents(
             contractAddress,
@@ -188,7 +188,7 @@ export class EnclaveSDK {
      * Start polling for events
      */
     public async startEventPolling(): Promise<void> {
-        return this.eventListener.startPolling();
+        void this.eventListener.startPolling();
     }
 
     /**
@@ -209,7 +209,7 @@ export class EnclaveSDK {
         functionName: string,
         args: readonly unknown[],
         contractAddress: `0x${string}`,
-        abi: readonly unknown[],
+        abi: Abi,
         value?: bigint
     ): Promise<bigint> {
         return this.contractClient.estimateGas(functionName, args, contractAddress, abi, value);
@@ -218,7 +218,7 @@ export class EnclaveSDK {
     /**
      * Wait for transaction confirmation
      */
-    public async waitForTransaction(hash: Hash): Promise<any> {
+    public async waitForTransaction(hash: Hash): Promise<unknown> {
         return this.contractClient.waitForTransaction(hash);
     }
 

@@ -186,7 +186,7 @@ export type EventCallback<T extends AllEventTypes = AllEventTypes> = (
     event: EnclaveEvent<T>
 ) => void | Promise<void>;
 
-export interface EventFilter<T = any> {
+export interface EventFilter<T = unknown> {
     address?: `0x${string}`;
     fromBlock?: bigint;
     toBlock?: bigint;
