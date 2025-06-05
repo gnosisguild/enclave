@@ -52,12 +52,6 @@ enclave init ./myproj
 cd ./myproj
 ```
 
-### Install Dependencies
-
-```bash
-pnpm install
-```
-
 ### Start Local Hardhat Node
 
 ```bash

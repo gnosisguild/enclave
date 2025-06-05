@@ -16,7 +16,7 @@ rand = "0.8.5"
 ethers = "2.0.14"
 getrandom = { version = "0.2.11", features = ["js"] }
 bincode = "1.3.3"
-e3-bfv-helpers = { path = "../../../../crates/bfv-helpers" }
+e3-bfv-helpers = { path = "https://github.com/gnosisguild/enclave.git", branch = "hacknet" }
 rayon = "1.10.0"
 ndarray = "0.15.6"
 itertools = "0.13.0"
