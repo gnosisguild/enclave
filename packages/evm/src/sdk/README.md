@@ -1,16 +1,20 @@
 # Enclave TypeScript SDK
 
-A powerful, type-safe TypeScript SDK for interacting with Enclave smart contracts. This SDK provides real-time event listening, contract interaction methods, and comprehensive error handling.
+A powerful, type-safe TypeScript SDK for interacting with Enclave smart
+contracts. This SDK provides real-time event listening, contract interaction
+methods, and comprehensive error handling.
 
 ## Features
 
 - **Event-driven architecture**: Listen to smart contract events in real-time
 - **Type-safe**: Built with TypeScript and uses generated types from contracts
-- **Easy contract interactions**: Simple methods for reading from and writing to contracts
+- **Easy contract interactions**: Simple methods for reading from and writing to
+  contracts
 - **React integration**: Includes React hooks for easy frontend integration
 - **Error handling**: Comprehensive error handling with custom error types
 - **Gas estimation**: Built-in gas estimation for transactions
-- **Event polling**: Support for both WebSocket and polling-based event listening
+- **Event polling**: Support for both WebSocket and polling-based event
+  listening
 
 ## Installation
 
@@ -21,16 +25,20 @@ pnpm add @gnosis-guild/enclave
 ## Quick Start
 
 ```typescript
-import { EnclaveSDK, EnclaveEventType, RegistryEventType } from '@gnosis-guild/enclave/sdk';
-import { createPublicClient, createWalletClient, http, custom } from 'viem';
+import {
+  EnclaveSDK,
+  EnclaveEventType,
+  RegistryEventType,
+} from "@gnosis-guild/enclave/sdk";
+import { createPublicClient, createWalletClient, http, custom } from "viem";
 
 // Initialize clients
 const publicClient = createPublicClient({
-  transport: http('YOUR_RPC_URL')
+  transport: http("YOUR_RPC_URL"),
 });
 
 const walletClient = createWalletClient({
-  transport: custom(window.ethereum)
+  transport: custom(window.ethereum),
 });
 
 // Create SDK instance
@@ -38,10 +46,10 @@ const sdk = new EnclaveSDK({
   publicClient,
   walletClient,
   contracts: {
-    enclave: '0x...', // Your Enclave contract address
-    ciphernodeRegistry: '0x...' // Your CiphernodeRegistry contract address
+    enclave: "0x...", // Your Enclave contract address
+    ciphernodeRegistry: "0x...", // Your CiphernodeRegistry contract address
   },
-  chainId: 1 // Optional
+  chainId: 1, // Optional
 });
 
 // Initialize the SDK
@@ -49,22 +57,22 @@ await sdk.initialize();
 
 // Listen to events with the unified event system
 sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
-  console.log('E3 Requested:', event.data);
+  console.log("E3 Requested:", event.data);
 });
 
 sdk.onEnclaveEvent(RegistryEventType.CIPHERNODE_ADDED, (event) => {
-  console.log('Ciphernode Added:', event.data);
+  console.log("Ciphernode Added:", event.data);
 });
 
 // Interact with contracts
 const hash = await sdk.requestE3({
-  filter: '0x...',
+  filter: "0x...",
   threshold: [1, 3],
   startWindow: [BigInt(0), BigInt(100)],
   duration: BigInt(3600),
-  e3Program: '0x...',
-  e3ProgramParams: '0x...',
-  computeProviderParams: '0x...'
+  e3Program: "0x...",
+  e3ProgramParams: "0x...",
+  computeProviderParams: "0x...",
 });
 ```
 
@@ -77,19 +85,19 @@ The SDK uses a unified event system with TypeScript enums for type safety:
 ```typescript
 enum EnclaveEventType {
   // E3 Lifecycle
-  E3_REQUESTED = 'E3Requested',
-  E3_ACTIVATED = 'E3Activated',
-  INPUT_PUBLISHED = 'InputPublished',
-  CIPHERTEXT_OUTPUT_PUBLISHED = 'CiphertextOutputPublished',
-  PLAINTEXT_OUTPUT_PUBLISHED = 'PlaintextOutputPublished',
-  
+  E3_REQUESTED = "E3Requested",
+  E3_ACTIVATED = "E3Activated",
+  INPUT_PUBLISHED = "InputPublished",
+  CIPHERTEXT_OUTPUT_PUBLISHED = "CiphertextOutputPublished",
+  PLAINTEXT_OUTPUT_PUBLISHED = "PlaintextOutputPublished",
+
   // E3 Program Management
-  E3_PROGRAM_ENABLED = 'E3ProgramEnabled',
-  E3_PROGRAM_DISABLED = 'E3ProgramDisabled',
-  
+  E3_PROGRAM_ENABLED = "E3ProgramEnabled",
+  E3_PROGRAM_DISABLED = "E3ProgramDisabled",
+
   // Configuration
-  CIPHERNODE_REGISTRY_SET = 'CiphernodeRegistrySet',
-  MAX_DURATION_SET = 'MaxDurationSet',
+  CIPHERNODE_REGISTRY_SET = "CiphernodeRegistrySet",
+  MAX_DURATION_SET = "MaxDurationSet",
   // ... more events
 }
 ```
@@ -98,11 +106,11 @@ enum EnclaveEventType {
 
 ```typescript
 enum RegistryEventType {
-  CIPHERNODE_ADDED = 'CiphernodeAdded',
-  CIPHERNODE_REMOVED = 'CiphernodeRemoved',
-  COMMITTEE_REQUESTED = 'CommitteeRequested',
-  COMMITTEE_PUBLISHED = 'CommitteePublished',
-  ENCLAVE_SET = 'EnclaveSet',
+  CIPHERNODE_ADDED = "CiphernodeAdded",
+  CIPHERNODE_REMOVED = "CiphernodeRemoved",
+  COMMITTEE_REQUESTED = "CommitteeRequested",
+  COMMITTEE_PUBLISHED = "CommitteePublished",
+  ENCLAVE_SET = "EnclaveSet",
   // ... more events
 }
 ```
@@ -252,7 +260,7 @@ interface SDKConfig {
 The SDK includes comprehensive error handling:
 
 ```typescript
-import { SDKError } from '@gnosis-guild/enclave/sdk';
+import { SDKError } from "@gnosis-guild/enclave/sdk";
 
 try {
   await sdk.requestE3(params);
@@ -260,7 +268,7 @@ try {
   if (error instanceof SDKError) {
     console.error(`SDK Error (${error.code}): ${error.message}`);
   } else {
-    console.error('Unexpected error:', error);
+    console.error("Unexpected error:", error);
   }
 }
 ```
@@ -282,7 +290,8 @@ pnpm install
 pnpm dev
 ```
 
-The demo showcases all SDK features including real-time event listening and contract interactions.
+The demo showcases all SDK features including real-time event listening and
+contract interactions.
 
 ### Testing
 
@@ -303,4 +312,4 @@ The SDK consists of several key components:
 
 ## License
 
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License.
