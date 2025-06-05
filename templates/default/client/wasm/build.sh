@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Check if wasm-pack is installed
 if ! command -v wasm-pack >/dev/null 2>&1; then
