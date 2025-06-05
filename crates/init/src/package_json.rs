@@ -22,6 +22,7 @@ impl DependencyType {
 }
 
 pub async fn get_version_from_package_json(file_path: &PathBuf) -> Result<String> {
+    println!("json path: {:?}", file_path);
     let content = fs::read_to_string(file_path).await?;
     let json: Value = serde_json::from_str(&content)?;
 

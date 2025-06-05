@@ -84,6 +84,9 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
             escape_sed_pattern(&filter.search_pattern),
             escape_sed_replacement(&filter.replacement)
         );
+
+        println!("Running sed...");
+        println!("> {}", sed_cmd);
         let sed_output = Command::new("sed")
             .arg("-i")
             .arg(sed_cmd)
@@ -91,7 +94,7 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
             .output()
             .await
             .context("Failed to execute sed command")?;
-
+        println!("{:?}", sed_output);
         if !sed_output.status.success() {
             let stderr = String::from_utf8_lossy(&sed_output.stderr);
             bail!("sed command failed on {}: {}", file_path, stderr);
