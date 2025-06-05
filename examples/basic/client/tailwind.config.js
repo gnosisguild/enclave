@@ -13,11 +13,25 @@ const config = {
     extend: {
       fontFamily: {
         jakarta: ['Plus Jakarta Sans', 'sans-serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui'],
       },
       colors: {
         slate: {
           200: '#E3E9F5',
         },
+        'enclave': {
+          50: '#eff9ff',
+          100: '#def2ff',
+          200: '#b6e8ff',
+          300: '#75d8ff',
+          400: '#2cc4ff',
+          500: '#60c2ff',
+          600: '#0ea5e9',
+          700: '#0284c7',
+          800: '#0369a1',
+          900: '#0c4a6e',
+          950: '#082f49',
+        }
       },
       letterSpacing: {
         custom: '0.03em',

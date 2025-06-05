@@ -1,5 +1,6 @@
 packages:
   - packages/evm
+  - packages/enclave-react
   - examples/CRISP
   - examples/basic
   - examples/basic/client
