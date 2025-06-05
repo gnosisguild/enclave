@@ -17,7 +17,7 @@ use std::str::FromStr;
 use tokio::fs;
 
 const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#hacknet";
-const TEMPLATE_FOLDER: &str = "examples/basic";
+const TEMPLATE_FOLDER: &str = "templates/default";
 const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 
 // Updated execute function to include workspace dependency substitution
