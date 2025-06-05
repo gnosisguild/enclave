@@ -8,7 +8,11 @@
     "url": "https://github.com/gnosisguild"
   },
   "exports": {
-    "./deploy/enclave": "./dist/deploy/enclave.js",
+    "./deploy/enclave": {
+      "types": "./dist/deploy/enclave.d.ts",
+      "import": "./dist/deploy/enclave.js",
+      "require": "./dist/deploy/enclave.js"
+    },
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",
     "./sdk": "./dist/src/sdk/index.js",
