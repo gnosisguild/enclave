@@ -59,13 +59,13 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
         &vec![
             Filter::new(
                 "package.json",
-                "(\"@gnosis-guild/enclave\":\\s*\")[^\"]*\"",
-                &format!("\\1\"{}\"", evm_version),
+                "\"@gnosis-guild/enclave\":\\s*\"[^\"]*\"",
+                &format!("\"@gnosis-guild/enclave\": \"{}\"", evm_version),
             ),
             Filter::new(
                 "package.json",
-                "(\"@gnosis-guild/enclave-react\":\\s*\")[^\"]*\"",
-                &format!("\\1\"{}\"", react_version),
+                "\"@gnosis-guild/enclave-react\":\\s*\"[^\"]*\"",
+                &format!("\"@gnosis-guild/enclave-react\": \"{}\"", react_version),
             ),
         ],
     )

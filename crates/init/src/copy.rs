@@ -80,7 +80,7 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
     // Apply sed replacement to each matching file
     for file_path in files.lines().filter(|line| !line.is_empty()) {
         let sed_cmd = format!(
-            "s/{}/{}/g",
+            "s|{}|{}|g",
             escape_sed_pattern(&filter.search_pattern),
             escape_sed_replacement(&filter.replacement)
         );
@@ -105,17 +105,19 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
 }
 
 fn escape_sed_pattern(pattern: &str) -> String {
-    // Escape special sed characters in the search pattern
-    pattern
-        .replace('\\', r"\\")
-        .replace('/', r"\/")
-        .replace('&', r"\&")
+    pattern.replace("|", "\\|") // Only escape the pipe delimiter
 }
 
 fn escape_sed_replacement(replacement: &str) -> String {
-    // Escape special sed characters in the replacement string
-    replacement
-        .replace('\\', r"\\")
-        .replace('/', r"\/")
-        .replace('&', r"\&")
+    // Don't escape backslashes that are followed by digits (backreferences like \1, \2, etc.)
+    let mut result = replacement.to_string();
+
+    // First escape literal backslashes (but not backreferences)
+    // This is tricky - we need to escape \ that aren't part of \1, \2, etc.
+
+    // Simple approach: only escape the delimiter and ampersand
+    result = result.replace("|", "\\|"); // Escape pipe delimiter
+    result = result.replace("&", "\\&"); // Escape ampersand
+
+    result
 }
