@@ -18,9 +18,9 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
-    docker exec -t "$CONTAINER_NAME" bash -c "$*"
+    docker exec -it "$CONTAINER_NAME" bash -c "$*"
 else
-    docker run -t --rm \
+    docker run -it --rm \
         --name "$CONTAINER_NAME" \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
