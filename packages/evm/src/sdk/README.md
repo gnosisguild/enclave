@@ -195,25 +195,17 @@ await sdk.activateE3(e3Id: bigint, publicKey: `0x${string}`, gasLimit?: bigint);
 // Publish input data
 await sdk.publishInput(e3Id: bigint, data: `0x${string}`, gasLimit?: bigint);
 
-// Registry operations
-await sdk.addCiphernode(node: `0x${string}`, gasLimit?: bigint);
-await sdk.removeCiphernode(node: `0x${string}`, siblingNodes: bigint[], gasLimit?: bigint);
-
 // Read operations
 const e3Data = await sdk.getE3(e3Id: bigint);
-const ciphernodeData = await sdk.getCiphernode(node: `0x${string}`);
 ```
 
 #### Event Handling
 
 ```typescript
-// Listen to events (unified API)
 sdk.onEnclaveEvent(eventType: AllEventTypes, callback: EventCallback);
 
-// Remove event listeners
 sdk.off(eventType: AllEventTypes, callback: EventCallback);
 
-// Get historical events
 const logs = await sdk.getHistoricalEvents(
   eventType: AllEventTypes,
   fromBlock?: bigint,

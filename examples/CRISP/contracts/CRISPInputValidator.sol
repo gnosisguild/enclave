@@ -44,20 +44,20 @@ contract CRISPInputValidator is IInputValidator, Clone {
     ) external returns (bytes memory input) {
         if (data.length == 0) revert EmptyInputData();
 
-        (
-            bytes memory semaphoreProof,
-            bytes memory noirProof,
-            bytes32[] memory noirPublicInputs,
-            bytes memory vote
-        ) = abi.decode(data, (bytes, bytes, bytes32[], bytes));
+        // (
+        //     bytes memory semaphoreProof,
+        //     bytes memory noirProof,
+        //     bytes32[] memory noirPublicInputs,
+        //     bytes memory vote
+        // ) = abi.decode(data, (bytes, bytes, bytes32[], bytes));
 
-        // Reverts if the semaphore proof is invalid
-        policy.enforce(sender, semaphoreProof);
+        // // Reverts if the semaphore proof is invalid
+        // policy.enforce(sender, semaphoreProof);
 
-        // Reverts if noir proof is invalid
-        if (!noirVerifier.verify(noirProof, noirPublicInputs))
-            revert InvalidNoirProof();
+        // // Reverts if noir proof is invalid
+        // if (!noirVerifier.verify(noirProof, noirPublicInputs))
+        //     revert InvalidNoirProof();
 
-        input = vote;
+        input = data;
     }
 }

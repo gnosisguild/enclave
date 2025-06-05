@@ -4,11 +4,8 @@ import { ContractClient } from './contract-client';
 import {
     type SDKConfig,
     type EventCallback,
-    type EventListenerConfig,
     type AllEventTypes,
-    type EnclaveEvent,
     EnclaveEventType,
-    RegistryEventType
 } from './types';
 import {
     Enclave__factory,
@@ -121,35 +118,6 @@ export class EnclaveSDK {
     }
 
     /**
-     * Add a ciphernode to the registry
-     */
-    public async addCiphernode(
-        node: `0x${string}`,
-        gasLimit?: bigint
-    ): Promise<Hash> {
-        if (!this.initialized) {
-            await this.initialize();
-        }
-
-        return this.contractClient.addCiphernode(node, gasLimit);
-    }
-
-    /**
-     * Remove a ciphernode from the registry
-     */
-    public async removeCiphernode(
-        node: `0x${string}`,
-        siblingNodes: bigint[],
-        gasLimit?: bigint
-    ): Promise<Hash> {
-        if (!this.initialized) {
-            await this.initialize();
-        }
-
-        return this.contractClient.removeCiphernode(node, siblingNodes, gasLimit);
-    }
-
-    /**
      * Get E3 information
      */
     public async getE3(e3Id: bigint): Promise<any> {
@@ -158,17 +126,6 @@ export class EnclaveSDK {
         }
 
         return this.contractClient.getE3(e3Id);
-    }
-
-    /**
-     * Get ciphernode information
-     */
-    public async getCiphernode(node: `0x${string}`): Promise<any> {
-        if (!this.initialized) {
-            await this.initialize();
-        }
-
-        return this.contractClient.getCiphernode(node);
     }
 
     /**

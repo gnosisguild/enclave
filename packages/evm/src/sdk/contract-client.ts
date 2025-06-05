@@ -1,19 +1,11 @@
 import {
     type PublicClient,
     type WalletClient,
-    type Account,
     type Hash,
-    type WriteContractParameters,
-    type SimulateContractParameters,
-    type EstimateGasParameters,
-    encodeAbiParameters,
-    parseAbiParameters
 } from 'viem';
 import {
     Enclave__factory,
     CiphernodeRegistryOwnable__factory,
-    type Enclave,
-    type CiphernodeRegistryOwnable
 } from '../../types';
 import { SDKError, isValidAddress } from './utils';
 
@@ -47,7 +39,6 @@ export class ContractClient {
      */
     public async initialize(): Promise<void> {
         try {
-            // Store contract info for use with viem calls
             this.contractInfo = {
                 enclave: {
                     address: this.addresses.enclave,
@@ -68,7 +59,7 @@ export class ContractClient {
 
     /**
      * Request a new E3 computation
-     * Based on the contract: request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams)
+     * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams)
      */
     public async requestE3(
         filter: `0x${string}`,
@@ -95,7 +86,7 @@ export class ContractClient {
                 throw new SDKError('No account connected', 'NO_ACCOUNT');
             }
 
-            // Simulate the transaction first
+            // Simulate transaction
             const { request } = await this.publicClient.simulateContract({
                 address: this.addresses.enclave,
                 abi: Enclave__factory.abi,
@@ -106,7 +97,7 @@ export class ContractClient {
                 gas: gasLimit
             });
 
-            // Execute the transaction
+            // Execute transaction
             const hash = await this.walletClient.writeContract(request);
 
             return hash;
@@ -120,7 +111,7 @@ export class ContractClient {
 
     /**
      * Activate an E3 computation
-     * Based on the contract: activate(uint256 e3Id, bytes memory publicKey)
+     * activate(uint256 e3Id, bytes memory publicKey)
      */
     public async activateE3(
         e3Id: bigint,
@@ -163,7 +154,7 @@ export class ContractClient {
 
     /**
      * Publish input for an E3 computation
-     * Based on the contract: publishInput(uint256 e3Id, bytes memory data)
+     * publishInput(uint256 e3Id, bytes memory data)
      */
     public async publishInput(
         e3Id: bigint,
@@ -205,91 +196,6 @@ export class ContractClient {
     }
 
     /**
-     * Add a ciphernode to the registry
-     * Based on the contract: addCiphernode(address node)
-     */
-    public async addCiphernode(
-        node: `0x${string}`,
-        gasLimit?: bigint
-    ): Promise<Hash> {
-        if (!this.walletClient) {
-            throw new SDKError('Wallet client required for write operations', 'NO_WALLET');
-        }
-
-        if (!this.contractInfo) {
-            await this.initialize();
-        }
-
-        try {
-            const account = this.walletClient.account;
-            if (!account) {
-                throw new SDKError('No account connected', 'NO_ACCOUNT');
-            }
-
-            const { request } = await this.publicClient.simulateContract({
-                address: this.addresses.ciphernodeRegistry,
-                abi: CiphernodeRegistryOwnable__factory.abi,
-                functionName: 'addCiphernode',
-                args: [node],
-                account,
-                gas: gasLimit
-            });
-
-            const hash = await this.walletClient.writeContract(request);
-
-            return hash;
-        } catch (error) {
-            throw new SDKError(
-                `Failed to add ciphernode: ${error}`,
-                'ADD_CIPHERNODE_FAILED'
-            );
-        }
-    }
-
-    /**
-     * Remove a ciphernode from the registry
-     * Based on the contract: removeCiphernode(address node, uint256[] calldata siblingNodes)
-     */
-    public async removeCiphernode(
-        node: `0x${string}`,
-        siblingNodes: bigint[],
-        gasLimit?: bigint
-    ): Promise<Hash> {
-        if (!this.walletClient) {
-            throw new SDKError('Wallet client required for write operations', 'NO_WALLET');
-        }
-
-        if (!this.contractInfo) {
-            await this.initialize();
-        }
-
-        try {
-            const account = this.walletClient.account;
-            if (!account) {
-                throw new SDKError('No account connected', 'NO_ACCOUNT');
-            }
-
-            const { request } = await this.publicClient.simulateContract({
-                address: this.addresses.ciphernodeRegistry,
-                abi: CiphernodeRegistryOwnable__factory.abi,
-                functionName: 'removeCiphernode',
-                args: [node, siblingNodes],
-                account,
-                gas: gasLimit
-            });
-
-            const hash = await this.walletClient.writeContract(request);
-
-            return hash;
-        } catch (error) {
-            throw new SDKError(
-                `Failed to remove ciphernode: ${error}`,
-                'REMOVE_CIPHERNODE_FAILED'
-            );
-        }
-    }
-
-    /**
      * Get E3 information
      * Based on the contract: getE3(uint256 e3Id) returns (E3 memory e3)
      */
@@ -311,33 +217,6 @@ export class ContractClient {
             throw new SDKError(
                 `Failed to get E3: ${error}`,
                 'GET_E3_FAILED'
-            );
-        }
-    }
-
-    /**
-     * Check if a ciphernode is enabled in the registry
-     * Based on the contract: isEnabled(address node) returns (bool)
-     */
-    public async getCiphernode(node: `0x${string}`): Promise<any> {
-        if (!this.contractInfo) {
-            await this.initialize();
-        }
-
-        try {
-            // Check if the ciphernode is enabled
-            const result = await this.publicClient.readContract({
-                address: this.addresses.ciphernodeRegistry,
-                abi: CiphernodeRegistryOwnable__factory.abi,
-                functionName: 'isEnabled',
-                args: [node]
-            });
-
-            return result;
-        } catch (error) {
-            throw new SDKError(
-                `Failed to get ciphernode: ${error}`,
-                'GET_CIPHERNODE_FAILED'
             );
         }
     }

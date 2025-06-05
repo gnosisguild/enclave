@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@gnosis-guild/enclave": "workspace:*",
+    "@gnosis-guild/enclave-react": "workspace:*",
     "@phosphor-icons/react": "^2.1.4",
     "@tanstack/react-query": "^5.74.3",
     "@wagmi/core": "^2.14.16",

@@ -32,5 +32,25 @@ export type {
 // Event enums
 export { EnclaveEventType, RegistryEventType } from './types';
 
-// Utilities
-export { SDKError, isValidAddress, formatEventName, generateEventId, sleep } from './utils'; 
+// Export utilities
+export {
+    SDKError,
+    isValidAddress,
+    isValidHash,
+    formatEventName,
+    parseEventData,
+    formatBigInt,
+    parseBigInt,
+    generateEventId,
+    sleep,
+    getCurrentTimestamp,
+    // BFV and E3 utilities
+    BFV_PARAMS_SET,
+    DEFAULT_COMPUTE_PROVIDER_PARAMS,
+    DEFAULT_E3_CONFIG,
+    encodeBfvParams,
+    encodeComputeProviderParams,
+    calculateStartWindow,
+    decodePlaintextOutput,
+    type ComputeProviderParams
+} from './utils'; 

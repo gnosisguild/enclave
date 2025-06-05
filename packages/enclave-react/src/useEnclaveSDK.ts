@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createPublicClient, createWalletClient, custom, http } from 'viem';
+import { useWalletClient, usePublicClient } from 'wagmi';
 import {
     EnclaveSDK,
     type SDKConfig,
@@ -8,60 +8,86 @@ import {
     EnclaveEventType,
     RegistryEventType,
     SDKError
-} from '../sdk';
+} from '@gnosis-guild/enclave/sdk';
 
-interface UseEnclaveSDKConfig {
-    contracts: {
+export interface UseEnclaveSDKConfig {
+    contracts?: {
         enclave: `0x${string}`;
         ciphernodeRegistry: `0x${string}`;
     };
     chainId?: number;
     autoConnect?: boolean;
-    rpcUrl: string;
 }
 
-interface UseEnclaveSDKReturn {
+export interface UseEnclaveSDKReturn {
     sdk: EnclaveSDK | null;
     isInitialized: boolean;
-    isConnecting: boolean;
     error: string | null;
-    connectWallet: () => Promise<void>;
-    // Contract interaction methods
+    // Contract interaction methods (only the ones commonly used)
     requestE3: typeof EnclaveSDK.prototype.requestE3;
     activateE3: typeof EnclaveSDK.prototype.activateE3;
     publishInput: typeof EnclaveSDK.prototype.publishInput;
-    addCiphernode: typeof EnclaveSDK.prototype.addCiphernode;
-    removeCiphernode: typeof EnclaveSDK.prototype.removeCiphernode;
-    getE3: typeof EnclaveSDK.prototype.getE3;
-    getCiphernode: typeof EnclaveSDK.prototype.getCiphernode;
     // Event handling
     onEnclaveEvent: <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => void;
     off: <T extends AllEventTypes>(eventType: T, callback: EventCallback<T>) => void;
-    getHistoricalEvents: typeof EnclaveSDK.prototype.getHistoricalEvents;
     // Event types for convenience
     EnclaveEventType: typeof EnclaveEventType;
     RegistryEventType: typeof RegistryEventType;
 }
 
+/**
+ * React hook for interacting with Enclave SDK
+ * 
+ * @param config Configuration for the SDK initialization
+ * @returns Object containing SDK instance and helper methods
+ * 
+ * @example
+ * ```tsx
+ * import { useEnclaveSDK } from '@gnosis-guild/enclave-react';
+ * 
+ * function MyComponent() {
+ *   const { 
+ *     sdk, 
+ *     isInitialized, 
+ *     error, 
+ *     requestE3, 
+ *     onEnclaveEvent 
+ *   } = useEnclaveSDK({
+ *     autoConnect: true,
+ *     contracts: {
+ *       enclave: '0x...',
+ *       ciphernodeRegistry: '0x...'
+ *     }
+ *   });
+ * 
+ *   // Use the SDK...
+ * }
+ * ```
+ */
 export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn => {
     const [sdk, setSdk] = useState<EnclaveSDK | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
-    const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const sdkRef = useRef<EnclaveSDK | null>(null);
 
-    const initializeSDK = useCallback(async (walletClient?: any) => {
+    const publicClient = usePublicClient();
+    const { data: walletClient } = useWalletClient();
+
+    const initializeSDK = useCallback(async () => {
         try {
             setError(null);
 
-            const publicClient = createPublicClient({
-                transport: http(config.rpcUrl)
-            });
+            if (!publicClient) {
+                throw new Error('Public client not available');
+            }
 
             const sdkConfig: SDKConfig = {
                 publicClient,
-                walletClient,
-                contracts: config.contracts,
+                walletClient: walletClient || undefined,
+                contracts: config.contracts || {
+                    enclave: '0x0000000000000000000000000000000000000000',
+                    ciphernodeRegistry: '0x0000000000000000000000000000000000000000'
+                },
                 chainId: config.chainId
             };
 
@@ -71,47 +97,28 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
             setSdk(newSdk);
             sdkRef.current = newSdk;
             setIsInitialized(true);
-        } catch (err) {
+        } catch (err: unknown) {
             const errorMessage = err instanceof SDKError
                 ? `SDK Error (${err.code}): ${err.message}`
                 : `Failed to initialize SDK: ${err}`;
             setError(errorMessage);
             console.error('SDK initialization failed:', err);
         }
-    }, [config.contracts, config.chainId, config.rpcUrl]);
+    }, [publicClient, walletClient, config.contracts, config.chainId]);
 
-    const connectWallet = useCallback(async () => {
-        if (typeof window === 'undefined' || !window.ethereum) {
-            setError('MetaMask not found. Please install MetaMask.');
-            return;
-        }
-
-        try {
-            setIsConnecting(true);
-            setError(null);
-
-            await window.ethereum.request({ method: 'eth_requestAccounts' });
-
-            const walletClient = createWalletClient({
-                transport: custom(window.ethereum)
-            });
-
-            await initializeSDK(walletClient);
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Failed to connect wallet';
-            setError(errorMessage);
-            console.error('Wallet connection failed:', err);
-        } finally {
-            setIsConnecting(false);
-        }
-    }, [initializeSDK]);
-
-    // Initialize SDK on mount
+    // Initialize SDK when wagmi clients are available
     useEffect(() => {
-        if (config.autoConnect) {
+        if (config.autoConnect && publicClient && !isInitialized) {
             initializeSDK();
         }
-    }, [config.autoConnect, initializeSDK]);
+    }, [config.autoConnect, publicClient, isInitialized, initializeSDK]);
+
+    // Re-initialize when wallet client changes (connect/disconnect)
+    useEffect(() => {
+        if (isInitialized && publicClient && walletClient) {
+            initializeSDK();
+        }
+    }, [walletClient, initializeSDK]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -138,26 +145,6 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
         return sdk.publishInput(...args);
     }, [sdk]);
 
-    const addCiphernode = useCallback((...args: Parameters<typeof EnclaveSDK.prototype.addCiphernode>) => {
-        if (!sdk) throw new Error('SDK not initialized');
-        return sdk.addCiphernode(...args);
-    }, [sdk]);
-
-    const removeCiphernode = useCallback((...args: Parameters<typeof EnclaveSDK.prototype.removeCiphernode>) => {
-        if (!sdk) throw new Error('SDK not initialized');
-        return sdk.removeCiphernode(...args);
-    }, [sdk]);
-
-    const getE3 = useCallback((...args: Parameters<typeof EnclaveSDK.prototype.getE3>) => {
-        if (!sdk) throw new Error('SDK not initialized');
-        return sdk.getE3(...args);
-    }, [sdk]);
-
-    const getCiphernode = useCallback((...args: Parameters<typeof EnclaveSDK.prototype.getCiphernode>) => {
-        if (!sdk) throw new Error('SDK not initialized');
-        return sdk.getCiphernode(...args);
-    }, [sdk]);
-
     // Event handling methods
     const onEnclaveEvent = useCallback(<T extends AllEventTypes>(
         eventType: T,
@@ -175,27 +162,15 @@ export const useEnclaveSDK = (config: UseEnclaveSDKConfig): UseEnclaveSDKReturn 
         return sdk.off(eventType, callback);
     }, [sdk]);
 
-    const getHistoricalEvents = useCallback((...args: Parameters<typeof EnclaveSDK.prototype.getHistoricalEvents>) => {
-        if (!sdk) throw new Error('SDK not initialized');
-        return sdk.getHistoricalEvents(...args);
-    }, [sdk]);
-
     return {
         sdk,
         isInitialized,
-        isConnecting,
         error,
-        connectWallet,
         requestE3,
         activateE3,
         publishInput,
-        addCiphernode,
-        removeCiphernode,
-        getE3,
-        getCiphernode,
         onEnclaveEvent,
         off,
-        getHistoricalEvents,
         EnclaveEventType,
         RegistryEventType
     };

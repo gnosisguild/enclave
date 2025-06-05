@@ -4,7 +4,6 @@ import {
     type Enclave,
     type CiphernodeRegistryOwnable,
     type MockCiphernodeRegistry,
-    type MockE3Program
 } from '../../types';
 
 export interface SDKConfig {
@@ -57,10 +56,6 @@ export enum EnclaveEventType {
 }
 
 export enum RegistryEventType {
-    // Ciphernode Management
-    CIPHERNODE_ADDED = 'CiphernodeAdded',
-    CIPHERNODE_REMOVED = 'CiphernodeRemoved',
-
     // Committee Management
     COMMITTEE_REQUESTED = 'CommitteeRequested',
     COMMITTEE_PUBLISHED = 'CommitteePublished',
@@ -166,8 +161,6 @@ export interface EnclaveEventData {
 }
 
 export interface RegistryEventData {
-    [RegistryEventType.CIPHERNODE_ADDED]: CiphernodeAddedData;
-    [RegistryEventType.CIPHERNODE_REMOVED]: CiphernodeRemovedData;
     [RegistryEventType.COMMITTEE_REQUESTED]: CommitteeRequestedData;
     [RegistryEventType.COMMITTEE_PUBLISHED]: CommitteePublishedData;
     [RegistryEventType.ENCLAVE_SET]: { enclave: string };

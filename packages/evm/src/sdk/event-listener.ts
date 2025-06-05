@@ -1,14 +1,12 @@
-import { type PublicClient, type Log, type WatchContractEventParameters, type Abi } from 'viem';
+import { type PublicClient, type Log, type Abi } from 'viem';
 import {
     type EventCallback,
     type EventListenerConfig,
     type SDKEventEmitter,
     type AllEventTypes,
     type EnclaveEvent,
-    EnclaveEventType,
-    RegistryEventType
 } from './types';
-import { formatEventName, generateEventId, sleep, SDKError } from './utils';
+import { sleep, SDKError } from './utils';
 
 export class EventListener implements SDKEventEmitter {
     private listeners: Map<AllEventTypes, Set<EventCallback>> = new Map();
@@ -219,8 +217,6 @@ export class EventListener implements SDKEventEmitter {
                 const currentBlock = await this.publicClient.getBlockNumber();
 
                 if (currentBlock > this.lastBlockNumber) {
-                    // Check for new events in the new blocks
-                    // This is a simplified implementation
                     this.lastBlockNumber = currentBlock;
                 }
 

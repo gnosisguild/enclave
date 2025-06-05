@@ -15,8 +15,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['@rollup/browser'],
-    include: ['@gnosis-guild/enclave/sdk'], // Include SDK for optimization
-    force: true, // Force re-optimization
+    include: [
+      '@gnosis-guild/enclave/sdk',
+      '@gnosis-guild/enclave-react',
+    ],
+    force: true,
   },
   build: {
     commonjsOptions: {
@@ -25,12 +28,18 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      react: path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      wagmi: path.resolve(__dirname, 'node_modules/wagmi'),
+      '@gnosis-guild/enclave-react': path.resolve(
+        __dirname,
+        'node_modules/@gnosis-guild/enclave-react'
+      ),
       '@': path.resolve(__dirname, './src'),
       libs: path.resolve(__dirname, './libs'),
     },
   },
   plugins: [
-    // here is the main update
     wasm(),
     topLevelAwait(),
     react(),
@@ -38,7 +47,6 @@ export default defineConfig({
   ],
   server: {
     open: true,
-    // this sets a default port to 3000
     port: 3000,
   },
   preview: {
