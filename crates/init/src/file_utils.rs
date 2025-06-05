@@ -45,3 +45,12 @@ pub async fn chmod_recursive<P: AsRef<Path>>(path: P, mode: &str) -> Result<()> 
         .await?;
     Ok(())
 }
+
+pub async fn move_file<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> Result<()> {
+    Command::new("mv")
+        .arg(src.as_ref())
+        .arg(dst.as_ref())
+        .status()
+        .await?;
+    Ok(())
+}

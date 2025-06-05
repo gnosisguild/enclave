@@ -7,7 +7,7 @@ mod pkgman;
 
 use anyhow::Result;
 use copy::Filter;
-use file_utils::chmod_recursive;
+use file_utils::{chmod_recursive, delete_path, move_file};
 use git_url::GitUrl;
 use package_json::DependencyType;
 use pkgman::PkgMan;
@@ -42,10 +42,11 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     copy::copy_with_filters(
         &PathBuf::from(TEMP_DIR).join(TEMPLATE_FOLDER),
         &cwd,
-        &vec![
-            Filter::new(".gitignore", "/deployments$", ""),
-            Filter::new("package.json", "workspace:\\*", &version),
-        ],
+        &vec![Filter::new(
+            "package.json",
+            "(\"@gnosis-guild\\/enclave\":\\s*\")[^\"]*\"",
+            &format!("\\1{}", version),
+        )],
     )
     .await?;
 
@@ -55,12 +56,16 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
         &vec![],
     )
     .await?;
+    delete_path(&cwd.join(".gitignore")).await?;
+    delete_path(&cwd.join(".gitignore.bak")).await?;
+    delete_path(&cwd.join("lib")).await?;
 
     // We need to make these chmod 777 because the dockerfile needs to be able to successfully
     // write to them. There are better ways to do this but right now this is the most efficient.
     // PRs/Ideas welcome.
     chmod_recursive(&cwd.join("contracts"), "777").await?;
     chmod_recursive(&cwd.join("tests"), "777").await?;
+    move_file(&cwd.join(".gitignore.bak"), &cwd.join(".gitignore")).await?;
 
     git::init(&cwd).await?;
 
