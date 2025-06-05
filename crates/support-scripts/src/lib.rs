@@ -1,26 +1,32 @@
-use std::{env, path::PathBuf};
-
 use anyhow::{bail, Result};
+use std::{env, path::PathBuf};
+use tokio::signal;
 use tokio::{fs, process::Command};
 
 async fn run_bash_script(cwd: &PathBuf, script: &PathBuf, args: &[&str]) -> Result<()> {
+    println!("run_bash_script: {:?} {:?} {:?}", cwd, script, args);
     let mut cmd = Command::new("bash");
-    cmd.current_dir(cwd).arg(script);
+    cmd.current_dir(cwd).arg(script).kill_on_drop(true);
 
     for arg in args {
         cmd.arg(arg);
     }
 
-    let status = cmd.status().await?;
+    let mut child = cmd.spawn()?;
 
-    if status.success() {
-        Ok(())
-    } else {
-        bail!(
-            "{} failed with exit code: {:?}",
-            script.display(),
-            status.code()
-        );
+    tokio::select! {
+        result = child.wait() => {
+            let status = result?;
+            if status.success() {
+                Ok(())
+            } else {
+                bail!("{} failed with exit code: {:?}", script.display(), status.code());
+            }
+        }
+        _ = signal::ctrl_c() => {
+            let _ = child.kill().await;
+            bail!("Script interrupted by user");
+        }
     }
 }
 

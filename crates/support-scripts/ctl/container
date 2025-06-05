@@ -4,9 +4,9 @@ IMAGE="ghcr.io/gnosisguild/e3-support:next"
 CACHE_PREFIX="e3-support"
 
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
-    docker exec -it "$CONTAINER_NAME" bash -c "$*"
+    docker exec -t "$CONTAINER_NAME" bash -c "$*"
 else
-    docker run -it --rm \
+    docker run -t --rm \
         --name "$CONTAINER_NAME" \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
