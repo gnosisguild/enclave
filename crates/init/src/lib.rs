@@ -1,29 +1,32 @@
 mod copy;
 mod file_utils;
 mod git;
-mod git_url;
 mod package_json;
 mod pkgman;
 
 use anyhow::Result;
 use copy::Filter;
 use file_utils::{chmod_recursive, delete_path, move_file};
-use git_url::GitUrl;
+use git::parse_git_url;
 use package_json::DependencyType;
 use pkgman::PkgMan;
 use std::env;
 use std::path::PathBuf;
-use std::str::FromStr;
 use tokio::fs;
 
 // const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#ry/support-alterations-2";
-const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#hacknet";
-const TEMPLATE_FOLDER: &str = "templates/default";
+const DEFAULT_TEMPLATE_URL: &str =
+    "https://github.com/gnosisguild/enclave.git#hacknet:templates/default";
 const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
+const DEFAULT_TEMPLATE_PATH: &str = ".";
+const DEFAULT_BRANCH: &str = "main";
 
 // Updated execute function to include workspace dependency substitution
-pub async fn execute(location: Option<PathBuf>) -> Result<()> {
-    let repo = GitUrl::from_str(GIT_URL)?;
+pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Result<()> {
+    let repo = parse_git_url(template.unwrap_or(DEFAULT_TEMPLATE_URL.to_string()))?;
+    let base_url = repo.base_url;
+    let branch = repo.branch.unwrap_or(DEFAULT_BRANCH.to_string());
+    let template_path = repo.path.unwrap_or(DEFAULT_TEMPLATE_PATH.to_string());
 
     let cwd = match location {
         Some(loc) => loc,
@@ -38,7 +41,7 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
     file_utils::ensure_empty_folder(&cwd).await?;
 
     println!("Start git clone...");
-    git::shallow_clone(&repo.repo_url, &repo.branch, TEMP_DIR).await?;
+    git::shallow_clone(&base_url, &branch, TEMP_DIR).await?;
 
     println!("Getting workspace version for enclave...");
     let evm_version = package_json::get_version_from_package_json(
@@ -54,7 +57,7 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
 
     println!("Copy with filters...");
     copy::copy_with_filters(
-        &PathBuf::from(TEMP_DIR).join(TEMPLATE_FOLDER),
+        &PathBuf::from(TEMP_DIR).join(template_path),
         &cwd,
         &vec![
             Filter::new(

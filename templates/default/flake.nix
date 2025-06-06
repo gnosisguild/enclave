@@ -29,6 +29,7 @@
           wasm-pack
           nodejs
           nodePackages.pnpm
+          rust-analyzer
         ];
       };
     });
