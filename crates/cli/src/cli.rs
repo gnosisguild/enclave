@@ -5,9 +5,9 @@ use crate::net::NetCommands;
 use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
-use crate::start;
 use crate::wallet::WalletCommands;
 use crate::{init, net, password, wallet, wizard};
+use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use e3_config::validation::ValidUrl;
@@ -84,7 +84,7 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
-                    Commands::Init {path} => init::execute(path).await?,
+                    Commands::Init {path, template} => init::execute(path, template).await?,
                     Commands::Wizard {
                         rpc_url,
                         eth_address,
@@ -134,6 +134,7 @@ impl Cli {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }
             Commands::Compile => e3_support_scripts::program_compile().await?,
+            Commands::PrintEnv { vite, chain } => print_env::execute(&config, &chain, vite).await?,
             Commands::Program { command } => program::execute(command, &config).await?,
             Commands::Wizard { .. } => {
                 bail!("Cannot run `enclave wizard` when a configuration exists.");
@@ -186,10 +187,25 @@ pub enum Commands {
         peers: Vec<String>,
     },
 
+    /// Print the config env
+    PrintEnv {
+        /// Display vite addresses
+        #[arg(long)]
+        vite: bool,
+
+        /// Chain name
+        #[arg(long)]
+        chain: String,
+    },
+
     /// Initialize an enclave project
     Init {
         /// Path to the location where the project should be initialized
         path: Option<PathBuf>,
+
+        /// Template repository to use. Expecting the form `git+https://github.com/gnosisguild/enclave.git#hacknet:template/default`
+        #[arg(long)]
+        template: Option<String>,
     },
 
     /// Compile an Enclave project

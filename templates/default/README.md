@@ -30,10 +30,18 @@ rustc 1.85.1 (4eb161250 2025-03-15)
 
 Linux/POSIX environment
 
+Note for Nix users a Nix flake is included within the generated template.
+
 ### Install Enclave
 
 ```
 cargo install --git https://github.com/gnosisguild/enclave e3-cli
+```
+
+### install wasm-pack
+
+```
+cargo install wasm-pack
 ```
 
 ### Generate Template
@@ -46,11 +54,18 @@ enclave init ./myproj
 cd ./myproj
 ```
 
-### Install Dependencies
+### Run all services
 
-```bash
-pnpm install
 ```
+pnpm dev:all
+```
+
+This will run:
+
+- `pnpm node` - hardhat eth node
+- `pnpm rpc` - Server to accept computation output and post on chain
+- `enclave program listen` - Server to listen to onchain events and compute over encrypted inputs then send to the rpc server
+- `pnpm dev:frontend` - Run the frontend for the template
 
 ### Start Local Hardhat Node
 
@@ -60,6 +75,15 @@ pnpm node
 
 Enclave contracts should be automatically deployed.
 
+### Compiling your program
+
+Use the following command to compile your program:
+
+```
+enclave program compile
+```
+
+This should create an `ImageID.sol` contract within the `./contracts` folder.
 
 ### Your FHE program
 
@@ -82,10 +106,10 @@ Your RPC must provide the following methods:
 ```ts
 type Capabilities = "processOutput" | "shouldCompute";
 
-interface RpcServer{
-    // Handle the FHE 
-    processOutput(e3Id: number, proof: string, ciphertext: string) : number;
-    capabilities() : Capabilities
+interface RpcServer {
+  // Handle the FHE
+  processOutput(e3Id: number, proof: string, ciphertext: string): number;
+  capabilities(): Capabilities;
 }
 ```
 
@@ -100,7 +124,6 @@ enclave program listen \
 ```
 
 This will listen to your local hardhat node and trigger computations when the E3 round has expired.
-
 
 ## Usage Commands
 

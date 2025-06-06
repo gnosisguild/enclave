@@ -36,11 +36,14 @@
     "compile": "hardhat compile",
     "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
-    "node": "hardhat node",
-    "dev:frontend": "cd client && pnpm dev",
-    "dev:program": "concurrently \"pnpm rpc\" \"enclave program listen --json-rpc-server http://localhost:8080 --chain hardhat\"",
+    "dev:evm": "hardhat node",
+    "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile",
+    "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
+    "dev:all": "concurrently -r \"pnpm node\" \"pnpm dev:ciphernodes\" \"pnpm dev:program\" \"pnpm dev:frontend\"",
+    "dev:frontend": "./scripts/dev_frontend.sh",
+    "dev:program": "./scripts/dev_program.sh",
     "remove-ciphernode": "hardhat run scripts/interact.ts -- remove-ciphernode",
-    "rpc": "ts-node ./server",
+    "server": "ts-node ./server",
     "test": "hardhat test"
   }
 }

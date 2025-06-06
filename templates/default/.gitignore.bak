@@ -1,6 +1,8 @@
 node_modules
 .env
 
+.direnv
+
 /.enclave
 
 # Hardhat files
@@ -10,6 +12,8 @@ node_modules
 # TypeChain files
 /typechain
 /typechain-types
+
+/target
 
 # solidity-coverage files
 /coverage
