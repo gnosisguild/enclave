@@ -84,7 +84,7 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
-                    Commands::Init {path} => init::execute(path).await?,
+                    Commands::Init {path, template} => init::execute(path, template).await?,
                     Commands::Wizard {
                         rpc_url,
                         eth_address,
@@ -202,6 +202,9 @@ pub enum Commands {
     Init {
         /// Path to the location where the project should be initialized
         path: Option<PathBuf>,
+
+        /// Template repository to use
+        template: Option<String>,
     },
 
     /// Compile an Enclave project
