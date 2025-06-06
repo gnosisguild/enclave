@@ -24,8 +24,8 @@
     "hardhat": "^2.14.0",
     "hardhat-deploy": "^0.12.1",
     "hardhat-gas-reporter": "^1.0.8",
-    "solidity-coverage": "^0.8.0",
     "poseidon-lite": "^0.3.0",
+    "solidity-coverage": "^0.8.0",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.0",
     "typed-rpc": "^6.1.1",
@@ -33,11 +33,13 @@
     "wait-on": "^8.0.3"
   },
   "dependencies": {
-    "@gnosis-guild/enclave": "workspace:*"
+    "@gnosis-guild/enclave": "workspace:*",
+    "@types/yargs": "^17.0.33",
+    "yargs": "^18.0.0"
   },
   "name": "enclave-example",
   "scripts": {
-    "ciphernode:add": "hardhat run scripts/interact.ts -- add-ciphernode",
+    "ciphernode:add": "hardhat run scripts/ciphernode-add.ts",
     "compile": "hardhat compile",
     "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
@@ -47,7 +49,6 @@
     "dev:all": "concurrently -r \"pnpm dev:evm\" \"pnpm dev:ciphernodes\" \"pnpm dev:program\" \"pnpm dev:frontend\"",
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",
-    "ciphernode:remove": "hardhat run scripts/interact.ts -- remove-ciphernode",
     "dev:server": "ts-node ./server",
     "test": "hardhat test"
   }
