@@ -37,6 +37,8 @@
     "evm:test": "cd packages/evm && pnpm test",
     "evm:coverage": "cd packages/evm && pnpm coverage",
     "evm:release": "cd packages/evm && pnpm release",
+    "react:release": "cd packages/enclave-react && pnpm release",
+    "npm:release": "pnpm evm:release && pnpm react:release",
     "build": "pnpm -r build",
     "changeset": "changeset",
     "version": "changeset version",
