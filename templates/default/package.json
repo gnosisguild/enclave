@@ -21,7 +21,7 @@
     "concurrently": "^9.1.2",
     "ethers": "^6.9.0",
     "express": "^5.1.0",
-    "hardhat": "^2.14.0",
+    "hardhat": "^2.22.10",
     "hardhat-deploy": "^0.12.1",
     "hardhat-gas-reporter": "^1.0.8",
     "poseidon-lite": "^0.3.0",
