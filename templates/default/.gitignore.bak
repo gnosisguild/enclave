@@ -13,6 +13,8 @@ node_modules
 /typechain
 /typechain-types
 
+/target
+
 # solidity-coverage files
 /coverage
 /coverage.json

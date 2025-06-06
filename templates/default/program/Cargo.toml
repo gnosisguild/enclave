@@ -8,3 +8,7 @@ fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", branch = "hacknet" }
 e3-bfv-helpers = { git = "https://github.com/gnosisguild/enclave", branch = "hacknet" }
+
+[dev-dependencies]
+rand = { workspace = true }
+anyhow = { workspace = true }
