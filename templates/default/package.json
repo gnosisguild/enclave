@@ -39,7 +39,7 @@
   },
   "name": "enclave-example",
   "scripts": {
-    "ciphernode:add": "hardhat run scripts/ciphernode-add.ts",
+    "ciphernode:add": "hardhat run scripts/ciphernode-add.ts -- ",
     "compile": "hardhat compile",
     "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
