@@ -1,4 +1,14 @@
-import { type Abi, type Hash, type Log } from "viem";
+import {
+  type Abi,
+  type Hash,
+  type Log,
+  WalletClient,
+  createPublicClient,
+  createWalletClient,
+  http,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { hardhat, mainnet, monadTestnet, sepolia } from "viem/chains";
 
 import {
   CiphernodeRegistryOwnable__factory,
@@ -15,9 +25,17 @@ import {
 import { SDKError, isValidAddress } from "./utils";
 
 export class EnclaveSDK {
+  public static readonly chains = {
+    1: mainnet,
+    11155111: sepolia,
+    41454: monadTestnet,
+    31337: hardhat,
+    // Add new chains here
+  } as const;
+
   private eventListener: EventListener;
   private contractClient: ContractClient;
-  private initialized = false;
+  private initialized = false; // This is redundant
 
   constructor(private config: SDKConfig) {
     if (!config.publicClient) {
@@ -46,6 +64,7 @@ export class EnclaveSDK {
   /**
    * Initialize the SDK
    */
+  // TODO: Delete this it is redundant
   public async initialize(): Promise<void> {
     if (this.initialized) return;
 
@@ -119,6 +138,27 @@ export class EnclaveSDK {
     }
 
     return this.contractClient.publishInput(e3Id, data, gasLimit);
+  }
+
+  /**
+   * Publish ciphertext output for an E3 computation
+   */
+  public async publishCiphertextOutput(
+    e3Id: bigint,
+    ciphertextOutput: `0x${string}`,
+    proof: `0x${string}`,
+    gasLimit?: bigint,
+  ): Promise<Hash> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    return this.contractClient.publishCiphertextOutput(
+      e3Id,
+      ciphertextOutput,
+      proof,
+      gasLimit,
+    );
   }
 
   /**
@@ -249,6 +289,7 @@ export class EnclaveSDK {
   /**
    * Update SDK configuration
    */
+  // TODO: We should delete this as we don't want a stateful client.
   public updateConfig(newConfig: Partial<SDKConfig>): void {
     if (newConfig.publicClient) {
       this.config.publicClient = newConfig.publicClient;
@@ -278,5 +319,38 @@ export class EnclaveSDK {
     );
 
     this.initialized = false;
+  }
+
+  public static create(options: {
+    rpcUrl: string;
+    contracts: {
+      enclave: `0x${string}`;
+      ciphernodeRegistry: `0x${string}`;
+    };
+    privateKey?: `0x${string}`;
+    chainId: keyof typeof EnclaveSDK.chains;
+  }): EnclaveSDK {
+    const chain = EnclaveSDK.chains[options.chainId];
+
+    const publicClient = createPublicClient({
+      chain,
+      transport: http(options.rpcUrl),
+    }) as SDKConfig["publicClient"];
+
+    let walletClient: WalletClient | undefined = undefined;
+    if (options.privateKey) {
+      const account = privateKeyToAccount(options.privateKey);
+      walletClient = createWalletClient({
+        account,
+        chain: mainnet,
+        transport: http(options.rpcUrl),
+      });
+    }
+
+    return new EnclaveSDK({
+      publicClient,
+      walletClient,
+      contracts: options.contracts,
+    });
   }
 }
