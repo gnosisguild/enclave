@@ -1,0 +1,50 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+exporters:
+  logging:
+    loglevel: debug
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  file:
+    path: /tmp/otel-logs.json
+    rotation:
+      max_megabytes: 100
+      max_days: 3
+
+  otlp/signoz-cloud:
+    endpoint: "${SIGNOZ_ENDPOINT}"
+    headers:
+      "signoz-ingestion-key": "${SIGNOZ_INGESTION_KEY}"
+    tls:
+      insecure: false
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  telemetry:
+    logs:
+      level: DEBUG
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging, file, otlp/signoz-cloud]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging, file, otlp/signoz-cloud]

@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  otel-collector:
+    image: signoz/signoz-otel-collector:0.102.8
+    command: ["--config=/etc/otelcol-contrib/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config-cloud-only.yaml:/etc/otelcol-contrib/otel-collector-config.yaml
+      - ./otel-logs:/tmp/otel-logs
+    environment:
+      - SIGNOZ_INGESTION_KEY=${SIGNOZ_INGESTION_KEY}
+      - SIGNOZ_CLOUD_ENDPOINT=${SIGNOZ_CLOUD_ENDPOINT}
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+      - "8888:8888" # Prometheus metrics
+      - "13133:13133" # Health check
+    env_file:
+      - .env
+    restart: unless-stopped
