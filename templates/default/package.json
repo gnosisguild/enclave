@@ -1,6 +1,5 @@
 {
   "devDependencies": {
-    "@gnosis-guild/enclave": "workspace:*",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-ignition": "^0.15.0",
@@ -30,6 +29,9 @@
     "typescript": ">=4.5.0",
     "wait-on": "^8.0.3"
   },
+  "dependencies": {
+    "@gnosis-guild/enclave": "workspace:*"
+  },
   "name": "enclave-example",
   "scripts": {
     "add-ciphernode": "hardhat run scripts/interact.ts -- add-ciphernode",
@@ -43,7 +45,7 @@
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",
     "remove-ciphernode": "hardhat run scripts/interact.ts -- remove-ciphernode",
-    "server": "ts-node ./server",
+    "dev:server": "ts-node ./server",
     "test": "hardhat test"
   }
 }

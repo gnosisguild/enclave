@@ -11,6 +11,7 @@ pub fn extract_env_vars_vite(config: &AppConfig, chain: &str) -> String {
         let filter_addr = &chain.contracts.filter_registry;
         env_vars.push(format!("VITE_ENCLAVE_ADDRESS={}", enclave_addr.address()));
         env_vars.push(format!("VITE_REGISTRY_ADDRESS={}", registry_addr.address()));
+        env_vars.push(format!("VITE_RPC_URL={}", chain.rpc_url));
         env_vars.push(format!(
             "VITE_FILTER_REGISTRY_ADDRESS={}",
             filter_addr.address()
@@ -32,6 +33,7 @@ pub fn extract_env_vars(config: &AppConfig, chain: &str) -> String {
         let registry_addr = &chain.contracts.ciphernode_registry;
         let filter_addr = &chain.contracts.filter_registry;
         env_vars.push(format!("ENCLAVE_ADDRESS={}", enclave_addr.address()));
+        env_vars.push(format!("RPC_URL={}", chain.rpc_url));
         env_vars.push(format!("REGISTRY_ADDRESS={}", registry_addr.address()));
         env_vars.push(format!("FILTER_REGISTRY_ADDRESS={}", filter_addr.address()));
         if let Some(e3_program) = &chain.contracts.e3_program {
