@@ -122,6 +122,27 @@ export class EnclaveSDK {
   }
 
   /**
+   * Publish ciphertext output for an E3 computation
+   */
+  public async publishCiphertextOutput(
+    e3Id: bigint,
+    ciphertextOutput: `0x${string}`,
+    proof: `0x${string}`,
+    gasLimit?: bigint,
+  ): Promise<Hash> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    return this.contractClient.publishCiphertextOutput(
+      e3Id,
+      ciphertextOutput,
+      proof,
+      gasLimit,
+    );
+  }
+
+  /**
    * Get E3 information
    */
   public async getE3(e3Id: bigint): Promise<unknown> {
