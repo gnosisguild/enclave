@@ -30,6 +30,8 @@ rustc 1.85.1 (4eb161250 2025-03-15)
 
 Linux/POSIX environment
 
+Note for Nix users a Nix flake is included within the generated template.
+
 ### Install Enclave
 
 ```
@@ -51,6 +53,19 @@ enclave init ./myproj
 ```
 cd ./myproj
 ```
+
+### Run all services
+
+```
+pnpm dev:all
+```
+
+This will run:
+
+- `pnpm node` - hardhat eth node
+- `pnpm rpc` - Server to accept computation output and post on chain
+- `enclave program listen` - Server to listen to onchain events and compute over encrypted inputs then send to the rpc server
+- `pnpm dev:frontend` - Run the frontend for the template
 
 ### Start Local Hardhat Node
 
