@@ -1,18 +1,23 @@
 {
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
-  "prettier.documentSelectors": ["**/*.sol"],
+  "prettier.documentSelectors": [
+    "**/*.sol"
+  ],
   "solidity.formatter": "prettier",
   "typescript.tsdk": "node_modules/typescript/lib",
   "rust-analyzer.linkedProjects": [
     "packages/ciphernode/Cargo.toml",
     "packages/compute_provider/Cargo.toml",
-    "packages/commons/Cargo.toml",
+    "packages/enclave-sdk/Cargo.toml",
     "examples/CRISP/apps/program/Cargo.toml",
     "examples/CRISP/apps/server/Cargo.toml",
     "examples/CRISP/apps/wasm-crypto/Cargo.toml"
   ],
   "[solidity]": {
     "editor.defaultFormatter": "NomicFoundation.hardhat-solidity"
+  },
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
   }
 }

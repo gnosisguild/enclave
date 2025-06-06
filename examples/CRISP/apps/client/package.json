@@ -17,8 +17,10 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@aztec/bb.js": "^0.82.2",
     "@emotion/babel-plugin": "^11.11.0",
     "@emotion/react": "^11.11.4",
+    "@noir-lang/noir_js": "1.0.0-beta.3",
     "@phosphor-icons/react": "^2.1.4",
     "@semaphore-protocol/core": "^4.9.2",
     "@semaphore-protocol/data": "^4.9.2",
@@ -32,7 +34,7 @@
     "react-markdown": "^9.0.1",
     "react-router-dom": "^6.22.3",
     "react-syntax-highlighter": "^15.5.0",
-    "viem": "^2.27.0",
+    "viem": "^2.30.6",
     "vite-plugin-node-polyfills": "^0.22.0",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-tsconfig-paths": "^4.3.2",

@@ -25,7 +25,8 @@ function run_in_docker() {
   else
     # Not in container, start Docker and run inside
     echo "Running outside container, starting Docker and executing command"
-    docker compose up -d # ensure our container is running
+    # Passing in the following on first run should theoretically bake the current group and user id into the container so if you build locally using this script the container shouldn't clobber your files with the wrong user
+    USER_UID=$(id -u) USER_GID=$(id -g) docker compose up -d # ensure our container is running
      
     if [ $# -eq 0 ]; then
       docker compose exec enclave-dev bash

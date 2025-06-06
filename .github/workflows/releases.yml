@@ -1,0 +1,87 @@
+name: Releases Workflow
+
+permissions:
+  pull-requests: write
+  contents: write
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "package.json"
+      - "crates/**"
+      - "packages/**"
+      - ".github/workflows/releases.yml"
+
+jobs:
+  release-rust:
+    name: Release Rust Crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run release-plz
+        id: release-plz
+        uses: MarcoIeni/release-plz-action@v0.5.64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        with:
+          version: "0.3.83"
+
+      - uses: fregante/setup-git-user@v2.0.1
+        if: steps.release-plz.outputs.prs_created == 'true'
+
+      - name: Install dprint
+        if: steps.release-plz.outputs.prs_created == 'true'
+        run: curl -fsSL https://dprint.dev/install.sh | sh -s 0.47.2 > /dev/null 2>&1
+
+      - name: Format Rust code
+        if: steps.release-plz.outputs.prs_created == 'true'
+        run: |
+          pr_branch="${{ fromJSON(steps.release-plz.outputs.pr).head_branch }}"
+          git pull
+          git checkout "$pr_branch"
+          $HOME/.dprint/bin/dprint fmt
+          git commit -am 'chore: format files'
+          git push origin "$pr_branch"
+
+  release-npm:
+    name: Release NPM Packages
+    runs-on: ubuntu-latest
+    needs: release-rust
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.7.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Create Release PR or Publish
+        uses: changesets/action@v1
+        with:
+          publish: pnpm release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

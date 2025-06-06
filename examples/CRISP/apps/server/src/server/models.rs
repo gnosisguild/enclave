@@ -1,9 +1,4 @@
-use crate::server::database::SledDB;
 use serde::{Deserialize, Serialize};
-
-pub struct AppState {
-    pub sled: SledDB,
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct JsonResponse {
@@ -50,6 +45,8 @@ pub struct CTRequest {
 pub struct EncryptedVote {
     pub round_id: u64,
     pub enc_vote_bytes: Vec<u8>,
+    pub proof: Vec<u8>,
+    pub public_inputs: Vec<[u8; 32]>,
     pub address: String,
     pub proof_sem: Vec<u8>,
 }
@@ -95,7 +92,7 @@ pub struct E3StateLite {
     pub duration: u64,
     pub expiration: u64,
     pub start_block: u64,
-  
+
     pub committee_public_key: Vec<u8>,
     pub emojis: [String; 2],
 }
@@ -133,6 +130,16 @@ pub struct E3 {
 
     // Emojis
     pub emojis: [String; 2],
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct E3Crisp {
+    pub emojis: [String; 2],
+    pub has_voted: Vec<String>,
+    pub start_time: u64,
+    pub status: String,
+    pub votes_option_1: u64,
+    pub votes_option_2: u64,
 }
 
 impl From<E3> for WebResultRequest {
