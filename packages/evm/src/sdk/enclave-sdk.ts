@@ -2,7 +2,6 @@ import {
   type Abi,
   type Hash,
   type Log,
-  PublicClient,
   WalletClient,
   createPublicClient,
   createWalletClient,
