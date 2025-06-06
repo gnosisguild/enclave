@@ -27,6 +27,21 @@ const func: DeployFunction = async function(hre: HardhatRuntimeEnvironment) {
     args: [verifier.address, programId],
     log: true,
   });
+
+  // Set up MockDecryptionVerifier in Enclave contract
+  const enclaveDeployment = await hre.deployments.get("Enclave");
+  const enclaveContract = await hre.ethers.getContractAt(
+    "Enclave",
+    enclaveDeployment.address,
+  );
+  try {
+    const tx = await enclaveContract.enableE3Program(e3Program.address);
+    await tx.wait();
+    console.log(`Successfully enabled e3Program in Enclave contract`);
+  } catch (error) {
+    console.error("Error enabling e3Program:", error);
+    process.exit(1);
+  }
 };
 export default func;
 func.tags = ["default"];
