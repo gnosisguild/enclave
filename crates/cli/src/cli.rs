@@ -203,7 +203,8 @@ pub enum Commands {
         /// Path to the location where the project should be initialized
         path: Option<PathBuf>,
 
-        /// Template repository to use
+        /// Template repository to use. Expecting the form `git+https://github.com/gnosisguild/enclave.git#hacknet:template/default`
+        #[arg(long)]
         template: Option<String>,
     },
 

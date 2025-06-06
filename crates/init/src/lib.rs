@@ -7,6 +7,7 @@ mod pkgman;
 use anyhow::Result;
 use copy::Filter;
 use file_utils::{chmod_recursive, delete_path, move_file};
+use git::parse_git_url;
 use package_json::DependencyType;
 use pkgman::PkgMan;
 use std::env;
@@ -19,43 +20,6 @@ const DEFAULT_TEMPLATE_URL: &str =
 const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 const DEFAULT_TEMPLATE_PATH: &str = ".";
 const DEFAULT_BRANCH: &str = "main";
-
-use url::Url;
-
-#[derive(Debug)]
-struct GitReference {
-    base_url: String,
-    branch: Option<String>,
-    path: Option<String>,
-}
-
-fn parse_git_url(input: String) -> Result<GitReference, url::ParseError> {
-    let url = Url::parse(&input)?;
-
-    // Remove git+ prefix and fragment to get base URL
-    let base_url = {
-        let mut u = url.clone();
-        u.set_fragment(None);
-        u.to_string().trim_start_matches("git+").to_string()
-    };
-
-    // Parse fragment for branch:path
-    let (branch, path) = if let Some(fragment) = url.fragment() {
-        let parts: Vec<&str> = fragment.splitn(2, ':').collect();
-        (
-            Some(parts[0].to_string()),
-            parts.get(1).map(|s| s.to_string()),
-        )
-    } else {
-        (None, None)
-    };
-
-    Ok(GitReference {
-        base_url,
-        branch,
-        path,
-    })
-}
 
 // Updated execute function to include workspace dependency substitution
 pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Result<()> {
