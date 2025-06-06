@@ -1,5 +1,6 @@
 // scripts/interact.ts
-import { ethers } from "hardhat";
+import hre from "hardhat";
+import { ethers } from "ethers";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { poseidon2 } from "poseidon-lite";
 
@@ -15,8 +16,6 @@ async function main() {
     console.log("  new-committee [options]");
     process.exit(1);
   }
-
-  const hre = require("hardhat");
 
   try {
     switch (command) {
@@ -50,7 +49,7 @@ async function addCiphernode(hre: any, ciphernodeAddress: string) {
   console.log(`📝 Adding ciphernode: ${ciphernodeAddress}`);
 
   const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
-  const registryContract = await ethers.getContractAt(
+  const registryContract = await hre.ethers.getContractAt(
     "CiphernodeRegistryOwnable",
     registry.address,
   );
@@ -74,7 +73,7 @@ async function removeCiphernode(
   console.log(`🗑️  Removing ciphernode: ${ciphernodeAddress}`);
 
   const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
-  const registryContract = await ethers.getContractAt(
+  const registryContract = await hre.ethers.getContractAt(
     "CiphernodeRegistryOwnable",
     registry.address,
   );
@@ -122,7 +121,7 @@ async function newCommittee(hre: any, args: string[]) {
   console.log("🏛️  Requesting new committee...");
 
   const enclave = await hre.deployments.get("Enclave");
-  const enclaveContract = await ethers.getContractAt(
+  const enclaveContract = await hre.ethers.getContractAt(
     "Enclave",
     enclave.address,
   );
@@ -165,9 +164,9 @@ async function newCommittee(hre: any, args: string[]) {
     [windowStart, windowEnd],
     duration,
     e3Address,
-    ethers.zeroPadValue("0x00", 32), // e3Params
-    ethers.zeroPadValue("0x00", 32), // computeParams
-    { value: ethers.parseEther("1.0") }, // 1 ETH
+    hre.ethers.zeroPadValue("0x00", 32), // e3Params
+    hre.ethers.zeroPadValue("0x00", 32), // computeParams
+    { value: hre.ethers.parseEther("1.0") }, // 1 ETH
   );
 
   console.log("Transaction hash:", tx.hash);
