@@ -49,7 +49,7 @@
     "dev:all": "concurrently -r \"pnpm dev:evm\" \"pnpm dev:ciphernodes\" \"pnpm dev:program\" \"pnpm dev:frontend\"",
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",
-    "dev:server": "ts-node ./server",
+    "dev:server": "./scripts/dev_server.sh",
     "test": "hardhat test"
   }
 }
