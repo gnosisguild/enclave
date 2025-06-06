@@ -1,4 +1,3 @@
-// scripts/interact.ts
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { parseArgs } from "util";
 
