@@ -14,6 +14,9 @@ pub enum ProgramCommands {
         #[arg(long)]
         chain: String,
     },
+
+    /// Compile the program code
+    Compile,
 }
 
 pub async fn execute(command: ProgramCommands, config: &AppConfig) -> Result<()> {
@@ -24,6 +27,7 @@ pub async fn execute(command: ProgramCommands, config: &AppConfig) -> Result<()>
         } => {
             e3_program_listener::execute(config, &chain, &json_rpc_server).await?;
         }
+        ProgramCommands::Compile => e3_support_scripts::program_compile().await?,
     };
 
     Ok(())

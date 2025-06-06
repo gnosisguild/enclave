@@ -37,8 +37,10 @@
     "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
     "node": "hardhat node",
-    "dev:frontend": "cd client && pnpm dev",
-    "dev:program": "concurrently \"pnpm rpc\" \"enclave program listen --json-rpc-server http://localhost:8080 --chain hardhat\"",
+    "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile",
+    "dev:all": "concurrently -r \"pnpm node\" \"wait-on http://localhost:8545 && pnpm dev:program\" \"pnpm dev:frontend\"",
+    "dev:frontend": "cd client && (export $(enclave print-env --vite --chain hardhat) && pnpm dev)",
+    "dev:program": "concurrently -r \"pnpm rpc\" \"enclave program listen --json-rpc-server http://localhost:8080 --chain hardhat\"",
     "remove-ciphernode": "hardhat run scripts/interact.ts -- remove-ciphernode",
     "rpc": "ts-node ./server",
     "test": "hardhat test"

@@ -33,4 +33,5 @@ pub struct ContractAddresses {
     pub enclave: Contract,
     pub ciphernode_registry: Contract,
     pub filter_registry: Contract,
+    pub e3_program: Option<Contract>,
 }

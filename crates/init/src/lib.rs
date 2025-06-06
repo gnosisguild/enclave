@@ -16,8 +16,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use tokio::fs;
 
-const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#ry/support-alterations-1";
-// const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#hacknet";
+// const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#ry/support-alterations-2";
+const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#hacknet";
 const TEMPLATE_FOLDER: &str = "templates/default";
 const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 
@@ -87,6 +87,13 @@ pub async fn execute(location: Option<PathBuf>) -> Result<()> {
 
     println!("Using bak files for ignores...");
     move_file(&cwd.join(".gitignore.bak"), &cwd.join(".gitignore")).await?;
+
+    println!("Move bak files for workspace...");
+    move_file(
+        &cwd.join("pnpm-workspace.yaml.bak"),
+        &cwd.join("pnpm-workspace.yaml"),
+    )
+    .await?;
 
     println!("Remove lib folder...");
     delete_path(&cwd.join("lib")).await?;
