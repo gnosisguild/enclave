@@ -216,6 +216,55 @@ export class ContractClient {
   }
 
   /**
+   * Publish ciphertext output for an E3 computation
+   * publishCiphertextOutput(uint256 e3Id, bytes memory ciphertextOutput, bytes memory proof)
+   */
+  public async publishCiphertextOutput(
+    e3Id: bigint,
+    ciphertextOutput: `0x${string}`,
+    proof: `0x${string}`,
+    gasLimit?: bigint,
+  ): Promise<Hash> {
+    if (!this.walletClient) {
+      throw new SDKError(
+        "Wallet client required for write operations",
+        "NO_WALLET",
+      );
+    }
+
+    if (!this.contractInfo) {
+      await this.initialize();
+    }
+
+    try {
+      const account = this.walletClient.account;
+      if (!account) {
+        throw new SDKError("No account connected", "NO_ACCOUNT");
+      }
+
+      // Simulate transaction
+      const { request } = await this.publicClient.simulateContract({
+        address: this.addresses.enclave,
+        abi: Enclave__factory.abi,
+        functionName: "publishCiphertextOutput",
+        args: [e3Id, ciphertextOutput, proof],
+        account,
+        gas: gasLimit,
+      });
+
+      // Execute transaction
+      const hash = await this.walletClient.writeContract(request);
+
+      return hash;
+    } catch (error) {
+      throw new SDKError(
+        `Failed to publish ciphertext output: ${error}`,
+        "PUBLISH_CIPHERTEXT_OUTPUT_FAILED",
+      );
+    }
+  }
+
+  /**
    * Get E3 information
    * Based on the contract: getE3(uint256 e3Id) returns (E3 memory e3)
    */
