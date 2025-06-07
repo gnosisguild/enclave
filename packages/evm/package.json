@@ -13,6 +13,11 @@
       "import": "./dist/deploy/enclave.js",
       "require": "./dist/deploy/enclave.js"
     },
+    "./deploy/mocks": {
+      "types": "./dist/deploy/mocks.d.ts",
+      "import": "./dist/deploy/mocks.js",
+      "require": "./dist/deploy/mocks.js"
+    },
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",
     "./sdk": "./dist/src/sdk/index.js",
