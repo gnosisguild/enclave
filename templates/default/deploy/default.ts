@@ -1,9 +1,12 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
-const func: DeployFunction = async function(hre: HardhatRuntimeEnvironment) {
+const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
+
+  const [deployerAccount] = await hre.ethers.getSigners();
+  const enclave = await hre.deployments.get("Enclave");
 
   const verifier = await deploy("MockRISC0Verifier", {
     from: deployer,
@@ -22,23 +25,27 @@ const func: DeployFunction = async function(hre: HardhatRuntimeEnvironment) {
   );
   const programId = await imageIdContract.PROGRAM_ID();
 
-  const e3Program = await deploy("MyProgram", {
+  const inputValidator = await deploy("InputValidator", {
     from: deployer,
-    args: [verifier.address, programId],
+    args: [],
     log: true,
   });
 
-  const [deployerAccount] = await hre.ethers.getSigners();
-  const enclave = await hre.deployments.get("Enclave");
+  const e3Program = await deploy("MyProgram", {
+    from: deployer,
+    args: [enclave.address, verifier.address, programId, inputValidator.address],
+    log: true,
+  });
 
-  const contract = new hre.ethers.Contract(
+  const enclaveContract = new hre.ethers.Contract(
     enclave.address,
     enclave.abi,
     deployerAccount,
   );
-  const result = contract.interface.encodeFunctionData("enableE3Program", [
-    e3Program.address,
-  ]);
+  const result = enclaveContract.interface.encodeFunctionData(
+    "enableE3Program",
+    [e3Program.address],
+  );
   const tx = await deployerAccount.sendTransaction({
     to: enclave.address,
     data: result,

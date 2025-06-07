@@ -14,6 +14,7 @@ contract MyProgram is IE3Program, Ownable {
     // State variables
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
+    IInputValidator public inputValidator;
     bytes32 public imageId;
 
     // Mappings
@@ -28,16 +29,23 @@ contract MyProgram is IE3Program, Ownable {
     error AlreadyRegistered();
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
+    /// @param _enclave The Enclave contract address
     /// @param _verifier The RISC Zero verifier address
     /// @param _imageId The image ID for the guest program
+    /// @param _inputValidator The input validator address
     constructor(
+        IEnclave _enclave,
         IRiscZeroVerifier _verifier,
-        bytes32 _imageId
+        bytes32 _imageId,
+        IInputValidator _inputValidator
     ) Ownable(msg.sender) {
         require(address(_verifier) != address(0), VerifierAddressZero());
 
+        enclave = _enclave;
         verifier = _verifier;
+        inputValidator = _inputValidator;
         imageId = _imageId;
+        authorizedContracts[address(_enclave)] = true;
     }
 
     /// @notice Validate the E3 program parameters
@@ -48,7 +56,7 @@ contract MyProgram is IE3Program, Ownable {
         uint256,
         bytes calldata e3ProgramParams,
         bytes calldata
-    ) external returns (bytes32, IInputValidator inputValidator) {
+    ) external returns (bytes32, IInputValidator) {
         require(
             authorizedContracts[msg.sender] || msg.sender == owner(),
             CallerNotAuthorized()
@@ -56,7 +64,7 @@ contract MyProgram is IE3Program, Ownable {
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
-        return (ENCRYPTION_SCHEME_ID, inputValidator);
+        return (ENCRYPTION_SCHEME_ID, IInputValidator(address(inputValidator)));
     }
 
     /// @notice Verify the proof
