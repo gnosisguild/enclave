@@ -1,11 +1,10 @@
-mod greco;
 mod util;
 
 use console_log;
 use e3_bfv_helpers::{build_bfv_params_arc, params::SET_2048_1032193_1};
 use fhe_rs::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, FheDecrypter, FheEncoder, Serialize};
-use greco::greco::InputValidationVectors;
+use greco::InputValidationVectors;
 use num_bigint::BigInt;
 use num_traits::Num;
 use rand::thread_rng;
