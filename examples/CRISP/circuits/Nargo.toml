@@ -1,6 +1,9 @@
 [package]
 name = "crisp_circuit"
 type = "bin"
-authors = [""]
+version = "0.1.0"
+authors = ["Gnosis Guild / Enclave"]
+license = "MIT"
 
 [dependencies]
+greco = { tag = "v0.1.0", git = "https://github.com/gnosisguild/greco", branch = "main", directory = "./circuits" }
