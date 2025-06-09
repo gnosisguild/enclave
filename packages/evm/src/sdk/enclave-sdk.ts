@@ -18,10 +18,10 @@ import { ContractClient } from "./contract-client";
 import { EventListener } from "./event-listener";
 import {
   type AllEventTypes,
+  type E3,
   EnclaveEventType,
   type EventCallback,
   type SDKConfig,
-  type E3,
 } from "./types";
 import { SDKError, isValidAddress } from "./utils";
 
