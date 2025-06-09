@@ -21,6 +21,7 @@ import {
   EnclaveEventType,
   type EventCallback,
   type SDKConfig,
+  type E3,
 } from "./types";
 import { SDKError, isValidAddress } from "./utils";
 
@@ -164,7 +165,7 @@ export class EnclaveSDK {
   /**
    * Get E3 information
    */
-  public async getE3(e3Id: bigint): Promise<unknown> {
+  public async getE3(e3Id: bigint): Promise<E3> {
     if (!this.initialized) {
       await this.initialize();
     }

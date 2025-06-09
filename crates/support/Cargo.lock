@@ -2403,24 +2403,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-program-client"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave?branch=hacknet#2ee401f759f530b14ddf6875cc055f4dffd83ea1"
-dependencies = [
- "anyhow",
- "reqwest",
- "serde",
-]
-
-[[package]]
 name = "e3-support-app"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "anyhow",
  "e3-compute-provider",
- "e3-program-client",
  "e3-support-host",
  "env_logger",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",

@@ -17,8 +17,6 @@ members = [
   "crates/keyshare",
   "crates/logger",
   "crates/net", 
-  "crates/program-client",
-  "crates/program-listener", 
   "crates/request",
   "crates/sdk",
   "crates/sortition",
@@ -72,10 +70,9 @@ e3-indexer = { version = "0.1.0", path = "./crates/indexer" }
 e3-keyshare = { version = "0.1.0", path = "./crates/keyshare" }
 e3-logger = { version = "0.1.0", path = "./crates/logger" }
 e3-net = { version = "0.1.0", path = "./crates/net" }
-e3-program-client = { version = "0.1.0", path = "./crates/program-client" }
 e3-compute-provider = { version = "0.1.0", path = "./crates/compute-provider" }
-e3-program-listener = { version = "0.1.0", path = "./crates/program-listener" }
 e3-sortition = { version = "0.1.0", path = "./crates/sortition" }
+e3-support-app = { version = "0.1.0", path = "./crates/support/app" }
 e3-support-scripts = { version = "0.1.0", path = "./crates/support-scripts" }
 e3-test-helpers = { version = "0.1.0", path = "./crates/test-helpers" }
 e3-tests = { version = "0.1.0", path = "./crates/tests" }

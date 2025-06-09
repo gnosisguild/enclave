@@ -73,24 +73,26 @@ export enum RegistryEventType {
 export type AllEventTypes = EnclaveEventType | RegistryEventType;
 
 // Event data interfaces based on TypeChain types
+export interface E3 {
+  seed: bigint;
+  threshold: readonly [number, number];
+  requestBlock: bigint;
+  startWindow: readonly [bigint, bigint];
+  duration: bigint;
+  expiration: bigint;
+  encryptionSchemeId: string;
+  e3Program: string;
+  e3ProgramParams: string;
+  inputValidator: string;
+  decryptionVerifier: string;
+  committeePublicKey: string;
+  ciphertextOutput: string;
+  plaintextOutput: string;
+}
+
 export interface E3RequestedData {
   e3Id: bigint;
-  e3: {
-    seed: bigint;
-    threshold: [bigint, bigint];
-    requestBlock: bigint;
-    startWindow: [bigint, bigint];
-    duration: bigint;
-    expiration: bigint;
-    encryptionSchemeId: string;
-    e3Program: string;
-    e3ProgramParams: string;
-    inputValidator: string;
-    decryptionVerifier: string;
-    committeePublicKey: string;
-    ciphertextOutput: string;
-    plaintextOutput: string;
-  };
+  e3: E3;
   filter: string;
   e3Program: string;
 }
@@ -181,10 +183,10 @@ export interface RegistryEventData {
 export interface EnclaveEvent<T extends AllEventTypes> {
   type: T;
   data: T extends EnclaveEventType
-    ? EnclaveEventData[T]
-    : T extends RegistryEventType
-      ? RegistryEventData[T]
-      : unknown;
+  ? EnclaveEventData[T]
+  : T extends RegistryEventType
+  ? RegistryEventData[T]
+  : unknown;
   log: Log;
   timestamp: Date;
   blockNumber: bigint;
