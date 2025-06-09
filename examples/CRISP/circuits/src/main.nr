@@ -1,14 +1,7 @@
-/// `N` is the degree of the cyclotomic polynomial defining the ring `Rq = Zq[X]/(X^N + 1)`.
-pub global N: u32 = 2048;
-/// `L` is the dimension size of the polynomials.
-pub global L: u32 = 1;
-/// Polynomial structure
-pub struct Polynomial<let N: u32> {
-    // Coefficients of the polynomial (Biggest degree at the first index)
-    pub coefficients: [Field; N],
-}
+use greco::constants::{L, N};
+use greco::crypto::pk_encryption::BfvPkEncryptionCircuit;
+use greco::math::polynomial::Polynomial;
 
-/// Main function
 fn main(
     pk0is: [Polynomial<N>; L],
     pk1is: [Polynomial<N>; L],
@@ -18,10 +11,24 @@ fn main(
     e0: Polynomial<N>,
     e1: Polynomial<N>,
     k1: Polynomial<N>,
-    r1is: [Polynomial<2 * N - 1>; L],
+    r1is: [Polynomial<(2 * N) - 1>; L],
     r2is: [Polynomial<N - 1>; L],
-    p1is: [Polynomial<2 * N - 1>; L],
+    p1is: [Polynomial<(2 * N) - 1>; L],
     p2is: [Polynomial<N - 1>; L],
 ) {
-    assert(1 != 2);
+    let circuit = BfvPkEncryptionCircuit::new(
+        pk0is,
+        pk1is,
+        ct0is,
+        ct1is,
+        u,
+        e0,
+        e1,
+        k1,
+        r1is,
+        r2is,
+        p1is,
+        p2is,
+    );
+    circuit.correct_encryption();
 }

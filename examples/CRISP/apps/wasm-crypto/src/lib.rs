@@ -63,11 +63,17 @@ impl Encrypt {
             .try_encrypt_extended(&pt, &mut thread_rng())
             .map_err(|e| JsValue::from_str(&format!("Error encrypting vote: {}", e)))?;
 
+        web_sys::console::log_1(&format!("ct: {:?}", ct).into());
+        web_sys::console::log_1(&format!("u_rns: {:?}", u_rns).into());
+        web_sys::console::log_1(&format!("e0_rns: {:?}", e0_rns).into());
+        web_sys::console::log_1(&format!("e1_rns: {:?}", e1_rns).into());
+
         // Create Greco input validation ZKP proof
         let input_val_vectors =
-            InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk).map_err(
-                |e| JsValue::from_str(&format!("Error computing input validation vectors: {}", e)),
-            )?;
+            InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params)
+                .map_err(|e| {
+                    JsValue::from_str(&format!("Error computing input validation vectors: {}", e))
+                })?;
 
         let p = BigInt::from_str_radix(
             "21888242871839275222246405745257275088548364400416034343698204186575808495617",

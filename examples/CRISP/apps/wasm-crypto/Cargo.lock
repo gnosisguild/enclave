@@ -1598,7 +1598,7 @@ dependencies = [
 [[package]]
 name = "e3-greco-generator"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/greco?branch=main#84f5f6d0ca148e7e8010f6593e13e545abc272fe"
+source = "git+https://github.com/gnosisguild/greco#191c596bb97fb186ba642b1e6da69c4a47d82716"
 dependencies = [
  "blake3",
  "clap",
@@ -1619,7 +1619,7 @@ dependencies = [
 [[package]]
 name = "e3-greco-polynomial"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/greco?branch=main#84f5f6d0ca148e7e8010f6593e13e545abc272fe"
+source = "git+https://github.com/gnosisguild/greco#191c596bb97fb186ba642b1e6da69c4a47d82716"
 dependencies = [
  "num-bigint",
  "num-traits",
