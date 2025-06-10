@@ -159,7 +159,7 @@ impl Handler<EnclaveEvent> for NetworkManager {
                         })
                         .await
                     {
-                        error!(error=?e, "Error sending bytes to libp2p");
+                        error!(error=?e, "Error sending bytes to libp2p: {e}");
                     };
                 }
                 Err(error) => {

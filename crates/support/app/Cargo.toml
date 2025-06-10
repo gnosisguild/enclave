@@ -11,4 +11,5 @@ serde_json.workspace = true
 tokio.workspace = true
 e3-compute-provider.workspace = true
 e3-support-host.workspace = true
-e3-program-client.workspace = true
+reqwest.workspace = true
+anyhow.workspace = true

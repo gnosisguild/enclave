@@ -10,6 +10,7 @@ import {
   CiphernodeRegistryOwnable__factory,
   Enclave__factory,
 } from "../../types";
+import { type E3 } from "./types";
 import { SDKError, isValidAddress } from "./utils";
 
 export class ContractClient {
@@ -268,13 +269,13 @@ export class ContractClient {
    * Get E3 information
    * Based on the contract: getE3(uint256 e3Id) returns (E3 memory e3)
    */
-  public async getE3(e3Id: bigint): Promise<unknown> {
+  public async getE3(e3Id: bigint): Promise<E3> {
     if (!this.contractInfo) {
       await this.initialize();
     }
 
     try {
-      const result = await this.publicClient.readContract({
+      const result: E3 = await this.publicClient.readContract({
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
         functionName: "getE3",
