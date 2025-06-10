@@ -13,7 +13,7 @@ This is the monorepo for Enclave, an open-source protocol for Encrypted Executio
 
 ## Architecture
 
-Enclave employs a modular architecture involving numerous actors and participants. The sequence diagram below offers a high-level overview of the protocol, but necessarily omits most detail.
+Enclave employs a modular architecture involving numerous actors and participants. The sequence diagram below offers a high-level overview of the protocol, but necessarily omits most detail..
 
 ```mermaid
 sequenceDiagram
