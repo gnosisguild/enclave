@@ -42,6 +42,7 @@ export class EventListener implements SDKEventEmitter {
     console.log("Added callback");
     this.listeners.get(eventType)!.add(callback as EventCallback);
 
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const emitter = this;
 
     // If we don't have an active watcher for this event, create one
