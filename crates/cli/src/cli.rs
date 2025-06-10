@@ -101,7 +101,20 @@ impl Cli {
                             net_keypair,
                             generate_net_keypair,
                         )
-                        .await?
+                        .await?;
+                        println!("You can start your node using `enclave start`");
+                    }
+                    Commands::Start { .. } => {
+                        println!("No configuration found. Setting up enclave configuration...");
+                        config_set::execute(
+                            None,
+                            None,
+                            None,
+                            false,
+                            None,
+                            false,
+                        )
+                        .await?;
                     }
                     _ => bail!(
                         "Configuration file not found. Run `enclave config-set` to create a configuration."

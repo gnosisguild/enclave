@@ -73,7 +73,6 @@ pub async fn execute(
     }
 
     println!("Enclave configuration successfully created!");
-    println!("You can start your node using `enclave start`");
 
     Ok(())
 }
