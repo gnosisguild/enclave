@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react'
 import { handleGenericError } from '@/utils/handle-generic-error'
 import { useNotificationAlertContext } from '@/context/NotificationAlert'
 import { EncryptedVote } from '@/model/vote.model'
-import { generateProof, CircuitInputs } from '@/utils/proofUtils'
+import {
+  generateProof,
+  CircuitInputs,
+} from '@/utils/proofUtils'
 
 export const useWebAssemblyHook = () => {
   const { showToast } = useNotificationAlertContext()
@@ -32,8 +35,8 @@ export const useWebAssemblyHook = () => {
         const { type, success, encryptedVote, error } = event.data
         if (type === 'encrypt_vote') {
           if (success) {
-            const { vote, circuitInputs } = encryptedVote
-            const { proof, publicInputs } = await generateProof(circuitInputs as CircuitInputs)
+            const { vote, circuitInputs } = encryptedVote;
+            const { proof, publicInputs } = await generateProof(circuitInputs as CircuitInputs);
             resolve({
               vote: vote,
               proof: proof,

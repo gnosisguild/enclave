@@ -63,19 +63,12 @@ impl Encrypt {
             .try_encrypt_extended(&pt, &mut thread_rng())
             .map_err(|e| JsValue::from_str(&format!("Error encrypting vote: {}", e)))?;
 
-        web_sys::console::log_1(&format!("ct: {:?}", ct).into());
-        web_sys::console::log_1(&format!("u_rns: {:?}", u_rns).into());
-        web_sys::console::log_1(&format!("e0_rns: {:?}", e0_rns).into());
-        web_sys::console::log_1(&format!("e1_rns: {:?}", e1_rns).into());
-
         // Create Greco input validation ZKP proof
         let input_val_vectors =
             InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params)
                 .map_err(|e| {
                     JsValue::from_str(&format!("Error computing input validation vectors: {}", e))
                 })?;
-
-        web_sys::console::log_1(&format!("input_val_vectors: {:?}", input_val_vectors).into());
 
         let zkp_modulus = BigInt::from_str_radix(
             "21888242871839275222246405745257275088548364400416034343698204186575808495617",
@@ -84,21 +77,8 @@ impl Encrypt {
         .unwrap();
 
         let standard_input_val = input_val_vectors.standard_form(&zkp_modulus);
-        web_sys::console::log_1(&format!("standard_input_val: {:?}", standard_input_val).into());
-
-        // Add detailed debug logging
-        web_sys::console::log_1(
-            &format!("standard_input_val raw values: {:#?}", standard_input_val).into(),
-        );
-        web_sys::console::log_1(
-            &format!(
-                "standard_input_val json: {}",
-                standard_input_val.to_json().to_string()
-            )
-            .into(),
-        );
-
         self.encrypted_vote = ct.to_bytes();
+
         Ok(EncryptedVote {
             encrypted_vote: self.encrypted_vote.clone(),
             circuit_inputs: standard_input_val.to_json().to_string(),
