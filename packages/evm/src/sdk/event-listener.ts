@@ -216,10 +216,12 @@ export class EventListener implements SDKEventEmitter {
   }
 
   public emit<T extends AllEventTypes>(event: EnclaveEvent<T>): void {
-    console.log("emit() called with " + JSON.stringify(event));
+    console.log("emit() called for " + event.type);
     const callbacks = this.listeners.get(event.type);
     if (callbacks) {
+      console.log("Have " + callbacks.size + " callbacks");
       callbacks.forEach((callback) => {
+        console.log("Running callback...");
         try {
           void (callback as EventCallback<T>)(event);
         } catch (error) {
