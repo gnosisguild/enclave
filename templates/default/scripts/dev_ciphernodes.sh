@@ -5,7 +5,7 @@ set -euo pipefail
 cleanup() {
   echo "Cleaning up processes..."
   enclave nodes down
-  sleep 10
+  sleep 2
   pkill enclave
   echo "Cleanup complete"
   exit 0
