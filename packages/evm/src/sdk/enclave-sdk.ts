@@ -6,6 +6,7 @@ import {
   createPublicClient,
   createWalletClient,
   http,
+  webSocket,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { hardhat, mainnet, monadTestnet, sepolia } from "viem/chains";
@@ -31,12 +32,11 @@ export class EnclaveSDK {
     11155111: sepolia,
     41454: monadTestnet,
     31337: hardhat,
-    // Add new chains here
   } as const;
 
   private eventListener: EventListener;
   private contractClient: ContractClient;
-  private initialized = false; // This is redundant
+  private initialized = false;
 
   constructor(private config: SDKConfig) {
     if (!config.publicClient) {
@@ -312,7 +312,6 @@ export class EnclaveSDK {
       this.config.chainId = newConfig.chainId;
     }
 
-    // Reinitialize contract client with new config
     this.contractClient = new ContractClient(
       this.config.publicClient,
       this.config.walletClient,
@@ -333,18 +332,24 @@ export class EnclaveSDK {
   }): EnclaveSDK {
     const chain = EnclaveSDK.chains[options.chainId];
 
+    const isWebSocket = options.rpcUrl.startsWith('ws://') || options.rpcUrl.startsWith('wss://');
+    const transport = isWebSocket
+      ? webSocket(options.rpcUrl, {
+        keepAlive: { interval: 30_000 },
+        reconnect: { attempts: 5, delay: 2_000 },
+      })
+      : http(options.rpcUrl);
     const publicClient = createPublicClient({
       chain,
-      transport: http(options.rpcUrl),
+      transport,
     }) as SDKConfig["publicClient"];
-
     let walletClient: WalletClient | undefined = undefined;
     if (options.privateKey) {
       const account = privateKeyToAccount(options.privateKey);
       walletClient = createWalletClient({
         account,
-        chain: mainnet,
-        transport: http(options.rpcUrl),
+        chain,
+        transport,
       });
     }
 
