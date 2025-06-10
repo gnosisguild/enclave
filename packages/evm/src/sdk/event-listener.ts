@@ -54,8 +54,9 @@ export class EventListener implements SDKEventEmitter {
           fromBlock: this.config.fromBlock,
           onLogs: (logs: Log[]) => {
             console.log(`Log received for ${watcherKey}`, logs);
-            for (const log of logs) {
-              console.log(`processing log ${JSON.stringify(log)}`);
+            for (let i = 0; i < logs.length; i++) {
+              const log = logs[i];
+              console.log("Got log!");
               const event: EnclaveEvent<T> = {
                 type: eventType,
                 data: (log as unknown as { args: unknown })
@@ -69,7 +70,7 @@ export class EventListener implements SDKEventEmitter {
                 blockNumber: log.blockNumber ?? BigInt(0),
                 transactionHash: log.transactionHash ?? "0x",
               };
-              console.log("Emitting event...");
+              console.log("Created event, now emitting event...");
               this.emit(event);
               console.log("Event emitted");
             }
