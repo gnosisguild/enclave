@@ -2410,7 +2410,9 @@ dependencies = [
  "anyhow",
  "e3-compute-provider",
  "e3-support-host",
+ "e3-support-types",
  "env_logger",
+ "hex",
  "reqwest",
  "serde",
  "serde_json",
@@ -2439,6 +2441,16 @@ dependencies = [
  "serde",
  "tokio",
  "tracing-subscriber 0.3.19",
+]
+
+[[package]]
+name = "e3-support-types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
