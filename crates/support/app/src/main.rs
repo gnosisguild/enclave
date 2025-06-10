@@ -1,19 +1,6 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult};
 use e3_compute_provider::FHEInputs;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::RwLock;
-
-#[derive(Debug, Clone)]
-pub struct WebhookConfig {
-    pub json_rpc_server: String,
-    pub chain: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct AppState {
-    pub webhook_config: Option<WebhookConfig>,
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ComputeRequest {
@@ -32,6 +19,7 @@ struct ComputeRequestPayload {
     pub e3_id: Option<u64>,
     pub params: Vec<u8>,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
+    pub callback_url: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -48,7 +36,7 @@ struct ProcessingResponse {
 }
 
 async fn call_webhook(
-    config: &WebhookConfig,
+    callback_url: &str,
     e3_id: u64,
     proof: Vec<u8>,
     ciphertext: Vec<u8>,
@@ -60,7 +48,7 @@ async fn call_webhook(
     };
 
     let _response: serde_json::Value = reqwest::Client::new()
-        .post(&config.json_rpc_server)
+        .post(callback_url)
         .json(&payload)
         .send()
         .await?
@@ -71,10 +59,8 @@ async fn call_webhook(
     Ok(())
 }
 
-// Main compute handler
 async fn handle_compute(
     req: web::Json<ComputeRequestPayload>,
-    data: web::Data<Arc<RwLock<AppState>>>,
 ) -> ActixResult<HttpResponse> {
     let fhe_inputs = FHEInputs {
         params: req.params.clone(),
@@ -96,52 +82,39 @@ async fn handle_compute(
 
     let proof: Vec<u8> = risc0_output.seal.into();
 
-    match req.e3_id {
-        Some(e3_id) => {
-            // Async mode
-            let state = data.read().await;
-            if let Some(webhook_config) = &state.webhook_config {
-                let config = webhook_config.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = call_webhook(&config, e3_id, proof, ciphertext).await {
-                        eprintln!("✗ Webhook failed for E3 {}: {}", e3_id, e);
-                    }
-                });
-            }
+    match (req.e3_id, &req.callback_url) {
+        (Some(e3_id), Some(callback_url)) => {
+            let callback_url = callback_url.clone();
+            tokio::spawn(async move {
+                if let Err(e) = call_webhook(&callback_url, e3_id, proof, ciphertext).await {
+                    eprintln!("✗ Webhook failed for E3 {}: {}", e3_id, e);
+                }
+            });
 
             Ok(HttpResponse::Ok().json(ProcessingResponse {
                 status: "processing".to_string(),
                 e3_id,
             }))
         }
-        None => {
-            // Sync mode
+        (Some(e3_id), None) => {
+            println!("⚠️ E3 {} completed but no callback URL provided", e3_id);
+            let response = ComputeResponse { ciphertext, proof };
+            Ok(HttpResponse::Ok().json(response))
+        }
+        (None, _) => {
             let response = ComputeResponse { ciphertext, proof };
             Ok(HttpResponse::Ok().json(response))
         }
     }
 }
 
-pub async fn start_with_webhook(json_rpc_server: &str, chain: &str) -> anyhow::Result<()> {
-    let webhook_config = WebhookConfig {
-        json_rpc_server: json_rpc_server.to_string(),
-        chain: chain.to_string(),
-    };
-
-    let state = Arc::new(RwLock::new(AppState {
-        webhook_config: Some(webhook_config),
-    }));
-
-    start_server_with_state(state).await
-}
-
-async fn start_server_with_state(state: Arc<RwLock<AppState>>) -> anyhow::Result<()> {
+#[actix_web::main]
+async fn main() -> anyhow::Result<()> {
     env_logger::init();
     
     let bind_addr = "0.0.0.0:4001";
     let server = HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(state.clone()))
             .wrap(Logger::default())
             .route("/run_compute", web::post().to(handle_compute))
     })
@@ -150,17 +123,4 @@ async fn start_server_with_state(state: Arc<RwLock<AppState>>) -> anyhow::Result
     println!("🚀 FHE Compute Service listening on http://{}", bind_addr);
     
     server.run().await.map_err(Into::into)
-}
-
-pub async fn start_standalone() -> anyhow::Result<()> {
-    let state = Arc::new(RwLock::new(AppState {
-        webhook_config: None,
-    }));
-
-    start_server_with_state(state).await
-}
-
-#[actix_web::main]
-async fn main() -> anyhow::Result<()> {
-    start_standalone().await
 }

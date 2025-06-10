@@ -28,6 +28,7 @@ function getCheckedEnvVars() {
     PRIVATE_KEY: ensureEnv("PRIVATE_KEY"),
     CHAIN_ID: parseInt(ensureEnv("CHAIN_ID")),
     FHE_RUNNER_URL: process.env.FHE_RUNNER_URL || "http://127.0.0.1:4001",
+    CALLBACK_URL: process.env.CALLBACK_URL || "http://127.0.0.1:8080",
   };
 }
 
@@ -59,12 +60,13 @@ async function createPrivateSDK() {
 }
 
 async function callFheRunner(e3Id: bigint, params: string, ciphertextInputs: Array<[string, number]>): Promise<void> {
-  const { FHE_RUNNER_URL } = getCheckedEnvVars();
+  const { FHE_RUNNER_URL, CALLBACK_URL } = getCheckedEnvVars();
 
   const payload = {
     e3_id: Number(e3Id),
     params,
     ciphertext_inputs: ciphertextInputs,
+    callback_url: CALLBACK_URL,
   };
 
   const response = await fetch(`${FHE_RUNNER_URL}/run_compute`, {
