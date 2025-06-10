@@ -28,21 +28,19 @@ tmux split-window -h
 tmux split-window -h
 
 # Select the first pane and create bottom row
-tmux select-pane -t 0
+tmux select-pane -t 1
 tmux split-window -v
 
 # Select the second pane and create its bottom counterpart
-tmux select-pane -t 2
+tmux select-pane -t 3
 tmux split-window -v
 
 # Select the third pane and create its bottom counterpart
-tmux select-pane -t 4
+tmux select-pane -t 5
 tmux split-window -v
 
 # Reorganize layout to make it more even
 tmux select-layout tiled
-
-sleep 2
 
 # Run commands in each pane
 tmux send-keys -t 1 'pnpm dev:evm' C-m
