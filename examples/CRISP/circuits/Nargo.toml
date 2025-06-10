@@ -6,4 +6,4 @@ authors = ["Gnosis Guild / Enclave"]
 license = "MIT"
 
 [dependencies]
-greco = { tag = "v0.1.0", git = "https://github.com/gnosisguild/greco", branch = "main", directory = "./circuits" }
+greco = { tag = "v0.1.0", git = "https://github.com/gnosisguild/greco", directory = "./circuits" }

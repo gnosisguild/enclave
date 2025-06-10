@@ -218,15 +218,15 @@ export function __wbgtest_console_error(args) {
 }
 
 function __wbg_adapter_28(arg0, arg1, arg2) {
-    wasm.closure327_externref_shim(arg0, arg1, arg2);
+    wasm.closure335_externref_shim(arg0, arg1, arg2);
 }
 
 function __wbg_adapter_52(arg0, arg1, arg2, arg3, arg4) {
-    wasm.closure249_externref_shim(arg0, arg1, arg2, arg3, arg4);
+    wasm.closure257_externref_shim(arg0, arg1, arg2, arg3, arg4);
 }
 
 function __wbg_adapter_65(arg0, arg1, arg2, arg3) {
-    wasm.closure253_externref_shim(arg0, arg1, arg2, arg3);
+    wasm.closure261_externref_shim(arg0, arg1, arg2, arg3);
 }
 
 const EncryptFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -664,8 +664,8 @@ function __wbg_get_imports() {
         const ret = false;
         return ret;
     };
-    imports.wbg.__wbindgen_closure_wrapper1954 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 328, __wbg_adapter_28);
+    imports.wbg.__wbindgen_closure_wrapper1962 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 336, __wbg_adapter_28);
         return ret;
     };
     imports.wbg.__wbindgen_init_externref_table = function() {

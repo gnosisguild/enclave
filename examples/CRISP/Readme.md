@@ -15,7 +15,7 @@ CRISP
 ├── contracts - Contracts for the CRISP protocol
 ├── deploy - Deployment scripts
 ├── docker-compose.yaml
-└── scripts 
+└── scripts
     └── tasks - Scripts for tasks to be run inside the docker container
 ```
 
@@ -25,7 +25,7 @@ There is a Dockerfile for easy local development which has all the tools you nee
 
 ```sh
 pnpm dev:setup # build the devcontainer
-pnpm dev:up # run the services 
+pnpm dev:up # run the services
 ```
 
 ## Prerequisites for running without Docker

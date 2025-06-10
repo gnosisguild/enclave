@@ -75,13 +75,28 @@ impl Encrypt {
                     JsValue::from_str(&format!("Error computing input validation vectors: {}", e))
                 })?;
 
-        let p = BigInt::from_str_radix(
+        web_sys::console::log_1(&format!("input_val_vectors: {:?}", input_val_vectors).into());
+
+        let zkp_modulus = BigInt::from_str_radix(
             "21888242871839275222246405745257275088548364400416034343698204186575808495617",
             10,
         )
         .unwrap();
 
-        let standard_input_val = input_val_vectors.standard_form(&p);
+        let standard_input_val = input_val_vectors.standard_form(&zkp_modulus);
+        web_sys::console::log_1(&format!("standard_input_val: {:?}", standard_input_val).into());
+
+        // Add detailed debug logging
+        web_sys::console::log_1(
+            &format!("standard_input_val raw values: {:#?}", standard_input_val).into(),
+        );
+        web_sys::console::log_1(
+            &format!(
+                "standard_input_val json: {}",
+                standard_input_val.to_json().to_string()
+            )
+            .into(),
+        );
 
         self.encrypted_vote = ct.to_bytes();
         Ok(EncryptedVote {
