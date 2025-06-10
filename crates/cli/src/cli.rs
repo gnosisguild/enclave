@@ -238,11 +238,11 @@ pub enum Commands {
     /// Set configuration values (similar to solana config set)
     ConfigSet {
         /// An rpc url for enclave to connect to
-        #[arg(long = "rpc-url")]
+        #[arg(long = "rpc-url", short = 'r')]
         rpc_url: Option<String>,
 
         /// An Ethereum address that enclave should use to identify the node
-        #[arg(long = "eth-address")]
+        #[arg(long = "eth-address", short = 'e')]
         eth_address: Option<String>,
 
         /// The password
@@ -250,15 +250,15 @@ pub enum Commands {
         password: Option<String>,
 
         /// Skip asking for eth
-        #[arg(long = "skip-eth")]
+        #[arg(long = "skip-eth", short = 's')]
         skip_eth: bool,
 
         /// The network private key (ed25519)
-        #[arg(long = "net-keypair")]
+        #[arg(long = "net-keypair", short = 'n')]
         net_keypair: Option<String>,
 
         /// Generate a new network keypair
-        #[arg(long = "generate-net-keypair")]
+        #[arg(long = "generate-net-keypair", short = 'g')]
         generate_net_keypair: bool,
     },
 
