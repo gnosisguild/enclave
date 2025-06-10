@@ -1,4 +1,5 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult};
+use anyhow::bail;
 use e3_compute_provider::FHEInputs;
 use serde::{Deserialize, Serialize};
 
@@ -59,26 +60,26 @@ async fn call_webhook(
     Ok(())
 }
 
-async fn handle_compute(
-    req: web::Json<ComputeRequestPayload>,
-) -> ActixResult<HttpResponse> {
+async fn handle_compute(req: web::Json<ComputeRequestPayload>) -> ActixResult<HttpResponse> {
+    // TODO: process this in a spawn so that we return early and allow webhook instead of
+    // processing sequentially
+    println!("Processing computation...");
     let fhe_inputs = FHEInputs {
         params: req.params.clone(),
         ciphertexts: req.ciphertext_inputs.clone(),
     };
 
-    let (risc0_output, ciphertext) = tokio::task::spawn_blocking(move || {
-        e3_support_host::run_compute(fhe_inputs)
-    })
-    .await
-    .map_err(|e| {
-        eprintln!("Task spawn failed: {:?}", e);
-        actix_web::error::ErrorInternalServerError("Task execution failed")
-    })?
-    .map_err(|e| {
-        eprintln!("Computation failed: {:?}", e);
-        actix_web::error::ErrorInternalServerError("Computation failed")
-    })?;
+    let (risc0_output, ciphertext) =
+        tokio::task::spawn_blocking(move || e3_support_host::run_compute(fhe_inputs))
+            .await
+            .map_err(|e| {
+                eprintln!("Task spawn failed: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Task execution failed")
+            })?
+            .map_err(|e| {
+                eprintln!("Computation failed: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Computation failed")
+            })?;
 
     let proof: Vec<u8> = risc0_output.seal.into();
 
@@ -111,7 +112,7 @@ async fn handle_compute(
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    
+
     let bind_addr = "0.0.0.0:13151";
     let server = HttpServer::new(move || {
         App::new()
@@ -121,6 +122,6 @@ async fn main() -> anyhow::Result<()> {
     .bind(bind_addr)?;
 
     println!("🚀 FHE Compute Service listening on http://{}", bind_addr);
-    
+
     server.run().await.map_err(Into::into)
 }
