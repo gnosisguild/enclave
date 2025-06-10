@@ -54,7 +54,7 @@ export class EventListener implements SDKEventEmitter {
           fromBlock: this.config.fromBlock,
           onLogs: (logs: Log[]) => {
             console.log(`Log received for ${watcherKey}`, logs);
-            for (let log of logs) {
+            for (const log of logs) {
               console.log(`processing log ${JSON.stringify(log)}`);
               const event: EnclaveEvent<T> = {
                 type: eventType,
