@@ -42,6 +42,8 @@ export class EventListener implements SDKEventEmitter {
     console.log("Added callback");
     this.listeners.get(eventType)!.add(callback as EventCallback);
 
+    const emitter = this;
+
     // If we don't have an active watcher for this event, create one
     if (!this.activeWatchers.has(watcherKey)) {
       console.log("Adding active watcher for " + watcherKey);
@@ -52,7 +54,7 @@ export class EventListener implements SDKEventEmitter {
           abi,
           eventName: eventType as string,
           fromBlock: this.config.fromBlock,
-          onLogs: (logs: Log[]) => {
+          onLogs(logs: Log[]) {
             console.log(`Log received for ${watcherKey}`, logs);
             for (let i = 0; i < logs.length; i++) {
               const log = logs[i];
@@ -71,7 +73,7 @@ export class EventListener implements SDKEventEmitter {
                 transactionHash: log.transactionHash ?? "0x",
               };
               console.log("Created event, now emitting event...");
-              this.emit(event);
+              emitter.emit(event);
               console.log("Event emitted");
             }
           },
