@@ -34,15 +34,18 @@ export class EventListener implements SDKEventEmitter {
     callback: EventCallback<T>,
   ): Promise<void> {
     const watcherKey = `${address}:${eventType}`;
+    console.log(`watchContractEvent: ${watcherKey}`);
 
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, new Set());
     }
-
+    console.log("Added callback");
     this.listeners.get(eventType)!.add(callback as EventCallback);
 
     // If we don't have an active watcher for this event, create one
     if (!this.activeWatchers.has(watcherKey)) {
+      console.log("Adding active watcher for " + watcherKey);
+
       try {
         const unwatch = this.publicClient.watchContractEvent({
           address,
@@ -50,7 +53,9 @@ export class EventListener implements SDKEventEmitter {
           eventName: eventType as string,
           fromBlock: this.config.fromBlock,
           onLogs: (logs: Log[]) => {
+            console.log(`Log received for ${watcherKey}`);
             logs.forEach((log: Log) => {
+              console.log(`processing log ${JSON.stringify(log)}`);
               const event: EnclaveEvent<T> = {
                 type: eventType,
                 data: (log as unknown as { args: unknown })
@@ -64,7 +69,9 @@ export class EventListener implements SDKEventEmitter {
                 blockNumber: log.blockNumber ?? BigInt(0),
                 transactionHash: log.transactionHash ?? "0x",
               };
+              console.log("Emitting event...");
               this.emit(event);
+              console.log("Event emitted");
             });
           },
         });
@@ -205,6 +212,7 @@ export class EventListener implements SDKEventEmitter {
   }
 
   public emit<T extends AllEventTypes>(event: EnclaveEvent<T>): void {
+    console.log("emit() called with " + JSON.stringify(event));
     const callbacks = this.listeners.get(event.type);
     if (callbacks) {
       callbacks.forEach((callback) => {
