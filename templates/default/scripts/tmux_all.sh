@@ -42,16 +42,25 @@ tmux split-window -v
 # Reorganize layout to make it more even
 tmux select-layout tiled
 
+sleep 2
+
 # Run commands in each pane
-tmux send-keys -t 0 'pnpm dev:evm' C-m
-tmux send-keys -t 1 'pnpm dev:ciphernodes' C-m
-tmux send-keys -t 2 'pnpm dev:server' C-m
-tmux send-keys -t 3 'enclave program start' C-m
-tmux send-keys -t 4 'pnpm dev:frontend' C-m
-tmux send-keys -t 5 'clear' C-m
+tmux send-keys -t 1 'pnpm dev:evm' C-m
+sleep 1
+
+tmux send-keys -t 2 'pnpm dev:ciphernodes' C-m
+sleep 1
+
+tmux send-keys -t 3 'pnpm dev:server' C-m
+sleep 1
+
+tmux send-keys -t 4 'enclave program start' C-m
+sleep 1
+
+tmux send-keys -t 5 'pnpm dev:frontend' C-m
 
 # Select the first pane to start
-tmux select-pane -t 0
+tmux select-pane -t 1
 
 # Attach to the session only if we weren't already in tmux
 if [ -z "$TMUX" ]; then
