@@ -332,12 +332,13 @@ export class EnclaveSDK {
   }): EnclaveSDK {
     const chain = EnclaveSDK.chains[options.chainId];
 
-    const isWebSocket = options.rpcUrl.startsWith('ws://') || options.rpcUrl.startsWith('wss://');
+    const isWebSocket =
+      options.rpcUrl.startsWith("ws://") || options.rpcUrl.startsWith("wss://");
     const transport = isWebSocket
       ? webSocket(options.rpcUrl, {
-        keepAlive: { interval: 30_000 },
-        reconnect: { attempts: 5, delay: 2_000 },
-      })
+          keepAlive: { interval: 30_000 },
+          reconnect: { attempts: 5, delay: 2_000 },
+        })
       : http(options.rpcUrl);
     const publicClient = createPublicClient({
       chain,
