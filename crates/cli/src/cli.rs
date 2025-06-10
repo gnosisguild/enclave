@@ -6,7 +6,7 @@ use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
-use crate::{init, net, password, wallet, wizard};
+use crate::{config_set, init, net, password, wallet};
 use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
@@ -71,11 +71,11 @@ impl Cli {
 
     #[instrument(skip_all)]
     pub async fn execute(self) -> Result<()> {
-        // Attempt to load the config, but only treat “not found” as
+        // Attempt to load the config, but only treat "not found" as
         // the trigger for the init flow.  All other errors bubble up.
         let config = match self.load_config() {
             Ok(cfg) => cfg,
-            // If the file truly doesn’t exist, fall back to init
+            // If the file truly doesn't exist, fall back to init
             Err(e)
                 if matches!(
                     e.downcast_ref::<std::io::Error>(),
@@ -85,7 +85,7 @@ impl Cli {
                 // Existing init branch
                 match self.command {
                     Commands::Init {path, template} => init::execute(path, template).await?,
-                    Commands::Wizard {
+                    Commands::ConfigSet {
                         rpc_url,
                         eth_address,
                         password,
@@ -93,7 +93,7 @@ impl Cli {
                         net_keypair,
                         generate_net_keypair,
                     } => {
-                        wizard::execute(
+                        config_set::execute(
                             rpc_url,
                             eth_address,
                             password,
@@ -104,7 +104,7 @@ impl Cli {
                         .await?
                     }
                     _ => bail!(
-                        "Configuration file not found. Have you created `enclave.config.yaml` in your project?"
+                        "Configuration file not found. Run `enclave config-set` to create a configuration."
                     ),
                 };
                 return Ok(());
@@ -136,8 +136,8 @@ impl Cli {
             Commands::Compile => e3_support_scripts::program_compile().await?,
             Commands::PrintEnv { vite, chain } => print_env::execute(&config, &chain, vite).await?,
             Commands::Program { command } => program::execute(command, &config).await?,
-            Commands::Wizard { .. } => {
-                bail!("Cannot run `enclave wizard` when a configuration exists.");
+            Commands::ConfigSet { .. } => {
+                bail!("Cannot run `enclave config-set` when a configuration already exists.");
             }
             Commands::Nodes { command } => {
                 nodes::execute(
@@ -235,9 +235,8 @@ pub enum Commands {
         command: NetCommands,
     },
 
-    #[command(hide = true)]
-    /// Initialize your ciphernode by setting up a configuration
-    Wizard {
+    /// Set configuration values (similar to solana config set)
+    ConfigSet {
         /// An rpc url for enclave to connect to
         #[arg(long = "rpc-url")]
         rpc_url: Option<String>,

@@ -4,4 +4,4 @@ pub mod nodes;
 pub mod password;
 pub mod start;
 pub mod wallet;
-pub mod wizard;
+pub mod config_set;
