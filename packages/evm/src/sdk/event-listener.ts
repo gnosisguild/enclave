@@ -22,7 +22,7 @@ export class EventListener implements SDKEventEmitter {
   constructor(
     private publicClient: PublicClient,
     private config: EventListenerConfig = {},
-  ) {}
+  ) { }
 
   /**
    * Listen to specific contract events
@@ -54,7 +54,7 @@ export class EventListener implements SDKEventEmitter {
           fromBlock: this.config.fromBlock,
           onLogs: (logs: Log[]) => {
             console.log(`Log received for ${watcherKey}`, logs);
-            logs.forEach((log: Log) => {
+            for (let log of logs) {
               console.log(`processing log ${JSON.stringify(log)}`);
               const event: EnclaveEvent<T> = {
                 type: eventType,
@@ -62,8 +62,8 @@ export class EventListener implements SDKEventEmitter {
                   .args as T extends EnclaveEventType
                   ? EnclaveEventData[T]
                   : T extends RegistryEventType
-                    ? RegistryEventData[T]
-                    : unknown,
+                  ? RegistryEventData[T]
+                  : unknown,
                 log,
                 timestamp: new Date(),
                 blockNumber: log.blockNumber ?? BigInt(0),
@@ -72,7 +72,7 @@ export class EventListener implements SDKEventEmitter {
               console.log("Emitting event...");
               this.emit(event);
               console.log("Event emitted");
-            });
+            }
           },
         });
 
