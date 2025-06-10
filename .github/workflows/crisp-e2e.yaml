@@ -72,6 +72,15 @@ jobs:
         working-directory: ./examples/CRISP
         run: pnpm exec playwright install chromium
 
+      - name: Increase swapfile
+        run: |
+          sudo swapoff -a
+          sudo fallocate -l 15G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo swapon --show
+
       - name: Run Playwright tests
         working-directory: ./examples/CRISP
         run: pnpm test:e2e
