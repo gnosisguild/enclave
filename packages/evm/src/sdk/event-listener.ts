@@ -22,7 +22,7 @@ export class EventListener implements SDKEventEmitter {
   constructor(
     private publicClient: PublicClient,
     private config: EventListenerConfig = {},
-  ) { }
+  ) {}
 
   /**
    * Listen to specific contract events
@@ -62,8 +62,8 @@ export class EventListener implements SDKEventEmitter {
                   .args as T extends EnclaveEventType
                   ? EnclaveEventData[T]
                   : T extends RegistryEventType
-                  ? RegistryEventData[T]
-                  : unknown,
+                    ? RegistryEventData[T]
+                    : unknown,
                 log,
                 timestamp: new Date(),
                 blockNumber: log.blockNumber ?? BigInt(0),
