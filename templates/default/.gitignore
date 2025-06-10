@@ -17,7 +17,6 @@ node_modules
 /target
 
 # Ignore risc0 files
-contracts/ImageID.sol
 tests/Elf.sol
 
 /deployments

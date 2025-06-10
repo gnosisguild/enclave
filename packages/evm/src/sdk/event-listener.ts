@@ -34,23 +34,32 @@ export class EventListener implements SDKEventEmitter {
     callback: EventCallback<T>,
   ): Promise<void> {
     const watcherKey = `${address}:${eventType}`;
+    console.log(`watchContractEvent: ${watcherKey}`);
 
     if (!this.listeners.has(eventType)) {
       this.listeners.set(eventType, new Set());
     }
-
+    console.log("Added callback");
     this.listeners.get(eventType)!.add(callback as EventCallback);
+
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const emitter = this;
 
     // If we don't have an active watcher for this event, create one
     if (!this.activeWatchers.has(watcherKey)) {
+      console.log("Adding active watcher for " + watcherKey);
+
       try {
         const unwatch = this.publicClient.watchContractEvent({
           address,
           abi,
           eventName: eventType as string,
           fromBlock: this.config.fromBlock,
-          onLogs: (logs: Log[]) => {
-            logs.forEach((log: Log) => {
+          onLogs(logs: Log[]) {
+            console.log(`Log received for ${watcherKey}`, logs);
+            for (let i = 0; i < logs.length; i++) {
+              const log = logs[i];
+              console.log("Got log!");
               const event: EnclaveEvent<T> = {
                 type: eventType,
                 data: (log as unknown as { args: unknown })
@@ -64,8 +73,10 @@ export class EventListener implements SDKEventEmitter {
                 blockNumber: log.blockNumber ?? BigInt(0),
                 transactionHash: log.transactionHash ?? "0x",
               };
-              this.emit(event);
-            });
+              console.log("Created event, now emitting event...");
+              emitter.emit(event);
+              console.log("Event emitted");
+            }
           },
         });
 
@@ -205,9 +216,12 @@ export class EventListener implements SDKEventEmitter {
   }
 
   public emit<T extends AllEventTypes>(event: EnclaveEvent<T>): void {
+    console.log("emit() called for " + event.type);
     const callbacks = this.listeners.get(event.type);
     if (callbacks) {
+      console.log("Have " + callbacks.size + " callbacks");
       callbacks.forEach((callback) => {
+        console.log("Running callback...");
         try {
           void (callback as EventCallback<T>)(event);
         } catch (error) {

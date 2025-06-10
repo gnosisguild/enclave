@@ -50,9 +50,9 @@ pub async fn program_compile() -> Result<()> {
     Ok(())
 }
 
-pub async fn ctl_run() -> Result<()> {
+pub async fn program_start() -> Result<()> {
     let cwd = env::current_dir()?;
-    let script = cwd.join(".enclave/support/ctl/run");
+    let script = cwd.join(".enclave/support/ctl/start");
     ensure_script_exists(&script).await?;
     run_bash_script(&cwd, &script, &[]).await?;
     Ok(())

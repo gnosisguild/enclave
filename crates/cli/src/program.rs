@@ -4,29 +4,16 @@ use e3_config::AppConfig;
 
 #[derive(Subcommand, Debug)]
 pub enum ProgramCommands {
-    /// Listen for blockchain events and trigger a computation after an E3Request has expired
-    Listen {
-        /// Webhook to trigger upon execution completion
-        #[arg(long)]
-        json_rpc_server: String,
-
-        /// Webhook to trigger upon execution completion
-        #[arg(long)]
-        chain: String,
-    },
+    /// Start the program
+    Start,
 
     /// Compile the program code
     Compile,
 }
 
-pub async fn execute(command: ProgramCommands, config: &AppConfig) -> Result<()> {
+pub async fn execute(command: ProgramCommands, _config: &AppConfig) -> Result<()> {
     match command {
-        ProgramCommands::Listen {
-            json_rpc_server,
-            chain,
-        } => {
-            e3_program_listener::execute(config, &chain, &json_rpc_server).await?;
-        }
+        ProgramCommands::Start => e3_support_scripts::program_start().await?,
         ProgramCommands::Compile => e3_support_scripts::program_compile().await?,
     };
 
