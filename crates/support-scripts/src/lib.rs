@@ -50,10 +50,22 @@ pub async fn program_compile() -> Result<()> {
     Ok(())
 }
 
-pub async fn program_start() -> Result<()> {
+pub enum SupportArgs {
+    BonsaiCredentials { api_key: String, api_url: String },
+    DevMode,
+}
+
+pub async fn program_start(bonsai_api: SupportArgs) -> Result<()> {
     let cwd = env::current_dir()?;
     let script = cwd.join(".enclave/support/ctl/start");
     ensure_script_exists(&script).await?;
-    run_bash_script(&cwd, &script, &[]).await?;
+
+    let args: Vec<&str> = match &bonsai_api {
+        SupportArgs::BonsaiCredentials { api_key, api_url } => {
+            vec!["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]
+        }
+        SupportArgs::DevMode => vec![],
+    };
+    run_bash_script(&cwd, &script, &args).await?;
     Ok(())
 }
