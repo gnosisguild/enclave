@@ -84,6 +84,34 @@ impl Default for NodeDefinition {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(untagged)]
+pub enum Risc0Config {
+    Bonsai {
+        bonsai_api_key: String,
+        bonsai_api_url: String,
+    },
+    DevMode,
+}
+
+impl Default for Risc0Config {
+    fn default() -> Self {
+        Risc0Config::DevMode
+    }
+}
+
+/// Configuration for the program runner
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct ProgramConfig {
+    risc0: Risc0Config,
+}
+
+impl ProgramConfig {
+    pub fn risc0(&self) -> &Risc0Config {
+        &self.risc0
+    }
+}
+
 /// The config actually used throughout the app
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppConfig {
@@ -105,6 +133,8 @@ pub struct AppConfig {
     autopassword: bool,
     /// If a wallet has not been set autogenerate one on start
     autowallet: bool,
+    /// Program config
+    program: ProgramConfig,
 }
 
 impl AppConfig {
@@ -160,6 +190,7 @@ impl AppConfig {
             autopassword: node.autopassword,
             autowallet: node.autowallet,
             autonetkey: node.autonetkey,
+            program: config.program.unwrap_or_default(),
         })
     }
 
@@ -275,6 +306,10 @@ impl AppConfig {
     pub fn autopassword(&self) -> bool {
         self.autopassword
     }
+
+    pub fn program(&self) -> &ProgramConfig {
+        &self.program
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -296,6 +331,8 @@ pub struct UnscopedAppConfig {
     nodes: HashMap<String, NodeDefinition>,
     /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
     otel: Option<String>,
+    /// Program config
+    program: Option<ProgramConfig>,
 }
 
 impl Default for UnscopedAppConfig {
@@ -308,6 +345,7 @@ impl Default for UnscopedAppConfig {
             found_config_file: None,
             otel: None,
             nodes: HashMap::new(),
+            program: None,
         }
     }
 }
@@ -441,6 +479,11 @@ node:
   db_file: "./foo"
   quic_port: 1234
 
+program:
+  risc0:
+    bonsai_api_key: "12345678"
+    bonsai_api_url: "http://my.api.com"
+
 nodes:
   ag:
     quic_port: 1235
@@ -473,6 +516,13 @@ nodes:
                 PathBuf::from("/myconfig/override/_default/key")
             );
             assert_eq!(config.quic_port(), 1234);
+            assert_eq!(
+                config.program().risc0(),
+                &Risc0Config::Bonsai {
+                    bonsai_api_key: "12345678".to_string(),
+                    bonsai_api_url: "http://my.api.com".to_string()
+                }
+            );
             assert!(config.peers().is_empty());
         };
         {
