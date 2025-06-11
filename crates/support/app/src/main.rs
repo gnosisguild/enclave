@@ -1,7 +1,7 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult};
 use anyhow::bail;
 use e3_compute_provider::FHEInputs;
-use e3_support_types::{ComputeRequestPayload, ComputeResponse};
+use e3_support_types::{ComputeRequest, ComputeResponse};
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Serialize, Debug)]
@@ -41,7 +41,7 @@ async fn call_webhook(
     Ok(())
 }
 
-async fn handle_compute(req: web::Json<ComputeRequestPayload>) -> ActixResult<HttpResponse> {
+async fn handle_compute(req: web::Json<ComputeRequest>) -> ActixResult<HttpResponse> {
     // TODO: process this in a spawn so that we return early and allow webhook instead of
     // processing sequentially
     println!("Processing computation...");

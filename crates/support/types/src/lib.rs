@@ -8,7 +8,7 @@ pub struct ComputeResponse {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ComputeRequestPayload {
+pub struct ComputeRequest {
     pub e3_id: Option<u64>,
     #[serde(deserialize_with = "deserialize_hex_string")]
     pub params: Vec<u8>,
@@ -44,7 +44,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ComputeRequestPayload;
+    use crate::ComputeRequest;
 
     #[test]
     fn test_deserialize_compute_request() {
@@ -60,7 +60,40 @@ mod tests {
         }
         "#;
 
-        let payload: ComputeRequestPayload = serde_json::from_str(json).unwrap();
+        let payload: ComputeRequest = serde_json::from_str(json).unwrap();
+
+        assert_eq!(payload.e3_id, Some(12345));
+        assert_eq!(payload.params, hex::decode("12345ffa").unwrap());
+        assert_eq!(payload.ciphertext_inputs.len(), 2);
+        assert_eq!(
+            payload.ciphertext_inputs[0],
+            (hex::decode("ffabc123").unwrap(), 100)
+        );
+        assert_eq!(
+            payload.ciphertext_inputs[1],
+            (hex::decode("aa6de432").unwrap(), 200)
+        );
+        assert_eq!(
+            payload.callback_url,
+            Some("https://example.com/callback".to_string())
+        );
+    }
+
+    #[test]
+    fn test_deserialize_compute_request_no_prefix() {
+        let json = r#"
+        {
+            "e3_id": 12345,
+            "params": "12345ffa",
+            "ciphertext_inputs": [
+                ["ffabc123", 100],
+                ["aa6de432", 200]
+            ],
+            "callback_url": "https://example.com/callback"
+        }
+        "#;
+
+        let payload: ComputeRequest = serde_json::from_str(json).unwrap();
 
         assert_eq!(payload.e3_id, Some(12345));
         assert_eq!(payload.params, hex::decode("12345ffa").unwrap());
