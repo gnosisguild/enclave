@@ -206,6 +206,7 @@ pub fn decode_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
 
     #[test]
     fn test_build_bfv_params() {
@@ -283,6 +284,7 @@ mod tests {
         let _ = decode_bfv_params(&invalid_bytes);
     }
 
+    #[cfg(test)]
     mod params_tests {
         use super::*;
 
@@ -338,6 +340,30 @@ mod tests {
             assert_eq!(decoded.degree(), degree);
             assert_eq!(decoded.plaintext(), plaintext_modulus);
             assert_eq!(decoded.moduli(), moduli);
+        }
+
+        #[test]
+        fn test_real_bfv_params() -> Result<()> {
+            let decoded = decode_bfv_params_arc(&hex::decode("0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001")?);
+            Ok(())
+        }
+
+        #[test]
+        fn test_real_bfv_params_2() -> Result<()> {
+            let bytes = [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 192, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 63, 255, 255, 255, 0,
+                0, 1,
+            ];
+
+            let params = decode_bfv_params_arc(&bytes);
+            assert_eq!(params.plaintext(), 1032193);
+            Ok(())
         }
     }
 }

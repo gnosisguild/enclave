@@ -49,7 +49,7 @@ async fn handle_compute(req: web::Json<ComputeRequest>) -> ActixResult<HttpRespo
         params: req.params.clone(),
         ciphertexts: req.ciphertext_inputs.clone(),
     };
-
+    println!("fhe_inputs.params = {:?}", fhe_inputs.params);
     let (risc0_output, ciphertext) =
         tokio::task::spawn_blocking(move || e3_support_host::run_compute(fhe_inputs))
             .await
