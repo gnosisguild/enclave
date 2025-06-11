@@ -1,6 +1,6 @@
 {
   "name": "@gnosis-guild/enclave-react",
-  "version": "0.0.5-test.18",
+  "version": "0.0.5-test.19",
   "description": "React hooks and utilities for Enclave SDK",
   "main": "dist/index.js",
   "module": "dist/index.js",
