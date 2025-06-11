@@ -2343,8 +2343,10 @@ name = "e3-bfv-helpers"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "anyhow",
  "fhe",
  "fhe-traits",
+ "hex",
 ]
 
 [[package]]
