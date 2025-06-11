@@ -84,10 +84,13 @@ impl Default for NodeDefinition {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(untagged)]
 pub enum Risc0Config {
-    Bonsai { api_key: String, api_url: String },
+    Bonsai {
+        bonsai_api_key: String,
+        bonsai_api_url: String,
+    },
     DevMode,
 }
 
@@ -100,7 +103,13 @@ impl Default for Risc0Config {
 /// Configuration for the program runner
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct ProgramConfig {
-    pub risc0: Risc0Config,
+    risc0: Risc0Config,
+}
+
+impl ProgramConfig {
+    pub fn risc0(&self) -> &Risc0Config {
+        &self.risc0
+    }
 }
 
 /// The config actually used throughout the app
@@ -470,6 +479,11 @@ node:
   db_file: "./foo"
   quic_port: 1234
 
+program:
+  risc0:
+    bonsai_api_key: "12345678"
+    bonsai_api_url: "http://my.api.com"
+
 nodes:
   ag:
     quic_port: 1235
@@ -502,6 +516,13 @@ nodes:
                 PathBuf::from("/myconfig/override/_default/key")
             );
             assert_eq!(config.quic_port(), 1234);
+            assert_eq!(
+                config.program().risc0(),
+                &Risc0Config::Bonsai {
+                    bonsai_api_key: "12345678".to_string(),
+                    bonsai_api_url: "http://my.api.com".to_string()
+                }
+            );
             assert!(config.peers().is_empty());
         };
         {

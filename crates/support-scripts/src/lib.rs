@@ -59,9 +59,17 @@ pub async fn program_start(program_config: &ProgramConfig) -> Result<()> {
     let script = cwd.join(".enclave/support/ctl/start");
     ensure_script_exists(&script).await?;
 
-    let args: Vec<&str> = match &program_config.risc0 {
-        Risc0Config::Bonsai { api_key, api_url } => {
-            vec!["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]
+    let args: Vec<&str> = match program_config.risc0() {
+        Risc0Config::Bonsai {
+            bonsai_api_key,
+            bonsai_api_url,
+        } => {
+            vec![
+                "--api-key",
+                bonsai_api_key.as_str(),
+                "--api-url",
+                bonsai_api_url.as_str(),
+            ]
         }
         Risc0Config::DevMode => vec![],
     };
