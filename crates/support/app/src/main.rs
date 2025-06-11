@@ -1,27 +1,8 @@
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult};
 use anyhow::bail;
 use e3_compute_provider::FHEInputs;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ComputeRequest {
-    pub params: Vec<u8>,
-    pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ComputeResponse {
-    pub ciphertext: Vec<u8>,
-    pub proof: Vec<u8>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ComputeRequestPayload {
-    pub e3_id: Option<u64>,
-    pub params: Vec<u8>,
-    pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
-    pub callback_url: Option<String>,
-}
+use e3_support_types::{ComputeRequest, ComputeResponse};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Serialize, Debug)]
 struct WebhookPayload {
@@ -60,7 +41,7 @@ async fn call_webhook(
     Ok(())
 }
 
-async fn handle_compute(req: web::Json<ComputeRequestPayload>) -> ActixResult<HttpResponse> {
+async fn handle_compute(req: web::Json<ComputeRequest>) -> ActixResult<HttpResponse> {
     // TODO: process this in a spawn so that we return early and allow webhook instead of
     // processing sequentially
     println!("Processing computation...");

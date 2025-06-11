@@ -79,6 +79,8 @@ async function callFheRunner(
     ciphertext_inputs: ciphertextInputs,
     callback_url: CALLBACK_URL,
   };
+  console.log("payload:");
+  console.log(JSON.stringify(payload));
 
   const response = await fetch(`${PROGRAM_RUNNER_URL}/run_compute`, {
     method: "POST",

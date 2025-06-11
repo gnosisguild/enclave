@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["app", "host", "methods"]
+members = ["app", "host", "methods", "types"]
 exclude = ["methods/guest"]
 
 [workspace.package]
@@ -11,6 +11,7 @@ edition = "2021"
 e3-support-app = { path = "./app" }
 e3-support-host = { path = "./host" }
 e3-user-program = { path = "./program" }
+e3-support-types = { path = "./types" }
 methods = { path = "./methods" }
 alloy-primitives = { version = "0.8", default-features = false, features = [
     "rlp",
