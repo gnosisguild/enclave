@@ -206,6 +206,7 @@ pub fn decode_bfv_params_arc(bytes: &[u8]) -> Arc<BfvParameters> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
 
     #[test]
     fn test_build_bfv_params() {
@@ -283,6 +284,7 @@ mod tests {
         let _ = decode_bfv_params(&invalid_bytes);
     }
 
+    #[cfg(test)]
     mod params_tests {
         use super::*;
 
@@ -338,6 +340,12 @@ mod tests {
             assert_eq!(decoded.degree(), degree);
             assert_eq!(decoded.plaintext(), plaintext_modulus);
             assert_eq!(decoded.moduli(), moduli);
+        }
+
+        #[test]
+        fn test_real_bfv_params() -> Result<()> {
+            let decoded = decode_bfv_params_arc(&hex::decode("0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001")?);
+            Ok(())
         }
     }
 }

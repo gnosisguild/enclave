@@ -11,3 +11,6 @@ alloy = { version = "0.8.3" , features = ["dyn-abi", "rlp", "serde"] }
 fhe-traits.workspace = true
 fhe_rs.workspace = true
 
+[dev-dependencies]
+hex.workspace = true
+anyhow.workspace = true
