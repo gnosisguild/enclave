@@ -198,7 +198,7 @@ const RequestComputationStep: React.FC<RequestComputationStepProps> = ({
           </div>
         )}
 
-        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => {}} />}
+        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => { }} />}
 
         {isSuccess && transactionHash && (
           <div className='rounded-lg border border-green-200 bg-green-50 p-4'>
@@ -267,7 +267,7 @@ const ActivateE3Step: React.FC<ActivateE3StepProps> = ({ e3State, isRequesting, 
           </div>
         )}
 
-        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => {}} />}
+        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => { }} />}
 
         {isSuccess && transactionHash && (
           <div className='rounded-lg border border-green-200 bg-green-50 p-4'>
@@ -733,7 +733,7 @@ const WizardSDK: React.FC = () => {
   }
 
   const handleActivateE3 = async () => {
-    if (!e3State.id || !e3State.publicKey) return
+    if (e3State.id === null || e3State.publicKey === null) return
 
     setIsRequesting(true)
     setRequestError(null)
@@ -752,7 +752,7 @@ const WizardSDK: React.FC = () => {
 
   const handleInputSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input1 || !input2 || !e3State.publicKey || !e3State.id) return
+    if (!input1 || !input2 || e3State.publicKey === null || e3State.id === null) return
 
     setCurrentStep(WizardStep.ENCRYPT_SUBMIT)
     setInputPublishError(null)
@@ -844,9 +844,8 @@ const WizardSDK: React.FC = () => {
         {[1, 2, 3, 4, 5, 6].map((step) => (
           <div key={step} className='flex items-center'>
             <div
-              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${
-                currentStep >= step ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
-              }`}
+              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${currentStep >= step ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
+                }`}
             >
               {getStepIcon(step as WizardStep)}
             </div>
