@@ -198,7 +198,7 @@ const RequestComputationStep: React.FC<RequestComputationStepProps> = ({
           </div>
         )}
 
-        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => {}} />}
+        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => { }} />}
 
         {isSuccess && transactionHash && (
           <div className='rounded-lg border border-green-200 bg-green-50 p-4'>
@@ -267,7 +267,7 @@ const ActivateE3Step: React.FC<ActivateE3StepProps> = ({ e3State, isRequesting, 
           </div>
         )}
 
-        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => {}} />}
+        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => { }} />}
 
         {isSuccess && transactionHash && (
           <div className='rounded-lg border border-green-200 bg-green-50 p-4'>
@@ -598,9 +598,15 @@ const WizardSDK: React.FC = () => {
 
   // Set up event listeners
   useEffect(() => {
-    if (!isInitialized) return
+    console.log('setup event listener useEffect running...')
+    if (!isInitialized) {
+      console.log('isInitialized = false so refusing to set up listeners')
+      return
+    }
+    console.log('isInitialized was true so setting up listeners and handlers...')
 
     const handleE3Requested = (event: any) => {
+      console.log('handleE3Requested')
       const e3Id = event.data.e3Id
       setE3State((prev) => ({
         ...prev,
@@ -610,8 +616,10 @@ const WizardSDK: React.FC = () => {
     }
 
     const handleCommitteePublished = (event: any) => {
-      const { e3Id, publicKey } = event.data
+      console.log('handleCommitteePublished')
 
+      const { e3Id, publicKey } = event.data
+      console.log(`Got committee published: e3Id=`, e3Id, `publicKey=`, publicKey)
       // I added a 2 second delay to show the waiting state, its too fast on anvil
       setTimeout(() => {
         setE3State((prev) => {
@@ -628,6 +636,7 @@ const WizardSDK: React.FC = () => {
     }
 
     const handleE3Activated = (event: any) => {
+      console.log('handleE3Activated')
       const { e3Id, expiration } = event.data
       setE3State((prev) => {
         if (prev.id !== null && e3Id === prev.id) {
@@ -642,6 +651,7 @@ const WizardSDK: React.FC = () => {
     }
 
     const handlePlaintextOutput = (event: any) => {
+      console.log('handlePlaintextOutput')
       const { e3Id, plaintextOutput } = event.data
       setE3State((prev) => {
         if (prev.id !== null && e3Id === prev.id) {
@@ -658,6 +668,7 @@ const WizardSDK: React.FC = () => {
     }
 
     // Set up event listeners
+    console.log('registering listeners...')
     onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handleE3Requested)
     onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublished)
     onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3Activated)
@@ -665,13 +676,14 @@ const WizardSDK: React.FC = () => {
 
     // Cleanup
     return () => {
+      console.log('deregistering listeners')
       off(EnclaveEventType.E3_REQUESTED, handleE3Requested)
       off(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublished)
       off(EnclaveEventType.E3_ACTIVATED, handleE3Activated)
       off(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, handlePlaintextOutput)
     }
   }, [isInitialized, onEnclaveEvent, off, EnclaveEventType, RegistryEventType])
-  console.log({ currentStep })
+
   // Auto-advance steps based on state
   useEffect(() => {
     if (!isConnected && currentStep > WizardStep.CONNECT_WALLET) {
@@ -688,6 +700,7 @@ const WizardSDK: React.FC = () => {
   }, [isConnected, isInitialized, currentStep, e3State])
 
   const handleRequestComputation = async () => {
+    console.log('handleRequestComputation')
     setIsRequesting(true)
     setRequestError(null)
     setRequestSuccess(false)
@@ -710,7 +723,7 @@ const WizardSDK: React.FC = () => {
       const duration = BigInt(60) // 1 minute
       const e3ProgramParams = encodeBfvParams()
       const computeProviderParams = encodeComputeProviderParams(DEFAULT_COMPUTE_PROVIDER_PARAMS)
-
+      console.log('calling requestE3...')
       const hash = await requestE3({
         filter: contracts.filterRegistry,
         threshold,
@@ -733,8 +746,11 @@ const WizardSDK: React.FC = () => {
   }
 
   const handleActivateE3 = async () => {
-    if (!e3State.id || !e3State.publicKey) return
-
+    console.log('handleActivateE3')
+    if (!e3State.id || !e3State.publicKey) {
+      console.log(`refusing to activate because id=${e3State.id} or publicKey=${e3State.publicKey}`)
+      return
+    }
     setIsRequesting(true)
     setRequestError(null)
 
@@ -844,9 +860,8 @@ const WizardSDK: React.FC = () => {
         {[1, 2, 3, 4, 5, 6].map((step) => (
           <div key={step} className='flex items-center'>
             <div
-              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${
-                currentStep >= step ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
-              }`}
+              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${currentStep >= step ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
+                }`}
             >
               {getStepIcon(step as WizardStep)}
             </div>
