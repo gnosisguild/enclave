@@ -5,3 +5,4 @@ packages:
   - packages/enclave-react
   - packages/evm
   - templates/default
+  - templates/default/client

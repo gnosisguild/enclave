@@ -72,7 +72,7 @@ interface ErrorDisplayProps {
   onToggleDetails: () => void
 }
 
-const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, showDetails, onToggleDetails }) => {
+const ErrorDisplay = ({ error, showDetails, onToggleDetails }: ErrorDisplayProps) => {
   if (!error) return null
 
   const userMessage = formatContractError(error)
@@ -99,7 +99,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, showDetails, onToggl
 // STEP COMPONENTS
 // ============================================================================
 
-const ConnectWalletStep: React.FC = () => (
+const ConnectWalletStep = () => (
   <CardContent>
     <div className='space-y-6 text-center'>
       <div className='flex justify-center'>
@@ -133,17 +133,17 @@ interface RequestComputationStepProps {
   transactionHash: string | undefined
   error: any
   isSuccess: boolean
-  onRequestComputation: () => Promise<void>
+  onRequestComputation: any
 }
 
-const RequestComputationStep: React.FC<RequestComputationStepProps> = ({
+const RequestComputationStep = ({
   e3State,
   isRequesting,
   transactionHash,
   error,
   isSuccess,
   onRequestComputation,
-}) => (
+}: RequestComputationStepProps) => (
   <CardContent>
     <div className='space-y-6 text-center'>
       <div className='flex justify-center'>
@@ -240,10 +240,10 @@ interface ActivateE3StepProps {
   transactionHash: string | undefined
   error: any
   isSuccess: boolean
-  onActivateE3: () => Promise<void>
+  onActivateE3: () => Promise
 }
 
-const ActivateE3Step: React.FC<ActivateE3StepProps> = ({ e3State, isRequesting, transactionHash, error, isSuccess, onActivateE3 }) => (
+const ActivateE3Step = ({ e3State, isRequesting, transactionHash, error, isSuccess, onActivateE3 }: ActivateE3StepProps) => (
   <CardContent>
     <div className='space-y-6 text-center'>
       <div className='flex justify-center'>
@@ -312,7 +312,7 @@ interface EnterInputsStepProps {
   onSubmit: (e: React.FormEvent) => void
 }
 
-const EnterInputsStep: React.FC<EnterInputsStepProps> = ({ e3State, input1, input2, onInput1Change, onInput2Change, onSubmit }) => (
+const EnterInputsStep = ({ e3State, input1, input2, onInput1Change, onInput2Change, onSubmit }: EnterInputsStepProps) => (
   <CardContent>
     <form onSubmit={onSubmit} className='space-y-6 text-center'>
       <div className='flex justify-center'>
@@ -391,13 +391,13 @@ interface EncryptSubmitStepProps {
   onTryAgain: () => void
 }
 
-const EncryptSubmitStep: React.FC<EncryptSubmitStepProps> = ({
+const EncryptSubmitStep = ({
   inputPublishError,
   inputPublishSuccess,
   showErrorDetails,
   onToggleErrorDetails,
   onTryAgain,
-}) => (
+}: EncryptSubmitStepProps) => (
   <CardContent>
     <div className='space-y-6 text-center'>
       <div className='flex justify-center'>
@@ -473,7 +473,7 @@ interface ResultsStepProps {
   onReset: () => void
 }
 
-const ResultsStep: React.FC<ResultsStepProps> = ({ input1, input2, result, e3State, transactionHash, onReset }) => (
+const ResultsStep = ({ input1, input2, result, e3State, transactionHash, onReset }: ResultsStepProps) => (
   <CardContent>
     <div className='space-y-6 text-center'>
       <div className='flex justify-center'>
@@ -540,7 +540,7 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ input1, input2, result, e3Sta
 // MAIN WIZARD COMPONENT
 // ============================================================================
 
-const WizardSDK: React.FC = () => {
+const WizardSDK = () => {
   const { isConnected } = useAccount()
   const { isLoaded: isWasmLoaded, encryptInput } = useWebAssemblyHook()
 
@@ -747,7 +747,7 @@ const WizardSDK: React.FC = () => {
 
   const handleActivateE3 = async () => {
     console.log('handleActivateE3')
-    if (!e3State.id || !e3State.publicKey) {
+    if (e3State.id === null || e3State.publicKey === null) {
       console.log(`refusing to activate because id=${e3State.id} or publicKey=${e3State.publicKey}`)
       return
     }
@@ -768,8 +768,10 @@ const WizardSDK: React.FC = () => {
 
   const handleInputSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input1 || !input2 || !e3State.publicKey || !e3State.id) return
-
+    if (!input1 || !input2 || e3State.publicKey === null || e3State.id === null) {
+      console.log(`refusing to submit input because input1=${input1},input2=${input2},publicKey=${e3State.publicKey}, id=${e3State.id}`)
+      return
+    }
     setCurrentStep(WizardStep.ENCRYPT_SUBMIT)
     setInputPublishError(null)
     setInputPublishSuccess(false)
