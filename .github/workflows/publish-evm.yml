@@ -23,3 +23,7 @@ jobs:
         env:
           NPM_AUTH_TOKEN: ${{secrets.PUBLISH_NPM_TOKEN}}
           YARN_REGISTRY: https://registry.npmjs.org/
+      - run: pnpm react:release
+        env:
+          NPM_AUTH_TOKEN: ${{secrets.PUBLISH_NPM_TOKEN}}
+          YARN_REGISTRY: https://registry.npmjs.org/
