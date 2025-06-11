@@ -1,16 +1,20 @@
 use anyhow::{bail, Result};
 use duct::cmd;
+use e3_config::ProgramConfig;
+use e3_config::Risc0Config;
 use std::{env, path::PathBuf};
 use tokio::fs;
 use tokio::signal;
 
 async fn run_bash_script(cwd: &PathBuf, script: &PathBuf, args: &[&str]) -> Result<()> {
-    println!("run_bash_script: {:?} {:?} {:?}", cwd, script, args);
+    println!("run_bash_script: {:?} {:?} {:?}", cwd, script, args); // Delete this later as this exposes
+                                                                    // credential information
 
     // Build the command using cmd! macro for cleaner syntax
     let mut cmd_args = vec!["bash".to_string(), script.to_string_lossy().to_string()];
     cmd_args.extend(args.iter().map(|s| s.to_string()));
 
+    // Note this will not end up on shell history
     let expression = cmd("bash", &cmd_args[1..]).dir(cwd);
 
     let handle = expression.start()?;
@@ -50,21 +54,16 @@ pub async fn program_compile() -> Result<()> {
     Ok(())
 }
 
-pub enum SupportArgs {
-    BonsaiCredentials { api_key: String, api_url: String },
-    DevMode,
-}
-
-pub async fn program_start(bonsai_api: SupportArgs) -> Result<()> {
+pub async fn program_start(program_config: &ProgramConfig) -> Result<()> {
     let cwd = env::current_dir()?;
     let script = cwd.join(".enclave/support/ctl/start");
     ensure_script_exists(&script).await?;
 
-    let args: Vec<&str> = match &bonsai_api {
-        SupportArgs::BonsaiCredentials { api_key, api_url } => {
+    let args: Vec<&str> = match &program_config.risc0 {
+        Risc0Config::Bonsai { api_key, api_url } => {
             vec!["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]
         }
-        SupportArgs::DevMode => vec![],
+        Risc0Config::DevMode => vec![],
     };
     run_bash_script(&cwd, &script, &args).await?;
     Ok(())

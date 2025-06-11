@@ -84,6 +84,25 @@ impl Default for NodeDefinition {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Risc0Config {
+    Bonsai { api_key: String, api_url: String },
+    DevMode,
+}
+
+impl Default for Risc0Config {
+    fn default() -> Self {
+        Risc0Config::DevMode
+    }
+}
+
+/// Configuration for the program runner
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct ProgramConfig {
+    pub risc0: Risc0Config,
+}
+
 /// The config actually used throughout the app
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppConfig {
@@ -105,6 +124,8 @@ pub struct AppConfig {
     autopassword: bool,
     /// If a wallet has not been set autogenerate one on start
     autowallet: bool,
+    /// Program config
+    program: ProgramConfig,
 }
 
 impl AppConfig {
@@ -160,6 +181,7 @@ impl AppConfig {
             autopassword: node.autopassword,
             autowallet: node.autowallet,
             autonetkey: node.autonetkey,
+            program: config.program.unwrap_or_default(),
         })
     }
 
@@ -275,6 +297,10 @@ impl AppConfig {
     pub fn autopassword(&self) -> bool {
         self.autopassword
     }
+
+    pub fn program(&self) -> &ProgramConfig {
+        &self.program
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -296,6 +322,8 @@ pub struct UnscopedAppConfig {
     nodes: HashMap<String, NodeDefinition>,
     /// Set the Open Telemetry collector grpc endpoint. Eg. 127.0.0.1:4317
     otel: Option<String>,
+    /// Program config
+    program: Option<ProgramConfig>,
 }
 
 impl Default for UnscopedAppConfig {
@@ -308,6 +336,7 @@ impl Default for UnscopedAppConfig {
             found_config_file: None,
             otel: None,
             nodes: HashMap::new(),
+            program: None,
         }
     }
 }
