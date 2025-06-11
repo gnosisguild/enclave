@@ -21,6 +21,8 @@ jobs:
       - run: pnpm evm:release
         env:
           NODE_AUTH_TOKEN: ${{secrets.PUBLISH_NPM_TOKEN}}
+          NPM_CONFIG_GIT_CHECKS: false # while we are using hacknet
       - run: pnpm react:release
         env:
           NODE_AUTH_TOKEN: ${{secrets.PUBLISH_NPM_TOKEN}}
+          NPM_CONFIG_GIT_CHECKS: false # while we are using hacknet
