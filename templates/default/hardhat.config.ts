@@ -42,6 +42,14 @@ const config: HardhatUserConfig = {
       },
     },
   },
+  networks: {
+    hardhat: {
+      mining: {
+        auto: false,
+        interval: 1000,
+      },
+    },
+  },
   external: {
     contracts: [
       {
