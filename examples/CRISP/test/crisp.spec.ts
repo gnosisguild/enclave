@@ -79,7 +79,7 @@ test("CRISP smoke test", async ({
   await page.locator('button:has-text("Cast Vote")').click();
 
   console.log("⏳ [Step] Waiting for on-chain result (200s)");
-  await page.waitForTimeout(240_000);
+  await page.waitForTimeout(200_000);
 
   console.log("📊 [Step] Navigating to Historic Polls");
   await page.locator('a:has-text("Historic polls")').click();
