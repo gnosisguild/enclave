@@ -3,8 +3,6 @@
 # ────────────────────────────────────────────────────────────────────────────────
 FROM ubuntu:24.04
 
-ARG NOIR_VERSION=1.0.0-beta.3
-ARG BB_VERSION=0.82.2
 ARG RISCZERO_VERSION=2.0.0
 ARG CPP_VERSION=2024.1.5
 ARG RUST_VERSION=1.85.0
@@ -49,24 +47,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
  | sh -s -- -y --default-toolchain ${RUST_VERSION}
 ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 RUN rustup component add rustfmt clippy
-
-# ────────────────────────────────────────────────────────────────────────────────
-#   Noir / Nargo
-# ────────────────────────────────────────────────────────────────────────────────
-ENV NARGO_HOME="/home/${USERNAME}/.nargo"
-ENV PATH="${PATH}:${NARGO_HOME}/bin"
-
-RUN curl -L https://raw.githubusercontent.com/noir-lang/noirup/refs/heads/main/install | bash \
- && "$HOME/.nargo/bin/noirup" -v ${NOIR_VERSION}
-
-# ────────────────────────────────────────────────────────────────────────────────
-#   Barretenberg CLI (bbup)
-# ────────────────────────────────────────────────────────────────────────────────
-ENV BB_HOME="/home/${USERNAME}/.bb"
-ENV PATH="${PATH}:${BB_HOME}"
-
-RUN curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/master/barretenberg/bbup/install | bash \
- && bbup -v ${BB_VERSION}
 
 # ────────────────────────────────────────────────────────────────────────────────
 #   Foundry
