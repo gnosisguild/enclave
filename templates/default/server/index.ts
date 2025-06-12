@@ -9,6 +9,7 @@ import {
 import { handleTestInteraction } from "./testHandler";
 import { getCheckedEnvVars } from "./utils";
 import { callFheRunner } from "./runner";
+import { createPublicClient, http } from "viem";
 
 interface E3Session {
   e3Id: bigint;
@@ -196,6 +197,21 @@ async function handleWebhookRequest(req: Request, res: Response) {
     }
 
     console.log(`🔄 Publishing output for E3 ${e3_id}...`);
+    if (process.env.TEST_MODE) {
+      const client = createPublicClient({
+        transport: http("http://127.0.0.1:8545"), // your Hardhat node URL
+      });
+      // The following ensures that if we are in test mode using hardhat
+      // We make sure we are past the input window
+      await client.request({
+        method: "evm_increaseTime",
+        params: [60], // seconds
+      });
+      await client.request({
+        method: "evm_mine",
+        params: [],
+      });
+    }
 
     const sdk = await createPrivateSDK();
     await sdk.publishCiphertextOutput(BigInt(e3_id), ciphertext, proof);

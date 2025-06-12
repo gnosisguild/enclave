@@ -46,7 +46,7 @@ tmux send-keys -t 1 'pnpm dev:evm' C-m
 sleep 1
 tmux send-keys -t 2 'pnpm dev:ciphernodes' C-m
 sleep 1
-tmux send-keys -t 3 'pnpm dev:server' C-m
+tmux send-keys -t 3 'TEST_MODE=1 pnpm dev:server' C-m
 sleep 1
 tmux send-keys -t 4 'enclave program start' C-m
 sleep 1
