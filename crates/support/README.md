@@ -7,9 +7,14 @@ To develop on this you should log into the container by running `./scripts/dev.s
 
 ```mermaid
 graph TD
-    A["enclave program start"]
-    A -->|"./.enclave/support/ctl/start"| D
-
+    subgraph N["e3-support-scripts"]
+        A["enclave program start"]
+        AA["./.enclave/support/ctl/start"]
+        A --> AA
+    end
+    M["instigator"] --"http\:\/\/localhost\:13151\/run_compute (cb in payload)"--> D
+    D --"http\:\/\/someurl.com"--> O["callback server receives results"]
+    AA --listen on port 13151--> D
     subgraph C["e3-support (container)"]
         D["app"]
         E["host"]
@@ -37,3 +42,5 @@ graph TD
 NOTE: This is outside of the main workspace because it needs to be run within it's own context in order to isolate risc0.
 
 NOTE: We are attempting to isolate risc0 - it is anticipated that we will have to use feature flags to tody this up so that we can compile more of the code and enable rust-analyzer to work outside of the risc0 environment for this project.
+
+**NOTE: currently this is an open relay which is a known issue**
