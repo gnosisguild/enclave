@@ -7,11 +7,31 @@ To develop on this you should log into the container by running `./scripts/dev.s
 
 ```mermaid
 graph TD
-  a['enclave program start']
-  b['./.enclave/support/ctl/start']
-  c['e3-support (container)']
-  a --> b
-  b --> c
+    A["enclave program start"]
+    A -->|"./.enclave/support/ctl/start"| D
+
+    subgraph C["e3-support (container)"]
+        D["app"]
+        E["host"]
+        F["types"]
+        G["compute-provider"]
+        H["methods"]
+        I["guest"]
+        J["user-program"]
+
+        D --> E
+        D --> F
+        D --> G
+
+        E --> H
+        E --> G
+        E --> J
+
+        H --> I
+
+        I --> G
+        I --> J
+    end
 ```
 
 NOTE: This is outside of the main workspace because it needs to be run within it's own context in order to isolate risc0.
