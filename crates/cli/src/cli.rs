@@ -6,7 +6,7 @@ use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
-use crate::{init, net, password, wallet, wizard};
+use crate::{config_set, init, net, password, wallet};
 use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
@@ -71,11 +71,11 @@ impl Cli {
 
     #[instrument(skip_all)]
     pub async fn execute(self) -> Result<()> {
-        // Attempt to load the config, but only treat “not found” as
+        // Attempt to load the config, but only treat "not found" as
         // the trigger for the init flow.  All other errors bubble up.
         let config = match self.load_config() {
             Ok(cfg) => cfg,
-            // If the file truly doesn’t exist, fall back to init
+            // If the file truly doesn't exist, fall back to init
             Err(e)
                 if matches!(
                     e.downcast_ref::<std::io::Error>(),
@@ -85,7 +85,7 @@ impl Cli {
                 // Existing init branch
                 match self.command {
                     Commands::Init {path, template} => init::execute(path, template).await?,
-                    Commands::Wizard {
+                    Commands::ConfigSet {
                         rpc_url,
                         eth_address,
                         password,
@@ -93,7 +93,7 @@ impl Cli {
                         net_keypair,
                         generate_net_keypair,
                     } => {
-                        wizard::execute(
+                        config_set::execute(
                             rpc_url,
                             eth_address,
                             password,
@@ -101,10 +101,23 @@ impl Cli {
                             net_keypair,
                             generate_net_keypair,
                         )
-                        .await?
+                        .await?;
+                        println!("You can start your node using `enclave start`");
+                    }
+                    Commands::Start { .. } => {
+                        println!("No configuration found. Setting up enclave configuration...");
+                        config_set::execute(
+                            None,
+                            None,
+                            None,
+                            false,
+                            None,
+                            false,
+                        )
+                        .await?;
                     }
                     _ => bail!(
-                        "Configuration file not found. Have you created `enclave.config.yaml` in your project?"
+                        "Configuration file not found. Run `enclave config-set` to create a configuration."
                     ),
                 };
                 return Ok(());
@@ -136,8 +149,8 @@ impl Cli {
             Commands::Compile => e3_support_scripts::program_compile().await?,
             Commands::PrintEnv { vite, chain } => print_env::execute(&config, &chain, vite).await?,
             Commands::Program { command } => program::execute(command, &config).await?,
-            Commands::Wizard { .. } => {
-                bail!("Cannot run `enclave wizard` when a configuration exists.");
+            Commands::ConfigSet { .. } => {
+                bail!("Cannot run `enclave config-set` when a configuration already exists.");
             }
             Commands::Nodes { command } => {
                 nodes::execute(
@@ -235,15 +248,14 @@ pub enum Commands {
         command: NetCommands,
     },
 
-    #[command(hide = true)]
-    /// Initialize your ciphernode by setting up a configuration
-    Wizard {
+    /// Set configuration values (similar to solana config set)
+    ConfigSet {
         /// An rpc url for enclave to connect to
-        #[arg(long = "rpc-url")]
+        #[arg(long = "rpc-url", short = 'r')]
         rpc_url: Option<String>,
 
         /// An Ethereum address that enclave should use to identify the node
-        #[arg(long = "eth-address")]
+        #[arg(long = "eth-address", short = 'e')]
         eth_address: Option<String>,
 
         /// The password
@@ -251,15 +263,15 @@ pub enum Commands {
         password: Option<String>,
 
         /// Skip asking for eth
-        #[arg(long = "skip-eth")]
+        #[arg(long = "skip-eth", short = 's')]
         skip_eth: bool,
 
         /// The network private key (ed25519)
-        #[arg(long = "net-keypair")]
+        #[arg(long = "net-keypair", short = 'n')]
         net_keypair: Option<String>,
 
         /// Generate a new network keypair
-        #[arg(long = "generate-net-keypair")]
+        #[arg(long = "generate-net-keypair", short = 'g')]
         generate_net_keypair: bool,
     },
 
