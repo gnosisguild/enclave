@@ -533,6 +533,9 @@ importers:
       typescript:
         specifier: '>=4.5.0'
         version: 5.8.3
+      viem:
+        specifier: ^2.30.6
+        version: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.51)
       wait-on:
         specifier: ^8.0.3
         version: 8.0.3

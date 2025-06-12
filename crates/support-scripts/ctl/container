@@ -22,10 +22,10 @@ if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
 else
     docker run -it --rm \
         --name "$CONTAINER_NAME" \
+        --network=host \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
         -v "${CACHE_PREFIX}-target-cache:/app/target" \
-        -p 13151:13151 \
         "$IMAGE" bash -c "$*"
 fi

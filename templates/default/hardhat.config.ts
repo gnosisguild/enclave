@@ -7,7 +7,7 @@ import type { HardhatUserConfig } from "hardhat/config";
 
 task("ciphernode:add", "Register a ciphernode to the registry")
   .addParam("ciphernodeAddress", "address of ciphernode to register")
-  .setAction(async function(taskArguments: TaskArguments, hre) {
+  .setAction(async function (taskArguments: TaskArguments, hre) {
     const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
     const [deployer] = await hre.ethers.getSigners();
     const registryContract = new hre.ethers.Contract(

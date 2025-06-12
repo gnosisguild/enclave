@@ -6,6 +6,11 @@ import {
   type InputPublishedData,
   type E3RequestedData,
 } from "@gnosis-guild/enclave/sdk";
+import { handleTestInteraction } from "./testHandler";
+import { getCheckedEnvVars } from "./utils";
+import { callFheRunner } from "./runner";
+import { createPublicClient, http } from "viem";
+import { hardhat } from "viem/chains";
 
 interface E3Session {
   e3Id: bigint;
@@ -17,27 +22,6 @@ interface E3Session {
 }
 
 const e3Sessions = new Map<string, E3Session>();
-
-function ensureEnv(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Missing required env var: ${key}`);
-  }
-  return value;
-}
-
-function getCheckedEnvVars() {
-  return {
-    RPC_URL: ensureEnv("RPC_URL"),
-    ENCLAVE_CONTRACT: ensureEnv("ENCLAVE_ADDRESS"),
-    CIPHERNODE_REGISTRY_CONTRACT: ensureEnv("REGISTRY_ADDRESS"),
-    PRIVATE_KEY: ensureEnv("PRIVATE_KEY"),
-    CHAIN_ID: parseInt(ensureEnv("CHAIN_ID")),
-    PROGRAM_RUNNER_URL:
-      process.env.PROGRAM_RUNNER_URL || "http://127.0.0.1:13151",
-    CALLBACK_URL: process.env.CALLBACK_URL || "http://127.0.0.1:8080",
-  };
-}
 
 async function createPrivateSDK() {
   const {
@@ -66,41 +50,7 @@ async function createPrivateSDK() {
   return sdk;
 }
 
-async function callFheRunner(
-  e3Id: bigint,
-  params: string,
-  ciphertextInputs: Array<[string, number]>,
-): Promise<void> {
-  const { PROGRAM_RUNNER_URL, CALLBACK_URL } = getCheckedEnvVars();
-
-  const payload = {
-    e3_id: Number(e3Id),
-    params,
-    ciphertext_inputs: ciphertextInputs,
-    callback_url: CALLBACK_URL,
-  };
-  console.log("payload:");
-  console.log(JSON.stringify(payload));
-
-  const response = await fetch(`${PROGRAM_RUNNER_URL}/run_compute`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `FHE Runner failed: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  const result = await response.json();
-  console.log(`✓ FHE Runner accepted E3 ${e3Id}:`, result);
-}
-
-async function processE3Session(e3Id: bigint): Promise<void> {
+async function runProgram(e3Id: bigint): Promise<void> {
   const sessionKey = e3Id.toString();
   const session = e3Sessions.get(sessionKey);
 
@@ -145,67 +95,74 @@ async function processE3Session(e3Id: bigint): Promise<void> {
   }
 }
 
+async function handleE3ActivatedEvent(event: any) {
+  const data = event.data as E3ActivatedData;
+  const e3Id = data.e3Id;
+  const expiration = data.expiration;
+
+  console.log(`🎯 E3 Activated: ${e3Id}, expiration: ${expiration}`);
+
+  const sessionKey = e3Id.toString();
+  if (!e3Sessions.has(sessionKey)) {
+    const sdk = await createPrivateSDK();
+    const e3 = await sdk.getE3(e3Id);
+    e3Sessions.set(sessionKey, {
+      e3Id,
+      e3ProgramParams: e3.e3ProgramParams,
+      expiration,
+      inputs: [],
+      isProcessing: false,
+      isCompleted: false,
+    });
+  }
+
+  const currentTime = BigInt(Math.floor(Date.now() / 1000));
+  const sleepSeconds =
+    expiration > currentTime ? Number(expiration - currentTime) : 0;
+
+  if (sleepSeconds > 0) {
+    console.log(
+      `⏰ Scheduling E3 ${e3Id} processing in ${sleepSeconds} seconds...`,
+    );
+    setTimeout(async () => {
+      await runProgram(e3Id);
+    }, sleepSeconds * 1000);
+  } else {
+    console.log(`⚡ E3 ${e3Id} already expired, processing immediately...`);
+    await runProgram(e3Id);
+  }
+}
+
+async function handleInputPublishedEvent(event: any) {
+  const data = event.data as InputPublishedData;
+  const e3Id = data.e3Id;
+
+  console.log(`📝 Input Published for E3 ${e3Id}: index ${data.index}`);
+
+  const sessionKey = e3Id.toString();
+  const session = e3Sessions.get(sessionKey);
+
+  if (session) {
+    session.inputs.push({
+      data: data.data,
+      index: data.index,
+    });
+    console.log(`📊 E3 ${e3Id} now has ${session.inputs.length} inputs`);
+  } else {
+    console.warn(`⚠️  Received input for unknown E3 session: ${e3Id}`);
+  }
+}
+
 async function setupEventListeners() {
   const sdk = await createPrivateSDK();
 
   console.log("📡 Setting up event listeners...");
 
-  sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, async (event) => {
-    const data = event.data as E3ActivatedData;
-    const e3Id = data.e3Id;
-    const expiration = data.expiration;
-
-    console.log(`🎯 E3 Activated: ${e3Id}, expiration: ${expiration}`);
-
-    const sessionKey = e3Id.toString();
-    if (!e3Sessions.has(sessionKey)) {
-      const e3 = await sdk.getE3(e3Id);
-      e3Sessions.set(sessionKey, {
-        e3Id,
-        e3ProgramParams: e3.e3ProgramParams,
-        expiration,
-        inputs: [],
-        isProcessing: false,
-        isCompleted: false,
-      });
-    }
-
-    const currentTime = BigInt(Math.floor(Date.now() / 1000));
-    const sleepSeconds =
-      expiration > currentTime ? Number(expiration - currentTime) : 0;
-
-    if (sleepSeconds > 0) {
-      console.log(
-        `⏰ Scheduling E3 ${e3Id} processing in ${sleepSeconds} seconds...`,
-      );
-      setTimeout(async () => {
-        await processE3Session(e3Id);
-      }, sleepSeconds * 1000);
-    } else {
-      console.log(`⚡ E3 ${e3Id} already expired, processing immediately...`);
-      await processE3Session(e3Id);
-    }
-  });
-
-  sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, async (event) => {
-    const data = event.data as InputPublishedData;
-    const e3Id = data.e3Id;
-
-    console.log(`📝 Input Published for E3 ${e3Id}: index ${data.index}`);
-
-    const sessionKey = e3Id.toString();
-    const session = e3Sessions.get(sessionKey);
-
-    if (session) {
-      session.inputs.push({
-        data: data.data,
-        index: data.index,
-      });
-      console.log(`📊 E3 ${e3Id} now has ${session.inputs.length} inputs`);
-    } else {
-      console.warn(`⚠️  Received input for unknown E3 session: ${e3Id}`);
-    }
-  });
+  sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3ActivatedEvent);
+  sdk.onEnclaveEvent(
+    EnclaveEventType.INPUT_PUBLISHED,
+    handleInputPublishedEvent,
+  );
 
   console.log("✅ Event listeners set up successfully");
 }
@@ -218,16 +175,14 @@ function isSupportedChain(value: any): value is keyof typeof EnclaveSDK.chains {
   return value in EnclaveSDK.chains;
 }
 
-const app = express();
-app.use(express.json());
-
-app.post("/", async (req: Request, res: Response) => {
+async function handleWebhookRequest(req: Request, res: Response) {
   try {
-    console.log("📨 Webhook received:", req.body);
+    console.log("📨 Webhook received:");
 
     const { e3_id, ciphertext, proof } = req.body;
+    if (e3_id === undefined || !ciphertext || !proof) {
+      console.error("Missing required fields: e3_id, ciphertext, proof");
 
-    if (!e3_id || !ciphertext || !proof) {
       res
         .status(400)
         .json({ error: "Missing required fields: e3_id, ciphertext, proof" });
@@ -235,6 +190,7 @@ app.post("/", async (req: Request, res: Response) => {
     }
 
     if (!isValidHexString(ciphertext) || !isValidHexString(proof)) {
+      console.error("ciphertext and proof must be valid hex strings");
       res
         .status(400)
         .json({ error: "ciphertext and proof must be valid hex strings" });
@@ -242,6 +198,22 @@ app.post("/", async (req: Request, res: Response) => {
     }
 
     console.log(`🔄 Publishing output for E3 ${e3_id}...`);
+    if (process.env.TEST_MODE) {
+      const client = createPublicClient({
+        transport: http("http://127.0.0.1:8545"), // your Hardhat node URL
+        chain: hardhat,
+      });
+      // The following ensures that if we are in test mode using hardhat
+      // We make sure we are past the input window
+      await client.request({
+        method: "evm_increaseTime" as any,
+        params: [60] as any, // seconds
+      });
+      await client.request({
+        method: "evm_mine" as any,
+        params: [] as any,
+      });
+    }
 
     const sdk = await createPrivateSDK();
     await sdk.publishCiphertextOutput(BigInt(e3_id), ciphertext, proof);
@@ -260,9 +232,9 @@ app.post("/", async (req: Request, res: Response) => {
     console.error("❌ Webhook processing failed:", error);
     res.status(500).json({ error: "Internal server error" });
   }
-});
+}
 
-app.get("/sessions", (req: Request, res: Response) => {
+function handleGetSessions(req: Request, res: Response) {
   const sessions = Array.from(e3Sessions.entries()).map(([key, session]) => ({
     e3Id: key,
     expiration: session.expiration.toString(),
@@ -271,7 +243,21 @@ app.get("/sessions", (req: Request, res: Response) => {
     isCompleted: session.isCompleted,
   }));
   res.json(sessions);
-});
+}
+
+const app = express();
+app.use(express.json());
+
+app.post("/", handleWebhookRequest);
+app.get("/sessions", handleGetSessions);
+
+// This allows us to test interaction between server and program
+// TEST_MODE=1 pnpm dev:server
+if (process.env.TEST_MODE) {
+  app.get("/test", handleTestInteraction);
+}
+
+app.get("/sessions", handleGetSessions);
 
 async function startServer() {
   try {
