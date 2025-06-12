@@ -175,11 +175,12 @@ function isSupportedChain(value: any): value is keyof typeof EnclaveSDK.chains {
 
 async function handleWebhookRequest(req: Request, res: Response) {
   try {
-    console.log("📨 Webhook received:", req.body);
+    console.log("📨 Webhook received:");
 
     const { e3_id, ciphertext, proof } = req.body;
+    if (e3_id === undefined || !ciphertext || !proof) {
+      console.error("Missing required fields: e3_id, ciphertext, proof");
 
-    if (!e3_id || !ciphertext || !proof) {
       res
         .status(400)
         .json({ error: "Missing required fields: e3_id, ciphertext, proof" });
@@ -187,6 +188,7 @@ async function handleWebhookRequest(req: Request, res: Response) {
     }
 
     if (!isValidHexString(ciphertext) || !isValidHexString(proof)) {
+      console.error("ciphertext and proof must be valid hex strings");
       res
         .status(400)
         .json({ error: "ciphertext and proof must be valid hex strings" });

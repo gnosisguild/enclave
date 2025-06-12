@@ -35,8 +35,8 @@ tmux select-pane -t 3
 tmux split-window -v
 
 # Select the third pane and create its bottom counterpart
-tmux select-pane -t 5
-tmux split-window -v
+# tmux select-pane -t 5
+# tmux split-window -v
 
 # Reorganize layout to make it more even
 tmux select-layout tiled
