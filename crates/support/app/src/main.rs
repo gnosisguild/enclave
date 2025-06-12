@@ -2,15 +2,8 @@ use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result a
 use anyhow::bail;
 use e3_compute_provider::FHEInputs;
 use e3_support_host::Risc0Output;
-use e3_support_types::{ComputeRequest, ComputeResponse};
+use e3_support_types::{ComputeRequest, ComputeResponse, WebhookPayload};
 use serde::{Deserialize, Deserializer, Serialize};
-
-#[derive(Serialize, Debug)]
-struct WebhookPayload {
-    pub e3_id: u64,
-    pub ciphertext: Vec<u8>,
-    pub proof: Vec<u8>,
-}
 
 #[derive(Serialize, Debug)]
 struct ProcessingResponse {
@@ -24,6 +17,7 @@ async fn call_webhook(
     proof: Vec<u8>,
     ciphertext: Vec<u8>,
 ) -> anyhow::Result<()> {
+    println!("call_webhook()");
     let payload = WebhookPayload {
         e3_id,
         ciphertext,
@@ -33,21 +27,22 @@ async fn call_webhook(
     println!("callback_url: {}", callback_url);
     println!("payload: {:?}", payload);
 
-    let _response: serde_json::Value = reqwest::Client::new()
+    reqwest::Client::new()
         .post(callback_url)
         .json(&payload)
         .send()
         .await?
-        .json()
-        .await?;
+        .error_for_status()?;
 
     println!("✓ Webhook called successfully for E3 {}", e3_id);
     Ok(())
 }
 
 async fn run_computation_async(fhe_inputs: FHEInputs) -> anyhow::Result<(Risc0Output, Vec<u8>)> {
+    println!("running computation...");
     let result =
         tokio::task::spawn_blocking(move || e3_support_host::run_compute(fhe_inputs)).await??;
+    println!("have result from computation!");
     Ok(result)
 }
 
@@ -57,6 +52,7 @@ async fn handle_webhook_delivery(
     proof: Vec<u8>,
     ciphertext: Vec<u8>,
 ) -> anyhow::Result<()> {
+    println!("handle_webhook_delivery()");
     call_webhook(callback_url, e3_id, proof, ciphertext).await?;
     println!("✓ Webhook sent successfully for E3 {}", e3_id);
     Ok(())
@@ -68,7 +64,9 @@ async fn process_computation_background(
     fhe_inputs: FHEInputs,
 ) -> anyhow::Result<()> {
     let (risc0_output, ciphertext) = run_computation_async(fhe_inputs).await?;
+    println!("computation finished!");
     let proof: Vec<u8> = risc0_output.seal.into();
+    println!("handling webhook delivery...");
     handle_webhook_delivery(e3_id, callback_url, proof, ciphertext).await?;
     println!("✓ Computation completed for E3 {}", e3_id);
     Ok(())

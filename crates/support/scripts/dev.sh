@@ -5,6 +5,7 @@ docker run -it \
   -v $(pwd)/app:/app/app \
   -v $(pwd)/host:/app/host \
   -v $(pwd)/methods:/app/methods \
+  -v $(pwd)/types:/app/types \
   -v $(pwd)/program:/app/program \
   -v $(pwd)/scripts:/app/scripts \
   -v $(pwd)/contracts:/app/contracts \
