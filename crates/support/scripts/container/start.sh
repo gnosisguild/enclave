@@ -8,12 +8,10 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --api-key)
       export BONSAI_API_KEY="$2"
-      export RISC0_DEV_MODE=1
       shift 2
       ;;
     --api-url)
       export BONSAI_API_URL="$2"
-      unset RISC0_DEV_MODE
       shift 2
       ;;
     *)
@@ -22,5 +20,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+CARGO_INCREMENTAL=1
+
+[ -z "$BONSAI_API_KEY" ] && export RISC0_DEV_MODE=1
+
+echo "RISC0_DEV_MODE=$RISC0_DEV_MODE"
 
 exec cargo run --bin e3-support-app "$@"
