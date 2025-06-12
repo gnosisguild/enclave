@@ -10,6 +10,7 @@ import { handleTestInteraction } from "./testHandler";
 import { getCheckedEnvVars } from "./utils";
 import { callFheRunner } from "./runner";
 import { createPublicClient, http } from "viem";
+import { hardhat } from "viem/chains";
 
 interface E3Session {
   e3Id: bigint;
@@ -200,16 +201,17 @@ async function handleWebhookRequest(req: Request, res: Response) {
     if (process.env.TEST_MODE) {
       const client = createPublicClient({
         transport: http("http://127.0.0.1:8545"), // your Hardhat node URL
+        chain: hardhat,
       });
       // The following ensures that if we are in test mode using hardhat
       // We make sure we are past the input window
       await client.request({
-        method: "evm_increaseTime",
-        params: [60], // seconds
+        method: "evm_increaseTime" as any,
+        params: [60] as any, // seconds
       });
       await client.request({
-        method: "evm_mine",
-        params: [],
+        method: "evm_mine" as any,
+        params: [] as any,
       });
     }
 
