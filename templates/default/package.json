@@ -45,7 +45,7 @@
     "dev:evm": "hardhat node",
     "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile || true",
     "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
-    "dev:all": "concurrently -r \"pnpm dev:evm\" \"pnpm dev:ciphernodes\" \"pnpm dev:program\" \"pnpm dev:frontend\"",
+    "dev:all": "./scripts/dev_all.sh",
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",
     "dev:server": "./scripts/dev_server.sh",
