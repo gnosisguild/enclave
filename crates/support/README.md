@@ -13,3 +13,7 @@ graph TD
   a --> b
   b --> c
 ```
+
+NOTE: This is outside of the main workspace because it needs to be run within it's own context in order to isolate risc0.
+
+NOTE: We are attempting to isolate risc0 - it is anticipated that we will have to use feature flags to tody this up so that we can compile more of the code and enable rust-analyzer to work outside of the risc0 environment for this project.
