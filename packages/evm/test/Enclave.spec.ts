@@ -35,7 +35,7 @@ const _publicKeyHash = ethers.keccak256(abiCoder.encode(["uint256"], [0]));
 const proof = "0x1337";
 const polynomial_degree = ethers.toBigInt(2048);
 const plaintext_modulus = ethers.toBigInt(1032193);
-const moduli = [ethers.toBigInt("4503599626321921")]; // 0x3FFFFFFF000001
+const moduli = [ethers.toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
 
 const encodedE3ProgramParams = ethers.AbiCoder.defaultAbiCoder().encode(
   ["uint256", "uint256", "uint256[]"],
@@ -199,7 +199,7 @@ describe("Enclave", function () {
   describe("setE3ProgramsParams()", function () {
     const polynomial_degree = ethers.toBigInt(2048);
     const plaintext_modulus = ethers.toBigInt(1032193);
-    const moduli = [ethers.toBigInt("4503599626321921")]; // 0x3FFFFFFF000001
+    const moduli = [ethers.toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
 
     const encodedE3ProgramParams = ethers.AbiCoder.defaultAbiCoder().encode(
       ["uint256", "uint256", "uint256[]"],
