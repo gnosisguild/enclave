@@ -15,8 +15,8 @@ graph TD
         E["host"]
         F["types"]
         G["compute-provider"]
-        H["methods"]
-        I["guest"]
+        H["methods (risc0)"]
+        I["guest (risc0)"]
         J["user-program"]
 
         D --> E
