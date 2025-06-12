@@ -10,3 +10,4 @@ repository.workspace = true
 anyhow.workspace = true
 tokio.workspace = true
 duct.workspace = true
+e3-config.workspace = true

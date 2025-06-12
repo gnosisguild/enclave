@@ -1,4 +1,35 @@
 #!/usr/bin/env bash
 
+# Clear any existing environment variables
+unset API_KEY API_URL
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --api-key)
+      API_KEY="$2"
+      shift 2
+      ;;
+    --api-url)
+      API_URL="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      exit 1
+      ;;
+  esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-"$SCRIPT_DIR/container" ./scripts/container/start.sh
+
+if [[ -n "$API_KEY" && -n "$API_URL" ]]; then
+  # BONSAI MODE
+  exec "$SCRIPT_DIR/container" ./scripts/container/start.sh --api-key "$API_KEY" --api-url "$API_URL"
+elif [[ -z "$API_KEY" && -z "$API_URL" ]]; then
+  # DEV MODE
+  exec "$SCRIPT_DIR/container" ./scripts/container/start.sh
+else
+  echo "Error: Both --api-key and --api-url must be provided together, or neither"
+  exit 1
+fi
