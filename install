@@ -1,0 +1,196 @@
+#!/bin/bash
+
+set -e
+
+# Configuration
+GITHUB_REPO="gnosisguild/enclave"
+BINARY_NAME="enclaveup"
+INSTALL_DIR="$HOME/.local/bin"
+
+log_info() {
+    echo "$1"
+}
+
+log_success() {
+    echo "$1"
+}
+
+log_warning() {
+    echo "$1"
+}
+
+log_error() {
+    echo "$1" >&2
+}
+
+detect_platform() {
+    local os=""
+    local arch=""
+    case "$(uname -s)" in
+        Linux*)
+            os="linux"
+            ;;
+        Darwin*)
+            os="macos"
+            ;;
+        *)
+            log_error "Unsupported operating system: $(uname -s)"
+            exit 1
+            ;;
+    esac
+    case "$(uname -m)" in
+        x86_64)
+            arch="x86_64"
+            ;;
+        arm64|aarch64)
+            arch="aarch64"
+            ;;
+        *)
+            log_error "Unsupported architecture: $(uname -m)"
+            exit 1
+            ;;
+    esac
+
+    echo "${os}-${arch}"
+}
+
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+download_file() {
+    local url="$1"
+    local output="$2"
+
+    if command_exists curl; then
+        curl -fsSL "$url" -o "$output"
+    elif command_exists wget; then
+        wget -q "$url" -O "$output"
+    else
+        log_error "Neither curl nor wget is available. Please install one of them."
+        exit 1
+    fi
+}
+
+get_latest_release() {
+    local api_url="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
+    local temp_file=$(mktemp)
+
+    log_info "Fetching latest release information..."
+    
+    if ! download_file "$api_url" "$temp_file"; then
+        log_error "Failed to fetch release information from GitHub API"
+        rm -f "$temp_file"
+        exit 1
+    fi
+    local tag_name=$(grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' "$temp_file" | cut -d'"' -f4)
+    
+    if [ -z "$tag_name" ]; then
+        log_error "Failed to parse release information"
+        rm -f "$temp_file"
+        exit 1
+    fi
+
+    rm -f "$temp_file"
+    echo "$tag_name"
+}
+
+get_download_url() {
+    local platform="$1"
+    local api_url="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
+    local temp_file=$(mktemp)
+
+    if ! download_file "$api_url" "$temp_file"; then
+        log_error "Failed to fetch release information"
+        rm -f "$temp_file"
+        exit 1
+    fi
+    local asset_pattern="${BINARY_NAME}-${platform}"
+    local download_url=$(grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*'"$asset_pattern"'[^"]*"' "$temp_file" | cut -d'"' -f4)
+
+    if [ -z "$download_url" ]; then
+        log_error "No compatible binary found for platform: $platform"
+        log_info "Available assets:"
+        grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$temp_file" | cut -d'"' -f4 | sed 's/^/  - /'
+        rm -f "$temp_file"
+        exit 1
+    fi
+
+    rm -f "$temp_file"
+    echo "$download_url"
+}
+
+main() {
+    log_info "Enclave Installer"
+    local platform
+    platform=$(detect_platform)
+    log_info "Detected platform: $platform"
+    local version
+    version=$(get_latest_release)
+    log_info "Latest version: $version"
+    local download_url
+    download_url=$(get_download_url "$platform")
+    log_info "Download URL: $download_url"
+    log_info "Creating install directory: $INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR"
+    local temp_file=$(mktemp)
+    local asset_name=$(basename "$download_url")
+    
+    log_info "Downloading $asset_name..."
+    if ! download_file "$download_url" "$temp_file"; then
+        log_error "Failed to download $asset_name"
+        rm -f "$temp_file"
+        exit 1
+    fi
+    local target_path="$INSTALL_DIR/$BINARY_NAME"
+    log_info "Extracting to $target_path..."
+    
+    if ! tar -xzf "$temp_file" -C "$INSTALL_DIR" --strip-components=0 "$BINARY_NAME" 2>/dev/null; then
+        # Try extracting without specifying the binary name (in case the structure is different)
+        if ! tar -xzf "$temp_file" -O | dd of="$target_path" 2>/dev/null; then
+            log_error "Failed to extract binary from tarball"
+            rm -f "$temp_file"
+            exit 1
+        fi
+    fi
+
+    rm -f "$temp_file"
+
+    # Make executable
+    chmod +x "$target_path"
+
+    log_success "Successfully installed $BINARY_NAME to $target_path"
+
+    # Check if install directory is in PATH
+    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+        log_warning "$INSTALL_DIR is not in your PATH"
+        echo ""
+        echo "To add it to your PATH, run one of the following:"
+        echo ""
+        echo "  # For bash users:"
+        echo "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.bashrc"
+        echo "  source ~/.bashrc"
+        echo ""
+        echo "  # For zsh users:"
+        echo "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.zshrc"
+        echo "  source ~/.zshrc"
+        echo ""
+        echo "  # For fish users:"
+        echo "  fish_add_path $INSTALL_DIR"
+        echo ""
+    fi
+
+    echo ""
+    log_success "Installation complete!"
+    echo ""
+    echo "You can now use $BINARY_NAME to install the Enclave CLI:"
+    echo ""
+    echo "  $BINARY_NAME install    # Install the latest enclave CLI"
+    echo "  $BINARY_NAME update     # Update to the latest version"
+    echo "  $BINARY_NAME uninstall  # Remove the enclave CLI"
+    echo "  $BINARY_NAME --help     # Show help"
+    echo ""
+}
+
+# Run main function
+main "$@" 
