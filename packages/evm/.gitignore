@@ -2,7 +2,10 @@
 .coverage_artifacts
 .coverage_cache
 .coverage_contracts
-artifacts
+artifacts/
+!artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json
+!artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json
+!artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json
 build
 cache
 coverage
