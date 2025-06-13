@@ -10,6 +10,13 @@ on:
         description: 'Tag to release'
         required: true
         default: 'v0.1.0'
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+  repository_dispatch:
+    types: [binary-release]
 
 permissions:
   contents: write
@@ -99,13 +106,25 @@ jobs:
           find dist/ -name "*.tar.gz" -exec cp {} release-assets/ \;
           ls -la release-assets/
 
-      - name: Get tag name
+      - name: Get tag name and prerelease status
         id: get_tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+            echo "prerelease=${{ github.event.inputs.prerelease }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
           else
-            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
+            # Auto-detect prerelease based on tag name
+            if [[ "${TAG}" =~ (test|alpha|beta|rc|dev) ]]; then
+              echo "prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "prerelease=false" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Create Release
@@ -114,7 +133,7 @@ jobs:
           tag_name: ${{ steps.get_tag.outputs.tag }}
           name: Release ${{ steps.get_tag.outputs.tag }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.get_tag.outputs.prerelease }}
           files: release-assets/*
           body: |
             ## Installation
