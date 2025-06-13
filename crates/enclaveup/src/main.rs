@@ -69,13 +69,23 @@ impl Platform {
         let os = match std::env::consts::OS {
             "linux" => "linux",
             "macos" => "macos",
-            _ => return Err(anyhow!("Unsupported operating system: {}", std::env::consts::OS)),
+            _ => {
+                return Err(anyhow!(
+                    "Unsupported operating system: {}",
+                    std::env::consts::OS
+                ))
+            }
         };
 
         let arch = match std::env::consts::ARCH {
             "x86_64" => "x86_64",
             "aarch64" => "aarch64",
-            _ => return Err(anyhow!("Unsupported architecture: {}", std::env::consts::ARCH)),
+            _ => {
+                return Err(anyhow!(
+                    "Unsupported architecture: {}",
+                    std::env::consts::ARCH
+                ))
+            }
         };
 
         Ok(Platform {
@@ -107,8 +117,11 @@ impl Installer {
     }
 
     async fn get_latest_release(&self) -> Result<GitHubRelease> {
-        let url = format!("https://api.github.com/repos/{}/releases/latest", GITHUB_REPO);
-        
+        let url = format!(
+            "https://api.github.com/repos/{}/releases/latest",
+            GITHUB_REPO
+        );
+
         let response = self
             .client
             .get(&url)
@@ -132,8 +145,11 @@ impl Installer {
     }
 
     async fn download_and_install(&self, system: bool) -> Result<()> {
-        println!("Detecting platform: {}-{}", self.platform.os, self.platform.arch);
-        
+        println!(
+            "Detecting platform: {}-{}",
+            self.platform.os, self.platform.arch
+        );
+
         let release = self.get_latest_release().await?;
         println!("Latest release: {}", release.tag_name);
 
@@ -185,15 +201,17 @@ impl Installer {
         let tar = GzDecoder::new(&bytes[..]);
         let mut archive = Archive::new(tar);
 
-        for entry in archive.entries().context("Failed to read archive entries")? {
+        for entry in archive
+            .entries()
+            .context("Failed to read archive entries")?
+        {
             let mut entry = entry.context("Failed to read archive entry")?;
             let path = entry.path().context("Failed to get entry path")?;
-            
+
             if path.file_name() == Some(std::ffi::OsStr::new(BINARY_NAME)) {
-                let mut file = fs::File::create(&target_path)
-                    .context("Failed to create target file")?;
-                io::copy(&mut entry, &mut file)
-                    .context("Failed to extract binary")?;
+                let mut file =
+                    fs::File::create(&target_path).context("Failed to create target file")?;
+                io::copy(&mut entry, &mut file).context("Failed to extract binary")?;
                 break;
             }
         }
@@ -207,8 +225,12 @@ impl Installer {
                 .context("Failed to set executable permissions")?;
         }
 
-        println!("Successfully installed {} to {}", BINARY_NAME, target_path.display());
-        
+        println!(
+            "Successfully installed {} to {}",
+            BINARY_NAME,
+            target_path.display()
+        );
+
         self.check_path(&target_dir);
 
         Ok(())
@@ -218,7 +240,8 @@ impl Installer {
         if system {
             Ok(PathBuf::from("/usr/local/bin"))
         } else {
-            let base_dirs = BaseDirs::new().ok_or_else(|| anyhow!("Failed to get base directories"))?;
+            let base_dirs =
+                BaseDirs::new().ok_or_else(|| anyhow!("Failed to get base directories"))?;
             let local_bin = base_dirs.home_dir().join(".local/bin");
             Ok(local_bin)
         }
@@ -240,11 +263,18 @@ impl Installer {
         let target_path = target_dir.join(BINARY_NAME);
 
         if target_path.exists() {
-            fs::remove_file(&target_path)
-                .context("Failed to remove binary")?;
-            println!("Successfully removed {} from {}", BINARY_NAME, target_path.display());
+            fs::remove_file(&target_path).context("Failed to remove binary")?;
+            println!(
+                "Successfully removed {} from {}",
+                BINARY_NAME,
+                target_path.display()
+            );
         } else {
-            println!("{} is not installed at {}", BINARY_NAME, target_path.display());
+            println!(
+                "{} is not installed at {}",
+                BINARY_NAME,
+                target_path.display()
+            );
         }
 
         Ok(())
@@ -255,7 +285,10 @@ impl Installer {
         let target_path = target_dir.join(BINARY_NAME);
 
         if !target_path.exists() {
-            println!("{} is not installed. Running install instead...", BINARY_NAME);
+            println!(
+                "{} is not installed. Running install instead...",
+                BINARY_NAME
+            );
             return self.download_and_install(system).await;
         }
         let current_version = self.get_current_version(&target_path);
@@ -266,7 +299,10 @@ impl Installer {
                 println!("{} is already up to date ({})", BINARY_NAME, current);
                 return Ok(());
             }
-            println!("Updating {} from {} to {}", BINARY_NAME, current, latest_release.tag_name);
+            println!(
+                "Updating {} from {} to {}",
+                BINARY_NAME, current, latest_release.tag_name
+            );
         } else {
             println!("Updating {} to {}", BINARY_NAME, latest_release.tag_name);
         }
@@ -307,4 +343,4 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-} 
+}
