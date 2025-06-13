@@ -1,0 +1,30 @@
+[package]
+name = "e3-evm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave Ciphernode EVM Connectors"
+repository = "https://github.com/gnosisguild/enclave/crates/evm"
+
+[dependencies]
+actix = { workspace = true }
+alloy = { workspace = true }
+alloy-primitives = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+e3-crypto = { workspace = true }
+e3-config = { workspace = true }
+e3-data = { workspace = true }
+e3-events = { workspace = true }
+futures-util = { workspace = true }
+e3-sortition = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+e3-entrypoint = { workspace = true }
+

@@ -1,0 +1,24 @@
+[package]
+name = "e3-fhe"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave Ciphernode FHE Actors"
+repository = "https://github.com/gnosisguild/enclave/crates/fhe"
+
+[dependencies]
+actix = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+bincode = { workspace = true }
+e3-config = { workspace = true }
+e3-data = { workspace = true }
+e3-events = { workspace = true }
+fhe-traits = { workspace = true }
+fhe-util = { workspace = true }
+fhe_rs = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+e3-request = { workspace = true }
+serde = { workspace = true }
+e3-bfv-helpers = { workspace = true }

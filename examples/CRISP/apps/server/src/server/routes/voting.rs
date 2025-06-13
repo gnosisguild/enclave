@@ -1,16 +1,18 @@
+use crate::server::{
+    app_data::AppData,
+    config::CONFIG,
+    database::SledDB,
+    models::{EncryptedVote, VoteResponse, VoteResponseStatus},
+    repo::CrispE3Repository,
+};
 use actix_web::{web, HttpResponse, Responder};
-use log::info;
 use alloy::{
     dyn_abi::DynSolValue,
     primitives::{Bytes, U256},
 };
+use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveWrite};
 use eyre::Error;
-use crate::server::{
-    blockchain::relayer::EnclaveContract,
-    config::CONFIG,
-    database::{get_e3, GLOBAL_DB},
-    models::{EncryptedVote, VoteResponse, VoteResponseStatus, E3},
-};
+use log::{error, info};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -27,62 +29,85 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
 /// # Returns
 ///
 /// * A JSON response indicating the success or failure of the operation
-async fn broadcast_encrypted_vote(data: web::Json<EncryptedVote>) -> impl Responder {
+async fn broadcast_encrypted_vote(
+    data: web::Json<EncryptedVote>,
+    store: web::Data<AppData>,
+) -> impl Responder {
     let vote = data.into_inner();
 
     // Validate and update vote status
-    let (mut state_data, key) = match validate_and_update_vote_status(&vote).await {
-        Ok(result) => result,
-        Err(response) => return response,
+    let has_voted = match store
+        .e3(vote.round_id)
+        .has_voted(vote.address.clone())
+        .await
+    {
+        Ok(voted) => voted,
+        Err(e) => {
+            log::error!("Database error checking vote status: {:?}", e);
+            return HttpResponse::InternalServerError().json("Internal server error");
+        }
     };
 
+    if has_voted {
+        return HttpResponse::Ok().json(VoteResponse {
+            status: VoteResponseStatus::UserAlreadyVoted,
+            tx_hash: None,
+            message: Some("User Has Already Voted".to_string()),
+        });
+    }
+
+    let mut repo = store.e3(vote.round_id);
+
+    if let Err(e) = repo.insert_voter_address(vote.address.clone()).await {
+        log::error!("Database error inserting voter: {:?}", e);
+        return HttpResponse::InternalServerError().json("Internal server error");
+    }
+
     // Prepare vote data for blockchain
+    let public_inputs_array = if vote.public_inputs.is_empty() {
+        DynSolValue::Array(vec![])
+    } else {
+        DynSolValue::Array(
+            vote.public_inputs
+                .into_iter()
+                .map(|pi_array_u8| DynSolValue::FixedBytes(pi_array_u8.into(), 32))
+                .collect(),
+        )
+    };
+
     let e3_id = U256::from(vote.round_id);
     let params_value = DynSolValue::Tuple(vec![
         DynSolValue::Bytes(vote.proof_sem),
+        DynSolValue::Bytes(vote.proof),
+        public_inputs_array,
         DynSolValue::Bytes(vote.enc_vote_bytes),
     ]);
 
     let encoded_params = Bytes::from(params_value.abi_encode_params());
 
     // Broadcast vote to blockchain
-    let contract = EnclaveContract::new(CONFIG.enclave_address.clone()).await.unwrap();
+    let contract = match EnclaveContract::new(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.enclave_address,
+    )
+    .await
+    {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Database error checking vote status: {:?}", e);
+            return HttpResponse::InternalServerError().json("Internal server error");
+        }
+    };
+
     match contract.publish_input(e3_id, encoded_params).await {
         Ok(hash) => HttpResponse::Ok().json(VoteResponse {
             status: VoteResponseStatus::Success,
             tx_hash: Some(hash.transaction_hash.to_string()),
             message: Some("Vote Successful".to_string()),
         }),
-        Err(e) => handle_vote_error(e, &mut state_data, &key, &vote.address).await,
+        Err(e) => handle_vote_error(e, repo, &vote.address).await,
     }
-}
-
-/// Validate and update the vote status
-///
-/// # Arguments
-///
-/// * `vote` - The vote data to be validated and updated
-///
-/// # Returns
-///
-/// * A tuple containing the state data and the key
-async fn validate_and_update_vote_status(
-    vote: &EncryptedVote,
-) -> Result<(E3, String), HttpResponse> {
-    let (mut state_data, key) = get_e3(vote.round_id).await.unwrap();
-
-    if state_data.has_voted.contains(&vote.address) {
-        return Err(HttpResponse::Ok().json(VoteResponse {
-            status: VoteResponseStatus::UserAlreadyVoted,
-            tx_hash: None,
-            message: Some("User Has Already Voted".to_string()),
-        }));
-    }
-
-    state_data.has_voted.push(vote.address.clone());
-    GLOBAL_DB.insert(&key, &state_data).await.unwrap();
-
-    Ok((state_data, key.to_string()))
 }
 
 /// Handle the vote error
@@ -95,17 +120,16 @@ async fn validate_and_update_vote_status(
 /// * `address` - The address for the vote
 async fn handle_vote_error(
     e: Error,
-    state_data: &mut E3,
-    key: &str,
+    mut repo: CrispE3Repository<SledDB>,
     address: &str,
 ) -> HttpResponse {
     info!("Error while sending vote transaction: {:?}", e);
 
     // Rollback the vote
-    if let Some(pos) = state_data.has_voted.iter().position(|x| x == address) {
-        state_data.has_voted.remove(pos);
-        GLOBAL_DB.insert(key, state_data).await.unwrap();
-    }
+    match repo.remove_voter_address(address).await {
+        Ok(_) => (),
+        Err(err) => error!("Error rolling back the vote: {err}"),
+    };
 
     HttpResponse::Ok().json(VoteResponse {
         status: VoteResponseStatus::FailedBroadcast,

@@ -1,15 +1,21 @@
-pub mod blockchain;
-mod config;
+mod app_data;
+pub mod config;
 mod database;
+mod indexer;
 mod models;
+mod repo;
 mod routes;
+
+use std::sync::Arc;
 
 use actix_cors::Cors;
 use actix_web::{middleware::Logger, web, App, HttpServer};
-
-use blockchain::listener::start_listener;
-use database::GLOBAL_DB;
-use models::AppState;
+use app_data::AppData;
+use database::SledDB;
+use e3_sdk::indexer::SharedStore;
+use eyre::OptionExt;
+use indexer::start_indexer;
+use tokio::sync::RwLock;
 
 use crate::logger::init_logger;
 use config::CONFIG;
@@ -18,25 +24,31 @@ use config::CONFIG;
 pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_logger();
 
-    tokio::spawn(async {
-        if let Err(e) = blockchain::sync::sync_server().await {
-            eprintln!("Sync server failed: {:?}", e);
+    let pathdb = std::env::current_dir()?.join("database/server");
+    let pathdb = pathdb.to_str().ok_or_eyre("Path could not be determined")?;
+    let db = SharedStore::new(Arc::new(RwLock::new(SledDB::new(pathdb)?)));
+
+    // New indexer
+    tokio::spawn({
+        let db = db.clone();
+        async move {
+            if let Err(e) = start_indexer(
+                &CONFIG.ws_rpc_url,
+                &CONFIG.enclave_address,
+                &CONFIG.ciphernode_registry_address,
+                db.clone(),
+                &CONFIG.private_key,
+            )
+            .await
+            {
+                eprintln!("Listener failed: {:?}", e);
+            }
         }
     });
 
-    tokio::spawn(async {
-        if let Err(e) = start_listener(
-            &CONFIG.ws_rpc_url,
-            &CONFIG.enclave_address,
-            &CONFIG.ciphernode_registry_address,
-        )
-        .await
-        {
-            eprintln!("Listener failed: {:?}", e);
-        }
-    });
-
-    let _ = HttpServer::new(|| {
+    let bind_addr = "0.0.0.0:4000";
+    let db_clone = db.clone();
+    let server = HttpServer::new(move || {
         let cors = Cors::default()
             .allow_any_origin()
             .allowed_methods(vec!["GET", "POST", "OPTIONS"])
@@ -47,14 +59,14 @@ pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         App::new()
             .wrap(cors)
             .wrap(Logger::new(r#"%a "%r" %s %b %T"#))
-            .app_data(web::Data::new(AppState {
-                sled: GLOBAL_DB.clone(),
-            }))
+            .app_data(web::Data::new(AppData::new(db_clone.clone())))
             .configure(routes::setup_routes)
     })
-    .bind("0.0.0.0:4000")?
-    .run()
-    .await;
+    .bind(bind_addr)?;
+
+    println!("'crisp-server' listening on http://{}", bind_addr);
+
+    server.run().await?;
 
     Ok(())
 }

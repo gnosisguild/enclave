@@ -1,0 +1,37 @@
+[package]
+name = "e3-cli"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "E3 - Enclave CLI"
+repository = "https://github.com/gnosisguild/enclave/crates/cli"
+
+[[bin]]
+name = "enclave"
+path = "src/main.rs"
+
+[dependencies]
+actix = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+compile-time = { workspace = true }
+dialoguer = { workspace = true }
+e3-config = { workspace = true }
+e3-crypto = { workspace = true }
+e3-entrypoint = { workspace = true }
+e3-events = { workspace = true }
+e3-init = { workspace = true }
+e3-support-scripts = { workspace = true }
+hex = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry-stdout = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+petname = { workspace = true }
+rand = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true } 
+tracing-subscriber = { workspace = true } 
+url = { workspace = true }
+zeroize = { workspace = true }

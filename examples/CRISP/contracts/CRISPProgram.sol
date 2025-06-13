@@ -11,6 +11,7 @@ import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.so
 import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
+import {HonkVerifier} from "./CRISPVerifier.sol";
 
 contract CRISPProgram is IE3Program, Ownable {
     // Constants
@@ -23,6 +24,7 @@ contract CRISPProgram is IE3Program, Ownable {
     CRISPCheckerFactory private immutable CHECKER_FACTORY;
     CRISPPolicyFactory private immutable POLICY_FACTORY;
     CRISPInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
+    HonkVerifier private immutable HONK_VERIFIER;
     uint8 public constant INPUT_LIMIT = 100;
     bytes32 public imageId;
 
@@ -46,6 +48,7 @@ contract CRISPProgram is IE3Program, Ownable {
     error InvalidPolicyFactory();
     error InvalidCheckerFactory();
     error InvalidInputValidatorFactory();
+    error InvalidHonkVerifier();
     error GroupDoesNotExist();
     error AlreadyRegistered();
 
@@ -56,6 +59,7 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @param _checkerFactory The checker factory address
     /// @param _policyFactory The policy factory address
     /// @param _inputValidatorFactory The input validator factory address
+    /// @param _honkVerifier The honk verifier address
     /// @param _imageId The image ID for the guest program
     constructor(
         IEnclave _enclave,
@@ -64,6 +68,7 @@ contract CRISPProgram is IE3Program, Ownable {
         CRISPCheckerFactory _checkerFactory,
         CRISPPolicyFactory _policyFactory,
         CRISPInputValidatorFactory _inputValidatorFactory,
+        HonkVerifier _honkVerifier,
         bytes32 _imageId
     ) Ownable(msg.sender) {
         require(address(_enclave) != address(0), EnclaveAddressZero());
@@ -78,6 +83,7 @@ contract CRISPProgram is IE3Program, Ownable {
             address(_inputValidatorFactory) != address(0),
             InvalidInputValidatorFactory()
         );
+        require(address(_honkVerifier) != address(0), InvalidHonkVerifier());
 
         enclave = _enclave;
         verifier = _verifier;
@@ -85,6 +91,7 @@ contract CRISPProgram is IE3Program, Ownable {
         CHECKER_FACTORY = _checkerFactory;
         POLICY_FACTORY = _policyFactory;
         INPUT_VALIDATOR_FACTORY = _inputValidatorFactory;
+        HONK_VERIFIER = _honkVerifier;
         authorizedContracts[address(_enclave)] = true;
         imageId = _imageId;
     }
@@ -151,7 +158,10 @@ contract CRISPProgram is IE3Program, Ownable {
 
         // Deploy a new input validator
         inputValidator = IInputValidator(
-            INPUT_VALIDATOR_FACTORY.deploy(address(policy))
+            INPUT_VALIDATOR_FACTORY.deploy(
+                address(policy),
+                address(HONK_VERIFIER)
+            )
         );
         policy.setTarget(address(inputValidator));
 

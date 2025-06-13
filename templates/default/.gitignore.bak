@@ -1,0 +1,27 @@
+node_modules
+.env
+
+.direnv
+
+/.enclave
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+/target
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+# Ignore risc0 files
+contracts/ImageID.sol
+tests/Elf.sol
+
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337

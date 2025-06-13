@@ -4,19 +4,23 @@ on:
     branches:
       - release
       - main
+      - hacknet
     paths:
-      - "packages/ciphernode/**"
+      - "Cargo.*"
+      - "crates/**"
       - "packages/evm/contracts/**"
   pull_request:
     branches:
       - release
       - main
+      - hacknet
     paths:
-      - "packages/ciphernode/**"
+      - "Cargo.*"
+      - "crates/**"
       - "packages/evm/contracts/**"
 
 env:
-  DOCKERFILE_PATH: packages/ciphernode/Dockerfile
+  DOCKERFILE_PATH: crates/Dockerfile
   IMAGE_NAME: ghcr.io/gnosisguild/ciphernode
 
 permissions:
@@ -25,7 +29,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Image
+    name: Build & Push Image
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.version.outputs.version }}

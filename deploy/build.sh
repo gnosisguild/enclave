@@ -9,4 +9,4 @@ time docker buildx build \
   --cache-from=type=local,src=/tmp/docker-cache \
   --cache-to=type=local,dest=/tmp/docker-cache \
   --load \
-  -t ${1:-ghcr.io/gnosisguild/ciphernode} -f ./packages/ciphernode/Dockerfile .
+  -t ${1:-ghcr.io/gnosisguild/ciphernode} -f ./crates/Dockerfile .

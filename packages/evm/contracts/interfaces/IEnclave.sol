@@ -82,6 +82,10 @@ interface IEnclave {
     /// @param e3Program The address of the E3 Program.
     event E3ProgramDisabled(IE3Program e3Program);
 
+    /// @notice Emitted when the allowed E3 encryption scheme parameters are configured.
+    /// @param e3ProgramParams Array of encoded encryption scheme parameters (e.g, for BFV)
+    event AllowedE3ProgramsParamsSet(bytes[] e3ProgramParams);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                  Core Entrypoints                      //
@@ -167,6 +171,20 @@ interface IEnclave {
     /// @return success True if the max duration was successfully set.
     function setMaxDuration(
         uint256 _maxDuration
+    ) external returns (bool success);
+
+    /// @notice This function should be called to enable an E3 Program.
+    /// @param e3Program The address of the E3 Program.
+    /// @return success True if the E3 Program was successfully enabled.
+    function enableE3Program(
+        IE3Program e3Program
+    ) external returns (bool success);
+
+    /// @notice This function should be called to disable an E3 Program.
+    /// @param e3Program The address of the E3 Program.
+    /// @return success True if the E3 Program was successfully disabled.
+    function disableE3Program(
+        IE3Program e3Program
     ) external returns (bool success);
 
     ////////////////////////////////////////////////////////////
