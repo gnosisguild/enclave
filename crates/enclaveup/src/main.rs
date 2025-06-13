@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use directories::BaseDirs;
 use flate2::read::GzDecoder;
+use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
 use std::fs;
@@ -144,6 +145,45 @@ impl Installer {
         Ok(release)
     }
 
+    async fn download_with_progress(&self, url: &str) -> Result<Vec<u8>> {
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .context("Failed to start download")?;
+
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "Download failed with status: {}",
+                response.status()
+            ));
+        }
+
+        let total_size = response.content_length().unwrap_or(0);
+
+        let pb = ProgressBar::new(total_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .unwrap()
+                .progress_chars("#>-")
+        );
+
+        let mut downloaded = 0u64;
+        let mut buffer = Vec::new();
+
+        let mut stream = response;
+        while let Some(chunk) = stream.chunk().await.context("Failed to read chunk")? {
+            buffer.extend_from_slice(&chunk);
+            downloaded += chunk.len() as u64;
+            pb.set_position(downloaded);
+        }
+
+        pb.finish_with_message("Download complete");
+        Ok(buffer)
+    }
+
     async fn download_and_install(&self, system: bool) -> Result<()> {
         println!(
             "Detecting platform: {}-{}",
@@ -173,24 +213,9 @@ impl Installer {
             })?;
 
         println!("Downloading {} ...", asset.name);
-        let response = self
-            .client
-            .get(&asset.browser_download_url)
-            .send()
-            .await
-            .context("Failed to download asset")?;
-
-        if !response.status().is_success() {
-            return Err(anyhow!(
-                "Download failed with status: {}",
-                response.status()
-            ));
-        }
-
-        let bytes = response
-            .bytes()
-            .await
-            .context("Failed to read downloaded bytes")?;
+        let bytes = self
+            .download_with_progress(&asset.browser_download_url)
+            .await?;
 
         let target_dir = self.get_install_dir(system)?;
         fs::create_dir_all(&target_dir).context("Failed to create target directory")?;

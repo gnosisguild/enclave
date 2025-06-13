@@ -17,6 +17,8 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
+futures-util = { workspace = true }
+indicatif = "0.17.11"
 flate2 = "1.0"
 tar = "0.4"
 directories = "6.0.0" 
