@@ -2,7 +2,6 @@
 
 set -e
 
-# Configuration
 GITHUB_REPO="gnosisguild/enclave"
 BINARY_NAME="enclaveup"
 INSTALL_DIR="$HOME/.local/bin"
@@ -146,7 +145,7 @@ main() {
     log_info "Extracting to $target_path..."
     
     if ! tar -xzf "$temp_file" -C "$INSTALL_DIR" --strip-components=0 "$BINARY_NAME" 2>/dev/null; then
-        # Try extracting without specifying the binary name (in case the structure is different)
+        # Extracting without specifying the binary name (in case the structure is different)
         if ! tar -xzf "$temp_file" -O | dd of="$target_path" 2>/dev/null; then
             log_error "Failed to extract binary from tarball"
             rm -f "$temp_file"
@@ -155,13 +154,9 @@ main() {
     fi
 
     rm -f "$temp_file"
-
-    # Make executable
     chmod +x "$target_path"
-
     log_success "Successfully installed $BINARY_NAME to $target_path"
 
-    # Check if install directory is in PATH
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         log_warning "$INSTALL_DIR is not in your PATH"
         echo ""
@@ -192,5 +187,4 @@ main() {
     echo ""
 }
 
-# Run main function
 main "$@" 
