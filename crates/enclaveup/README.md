@@ -78,11 +78,11 @@ The binary will be available at `target/release/enclaveup`.
 
 | Platform | Architecture | Status |
 |----------|-------------|---------|
-| Linux | x86_64 | ✅ Supported |
-| macOS | x86_64 (Intel) | ✅ Supported |
-| macOS | aarch64 (Apple Silicon) | ✅ Supported |
-| Linux | aarch64 (ARM64) | 🚧 Planned |
-| Windows | x86_64 | 🚧 Planned |
+| Linux | x86_64 | ✅ Native binary |
+| macOS | Apple Silicon (M1/M2/M3) | ✅ Native binary |
+| macOS | Intel | ✅ Via Rosetta 2* |
+
+\* Intel Macs automatically run Apple Silicon binaries through Rosetta 2 translation
 
 ## Binary Naming Convention
 
@@ -90,12 +90,10 @@ The installer expects GitHub releases to contain assets with this naming pattern
 
 **For Enclave CLI:**
 - `enclave-linux-x86_64.tar.gz`
-- `enclave-macos-x86_64.tar.gz`
 - `enclave-macos-aarch64.tar.gz`
 
 **For enclaveup itself:**
 - `enclaveup-linux-x86_64.tar.gz`
-- `enclaveup-macos-x86_64.tar.gz`
 - `enclaveup-macos-aarch64.tar.gz`
 
 Each tarball contains the binary at the root level.

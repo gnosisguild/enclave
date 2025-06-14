@@ -28,24 +28,37 @@ detect_platform() {
     case "$(uname -s)" in
         Linux*)
             os="linux"
+            case "$(uname -m)" in
+                x86_64)
+                    arch="x86_64"
+                    ;;
+                arm64|aarch64)
+                    arch="aarch64"
+                    ;;
+                *)
+                    log_error "Unsupported Linux architecture: $(uname -m)"
+                    exit 1
+                    ;;
+            esac
             ;;
         Darwin*)
             os="macos"
+            case "$(uname -m)" in
+                x86_64)
+                    arch="aarch64" 
+                    log_info "Intel Mac detected - using Apple Silicon binary (runs via Rosetta 2)"
+                    ;;
+                arm64|aarch64)
+                    arch="aarch64"
+                    ;;
+                *)
+                    log_error "Unsupported macOS architecture: $(uname -m)"
+                    exit 1
+                    ;;
+            esac
             ;;
         *)
             log_error "Unsupported operating system: $(uname -s)"
-            exit 1
-            ;;
-    esac
-    case "$(uname -m)" in
-        x86_64)
-            arch="x86_64"
-            ;;
-        arm64|aarch64)
-            arch="aarch64"
-            ;;
-        *)
-            log_error "Unsupported architecture: $(uname -m)"
             exit 1
             ;;
     esac
