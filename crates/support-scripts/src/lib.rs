@@ -60,19 +60,13 @@ pub async fn program_start(program_config: &ProgramConfig) -> Result<()> {
 
     let risc0_config = program_config.risc0();
     let risc0_dev_mode_str = risc0_config.risc0_dev_mode.to_string();
-    
-    let mut args = vec![
-        "--risc0-dev-mode",
-        risc0_dev_mode_str.as_str(),
-    ];
 
-    if let (Some(api_key), Some(api_url)) = (&risc0_config.bonsai_api_key, &risc0_config.bonsai_api_url) {
-        args.extend([
-            "--api-key",
-            api_key.as_str(),
-            "--api-url", 
-            api_url.as_str(),
-        ]);
+    let mut args = vec!["--risc0-dev-mode", risc0_dev_mode_str.as_str()];
+
+    if let (Some(api_key), Some(api_url)) =
+        (&risc0_config.bonsai_api_key, &risc0_config.bonsai_api_url)
+    {
+        args.extend(["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]);
     }
 
     run_bash_script(&cwd, &script, &args).await?;
