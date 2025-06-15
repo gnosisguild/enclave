@@ -24,6 +24,10 @@ docker pull "$IMAGE" || {
     echo "Warning: Failed to pull latest image, using cached version"
 }
 
+# Ensure directories exist with proper permissions
+mkdir -p "$(pwd)/target"
+chmod -R 777 "$(pwd)/target"
+
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
     docker exec -it "$CONTAINER_NAME" bash -c "$*"
 else
@@ -32,7 +36,8 @@ else
         --network=host \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
+        -v "$(pwd)/target:/app/target" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
-        -v "${CACHE_PREFIX}-target-cache:/app/target" \
+        -v "$(pwd)/target:/app/target" \
         "$IMAGE" bash -c "$*"
 fi
