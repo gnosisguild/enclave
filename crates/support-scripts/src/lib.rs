@@ -1,7 +1,6 @@
 use anyhow::{bail, Result};
 use duct::cmd;
 use e3_config::ProgramConfig;
-use e3_config::Risc0Config;
 use std::{env, path::PathBuf};
 use tokio::fs;
 use tokio::signal;
@@ -59,20 +58,17 @@ pub async fn program_start(program_config: &ProgramConfig) -> Result<()> {
     let script = cwd.join(".enclave/support/ctl/start");
     ensure_script_exists(&script).await?;
 
-    let args: Vec<&str> = match program_config.risc0() {
-        Risc0Config::Bonsai {
-            bonsai_api_key,
-            bonsai_api_url,
-        } => {
-            vec![
-                "--api-key",
-                bonsai_api_key.as_str(),
-                "--api-url",
-                bonsai_api_url.as_str(),
-            ]
-        }
-        Risc0Config::DevMode => vec![],
-    };
+    let risc0_config = program_config.risc0();
+    let risc0_dev_mode_str = risc0_config.risc0_dev_mode.to_string();
+
+    let mut args = vec!["--risc0-dev-mode", risc0_dev_mode_str.as_str()];
+
+    if let (Some(api_key), Some(api_url)) =
+        (&risc0_config.bonsai_api_key, &risc0_config.bonsai_api_url)
+    {
+        args.extend(["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]);
+    }
+
     run_bash_script(&cwd, &script, &args).await?;
     Ok(())
 }
