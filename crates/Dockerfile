@@ -59,7 +59,7 @@ COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
-          if [ "$d" = "./cli/" ]; then \
+          if [ "$d" = "./cli/" ] || [ "$d" = "./enclaveup/" ]; then \
             mkdir -p "$d/src" && \
             echo "fn main() {}" > "$d/src/main.rs"; \
           else \
