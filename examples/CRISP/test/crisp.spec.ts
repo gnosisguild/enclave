@@ -53,7 +53,7 @@ test("CRISP smoke test", async ({
   await page.waitForTimeout(1000);
   await metamask.confirmTransaction();
   await page.locator('button:has-text("Cast Vote")').click();
-  await page.waitForTimeout(60000);
+  await page.waitForTimeout(180_000);
   await page.locator('a:has-text("Historic polls")').click();
   await expect(page.locator("h1")).toHaveText("Historic polls");
   await expect(

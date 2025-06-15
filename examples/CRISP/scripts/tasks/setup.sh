@@ -12,10 +12,15 @@ echo "pnpm install"
 echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"
-(cd /app/packages/ciphernode && cargo build && cargo install --path ./enclave --force)
+(cd /app && cargo build -p e3-cli && cargo install --path crates/cli)
+echo "program"
+(cd ./apps/program && cargo build --bin crisp-program)
 echo "server"
 (cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo build --bin cli && cargo build --bin server)
 echo "crisp-wasm-crypto"
 (cd ./apps/wasm-crypto && cargo check)
 echo "client"
 (cd ./apps/client && if [[ ! -f .env ]]; then cp .env.example .env; fi)
+# echo "noir"
+# ./scripts/tasks/compile_circuits.sh
+echo "Skipping circuit compilation - using pre-compiled circuits"

@@ -1,6 +1,8 @@
 use anyhow::{Error, Result};
 use bincode::serialize;
-use compute_provider::{ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs};
+use e3_compute_provider::{
+    ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEInputs,
+};
 use methods::VOTING_ELF;
 use risc0_ethereum_contracts::groth16;
 use risc0_zkvm::{default_prover, ExecutorEnv, ProverOpts, VerifierContext};

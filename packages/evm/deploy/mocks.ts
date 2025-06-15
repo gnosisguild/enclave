@@ -40,9 +40,11 @@ MockE3Program:${mockE3Program.address}
 
   // Set up MockDecryptionVerifier in Enclave contract
   const enclaveDeployment = await hre.deployments.get("Enclave");
-  const enclaveContract = await hre.ethers.getContractAt(
-    "Enclave",
+  const enclaveArtifact = await hre.deployments.getArtifact("Enclave");
+  const enclaveContract = new hre.ethers.Contract(
     enclaveDeployment.address,
+    enclaveArtifact.abi,
+    await hre.ethers.getSigner(deployer),
   );
 
   const encryptionSchemeId = hre.ethers.keccak256(

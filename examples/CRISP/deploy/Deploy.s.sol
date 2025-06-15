@@ -25,6 +25,7 @@ import {ControlID} from "risc0/groth16/ControlID.sol";
 import {CRISPProgram} from "../contracts/CRISPProgram.sol";
 import {CRISPPolicy} from "../contracts/CRISPPolicy.sol";
 import {CRISPChecker} from "../contracts/CRISPChecker.sol";
+import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
 import {Semaphore} from "@semaphore-protocol/contracts/Semaphore.sol";
 import {SemaphoreVerifier} from "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol";
@@ -32,6 +33,7 @@ import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISema
 import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
+import {HonkVerifier} from "../contracts/CRISPVerifier.sol";
 import {MockRISC0Verifier} from "../contracts/Mocks/MockRISC0Verifier.sol";
 import {ImageID} from "../contracts/ImageID.sol";
 
@@ -183,6 +185,9 @@ contract CRISPProgramDeploy is Script {
             address(inputValidatorFactory)
         );
 
+        HonkVerifier honkVerifier = new HonkVerifier();
+        console2.log("Deployed HonkVerifier to", address(honkVerifier));
+
         CRISPProgram crisp = new CRISPProgram(
             enclave,
             verifier,
@@ -190,8 +195,12 @@ contract CRISPProgramDeploy is Script {
             checkerFactory,
             policyFactory,
             inputValidatorFactory,
+            honkVerifier,
             ImageID.VOTING_ID
         );
         console2.log("Deployed CRISPProgram to", address(crisp));
+
+        enclave.enableE3Program(IE3Program(address(crisp)));
+        console2.log("Enabled E3 Program on Enclave");
     }
 }

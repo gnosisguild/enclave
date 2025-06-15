@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - hacknet
 
 jobs:
   ci:
@@ -12,11 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.81.0
+      - name: Install Rust 1.85.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.81.0
-          override: true
+          toolchain: 1.85.0
 
         # We must install foundry in order to be able to test anvil
       - name: Install Foundry
@@ -48,9 +48,8 @@ jobs:
       - name: "Compile the contracts and generate the TypeChain bindings"
         run: "pnpm typechain"
 
-        # Now we can check rust formatting and run tests
-      - name: Checking code format
-        run: cd ./packages/ciphernode && cargo fmt -- --check
+      - name: Checking code format ciphernode
+        run: pnpm ciphernode:lint
 
       - name: Run tests
         run: "pnpm ciphernode:test"

@@ -4,6 +4,7 @@ pragma solidity >=0.8.27;
 import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
 import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
 import {Clone} from "@excubiae/contracts/proxy/Clone.sol";
+import {IVerifier} from "./CRISPVerifier.sol";
 
 /// @title CRISPInputValidator.
 /// @notice Enclave Input Validator
@@ -11,18 +12,26 @@ contract CRISPInputValidator is IInputValidator, Clone {
     /// @notice The policy that will be used to validate the input.
     IBasePolicy internal policy;
 
+    /// @notice The verifier that will be used to validate the input.
+    IVerifier internal noirVerifier;
+
     /// @notice The error emitted when the input data is empty.
     error EmptyInputData();
     /// @notice The error emitted when the input data is invalid.
     error InvalidInputData(bytes reason);
+    /// @notice The error emitted when the Noir proof is invalid.
+    error InvalidNoirProof();
 
     /// @notice Initializes the contract with appended bytes data for configuration.
     function _initialize() internal virtual override(Clone) {
         super._initialize();
-        bytes memory data = _getAppendedBytes();
-        address policyAddr = abi.decode(data, (address));
 
+        (address policyAddr, address verifierAddr) = abi.decode(
+            _getAppendedBytes(),
+            (address, address)
+        );
         policy = IBasePolicy(policyAddr);
+        noirVerifier = IVerifier(verifierAddr);
     }
 
     /// @notice Validates input
@@ -35,13 +44,19 @@ contract CRISPInputValidator is IInputValidator, Clone {
     ) external returns (bytes memory input) {
         if (data.length == 0) revert EmptyInputData();
 
-        (bytes memory proofBytes, bytes memory vote) = abi.decode(
-            data,
-            (bytes, bytes)
-        );
+        (
+            bytes memory semaphoreProof,
+            bytes memory noirProof,
+            bytes32[] memory noirPublicInputs,
+            bytes memory vote
+        ) = abi.decode(data, (bytes, bytes, bytes32[], bytes));
 
-        // Reverts if the proof is invalid
-        policy.enforce(sender, proofBytes);
+        // Reverts if the semaphore proof is invalid
+        policy.enforce(sender, semaphoreProof);
+
+        // Reverts if noir proof is invalid
+        if (!noirVerifier.verify(noirProof, noirPublicInputs))
+            revert InvalidNoirProof();
 
         input = vote;
     }
