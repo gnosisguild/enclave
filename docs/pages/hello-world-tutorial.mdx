@@ -189,34 +189,7 @@ Modify your program to accept 3 or more encrypted inputs.
 
 Customize the client application in `./client/src/` to match your computation.
 
-## Key Takeaways
-
-🔒 **Privacy-Preserving**: Inputs never leave the client unencrypted  
-⚡ **Homomorphic**: Computations work directly on encrypted data  
-🌐 **Decentralized**: Multiple ciphernodes ensure security and availability  
-🔧 **Configurable**: Easy to modify computations and deployment settings  
-
-## Common Patterns
-
-### Input Validation
-```rust
-if fhe_inputs.ciphertexts.len() != expected_count {
-    panic!("Wrong number of inputs");
-}
-```
-
-### Complex Computations
-```rust
-// You can chain operations
-let intermediate = &a + &b;
-let result = &intermediate * &c;
-```
-
-### Error Handling
-```rust
-let ciphertext = Ciphertext::from_bytes(&bytes, &params)
-    .map_err(|e| format!("Failed to deserialize: {}", e))?;
-```
+Happy building with Enclave! 🚀 
 
 ## Next Steps
 
@@ -225,19 +198,3 @@ Ready to build more complex E3 programs? Continue with:
 1. [Writing the Secure Process](/write-secure-program) - Advanced FHE programming
 2. [Writing the E3 Program Contract](/write-e3-contract) - Smart contract integration
 3. [Setting Up the Server](/setting-up-server) - Custom coordination logic
-
-## Troubleshooting
-
-**Compilation fails?**
-- Ensure Rust toolchain is up to date: `rustup update`
-- Check that all dependencies are installed
-
-**Services won't start?**
-- Verify Docker is running: `docker ps`
-- Check ports aren't in use: `lsof -i :8545,3000,9201`
-
-**Client connection issues?**
-- Confirm MetaMask is configured for `http://localhost:8545`
-- Check that all services have started successfully
-
-Happy building with Enclave! 🚀 
