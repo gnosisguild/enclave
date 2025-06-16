@@ -6,6 +6,7 @@
     "moduleResolution": "nodenext",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true
   },

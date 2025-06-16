@@ -6,6 +6,7 @@ repository = "https://github.com/gnosisguild/enclave"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+greco = { package = "e3-greco-generator", git = "https://github.com/gnosisguild/greco" } 
 web-sys = { version = "0.3", features = ["console"] }
 console = "0.15.7"
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }

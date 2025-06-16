@@ -1460,7 +1460,7 @@ checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 [[package]]
 name = "e3-bfv-helpers"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave?branch=hacknet#2ee401f759f530b14ddf6875cc055f4dffd83ea1"
+source = "git+https://github.com/gnosisguild/enclave?rev=f5508ef#f5508ef9855f66c4bfde3d9147a6d04a1eff2d4e"
 dependencies = [
  "alloy",
  "fhe",
@@ -1470,7 +1470,7 @@ dependencies = [
 [[package]]
 name = "e3-compute-provider"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave?branch=hacknet#2ee401f759f530b14ddf6875cc055f4dffd83ea1"
+source = "git+https://github.com/gnosisguild/enclave?rev=f5508ef#f5508ef9855f66c4bfde3d9147a6d04a1eff2d4e"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",

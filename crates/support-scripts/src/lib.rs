@@ -1,16 +1,19 @@
 use anyhow::{bail, Result};
 use duct::cmd;
+use e3_config::ProgramConfig;
 use std::{env, path::PathBuf};
 use tokio::fs;
 use tokio::signal;
 
 async fn run_bash_script(cwd: &PathBuf, script: &PathBuf, args: &[&str]) -> Result<()> {
-    println!("run_bash_script: {:?} {:?} {:?}", cwd, script, args);
+    println!("run_bash_script: {:?} {:?} {:?}", cwd, script, args); // Delete this later as this exposes
+                                                                    // credential information
 
     // Build the command using cmd! macro for cleaner syntax
     let mut cmd_args = vec!["bash".to_string(), script.to_string_lossy().to_string()];
     cmd_args.extend(args.iter().map(|s| s.to_string()));
 
+    // Note this will not end up on shell history
     let expression = cmd("bash", &cmd_args[1..]).dir(cwd);
 
     let handle = expression.start()?;
@@ -50,10 +53,22 @@ pub async fn program_compile() -> Result<()> {
     Ok(())
 }
 
-pub async fn program_start() -> Result<()> {
+pub async fn program_start(program_config: &ProgramConfig) -> Result<()> {
     let cwd = env::current_dir()?;
     let script = cwd.join(".enclave/support/ctl/start");
     ensure_script_exists(&script).await?;
-    run_bash_script(&cwd, &script, &[]).await?;
+
+    let risc0_config = program_config.risc0();
+    let risc0_dev_mode_str = risc0_config.risc0_dev_mode.to_string();
+
+    let mut args = vec!["--risc0-dev-mode", risc0_dev_mode_str.as_str()];
+
+    if let (Some(api_key), Some(api_url)) =
+        (&risc0_config.bonsai_api_key, &risc0_config.bonsai_api_url)
+    {
+        args.extend(["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]);
+    }
+
+    run_bash_script(&cwd, &script, &args).await?;
     Ok(())
 }

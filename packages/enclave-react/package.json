@@ -1,6 +1,6 @@
 {
   "name": "@gnosis-guild/enclave-react",
-  "version": "0.0.5-test.17",
+  "version": "0.0.5-test.22",
   "description": "React hooks and utilities for Enclave SDK",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -33,6 +33,10 @@
     "react": "^18.2.0",
     "wagmi": "^2.14.16",
     "viem": "^2.30.6"
+  },
+  "publishConfig": {
+    "access": "public",
+    "git-checks": false
   },
   "dependencies": {
     "@gnosis-guild/enclave": "workspace:*"

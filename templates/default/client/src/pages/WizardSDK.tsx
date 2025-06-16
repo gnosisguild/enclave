@@ -198,7 +198,7 @@ const RequestComputationStep: React.FC<RequestComputationStepProps> = ({
           </div>
         )}
 
-        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => {}} />}
+        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => { }} />}
 
         {isSuccess && transactionHash && (
           <div className='rounded-lg border border-green-200 bg-green-50 p-4'>
@@ -267,7 +267,7 @@ const ActivateE3Step: React.FC<ActivateE3StepProps> = ({ e3State, isRequesting, 
           </div>
         )}
 
-        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => {}} />}
+        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => { }} />}
 
         {isSuccess && transactionHash && (
           <div className='rounded-lg border border-green-200 bg-green-50 p-4'>
@@ -598,7 +598,11 @@ const WizardSDK: React.FC = () => {
 
   // Set up event listeners
   useEffect(() => {
-    if (!isInitialized) return
+    console.log('running use effect')
+    if (!isInitialized) {
+      console.log('refusing to run because sdk is not initialized!')
+      return
+    }
 
     const handleE3Requested = (event: any) => {
       const e3Id = event.data.e3Id
@@ -658,6 +662,7 @@ const WizardSDK: React.FC = () => {
     }
 
     // Set up event listeners
+    console.log('Setting up listeners...')
     onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handleE3Requested)
     onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublished)
     onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3Activated)
@@ -665,13 +670,14 @@ const WizardSDK: React.FC = () => {
 
     // Cleanup
     return () => {
+      console.log('Cleaning up listeners...')
       off(EnclaveEventType.E3_REQUESTED, handleE3Requested)
       off(RegistryEventType.COMMITTEE_PUBLISHED, handleCommitteePublished)
       off(EnclaveEventType.E3_ACTIVATED, handleE3Activated)
       off(EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED, handlePlaintextOutput)
     }
   }, [isInitialized, onEnclaveEvent, off, EnclaveEventType, RegistryEventType])
-  console.log({ currentStep })
+
   // Auto-advance steps based on state
   useEffect(() => {
     if (!isConnected && currentStep > WizardStep.CONNECT_WALLET) {
@@ -688,6 +694,7 @@ const WizardSDK: React.FC = () => {
   }, [isConnected, isInitialized, currentStep, e3State])
 
   const handleRequestComputation = async () => {
+    console.log('handleRequestComputation')
     setIsRequesting(true)
     setRequestError(null)
     setRequestSuccess(false)
@@ -711,6 +718,7 @@ const WizardSDK: React.FC = () => {
       const e3ProgramParams = encodeBfvParams()
       const computeProviderParams = encodeComputeProviderParams(DEFAULT_COMPUTE_PROVIDER_PARAMS)
 
+      console.log('requestE3')
       const hash = await requestE3({
         filter: contracts.filterRegistry,
         threshold,
@@ -733,8 +741,12 @@ const WizardSDK: React.FC = () => {
   }
 
   const handleActivateE3 = async () => {
-    if (!e3State.id || !e3State.publicKey) return
+    console.log('handleActivateE3')
 
+    if (e3State.id === null || e3State.publicKey === null) {
+      console.log('refusing to run handler because id or publicKey is null')
+      return
+    }
     setIsRequesting(true)
     setRequestError(null)
 
@@ -752,7 +764,11 @@ const WizardSDK: React.FC = () => {
 
   const handleInputSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input1 || !input2 || !e3State.publicKey || !e3State.id) return
+    console.log('handleInputSubmit')
+    if (!input1 || !input2 || e3State.publicKey === null || e3State.id === null) {
+      console.log('Refusing to submit input because input is empty or publickey is null or is is null')
+      return
+    }
 
     setCurrentStep(WizardStep.ENCRYPT_SUBMIT)
     setInputPublishError(null)
@@ -792,6 +808,7 @@ const WizardSDK: React.FC = () => {
   }
 
   const handleReset = () => {
+    console.log('handleReset')
     setCurrentStep(WizardStep.CONNECT_WALLET)
     setInput1('')
     setInput2('')
@@ -815,6 +832,7 @@ const WizardSDK: React.FC = () => {
   }
 
   const handleTryAgain = () => {
+    console.log('HandleTryAgain')
     setCurrentStep(WizardStep.ENTER_INPUTS)
     setInputPublishError(null)
     setInputPublishSuccess(false)
@@ -844,9 +862,8 @@ const WizardSDK: React.FC = () => {
         {[1, 2, 3, 4, 5, 6].map((step) => (
           <div key={step} className='flex items-center'>
             <div
-              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${
-                currentStep >= step ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
-              }`}
+              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${currentStep >= step ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
+                }`}
             >
               {getStepIcon(step as WizardStep)}
             </div>

@@ -17,15 +17,27 @@ cleanup() {
 # Set trap for signals
 trap cleanup EXIT INT TERM
 
+# Pull the latest image to ensure we have the most recent version
+# NOTE: This might cause issues if the CLI is not up to date
+echo "Pulling latest image: $IMAGE"
+docker pull "$IMAGE" || {
+    echo "Warning: Failed to pull latest image, using cached version"
+}
+
+# Ensure directories exist with proper permissions
+mkdir -p "$(pwd)/target"
+chmod -R 777 "$(pwd)/target"
+
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
     docker exec -it "$CONTAINER_NAME" bash -c "$*"
 else
     docker run -it --rm \
         --name "$CONTAINER_NAME" \
+        --network=host \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
+        -v "$(pwd)/target:/app/target" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
-        -v "${CACHE_PREFIX}-target-cache:/app/target" \
-        -p 13151:13151 \
+        -v "$(pwd)/target:/app/target" \
         "$IMAGE" bash -c "$*"
 fi

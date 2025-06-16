@@ -11,9 +11,9 @@ pub enum ProgramCommands {
     Compile,
 }
 
-pub async fn execute(command: ProgramCommands, _config: &AppConfig) -> Result<()> {
+pub async fn execute(command: ProgramCommands, config: &AppConfig) -> Result<()> {
     match command {
-        ProgramCommands::Start => e3_support_scripts::program_start().await?,
+        ProgramCommands::Start => e3_support_scripts::program_start(config.program()).await?,
         ProgramCommands::Compile => e3_support_scripts::program_compile().await?,
     };
 

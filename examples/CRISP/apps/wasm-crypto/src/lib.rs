@@ -1,11 +1,10 @@
-mod greco;
 mod util;
 
 use console_log;
 use e3_bfv_helpers::{build_bfv_params_arc, params::SET_2048_1032193_1};
 use fhe_rs::bfv::{Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
 use fhe_traits::{DeserializeParametrized, FheDecrypter, FheEncoder, Serialize};
-use greco::greco::InputValidationVectors;
+use greco::InputValidationVectors;
 use num_bigint::BigInt;
 use num_traits::Num;
 use rand::thread_rng;
@@ -66,19 +65,20 @@ impl Encrypt {
 
         // Create Greco input validation ZKP proof
         let input_val_vectors =
-            InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk).map_err(
-                |e| JsValue::from_str(&format!("Error computing input validation vectors: {}", e)),
-            )?;
+            InputValidationVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &params)
+                .map_err(|e| {
+                    JsValue::from_str(&format!("Error computing input validation vectors: {}", e))
+                })?;
 
-        let p = BigInt::from_str_radix(
+        let zkp_modulus = BigInt::from_str_radix(
             "21888242871839275222246405745257275088548364400416034343698204186575808495617",
             10,
         )
         .unwrap();
 
-        let standard_input_val = input_val_vectors.standard_form(&p);
-
+        let standard_input_val = input_val_vectors.standard_form(&zkp_modulus);
         self.encrypted_vote = ct.to_bytes();
+
         Ok(EncryptedVote {
             encrypted_vote: self.encrypted_vote.clone(),
             circuit_inputs: standard_input_val.to_json().to_string(),

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["app", "host", "methods"]
+members = ["app", "host", "methods", "types"]
 exclude = ["methods/guest"]
 
 [workspace.package]
@@ -11,6 +11,7 @@ edition = "2021"
 e3-support-app = { path = "./app" }
 e3-support-host = { path = "./host" }
 e3-user-program = { path = "./program" }
+e3-support-types = { path = "./types" }
 methods = { path = "./methods" }
 alloy-primitives = { version = "0.8", default-features = false, features = [
     "rlp",
@@ -36,7 +37,7 @@ serde_json = "1.0.133"
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
-e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", branch = "hacknet" }
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "f5508ef" }
 tokio = { version = "1.38", features = ["full"] }
 rand = { version = "0.8.5" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
