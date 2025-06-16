@@ -3,6 +3,7 @@ use cli::Cli;
 use tracing::info;
 
 mod cli;
+mod config_set;
 pub mod helpers;
 mod init;
 pub mod net;
@@ -26,7 +27,6 @@ mod program;
 mod start;
 mod wallet;
 mod wallet_set;
-mod wizard;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     
