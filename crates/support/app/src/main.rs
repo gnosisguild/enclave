@@ -110,7 +110,7 @@ async fn handle_compute(req: web::Json<ComputeRequest>) -> ActixResult<HttpRespo
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
-    let bind_addr = "0.0.0.0:13151";
+    let bind_addr = "127.0.0.1:13151";
     let server = HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
