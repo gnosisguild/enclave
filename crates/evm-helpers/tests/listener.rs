@@ -97,7 +97,7 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
     // events without disruption.
     let (contract, _, _, anvil) = setup_logs_contract().await?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
-    
+
     let mut event_listener = EventListener::create_contract_listener(
         &anvil.ws_endpoint(),
         &contract.address().to_string(),
@@ -111,7 +111,7 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
             async move {
                 let (msg, time_diff) = process_message_with_timestamp(&event.value)?;
                 println!("PublishMessage '{}' ({} since sent)", msg, time_diff);
-                
+
                 let _ = tx.try_send("waiting".to_string());
                 // Wait 200ms before publishing to simulate long running handlers
                 sleep(Duration::from_millis(200)).await;
@@ -138,7 +138,7 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
 
     // Events should be returned roughly in this order:
     // 0ms : one
-    // 0ms : waiting  
+    // 0ms : waiting
     // 100ms : two
     // 200ms : three
     // 300ms : four

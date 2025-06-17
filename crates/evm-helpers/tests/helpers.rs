@@ -43,7 +43,7 @@ pub async fn setup_provider() -> Result<(impl Provider, String, AnvilInstance)> 
         .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
         .connect_ws(WsConnect::new(anvil.ws_endpoint()))
         .await?;
-        
+
     let endpoint = anvil.ws_endpoint();
     Ok((provider, endpoint, anvil))
 }
