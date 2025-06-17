@@ -255,7 +255,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     assert_eq!(msgs, ["before", "online", "live", "events"]);
 
     let _ = EvmEventReader::attach(
-        provider,
+        provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
         None,
