@@ -1,4 +1,5 @@
 use alloy::{
+    network::Ethereum,
     primitives::{Address, B256},
     providers::{Provider, ProviderBuilder, RootProvider},
     rpc::types::{BlockNumberOrTag, Filter, Log},
@@ -16,13 +17,13 @@ type EventHandler =
 
 #[derive(Clone)]
 pub struct EventListener {
-    provider: Arc<RootProvider<BoxTransport>>,
+    provider: Arc<dyn Provider<Ethereum>>,
     filter: Filter,
     handlers: Arc<RwLock<HashMap<B256, Vec<EventHandler>>>>,
 }
 
 impl EventListener {
-    pub fn new(provider: Arc<RootProvider<BoxTransport>>, filter: Filter) -> Self {
+    pub fn new(provider: Arc<dyn Provider<Ethereum>>, filter: Filter) -> Self {
         Self {
             provider,
             filter,

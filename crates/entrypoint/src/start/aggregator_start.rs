@@ -6,7 +6,7 @@ use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_events::{get_enclave_event_bus, EnclaveEvent, EventBus};
 use e3_evm::{
-    helpers::{get_signer_from_repository, ProviderConfig},
+    helpers::{load_signer_from_repository, ProviderConfig},
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
 };
@@ -37,7 +37,7 @@ pub async fn execute(
     let repositories = store.repositories();
     let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     let cipher = Arc::new(Cipher::from_config(config).await?);
-    let signer = get_signer_from_repository(repositories.eth_private_key(), &cipher).await?;
+    let signer = load_signer_from_repository(repositories.eth_private_key(), &cipher).await?;
 
     for chain in config
         .chains()
@@ -47,29 +47,29 @@ pub async fn execute(
         let rpc_url = chain.rpc_url()?;
         let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
         let read_provider = provider_config.create_readonly_provider().await?;
-        let write_provider = provider_config.create_ws_signer_provider(&signer).await?;
+        let write_provider = provider_config.create_signer_provider(&signer).await?;
 
         EnclaveSol::attach(
             &bus,
-            &read_provider,
-            &write_provider,
+            read_provider.clone(),
+            write_provider.clone(),
             &chain.contracts.enclave.address(),
-            &repositories.enclave_sol_reader(read_provider.get_chain_id()),
+            &repositories.enclave_sol_reader(read_provider.chain_id()),
             chain.contracts.enclave.deploy_block(),
             chain.rpc_url.clone(),
         )
         .await?;
         RegistryFilterSol::attach(
             &bus,
-            &write_provider,
+            write_provider.clone(),
             &chain.contracts.filter_registry.address(),
         )
         .await?;
         CiphernodeRegistrySol::attach(
             &bus,
-            &read_provider,
+            read_provider.clone(),
             &chain.contracts.ciphernode_registry.address(),
-            &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
+            &repositories.ciphernode_registry_reader(read_provider.chain_id()),
             chain.contracts.ciphernode_registry.deploy_block(),
             chain.rpc_url.clone(),
         )

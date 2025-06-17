@@ -1,4 +1,4 @@
-use crate::helpers::WithChainId;
+use crate::helpers::EthProvider;
 use actix::prelude::*;
 use actix::{Addr, Recipient};
 use alloy::eips::BlockNumberOrTag;
@@ -6,7 +6,6 @@ use alloy::primitives::Address;
 use alloy::primitives::{LogData, B256};
 use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
-use alloy::transports::{BoxTransport, Transport};
 use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus, EventId, Subscribe};
@@ -35,12 +34,8 @@ impl EnclaveEvmEvent {
 
 pub type ExtractorFn<E> = fn(&LogData, Option<&B256>, u64) -> Option<E>;
 
-pub struct EvmEventReaderParams<P, T>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
-    provider: WithChainId<P, T>,
+pub struct EvmEventReaderParams<P> {
+    provider: EthProvider<P>,
     extractor: ExtractorFn<EnclaveEvent>,
     contract_address: Address,
     start_block: Option<u64>,
@@ -56,13 +51,9 @@ pub struct EvmEventReaderState {
 }
 
 /// Connects to Enclave.sol converting EVM events to EnclaveEvents
-pub struct EvmEventReader<P, T = BoxTransport>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
+pub struct EvmEventReader<P> {
     /// The alloy provider
-    provider: Option<WithChainId<P, T>>,
+    provider: Option<EthProvider<P>>,
     /// The contract address
     contract_address: Address,
     /// The Extractor function to determine which events to extract and convert to EnclaveEvents
@@ -82,12 +73,8 @@ where
     rpc_url: String,
 }
 
-impl<P, T> EvmEventReader<P, T>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
-    pub fn new(params: EvmEventReaderParams<P, T>) -> Self {
+impl<P: Provider + Clone + 'static> EvmEventReader<P> {
+    pub fn new(params: EvmEventReaderParams<P>) -> Self {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         Self {
             contract_address: params.contract_address,
@@ -103,7 +90,7 @@ where
     }
 
     pub async fn attach(
-        provider: &WithChainId<P, T>,
+        provider: EthProvider<P>,
         extractor: ExtractorFn<EnclaveEvent>,
         contract_address: &str,
         start_block: Option<u64>,
@@ -117,7 +104,7 @@ where
             .await?;
 
         let params = EvmEventReaderParams {
-            provider: provider.clone(),
+            provider,
             extractor,
             contract_address: contract_address.parse()?,
             start_block,
@@ -125,25 +112,22 @@ where
             state: sync_state,
             rpc_url,
         };
+        
         let addr = EvmEventReader::new(params).start();
-
         bus.do_send(Subscribe::new("Shutdown", addr.clone().into()));
-
         Ok(addr)
     }
 }
 
-impl<P, T> Actor for EvmEventReader<P, T>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
+impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
     type Context = actix::Context<Self>;
+    
     fn started(&mut self, ctx: &mut Self::Context) {
         let processor = ctx.address().recipient();
         let bus = self.bus.clone();
+        
         let Some(provider) = self.provider.take() else {
-            tracing::error!("Could not start event reader as provider has already been used.");
+            error!("Could not start event reader as provider has already been used.");
             return;
         };
 
@@ -156,6 +140,7 @@ where
         let contract_address = self.contract_address;
         let start_block = self.start_block;
         let rpc_url = self.rpc_url.clone();
+        
         ctx.spawn(
             async move {
                 stream_from_evm(
@@ -176,8 +161,8 @@ where
 }
 
 #[instrument(name = "evm_event_reader", skip_all)]
-async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
-    provider: WithChainId<P, T>,
+async fn stream_from_evm<P: Provider + Clone>(
+    provider: EthProvider<P>,
     contract_address: &Address,
     processor: &Recipient<EnclaveEvmEvent>,
     extractor: fn(&LogData, Option<&B256>, u64) -> Option<EnclaveEvent>,
@@ -186,8 +171,8 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
     bus: &Addr<EventBus<EnclaveEvent>>,
     rpc_url: String,
 ) {
-    let chain_id = provider.get_chain_id();
-    let provider = provider.get_provider();
+    let chain_id = provider.chain_id();
+    let provider_ref = provider.provider();
 
     if start_block.unwrap_or(0) == 0 && !is_local_node(&rpc_url) {
         error!(
@@ -197,21 +182,22 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
         bus.err(
             EnclaveErrorType::Evm,
             anyhow!(
-                "Misconfiguration: Attempted to query historical events from genesis on a non-local node. Please specify a `start_block` for contract address {contract_address} on chain {chain_id} using rpc {rpc_url}"
+                "Misconfiguration: Attempted to query historical events from genesis on a non-local node. \
+                Please specify a `start_block` for contract address {contract_address} on chain {chain_id} using rpc {rpc_url}"
             )
         );
         return;
     }
 
     let historical_filter = Filter::new()
-        .address(contract_address.clone())
+        .address(*contract_address)
         .from_block(start_block.unwrap_or(0));
     let current_filter = Filter::new()
         .address(*contract_address)
         .from_block(BlockNumberOrTag::Latest);
 
     // Historical events
-    match provider.clone().get_logs(&historical_filter).await {
+    match provider_ref.get_logs(&historical_filter).await {
         Ok(historical_logs) => {
             info!("Fetched {} historical events", historical_logs.len());
             for log in historical_logs {
@@ -229,11 +215,12 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
         }
     }
 
-    info!("subscribing to live events");
-    match provider.subscribe_logs(&current_filter).await {
+    info!("Subscribing to live events");
+    match provider_ref.subscribe_logs(&current_filter).await {
         Ok(subscription) => {
             let id: B256 = subscription.local_id().clone();
             let mut stream = subscription.into_stream();
+            
             loop {
                 select! {
                     maybe_log = stream.next() => {
@@ -241,27 +228,23 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
                             Some(log) => {
                                 let block_number = log.block_number;
                                 trace!("Received log from EVM");
-                                let Some(event) = extractor(log.data(), log.topic0(), chain_id)
-                                else {
+                                
+                                let Some(event) = extractor(log.data(), log.topic0(), chain_id) else {
                                     trace!("Unknown log from EVM. This will happen from time to time.");
                                     continue;
                                 };
-                                trace!("Extracted Evm Event: {}", event);
+                                
+                                trace!("Extracted EVM Event: {}", event);
                                 processor.do_send(EnclaveEvmEvent::new(event, block_number));
-
                             }
                             None => break, // Stream ended
                         }
                     }
                     _ = &mut shutdown => {
                         info!("Received shutdown signal, stopping EVM stream");
-                        match provider.unsubscribe(id).await {
-                            Ok(_) => {
-                                info!("Unsubscribed successfully from EVM event stream");
-                            },
-                            Err(err) => {
-                                error!("Cannot unsubscribe from EVM event stream: {}", err);
-                            }
+                        match provider_ref.unsubscribe(id).await {
+                            Ok(_) => info!("Unsubscribed successfully from EVM event stream"),
+                            Err(err) => error!("Cannot unsubscribe from EVM event stream: {}", err),
                         };
                         break;
                     }
@@ -271,7 +254,8 @@ async fn stream_from_evm<P: Provider<T>, T: Transport + Clone>(
         Err(e) => {
             bus.err(EnclaveErrorType::Evm, anyhow!("{}", e));
         }
-    };
+    }
+    
     info!("Exiting stream loop");
 }
 
@@ -279,12 +263,9 @@ fn is_local_node(rpc_url: &str) -> bool {
     rpc_url.contains("localhost") || rpc_url.contains("127.0.0.1")
 }
 
-impl<P, T> Handler<EnclaveEvent> for EvmEventReader<P, T>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
+impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmEventReader<P> {
     type Result = ();
+    
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::Shutdown { .. } = msg {
             if let Some(shutdown) = self.shutdown_tx.take() {
@@ -294,11 +275,7 @@ where
     }
 }
 
-impl<P, T> Handler<EnclaveEvmEvent> for EvmEventReader<P, T>
-where
-    P: Provider<T> + Clone + 'static,
-    T: Transport + Clone + Unpin,
-{
+impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<P> {
     type Result = ();
 
     #[instrument(name = "evm_event_reader", skip_all)]
@@ -306,7 +283,8 @@ where
         match self.state.try_mutate(|mut state| {
             let event_id = wrapped.get_id();
             trace!("Processing event: {}", event_id);
-            trace!("cache length: {}", state.ids.len());
+            trace!("Cache length: {}", state.ids.len());
+            
             if state.ids.contains(&event_id) {
                 warn!(
                     "Event id {} has already been seen and was not forwarded to the bus",
@@ -317,12 +295,11 @@ where
 
             let event_type = wrapped.event.event_type();
 
-            // Forward everything else to the event bus
+            // Forward to the event bus
             self.bus.do_send(wrapped.event);
 
-            // Save processed ids
+            // Save processed IDs
             trace!("Storing event(EVM) in cache {}({})", event_type, event_id);
-
             state.ids.insert(event_id);
             state.last_block = wrapped.block;
 

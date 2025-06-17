@@ -1,6 +1,10 @@
 use alloy::{
+    network::Ethereum,
     node_bindings::{Anvil, AnvilInstance},
-    providers::{ProviderBuilder, RootProvider, WsConnect},
+    providers::{
+        fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, BlobGasFiller},
+        Identity, ProviderBuilder, RootProvider, WsConnect,
+    },
     pubsub::PubSubFrontend,
     sol,
 };
@@ -21,7 +25,7 @@ sol!(
 );
 
 pub async fn setup_logs_contract() -> Result<(
-    EmitLogsInstance<PubSubFrontend, RootProvider<PubSubFrontend>>,
+    EmitLogsInstance<PubSubFrontend, RootProvider<Ethereum>>,
     String,
     String,
     AnvilInstance,
@@ -33,7 +37,7 @@ pub async fn setup_logs_contract() -> Result<(
 }
 
 pub async fn setup_fake_enclave() -> Result<(
-    EnclaveInstance<PubSubFrontend, RootProvider<PubSubFrontend>>,
+    EnclaveInstance<PubSubFrontend, RootProvider<Ethereum>>,
     String,
     String,
     AnvilInstance,
@@ -44,7 +48,7 @@ pub async fn setup_fake_enclave() -> Result<(
     Ok((contract, address, endpoint, anvil))
 }
 
-pub async fn setup_provider() -> Result<(RootProvider<PubSubFrontend>, String, AnvilInstance)> {
+pub async fn setup_provider() -> Result<(FillProvider<JoinFill<Identity, JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>>, RootProvider<Ethereum>, Ethereum>, String, AnvilInstance)> {
     // Set anvil with fast blocktimes for testing
     let anvil = Anvil::new().block_time_f64(0.01).try_spawn()?;
 

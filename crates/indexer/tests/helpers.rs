@@ -1,6 +1,6 @@
 use alloy::{
     node_bindings::{Anvil, AnvilInstance},
-    providers::{ProviderBuilder, RootProvider, WsConnect},
+    providers::{Provider, ProviderBuilder, RootProvider, WsConnect},
     pubsub::PubSubFrontend,
     sol,
 };
@@ -44,12 +44,12 @@ pub async fn setup_fake_enclave() -> Result<(
     Ok((contract, address, endpoint, anvil))
 }
 
-pub async fn setup_provider() -> Result<(RootProvider<PubSubFrontend>, String, AnvilInstance)> {
+pub async fn setup_provider() -> Result<(impl Provider + Clone, String, AnvilInstance)> {
     // Set anvil with fast blocktimes for testing
     let anvil = Anvil::new().block_time_f64(0.01).try_spawn()?;
 
     let provider = ProviderBuilder::new()
-        .on_ws(WsConnect::new(anvil.ws_endpoint()))
+        .connect_ws(WsConnect::new(anvil.ws_endpoint()))
         .await?;
     let endpoint = anvil.ws_endpoint();
     Ok((provider, endpoint, anvil))

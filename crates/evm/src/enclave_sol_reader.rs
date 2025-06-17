@@ -1,9 +1,9 @@
 use crate::event_reader::EvmEventReaderState;
-use crate::helpers::{ReadonlyProvider, WithChainId};
+use crate::helpers::EthProvider;
 use crate::EvmEventReader;
 use actix::Addr;
 use alloy::primitives::{LogData, B256};
-use alloy::transports::BoxTransport;
+use alloy::providers::Provider;
 use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use e3_data::Repository;
@@ -57,28 +57,27 @@ impl From<CiphertextOutputPublishedWithChainId> for EnclaveEvent {
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&IEnclave::E3Requested::SIGNATURE_HASH) => {
-            let Ok(event) = IEnclave::E3Requested::decode_log_data(data, true) else {
+            let Ok(event) = IEnclave::E3Requested::decode_log_data(data) else {
                 error!("Error parsing event E3Requested after topic matched!");
                 return None;
             };
             Some(EnclaveEvent::from(E3RequestedWithChainId(event, chain_id)))
         }
         Some(&IEnclave::CiphertextOutputPublished::SIGNATURE_HASH) => {
-            let Ok(event) = IEnclave::CiphertextOutputPublished::decode_log_data(data, true) else {
-                error!("Error parsing event CiphertextOutputPublished after topic matched!"); // TODO: provide more info
+            let Ok(event) = IEnclave::CiphertextOutputPublished::decode_log_data(data) else {
+                error!("Error parsing event CiphertextOutputPublished after topic matched!");
                 return None;
             };
             Some(EnclaveEvent::from(CiphertextOutputPublishedWithChainId(
                 event, chain_id,
             )))
         }
-
         _topic => {
             trace!(
                 topic=?_topic,
-                "Unknown event was received by Enclave.sol parser buut was ignored"
+                "Unknown event received by Enclave.sol parser but was ignored"
             );
-            return None;
+            None
         }
     }
 }
@@ -87,14 +86,17 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
 pub struct EnclaveSolReader;
 
 impl EnclaveSolReader {
-    pub async fn attach(
+    pub async fn attach<P>(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: &WithChainId<ReadonlyProvider, BoxTransport>,
+        provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
+    ) -> Result<Addr<EvmEventReader<P>>>
+    where
+        P: Provider + Clone + 'static,
+    {
         let addr = EvmEventReader::attach(
             provider,
             extractor,

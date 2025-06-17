@@ -80,7 +80,7 @@ e3-tests = { version = "0.1.0", path = "./crates/tests" }
 actix = "0.13.5"
 actix-web = "4.10.2"
 aes-gcm = "0.10.3"
-alloy = { version = "0.15", features = ["node-bindings", "full"] }
+alloy = { version = "1.0.9", features = ["node-bindings", "full"] }
 alloy-primitives = { version = "1.0", default-features = false, features = [
   "rlp",
   "serde",
@@ -134,7 +134,7 @@ sled = "0.34.7"
 serde_yaml = "0.9.34"
 sha2 = "0.10.8"
 shellexpand = "3.1.0"
-tempfile = "3.14.0"
+tempfile = "3.20.0"
 thiserror =  { version = "1.0.58" }
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"

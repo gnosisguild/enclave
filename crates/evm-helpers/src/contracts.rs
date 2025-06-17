@@ -180,7 +180,11 @@ impl EnclaveContract<ReadOnly> {
 }
 
 /// Type alias for read-only provider
-pub type EnclaveReadOnlyProvider = RootProvider<BoxTransport>;
+pub type EnclaveReadOnlyProvider = FillProvider<
+    JoinFill<Identity, JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>>,
+    RootProvider<Ethereum>,
+    Ethereum,
+>;
 
 /// Type alias for read-write provider
 pub type EnclaveWriteProvider = FillProvider<
@@ -191,8 +195,7 @@ pub type EnclaveWriteProvider = FillProvider<
         >,
         WalletFiller<EthereumWallet>,
     >,
-    RootProvider<BoxTransport>,
-    BoxTransport,
+    RootProvider<Ethereum>,
     Ethereum,
 >;
 
@@ -215,7 +218,6 @@ impl EnclaveContractFactory {
         let signer: PrivateKeySigner = private_key.parse()?;
         let wallet = EthereumWallet::from(signer);
         let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
             .wallet(wallet)
             .on_builtin(http_rpc_url)
             .await?;
@@ -253,19 +255,19 @@ where
     async fn get_e3_id(&self) -> Result<U256> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let e3_id = contract.nexte3Id().call().await?;
-        Ok(e3_id.nexte3Id)
+        Ok(e3_id)
     }
 
     async fn get_e3(&self, e3_id: U256) -> Result<E3> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let e3_return = contract.getE3(e3_id).call().await?;
-        Ok(e3_return.e3)
+        Ok(e3_return)
     }
 
     async fn get_input_count(&self, e3_id: U256) -> Result<U256> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let input_count = contract.inputCounts(e3_id).call().await?;
-        Ok(input_count.inputCount)
+        Ok(input_count)
     }
 
     async fn get_latest_block(&self) -> Result<u64> {
@@ -276,19 +278,19 @@ where
     async fn get_root(&self, id: U256) -> Result<U256> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let root = contract.getRoot(id).call().await?;
-        Ok(root._0)
+        Ok(root)
     }
 
     async fn get_e3_params(&self, e3_id: U256) -> Result<Bytes> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let params = contract.e3Params(e3_id).call().await?;
-        Ok(params.params)
+        Ok(params)
     }
 
     async fn is_e3_program_enabled(&self, e3_program: Address) -> Result<bool> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let enabled = contract.e3Programs(e3_program).call().await?;
-        Ok(enabled.allowed)
+        Ok(enabled)
     }
 }
 
