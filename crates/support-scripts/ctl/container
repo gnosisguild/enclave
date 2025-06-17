@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 CONTAINER_NAME="e3-support.1"
-IMAGE="ghcr.io/gnosisguild/e3-support:next"
+IMAGE="ghcr.io/gnosisguild/e3-support:hacknet"
 CACHE_PREFIX="e3-support"
 
 # Function to cleanup
@@ -34,10 +34,10 @@ else
     docker run -it --rm \
         --name "$CONTAINER_NAME" \
         --network=host \
+        --platform linux/amd64 \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
         -v "$(pwd)/target:/app/target" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
-        -v "$(pwd)/target:/app/target" \
         "$IMAGE" bash -c "$*"
 fi
