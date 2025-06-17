@@ -29,7 +29,7 @@ fn test_event_extractor(
 ) -> Option<EnclaveEvent> {
     match topic {
         Some(&EmitLogs::ValueChanged::SIGNATURE_HASH) => {
-            let Ok(event) = EmitLogs::ValueChanged::decode_log_data(data, true) else {
+            let Ok(event) = EmitLogs::ValueChanged::decode_log_data(data) else {
                 return None;
             };
             Some(EnclaveEvent::from(TestEvent {
@@ -58,7 +58,7 @@ async fn evm_reader() -> Result<()> {
     let repository = Repository::new(get_in_mem_store());
 
     EvmEventReader::attach(
-        provider,
+        provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
         None,
@@ -132,7 +132,7 @@ async fn ensure_historical_events() -> Result<()> {
     }
 
     EvmEventReader::attach(
-        provider,
+        provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
         None,
@@ -218,7 +218,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     }
 
     let addr1 = EvmEventReader::attach(
-        provider,
+        provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
         None,
