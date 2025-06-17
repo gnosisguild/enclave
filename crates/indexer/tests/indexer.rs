@@ -60,7 +60,7 @@ async fn test_indexer() -> Result<()> {
     contract
         .emitInputPublished(
             Uint::from(e3_id),
-            Bytes::from(data.as_bytes()),
+            Bytes::from(data.clone().into_bytes()),
             Uint::from(1111),
             Uint::from(1),
         )
@@ -72,7 +72,7 @@ async fn test_indexer() -> Result<()> {
     contract
         .emitInputPublished(
             Uint::from(e3_id),
-            Bytes::from(data.as_str()),
+            Bytes::from(data.clone().into_bytes()),
             Uint::from(2222),
             Uint::from(2),
         )
@@ -84,7 +84,7 @@ async fn test_indexer() -> Result<()> {
     contract
         .emitInputPublished(
             Uint::from(e3_id),
-            Bytes::from(data.as_str()),
+            Bytes::from(data.clone().into_bytes()),
             Uint::from(3333),
             Uint::from(3),
         )
@@ -99,9 +99,9 @@ async fn test_indexer() -> Result<()> {
     assert_eq!(
         indexer.get_e3(e3_id).await?.ciphertext_inputs,
         vec![
-            (Bytes::from(data.as_str()).to_vec(), 1),
-            (Bytes::from(data.as_str()).to_vec(), 2),
-            (Bytes::from(data.as_str()).to_vec(), 3),
+            (Bytes::from(data.clone().into_bytes()).to_vec(), 1),
+            (Bytes::from(data.clone().into_bytes()).to_vec(), 2),
+            (Bytes::from(data.clone().into_bytes()).to_vec(), 3),
         ]
     );
 

@@ -3,6 +3,7 @@ use alloy::{
     node_bindings::Anvil,
     primitives::{FixedBytes, LogData},
     providers::{ProviderBuilder, WsConnect},
+    signers::local::PrivateKeySigner,
     sol,
     sol_types::SolEvent,
 };
@@ -49,6 +50,7 @@ async fn evm_reader() -> Result<()> {
     let rpc_url = anvil.ws_endpoint(); // Get RPC URL
     let provider = EthProvider::new(
         ProviderBuilder::new()
+            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
             .connect_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )
@@ -111,6 +113,7 @@ async fn ensure_historical_events() -> Result<()> {
     let rpc_url = anvil.ws_endpoint(); // Get RPC URL
     let provider = EthProvider::new(
         ProviderBuilder::new()
+            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
             .connect_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )
@@ -182,6 +185,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     let rpc_url = anvil.ws_endpoint(); // Get RPC URL
     let provider = EthProvider::new(
         ProviderBuilder::new()
+            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
             .connect_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )

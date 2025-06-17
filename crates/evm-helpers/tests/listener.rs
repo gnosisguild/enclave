@@ -3,7 +3,7 @@ use alloy::sol;
 use e3_evm_helpers::listener::EventListener;
 use eyre::Result;
 use helpers::setup_logs_contract;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 
 sol!(
@@ -29,7 +29,7 @@ async fn test_event_listener() -> Result<()> {
         .add_event_handler(move |event: EmitLogs::ValueChanged| {
             let tx = tx.clone();
             async move {
-                let _ = tx.clone().try_send(event.value.clone());
+                let _ = tx.try_send(event.value.clone());
                 Ok(())
             }
         })
@@ -39,7 +39,7 @@ async fn test_event_listener() -> Result<()> {
         .add_event_handler(move |event: EmitLogs::ValueChanged| {
             let tx_addr = tx_addr.clone();
             async move {
-                let _ = tx_addr.clone().try_send(event.author.to_string());
+                let _ = tx_addr.try_send(event.author.to_string());
                 Ok(())
             }
         })
@@ -74,13 +74,11 @@ async fn test_event_listener() -> Result<()> {
     );
     Ok(())
 }
-use std::time::{SystemTime, UNIX_EPOCH};
 
 fn time_diff(past_timestamp: u128) -> Result<String> {
     let current_time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
     let time_diff = current_time.saturating_sub(past_timestamp);
-    let time_diff_string = format!("{}ms", time_diff);
-    Ok(time_diff_string)
+    Ok(format!("{}ms", time_diff))
 }
 
 fn process_message_with_timestamp(input: &str) -> Result<(String, String)> {
@@ -94,13 +92,12 @@ fn process_message_with_timestamp(input: &str) -> Result<(String, String)> {
 
 #[tokio::test]
 async fn test_overlapping_listener_handlers() -> Result<()> {
-    // Here we are going to test that listeners can have overlapping async handlers.
-    // We want to ensure that long running handlers can run async whilest other handlers respond to
-    // events without disruption
-    // It is important that for this test we have Anvil blocktimes set to process fast so we can
-    // ensure order is maintained
+    // Test that listeners can have overlapping async handlers.
+    // Long running handlers should run async while other handlers respond to
+    // events without disruption.
     let (contract, _, _, anvil) = setup_logs_contract().await?;
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
+    
     let mut event_listener = EventListener::create_contract_listener(
         &anvil.ws_endpoint(),
         &contract.address().to_string(),
@@ -114,9 +111,9 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
             async move {
                 let (msg, time_diff) = process_message_with_timestamp(&event.value)?;
                 println!("PublishMessage '{}' ({} since sent)", msg, time_diff);
-                let tx = tx.clone();
+                
                 let _ = tx.try_send("waiting".to_string());
-                // Wait 200ms before publishing the message to simulate long running handlers
+                // Wait 200ms before publishing to simulate long running handlers
                 sleep(Duration::from_millis(200)).await;
                 println!("Sending message: '{msg}'");
                 let _ = tx.try_send(msg);
@@ -128,11 +125,10 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
     event_listener
         .add_event_handler(move |event: EmitLogs::ValueChanged| {
             let tx = tx.clone();
-
             async move {
                 let (msg, time_diff) = process_message_with_timestamp(&event.value)?;
                 println!("ValueChanged '{}' ({} since sent)", msg, time_diff);
-                let _ = tx.clone().try_send(msg);
+                let _ = tx.try_send(msg);
                 Ok(())
             }
         })
@@ -140,10 +136,9 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
 
     event_listener.start();
 
-    // For clarity the events should be returned
-    // roughly in this order:
+    // Events should be returned roughly in this order:
     // 0ms : one
-    // 0ms : waiting
+    // 0ms : waiting  
     // 100ms : two
     // 200ms : three
     // 300ms : four
@@ -167,7 +162,6 @@ async fn test_overlapping_listener_handlers() -> Result<()> {
     sleep(Duration::from_millis(100)).await;
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
-
     contract
         .setValue(format!("two:{now}"))
         .send()
