@@ -10,8 +10,8 @@ name = "voting"
 path = "src/bin/voting.rs"
 
 [dependencies]
-alloy-primitives = { version = "0.8", default-features = false, features = ["rlp", "serde", "std"] }
-alloy-sol-types = "0.8"
+alloy-primitives = { version = "1.0", default-features = false, features = ["rlp", "serde", "std"] }
+alloy-sol-types = "1.0"
 risc0-zkvm = { version = "2.1.0", default-features = false, features = ['std'] }
 e3-compute-provider = { path = "../../../../../../crates/compute-provider" }
 voting-core = { path = "../../core" }
