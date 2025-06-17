@@ -30,8 +30,9 @@ if command -v tmux &> /dev/null; then
     
     # Reorganize layout to make it more even
     tmux select-layout tiled
-    
-    # Run commands in each pane
+        
+    tmux send-keys -t 0 'pnpm dev:frontend' C-m
+    sleep 1
     tmux send-keys -t 1 'pnpm dev:evm' C-m
     sleep 1
     tmux send-keys -t 2 'pnpm dev:ciphernodes' C-m
@@ -39,11 +40,9 @@ if command -v tmux &> /dev/null; then
     tmux send-keys -t 3 'TEST_MODE=1 pnpm dev:server' C-m
     sleep 1
     tmux send-keys -t 4 'enclave program start' C-m
-    sleep 1
-    tmux send-keys -t 5 'pnpm dev:frontend' C-m
     
-    # Select the first pane to start
-    tmux select-pane -t 1
+    # Select the first pane to start (frontend will be focused)
+    tmux select-pane -t 0
     
     # Attach to the session
     tmux attach-session -t "$SESSION_NAME"
@@ -60,12 +59,12 @@ else
     
     # Run all processes concurrently using pnpm
     pnpm concurrently \
-        --names "EVM,CIPHER,SERVER,ENCLAVE,FRONTEND" \
-        --prefix-colors "cyan,magenta,yellow,green,blue" \
+        --names "FRONTEND,EVM,CIPHER,SERVER,ENCLAVE" \
+        --prefix-colors "blue,cyan,magenta,yellow,green" \
         --kill-others-on-fail \
+        "pnpm dev:frontend" \
         "pnpm dev:evm" \
         "pnpm dev:ciphernodes" \
         "TEST_MODE=1 pnpm dev:server" \
-        "enclave program start" \
-        "pnpm dev:frontend"
+        "enclave program start"
 fi
