@@ -3,7 +3,7 @@
 # ────────────────────────────────────────────────────────────────────────────────
 FROM ubuntu:24.04
 
-ARG RISCZERO_VERSION=2.0.0
+ARG RISCZERO_VERSION=2.1.0
 ARG CPP_VERSION=2024.1.5
 ARG RUST_VERSION=1.85.0
 
