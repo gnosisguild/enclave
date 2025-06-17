@@ -86,7 +86,7 @@ impl ProviderConfig {
             ProviderBuilder::new()
                 .connect_ws(self.create_ws_connect()?)
                 .await
-                .context("Failed to connect to WebSocket RPC! Check if the node is running and URL is correct.")?
+                .context("Failed to connect to WebSocket RPC. Check if the node is running and URL is correct.")?
         } else {
             ProviderBuilder::new().connect_client(self.create_http_client()?)
         };
@@ -105,7 +105,7 @@ impl ProviderConfig {
                 .wallet(wallet)
                 .connect_ws(self.create_ws_connect()?)
                 .await
-                .context("Failed to connect to WebSocket RPC! Check if the node is running and URL is correct.")?
+                .context("Failed to connect to WebSocket RPC. Check if the node is running and URL is correct.")?
         } else {
             ProviderBuilder::new()
                 .wallet(wallet)
