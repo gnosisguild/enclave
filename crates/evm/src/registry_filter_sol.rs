@@ -46,7 +46,7 @@ impl<P: Provider + Clone + 'static> RegistryFilterSolWriter<P> {
         let addr = RegistryFilterSolWriter::new(bus, provider, contract_address.parse()?)
             .await?
             .start();
-            
+
         let _ = bus
             .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
             .await;
@@ -61,7 +61,7 @@ impl<P: Provider + Clone + 'static> Actor for RegistryFilterSolWriter<P> {
 
 impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for RegistryFilterSolWriter<P> {
     type Result = ();
-    
+
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
@@ -78,7 +78,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for RegistryFilterSolW
 
 impl<P: Provider + Clone + 'static> Handler<PublicKeyAggregated> for RegistryFilterSolWriter<P> {
     type Result = ResponseFuture<()>;
-    
+
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
         Box::pin({
             let e3_id = msg.e3_id.clone();
@@ -89,7 +89,8 @@ impl<P: Provider + Clone + 'static> Handler<PublicKeyAggregated> for RegistryFil
             let nodes = msg.nodes.clone();
 
             async move {
-                let result = publish_committee(provider, contract_address, e3_id, nodes, pubkey).await;
+                let result =
+                    publish_committee(provider, contract_address, e3_id, nodes, pubkey).await;
                 match result {
                     Ok(receipt) => {
                         info!(tx=%receipt.transaction_hash, "Transaction published");
@@ -103,7 +104,7 @@ impl<P: Provider + Clone + 'static> Handler<PublicKeyAggregated> for RegistryFil
 
 impl<P: Provider + Clone + 'static> Handler<Shutdown> for RegistryFilterSolWriter<P> {
     type Result = ();
-    
+
     fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop();
     }
@@ -122,7 +123,7 @@ pub async fn publish_committee<P: Provider + Clone>(
         .into_iter()
         .filter_map(|node| node.parse().ok())
         .collect();
-        
+
     let contract = NaiveRegistryFilter::new(contract_address, provider.provider());
     let builder = contract.publishCommittee(e3_id, nodes, public_key);
     let receipt = builder.send().await?.get_receipt().await?;

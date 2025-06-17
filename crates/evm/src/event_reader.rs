@@ -112,7 +112,7 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
             state: sync_state,
             rpc_url,
         };
-        
+
         let addr = EvmEventReader::new(params).start();
         bus.do_send(Subscribe::new("Shutdown", addr.clone().into()));
         Ok(addr)
@@ -121,11 +121,11 @@ impl<P: Provider + Clone + 'static> EvmEventReader<P> {
 
 impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
     type Context = actix::Context<Self>;
-    
+
     fn started(&mut self, ctx: &mut Self::Context) {
         let processor = ctx.address().recipient();
         let bus = self.bus.clone();
-        
+
         let Some(provider) = self.provider.take() else {
             error!("Could not start event reader as provider has already been used.");
             return;
@@ -140,7 +140,7 @@ impl<P: Provider + Clone + 'static> Actor for EvmEventReader<P> {
         let contract_address = self.contract_address;
         let start_block = self.start_block;
         let rpc_url = self.rpc_url.clone();
-        
+
         ctx.spawn(
             async move {
                 stream_from_evm(
@@ -220,7 +220,7 @@ async fn stream_from_evm<P: Provider + Clone>(
         Ok(subscription) => {
             let id: B256 = subscription.local_id().clone();
             let mut stream = subscription.into_stream();
-            
+
             loop {
                 select! {
                     maybe_log = stream.next() => {
@@ -228,12 +228,12 @@ async fn stream_from_evm<P: Provider + Clone>(
                             Some(log) => {
                                 let block_number = log.block_number;
                                 trace!("Received log from EVM");
-                                
+
                                 let Some(event) = extractor(log.data(), log.topic0(), chain_id) else {
                                     trace!("Unknown log from EVM. This will happen from time to time.");
                                     continue;
                                 };
-                                
+
                                 trace!("Extracted EVM Event: {}", event);
                                 processor.do_send(EnclaveEvmEvent::new(event, block_number));
                             }
@@ -255,7 +255,7 @@ async fn stream_from_evm<P: Provider + Clone>(
             bus.err(EnclaveErrorType::Evm, anyhow!("{}", e));
         }
     }
-    
+
     info!("Exiting stream loop");
 }
 
@@ -265,7 +265,7 @@ fn is_local_node(rpc_url: &str) -> bool {
 
 impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EvmEventReader<P> {
     type Result = ();
-    
+
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::Shutdown { .. } = msg {
             if let Some(shutdown) = self.shutdown_tx.take() {
@@ -284,7 +284,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvmEvent> for EvmEventReader<
             let event_id = wrapped.get_id();
             trace!("Processing event: {}", event_id);
             trace!("Cache length: {}", state.ids.len());
-            
+
             if state.ids.contains(&event_id) {
                 warn!(
                     "Event id {} has already been seen and was not forwarded to the bus",

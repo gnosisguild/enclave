@@ -1,8 +1,6 @@
 use crate::{
-    enclave_sol_reader::EnclaveSolReader,
-    enclave_sol_writer::EnclaveSolWriter,
-    event_reader::EvmEventReaderState,
-    helpers::EthProvider,
+    enclave_sol_reader::EnclaveSolReader, enclave_sol_writer::EnclaveSolWriter,
+    event_reader::EvmEventReaderState, helpers::EthProvider,
 };
 use actix::Addr;
 use alloy::providers::Provider;
@@ -35,9 +33,9 @@ impl EnclaveSol {
             rpc_url,
         )
         .await?;
-        
+
         EnclaveSolWriter::attach(bus, write_provider, contract_address).await?;
-        
+
         Ok(())
     }
 }

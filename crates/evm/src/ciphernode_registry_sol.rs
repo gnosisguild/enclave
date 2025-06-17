@@ -1,8 +1,4 @@
-use crate::{
-    event_reader::EvmEventReaderState,
-    helpers::EthProvider,
-    EvmEventReader,
-};
+use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader};
 use actix::Addr;
 use alloy::{
     primitives::{LogData, B256},

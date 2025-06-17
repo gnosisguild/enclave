@@ -181,7 +181,10 @@ impl EnclaveContract<ReadOnly> {
 
 /// Type alias for read-only provider
 pub type EnclaveReadOnlyProvider = FillProvider<
-    JoinFill<Identity, JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>>,
+    JoinFill<
+        Identity,
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+    >,
     RootProvider<Ethereum>,
     Ethereum,
 >;

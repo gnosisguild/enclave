@@ -57,7 +57,7 @@ async fn test_indexer() -> Result<()> {
 
     // InputPublished
     let data = "Random data that wont actually be a string".to_string();
-            contract
+    contract
         .emitInputPublished(
             Uint::from(e3_id),
             Bytes::from(data.as_bytes()),
@@ -69,7 +69,7 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
-            contract
+    contract
         .emitInputPublished(
             Uint::from(e3_id),
             Bytes::from(data.as_str()),
@@ -81,7 +81,7 @@ async fn test_indexer() -> Result<()> {
         .watch()
         .await?;
 
-            contract
+    contract
         .emitInputPublished(
             Uint::from(e3_id),
             Bytes::from(data.as_str()),

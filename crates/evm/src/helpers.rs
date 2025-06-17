@@ -1,5 +1,5 @@
 use alloy::{
-    network::{EthereumWallet},
+    network::EthereumWallet,
     providers::{Provider, ProviderBuilder},
     signers::local::PrivateKeySigner,
     transports::{
@@ -14,7 +14,7 @@ use alloy::{
         Authorization,
     },
 };
-use anyhow::{ Context, Result};
+use anyhow::{Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use e3_config::{RpcAuth, RPC};
 use e3_crypto::Cipher;
@@ -88,10 +88,9 @@ impl ProviderConfig {
                 .await
                 .context("Failed to connect to WebSocket RPC. Check if the node is running and URL is correct.")?
         } else {
-            ProviderBuilder::new()
-                .connect_client(self.create_http_client()?)
+            ProviderBuilder::new().connect_client(self.create_http_client()?)
         };
-        
+
         EthProvider::new(provider).await
     }
 
@@ -100,7 +99,7 @@ impl ProviderConfig {
         signer: &PrivateKeySigner,
     ) -> Result<EthProvider<impl Provider + Clone>> {
         let wallet = EthereumWallet::from(signer.clone());
-        
+
         let provider = if self.rpc.is_websocket() {
             ProviderBuilder::new()
                 .wallet(wallet)
@@ -112,7 +111,7 @@ impl ProviderConfig {
                 .wallet(wallet)
                 .connect_client(self.create_http_client()?)
         };
-        
+
         EthProvider::new(provider).await
     }
 
@@ -122,11 +121,11 @@ impl ProviderConfig {
             .max_message_size(Some(32 * 1024 * 1024));
 
         let mut ws_connect = WsConnect::new(self.rpc.as_ws_url()?).with_config(config);
-        
+
         if let Some(auth) = self.auth.to_ws_auth() {
             ws_connect = ws_connect.with_auth(auth);
         }
-        
+
         Ok(ws_connect)
     }
 
@@ -135,12 +134,12 @@ impl ProviderConfig {
         if let Some(auth_header) = self.auth.to_header_value() {
             headers.insert(AUTHORIZATION, auth_header);
         }
-        
+
         let client = Client::builder()
             .default_headers(headers)
             .build()
             .context("Failed to create HTTP client")?;
-            
+
         let http = Http::with_client(client, self.rpc.as_http_url()?.parse()?);
         Ok(alloy::rpc::client::RpcClient::new(http, false))
     }
@@ -163,7 +162,7 @@ pub async fn load_signer_from_repository(
 
     let decrypted = cipher.decrypt_data(&encrypted_key)?;
     let private_key = String::from_utf8(decrypted)?;
-    
+
     private_key.parse().map_err(Into::into)
 }
 

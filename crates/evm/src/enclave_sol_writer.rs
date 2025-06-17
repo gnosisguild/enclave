@@ -44,7 +44,7 @@ impl<P: Provider + Clone + 'static> EnclaveSolWriter<P> {
         contract_address: &str,
     ) -> Result<Addr<EnclaveSolWriter<P>>> {
         let addr = EnclaveSolWriter::new(bus, provider, contract_address.parse()?)?.start();
-        
+
         bus.send(Subscribe::new("PlaintextAggregated", addr.clone().into()))
             .await?;
 
@@ -61,7 +61,7 @@ impl<P: Provider + Clone + 'static> Actor for EnclaveSolWriter<P> {
 
 impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EnclaveSolWriter<P> {
     type Result = ();
-    
+
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             EnclaveEvent::PlaintextAggregated { data, .. } => {
@@ -78,7 +78,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EnclaveSolWriter<P
 
 impl<P: Provider + Clone + 'static> Handler<PlaintextAggregated> for EnclaveSolWriter<P> {
     type Result = ResponseFuture<()>;
-    
+
     fn handle(&mut self, msg: PlaintextAggregated, _: &mut Self::Context) -> Self::Result {
         Box::pin({
             let e3_id = msg.e3_id.clone();
@@ -88,7 +88,9 @@ impl<P: Provider + Clone + 'static> Handler<PlaintextAggregated> for EnclaveSolW
             let bus = self.bus.clone();
 
             async move {
-                let result = publish_plaintext_output(provider, contract_address, e3_id, decrypted_output).await;
+                let result =
+                    publish_plaintext_output(provider, contract_address, e3_id, decrypted_output)
+                        .await;
                 match result {
                     Ok(receipt) => {
                         info!(tx=%receipt.transaction_hash, "Published plaintext output");
@@ -102,7 +104,7 @@ impl<P: Provider + Clone + 'static> Handler<PlaintextAggregated> for EnclaveSolW
 
 impl<P: Provider + Clone + 'static> Handler<Shutdown> for EnclaveSolWriter<P> {
     type Result = ();
-    
+
     fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop();
     }
@@ -117,7 +119,7 @@ async fn publish_plaintext_output<P: Provider + Clone>(
     let e3_id: U256 = e3_id.try_into()?;
     let decrypted_output = Bytes::from(decrypted_output);
     let proof = Bytes::from(vec![1]);
-    
+
     let contract = IEnclave::new(contract_address, provider.provider());
     let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof);
     let receipt = builder.send().await?.get_receipt().await?;
