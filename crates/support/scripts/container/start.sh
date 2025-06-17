@@ -4,6 +4,7 @@
 unset BONSAI_API_KEY BONSAI_API_URL
 
 # Parse command line arguments
+POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   case $1 in
     --api-key)
@@ -19,11 +20,13 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     *)
-      echo "Unknown argument: $1"
-      exit 1
+      POSITIONAL+=("$1")
+      shift
       ;;
   esac
 done
+
+set -- "${POSITIONAL[@]}" 
 
 CARGO_INCREMENTAL=1
 
