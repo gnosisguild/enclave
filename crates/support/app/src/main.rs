@@ -106,15 +106,23 @@ async fn handle_compute(req: web::Json<ComputeRequest>) -> ActixResult<HttpRespo
     }))
 }
 
+async fn handle_health_check() -> ActixResult<HttpResponse> {
+    Ok(HttpResponse::Ok().json(ProcessingResponse {
+        status: "healthy".to_string(),
+        e3_id: 0,
+    }))
+}
+
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
-    let bind_addr = "127.0.0.1:13151";
+    let bind_addr = "0.0.0.0:13151";
     let server = HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
             .route("/run_compute", web::post().to(handle_compute))
+            .route("/health", web::get().to(handle_health_check))
     })
     .bind(bind_addr)?;
 
