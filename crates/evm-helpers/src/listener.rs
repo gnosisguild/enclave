@@ -1,10 +1,9 @@
 use alloy::{
     network::Ethereum,
     primitives::{Address, B256},
-    providers::{Provider, ProviderBuilder, RootProvider},
+    providers::{Provider, ProviderBuilder},
     rpc::types::{BlockNumberOrTag, Filter, Log},
     sol_types::SolEvent,
-    transports::BoxTransport,
 };
 use eyre::Result;
 use futures::stream::StreamExt;
