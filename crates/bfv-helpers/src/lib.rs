@@ -1,5 +1,5 @@
-use alloy::dyn_abi::{DynSolType, DynSolValue};
-use alloy::primitives::U256;
+use alloy_dyn_abi::{DynSolType, DynSolValue};
+use alloy_primitives::U256;
 use fhe_rs::bfv::{BfvParameters, BfvParametersBuilder};
 use std::sync::Arc;
 /// Predefined BFV parameters for common use cases

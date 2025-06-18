@@ -4,7 +4,7 @@ use crate::load_config::resolve_config_path;
 use crate::paths_engine::PathsEngine;
 use crate::paths_engine::DEFAULT_CONFIG_NAME;
 use crate::yaml::load_yaml_with_env;
-use alloy::primitives::Address;
+use alloy_primitives::Address;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;

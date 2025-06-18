@@ -2529,7 +2529,8 @@ dependencies = [
 name = "e3-bfv-helpers"
 version = "0.1.0"
 dependencies = [
- "alloy",
+ "alloy-dyn-abi",
+ "alloy-primitives",
  "anyhow",
  "fhe",
  "fhe-traits",
@@ -2586,7 +2587,7 @@ dependencies = [
 name = "e3-config"
 version = "0.1.0"
 dependencies = [
- "alloy",
+ "alloy-primitives",
  "anyhow",
  "dirs 5.0.1",
  "e3-events",
