@@ -59,7 +59,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> Actor for RegistryFilterSol
     type Context = actix::Context<Self>;
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for RegistryFilterSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
+    for RegistryFilterSolWriter<P>
+{
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
@@ -76,7 +78,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for R
     }
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated> for RegistryFilterSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated>
+    for RegistryFilterSolWriter<P>
+{
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
@@ -102,7 +106,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
     }
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown> for RegistryFilterSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
+    for RegistryFilterSolWriter<P>
+{
     type Result = ();
 
     fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
@@ -124,12 +130,15 @@ pub async fn publish_committee<P: Provider + WalletProvider + Clone>(
         .filter_map(|node| node.parse().ok())
         .collect();
     let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider.provider()
+    let current_nonce = provider
+        .provider()
         .get_transaction_count(from_address)
         .pending()
         .await?;
     let contract = NaiveRegistryFilter::new(contract_address, provider.provider());
-    let builder = contract.publishCommittee(e3_id, nodes, public_key).nonce(current_nonce);
+    let builder = contract
+        .publishCommittee(e3_id, nodes, public_key)
+        .nonce(current_nonce);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }

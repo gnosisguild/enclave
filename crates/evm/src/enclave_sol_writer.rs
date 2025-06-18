@@ -1,7 +1,11 @@
 use crate::helpers::EthProvider;
 use actix::prelude::*;
 use actix::Addr;
-use alloy::{primitives::Address, providers::{Provider, WalletProvider}, sol};
+use alloy::{
+    primitives::Address,
+    providers::{Provider, WalletProvider},
+    sol,
+};
 use alloy::{
     primitives::{Bytes, U256},
     rpc::types::TransactionReceipt,
@@ -76,7 +80,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for E
     }
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated> for EnclaveSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated>
+    for EnclaveSolWriter<P>
+{
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: PlaintextAggregated, _: &mut Self::Context) -> Self::Result {
@@ -120,13 +126,16 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     let decrypted_output = Bytes::from(decrypted_output);
     let proof = Bytes::from(vec![1]);
     let from_address = provider.provider().default_signer_address();
-    let current_nonce = provider.provider()
+    let current_nonce = provider
+        .provider()
         .get_transaction_count(from_address)
         .pending()
         .await?;
 
     let contract = IEnclave::new(contract_address, provider.provider());
-    let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof).nonce(current_nonce);
+    let builder = contract
+        .publishPlaintextOutput(e3_id, decrypted_output, proof)
+        .nonce(current_nonce);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }
