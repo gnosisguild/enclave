@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-GIT_SHA=$(git rev-parse --short HEAD)
+GIT_SHA=$(enclave rev)
 CONTAINER_NAME="e3-support.1"
 IMAGE="ghcr.io/gnosisguild/e3-support:$GIT_SHA"
 CACHE_PREFIX="e3-support"
