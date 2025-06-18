@@ -1,14 +1,10 @@
-use crate::{
-    event_reader::EvmEventReaderState,
-    helpers::{ReadonlyProvider, WithChainId},
-    EvmEventReader,
-};
+use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader};
 use actix::Addr;
 use alloy::{
     primitives::{LogData, B256},
+    providers::Provider,
     sol,
     sol_types::SolEvent,
-    transports::BoxTransport,
 };
 use anyhow::Result;
 use e3_data::Repository;
@@ -52,6 +48,7 @@ impl From<CiphernodeAddedWithChainId> for EnclaveEvent {
 }
 
 struct CiphernodeRemovedWithChainId(pub ICiphernodeRegistry::CiphernodeRemoved, pub u64);
+
 impl From<CiphernodeRemovedWithChainId> for e3_events::CiphernodeRemoved {
     fn from(value: CiphernodeRemovedWithChainId) -> Self {
         e3_events::CiphernodeRemoved {
@@ -81,8 +78,7 @@ impl From<CiphernodeRemovedWithChainId> for EnclaveEvent {
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
-            let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data, true)
-            else {
+            let Ok(event) = ICiphernodeRegistry::CiphernodeAdded::decode_log_data(data) else {
                 error!("Error parsing event CiphernodeAdded after topic was matched!");
                 return None;
             };
@@ -91,8 +87,7 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
             )))
         }
         Some(&ICiphernodeRegistry::CiphernodeRemoved::SIGNATURE_HASH) => {
-            let Ok(event) = ICiphernodeRegistry::CiphernodeRemoved::decode_log_data(data, true)
-            else {
+            let Ok(event) = ICiphernodeRegistry::CiphernodeRemoved::decode_log_data(data) else {
                 error!("Error parsing event CiphernodeRemoved after topic was matched!");
                 return None;
             };
@@ -100,28 +95,31 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 event, chain_id,
             )))
         }
-
         _topic => {
             trace!(
                 topic=?_topic,
-                "Unknown event was received by Enclave.sol parser buut was ignored"
+                "Unknown event was received by CiphernodeRegistry.sol parser but was ignored"
             );
-            return None;
+            None
         }
     }
 }
 
 /// Connects to CiphernodeRegistry.sol converting EVM events to EnclaveEvents
 pub struct CiphernodeRegistrySolReader;
+
 impl CiphernodeRegistrySolReader {
-    pub async fn attach(
+    pub async fn attach<P>(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: &WithChainId<ReadonlyProvider, BoxTransport>,
+        provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-    ) -> Result<Addr<EvmEventReader<ReadonlyProvider>>> {
+    ) -> Result<Addr<EvmEventReader<P>>>
+    where
+        P: Provider + Clone + 'static,
+    {
         let addr = EvmEventReader::attach(
             provider,
             extractor,
@@ -133,7 +131,7 @@ impl CiphernodeRegistrySolReader {
         )
         .await?;
 
-        info!(address=%contract_address, "EnclaveSolReader is listening to address");
+        info!(address=%contract_address, "CiphernodeRegistrySolReader is listening to address");
 
         Ok(addr)
     }
@@ -141,15 +139,19 @@ impl CiphernodeRegistrySolReader {
 
 /// Wrapper for a reader and a future writer
 pub struct CiphernodeRegistrySol;
+
 impl CiphernodeRegistrySol {
-    pub async fn attach(
+    pub async fn attach<P>(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: &WithChainId<ReadonlyProvider, BoxTransport>,
+        provider: EthProvider<P>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        P: Provider + Clone + 'static,
+    {
         CiphernodeRegistrySolReader::attach(
             bus,
             provider,

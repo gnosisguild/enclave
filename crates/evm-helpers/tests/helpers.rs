@@ -1,7 +1,9 @@
+// helpers.rs
 use alloy::{
+    network::Ethereum,
     node_bindings::{Anvil, AnvilInstance},
-    providers::{ProviderBuilder, RootProvider, WsConnect},
-    pubsub::PubSubFrontend,
+    providers::{Provider, ProviderBuilder, WsConnect},
+    signers::local::PrivateKeySigner,
     sol,
 };
 use eyre::Result;
@@ -20,8 +22,9 @@ sol!(
     "tests/fixtures/emit_logs.json"
 );
 
+// Much cleaner return type using impl Provider
 pub async fn setup_logs_contract() -> Result<(
-    EmitLogsInstance<PubSubFrontend, RootProvider<PubSubFrontend>>,
+    EmitLogsInstance<impl Provider>,
     String,
     String,
     AnvilInstance,
@@ -32,25 +35,15 @@ pub async fn setup_logs_contract() -> Result<(
     Ok((contract, address, endpoint, anvil))
 }
 
-pub async fn setup_fake_enclave() -> Result<(
-    EnclaveInstance<PubSubFrontend, RootProvider<PubSubFrontend>>,
-    String,
-    String,
-    AnvilInstance,
-)> {
-    let (provider, endpoint, anvil) = setup_provider().await?;
-    let contract = Enclave::deploy(provider).await?;
-    let address = contract.address().to_string();
-    Ok((contract, address, endpoint, anvil))
-}
-
-pub async fn setup_provider() -> Result<(RootProvider<PubSubFrontend>, String, AnvilInstance)> {
+pub async fn setup_provider() -> Result<(impl Provider, String, AnvilInstance)> {
     // Set anvil with fast blocktimes for testing
     let anvil = Anvil::new().block_time_f64(0.01).try_spawn()?;
 
     let provider = ProviderBuilder::new()
-        .on_ws(WsConnect::new(anvil.ws_endpoint()))
+        .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
+        .connect_ws(WsConnect::new(anvil.ws_endpoint()))
         .await?;
+
     let endpoint = anvil.ws_endpoint();
     Ok((provider, endpoint, anvil))
 }

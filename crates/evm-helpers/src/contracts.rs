@@ -5,16 +5,32 @@ use alloy::{
     providers::fillers::{
         ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
     },
-    providers::{Identity, Provider, ProviderBuilder, RootProvider},
-    rpc::types::TransactionReceipt,
+    providers::{Identity, Provider, ProviderBuilder, RootProvider, WalletProvider},
+    rpc::types::{BlockNumberOrTag, TransactionReceipt},
     signers::local::PrivateKeySigner,
     sol,
     transports::BoxTransport,
 };
 use async_trait::async_trait;
 use eyre::Result;
+use once_cell::sync::Lazy;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use tokio::sync::Mutex;
+
+static NONCE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+pub async fn next_pending_nonce<P>(provider: &P) -> eyre::Result<u64>
+where
+    P: Provider<Ethereum> + Send + Sync,
+{
+    let from = provider.get_accounts().await?[0];
+    provider
+        .get_transaction_count(from)
+        .pending()
+        .await
+        .map_err(Into::into)
+}
 
 sol! {
     #[derive(Debug)]
@@ -180,19 +196,27 @@ impl EnclaveContract<ReadOnly> {
 }
 
 /// Type alias for read-only provider
-pub type EnclaveReadOnlyProvider = RootProvider<BoxTransport>;
+pub type EnclaveReadOnlyProvider = FillProvider<
+    JoinFill<
+        Identity,
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+    >,
+    RootProvider,
+>;
 
 /// Type alias for read-write provider
 pub type EnclaveWriteProvider = FillProvider<
     JoinFill<
         JoinFill<
-            Identity,
-            JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+            JoinFill<
+                Identity,
+                JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+            >,
+            WalletFiller<EthereumWallet>,
         >,
-        WalletFiller<EthereumWallet>,
+        NonceFiller,
     >,
-    RootProvider<BoxTransport>,
-    BoxTransport,
+    RootProvider<Ethereum>,
     Ethereum,
 >;
 
@@ -215,9 +239,9 @@ impl EnclaveContractFactory {
         let signer: PrivateKeySigner = private_key.parse()?;
         let wallet = EthereumWallet::from(signer);
         let provider = ProviderBuilder::new()
-            .with_recommended_fillers()
             .wallet(wallet)
-            .on_builtin(http_rpc_url)
+            .with_cached_nonce_management()
+            .connect(http_rpc_url)
             .await?;
 
         Ok(EnclaveContract::<ReadWrite> {
@@ -234,7 +258,7 @@ impl EnclaveContractFactory {
     ) -> Result<EnclaveContract<ReadOnly>> {
         let contract_address = contract_address.parse()?;
 
-        let provider = ProviderBuilder::new().on_builtin(http_rpc_url).await?;
+        let provider = ProviderBuilder::new().connect(http_rpc_url).await?;
 
         Ok(EnclaveContract::<ReadOnly> {
             provider: Arc::new(provider),
@@ -253,19 +277,19 @@ where
     async fn get_e3_id(&self) -> Result<U256> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let e3_id = contract.nexte3Id().call().await?;
-        Ok(e3_id.nexte3Id)
+        Ok(e3_id)
     }
 
     async fn get_e3(&self, e3_id: U256) -> Result<E3> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let e3_return = contract.getE3(e3_id).call().await?;
-        Ok(e3_return.e3)
+        Ok(e3_return)
     }
 
     async fn get_input_count(&self, e3_id: U256) -> Result<U256> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let input_count = contract.inputCounts(e3_id).call().await?;
-        Ok(input_count.inputCount)
+        Ok(input_count)
     }
 
     async fn get_latest_block(&self) -> Result<u64> {
@@ -276,19 +300,19 @@ where
     async fn get_root(&self, id: U256) -> Result<U256> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let root = contract.getRoot(id).call().await?;
-        Ok(root._0)
+        Ok(root)
     }
 
     async fn get_e3_params(&self, e3_id: U256) -> Result<Bytes> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let params = contract.e3Params(e3_id).call().await?;
-        Ok(params.params)
+        Ok(params)
     }
 
     async fn is_e3_program_enabled(&self, e3_program: Address) -> Result<bool> {
         let contract = Enclave::new(self.contract_address, &self.provider);
         let enabled = contract.e3Programs(e3_program).call().await?;
-        Ok(enabled.allowed)
+        Ok(enabled)
     }
 }
 
@@ -305,6 +329,9 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         e3_params: Bytes,
         compute_provider_params: Bytes,
     ) -> Result<TransactionReceipt> {
+        let _guard = NONCE_LOCK.lock().await;
+        let nonce = next_pending_nonce(&*self.provider).await?;
+
         let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract
             .request(
@@ -316,29 +343,43 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
                 e3_params,
                 compute_provider_params,
             )
-            .value(U256::from(1));
+            .value(U256::from(1))
+            .nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
+
         Ok(receipt)
     }
 
     async fn activate(&self, e3_id: U256, pub_key: Bytes) -> Result<TransactionReceipt> {
+        let _guard = NONCE_LOCK.lock().await;
+        let nonce = next_pending_nonce(&*self.provider).await?;
+
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.activate(e3_id, pub_key);
+        let builder = contract.activate(e3_id, pub_key).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
+
         Ok(receipt)
     }
 
     async fn enable_e3_program(&self, e3_program: Address) -> Result<TransactionReceipt> {
+        let _guard = NONCE_LOCK.lock().await;
+        let nonce = next_pending_nonce(&*self.provider).await?;
+
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.enableE3Program(e3_program);
+        let builder = contract.enableE3Program(e3_program).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
+
         Ok(receipt)
     }
 
     async fn publish_input(&self, e3_id: U256, data: Bytes) -> Result<TransactionReceipt> {
+        let _guard = NONCE_LOCK.lock().await;
+        let nonce = next_pending_nonce(&*self.provider).await?;
+
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.publishInput(e3_id, data);
+        let builder = contract.publishInput(e3_id, data).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
+
         Ok(receipt)
     }
 
@@ -348,9 +389,15 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         data: Bytes,
         proof: Bytes,
     ) -> Result<TransactionReceipt> {
+        let _guard = NONCE_LOCK.lock().await;
+        let nonce = next_pending_nonce(&*self.provider).await?;
+
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.publishCiphertextOutput(e3_id, data, proof);
+        let builder = contract
+            .publishCiphertextOutput(e3_id, data, proof)
+            .nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
+
         Ok(receipt)
     }
 
@@ -359,9 +406,13 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         e3_id: U256,
         data: Bytes,
     ) -> Result<TransactionReceipt> {
+        let _guard = NONCE_LOCK.lock().await;
+        let nonce = next_pending_nonce(&*self.provider).await?;
+
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.publishPlaintextOutput(e3_id, data);
+        let builder = contract.publishPlaintextOutput(e3_id, data).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
+
         Ok(receipt)
     }
 }

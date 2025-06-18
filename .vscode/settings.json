@@ -7,9 +7,8 @@
   "solidity.formatter": "prettier",
   "typescript.tsdk": "node_modules/typescript/lib",
   "rust-analyzer.linkedProjects": [
-    "packages/ciphernode/Cargo.toml",
-    "packages/compute_provider/Cargo.toml",
-    "packages/enclave-sdk/Cargo.toml",
+    "crates/evm/Cargo.toml",
+    "crates/evm-helpers/Cargo.toml",
     "examples/CRISP/apps/program/Cargo.toml",
     "examples/CRISP/apps/server/Cargo.toml",
     "examples/CRISP/apps/wasm-crypto/Cargo.toml"
