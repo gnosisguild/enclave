@@ -16,6 +16,7 @@ node_modules
 
 .enclave/data/
 .enclave/config/
+.enclave/caches/
 
 /target
 

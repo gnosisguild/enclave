@@ -29,9 +29,8 @@ cleanup() {
 # Set trap for signals
 trap cleanup EXIT INT TERM
 
-# Ensure directories exist with proper permissions
-mkdir -p "$(pwd)/.enclave/target"
-chmod -R 777 "$(pwd)/.enclave/target"
+mkdir -p "$(pwd)/.enclave/caches"/{target,registry,git,risc0-cache,risc0-circuits}
+chmod -R 777 "$(pwd)/.enclave/caches"
 
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
     echo "Running exec $IMAGE..."
@@ -44,7 +43,11 @@ else
         --network=host \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
-        -v "$(pwd)/.enclave/target:/app/target" \
+        -v "$(pwd)/.enclave/caches/target:/app/target" \
+        -v "$(pwd)/.enclave/caches/registry:/home/devuser/.cargo/registry" \
+        -v "$(pwd)/.enclave/caches/git:/home/devuser/.cargo/git" \
+        -v "$(pwd)/.enclave/caches/risc0-cache:/home/devuser/.risc0/cache" \
+        -v "$(pwd)/.enclave/caches/risc0-circuits:/home/devuser/.risc0/circuits" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
         "$IMAGE" bash -c "$*"
 fi

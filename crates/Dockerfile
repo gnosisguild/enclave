@@ -57,6 +57,7 @@ COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 
 # COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
+RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
           if [ "$d" = "./cli/" ] || [ "$d" = "./enclaveup/" ]; then \
