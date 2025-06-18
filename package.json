@@ -40,6 +40,7 @@
     "react:build": "cd packages/enclave-react && pnpm build",
     "react:release": "cd packages/enclave-react && pnpm release",
     "npm:release": "pnpm build && pnpm evm:release && pnpm react:release",
+    "support:build": "cd crates/support && ./scripts/build.sh",
     "build": "pnpm -r build",
     "changeset": "changeset",
     "version": "changeset version",
