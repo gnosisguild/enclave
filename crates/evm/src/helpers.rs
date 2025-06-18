@@ -1,6 +1,6 @@
 use alloy::{
     network::EthereumWallet,
-    providers::{Provider, ProviderBuilder},
+    providers::{Provider, ProviderBuilder, WalletProvider},
     signers::local::PrivateKeySigner,
     transports::{
         http::{
@@ -97,7 +97,7 @@ impl ProviderConfig {
     pub async fn create_signer_provider(
         &self,
         signer: &PrivateKeySigner,
-    ) -> Result<EthProvider<impl Provider + Clone>> {
+    ) -> Result<EthProvider<impl Provider + WalletProvider + Clone>> {
         let wallet = EthereumWallet::from(signer.clone());
 
         let provider = if self.rpc.is_websocket() {

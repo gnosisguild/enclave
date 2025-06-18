@@ -3,7 +3,7 @@ use crate::{
     event_reader::EvmEventReaderState, helpers::EthProvider,
 };
 use actix::Addr;
-use alloy::providers::Provider;
+use alloy::providers::{Provider, WalletProvider};
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{EnclaveEvent, EventBus};
@@ -22,7 +22,7 @@ impl EnclaveSol {
     ) -> Result<()>
     where
         R: Provider + Clone + 'static,
-        W: Provider + Clone + 'static,
+        W: Provider + WalletProvider + Clone + 'static,
     {
         EnclaveSolReader::attach(
             bus,

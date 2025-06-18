@@ -80,7 +80,7 @@ e3-tests = { version = "0.1.0", path = "./crates/tests" }
 actix = "0.13.5"
 actix-web = "4.10.2"
 aes-gcm = "0.10.3"
-alloy = { version = "1.0.9", features = ["node-bindings", "full"] }
+alloy = { version = "1.0.11", features = ["node-bindings", "full"] }
 alloy-primitives = { version = "1.0", default-features = false, features = [
   "rlp",
   "serde",

@@ -2,7 +2,7 @@ use crate::helpers::EthProvider;
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
-    providers::Provider,
+    providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
     sol,
 };
@@ -25,7 +25,7 @@ pub struct RegistryFilterSolWriter<P> {
     bus: Addr<EventBus<EnclaveEvent>>,
 }
 
-impl<P: Provider + Clone + 'static> RegistryFilterSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> RegistryFilterSolWriter<P> {
     pub async fn new(
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
@@ -55,11 +55,11 @@ impl<P: Provider + Clone + 'static> RegistryFilterSolWriter<P> {
     }
 }
 
-impl<P: Provider + Clone + 'static> Actor for RegistryFilterSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Actor for RegistryFilterSolWriter<P> {
     type Context = actix::Context<Self>;
 }
 
-impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for RegistryFilterSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for RegistryFilterSolWriter<P> {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
@@ -76,7 +76,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for RegistryFilterSolW
     }
 }
 
-impl<P: Provider + Clone + 'static> Handler<PublicKeyAggregated> for RegistryFilterSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated> for RegistryFilterSolWriter<P> {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
@@ -102,7 +102,7 @@ impl<P: Provider + Clone + 'static> Handler<PublicKeyAggregated> for RegistryFil
     }
 }
 
-impl<P: Provider + Clone + 'static> Handler<Shutdown> for RegistryFilterSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown> for RegistryFilterSolWriter<P> {
     type Result = ();
 
     fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
@@ -110,7 +110,7 @@ impl<P: Provider + Clone + 'static> Handler<Shutdown> for RegistryFilterSolWrite
     }
 }
 
-pub async fn publish_committee<P: Provider + Clone>(
+pub async fn publish_committee<P: Provider + WalletProvider + Clone>(
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
@@ -123,9 +123,13 @@ pub async fn publish_committee<P: Provider + Clone>(
         .into_iter()
         .filter_map(|node| node.parse().ok())
         .collect();
-
+    let from_address = provider.provider().default_signer_address();
+    let current_nonce = provider.provider()
+        .get_transaction_count(from_address)
+        .pending()
+        .await?;
     let contract = NaiveRegistryFilter::new(contract_address, provider.provider());
-    let builder = contract.publishCommittee(e3_id, nodes, public_key);
+    let builder = contract.publishCommittee(e3_id, nodes, public_key).nonce(current_nonce);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }
@@ -133,7 +137,7 @@ pub async fn publish_committee<P: Provider + Clone>(
 pub struct RegistryFilterSol;
 
 impl RegistryFilterSol {
-    pub async fn attach<P: Provider + Clone + 'static>(
+    pub async fn attach<P: Provider + WalletProvider + Clone + 'static>(
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,

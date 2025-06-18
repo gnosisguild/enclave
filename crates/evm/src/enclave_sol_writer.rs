@@ -1,7 +1,7 @@
 use crate::helpers::EthProvider;
 use actix::prelude::*;
 use actix::Addr;
-use alloy::{primitives::Address, providers::Provider, sol};
+use alloy::{primitives::Address, providers::{Provider, WalletProvider}, sol};
 use alloy::{
     primitives::{Bytes, U256},
     rpc::types::TransactionReceipt,
@@ -25,7 +25,7 @@ pub struct EnclaveSolWriter<P> {
     bus: Addr<EventBus<EnclaveEvent>>,
 }
 
-impl<P: Provider + Clone + 'static> EnclaveSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> EnclaveSolWriter<P> {
     pub fn new(
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
@@ -55,11 +55,11 @@ impl<P: Provider + Clone + 'static> EnclaveSolWriter<P> {
     }
 }
 
-impl<P: Provider + Clone + 'static> Actor for EnclaveSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Actor for EnclaveSolWriter<P> {
     type Context = actix::Context<Self>;
 }
 
-impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EnclaveSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent> for EnclaveSolWriter<P> {
     type Result = ();
 
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
@@ -76,7 +76,7 @@ impl<P: Provider + Clone + 'static> Handler<EnclaveEvent> for EnclaveSolWriter<P
     }
 }
 
-impl<P: Provider + Clone + 'static> Handler<PlaintextAggregated> for EnclaveSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated> for EnclaveSolWriter<P> {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, msg: PlaintextAggregated, _: &mut Self::Context) -> Self::Result {
@@ -102,7 +102,7 @@ impl<P: Provider + Clone + 'static> Handler<PlaintextAggregated> for EnclaveSolW
     }
 }
 
-impl<P: Provider + Clone + 'static> Handler<Shutdown> for EnclaveSolWriter<P> {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown> for EnclaveSolWriter<P> {
     type Result = ();
 
     fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
@@ -110,7 +110,7 @@ impl<P: Provider + Clone + 'static> Handler<Shutdown> for EnclaveSolWriter<P> {
     }
 }
 
-async fn publish_plaintext_output<P: Provider + Clone>(
+async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
@@ -119,9 +119,14 @@ async fn publish_plaintext_output<P: Provider + Clone>(
     let e3_id: U256 = e3_id.try_into()?;
     let decrypted_output = Bytes::from(decrypted_output);
     let proof = Bytes::from(vec![1]);
+    let from_address = provider.provider().default_signer_address();
+    let current_nonce = provider.provider()
+        .get_transaction_count(from_address)
+        .pending()
+        .await?;
 
     let contract = IEnclave::new(contract_address, provider.provider());
-    let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof);
+    let builder = contract.publishPlaintextOutput(e3_id, decrypted_output, proof).nonce(current_nonce);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }
