@@ -7,6 +7,9 @@ CACHE_PREFIX="e3-support"
 
 # Check if the image exists locally or remotely if not bail
 # Every time we push we build support so every build of enclave should have support built too.
+# This solves the problem where a person will be using the cli with a specific `enclave rev` but our latest 
+# support scripts have changed which will break the support behaviour for the user.
+# The user can then upgrade their cli once they are ready and then the support image will match their version
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1 && ! docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
     echo "Support scripts not found for git sha \"$GIT_SHA\" Please recompile the support scripts for this version of the enclave cli within the source repository"
     exit 1
