@@ -30,19 +30,21 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Ensure directories exist with proper permissions
-mkdir -p "$(pwd)/target"
-chmod -R 777 "$(pwd)/target"
+mkdir -p "$(pwd)/.enclave/target"
+chmod -R 777 "$(pwd)/.enclave/target"
 
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
+    echo "Running exec $IMAGE..."
     docker exec -it "$CONTAINER_NAME" bash -c "$*"
 else
+    echo "Running start $IMAGE..."
     docker run -it --rm \
         --name "$CONTAINER_NAME" \
         --platform linux/amd64 \
-        -p 13151:13151 \
+        --network=host \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
-        -v "$(pwd)/target:/app/target" \
+        -v "$(pwd)/.enclave/target:/app/target" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
         "$IMAGE" bash -c "$*"
 fi
