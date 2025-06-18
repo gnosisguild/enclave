@@ -1,4 +1,6 @@
-use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult};
+use actix_web::{
+    http::Method, middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult,
+};
 use anyhow::bail;
 use e3_compute_provider::FHEInputs;
 use e3_support_host::Risc0Output;
@@ -122,7 +124,13 @@ async fn main() -> anyhow::Result<()> {
         App::new()
             .wrap(Logger::default())
             .route("/run_compute", web::post().to(handle_compute))
-            .route("/health", web::get().to(handle_health_check))
+            .route(
+                "/health",
+                web::route()
+                    .method(Method::GET)
+                    .method(Method::HEAD) // need this for wait-on
+                    .to(handle_health_check),
+            )
     })
     .bind(bind_addr)?;
 

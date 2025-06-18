@@ -6,7 +6,7 @@ use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
-use crate::{config_set, init, net, password, wallet};
+use crate::{config_set, init, net, password, rev, wallet};
 use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
@@ -84,6 +84,7 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
+                    Commands::Rev => rev::execute().await?,
                     Commands::Init {path, template} => init::execute(path, template).await?,
                     Commands::ConfigSet {
                         rpc_url,
@@ -115,7 +116,7 @@ impl Cli {
                             false,
                         )
                         .await?;
-                    }
+                    },
                     _ => bail!(
                         "Configuration file not found. Run `enclave config-set` to create a configuration."
                     ),
@@ -165,6 +166,7 @@ impl Cli {
             Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
+            Commands::Rev => rev::execute().await?,
         }
 
         close_all_connections();
@@ -223,6 +225,9 @@ pub enum Commands {
 
     /// Compile an Enclave project
     Compile,
+
+    /// Return the git_sha rev that the cli was compiled against
+    Rev,
 
     /// Program management commands
     Program {

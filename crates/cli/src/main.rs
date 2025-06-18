@@ -24,6 +24,7 @@ mod password_delete;
 mod password_set;
 mod print_env;
 mod program;
+mod rev;
 mod start;
 mod wallet;
 mod wallet_set;

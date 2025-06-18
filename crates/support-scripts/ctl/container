@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
+
+GIT_SHA=$(git rev-parse --short HEAD)
 CONTAINER_NAME="e3-support.1"
-IMAGE="ghcr.io/gnosisguild/e3-support:hacknet"
+IMAGE="ghcr.io/gnosisguild/e3-support:$GIT_SHA"
 CACHE_PREFIX="e3-support"
 
 # Function to cleanup
@@ -16,13 +18,6 @@ cleanup() {
 
 # Set trap for signals
 trap cleanup EXIT INT TERM
-
-# Pull the latest image to ensure we have the most recent version
-# NOTE: This might cause issues if the CLI is not up to date
-echo "Pulling latest image: $IMAGE"
-docker pull "$IMAGE" || {
-    echo "Warning: Failed to pull latest image, using cached version"
-}
 
 # Ensure directories exist with proper permissions
 mkdir -p "$(pwd)/target"
