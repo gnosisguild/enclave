@@ -13,12 +13,12 @@ e3-support-host = { path = "./host" }
 e3-user-program = { path = "./program" }
 e3-support-types = { path = "./types" }
 methods = { path = "./methods" }
-alloy-primitives = { version = "0.8", default-features = false, features = [
+alloy-primitives = { version = "1.0", default-features = false, features = [
     "rlp",
     "serde",
     "std",
 ]}
-alloy-sol-types = { version = "0.8" }
+alloy-sol-types = { version = "1.0" }
 anyhow = { version = "1.0.86" }
 actix-web = "4.10.2"
 bincode = { version = "1.3.3" }
