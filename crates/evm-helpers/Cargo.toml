@@ -12,4 +12,5 @@ async-trait.workspace = true
 eyre.workspace = true
 futures.workspace = true
 futures-util.workspace = true
+once_cell.workspace = true
 tokio.workspace = true

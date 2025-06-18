@@ -3,6 +3,7 @@ use alloy::{
     node_bindings::Anvil,
     primitives::{FixedBytes, LogData},
     providers::{ProviderBuilder, WsConnect},
+    signers::local::PrivateKeySigner,
     sol,
     sol_types::SolEvent,
 };
@@ -12,7 +13,7 @@ use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
     new_event_bus_with_history, EnclaveEvent, GetHistory, HistoryCollector, Shutdown, TestEvent,
 };
-use e3_evm::{helpers::WithChainId, EvmEventReader};
+use e3_evm::{helpers::EthProvider, EvmEventReader};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -29,7 +30,7 @@ fn test_event_extractor(
 ) -> Option<EnclaveEvent> {
     match topic {
         Some(&EmitLogs::ValueChanged::SIGNATURE_HASH) => {
-            let Ok(event) = EmitLogs::ValueChanged::decode_log_data(data, true) else {
+            let Ok(event) = EmitLogs::ValueChanged::decode_log_data(data) else {
                 return None;
             };
             Some(EnclaveEvent::from(TestEvent {
@@ -47,18 +48,19 @@ async fn evm_reader() -> Result<()> {
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
     let rpc_url = anvil.ws_endpoint(); // Get RPC URL
-    let provider = WithChainId::new(
+    let provider = EthProvider::new(
         ProviderBuilder::new()
-            .on_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
+            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
+            .connect_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )
     .await?;
-    let contract = EmitLogs::deploy(provider.get_provider()).await?;
+    let contract = EmitLogs::deploy(provider.provider()).await?;
     let (bus, history_collector) = new_event_bus_with_history();
     let repository = Repository::new(get_in_mem_store());
 
     EvmEventReader::attach(
-        &provider,
+        provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
         None,
@@ -109,13 +111,14 @@ async fn ensure_historical_events() -> Result<()> {
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
     let rpc_url = anvil.ws_endpoint(); // Get RPC URL
-    let provider = WithChainId::new(
+    let provider = EthProvider::new(
         ProviderBuilder::new()
-            .on_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
+            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
+            .connect_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )
     .await?;
-    let contract = EmitLogs::deploy(provider.get_provider()).await?;
+    let contract = EmitLogs::deploy(provider.provider()).await?;
 
     let (bus, history_collector) = new_event_bus_with_history();
     let historical_msgs = vec!["these", "are", "historical", "events"];
@@ -132,7 +135,7 @@ async fn ensure_historical_events() -> Result<()> {
     }
 
     EvmEventReader::attach(
-        &provider,
+        provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
         None,
@@ -180,13 +183,14 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     // NOTE: Anvil must be available on $PATH
     let anvil = Anvil::new().block_time(1).try_spawn()?;
     let rpc_url = anvil.ws_endpoint(); // Get RPC URL
-    let provider = WithChainId::new(
+    let provider = EthProvider::new(
         ProviderBuilder::new()
-            .on_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
+            .wallet(PrivateKeySigner::from_slice(&anvil.keys()[0].to_bytes())?)
+            .connect_ws(WsConnect::new(rpc_url.clone())) // Use RPC URL
             .await?,
     )
     .await?;
-    let contract = EmitLogs::deploy(provider.get_provider()).await?;
+    let contract = EmitLogs::deploy(provider.provider()).await?;
     let (bus, history_collector) = new_event_bus_with_history();
 
     async fn get_msgs(
@@ -218,7 +222,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     }
 
     let addr1 = EvmEventReader::attach(
-        &provider,
+        provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
         None,
@@ -255,7 +259,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     assert_eq!(msgs, ["before", "online", "live", "events"]);
 
     let _ = EvmEventReader::attach(
-        &provider,
+        provider.clone(),
         test_event_extractor,
         &contract.address().to_string(),
         None,

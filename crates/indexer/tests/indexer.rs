@@ -19,6 +19,8 @@ sol!(
 #[tokio::test]
 async fn test_indexer() -> Result<()> {
     let (contract, address, endpoint, _anvil) = setup_fake_enclave().await?;
+    let address = address.to_string();
+    let endpoint = endpoint.to_string();
 
     let mut indexer =
         EnclaveIndexer::<InMemoryStore>::from_endpoint_address_in_mem(&endpoint, &address).await?;
@@ -58,7 +60,7 @@ async fn test_indexer() -> Result<()> {
     contract
         .emitInputPublished(
             Uint::from(e3_id),
-            Bytes::from(data.clone()),
+            Bytes::from(data.clone().into_bytes()),
             Uint::from(1111),
             Uint::from(1),
         )
@@ -70,7 +72,7 @@ async fn test_indexer() -> Result<()> {
     contract
         .emitInputPublished(
             Uint::from(e3_id),
-            Bytes::from(data.clone()),
+            Bytes::from(data.clone().into_bytes()),
             Uint::from(2222),
             Uint::from(2),
         )
@@ -82,7 +84,7 @@ async fn test_indexer() -> Result<()> {
     contract
         .emitInputPublished(
             Uint::from(e3_id),
-            Bytes::from(data.clone()),
+            Bytes::from(data.clone().into_bytes()),
             Uint::from(3333),
             Uint::from(3),
         )
@@ -97,9 +99,9 @@ async fn test_indexer() -> Result<()> {
     assert_eq!(
         indexer.get_e3(e3_id).await?.ciphertext_inputs,
         vec![
-            (Bytes::from(data.clone()).to_vec(), 1),
-            (Bytes::from(data.clone()).to_vec(), 2),
-            (Bytes::from(data.clone()).to_vec(), 3),
+            (Bytes::from(data.clone().into_bytes()).to_vec(), 1),
+            (Bytes::from(data.clone().into_bytes()).to_vec(), 2),
+            (Bytes::from(data.clone().into_bytes()).to_vec(), 3),
         ]
     );
 
