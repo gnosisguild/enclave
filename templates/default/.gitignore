@@ -13,7 +13,7 @@ node_modules
 # solidity-coverage files
 /coverage
 /coverage.json
-
+/.enclave/{data,config}
 /target
 
 # Ignore risc0 files
