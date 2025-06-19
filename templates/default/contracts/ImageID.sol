@@ -19,5 +19,5 @@
 pragma solidity ^0.8.20;
 
 library ImageID {
-    bytes32 public constant PROGRAM_ID = bytes32(0xa5b0fe8db4c201e03fe09835e9df9a2b49509564b7d2e214c5fe5c458678abd2);
+    bytes32 public constant PROGRAM_ID = bytes32(0xaf928ebf39fec4696c3f41f473a1a9473b67d723c6373149c6ab99ba4c1a76ef);
 }
