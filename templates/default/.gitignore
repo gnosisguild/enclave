@@ -22,7 +22,7 @@ node_modules
 
 # Ignore risc0 files
 tests/Elf.sol
-contracts/ImageID.sol
+/contracts/ImageID.sol
 
 /deployments
 
