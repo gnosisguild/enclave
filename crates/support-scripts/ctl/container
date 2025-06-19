@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
+
+GIT_SHA=$(enclave rev)
 CONTAINER_NAME="e3-support.1"
-IMAGE="ghcr.io/gnosisguild/e3-support:hacknet"
+IMAGE="ghcr.io/gnosisguild/e3-support:$GIT_SHA"
 CACHE_PREFIX="e3-support"
+
+# Check if the image exists locally or remotely if not bail
+# Every time we push we build support so every build of enclave should have support built too.
+# This solves the problem where a person will be using the cli with a specific `enclave rev` but our latest 
+# support scripts have changed which will break the support behaviour for the user.
+# The user can then upgrade their cli once they are ready and then the support image will match their version
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1 && ! docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+    echo "Support scripts not found for git sha \"$GIT_SHA\" Please recompile the support scripts for this version of the enclave cli within the source repository"
+    exit 1
+fi
 
 # Function to cleanup
 cleanup() {
@@ -17,27 +29,25 @@ cleanup() {
 # Set trap for signals
 trap cleanup EXIT INT TERM
 
-# Pull the latest image to ensure we have the most recent version
-# NOTE: This might cause issues if the CLI is not up to date
-echo "Pulling latest image: $IMAGE"
-docker pull "$IMAGE" || {
-    echo "Warning: Failed to pull latest image, using cached version"
-}
-
-# Ensure directories exist with proper permissions
-mkdir -p "$(pwd)/target"
-chmod -R 777 "$(pwd)/target"
+mkdir -p "$(pwd)/.enclave/caches"/{target,registry,git,risc0-cache,risc0-circuits}
+chmod -R 777 "$(pwd)/.enclave/caches"
 
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
+    echo "Running exec $IMAGE..."
     docker exec -it "$CONTAINER_NAME" bash -c "$*"
 else
+    echo "Running start $IMAGE..."
     docker run -it --rm \
         --name "$CONTAINER_NAME" \
         --platform linux/amd64 \
-        -p 13151:13151 \
+        --network=host \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
-        -v "$(pwd)/target:/app/target" \
+        -v "$(pwd)/.enclave/caches/target:/app/target" \
+        -v "$(pwd)/.enclave/caches/registry:/home/devuser/.cargo/registry" \
+        -v "$(pwd)/.enclave/caches/git:/home/devuser/.cargo/git" \
+        -v "$(pwd)/.enclave/caches/risc0-cache:/home/devuser/.risc0/cache" \
+        -v "$(pwd)/.enclave/caches/risc0-circuits:/home/devuser/.risc0/circuits" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
         "$IMAGE" bash -c "$*"
 fi
