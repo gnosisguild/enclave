@@ -42,7 +42,7 @@ fn get_remote_commit_hash() -> Option<String> {
         .split_whitespace()
         .next()?
         .chars()
-        .take(8)
+        .take(9)
         .collect::<String>();
 
     if commit_hash.is_empty() {
