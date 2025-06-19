@@ -24,7 +24,7 @@ jobs:
       - name: Generate version tag
         id: version
         run: |
-          echo "version=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          echo "version=$(git rev-parse --short=8 HEAD)" >> $GITHUB_OUTPUT
       - name: Set up BuildKit
         uses: docker/setup-buildx-action@v3
       - name: Log in to GitHub Container Registry
