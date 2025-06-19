@@ -29,6 +29,17 @@ jobs:
         id: version
         run: |
           echo "version=$(git rev-parse --short=8 HEAD)" >> $GITHUB_OUTPUT
+      - name: Generate tags
+        id: tags
+        run: |
+          VERSION=$(git rev-parse --short=8 HEAD)
+          TAGS="${{ env.IMAGE_NAME }}:$VERSION"
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            TAGS="$TAGS,${{ env.IMAGE_NAME }}:latest"
+          elif [ "${{ github.ref }}" = "refs/heads/hacknet" ]; then
+            TAGS="$TAGS,${{ env.IMAGE_NAME }}:hacknet"
+          fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
       - name: Set up BuildKit
         uses: docker/setup-buildx-action@v3
       - name: Log in to GitHub Container Registry
@@ -43,10 +54,7 @@ jobs:
           context: ./crates/support
           file: ${{ env.DOCKERFILE_PATH }}
           push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            ${{ github.ref == 'refs/heads/main' && format('{0}:latest', env.IMAGE_NAME) || '' }}
-            ${{ github.ref == 'refs/heads/hacknet' && format('{0}:hacknet', env.IMAGE_NAME) || '' }}
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: |
             type=gha,scope=cargo-registry
             type=gha,scope=cargo-git
