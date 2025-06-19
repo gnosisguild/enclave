@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - hacknet
+  push:
+    branches:
+      - main
+      - hacknet
     paths:
       - "crates/support/**"
 env:
