@@ -58,7 +58,21 @@ where
     Ok(())
 }
 
+// Async function to detect if we're using BSD sed
+// You can test for BSD sed by checking if the --version flag is supported.
+// GNU sed supports --version while BSD sed doesn't and will exit with an error.
+async fn is_bsd_sed() -> bool {
+    Command::new("sed")
+        .arg("--version")
+        .output()
+        .await
+        .map(|output| !output.status.success())
+        .unwrap_or(false)
+}
+
 async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) -> Result<()> {
+    let is_bsd = is_bsd_sed().await;
+
     // Find files matching the glob pattern
     let find_output = Command::new("find")
         .arg(base_path)
@@ -87,14 +101,29 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
 
         println!("Running sed...");
         println!("> {}", sed_cmd);
-        let sed_output = Command::new("sed")
-            .arg("-i")
+
+        let mut cmd = Command::new("sed");
+
+        // Check if we're on macOS (BSD sed) and add empty backup extension
+        if is_bsd {
+            // This is a quirk of BSD sed - we need to do the equivalent of:
+            // sed -i '' pattern filename
+            cmd.arg("-i").arg("");
+        } else {
+            // Normal sed is:
+            // sed -i pattern filename
+            cmd.arg("-i");
+        }
+
+        let sed_output = cmd
             .arg(sed_cmd)
             .arg(file_path)
             .output()
             .await
             .context("Failed to execute sed command")?;
+
         println!("{:?}", sed_output);
+
         if !sed_output.status.success() {
             let stderr = String::from_utf8_lossy(&sed_output.stderr);
             bail!("sed command failed on {}: {}", file_path, stderr);
