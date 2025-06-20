@@ -4,7 +4,7 @@ mod git;
 mod package_json;
 mod pkgman;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use copy::Filter;
 use file_utils::{chmod_recursive, delete_path, move_file, remove_all_files_in_dir};
 use git::parse_git_url;
@@ -151,14 +151,18 @@ pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Res
     match install_enclave(&cwd, template).await {
         Ok(_) => Ok(()),
         Err(e) => {
+            println!(
+                "install_in_current_dir: {} {:?}",
+                install_in_current_dir, cwd
+            );
             if install_in_current_dir {
                 remove_all_files_in_dir(&cwd).await?;
             } else {
                 fs::remove_dir_all(&cwd).await?;
             }
-            eprintln!("Sorry about this but there was an error running the installer. ");
-            eprintln!("\n {}\n", e);
-            eprintln!("Enclave is currently under active development please share this with our team:\n  https://github.com/gnosisguild/enclave/issues/new\n");
+            eprintln!("\nSorry about this but there was an error running the installer. ");
+            eprintln!("\n Error: {}\n", e);
+            eprintln!("Enclave is currently under active development please share this with our team:\n\n  https://github.com/gnosisguild/enclave/issues/new\n");
             Ok(())
         }
     }
