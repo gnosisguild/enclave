@@ -106,8 +106,12 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
 
         // Check if we're on macOS (BSD sed) and add empty backup extension
         if is_bsd {
+            // This is a quirk of BSD sed - we need to do the equivalent of:
+            // sed -i '' pattern filename
             cmd.arg("-i").arg("");
         } else {
+            // Normal sed is:
+            // sed -i pattern filename
             cmd.arg("-i");
         }
 
