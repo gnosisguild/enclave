@@ -87,14 +87,24 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
 
         println!("Running sed...");
         println!("> {}", sed_cmd);
-        let sed_output = Command::new("sed")
-            .arg("-i")
+        let mut cmd = Command::new("sed");
+
+        // Check if we're on macOS (BSD sed) and add empty backup extension
+        if cfg!(target_os = "macos") {
+            cmd.arg("-i").arg("");
+        } else {
+            cmd.arg("-i");
+        }
+
+        let sed_output = cmd
             .arg(sed_cmd)
             .arg(file_path)
             .output()
             .await
             .context("Failed to execute sed command")?;
+
         println!("{:?}", sed_output);
+
         if !sed_output.status.success() {
             let stderr = String::from_utf8_lossy(&sed_output.stderr);
             bail!("sed command failed on {}: {}", file_path, stderr);
