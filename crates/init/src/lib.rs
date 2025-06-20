@@ -4,7 +4,7 @@ mod git;
 mod package_json;
 mod pkgman;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use copy::Filter;
 use file_utils::{chmod_recursive, delete_path, move_file, remove_all_files_in_dir};
 use git::parse_git_url;
