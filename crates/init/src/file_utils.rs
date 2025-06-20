@@ -55,3 +55,16 @@ pub async fn move_file<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> Result
         .await?;
     Ok(())
 }
+
+pub async fn remove_all_files_in_dir<P: AsRef<Path>>(dir_path: P) -> Result<()> {
+    let mut entries = fs::read_dir(dir_path).await?;
+
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        if path.is_file() {
+            fs::remove_file(path).await?;
+        }
+    }
+
+    Ok(())
+}
