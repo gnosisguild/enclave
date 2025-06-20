@@ -151,10 +151,7 @@ pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Res
     match install_enclave(&cwd, template).await {
         Ok(_) => Ok(()),
         Err(e) => {
-            println!(
-                "install_in_current_dir: {} {:?}",
-                install_in_current_dir, cwd
-            );
+            println!("Cleaning up due to error...");
             if install_in_current_dir {
                 remove_all_files_in_dir(&cwd).await?;
             } else {
