@@ -145,7 +145,7 @@ tracing = "0.1.37"
 tracing-opentelemetry = "0.30.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 url = "2.5.4"
-vfs = { version = "0.12.1", features = ["async-vfs"] }
+vfs = { git = "https://github.com/ryardley/rust-vfs.git", features = ["async-vfs"] }
 libp2p = { version = "0.54.1", features = [
   "gossipsub",
   "identify",

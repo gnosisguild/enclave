@@ -134,13 +134,18 @@ impl FileFinder for Fs {
             .join(in_folder.as_ref().to_string_lossy().as_ref())?;
         let pattern = Pattern::new(glob_pattern)?;
         let mut matching_files = Vec::new();
-        let walker = folder_path.walk_dir().await?;
-        let all_entries: Vec<_> = walker.collect().await;
-        for entry_result in all_entries {
-            let entry = entry_result?;
+
+        let all_entries: Vec<_> = folder_path
+            .walk_dir()
+            .await?
+            .map(|res| res.unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        for entry in all_entries {
             if entry.is_file().await? {
-                let filename = entry.filename();
-                if pattern.matches(&filename) {
+                let filename = entry.as_str();
+                if pattern.matches(filename) {
                     matching_files.push(entry.as_str().to_string());
                 }
             }
