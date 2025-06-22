@@ -3,6 +3,7 @@ use e3_fs::prelude::*;
 use e3_fs::Fs;
 use regex::Regex;
 use std::path::Path;
+use tracing::info;
 
 #[derive(Debug, Clone)]
 pub struct Filter {
@@ -30,10 +31,22 @@ where
     P1: AsRef<Path> + Send + Sync,
     P2: AsRef<Path> + Send + Sync,
 {
+    info!("mkdirp {:?}", dest_path.as_ref());
     fs.mkdirp(&dest_path).await?;
+    info!("cp -r {:?} {:?}", src_path.as_ref(), dest_path.as_ref());
     fs.cp(&src_path, &dest_path).await?;
+
     for filter in filters {
-        let file_paths = fs.find_files(&dest_path, &filter.glob_pattern).await?;
+        // We need to prefix the glob pattern or it will be from the root of the filesystem
+        let prefixed_glob_pattern = format!(
+            "{}/{}",
+            dest_path.as_ref().to_string_lossy(),
+            &filter.glob_pattern
+        );
+        info!("Running filter: {:?}", filter);
+        let file_paths = fs.find_files(&dest_path, &prefixed_glob_pattern).await?;
+        info!("pattern:{} found {:?}", filter.glob_pattern, file_paths);
+
         for file_path in file_paths {
             fs.replace_in_place(
                 &Regex::new(&filter.search_pattern)?,
@@ -55,7 +68,19 @@ where
     P1: AsRef<Path> + Send + Sync,
     P2: AsRef<Path> + Send + Sync,
 {
-    copy_with_filters_impl(&Fs::physical()?, src_path, dest_path, filters).await?;
+    info!(
+        "src: {:?} dest: {:?}",
+        src_path.as_ref(),
+        dest_path.as_ref()
+    );
+
+    copy_with_filters_impl(
+        &Fs::physical()?,
+        src_path.as_ref().join("."),
+        dest_path,
+        filters,
+    )
+    .await?;
     Ok(())
 }
 

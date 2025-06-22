@@ -132,8 +132,12 @@ impl FileFinder for Fs {
         let folder_path = self
             .root
             .join(in_folder.as_ref().to_string_lossy().as_ref())?;
+
         let pattern = Pattern::new(glob_pattern)?;
         let mut matching_files = Vec::new();
+
+        println!("Folder Path: {}", folder_path.as_str());
+        println!("Pattern: {pattern}");
 
         let all_entries: Vec<_> = folder_path
             .walk_dir()
@@ -141,10 +145,11 @@ impl FileFinder for Fs {
             .map(|res| res.unwrap())
             .collect::<Vec<_>>()
             .await;
-
+        println!("ALL ENTRIES: {:?}", all_entries);
         for entry in all_entries {
             if entry.is_file().await? {
                 let filename = entry.as_str();
+                println!("entry is file for {filename}");
                 if pattern.matches(filename) {
                     matching_files.push(entry.as_str().to_string());
                 }
@@ -162,9 +167,19 @@ impl Replacer for Fs {
         replacement: &str,
         file_path: P,
     ) -> Result<()> {
+        println!(
+            "replace_in_place({:?},{:?},{:?})",
+            &pattern,
+            &replacement,
+            file_path.as_ref()
+        );
         let content = self.read_to_string(&file_path).await?;
         let new_content = pattern.replace_all(&content, replacement);
-        self.write_to_file(file_path, &new_content).await?;
+        if content != new_content {
+            self.write_to_file(file_path, &new_content).await?;
+        } else {
+            println!("No change made to {:?}", file_path.as_ref());
+        }
         Ok(())
     }
 }

@@ -42,18 +42,20 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> 
     )
     .await?;
 
+    let src = PathBuf::from(TEMP_DIR).join(template_path);
+
     println!("Copy with filters...");
     copy::copy_with_filters(
-        &PathBuf::from(TEMP_DIR).join(template_path),
+        &src,
         &cwd,
         &vec![
             Filter::new(
-                "package.json",
+                "**/package.json",
                 r#""@gnosis-guild/enclave":\s*"[^"]*""#,
                 &format!(r#""@gnosis-guild/enclave": "{}""#, evm_version),
             ),
             Filter::new(
-                "package.json",
+                "**/package.json",
                 r#""@gnosis-guild/enclave-react":\s*"[^"]*""#,
                 &format!(r#""@gnosis-guild/enclave-react": "{}""#, react_version),
             ),
@@ -130,13 +132,24 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> 
 }
 
 // Updated execute function to include workspace dependency substitution
-pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Result<()> {
+pub async fn execute(
+    location: Option<PathBuf>,
+    template: Option<String>,
+    skip_cleanup: bool,
+) -> Result<()> {
     let mut install_in_current_dir = false;
+    let env_current_dir = env::current_dir()?;
     let cwd = match location {
-        Some(loc) => loc,
+        Some(loc) => {
+            if loc.is_absolute() {
+                loc.clone()
+            } else {
+                env_current_dir.join(loc)
+            }
+        }
         None => {
             install_in_current_dir = true;
-            env::current_dir()?
+            env_current_dir
         }
     };
 
@@ -152,10 +165,12 @@ pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Res
         Ok(_) => Ok(()),
         Err(e) => {
             println!("Cleaning up due to error...");
-            if install_in_current_dir {
-                remove_all_files_in_dir(&cwd).await?;
-            } else {
-                fs::remove_dir_all(&cwd).await?;
+            if !skip_cleanup {
+                if install_in_current_dir {
+                    remove_all_files_in_dir(&cwd).await?;
+                } else {
+                    fs::remove_dir_all(&cwd).await?;
+                }
             }
             eprintln!("\nSorry about this but there was an error running the installer. ");
             eprintln!("\n Error: {}\n", e);
