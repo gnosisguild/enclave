@@ -1,5 +1,4 @@
 mod copy;
-mod copy_with_filters;
 mod file_utils;
 mod git;
 mod package_json;
