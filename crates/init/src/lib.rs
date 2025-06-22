@@ -142,7 +142,7 @@ pub async fn execute(
     let cwd = match location {
         Some(loc) => {
             if loc.is_absolute() {
-                loc.clone()
+                loc
             } else {
                 env_current_dir.join(loc)
             }
