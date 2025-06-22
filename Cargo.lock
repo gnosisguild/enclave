@@ -2749,6 +2749,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-fs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "glob",
+ "regex",
+ "tokio",
+ "vfs",
+]
+
+[[package]]
 name = "e3-indexer"
 version = "0.1.0"
 dependencies = [
@@ -2769,7 +2782,9 @@ dependencies = [
  "anyhow",
  "async-recursion",
  "async-trait",
+ "e3-fs",
  "git2",
+ "regex",
  "serde",
  "serde_json",
  "tokio",
@@ -7771,6 +7786,20 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vfs"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ec343ec20aa715908fd028a4b8e7c99a349d13143224222e4d61c316d1e7f0a"
+dependencies = [
+ "async-recursion",
+ "async-std",
+ "async-trait",
+ "filetime",
+ "futures",
+ "tokio",
+]
 
 [[package]]
 name = "void"

@@ -1,10 +1,11 @@
 mod copy;
+mod copy_with_filters;
 mod file_utils;
 mod git;
 mod package_json;
 mod pkgman;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use copy::Filter;
 use file_utils::{chmod_recursive, delete_path, move_file, remove_all_files_in_dir};
 use git::parse_git_url;
@@ -49,13 +50,13 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> 
         &vec![
             Filter::new(
                 "package.json",
-                "\"@gnosis-guild/enclave\":\\s*\"[^\"]*\"",
-                &format!("\"@gnosis-guild/enclave\": \"{}\"", evm_version),
+                r#""@gnosis-guild/enclave":\s*"[^"]*""#,
+                &format!(r#""@gnosis-guild/enclave": "{}""#, evm_version),
             ),
             Filter::new(
                 "package.json",
-                "\"@gnosis-guild/enclave-react\":\\s*\"[^\"]*\"",
-                &format!("\"@gnosis-guild/enclave-react\": \"{}\"", react_version),
+                r#""@gnosis-guild/enclave-react":\s*"[^"]*""#,
+                &format!(r#""@gnosis-guild/enclave-react": "{}""#, react_version),
             ),
         ],
     )

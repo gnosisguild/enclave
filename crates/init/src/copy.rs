@@ -110,8 +110,6 @@ async fn apply_filter_to_files(base_path: impl AsRef<OsStr>, filter: &Filter) ->
             // sed -i '' pattern filename
             cmd.arg("-i").arg("");
         } else {
-            // Normal sed is:
-            // sed -i pattern filename
             cmd.arg("-i");
         }
 

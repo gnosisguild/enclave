@@ -1,0 +1,16 @@
+[package]
+name = "e3-fs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+
+[dependencies]
+vfs.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
+futures.workspace = true
+tokio.workspace = true
+glob.workspace = true
+regex.workspace = true

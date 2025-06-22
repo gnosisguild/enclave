@@ -15,3 +15,5 @@ serde_json.workspace = true
 serde.workspace = true
 async-trait.workspace = true
 url.workspace = true
+e3-fs.workspace = true
+regex.workspace = true
