@@ -11,7 +11,7 @@ fi
 
 # Run all processes concurrently using pnpm
 pnpm concurrently \
-    --names "FRONTEND,EVM,CIPHER,SERVER,ENCLAVE" \
+    --names "FRONTEND,EVM,CIPHER,SERVER,PROGRAM" \
     --prefix-colors "blue,cyan,magenta,yellow,green" \
     --kill-others-on-fail \
     "pnpm dev:frontend" \
