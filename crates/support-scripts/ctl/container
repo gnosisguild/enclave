@@ -32,12 +32,18 @@ trap cleanup EXIT INT TERM
 mkdir -p "$(pwd)/.enclave/caches"/{target,registry,git,risc0-cache,risc0-circuits}
 chmod -R 777 "$(pwd)/.enclave/caches"
 
+if [ -t 0 ]; then
+    TTY_FLAGS="-it"
+else
+    TTY_FLAGS=""
+fi
+
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
     echo "Running exec $IMAGE..."
-    docker exec -it "$CONTAINER_NAME" bash -c "$*"
+    docker exec $TTY_FLAGS "$CONTAINER_NAME" bash -c "$*"
 else
     echo "Running start $IMAGE..."
-    docker run -it --rm \
+    docker run $TTY_FLAGS  --rm \
         --name "$CONTAINER_NAME" \
         --platform linux/amd64 \
         --network=host \
