@@ -43,10 +43,16 @@ if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
     docker exec $TTY_FLAGS "$CONTAINER_NAME" bash -c "$*"
 else
     echo "Running start $IMAGE..."
+    # --network=host does not work on macos for allowing the container to access 
+    # the local machine. `--add-host...` is adding host.local to the hosts file 
+    # in the docker container we can then replace localhost and 127.0.0.1 
+    # from the input callback url so calls redirect to gateway.
+    # This should in theory be crossplatform
     docker run $TTY_FLAGS  --rm \
         --name "$CONTAINER_NAME" \
         --platform linux/amd64 \
-        --network=host \
+        --add-host=host.local:host-gateway \
+        -p 13151:13151 \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
         -v "$(pwd)/.enclave/caches/target:/app/target" \
