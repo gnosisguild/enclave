@@ -29,7 +29,9 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
                 .with_protocol(Protocol::Grpc)
                 .build()?;
 
-            let resource = Resource::builder().with_service_name(name).build();
+            let service_name =
+                std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| name.to_string());
+            let resource = Resource::builder().with_service_name(service_name).build();
 
             let provider = SdkTracerProvider::builder()
                 .with_batch_exporter(otlp_exporter)
@@ -48,8 +50,6 @@ pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
                 .init();
         }
         None => {
-            // TODO: we might be able to dedupe this with above but there were
-            //       issues with telemetry so have left this like so for now
             tracing_subscriber::registry()
                 .with(tracing_subscriber::fmt::layer())
                 .with(tracing_subscriber::filter::LevelFilter::from_level(

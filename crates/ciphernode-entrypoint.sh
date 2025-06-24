@@ -1,12 +1,10 @@
 #!/bin/bash
 set -e
 
-# Paths to config and secrets
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
 SECRETS_FILE="/run/secrets/secrets.json"
 AGGREGATOR="$AGGREGATOR"
 
-# Ensure required files exist
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: Config file $CONFIG_FILE not found!"
     exit 1
@@ -17,7 +15,6 @@ if [ ! -f "$SECRETS_FILE" ]; then
     exit 1
 fi
 
-# Read secrets from the JSON file
 PRIVATE_KEY=$(jq -r '.private_key' "$SECRETS_FILE")
 PASSWORD=$(jq -r '.password' "$SECRETS_FILE")
 NETWORK_PRIVATE_KEY=$(jq -r '.network_private_key' "$SECRETS_FILE")
@@ -27,11 +24,9 @@ if [ -z "$PRIVATE_KEY" ] || [ -z "$PASSWORD" ] || [ -z "$NETWORK_PRIVATE_KEY" ];
     exit 1
 fi
 
-# Set password and private key
 echo "Setting password"
 enclave password set --config "$CONFIG_FILE" --password "$PASSWORD"
 
-# Set network private key
 echo "Setting network private key"
 enclave net set-key --config "$CONFIG_FILE" --net-keypair "$NETWORK_PRIVATE_KEY"
 
