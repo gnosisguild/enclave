@@ -35,15 +35,25 @@ enclave password set --config "$CONFIG_FILE" --password "$PASSWORD"
 echo "Setting network private key"
 enclave net set-key --config "$CONFIG_FILE" --net-keypair "$NETWORK_PRIVATE_KEY"
 
+OTEL_ARG=""
+if [ -n "$OTEL_EXPORTER_OTLP_ENDPOINT" ]; then
+    OTEL_ARG="--otel $OTEL_EXPORTER_OTLP_ENDPOINT"
+    echo "OTEL telemetry enabled: $OTEL_EXPORTER_OTLP_ENDPOINT"
+fi
+
+if [ -n "$OTEL_SERVICE_NAME" ]; then
+    echo "Service name for telemetry: $OTEL_SERVICE_NAME"
+fi
+
 if [ "$AGGREGATOR" = "true" ]; then
     echo "Setting private key"
     enclave wallet set --config "$CONFIG_FILE" --private-key "$PRIVATE_KEY"
 
     echo "Starting aggregator"
-    exec enclave start -v --config "$CONFIG_FILE"
+    exec enclave start -v --config "$CONFIG_FILE" $OTEL_ARG
 else
     echo "Starting Ciphernode"
-    exec enclave start -v --config "$CONFIG_FILE"
+    exec enclave start -v --config "$CONFIG_FILE" $OTEL_ARG
 fi
 
 
