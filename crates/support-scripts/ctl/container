@@ -48,6 +48,7 @@ else
     # in the docker container we can then replace localhost and 127.0.0.1 
     # from the input callback url so calls redirect to gateway.
     # This should in theory be crossplatform
+    # However on linux the user must allow incoming connections from Docker's bridge network 172.17.0.0/16 through their firewall.
     docker run $TTY_FLAGS  --rm \
         --name "$CONTAINER_NAME" \
         --platform linux/amd64 \
