@@ -42,6 +42,7 @@ COPY crates/events/Cargo.toml ./events/Cargo.toml
 COPY crates/evm/Cargo.toml ./evm/Cargo.toml
 COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY crates/fhe/Cargo.toml ./fhe/Cargo.toml
+COPY crates/fs/Cargo.toml ./fs/Cargo.toml
 COPY crates/indexer/Cargo.toml ./indexer/Cargo.toml
 COPY crates/init/Cargo.toml ./init/Cargo.toml
 COPY crates/keyshare/Cargo.toml ./keyshare/Cargo.toml
@@ -57,6 +58,7 @@ COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 
 # COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
+RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
 RUN for d in ./*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
           if [ "$d" = "./cli/" ] || [ "$d" = "./enclaveup/" ]; then \

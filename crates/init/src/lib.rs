@@ -6,7 +6,7 @@ mod pkgman;
 
 use anyhow::Result;
 use copy::Filter;
-use file_utils::{chmod_recursive, delete_path, move_file};
+use file_utils::{chmod_recursive, delete_path, move_file, remove_all_files_in_dir};
 use git::parse_git_url;
 use package_json::DependencyType;
 use pkgman::PkgMan;
@@ -21,24 +21,11 @@ const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 const DEFAULT_TEMPLATE_PATH: &str = ".";
 const DEFAULT_BRANCH: &str = "main";
 
-// Updated execute function to include workspace dependency substitution
-pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Result<()> {
+async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> {
     let repo = parse_git_url(template.unwrap_or(DEFAULT_TEMPLATE_URL.to_string()))?;
     let base_url = repo.base_url;
     let branch = repo.branch.unwrap_or(DEFAULT_BRANCH.to_string());
     let template_path = repo.path.unwrap_or(DEFAULT_TEMPLATE_PATH.to_string());
-
-    let cwd = match location {
-        Some(loc) => loc,
-        None => env::current_dir()?,
-    };
-
-    println!("Ensuring tmp folder does not exist...");
-    if fs::try_exists(TEMP_DIR).await? {
-        fs::remove_dir_all(TEMP_DIR).await?;
-    }
-    println!("Ensuring cwd is empty...");
-    file_utils::ensure_empty_folder(&cwd).await?;
 
     println!("Start git clone...");
     git::shallow_clone(&base_url, &branch, TEMP_DIR).await?;
@@ -55,20 +42,22 @@ pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Res
     )
     .await?;
 
+    let src = PathBuf::from(TEMP_DIR).join(template_path);
+
     println!("Copy with filters...");
     copy::copy_with_filters(
-        &PathBuf::from(TEMP_DIR).join(template_path),
+        &src,
         &cwd,
         &vec![
             Filter::new(
-                "package.json",
-                "\"@gnosis-guild/enclave\":\\s*\"[^\"]*\"",
-                &format!("\"@gnosis-guild/enclave\": \"{}\"", evm_version),
+                "**/package.json",
+                r#""@gnosis-guild/enclave":\s*"[^"]*""#,
+                &format!(r#""@gnosis-guild/enclave": "{}""#, evm_version),
             ),
             Filter::new(
-                "package.json",
-                "\"@gnosis-guild/enclave-react\":\\s*\"[^\"]*\"",
-                &format!("\"@gnosis-guild/enclave-react\": \"{}\"", react_version),
+                "**/package.json",
+                r#""@gnosis-guild/enclave-react":\s*"[^"]*""#,
+                &format!(r#""@gnosis-guild/enclave-react": "{}""#, react_version),
             ),
         ],
     )
@@ -140,4 +129,53 @@ pub async fn execute(location: Option<PathBuf>, template: Option<String>) -> Res
     git::commit(&cwd, "Initial Commit").await?;
 
     Ok(())
+}
+
+// Updated execute function to include workspace dependency substitution
+pub async fn execute(
+    location: Option<PathBuf>,
+    template: Option<String>,
+    skip_cleanup: bool,
+) -> Result<()> {
+    let mut install_in_current_dir = false;
+    let env_current_dir = env::current_dir()?;
+    let cwd = match location {
+        Some(loc) => {
+            if loc.is_absolute() {
+                loc
+            } else {
+                env_current_dir.join(loc)
+            }
+        }
+        None => {
+            install_in_current_dir = true;
+            env_current_dir
+        }
+    };
+
+    println!("Ensuring tmp folder does not exist...");
+    if fs::try_exists(TEMP_DIR).await? {
+        fs::remove_dir_all(TEMP_DIR).await?;
+    }
+
+    println!("Ensuring cwd is empty...");
+    file_utils::ensure_empty_folder(&cwd).await?;
+
+    match install_enclave(&cwd, template).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            println!("Cleaning up due to error...");
+            if !skip_cleanup {
+                if install_in_current_dir {
+                    remove_all_files_in_dir(&cwd).await?;
+                } else {
+                    fs::remove_dir_all(&cwd).await?;
+                }
+            }
+            eprintln!("\nSorry about this but there was an error running the installer. ");
+            eprintln!("\n Error: {}\n", e);
+            eprintln!("Enclave is currently under active development please share this with our team:\n\n  https://github.com/gnosisguild/enclave/issues/new\n");
+            Ok(())
+        }
+    }
 }

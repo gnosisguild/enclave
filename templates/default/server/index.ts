@@ -264,7 +264,7 @@ async function startServer() {
     await setupEventListeners();
 
     const PORT = process.env.PORT ? parseInt(process.env.PORT) : 8080;
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Enclave Server listening on port ${PORT}`);
       console.log(`📡 Event listeners active`);
       console.log(`📊 Sessions: http://localhost:${PORT}/sessions`);

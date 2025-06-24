@@ -12,7 +12,8 @@ members = [
   "crates/events",
   "crates/evm", 
   "crates/evm-helpers",
-  "crates/fhe", 
+  "crates/fhe",
+  "crates/fs", 
   "crates/indexer",
   "crates/init", 
   "crates/keyshare",
@@ -67,6 +68,7 @@ e3-events = { version = "0.1.0", path = "./crates/events" }
 e3-evm = { version = "0.1.0", path = "./crates/evm" }
 e3-evm-helpers = { version = "0.1.0", path = "./crates/evm-helpers" }
 e3-fhe = { version = "0.1.0", path = "./crates/fhe" }
+e3-fs = { version = "0.1.0", path = "./crates/fs" }
 e3-indexer = { version = "0.1.0", path = "./crates/indexer" }
 e3-keyshare = { version = "0.1.0", path = "./crates/keyshare" }
 e3-logger = { version = "0.1.0", path = "./crates/logger" }
@@ -110,6 +112,7 @@ fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 figment = { version = "0.10.19", features = ["yaml", "test"] }
 futures = "0.3.30"
 futures-util = "0.3"
+glob = "0.3.2"
 git2 = "0.20.2"
 hex = "0.4.3"
 jsonrpsee = { version = "0.25.1", features = ["http-client"] }
@@ -127,6 +130,7 @@ petname = "2.0.2"
 phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
+regex = "1.11.1" 
 reqwest = "0.12.15"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.133"
@@ -141,6 +145,7 @@ tracing = "0.1.37"
 tracing-opentelemetry = "0.30.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 url = "2.5.4"
+vfs = { git = "https://github.com/ryardley/rust-vfs.git", features = ["async-vfs"] }
 libp2p = { version = "0.54.1", features = [
   "gossipsub",
   "identify",

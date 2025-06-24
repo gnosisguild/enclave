@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use crate::helpers::telemetry::setup_tracing;
+use crate::helpers::telemetry::{setup_simple_tracing, setup_tracing};
 use crate::net::NetCommands;
 use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
-use crate::{config_set, init, net, password, wallet};
+use crate::{config_set, init, net, password, rev, wallet};
 use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
@@ -71,6 +71,7 @@ impl Cli {
 
     #[instrument(skip_all)]
     pub async fn execute(self) -> Result<()> {
+        let log_level = self.log_level();
         // Attempt to load the config, but only treat "not found" as
         // the trigger for the init flow.  All other errors bubble up.
         let config = match self.load_config() {
@@ -84,7 +85,11 @@ impl Cli {
             {
                 // Existing init branch
                 match self.command {
-                    Commands::Init {path, template} => init::execute(path, template).await?,
+                    Commands::Rev => rev::execute().await?,
+                    Commands::Init {path, template, skip_cleanup} => {
+                        setup_simple_tracing(log_level);
+                        init::execute(path, template, skip_cleanup).await?
+                    },
                     Commands::ConfigSet {
                         rpc_url,
                         eth_address,
@@ -115,7 +120,7 @@ impl Cli {
                             false,
                         )
                         .await?;
-                    }
+                    },
                     _ => bail!(
                         "Configuration file not found. Run `enclave config-set` to create a configuration."
                     ),
@@ -126,7 +131,7 @@ impl Cli {
             Err(e) => return Err(e),
         };
 
-        setup_tracing(&config, self.log_level())?;
+        setup_tracing(&config, log_level)?;
         info!("Config loaded from: {:?}", config.config_file());
 
         if config.autopassword() {
@@ -165,6 +170,7 @@ impl Cli {
             Commands::Password { command } => password::execute(command, &config).await?,
             Commands::Wallet { command } => wallet::execute(command, config).await?,
             Commands::Net { command } => net::execute(command, &config).await?,
+            Commands::Rev => rev::execute().await?,
         }
 
         close_all_connections();
@@ -219,10 +225,18 @@ pub enum Commands {
         /// Template repository to use. Expecting the form `git+https://github.com/gnosisguild/enclave.git#hacknet:template/default`
         #[arg(long)]
         template: Option<String>,
+
+        /// Do not clean up on errors leaving the working folder intact. This option is mainly used
+        /// for testing the installer.
+        #[arg(long)]
+        skip_cleanup: bool,
     },
 
     /// Compile an Enclave project
     Compile,
+
+    /// Return the git_sha rev that the cli was compiled against
+    Rev,
 
     /// Program management commands
     Program {
