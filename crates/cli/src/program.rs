@@ -13,6 +13,7 @@ pub enum ProgramCommands {
     /// Get a shell into the docker environment that the program runs in
     Shell,
 
+    /// Commands to manage the program compilation cache
     Cache {
         #[command(subcommand)]
         command: ProgramCacheCommands,
@@ -21,7 +22,7 @@ pub enum ProgramCommands {
 
 #[derive(Subcommand, Debug)]
 pub enum ProgramCacheCommands {
-    /// Purge all caches
+    /// Purge program compilation caches. Will make program compilation take longer.
     Purge,
 }
 
