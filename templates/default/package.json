@@ -42,13 +42,14 @@
     "compile": "hardhat compile",
     "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
-    "dev:evm": "hardhat node",
-    "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile || true",
-    "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
     "dev:all": "./scripts/dev_all.sh",
+    "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
+    "dev:evm": "hardhat node",
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",
     "dev:server": "./scripts/dev_server.sh",
-    "test": "hardhat test"
+    "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile || true",
+    "test": "hardhat test",
+    "test:integration": "./scripts/test_integration.sh"
   }
 }
