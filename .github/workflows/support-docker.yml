@@ -26,11 +26,11 @@ jobs:
       - name: Generate version tag
         id: version
         run: |
-          echo "version=$(git rev-parse --short=8 HEAD)" >> $GITHUB_OUTPUT
+          echo "version=$(git rev-parse --short=9 HEAD)" >> $GITHUB_OUTPUT
       - name: Generate tags
         id: tags
         run: |
-          VERSION=$(git rev-parse --short=7 HEAD)
+          VERSION=$(git rev-parse --short=9 HEAD)
           TAGS="${{ env.IMAGE_NAME }}:$VERSION"
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             TAGS="$TAGS,${{ env.IMAGE_NAME }}:latest"
