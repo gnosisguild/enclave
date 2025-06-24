@@ -74,9 +74,10 @@ jobs:
 
       - name: Run Playwright tests
         working-directory: ./examples/CRISP
-        run: pnpm test:e2e
         env:
           PLAYWRIGHT_WORKERS: 4
+          METAMASK_VERSION: 11.8.2
+        run: pnpm test:e2e
 
       - name: Upload test results
         if: always()

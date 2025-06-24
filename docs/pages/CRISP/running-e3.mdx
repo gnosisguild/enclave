@@ -3,132 +3,134 @@ title: Running an E3 Program
 description: ''
 ---
 
+import { Steps } from 'nextra/components'
+
 # Running an E3 Program
-In this section, we will go through all the steps to run an E3 Program using CRISP.
-We will run a single voting round of CRISP and do the following:
+
+In this section, we will go through all the steps to run an E3 Program using CRISP. We will run a complete voting round of CRISP and do the following:
+
+- Start the infrastructure (nodes and contracts)
+- Start the CRISP applications (client, server, program)
 - Request an E3 Voting Round
-- Submit a vote
-- Compute the result
-- Verify the result
+- Submit votes through the web interface
+- Compute and verify results
 
 Please make sure you have followed the [CRISP Setup](/CRISP/setup) guide before proceeding.
 
+<Steps>
 
-## Ciphernodes Setup
+### Start Infrastructure
 
-### Running Ciphernodes
-In the root `enclave` directory, you have to run the Ciphernodes. To run four Ciphernodes, use the provided script [`run_ciphernodes.sh`](https://github.com/gnosisguild/CRISP/blob/main/packages/local_testnet/run_ciphernodes.sh). Ensure you run the script from the root `enclave` directory to set the environment variables correctly:
+First, ensure you have the infrastructure running. If you haven't already, complete the setup:
+
+**Terminal 1: Start Anvil**
 ```sh
-RUST_LOG=info ./run_aggregator.sh
+anvil
 ```
 
-### Running the Aggregator
-After starting the Ciphernodes, run the aggregator with the script [`run_aggregator.sh`](https://github.com/gnosisguild/enclave/blob/main/evm/run_aggregator.sh):
-
+**Terminal 2: Start Ciphernodes**
 ```sh
-RUST_LOG=info ./run_aggregator.sh
+cd examples/CRISP
+enclave nodes up -v
 ```
 
-### Adding Ciphernodes to the Registry
-Once the aggregator is running, you can add the Ciphernodes to the registry with the script [`add_ciphernodes.sh`](https://github.com/gnosisguild/CRISP/blob/main/packages/local_testnet/add_ciphernodes.sh):
+Make sure contracts are deployed and ciphernodes are added to the registry as described in the setup guide.
+
+### Start the Client Application
+
+**Terminal 3: Client**
+
+Navigate to the client directory and start the React application:
 
 ```sh
-./add_ciphernodes.sh
+cd examples/CRISP/apps/client
+pnpm dev
 ```
 
-After running the script, you should see the following output in the aggregator terminal:
-```sh
-[AGG]: READY
-[AGG]: CiphernodeAdded(0x2546BcD3c84621e976D8185a91A922aE77ECEc30)
-[AGG]: CiphernodeAdded(0xbDA5747bFD65F08deb54cb465eB87D40e51B197E)
-[AGG]: CiphernodeAdded(0xdD2FD4581271e230360230F9337D5c0430Bf44C0)
-[AGG]: CiphernodeAdded(0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199)
-```
+The client application will start on `http://localhost:3000`.
 
+### Start the Server Application
 
-## Running the CRISP Server
+**Terminal 4: Server**
 
-To run the CRISP Server, navigate to the `CRISP/packages/server` directory and execute the following command:
-> **Note:** Make sure you have set the environment variables correctly before running the server.
+Navigate to the server directory and start the backend server:
 
 ```sh
+cd examples/CRISP/apps/server
 cargo run --bin server
 ```
 
-## Interacting with CRISP via CLI
+The server will start and begin listening for blockchain events.
 
-Once the Server is running, you can interact with the CRISP by using the CLI.
+### Start the Program Server
 
-### Requesting a New Round
+**Terminal 5: Program**
 
+Navigate to the program directory and start the program server:
 
-1. Run the CLI:
 ```sh
+cd examples/CRISP/apps/program
+cargo run
+```
+
+This runs the RISC Zero program server that handles secure computations.
+
+### Initialize a New Voting Round
+
+**Terminal 6: CLI**
+
+Navigate to the server directory and start the CLI:
+
+```sh
+cd examples/CRISP/apps/server
 cargo run --bin cli
 ```
-You should see the following output:
-```sh
-? Enclave (EEEE): Please choose the private execution environment you would like to run! ›  
-❯ CRISP: Voting Protocol (ETH)
-  More Coming Soon!
-```
 
-2. Select `CRISP: Voting Protocol (ETH)` from the menu.
-```sh
-❯ Initialize new E3 round.
-  Activate an E3 round.
-  Participate in an E3 round.
-  Decrypt Ciphertext & Publish Results
-```
+Follow these steps in the CLI:
 
-3. To initiate a new CRISP voting round, choose the option `Initialize new CRISP round`.
+1. Select `CRISP: Voting Protocol (ETH)` from the menu
+2. Choose `Initialize new E3 round` to start a new voting round
+
+You should see output similar to:
 ```sh
-✔ Initialize new E3 round.
 [2024-10-22 11:56:11] [commands.rs:42] - Starting new CRISP round!
 [2024-10-22 11:56:11] [commands.rs:46] - Enabling E3 Program...
 [2024-10-22 11:56:11] [commands.rs:50] - E3 Program enabled. TxHash: 0xa391a4cd2dcc59f4bc6dd1f5ed1c78006dbba4556ea633f4b6a53e2271538682
 [2024-10-22 11:56:11] [commands.rs:74] - E3 request sent. TxHash: 0xe7998b9748e3526f6ca992c9bb498beabe4f387b02240a23d0f42a2386d3c305
 ```
 
-Ensure all services are running correctly and that components are communicating as expected before starting a new CRISP round.
+### Set Up MetaMask
 
+To interact with the client application, you need to configure MetaMask:
 
-### Submitting a Vote
+1. Open MetaMask in your browser
+2. Add the Anvil private key to your wallet:
+   ```
+   0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+   ```
+3. Connect to the local Anvil network:
+   - Network Name: Anvil Local
+   - RPC URL: `http://localhost:8545`
+   - Chain ID: `31337`
+   - Currency Symbol: `ETH`
 
-1. Run the CLI:
-```sh
-cargo run --bin cli
-```
+### Submit Votes via Web Interface
 
-2. Select the option `Participate in an E3 round`.
-```sh
-✔ Participate in an E3 round.
-```
+1. Navigate to `http://localhost:3000` in your browser
+2. Connect your MetaMask wallet
+3. You should see the active voting round
+4. Submit your vote by selecting your choice and confirming the transaction
 
-3. Select the round you would like to participate in.
-```sh
-? Enter CRISP round ID. 
-❯ 0
-```
-4. Submit your vote by entering the vote in the prompt.
-```sh
-? Please select your voting option. 
-❯ Abstain
-  Yes
-  No
-```
+### Monitor the Process
 
-After submitting your vote, you should see the following output:
-```sh
-✔ Enclave (EEEE): Please choose the private execution environment you would like to run! · CRISP: Voting Protocol (ETH)
-✔ Create a new CRISP round or participate in an existing round. · Participate in an E3 round.
-✔ Enter CRISP round ID. · 0
-✔ Please select your voting option. · Vote yes.
-[2024-10-22 11:58:58] [commands.rs:129] - Vote broadcast. TxHash: 0x389466265c543845f050aa931472840eb1d3f67276d1650aede77ce07426e98e
-```
+You can monitor the entire process through the various terminal outputs:
 
-### Computing the Result
-After the voting period has ended, the server will compute the result and publish the ciphertext.
+**Server logs will show:**
+- Vote submissions being received
+- Computation starting when the voting period ends
+- Results being computed and published
+
+**Example server output:**
 ```sh
 [2024-10-22 11:59:12] [handlers.rs:95] - Vote Count: 1
 [2024-10-22 11:59:12] [handlers.rs:101] - Starting computation for E3: 0
@@ -138,8 +140,7 @@ Prove function execution time: 2 minutes and 37 seconds
 [2024-10-22 12:01:49] [handlers.rs:111] - Publishing ciphertext...
 ```
 
-### Decrypting the Result
-The Ciphernodes will capture the published ciphertext, decrypt it, and publish the plaintext.
+**Ciphernode logs will show:**
 ```sh
 INFO Extracted log from evm sending now.
 INFO evt=CiphertextOutputPublished(e3_id: 0) e3_id=0
@@ -149,10 +150,7 @@ INFO evt=E3RequestComplete(e3_id: 0)
 INFO Plaintext published. tx=0x320dd95358cc86c2a709b6fec0c6865b43fa063cb61dfcb8a748005d4886f040
 ```
 
-### Verifying the Result
-
-The server captures the plaintext, decodes it, and displays it.
-
+**Final result logs:**
 ```sh
 [2024-10-22 12:01:49] [handlers.rs:171] - Handling PlaintextOutputPublished event...
 [2024-10-22 12:01:49] [handlers.rs:181] - Vote Count: 1
@@ -160,6 +158,35 @@ The server captures the plaintext, decodes it, and displays it.
 [2024-10-22 12:01:49] [handlers.rs:183] - Votes Option 2: 1
 [2024-10-22 12:01:49] [handlers.rs:187] - PlaintextOutputPublished event handled.
 ```
+
+</Steps>
+
+## Understanding the Process
+
+The CRISP voting process involves several key steps:
+
+1. **Initialization**: A new E3 round is created on the blockchain
+2. **Vote Submission**: Users submit encrypted votes through the web interface
+3. **Computation**: After the voting period, RISC Zero computes the results using FHE
+4. **Decryption**: Ciphernodes collaboratively decrypt the results
+5. **Publication**: Final results are published to the blockchain and displayed
+
+## Troubleshooting
+
+- **Ensure all terminals remain open** during the voting process
+- **MetaMask connection issues**: Check that you're connected to the correct network (Chain ID: 31337)
+- **Transaction failures**: Verify you have sufficient ETH balance from the Anvil faucet
+- **Server errors**: Monitor the server logs for detailed error messages
+- **Ciphernode issues**: Ensure all ciphernode processes are running and connected
+
+## Next Steps
+
+Once you've successfully run a voting round, you can:
+
+- **Experiment with different voting scenarios**: Try multiple votes and different options
+- **Modify voting parameters**: Adjust the configuration for different use cases
+- **Explore the codebase**: Understand the implementation details for your own E3 programs
+- **Deploy to testnet**: Move beyond local development to public testnets
 
 ![Result](/poll-result.png)
 

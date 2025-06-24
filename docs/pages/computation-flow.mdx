@@ -26,17 +26,17 @@ Providers, or other network participant.
 4. **Submit the Request**: Call `request` on the Enclave contract to publish the request and
    initialize the E3.
 
-```solidity
-function request(
-        address filter,
-        uint32[2] calldata threshold,
-        uint256[2] calldata startWindow,
-        uint256 duration,
-        IE3Program e3Program,
-        bytes memory e3ProgramParams,
-        bytes memory computeProviderParams
-    ) external payable returns (uint256 e3Id, E3 memory e3)
-```
+   ```solidity
+   function request(
+      address filter,
+      uint32[2] calldata threshold,
+      uint256[2] calldata startWindow,
+      uint256 duration,
+      IE3Program e3Program,
+      bytes memory e3ProgramParams,
+      bytes memory computeProviderParams
+   ) external payable returns (uint256 e3Id, E3 memory e3)
+   ```
 
 ### Phase 2: Node Selection
 
@@ -57,19 +57,15 @@ During this phase, Data Providers — who may include individual users, applicat
    ensure they are valid for the requested E3. Some of these proofs are generic (e.g., proof of
    valid encryption) while others will be specific to your application.
 3. **Submit Inputs**: Both encrypted data and ZKPs are submitted to the Enclave contract, which will
-   call the `validate` function on your E3P smart contract. The input hash is then added to a Merkle
+   call the `validate` function on your E3P InputValidator smart contract. The input hash is then added to a Merkle
    tree, the root of which can later be used to anchor proofs of correct execution of your E3
    Program.
 
    ```solidity
    function validate(
-        uint256 e3Id,
-        uint256 seed,
-        bytes calldata e3ProgramParams,
-        bytes calldata computeProviderParams
-    )
-        external
-        returns (bytes32 encryptionSchemeId, IInputValidator inputValidator);
+      address sender,
+      bytes memory data
+   ) external returns (bytes memory input);
    ```
 
 ### Phase 4: Execution
@@ -84,10 +80,10 @@ publishes the encrypted output back to Enclave contract.
 
    ```solidity
    function publishCiphertextOutput(
-        uint256 e3Id,
-        bytes memory ciphertextOutput,
-        bytes memory proof
-    ) external returns (bool success);
+      uint256 e3Id,
+      bytes memory ciphertextOutput,
+      bytes memory proof
+   ) external returns (bool success);
    ```
 
 ### Phase 5: Decryption
@@ -98,4 +94,10 @@ Enclave contract's `getE3()` function.
 
 ```solidity
 function getE3(uint256 e3Id) external view returns (E3 memory e3);
+```
+
+or by listening to the `PlaintextOutputPublished` event.
+
+```solidity
+event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
 ```
