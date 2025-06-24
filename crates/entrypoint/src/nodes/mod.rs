@@ -4,6 +4,7 @@ pub mod down;
 pub mod nodes;
 pub mod process_manager;
 pub mod ps;
+pub mod purge;
 pub mod restart;
 pub mod server;
 pub mod start;

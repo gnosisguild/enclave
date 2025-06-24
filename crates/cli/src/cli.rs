@@ -6,7 +6,7 @@ use crate::nodes::{self, NodeCommands};
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
-use crate::{config_set, init, net, password, rev, wallet};
+use crate::{config_set, init, net, nodes_purge, password, purge, rev, wallet};
 use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
@@ -154,6 +154,9 @@ impl Cli {
             Commands::Compile => e3_support_scripts::program_compile().await?,
             Commands::PrintEnv { vite, chain } => print_env::execute(&config, &chain, vite).await?,
             Commands::Program { command } => program::execute(command, &config).await?,
+            Commands::Purge => {
+                purge::execute().await?;
+            }
             Commands::ConfigSet { .. } => {
                 bail!("Cannot run `enclave config-set` when a configuration already exists.");
             }
@@ -243,6 +246,9 @@ pub enum Commands {
         #[command(subcommand)]
         command: ProgramCommands,
     },
+
+    /// Purge both the local program cache and all ciphernode databases
+    Purge,
 
     /// Password management commands
     Password {
