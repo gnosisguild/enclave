@@ -1,6 +1,6 @@
 services:
   cn1:
-    image: {{IMAGE}}
+    image: { { IMAGE } }
     volumes:
       - ./cn1.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn1-data:/home/ciphernode/.local/share/enclave
@@ -12,6 +12,7 @@ services:
       AGGREGATOR: "false"
       ADDRESS: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
       QUIC_PORT: 9091
+      OTEL_SERVICE_NAME: "enclave-cn1"
     deploy:
       replicas: 1
       endpoint_mode: dnsrr
@@ -19,7 +20,7 @@ services:
       - global-network
 
   cn2:
-    image: {{IMAGE}}
+    image: { { IMAGE } }
     volumes:
       - ./cn2.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn2-data:/home/ciphernode/.local/share/enclave
@@ -29,8 +30,9 @@ services:
     env_file: .env
     environment:
       AGGREGATOR: "false"
-      ADDRESS: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0" 
+      ADDRESS: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
       QUIC_PORT: 9092
+      OTEL_SERVICE_NAME: "enclave-cn2"
     deploy:
       replicas: 1
       endpoint_mode: dnsrr
@@ -38,7 +40,7 @@ services:
       - global-network
 
   cn3:
-    image: {{IMAGE}}
+    image: { { IMAGE } }
     volumes:
       - ./cn3.yaml:/home/ciphernode/.config/enclave/config.yaml:ro
       - cn3-data:/home/ciphernode/.local/share/enclave
@@ -50,6 +52,7 @@ services:
       AGGREGATOR: "false"
       ADDRESS: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
       QUIC_PORT: 9093
+      OTEL_SERVICE_NAME: "enclave-cn3"
     deploy:
       replicas: 1
       endpoint_mode: dnsrr
@@ -57,7 +60,7 @@ services:
       - global-network
 
   aggregator:
-    image: {{IMAGE}}
+    image: { { IMAGE } }
     depends_on:
       - cn1
     volumes:
@@ -71,6 +74,7 @@ services:
       AGGREGATOR: "true"
       ADDRESS: "0x8626a6940E2eb28930eFb4CeF49B2d1F2C9C1199"
       QUIC_PORT: 9094
+      OTEL_SERVICE_NAME: "enclave-aggregator"
     deploy:
       replicas: 1
       endpoint_mode: dnsrr
@@ -85,7 +89,7 @@ secrets:
   secrets_cn3:
     file: cn3.secrets.json
   secrets_agg:
-    file: agg.secrets.json   
+    file: agg.secrets.json
 
 volumes:
   cn1-data:
