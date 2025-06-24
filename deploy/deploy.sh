@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 TIMESTAMP=$(date +%s)
-RUN_FILE="./deploy/tmp.docker-compose.${TIMESTAMP}.yml"
-TEMPLATE_FILE="./deploy/docker-compose.yml"
+RUN_FILE="./tmp.docker-compose.${TIMESTAMP}.yml"
+TEMPLATE_FILE="./docker-compose.yml"
 
 wait_ready() {
     local STACK_NAME="$1"
@@ -24,30 +24,61 @@ wait_removed() {
   echo "Stack $STACK_NAME is removed"
 }
 
+OTEL_ENDPOINT=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --otel-endpoint)
+            OTEL_ENDPOINT="$2"
+            shift 2
+            ;;
+        *)
+            if [ -z "$STACK_NAME" ]; then
+                STACK_NAME="$1"
+            elif [ -z "$IMAGE_NAME" ]; then
+                IMAGE_NAME="$1"
+            else
+                echo "Error: Unknown argument: $1"
+                echo "Usage: $0 <stack-name> <image-name> [--otel-endpoint <endpoint>]"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
 
-if [ -z "$1" ]; then
+if [ -z "$STACK_NAME" ]; then
     echo "Error: Please provide a stack name as an argument"
-    echo "Usage: $0 <stack-name> <image-name>"
+    echo "Usage: $0 <stack-name> <image-name> [--otel-endpoint <endpoint>]"
     exit 1
 fi
 
-if [ -z "$2" ]; then
+if [ -z "$IMAGE_NAME" ]; then
     echo "Error: Please provide an image name as an argument"
-    echo "Usage: $0 <stack-name> <image-name>"
+    echo "Usage: $0 <stack-name> <image-name> [--otel-endpoint <endpoint>]"
     exit 1
 fi
 
-# Check if docker-compose.yml exists
 if [ ! -f "$TEMPLATE_FILE" ]; then
     echo "Error: $TEMPLATE_FILE not found"
     exit 1
 fi
 
-sed "s|{{IMAGE}}|$2|g" $TEMPLATE_FILE > "${RUN_FILE}"
+sed "s|{{IMAGE}}|$IMAGE_NAME|g" $TEMPLATE_FILE > "${RUN_FILE}"
 
-STACK_NAME=$1
+COMPOSE_FILES="-c $RUN_FILE"
+if [ -n "$OTEL_ENDPOINT" ] && [[ "$OTEL_ENDPOINT" == *"otel-collector"* ]]; then
+    echo "OTEL enabled with internal collector"
+    COMPOSE_FILES="$COMPOSE_FILES -c docker-compose.otel.yml"
+elif [ -n "$OTEL_ENDPOINT" ]; then
+    echo "OTEL enabled with external endpoint: $OTEL_ENDPOINT"
+else
+    echo "OTEL disabled"
+fi
+
 docker stack rm $STACK_NAME
 wait_removed $STACK_NAME
-docker stack deploy -c $RUN_FILE $STACK_NAME
+docker stack deploy $COMPOSE_FILES $STACK_NAME
 wait_ready $STACK_NAME
-rm ./deploy/tmp.*.*
+rm ./tmp.*.*
+
+echo "✅ Stack '$STACK_NAME' deployed successfully!"
