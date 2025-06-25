@@ -218,7 +218,10 @@ export class EnclaveSDK {
   ): void {
     const handler: EventCallback<T> = (event) => {
       this.off(type, handler);
-      callback(event);
+      const prom = callback(event);
+      if (prom) {
+        prom.catch((e) => console.log(e));
+      }
     };
     this.onEnclaveEvent(type, handler);
   }
