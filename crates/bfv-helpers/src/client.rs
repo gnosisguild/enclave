@@ -1,14 +1,17 @@
 use crate::{build_bfv_params_arc, params::SET_2048_1032193_1};
 use anyhow::anyhow;
-use anyhow::Context;
 use anyhow::Result;
 use fhe_rs::bfv::Encoding;
 use fhe_rs::bfv::Plaintext;
 use fhe_rs::bfv::PublicKey;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
-use rand::thread_rng;
+use rand::CryptoRng;
+use rand::RngCore;
 
-pub fn bfv_encrypt_u64(data: u64, public_key: Vec<u8>) -> Result<Vec<u8>> {
+pub fn bfv_encrypt_u64<R>(data: u64, public_key: Vec<u8>, mut rng: R) -> Result<Vec<u8>>
+where
+    R: RngCore + CryptoRng,
+{
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
 
@@ -20,7 +23,7 @@ pub fn bfv_encrypt_u64(data: u64, public_key: Vec<u8>) -> Result<Vec<u8>> {
         .map_err(|e| anyhow!("Error encoding plaintext: {e}"))?;
 
     let ct = pk
-        .try_encrypt(&pt, &mut thread_rng())
+        .try_encrypt(&pt, &mut rng)
         .map_err(|e| anyhow!("Error encrypting data: {e}"))?;
 
     let encrypted_data = ct.to_bytes();

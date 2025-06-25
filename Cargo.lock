@@ -2942,6 +2942,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-wasm"
+version = "0.1.0"
+dependencies = [
+ "e3-bfv-helpers",
+ "fhe",
+ "fhe-traits",
+ "getrandom 0.2.16",
+ "rand 0.8.5",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "ecdsa"
 version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7839,17 +7851,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9683f9a5a998d873c0d21fcbe3c083009670149a8fab228644b8bd36b2c48cb3"
 dependencies = [
  "wit-bindgen-rt",
-]
-
-[[package]]
-name = "wasm"
-version = "0.1.0"
-dependencies = [
- "e3-bfv-helpers",
- "fhe",
- "fhe-traits",
- "rand 0.8.5",
- "wasm-bindgen",
 ]
 
 [[package]]
