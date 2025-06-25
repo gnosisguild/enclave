@@ -7,10 +7,10 @@
     "experimentalDecorators": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["es2020"],
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "outDir": "dist",
+    "module": "es2015",
+    "moduleResolution": "bundler",
     "noImplicitAny": true,
+    "outDir": "dist",
     "removeComments": true,
     "resolveJsonModule": true,
     "sourceMap": true,
@@ -18,6 +18,5 @@
     "target": "es2020"
   },
   "exclude": ["node_modules"],
-  "files": ["hardhat.config.ts"],
-  "include": ["tasks/**/*", "test/**/*", "deploy/**/*", "types/"]
+  "include": ["src/**/*"]
 }

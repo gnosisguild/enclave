@@ -1,18 +1,27 @@
 {
-  "name": "wasm",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@gnosis-guild/enclave-wasm",
+  "version": "0.0.5-test.22",
+  "description": "Wasm modules for enclave.",
   "main": "index.js",
   "files": [
-    "pkg"
+    "pkg-nodejs/",
+    "pkg-web/"
   ],
   "scripts": {
     "build": "./scripts/build.sh"
   },
   "exports": {
-    ".": {
-      "types": "./pkg/enclave_client_wasm.d.ts",
-      "default": "./pkg/enclave_client_wasm.js"
+    "node": {
+      "types": "./pkg-nodejs/e3_enclave_wasm.d.ts",
+      "default": "./pkg-nodejs/e3_enclave_wasm.js"
+    },
+    "browser": {
+      "types": "./pkg-web/e3_enclave_wasm.d.ts",
+      "default": "./pkg-web/e3_enclave_wasm.js"
+    },
+    "default": {
+      "types": "./pkg-web/e3_enclave_wasm.d.ts",
+      "default": "./pkg-web/e3_enclave_wasm.js"
     }
   },
   "keywords": [],

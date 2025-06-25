@@ -10,7 +10,7 @@
   },
   "scripts": {
     "clean": "cd packages/evm && pnpm clean",
-    "compile": "pnpm evm:build && pnpm react:build && pnpm ciphernode:build",
+    "compile": "pnpm wasm:build && pnpm evm:build && pnpm react:build && pnpm ciphernode:build",
     "lint": "pnpm evm:lint && pnpm ciphernode:lint",
     "typechain": "pnpm evm:typechain",
     "test": "pnpm evm:test && pnpm ciphernode:test",
@@ -41,9 +41,10 @@
     "react:release": "cd packages/enclave-react && pnpm release",
     "npm:release": "pnpm build && pnpm evm:release && pnpm react:release",
     "support:build": "cd crates/support && ./scripts/build.sh",
-    "build": "pnpm -r build",
+    "build": "pnpm compile",
     "changeset": "changeset",
     "version": "changeset version",
+    "wasm:build": "cd ./crates/wasm && pnpm build",
     "release": "pnpm build && changeset publish"
   },
   "workspaces": [

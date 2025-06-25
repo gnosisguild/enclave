@@ -20,8 +20,16 @@
     },
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",
-    "./sdk": "./dist/src/sdk/index.js",
-    "./sdk/*": "./dist/src/sdk/*"
+    "./sdk": {
+      "types": "./dist/src/sdk/index.d.ts",
+      "import": "./dist/src/sdk/index.js",
+      "require": "./dist/src/sdk/index.js"
+    },
+    "./sdk/*": {
+      "types": "./dist/src/sdk/*.d.ts",
+      "import": "./dist/src/sdk/*",
+      "require": "./dist/src/sdk/*"
+    }
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
@@ -88,10 +96,11 @@
     "git-checks": false
   },
   "scripts": {
-    "clean": "rimraf ./artifacts ./cache ./coverage ./types ./coverage.json && pnpm typechain",
+    "clean": "rimraf ./artifacts ./cache ./coverage ./types ./dist ./coverage.json && pnpm typechain",
     "build": "pnpm compile",
-    "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile && pnpm compile:scripts",
-    "compile:scripts": "tsc --noEmitOnError false --noCheck",
+    "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile && pnpm compile:scripts && pnpm compile:sdk",
+    "compile:scripts": "tsc -p tsconfig.json --noEmitOnError false --noCheck",
+    "compile:sdk": "tsc -p sdk.tsconfig.json --noEmitOnError false --noCheck",
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
     "deploy:mocks": "hardhat deploy --tags enclave,mocks",
@@ -113,6 +122,7 @@
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
+    "@gnosis-guild/enclave-wasm": "workspace:*",
     "solady": "^0.1.13",
     "viem": "^2.30.6"
   },
