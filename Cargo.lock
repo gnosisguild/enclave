@@ -2535,6 +2535,7 @@ dependencies = [
  "fhe",
  "fhe-traits",
  "hex",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -7838,6 +7839,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9683f9a5a998d873c0d21fcbe3c083009670149a8fab228644b8bd36b2c48cb3"
 dependencies = [
  "wit-bindgen-rt",
+]
+
+[[package]]
+name = "wasm"
+version = "0.1.0"
+dependencies = [
+ "e3-bfv-helpers",
+ "fhe",
+ "fhe-traits",
+ "rand 0.8.5",
+ "wasm-bindgen",
 ]
 
 [[package]]

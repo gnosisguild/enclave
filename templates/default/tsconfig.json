@@ -10,5 +10,10 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["./deploy/**/*", "./server/**/*", "hardhat.config.ts"]
+  "include": [
+    "./tests/**/*",
+    "./deploy/**/*",
+    "./server/**/*",
+    "hardhat.config.ts"
+  ]
 }
