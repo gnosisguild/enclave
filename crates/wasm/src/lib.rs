@@ -8,4 +8,3 @@ pub fn encrypt_number(data: u64, public_key: Vec<u8>) -> Result<Vec<u8>, JsValue
         .map_err(|e| JsValue::from_str(&format!("{}", e)))?;
     Ok(encrypted_data)
 }
-
