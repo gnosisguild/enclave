@@ -308,7 +308,7 @@ importers:
       '@excubiae/contracts':
         specifier: ^0.4.0
         version: 0.4.0
-      '@gnosis-guild/enclave-wasm':
+      '@gnosis-guild/e3-wasm':
         specifier: workspace:*
         version: link:../../crates/wasm
       solady:
