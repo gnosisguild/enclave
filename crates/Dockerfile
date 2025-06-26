@@ -54,6 +54,7 @@ COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
+COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
 
 
 # COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
