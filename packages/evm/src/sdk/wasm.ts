@@ -1,4 +1,4 @@
-import { encrypt_number } from "@gnosis-guild/enclave-wasm";
+import { encrypt_number } from "@gnosis-guild/e3-wasm";
 
 export function encryptNumber(
   data: bigint,

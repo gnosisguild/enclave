@@ -100,7 +100,7 @@
     "build": "pnpm compile",
     "compile": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile && pnpm compile:scripts && pnpm compile:sdk",
     "compile:scripts": "tsc -p tsconfig.json --noEmitOnError false --noCheck",
-    "compile:sdk": "tsc -p sdk.tsconfig.json --noEmitOnError false --noCheck",
+    "compile:sdk": "tsc -p ./src/tsconfig.json --noEmitOnError false --noCheck",
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
     "deploy:mocks": "hardhat deploy --tags enclave,mocks",
