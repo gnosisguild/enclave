@@ -1,15 +1,17 @@
 FROM node:22 AS evm-builder
 
-WORKDIR /build/packages/evm
-COPY ./packages/evm ./
+WORKDIR /build
+COPY crates/wasm/package.json ./crates/wasm/package.json
+COPY packages/enclave-react ./packages/enclave-react
+COPY packages/evm ./packages/evm
 
 RUN npm install -g corepack
 RUN corepack enable
 
-RUN pnpm install && pnpm compile
+RUN cd packages/evm && pnpm install && pnpm compile:contracts
 
 # Build stage
-FROM rust:1.81 AS ciphernode-builder
+FROM rust:1.85 AS ciphernode-builder
 
 # Force incremental 
 ENV CARGO_INCREMENTAL=1
@@ -33,14 +35,14 @@ COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
 COPY crates/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
 COPY crates/cli/Cargo.toml ./cli/Cargo.toml
 COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
-COPY crates/enclaveup/Cargo.toml ./enclaveup/Cargo.toml
 COPY crates/config/Cargo.toml ./config/Cargo.toml
 COPY crates/crypto/Cargo.toml ./crypto/Cargo.toml
 COPY crates/data/Cargo.toml ./data/Cargo.toml
+COPY crates/enclaveup/Cargo.toml ./enclaveup/Cargo.toml
 COPY crates/entrypoint/Cargo.toml ./entrypoint/Cargo.toml
 COPY crates/events/Cargo.toml ./events/Cargo.toml
-COPY crates/evm/Cargo.toml ./evm/Cargo.toml
 COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
+COPY crates/evm/Cargo.toml ./evm/Cargo.toml
 COPY crates/fhe/Cargo.toml ./fhe/Cargo.toml
 COPY crates/fs/Cargo.toml ./fs/Cargo.toml
 COPY crates/indexer/Cargo.toml ./indexer/Cargo.toml
@@ -56,8 +58,6 @@ COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
 
-
-# COPY ./crates/entrypoint/build.rs ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
 RUN for d in ./*/ ; do \
