@@ -1,7 +1,8 @@
-use crate::helpers::{RpcWSClient, SignerProvider, WithChainId};
+use crate::helpers::EthProvider;
 use actix::prelude::*;
 use alloy::{
     primitives::{Address, Bytes, U256},
+    providers::{Provider, WalletProvider},
     rpc::types::TransactionReceipt,
     sol,
 };
@@ -18,20 +19,20 @@ sol!(
     "../../packages/evm/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json"
 );
 
-pub struct RegistryFilterSolWriter {
-    provider: WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
+pub struct RegistryFilterSolWriter<P> {
+    provider: EthProvider<P>,
     contract_address: Address,
     bus: Addr<EventBus<EnclaveEvent>>,
 }
 
-impl RegistryFilterSolWriter {
+impl<P: Provider + WalletProvider + Clone + 'static> RegistryFilterSolWriter<P> {
     pub async fn new(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
+        provider: EthProvider<P>,
         contract_address: Address,
     ) -> Result<Self> {
         Ok(Self {
-            provider: provider.clone(),
+            provider,
             contract_address,
             bus: bus.clone(),
         })
@@ -39,12 +40,13 @@ impl RegistryFilterSolWriter {
 
     pub async fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
+        provider: EthProvider<P>,
         contract_address: &str,
-    ) -> Result<Addr<RegistryFilterSolWriter>> {
+    ) -> Result<Addr<RegistryFilterSolWriter<P>>> {
         let addr = RegistryFilterSolWriter::new(bus, provider, contract_address.parse()?)
             .await?
             .start();
+
         let _ = bus
             .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
             .await;
@@ -53,17 +55,20 @@ impl RegistryFilterSolWriter {
     }
 }
 
-impl Actor for RegistryFilterSolWriter {
+impl<P: Provider + WalletProvider + Clone + 'static> Actor for RegistryFilterSolWriter<P> {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<EnclaveEvent> for RegistryFilterSolWriter {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
+    for RegistryFilterSolWriter<P>
+{
     type Result = ();
+
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             EnclaveEvent::PublicKeyAggregated { data, .. } => {
                 // Only publish if the src and destination chains match
-                if self.provider.get_chain_id() == data.e3_id.chain_id() {
+                if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
             }
@@ -73,13 +78,16 @@ impl Handler<EnclaveEvent> for RegistryFilterSolWriter {
     }
 }
 
-impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated>
+    for RegistryFilterSolWriter<P>
+{
     type Result = ResponseFuture<()>;
+
     fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
         Box::pin({
             let e3_id = msg.e3_id.clone();
             let pubkey = msg.pubkey.clone();
-            let contract_address = self.contract_address.clone();
+            let contract_address = self.contract_address;
             let provider = self.provider.clone();
             let bus = self.bus.clone();
             let nodes = msg.nodes.clone();
@@ -89,7 +97,7 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
                     publish_committee(provider, contract_address, e3_id, nodes, pubkey).await;
                 match result {
                     Ok(receipt) => {
-                        info!(tx=%receipt.transaction_hash,"tx");
+                        info!(tx=%receipt.transaction_hash, "Transaction published");
                     }
                     Err(err) => bus.err(EnclaveErrorType::Evm, err),
                 }
@@ -98,15 +106,18 @@ impl Handler<PublicKeyAggregated> for RegistryFilterSolWriter {
     }
 }
 
-impl Handler<Shutdown> for RegistryFilterSolWriter {
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
+    for RegistryFilterSolWriter<P>
+{
     type Result = ();
+
     fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop();
     }
 }
 
-pub async fn publish_committee(
-    provider: WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
+pub async fn publish_committee<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
     contract_address: Address,
     e3_id: E3id,
     nodes: OrderedSet<String>,
@@ -118,17 +129,26 @@ pub async fn publish_committee(
         .into_iter()
         .filter_map(|node| node.parse().ok())
         .collect();
-    let contract = NaiveRegistryFilter::new(contract_address, provider.get_provider());
-    let builder = contract.publishCommittee(e3_id, nodes, public_key);
+    let from_address = provider.provider().default_signer_address();
+    let current_nonce = provider
+        .provider()
+        .get_transaction_count(from_address)
+        .pending()
+        .await?;
+    let contract = NaiveRegistryFilter::new(contract_address, provider.provider());
+    let builder = contract
+        .publishCommittee(e3_id, nodes, public_key)
+        .nonce(current_nonce);
     let receipt = builder.send().await?.get_receipt().await?;
     Ok(receipt)
 }
 
 pub struct RegistryFilterSol;
+
 impl RegistryFilterSol {
-    pub async fn attach(
+    pub async fn attach<P: Provider + WalletProvider + Clone + 'static>(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
+        provider: EthProvider<P>,
         contract_address: &str,
     ) -> Result<()> {
         RegistryFilterSolWriter::attach(bus, provider, contract_address).await?;

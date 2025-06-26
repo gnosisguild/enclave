@@ -4,7 +4,7 @@ use crate::load_config::resolve_config_path;
 use crate::paths_engine::PathsEngine;
 use crate::paths_engine::DEFAULT_CONFIG_NAME;
 use crate::yaml::load_yaml_with_env;
-use alloy::primitives::Address;
+use alloy_primitives::Address;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
@@ -85,18 +85,22 @@ impl Default for NodeDefinition {
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(untagged)]
-pub enum Risc0Config {
-    Bonsai {
-        bonsai_api_key: String,
-        bonsai_api_url: String,
-    },
-    DevMode,
+pub struct Risc0Config {
+    #[serde(default)]
+    pub bonsai_api_key: Option<String>,
+    #[serde(default)]
+    pub bonsai_api_url: Option<String>,
+    #[serde(default)]
+    pub risc0_dev_mode: u8,
 }
 
 impl Default for Risc0Config {
     fn default() -> Self {
-        Risc0Config::DevMode
+        Risc0Config {
+            bonsai_api_key: None,
+            bonsai_api_url: None,
+            risc0_dev_mode: 0,
+        }
     }
 }
 
@@ -483,6 +487,7 @@ program:
   risc0:
     bonsai_api_key: "12345678"
     bonsai_api_url: "http://my.api.com"
+    risc0_dev_mode: 0
 
 nodes:
   ag:
@@ -518,9 +523,10 @@ nodes:
             assert_eq!(config.quic_port(), 1234);
             assert_eq!(
                 config.program().risc0(),
-                &Risc0Config::Bonsai {
-                    bonsai_api_key: "12345678".to_string(),
-                    bonsai_api_url: "http://my.api.com".to_string()
+                &Risc0Config {
+                    bonsai_api_key: Some("12345678".to_string()),
+                    bonsai_api_url: Some("http://my.api.com".to_string()),
+                    risc0_dev_mode: 0,
                 }
             );
             assert!(config.peers().is_empty());

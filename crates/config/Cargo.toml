@@ -7,7 +7,7 @@ description = "E3 - Enclave Ciphernode Configuration"
 repository = "https://github.com/gnosisguild/enclave/crates/config"
 
 [dependencies]
-alloy = { workspace = true }
+alloy-primitives = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
 e3-events = { workspace = true }

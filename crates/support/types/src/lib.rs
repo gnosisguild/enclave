@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ComputeResponse {
@@ -15,6 +15,23 @@ pub struct ComputeRequest {
     #[serde(deserialize_with = "deserialize_hex_tuple")]
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
     pub callback_url: Option<String>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct WebhookPayload {
+    pub e3_id: u64,
+    #[serde(serialize_with = "serialize_as_hex")]
+    pub ciphertext: Vec<u8>,
+    #[serde(serialize_with = "serialize_as_hex")]
+    pub proof: Vec<u8>,
+}
+
+fn serialize_as_hex<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let hex_string = format!("0x{}", hex::encode(bytes));
+    serializer.serialize_str(&hex_string)
 }
 
 pub fn deserialize_hex_string<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
@@ -44,7 +61,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::ComputeRequest;
+    use crate::{ComputeRequest, WebhookPayload};
 
     #[test]
     fn test_deserialize_compute_request() {
@@ -110,6 +127,20 @@ mod tests {
             payload.callback_url,
             Some("https://example.com/callback".to_string())
         );
+    }
+
+    #[test]
+    fn test_webhook_payload_serialization() {
+        let payload = WebhookPayload {
+            e3_id: 12345,
+            ciphertext: vec![0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
+            proof: vec![0xde, 0xad, 0xbe, 0xef],
+        };
+
+        let json = serde_json::to_string(&payload).expect("Failed to serialize");
+        let expected = r#"{"e3_id":12345,"ciphertext":"0x0123456789abcdef","proof":"0xdeadbeef"}"#;
+
+        assert_eq!(json, expected);
     }
 
     #[test]

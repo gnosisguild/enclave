@@ -1,9 +1,9 @@
 use alloy::{
+    network::Ethereum,
     primitives::{Address, B256},
-    providers::{Provider, ProviderBuilder, RootProvider},
+    providers::{Provider, ProviderBuilder},
     rpc::types::{BlockNumberOrTag, Filter, Log},
     sol_types::SolEvent,
-    transports::BoxTransport,
 };
 use eyre::Result;
 use futures::stream::StreamExt;
@@ -16,13 +16,13 @@ type EventHandler =
 
 #[derive(Clone)]
 pub struct EventListener {
-    provider: Arc<RootProvider<BoxTransport>>,
+    provider: Arc<dyn Provider<Ethereum>>,
     filter: Filter,
     handlers: Arc<RwLock<HashMap<B256, Vec<EventHandler>>>>,
 }
 
 impl EventListener {
-    pub fn new(provider: Arc<RootProvider<BoxTransport>>, filter: Filter) -> Self {
+    pub fn new(provider: Arc<dyn Provider<Ethereum>>, filter: Filter) -> Self {
         Self {
             provider,
             filter,

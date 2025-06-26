@@ -8,6 +8,15 @@ use tracing::Level;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+pub fn setup_simple_tracing(log_level: Level) {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::filter::LevelFilter::from_level(
+            log_level,
+        ))
+        .init();
+}
+
 pub fn setup_tracing(config: &AppConfig, log_level: Level) -> Result<()> {
     let name = config.name();
     let maybe_otel_endpoint = config.otel();

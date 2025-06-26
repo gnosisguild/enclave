@@ -4,10 +4,7 @@ mod config;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use reqwest::Client;
 
-use commands::{
-    activate_e3_round, decrypt_and_publish_result, initialize_crisp_round,
-    participate_in_existing_round,
-};
+use commands::initialize_crisp_round;
 use config::CONFIG;
 use crisp::logger::init_logger;
 use log::info;
@@ -38,9 +35,6 @@ struct Cli {
 enum Commands {
     /// Initialize new E3 round
     Init,
-
-    /// Participate in an E3 round
-    Participate,
 }
 
 #[tokio::main]
@@ -59,18 +53,12 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Some(Commands::Init) => {
             initialize_crisp_round().await?;
         }
-        Some(Commands::Participate) => {
-            participate_in_existing_round(&client).await?;
-        }
         None => {
             // Fall back to interactive mode if no command was specified
             let action = select_action()?;
             match action {
                 0 => {
                     initialize_crisp_round().await?;
-                }
-                1 => {
-                    participate_in_existing_round(&client).await?;
                 }
                 _ => unreachable!(),
             }
@@ -92,7 +80,7 @@ fn select_environment() -> Result<usize, Box<dyn std::error::Error + Send + Sync
 fn select_action() -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
     let selections = &[
         "Initialize new E3 round.",
-        "Participate in an E3 round.",
+        // "Participate in an E3 round.",
         // "Activate an E3 round.",
         // "Decrypt Ciphertext & Publish Results",
     ];

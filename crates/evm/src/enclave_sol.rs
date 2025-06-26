@@ -1,26 +1,29 @@
 use crate::{
-    enclave_sol_reader::EnclaveSolReader,
-    enclave_sol_writer::EnclaveSolWriter,
-    event_reader::EvmEventReaderState,
-    helpers::{ReadonlyProvider, RpcWSClient, SignerProvider, WithChainId},
+    enclave_sol_reader::EnclaveSolReader, enclave_sol_writer::EnclaveSolWriter,
+    event_reader::EvmEventReaderState, helpers::EthProvider,
 };
 use actix::Addr;
-use alloy::transports::BoxTransport;
+use alloy::providers::{Provider, WalletProvider};
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{EnclaveEvent, EventBus};
 
 pub struct EnclaveSol;
+
 impl EnclaveSol {
-    pub async fn attach(
+    pub async fn attach<R, W>(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        read_provider: &WithChainId<ReadonlyProvider, BoxTransport>,
-        write_provider: &WithChainId<SignerProvider<RpcWSClient>, RpcWSClient>,
+        read_provider: EthProvider<R>,
+        write_provider: EthProvider<W>,
         contract_address: &str,
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        R: Provider + Clone + 'static,
+        W: Provider + WalletProvider + Clone + 'static,
+    {
         EnclaveSolReader::attach(
             bus,
             read_provider,
@@ -30,7 +33,9 @@ impl EnclaveSol {
             rpc_url,
         )
         .await?;
+
         EnclaveSolWriter::attach(bus, write_provider, contract_address).await?;
+
         Ok(())
     }
 }

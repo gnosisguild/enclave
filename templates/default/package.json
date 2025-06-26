@@ -28,6 +28,7 @@
     "typechain": "^8.3.0",
     "typed-rpc": "^6.1.1",
     "typescript": ">=4.5.0",
+    "viem": "^2.30.6",
     "wait-on": "^8.0.3"
   },
   "dependencies": {
@@ -44,7 +45,7 @@
     "dev:evm": "hardhat node",
     "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile || true",
     "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
-    "dev:all": "concurrently -r \"pnpm dev:evm\" \"pnpm dev:ciphernodes\" \"pnpm dev:program\" \"pnpm dev:frontend\"",
+    "dev:all": "./scripts/dev_all.sh",
     "dev:frontend": "./scripts/dev_frontend.sh",
     "dev:program": "./scripts/dev_program.sh",
     "dev:server": "./scripts/dev_server.sh",

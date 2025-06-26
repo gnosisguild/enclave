@@ -18,6 +18,9 @@ jobs:
   release-rust:
     name: Release Rust Crates
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release-plz.outputs.releases_created }}
+      version: ${{ steps.release-plz.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -85,3 +88,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  trigger-binary-release:
+    name: Trigger Binary Release
+    runs-on: ubuntu-latest
+    needs: [release-rust, release-npm]
+    if: needs.release-rust.outputs.releases_created == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger binary release workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: binary-release
+          client-payload: |
+            {
+              "version": "${{ needs.release-rust.outputs.version }}"
+            }

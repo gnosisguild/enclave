@@ -1,144 +1,138 @@
 # Enclave Protocol Template Setup
 
-This template allows you to deploy and interact with the Enclave protocol locally without copying the core contracts.
+The Enclave Protocol Template provides a complete development environment for building and testing applications with Fully Homomorphic Encryption (FHE). This template enables local deployment and interaction with the Enclave protocol without requiring the core contracts to be copied.
 
-## Quick Start
+## Prerequisites
 
-### Prerequisites
+Before getting started, ensure your development environment meets the following requirements:
 
-Tested with the following:
+### Required Software
 
-```
+**Docker** (tested with version 25.0.6 or later)
+
+```bash
 docker --version
-Docker version 25.0.6, build v25.0.6
+# Expected output: Docker version 25.0.6, build v25.0.6
 ```
 
-```
-pnpm --version
-10.7.1
-```
+**Node.js** (version 22.10.0 or later)
 
-```
+```bash
 node --version
-v22.10.0
+# Expected output: v22.10.0
 ```
 
+**pnpm** (version 10.7.1 or later)
+
+```bash
+pnpm --version
+# Expected output: 10.7.1
 ```
+
+**Rust** (version 1.85.1 or later)
+
+```bash
 rustc --version
-rustc 1.85.1 (4eb161250 2025-03-15)
+# Expected output: rustc 1.85.1 (4eb161250 2025-03-15)
 ```
 
-Linux/POSIX environment
+### Optional Software
 
-Note for Nix users a Nix flake is included within the generated template.
+**tmux** (recommended for managing multiple processes)
 
-### Install Enclave
-
+```bash
+tmux -V
+# Expected output: tmux 3.4
 ```
-cargo install --git https://github.com/gnosisguild/enclave e3-cli
+
+### System Requirements
+
+- Linux/POSIX environment
+- For Nix users: A Nix flake is included in the generated template
+
+## Installation
+
+### 1. Install the Enclave CLI
+
+Install the Enclave CLI tool from the official repository:
+
+```bash
+cargo install --git https://github.com/gnosisguild/enclave --branch hacknet e3-cli
 ```
 
-### install wasm-pack
+### 2. Install wasm-pack
 
-```
+Install wasm-pack for WebAssembly compilation:
+
+```bash
 cargo install wasm-pack
 ```
 
-### Generate Template
+## Project Setup
 
-```
-enclave init ./myproj
+### Generate a New Project
+
+Create a new Enclave project using the CLI:
+
+```bash
+enclave init myenclave
+cd ./myenclave
 ```
 
-```
-cd ./myproj
-```
+Replace `myenclave` with your desired project name.
 
-### Run all services
+### Project Structure
 
-```
+The generated project contains the following directories and files:
+
+| File/Directory          | Description                                        |
+| ----------------------- | -------------------------------------------------- |
+| `./client`              | Client-side application                            |
+| `./contracts`           | Your contracts that interact with the protocol     |
+| `./deploy`              | Your deploy scripts                                |
+| `./enclave.config.yaml` | Configuration for the enclave CLI                  |
+| `./program`             | FHE computation code                               |
+| `./scripts`             | Scripts to run the project                         |
+| `./server`              | TypeScript server that coordinates the FHE process |
+
+## Running the Development Environment
+
+### Start All Services
+
+Launch the complete development stack with a single command:
+
+```bash
 pnpm dev:all
 ```
 
-This will run:
+### What Happens Next
 
-- `pnpm node` - hardhat eth node
-- `pnpm rpc` - Server to accept computation output and post on chain
-- `enclave program listen` - Server to listen to onchain events and compute over encrypted inputs then send to the rpc server
-- `pnpm dev:frontend` - Run the frontend for the template
+The command will start multiple processes simultaneously:
 
-### Start Local Hardhat Node
+1. **Hardhat EVM Node** - Local Ethereum development network
+2. **Enclave Ciphernodes** - Set of nodes for FHE processing
+3. **TypeScript Coordination Server** - Manages FHE process coordination
+4. **FHE Program Server** - Handles encrypted computation execution
+5. **Frontend Application** - User interface for interaction
 
-```bash
-pnpm node
-```
+### Process Management
 
-Enclave contracts should be automatically deployed.
+- **With tmux installed**: Your terminal will split into multiple panes, each showing logs from different services
+- **Without tmux**: You'll see a stream of logs from all processes in a single terminal
 
-### Compiling your program
+### Accessing the Application
 
-Use the following command to compile your program:
+1. **Wait for initialization**: Allow all processes to fully start and stabilize
+2. **Open your browser**: Navigate to [http://localhost:3000](http://localhost:3000)
+3. **Configure MetaMask**: Ensure MetaMask is installed and configured with a local network pointing to `http://localhost:8545`
 
-```
-enclave program compile
-```
+## Next Steps
 
-This should create an `ImageID.sol` contract within the `./contracts` folder.
+Once your development environment is running, you can:
 
-### Your FHE program
+- Modify the FHE computation logic in the `./program` directory
+- Update smart contracts in the `./contracts` directory
+- Customize the client application in the `./client` directory
+- Configure deployment scripts in the `./deploy` directory
 
-Your FHE program is a rust crate located under `./program`.
-
-### Run your program with enclave
-
-To verifiably run your program with FHE locally with enclave you first need to setup an RPC server to receive the computation output.
-
-You RPC server gets called by the enclave program listener when the FHE computation is complete.
-
-We have set one up in the template to run it you can use the following command:
-
-```bash
-pnpm rpc
-```
-
-Your RPC must provide the following methods:
-
-```ts
-type Capabilities = "processOutput" | "shouldCompute";
-
-interface RpcServer {
-  // Handle the FHE
-  processOutput(e3Id: number, proof: string, ciphertext: string): number;
-  capabilities(): Capabilities;
-}
-```
-
-### Run a listener
-
-Next you can use the `enclave program listen` command to run your computation:
-
-```bash
-enclave program listen \
-  --json-rpc-server http://localhost:8080 \
-  --chain hardhat
-```
-
-This will listen to your local hardhat node and trigger computations when the E3 round has expired.
-
-## Usage Commands
-
-### Ciphernode Management
-
-```bash
-# Add a ciphernode
-pnpm add-ciphernode 0x1234567890123456789012345678901234567890
-```
-
-## Alternative: Direct Script Usage
-
-You can also run the scripts directly with custom parameters:
-
-```bash
-# Add ciphernode
-npx hardhat run scripts/interact.ts -- add-ciphernode 0x1234567890123456789012345678901234567890
-```
+For detailed usage instructions and API documentation, refer to the project's README.md file and the official Enclave Protocol documentation.

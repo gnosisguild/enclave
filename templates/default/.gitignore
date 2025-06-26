@@ -14,6 +14,10 @@ node_modules
 /coverage
 /coverage.json
 
+.enclave/data/
+.enclave/config/
+.enclave/caches/
+
 /target
 
 # Ignore risc0 files

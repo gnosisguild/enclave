@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
+
+GIT_SHA=$(enclave rev)
 CONTAINER_NAME="e3-support.1"
-IMAGE="ghcr.io/gnosisguild/e3-support:next"
+IMAGE="ghcr.io/gnosisguild/e3-support:$GIT_SHA"
 CACHE_PREFIX="e3-support"
+
+# Check if the image exists locally or remotely if not bail
+# Every time we push we build support so every build of enclave should have support built too.
+# This solves the problem where a person will be using the cli with a specific `enclave rev` but our latest 
+# support scripts have changed which will break the support behaviour for the user.
+# The user can then upgrade their cli once they are ready and then the support image will match their version
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1 && ! docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+    echo "Support scripts not found for git sha \"$GIT_SHA\" Please recompile the support scripts for this version of the enclave cli within the source repository"
+    exit 1
+fi
 
 # Function to cleanup
 cleanup() {
@@ -17,15 +29,38 @@ cleanup() {
 # Set trap for signals
 trap cleanup EXIT INT TERM
 
-if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
-    docker exec -it "$CONTAINER_NAME" bash -c "$*"
+mkdir -p "$(pwd)/.enclave/caches"/{target,registry,git,risc0-cache,risc0-circuits}
+chmod -R 777 "$(pwd)/.enclave/caches"
+
+if [ -t 0 ]; then
+    TTY_FLAGS="-it"
 else
-    docker run -it --rm \
+    TTY_FLAGS=""
+fi
+
+if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
+    echo "Running exec $IMAGE..."
+    docker exec $TTY_FLAGS "$CONTAINER_NAME" bash -c "$*"
+else
+    echo "Running start $IMAGE..."
+    # --network=host does not work on macos for allowing the container to access 
+    # the local machine. `--add-host...` is adding host.local to the hosts file 
+    # in the docker container we can then replace localhost and 127.0.0.1 
+    # from the input callback url so calls redirect to gateway.
+    # This should in theory be crossplatform
+    # However on linux the user must allow incoming connections from Docker's bridge network 172.17.0.0/16 through their firewall.
+    docker run $TTY_FLAGS  --rm \
         --name "$CONTAINER_NAME" \
+        --platform linux/amd64 \
+        --add-host=host.local:host-gateway \
+        -p 13151:13151 \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
+        -v "$(pwd)/.enclave/caches/target:/app/target" \
+        -v "$(pwd)/.enclave/caches/registry:/home/devuser/.cargo/registry" \
+        -v "$(pwd)/.enclave/caches/git:/home/devuser/.cargo/git" \
+        -v "$(pwd)/.enclave/caches/risc0-cache:/home/devuser/.risc0/cache" \
+        -v "$(pwd)/.enclave/caches/risc0-circuits:/home/devuser/.risc0/circuits" \
         -v "${CACHE_PREFIX}-cargo-cache:/usr/local/cargo" \
-        -v "${CACHE_PREFIX}-target-cache:/app/target" \
-        -p 13151:13151 \
         "$IMAGE" bash -c "$*"
 fi

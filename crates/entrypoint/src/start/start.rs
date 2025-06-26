@@ -53,18 +53,18 @@ pub async fn execute(
         let read_provider = provider_config.create_readonly_provider().await?;
         EnclaveSolReader::attach(
             &bus,
-            &read_provider,
+            read_provider.clone(),
             &chain.contracts.enclave.address(),
-            &repositories.enclave_sol_reader(read_provider.get_chain_id()),
+            &repositories.enclave_sol_reader(read_provider.chain_id()),
             chain.contracts.enclave.deploy_block(),
             chain.rpc_url.clone(),
         )
         .await?;
         CiphernodeRegistrySol::attach(
             &bus,
-            &read_provider,
+            read_provider.clone(),
             &chain.contracts.ciphernode_registry.address(),
-            &repositories.ciphernode_registry_reader(read_provider.get_chain_id()),
+            &repositories.ciphernode_registry_reader(read_provider.chain_id()),
             chain.contracts.ciphernode_registry.deploy_block(),
             chain.rpc_url.clone(),
         )

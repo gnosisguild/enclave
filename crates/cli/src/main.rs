@@ -3,6 +3,7 @@ use cli::Cli;
 use tracing::info;
 
 mod cli;
+mod config_set;
 pub mod helpers;
 mod init;
 pub mod net;
@@ -13,6 +14,7 @@ mod nodes;
 mod nodes_daemon;
 mod nodes_down;
 mod nodes_ps;
+mod nodes_purge;
 mod nodes_restart;
 mod nodes_start;
 mod nodes_status;
@@ -23,10 +25,11 @@ mod password_delete;
 mod password_set;
 mod print_env;
 mod program;
+mod purge_all;
+mod rev;
 mod start;
 mod wallet;
 mod wallet_set;
-mod wizard;
 
 const OWO: &str = r#"
       ___           ___           ___                         ___                         ___     

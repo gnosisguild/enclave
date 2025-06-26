@@ -7,11 +7,13 @@ members = [
   "crates/config",
   "crates/crypto",
   "crates/data",
+  "crates/enclaveup",
   "crates/entrypoint",
   "crates/events",
   "crates/evm", 
   "crates/evm-helpers",
-  "crates/fhe", 
+  "crates/fhe",
+  "crates/fs", 
   "crates/indexer",
   "crates/init", 
   "crates/keyshare",
@@ -66,6 +68,7 @@ e3-events = { version = "0.1.0", path = "./crates/events" }
 e3-evm = { version = "0.1.0", path = "./crates/evm" }
 e3-evm-helpers = { version = "0.1.0", path = "./crates/evm-helpers" }
 e3-fhe = { version = "0.1.0", path = "./crates/fhe" }
+e3-fs = { version = "0.1.0", path = "./crates/fs" }
 e3-indexer = { version = "0.1.0", path = "./crates/indexer" }
 e3-keyshare = { version = "0.1.0", path = "./crates/keyshare" }
 e3-logger = { version = "0.1.0", path = "./crates/logger" }
@@ -79,13 +82,13 @@ e3-tests = { version = "0.1.0", path = "./crates/tests" }
 actix = "0.13.5"
 actix-web = "4.10.2"
 aes-gcm = "0.10.3"
-alloy = { version = "0.8.3", features = ["node-bindings", "full"] }
-alloy-primitives = { version = "0.8", default-features = false, features = [
+alloy = { version = "1.0.11", features = ["node-bindings", "full"] }
+alloy-primitives = { version = "1.0", default-features = false, features = [
   "rlp",
   "serde",
   "std",
 ] }
-alloy-sol-types = "0.8"
+alloy-sol-types = "1.0"
 alloy-dyn-abi = "1.1.0"
 argon2 = "0.5.2"
 anyhow = "1.0.86"
@@ -109,6 +112,7 @@ fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 figment = { version = "0.10.19", features = ["yaml", "test"] }
 futures = "0.3.30"
 futures-util = "0.3"
+glob = "0.3.2"
 git2 = "0.20.2"
 hex = "0.4.3"
 jsonrpsee = { version = "0.25.1", features = ["http-client"] }
@@ -126,6 +130,7 @@ petname = "2.0.2"
 phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
+regex = "1.11.1" 
 reqwest = "0.12.15"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.133"
@@ -133,13 +138,14 @@ sled = "0.34.7"
 serde_yaml = "0.9.34"
 sha2 = "0.10.8"
 shellexpand = "3.1.0"
-tempfile = "3.14.0"
+tempfile = "3.20.0"
 thiserror =  { version = "1.0.58" }
 tokio = { version = "1.38", features = ["full"] }
 tracing = "0.1.37"
 tracing-opentelemetry = "0.30.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 url = "2.5.4"
+vfs = { git = "https://github.com/ryardley/rust-vfs.git", features = ["async-vfs"] }
 libp2p = { version = "0.54.1", features = [
   "gossipsub",
   "identify",

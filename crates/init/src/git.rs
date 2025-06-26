@@ -5,7 +5,7 @@ use tokio::process::Command;
 use url::Url;
 
 pub async fn shallow_clone(git_repo: &str, branch: &str, target_folder: &str) -> Result<()> {
-    Command::new("git")
+    let status = Command::new("git")
         .args([
             "clone",
             "--depth",
@@ -17,6 +17,15 @@ pub async fn shallow_clone(git_repo: &str, branch: &str, target_folder: &str) ->
         ])
         .status()
         .await?;
+
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "Git clone failed with exit code: {}",
+            status.code().unwrap_or(-1)
+        )
+        .into());
+    }
+
     Ok(())
 }
 
