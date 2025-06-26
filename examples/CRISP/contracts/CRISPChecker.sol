@@ -2,7 +2,7 @@
 pragma solidity >=0.8.27;
 
 import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphoreNoir.sol";
 
 /// @title CRISPChecker.
 /// @notice Enclave Input Validator
@@ -45,9 +45,9 @@ contract CRISPChecker is BaseChecker {
     ) internal view override returns (bool) {
         super._check(subject, evidence);
 
-        ISemaphore.SemaphoreProof memory proof = abi.decode(
+        ISemaphore.SemaphoreNoirProof memory proof = abi.decode(
             evidence,
-            (ISemaphore.SemaphoreProof)
+            (ISemaphore.SemaphoreNoirProof)
         );
 
         // The proof scope encodes both the subject address and group ID to prevent front-running attacks.

@@ -27,9 +27,9 @@ import {CRISPPolicy} from "../contracts/CRISPPolicy.sol";
 import {CRISPChecker} from "../contracts/CRISPChecker.sol";
 import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
-import {Semaphore} from "@semaphore-protocol/contracts/Semaphore.sol";
-import {SemaphoreVerifier} from "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol";
-import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISemaphoreVerifier.sol";
+import {SemaphoreNoir} from "@semaphore-protocol/contracts/SemaphoreNoir.sol";
+import {SemaphoreNoirVerifier} from "@semaphore-protocol/contracts/base/SemaphoreNoirVerifier.sol";
+import {IVerifier} from "@semaphore-protocol/contracts/interfaces/ISemaphoreNoirVerifier.sol";
 import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
@@ -159,14 +159,14 @@ contract CRISPProgramDeploy is Script {
         console2.log("Enclave Address: ", address(enclave));
         console2.log("Verifier Address: ", address(verifier));
 
-        SemaphoreVerifier semaphoreVerifier = new SemaphoreVerifier();
+        SemaphoreNoirVerifier semaphoreVerifier = new SemaphoreNoirVerifier();
         console2.log(
-            "Deployed SemaphoreVerifier to",
+            "Deployed SemaphoreNoirVerifier to",
             address(semaphoreVerifier)
         );
 
-        Semaphore semaphore = new Semaphore(
-            ISemaphoreVerifier(address(semaphoreVerifier))
+        SemaphoreNoir semaphore = new SemaphoreNoir(
+            IVerifier(address(semaphoreVerifier))
         );
         console2.log("Deployed Semaphore to", address(semaphore));
 
