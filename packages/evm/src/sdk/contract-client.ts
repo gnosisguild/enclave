@@ -26,9 +26,9 @@ export class ContractClient {
       enclave: `0x${string}`;
       ciphernodeRegistry: `0x${string}`;
     } = {
-      enclave: "0x0000000000000000000000000000000000000000",
-      ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
-    },
+        enclave: "0x0000000000000000000000000000000000000000",
+        ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
+      },
   ) {
     if (!isValidAddress(addresses.enclave)) {
       throw new SDKError("Invalid Enclave contract address", "INVALID_ADDRESS");
