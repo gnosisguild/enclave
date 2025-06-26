@@ -7,9 +7,9 @@ import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.
 import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
 import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
-import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
-import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts-noir/interfaces/ISemaphoreNoir.sol";
+import {CRISPCheckerNoirFactory} from "./CRISPCheckerNoirFactory.sol";
+import {CRISPPolicyNoirFactory} from "./CRISPPolicyNoirFactory.sol";
 import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
 import {HonkVerifier} from "./CRISPVerifier.sol";
 
@@ -21,8 +21,8 @@ contract CRISPProgram is IE3Program, Ownable {
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
     ISemaphore public semaphore;
-    CRISPCheckerFactory private immutable CHECKER_FACTORY;
-    CRISPPolicyFactory private immutable POLICY_FACTORY;
+    CRISPCheckerNoirFactory private immutable CHECKER_FACTORY;
+    CRISPPolicyNoirFactory private immutable POLICY_FACTORY;
     CRISPInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
     HonkVerifier private immutable HONK_VERIFIER;
     uint8 public constant INPUT_LIMIT = 100;
@@ -65,8 +65,8 @@ contract CRISPProgram is IE3Program, Ownable {
         IEnclave _enclave,
         IRiscZeroVerifier _verifier,
         ISemaphore _semaphore,
-        CRISPCheckerFactory _checkerFactory,
-        CRISPPolicyFactory _policyFactory,
+        CRISPCheckerNoirFactory _checkerFactory,
+        CRISPPolicyNoirFactory _policyFactory,
         CRISPInputValidatorFactory _inputValidatorFactory,
         HonkVerifier _honkVerifier,
         bytes32 _imageId
@@ -153,7 +153,7 @@ contract CRISPProgram is IE3Program, Ownable {
 
         // Deploy a new policy
         IBasePolicy policy = IBasePolicy(
-            POLICY_FACTORY.deploy(checker, INPUT_LIMIT)
+            POLICY_FACTORY.deploy(msg.sender, checker, INPUT_LIMIT)
         );
 
         // Deploy a new input validator

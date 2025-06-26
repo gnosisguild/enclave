@@ -1,10 +1,12 @@
 forge-std/=lib/risc0-ethereum/lib/forge-std/src/
 @openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/
 risc0/=lib/risc0-ethereum/contracts/src/
-@gnosis-guild/enclave/=node_modules/@gnosis-guild/enclave/
+@gnosis-guild/enclave/=../../packages/evm/
 @excubiae/contracts/=node_modules/@excubiae/contracts/
 solady/=node_modules/solady/
 @semaphore-protocol/contracts/=node_modules/@semaphore-protocol/contracts/
+@semaphore-protocol/contracts-noir/=node_modules/@semaphore-protocol/contracts-noir/packages/contracts-noir/contracts/
 @zk-kit/lean-imt.sol/=node_modules/@zk-kit/lean-imt.sol/
 poseidon-solidity/=node_modules/poseidon-solidity/

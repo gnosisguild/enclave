@@ -24,7 +24,7 @@
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
     "@gnosis-guild/enclave": "workspace:*",
-    "@semaphore-protocol/contracts": "^4.9.2",
+    "@semaphore-protocol/contracts-noir": "github:hashcloak/semaphore-noir#noir-support-part2",
     "@zk-kit/lean-imt.sol": "2.0.0",
     "poseidon-solidity": "^0.0.5",
     "solady": "^0.1.13"

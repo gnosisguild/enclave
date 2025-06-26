@@ -4,8 +4,10 @@ import { useVoteManagementContext } from '@/context/voteManagement';
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx';
 import { Poll } from '@/model/poll.model';
 import { BroadcastVoteRequest } from '@/model/vote.model';
-import { Group, generateProof, SemaphoreProof } from '@semaphore-protocol/core';
-import { encodeSemaphoreProof } from '@/utils/proof-encoding';
+import { Group } from '@semaphore-protocol/group';
+import { generateNoirProof, SemaphoreNoirProof, initSemaphoreNoirBackend } from '@/utils/semaphoreNoirProof';
+import { encodeSemaphoreNoirProof } from '@/utils/proof-encoding';
+import { encodeScope } from '@/utils/scopeEncoding';
 
 export const useVoteCasting = () => {
     const {
@@ -14,6 +16,7 @@ export const useVoteCasting = () => {
         votingRound,
         semaphoreIdentity,
         currentGroupMembers,
+        currentSemaphoreGroupId,
         fetchingMembers,
         isRegisteredForCurrentRound,
         encryptVote,
@@ -54,6 +57,11 @@ export const useVoteCasting = () => {
             showToast({ type: 'danger', message: 'Could not load group members for this round.' });
             return;
         }
+        if (!currentSemaphoreGroupId) {
+            console.error("Cannot cast vote: No group ID available for this round.");
+            showToast({ type: 'danger', message: 'Group ID not available for this round.' });
+            return;
+        }
 
         setIsLoading(true);
         console.log("Processing vote...");
@@ -64,12 +72,39 @@ export const useVoteCasting = () => {
                 throw new Error("Failed to encrypt vote.");
             }
 
+            // Initialize Noir backend for proof generation
+            const merkleTreeDepth = Math.ceil(Math.log2(currentGroupMembers.length)) || 10;
+            const backend = await initSemaphoreNoirBackend(merkleTreeDepth);
+
             const group = new Group(currentGroupMembers);
-            const scope = String(roundState.id);
+            
+            // CRITICAL FIX: Encode scope properly with address and group ID
+            // The scope encodes both the subject address and group ID to prevent front-running attacks:
+            // - Upper 160 bits: Subject address (20 bytes)  
+            // - Lower 96 bits: Group ID (12 bytes)
+            const encodedScope = encodeScope(user.address, currentSemaphoreGroupId);
+            const scope = encodedScope.toString();
             const message = String(pollSelected.value);
-            const fullProof: SemaphoreProof = await generateProof(semaphoreIdentity, group, message, scope);
-            console.log("Full generated proof object:", fullProof);
-            const proofBytes = encodeSemaphoreProof(fullProof);
+            
+            console.log("Scope encoding details:", {
+                userAddress: user.address,
+                groupId: currentSemaphoreGroupId.toString(),
+                encodedScope: encodedScope.toString(),
+                scope
+            });
+            
+            // Generate Noir proof
+            const fullProof: SemaphoreNoirProof = await generateNoirProof(
+                semaphoreIdentity as any, 
+                group, 
+                message, 
+                scope,
+                backend,
+                true // Use keccak for Solidity verifier
+            );
+            
+            console.log("Full generated Noir proof object:", fullProof);
+            const proofBytes = encodeSemaphoreNoirProof(fullProof);
 
             const voteRequest: BroadcastVoteRequest = {
                 round_id: roundState.id,
@@ -80,60 +115,44 @@ export const useVoteCasting = () => {
                 proof_sem: Array.from(proofBytes)
             };
 
-            const broadcastVoteResponse = await broadcastVote(voteRequest);
-            console.log('broadcastVoteResponse', broadcastVoteResponse)
+            console.log("Broadcasting vote to server...");
+            const result = await broadcastVote(voteRequest);
+            console.log("Vote broadcast result:", result);
 
-            if (broadcastVoteResponse) {
-                switch (broadcastVoteResponse.status) {
-                    case 'success': {
-                        const url = `https://sepolia.etherscan.io/tx/${broadcastVoteResponse.tx_hash}`;
-                        setTxUrl(url);
-                        showToast({
-                            type: 'success',
-                            message: broadcastVoteResponse.message || 'Successfully voted',
-                            linkUrl: url,
-                        });
-                        navigate(`/result/${roundState.id}/confirmation`);
-                        break;
-                    }
-                    case 'user_already_voted':
-                        showToast({
-                            type: 'danger',
-                            message: broadcastVoteResponse.message || 'User has already voted',
-                        });
-                        break;
-                    case 'failed_broadcast':
-                    default:
-                        showToast({
-                            type: 'danger',
-                            message: broadcastVoteResponse.message || 'Error broadcasting the vote',
-                        });
-                        break;
+            if (result && result.status === 'success') {
+                showToast({ type: 'success', message: 'Vote successfully submitted!' });
+                if (result.tx_hash) {
+                    console.log('Transaction hash:', result.tx_hash);
+                    setTxUrl(result.tx_hash);
                 }
+                navigate('/poll/result');
             } else {
-                throw new Error('Received no response after broadcasting vote.');
+                throw new Error(result?.message || 'Failed to broadcast vote');
             }
         } catch (error) {
-            console.error("Vote processing failed:", error);
-            showToast({ type: 'danger', message: `Vote failed: ${error instanceof Error ? error.message : String(error)}` });
+            console.error("Error during vote casting:", error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            showToast({ type: 'danger', message: `Failed to cast vote: ${errorMessage}` });
         } finally {
             setIsLoading(false);
         }
     }, [
         user,
-        roundState,
-        votingRound,
-        semaphoreIdentity,
-        currentGroupMembers,
-        fetchingMembers,
         isRegisteredForCurrentRound,
-        encryptVote,
+        roundState,
+        semaphoreIdentity,
+        fetchingMembers,
+        currentGroupMembers,
+        currentSemaphoreGroupId,
+        handleVoteEncryption,
         broadcastVote,
-        setTxUrl,
         showToast,
+        setTxUrl,
         navigate,
-        handleVoteEncryption
     ]);
 
-    return { castVoteWithProof, isLoading };
-}; 
+    return {
+        castVoteWithProof,
+        isLoading,
+    };
+};

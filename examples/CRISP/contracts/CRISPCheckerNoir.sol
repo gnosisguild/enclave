@@ -2,14 +2,14 @@
 pragma solidity >=0.8.27;
 
 import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
+import {ISemaphore, ISemaphore as ISemaphoreNoir} from "@semaphore-protocol/contracts-noir/interfaces/ISemaphoreNoir.sol";
 
-/// @title CRISPChecker.
-/// @notice Enclave Input Validator
-/// @dev Extends BaseChecker for input verification.
-contract CRISPChecker is BaseChecker {
-    /// @notice Address of the Semaphore contract used for proof verification.
-    ISemaphore public semaphore;
+/// @title CRISPCheckerNoir.
+/// @notice Enclave Input Validator using Semaphore Noir
+/// @dev Extends BaseChecker for input verification with Noir proofs.
+contract CRISPCheckerNoir is BaseChecker {
+    /// @notice Address of the Semaphore Noir contract used for proof verification.
+    ISemaphoreNoir public semaphoreNoir;
 
     /// @notice Unique identifier for the Semaphore group.
     /// @dev Proofs are validated against this specific group ID.
@@ -20,24 +20,24 @@ contract CRISPChecker is BaseChecker {
     error InvalidGroup();
     error InvalidProof();
 
-    /// @notice Initializes the SemaphoreChecker with the provided Semaphore contract address and group ID.
+    /// @notice Initializes the SemaphoreChecker with the provided Semaphore Noir contract address and group ID.
     /// @dev Decodes initialization parameters from appended bytes for clone deployments.
     function _initialize() internal override {
         super._initialize();
 
         bytes memory data = _getAppendedBytes();
-        (address _semaphore, uint256 _groupId) = abi.decode(
+        (address _semaphoreNoir, uint256 _groupId) = abi.decode(
             data,
             (address, uint256)
         );
 
-        semaphore = ISemaphore(_semaphore);
+        semaphoreNoir = ISemaphoreNoir(_semaphoreNoir);
         groupId = _groupId;
     }
 
-    /// @notice Validates input
+    /// @notice Validates input using Semaphore Noir proof
     /// @param subject Address to check.
-    /// @param evidence mock proof
+    /// @param evidence Noir proof data
     /// @return True if proof is valid
     function _check(
         address subject,
@@ -45,9 +45,9 @@ contract CRISPChecker is BaseChecker {
     ) internal view override returns (bool) {
         super._check(subject, evidence);
 
-        ISemaphore.SemaphoreProof memory proof = abi.decode(
+        ISemaphoreNoir.SemaphoreNoirProof memory proof = abi.decode(
             evidence,
-            (ISemaphore.SemaphoreProof)
+            (ISemaphoreNoir.SemaphoreNoirProof)
         );
 
         // The proof scope encodes both the subject address and group ID to prevent front-running attacks.
@@ -70,7 +70,7 @@ contract CRISPChecker is BaseChecker {
         // }
         // ===============================
 
-        if (!semaphore.verifyProof(_scope, proof)) {
+        if (!semaphoreNoir.verifyProof(groupId, proof)) {
             revert InvalidProof();
         }
 

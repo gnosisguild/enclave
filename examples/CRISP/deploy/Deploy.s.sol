@@ -23,15 +23,16 @@ import {RiscZeroGroth16Verifier} from "risc0/groth16/RiscZeroGroth16Verifier.sol
 import {ControlID} from "risc0/groth16/ControlID.sol";
 
 import {CRISPProgram} from "../contracts/CRISPProgram.sol";
-import {CRISPPolicy} from "../contracts/CRISPPolicy.sol";
-import {CRISPChecker} from "../contracts/CRISPChecker.sol";
 import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
-import {Semaphore} from "@semaphore-protocol/contracts/Semaphore.sol";
-import {SemaphoreVerifier} from "@semaphore-protocol/contracts/base/SemaphoreVerifier.sol";
-import {ISemaphoreVerifier} from "@semaphore-protocol/contracts/interfaces/ISemaphoreVerifier.sol";
-import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
-import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
+// import {Enclave} from "@gnosis-guild/enclave/contracts/Enclave.sol";
+// import {ICiphernodeRegistry} from "@gnosis-guild/enclave/contracts/interfaces/ICiphernodeRegistry.sol";
+// import {CiphernodeRegistryOwnable} from "@gnosis-guild/enclave/contracts/registry/CiphernodeRegistryOwnable.sol";
+import {ISemaphore, SemaphoreNoir} from "@semaphore-protocol/contracts-noir/SemaphoreNoir.sol";
+import {SemaphoreNoirVerifier} from "@semaphore-protocol/contracts-noir/base/SemaphoreNoirVerifier.sol";
+import {IVerifier} from "@semaphore-protocol/contracts-noir/interfaces/ISemaphoreNoirVerifier.sol";
+import {CRISPCheckerNoirFactory} from "../contracts/CRISPCheckerNoirFactory.sol";
+import {CRISPPolicyNoirFactory} from "../contracts/CRISPPolicyNoirFactory.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
 import {HonkVerifier} from "../contracts/CRISPVerifier.sol";
 import {MockRISC0Verifier} from "../contracts/Mocks/MockRISC0Verifier.sol";
@@ -97,36 +98,33 @@ contract CRISPProgramDeploy is Script {
             enclave = IEnclave(enclaveAddress);
         }
 
-        bool useMockEnv = vm.envOr("USE_MOCK_VERIFIER", false);
-        if (useMockEnv) {
-            console2.log("Using MockRISC0Verifier");
-            verifier = new MockRISC0Verifier();
-            console2.log("Deployed MockRISC0Verifier to", address(verifier));
-        } else if (address(verifier) == address(0)) {
-            verifier = new RiscZeroGroth16Verifier(
-                ControlID.CONTROL_ROOT,
-                ControlID.BN254_CONTROL_ID
-            );
+        if (address(verifier) == address(0)) {
             console2.log(
-                "Deployed RiscZeroGroth16Verifier to",
+                "RISC Zero verifier not found, deploying MockRISC0Verifier..."
+            );
+            verifier = new MockRISC0Verifier();
+            console2.log(
+                "Deployed MockRISC0Verifier to",
                 address(verifier)
             );
-        } else {
-            console2.log("Using IRiscZeroVerifier at", address(verifier));
+        }
+
+        if (address(enclave) == address(0)) {
+            console2.log("Enclave not found in config, expecting it to be deployed already");
+            revert("Enclave address not configured. Please deploy Enclave first or update config.toml");
         }
     }
 
     function setupDeployer() private {
-        uint256 deployerKey = uint256(
-            vm.envOr("ETH_WALLET_PRIVATE_KEY", bytes32(0))
-        );
+        uint256 deployerKey = vm.envOr("ETH_WALLET_PRIVATE_KEY", uint256(0));
         address deployerAddr = vm.envOr("ETH_WALLET_ADDRESS", address(0));
 
+        // Wallet selection is a user choice, so we don't check the chainId.
         if (deployerKey != 0) {
             require(
                 deployerAddr == address(0) ||
                     deployerAddr == vm.addr(deployerKey),
-                "Conflicting wallet settings"
+                "Deployer address does not match deployer private key"
             );
             vm.startBroadcast(deployerKey);
         } else {
@@ -159,25 +157,27 @@ contract CRISPProgramDeploy is Script {
         console2.log("Enclave Address: ", address(enclave));
         console2.log("Verifier Address: ", address(verifier));
 
-        SemaphoreVerifier semaphoreVerifier = new SemaphoreVerifier();
+        // Deploy Semaphore Noir Verifier
+        SemaphoreNoirVerifier semaphoreNoirVerifier = new SemaphoreNoirVerifier();
         console2.log(
-            "Deployed SemaphoreVerifier to",
-            address(semaphoreVerifier)
+            "Deployed SemaphoreNoirVerifier to",
+            address(semaphoreNoirVerifier)
         );
 
-        Semaphore semaphore = new Semaphore(
-            ISemaphoreVerifier(address(semaphoreVerifier))
+        // Deploy Semaphore Noir
+        SemaphoreNoir semaphoreNoir = new SemaphoreNoir(
+            IVerifier(address(semaphoreNoirVerifier))
         );
-        console2.log("Deployed Semaphore to", address(semaphore));
+        console2.log("Deployed SemaphoreNoir to", address(semaphoreNoir));
 
-        CRISPCheckerFactory checkerFactory = new CRISPCheckerFactory();
+        CRISPCheckerNoirFactory checkerFactory = new CRISPCheckerNoirFactory();
         console2.log(
-            "Deployed CRISPCheckerFactory to",
+            "Deployed CRISPCheckerNoirFactory to",
             address(checkerFactory)
         );
 
-        CRISPPolicyFactory policyFactory = new CRISPPolicyFactory();
-        console2.log("Deployed CRISPPolicyFactory to", address(policyFactory));
+        CRISPPolicyNoirFactory policyFactory = new CRISPPolicyNoirFactory();
+        console2.log("Deployed CRISPPolicyNoirFactory to", address(policyFactory));
 
         CRISPInputValidatorFactory inputValidatorFactory = new CRISPInputValidatorFactory();
         console2.log(
@@ -191,7 +191,7 @@ contract CRISPProgramDeploy is Script {
         CRISPProgram crisp = new CRISPProgram(
             enclave,
             verifier,
-            semaphore,
+            ISemaphore(address(semaphoreNoir)),
             checkerFactory,
             policyFactory,
             inputValidatorFactory,

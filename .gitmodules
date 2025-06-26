@@ -4,3 +4,6 @@
 [submodule "templates/default/lib/risc0-ethereum"]
 	path = templates/default/lib/risc0-ethereum
 	url = https://github.com/gnosisguild/risc0-ethereum
+[submodule "examples/CRISP/lib/openzeppelin-contracts-upgradeable"]
+	path = examples/CRISP/lib/openzeppelin-contracts-upgradeable
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
