@@ -9,6 +9,7 @@ import {
   RegistryEventType,
   AllEventTypes,
   EnclaveEvent,
+  encryptNumber,
 } from "@gnosis-guild/enclave/sdk";
 import { hexToBytes } from "viem";
 import { E3 } from "@gnosis-guild/enclave/sdk/types.js";
@@ -221,7 +222,21 @@ async function main() {
   const num1 = 123n;
   const num2 = 210n;
   const publicKeyBytes = hexToBytes(state.publicKey);
-  await waitForEvent(EnclaveEventType.E3_ACTIVATED, async () => {});
+  const enc1 = encryptNumber(num1, publicKeyBytes);
+  const enc2 = encryptNumber(num2, publicKeyBytes);
+
+  await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
+    await sdk.publishInput(
+      e3Id,
+      `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`,
+    );
+  });
+  await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
+    const hash2 = await sdk.publishInput(
+      e3Id,
+      `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`,
+    );
+  });
 
   console.log("It worked");
 
