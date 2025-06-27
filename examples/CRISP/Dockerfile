@@ -47,7 +47,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
  | sh -s -- -y --default-toolchain ${RUST_VERSION}
 ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 RUN rustup component add rustfmt clippy
-
+ENV RUSTFLAGS="-C debuginfo=0 -C strip=symbols" \
+    CARGO_TERM_COLOR=always
 # ────────────────────────────────────────────────────────────────────────────────
 #   Foundry
 # ────────────────────────────────────────────────────────────────────────────────
