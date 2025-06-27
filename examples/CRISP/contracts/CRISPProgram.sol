@@ -7,7 +7,7 @@ import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.
 import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
 import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphoreNoir.sol";
 import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
