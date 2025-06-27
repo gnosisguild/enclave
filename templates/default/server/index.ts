@@ -95,17 +95,55 @@ async function runProgram(e3Id: bigint): Promise<void> {
   }
 }
 
+function defer() {
+  let resolve: () => void = () => {};
+  let reject: (e?: any) => void = () => {};
+
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return {
+    promise,
+    resolve,
+    reject,
+  };
+}
+
+type Defer = ReturnType<typeof defer>;
+
+const currentlyActivating = new Map<bigint, Defer>();
+
+function getActivationDefer(e3Id: bigint): Defer {
+  let d = currentlyActivating.get(e3Id);
+  if (!d) {
+    const def = defer();
+    currentlyActivating.set(e3Id, def);
+    return def;
+  }
+  return d;
+}
+
 async function handleE3ActivatedEvent(event: any) {
   const data = event.data as E3ActivatedData;
   const e3Id = data.e3Id;
   const expiration = data.expiration;
 
+  // This allows us to wait until the session has been activated avoiding race conditions
+  const def = getActivationDefer(e3Id);
+
   console.log(`🎯 E3 Activated: ${e3Id}, expiration: ${expiration}`);
 
   const sessionKey = e3Id.toString();
+
   if (!e3Sessions.has(sessionKey)) {
     const sdk = await createPrivateSDK();
+    console.log("📡 Fetching E3 data from contract...");
+
     const e3 = await sdk.getE3(e3Id);
+    console.log("✅ Reveived E3 data from contract.");
+
     e3Sessions.set(sessionKey, {
       e3Id,
       e3ProgramParams: e3.e3ProgramParams,
@@ -114,6 +152,7 @@ async function handleE3ActivatedEvent(event: any) {
       isProcessing: false,
       isCompleted: false,
     });
+    def.resolve();
   }
 
   const currentTime = BigInt(Math.floor(Date.now() / 1000));
@@ -140,6 +179,10 @@ async function handleInputPublishedEvent(event: any) {
   console.log(`📝 Input Published for E3 ${e3Id}: index ${data.index}`);
 
   const sessionKey = e3Id.toString();
+
+  // Ensure the session is available
+  await getActivationDefer(e3Id).promise;
+
   const session = e3Sessions.get(sessionKey);
 
   if (session) {

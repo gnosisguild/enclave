@@ -132,7 +132,7 @@ async function setupEventListeners(
       throw new Error(`State for ID '${id}' not found.`);
     }
 
-    if (state.type !== "committee_published") {
+    if (state.type !== "activated") {
       throw new Error(`State must be in the ${state.type} state`);
     }
 
@@ -169,8 +169,8 @@ async function main() {
     DEFAULT_E3_CONFIG.threshold_min,
     DEFAULT_E3_CONFIG.threshold_max,
   ];
-  const startWindow = calculateStartWindow(60); // 1 minute
-  const duration = BigInt(60); // 1 minute
+  const startWindow = calculateStartWindow(60);
+  const duration = BigInt(10);
   const e3ProgramParams = encodeBfvParams();
   const computeProviderParams = encodeComputeProviderParams(
     DEFAULT_COMPUTE_PROVIDER_PARAMS,
@@ -219,8 +219,8 @@ async function main() {
   assert.strictEqual(state.type, "activated");
 
   // INPUT PUBLISHING phase
-  const num1 = 123n;
-  const num2 = 210n;
+  const num1 = 12n;
+  const num2 = 21n;
   const publicKeyBytes = hexToBytes(state.publicKey);
   const enc1 = encryptNumber(num1, publicKeyBytes);
   const enc2 = encryptNumber(num2, publicKeyBytes);
@@ -242,9 +242,16 @@ async function main() {
     EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED,
   );
 
-  assert.strictEqual(plaintextEvent.data.plaintextOutput, "0x12345678");
+  const parsed = hexToUint8Array(plaintextEvent.data.plaintextOutput);
 
-  console.log("It worked");
+  assert.strictEqual(BigInt(parsed[0]), num1 + num2);
+
+  console.log("");
+  console.log("*****************************************");
+  console.log("         TEST WAS SUCCESSFUL!");
+  console.log("        SHUTTING DOWN SERVICES");
+  console.log("*****************************************");
+  console.log("");
 
   process.exit(0);
 }
@@ -258,3 +265,9 @@ main()
     console.log(err);
     process.exit(1);
   });
+
+function hexToUint8Array(hexString: string) {
+  const hex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
+  const m = hex.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? [];
+  return new Uint8Array(m);
+}
