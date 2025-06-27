@@ -29,6 +29,11 @@ jobs:
       - name: "Check out the repo"
         uses: "actions/checkout@v4"
 
+      - name: Install Rust 1.85.0
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.85.0
+
       - name: "Setup node"
         uses: actions/setup-node@v3
         with:
