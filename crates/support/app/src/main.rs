@@ -93,8 +93,12 @@ async fn handle_compute(req: web::Json<ComputeRequest>) -> ActixResult<HttpRespo
         params: req.params.clone(),
         ciphertexts: req.ciphertext_inputs.clone(),
     };
+
     println!("fhe_inputs.params = {:?}", fhe_inputs.params);
-    let callback_url = callback_url.clone();
+    let callback_url = callback_url
+        .replace("localhost", "host.local")
+        .replace("127.0.0.1", "host.local");
+
     // Process computation in background
     tokio::spawn(async move {
         if let Err(e) = process_computation_background(e3_id, &callback_url, fhe_inputs).await {

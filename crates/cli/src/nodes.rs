@@ -3,8 +3,8 @@ use clap::Subcommand;
 use e3_config::AppConfig;
 
 use crate::{
-    nodes_daemon, nodes_down, nodes_ps, nodes_restart, nodes_start, nodes_status, nodes_stop,
-    nodes_up,
+    nodes_daemon, nodes_down, nodes_ps, nodes_purge, nodes_restart, nodes_start, nodes_status,
+    nodes_stop, nodes_up,
 };
 
 #[derive(Subcommand, Debug)]
@@ -31,6 +31,10 @@ pub enum NodeCommands {
 
     /// List all process statuses
     Ps,
+
+    /// Purge all local ciphernode data. This will delete all passwords and prior ciphernode
+    /// events.
+    Purge,
 
     /// Start an individual node in the nodes set
     Start {
@@ -81,6 +85,7 @@ pub async fn execute(
         NodeCommands::Status { id } => nodes_status::execute(&id).await?,
         NodeCommands::Stop { id } => nodes_stop::execute(&id).await?,
         NodeCommands::Restart { id } => nodes_restart::execute(&id).await?,
+        NodeCommands::Purge => nodes_purge::execute().await?,
     };
 
     Ok(())

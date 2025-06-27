@@ -80,3 +80,11 @@ pub async fn program_start(program_config: &ProgramConfig) -> Result<()> {
     run_bash_script(&cwd, &script, &args).await?;
     Ok(())
 }
+
+/// Purge all build caches from support
+pub async fn program_cache_purge() -> Result<()> {
+    let cwd = env::current_dir()?;
+    let caches = cwd.join(".enclave/caches");
+    fs::remove_dir_all(caches).await?;
+    Ok(())
+}

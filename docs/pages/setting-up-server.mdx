@@ -1,89 +1,361 @@
 ---
-title: 'Setting Up An E3 Nudging Server'
-description: ''
+title: 'Setting Up the Client and Server'
+description: 'Build client applications and coordination servers using the Enclave SDK'
 ---
 
-# Setting Up an E3 Nudging Server
+# Setting Up the Client and Server
 
-The end-to-end flow of an Encrypted Execution Environment (E3) involves multiple phases, each of which can be nudged along by anyone. However, to reduce delays and ensure a smooth progression of processes in your application, running a dedicated **E3 Nudging Server** can greatly enhance reliability and quality of service. While the protocol itself is decentralized and open to all, application developers are encouraged to manage this infrastructure for a more seamless experience.
+Building E3 applications involves creating client-side interfaces for users and coordination logic for managing the E3 lifecycle. The Enclave SDK provides powerful TypeScript and React tools to streamline this development process.
 
-## **What is an E3 Nudging Server?**
+## Overview
 
-An **E3 Nudging Server** is a process designed to ensure the seamless progression of the Enclave protocol. While any party can theoretically nudge an E3 forward, certain critical operations require dependable infratructure for efficient execution, such as:
+Modern E3 applications typically consist of:
 
-1. Event Monitoring: Listening for blockchain events.
-2. Input Aggregation: Collecting and managing inputs for computations.
-3. Computation Triggers: Running secure processes in a zkVM or similar environments.
-4. Result Publication: Verifying and submitting outputs to the Enclave smart contracts.
+1. **Client Application**: User interface with wallet integration and FHE encryption
+2. **Coordination Logic**: Server-side or client-side coordination of E3 processes
+3. **Event Management**: Real-time monitoring of E3 lifecycle events
+4. **Contract Interactions**: Type-safe smart contract communication
 
-By providing an automated and secure solution, the E3 Nudging Server reduces manual overhead for developers, ensures process continuity, and minimizes delays.
+The Enclave SDK handles much of this complexity for you, providing:
+- Type-safe contract interactions
+- Real-time event listening
+- React hooks for easy frontend integration
+- Comprehensive error handling
 
-### **Why Use an E3 Nudging Server?**
+## Setting Up a Client Application
 
-Enclave relies on external actions to progress through its phases. Without an E3 Nudging Serverr, the following challenges may arise:
+### Install the SDK
 
-- Missed Protocol Events: Key actions like **Key Publish** or **Input Publish** might go unnoticed, stalling the process.
-- Increased Developer Overhead: Manual event handling and protocol nudging require custom infrastructure.
-- Reduced Reliability: Disruptions in protocol execution can lead to delays or errors, impacting user trust.
+For TypeScript/JavaScript applications:
 
-The E3 Nudging Server ensures:
+```bash
+pnpm add @gnosis-guild/enclave
+```
 
-- Seamless event handling and input collection.
-- Reliable computation triggers in secure environments (e.g., zkVM).
-- Automatic publication of verified results to maintain decentralized integrity
+For React applications:
 
-## **Building on Enclave with the Starter Template**
+```bash
+pnpm add @gnosis-guild/enclave @gnosis-guild/enclave-react
+```
 
-To simplify development, the **Enclave Starter Template** provides a pre-built foundation for developers to interact with the
-protocol, write secure zkVM-based computations, and deploy reliable infrastructure. Template features:
+### Basic TypeScript Client
 
-1. **Server Implementation**: An E3 Nudging Server for automating protocol progression.
-2. **zkVM Framework**: Based on
-   [RISC Zero Foundry Template](https://github.com/risc0/risc0-foundry-template), enabling secure, verifiable off-chain computations.
+Create a type-safe client that can interact with Enclave contracts:
 
-### **How to Use the Starter Template**
+```typescript
+import { EnclaveSDK, EnclaveEventType } from "@gnosis-guild/enclave/sdk";
+import { createPublicClient, createWalletClient, http, custom } from "viem";
 
-#### **1. Setting Up the Server**
+// Initialize clients
+const publicClient = createPublicClient({
+  transport: http("http://localhost:8545"), // Your RPC URL
+});
 
-The E3 Nudging Server ensures the protocol progresses by listening for events, gathering inputs, and triggering the next steps.
+const walletClient = createWalletClient({
+  transport: custom(window.ethereum),
+});
 
-- Clone and build the server:
+// Create SDK instance
+const sdk = new EnclaveSDK({
+  publicClient,
+  walletClient,
+  contracts: {
+    enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    ciphernodeRegistry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  },
+  chainId: 31337, // Hardhat local network
+});
 
-  ```bash
-  git clone https://github.com/gnosisguild/enclave-starter-template.git
-  cd packages/server
-  cargo build
-  ```
+// Initialize the SDK
+await sdk.initialize();
 
-- Implement custom logic if necessary:
-  - Event handlers can be extended to perform application-specific tasks.
-  - Routes and models can be customized to match your application's requirements.
+// Request a new E3 computation
+const hash = await sdk.requestE3({
+  filter: "0x0000000000000000000000000000000000000000",
+  threshold: [2, 3],
+  startWindow: [BigInt(0), BigInt(100)],
+  duration: BigInt(3600),
+  e3Program: "0x9A676e781A523b5d0C0e43731313A708CB607508",
+  e3ProgramParams: "0x",
+  computeProviderParams: "0x",
+});
 
-#### **2. Writing E3 Programs**
+console.log("E3 requested with hash:", hash);
+```
 
-The E3 Nudging Server interacts with the E3 Program (zkVM logic) to securely process inputs and publish
-verified outputs. Refer to the [**Building an E3 Program**](./write-secure-program.mdx) section of
-the documentation for detailed instructions on:
+### React Application with Hooks
 
-- Writing the Secure Process logic.
-- Implementing guest programs.
-- Deploying the associated smart contracts.
+For React applications, use the `useEnclaveSDK` hook for seamless integration:
 
-> **Note:** The zkVM framework follows the
-> [RISC Zero Foundry Template](https://github.com/risc0/risc0-foundry-template). Developers can use
-> the guide linked above to understand the nuances of RISC Zero development.
+```typescript
+import React, { useEffect, useState } from 'react';
+import { useEnclaveSDK } from '@gnosis-guild/enclave-react';
 
-#### **3. Configuring the Protocol Interaction**
+function E3Dashboard() {
+  const [e3Data, setE3Data] = useState(null);
+  
+  const {
+    sdk,
+    isInitialized,
+    error,
+    requestE3,
+    onEnclaveEvent,
+    off,
+    EnclaveEventType
+  } = useEnclaveSDK({
+    autoConnect: true,
+    contracts: {
+      enclave: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
+      ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9'
+    },
+    chainId: 31337
+  });
 
-Use the E3 Nudging Server to automate protocol nudging by:
+  // Listen to E3 events
+  useEffect(() => {
+    if (!isInitialized) return;
 
-- Monitoring events such as **Key Publish** or **E3 Round Activiation**.
-- Managing custom blockchain interaction logic under the `blockchain` directory.
+    const handleE3Requested = (event) => {
+      console.log('New E3 request:', event.data);
+      setE3Data(event.data);
+    };
 
-#### **4. Deploying Smart Contracts**
+    const handleE3Activated = (event) => {
+      console.log('E3 activated:', event.data);
+    };
 
-The E3 Nudging Server publishes computation results to the blockchain using smart contracts. Use the template's pre-built
-contracts as a starting point:
+    onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handleE3Requested);
+    onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3Activated);
 
-- `CRISPRisc0.sol`: Verifies zkVM proofs and updates the state.
-- Extend or modify contracts as needed to fit your application's logic.
+    return () => {
+      off(EnclaveEventType.E3_REQUESTED, handleE3Requested);
+      off(EnclaveEventType.E3_ACTIVATED, handleE3Activated);
+    };
+  }, [isInitialized, onEnclaveEvent, off, EnclaveEventType]);
+
+  const handleRequestE3 = async () => {
+    try {
+      const hash = await requestE3({
+        filter: '0x0000000000000000000000000000000000000000',
+        threshold: [2, 3],
+        startWindow: [BigInt(Date.now()), BigInt(Date.now() + 300000)],
+        duration: BigInt(1800),
+        e3Program: '0x9A676e781A523b5d0C0e43731313A708CB607508',
+        e3ProgramParams: '0x',
+        computeProviderParams: '0x',
+      });
+      console.log('E3 requested:', hash);
+    } catch (error) {
+      console.error('Failed to request E3:', error);
+    }
+  };
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
+
+  if (!isInitialized) {
+    return <div>Connecting to Enclave...</div>;
+  }
+
+  return (
+    <div>
+      <h1>E3 Dashboard</h1>
+      <button onClick={handleRequestE3}>
+        Request E3 Computation
+      </button>
+      {e3Data && (
+        <div>
+          <h2>Latest E3 Request</h2>
+          <pre>{JSON.stringify(e3Data, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default E3Dashboard;
+```
+
+## Event-Driven Architecture
+
+The SDK provides comprehensive event handling for the entire E3 lifecycle:
+
+### Enclave Events
+
+```typescript
+// Listen to key E3 lifecycle events
+sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
+  console.log("New E3 computation requested:", event.data);
+});
+
+sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, (event) => {
+  console.log("E3 environment activated:", event.data);
+});
+
+sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, (event) => {
+  console.log("Input data published:", event.data);
+});
+
+sdk.onEnclaveEvent(EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED, (event) => {
+  console.log("Computation result available:", event.data);
+});
+```
+
+### Registry Events
+
+```typescript
+import { RegistryEventType } from '@gnosis-guild/enclave/sdk';
+
+// Monitor ciphernode network changes
+sdk.onEnclaveEvent(RegistryEventType.CIPHERNODE_ADDED, (event) => {
+  console.log("New ciphernode joined:", event.data);
+});
+
+sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (event) => {
+  console.log("Committee selection complete:", event.data);
+});
+```
+
+## Server-Side Coordination
+
+For server-side applications, you can create automated coordination services:
+
+```typescript
+import { EnclaveSDK } from "@gnosis-guild/enclave/sdk";
+import { createPublicClient, createWalletClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+
+class E3CoordinationServer {
+  private sdk: EnclaveSDK;
+
+  constructor(privateKey: string, rpcUrl: string) {
+    const account = privateKeyToAccount(privateKey as `0x${string}`);
+    
+    const publicClient = createPublicClient({
+      transport: http(rpcUrl),
+    });
+
+    const walletClient = createWalletClient({
+      account,
+      transport: http(rpcUrl),
+    });
+
+    this.sdk = new EnclaveSDK({
+      publicClient,
+      walletClient,
+      contracts: {
+        enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        ciphernodeRegistry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      },
+    });
+  }
+
+  async start() {
+    await this.sdk.initialize();
+    this.setupEventListeners();
+    console.log("E3 Coordination Server started");
+  }
+
+  private setupEventListeners() {
+    // Auto-activate E3s when they become available
+    this.sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, async (event) => {
+      const { e3Id } = event.data;
+      console.log(`Auto-activating E3 ${e3Id}`);
+      
+      try {
+        // In a real implementation, you'd generate/retrieve the public key
+        const publicKey = "0x..."; // Your FHE public key
+        await this.sdk.activateE3(e3Id, publicKey);
+      } catch (error) {
+        console.error(`Failed to activate E3 ${e3Id}:`, error);
+      }
+    });
+
+    // Handle input aggregation
+    this.sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, async (event) => {
+      console.log("Input published:", event.data);
+      // Implement your input aggregation logic here
+    });
+  }
+
+  async stop() {
+    this.sdk.cleanup();
+    console.log("E3 Coordination Server stopped");
+  }
+}
+
+// Usage
+const server = new E3CoordinationServer(
+  process.env.PRIVATE_KEY!,
+  process.env.RPC_URL!
+);
+
+server.start();
+```
+
+## Error Handling
+
+The SDK includes comprehensive error handling:
+
+```typescript
+import { SDKError } from "@gnosis-guild/enclave/sdk";
+
+try {
+  await sdk.requestE3(params);
+} catch (error) {
+  if (error instanceof SDKError) {
+    console.error(`SDK Error (${error.code}): ${error.message}`);
+    
+    switch (error.code) {
+      case "MISSING_PUBLIC_CLIENT":
+        // Handle missing client
+        break;
+      case "INVALID_ADDRESS":
+        // Handle invalid contract address
+        break;
+      case "TRANSACTION_FAILED":
+        // Handle transaction failure
+        break;
+      default:
+        console.error("Unknown SDK error:", error);
+    }
+  } else {
+    console.error("Unexpected error:", error);
+  }
+}
+```
+
+## Configuration Management
+
+### Development Configuration
+
+For local development with the default template:
+
+```typescript
+const devConfig = {
+  contracts: {
+    enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    ciphernodeRegistry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  },
+  chainId: 31337,
+  rpcUrl: "http://localhost:8545",
+};
+```
+
+### Production Configuration
+
+For production deployments:
+
+```typescript
+const prodConfig = {
+  contracts: {
+    enclave: process.env.ENCLAVE_CONTRACT_ADDRESS!,
+    ciphernodeRegistry: process.env.REGISTRY_CONTRACT_ADDRESS!,
+  },
+  chainId: 1, // Mainnet
+  rpcUrl: process.env.RPC_URL!,
+};
+```
+
+The Enclave SDK abstracts away much of the complexity, allowing you to focus on your application's unique business logic while ensuring robust, type-safe interaction with the Enclave protocol.

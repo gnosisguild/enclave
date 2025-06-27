@@ -3,7 +3,7 @@ use std::process::Command;
 fn main() {
     // Try to get local git SHA first
     let output = Command::new("git")
-        .args(&["rev-parse", "--short", "HEAD"])
+        .args(&["rev-parse", "--short=9", "HEAD"])
         .output();
 
     let git_sha = match output {
@@ -42,7 +42,7 @@ fn get_remote_commit_hash() -> Option<String> {
         .split_whitespace()
         .next()?
         .chars()
-        .take(7)
+        .take(9)
         .collect::<String>();
 
     if commit_hash.is_empty() {

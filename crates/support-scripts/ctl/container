@@ -32,15 +32,28 @@ trap cleanup EXIT INT TERM
 mkdir -p "$(pwd)/.enclave/caches"/{target,registry,git,risc0-cache,risc0-circuits}
 chmod -R 777 "$(pwd)/.enclave/caches"
 
+if [ -t 0 ]; then
+    TTY_FLAGS="-it"
+else
+    TTY_FLAGS=""
+fi
+
 if docker ps -q -f name="$CONTAINER_NAME" | grep -q .; then
     echo "Running exec $IMAGE..."
-    docker exec -it "$CONTAINER_NAME" bash -c "$*"
+    docker exec $TTY_FLAGS "$CONTAINER_NAME" bash -c "$*"
 else
     echo "Running start $IMAGE..."
-    docker run -it --rm \
+    # --network=host does not work on macos for allowing the container to access 
+    # the local machine. `--add-host...` is adding host.local to the hosts file 
+    # in the docker container we can then replace localhost and 127.0.0.1 
+    # from the input callback url so calls redirect to gateway.
+    # This should in theory be crossplatform
+    # However on linux the user must allow incoming connections from Docker's bridge network 172.17.0.0/16 through their firewall.
+    docker run $TTY_FLAGS  --rm \
         --name "$CONTAINER_NAME" \
         --platform linux/amd64 \
-        --network=host \
+        --add-host=host.local:host-gateway \
+        -p 13151:13151 \
         -v "$(pwd)/contracts:/app/contracts" \
         -v "$(pwd)/tests:/app/tests" \
         -v "$(pwd)/.enclave/caches/target:/app/target" \

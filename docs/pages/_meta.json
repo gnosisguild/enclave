@@ -22,6 +22,19 @@
   "building-with-enclave": {
     "title": "Building with Enclave"
   },
+  "-- TUTORIAL": {
+    "type": "separator",
+    "title": "Tutorial"
+  },
+  "installation": {
+    "title": "Installation"
+  },
+  "quick-start": {
+    "title": "Quick Start"
+  },
+  "hello-world-tutorial": {
+    "title": "Hello World"
+  },
   "-- BUILD AN E3": {
     "type": "separator",
     "title": "BUILD AN E3 Program"

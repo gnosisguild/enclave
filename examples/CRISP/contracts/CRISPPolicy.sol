@@ -3,7 +3,7 @@ pragma solidity >=0.8.27;
 
 import {BasePolicy} from "@excubiae/contracts/policy/BasePolicy.sol";
 import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphoreNoir.sol";
 
 /// @title CRISPPolicy
 /// @notice Policy contract for validating inputs based on Semaphore proofs and usage limits.
@@ -36,9 +36,9 @@ contract CRISPPolicy is BasePolicy {
         address subject,
         bytes calldata evidence
     ) internal override(BasePolicy) onlyTarget {
-        ISemaphore.SemaphoreProof memory proof = abi.decode(
+        ISemaphore.SemaphoreNoirProof memory proof = abi.decode(
             evidence,
-            (ISemaphore.SemaphoreProof)
+            (ISemaphore.SemaphoreNoirProof)
         );
         uint256 n = proof.nullifier;
         if (spentNullifiers[n]) revert AlreadyEnforced();
