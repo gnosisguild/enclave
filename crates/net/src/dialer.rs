@@ -203,7 +203,8 @@ fn resolve_ipv4(domain: &str) -> Result<String> {
     Ok(addr.ip().to_string())
 }
 
-fn resolve_ipv6(domain: &str) -> Result<String> {
+// For if we wish to resolve ipv6 as well (currently disabled)
+fn _resolve_ipv6(domain: &str) -> Result<String> {
     let addr = format!("{}:0", domain)
         .to_socket_addrs()?
         .find(|addr| addr.ip().is_ipv6())

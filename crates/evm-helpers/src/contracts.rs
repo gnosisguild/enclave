@@ -5,11 +5,10 @@ use alloy::{
     providers::fillers::{
         ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller,
     },
-    providers::{Identity, Provider, ProviderBuilder, RootProvider, WalletProvider},
-    rpc::types::{BlockNumberOrTag, TransactionReceipt},
+    providers::{Identity, Provider, ProviderBuilder, RootProvider},
+    rpc::types::TransactionReceipt,
     signers::local::PrivateKeySigner,
     sol,
-    transports::BoxTransport,
 };
 use async_trait::async_trait;
 use eyre::Result;

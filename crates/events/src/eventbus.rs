@@ -242,7 +242,7 @@ impl<E: Event> Actor for HistoryCollector<E> {
 
 impl<E: Event> Handler<E> for HistoryCollector<E> {
     type Result = E::Result;
-    fn handle(&mut self, msg: E, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
         self.history.push(msg);
     }
 }

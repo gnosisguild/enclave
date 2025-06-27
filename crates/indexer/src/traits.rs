@@ -1,8 +1,6 @@
-use std::fmt::Display;
-
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::task::JoinHandle;
+use std::fmt::Display;
 
 /// Trait for injectable DataStore. Note the implementor must manage interior mutability
 #[async_trait]

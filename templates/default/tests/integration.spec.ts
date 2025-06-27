@@ -238,6 +238,12 @@ async function main() {
     );
   });
 
+  const plaintextEvent = await waitForEvent(
+    EnclaveEventType.PLAINTEXT_OUTPUT_PUBLISHED,
+  );
+
+  assert.strictEqual(plaintextEvent.data.plaintextOutput, "0x12345678");
+
   console.log("It worked");
 
   process.exit(0);
