@@ -4,10 +4,13 @@ WORKDIR /build
 COPY crates/wasm/package.json ./crates/wasm/package.json
 COPY packages/enclave-react ./packages/enclave-react
 COPY packages/evm ./packages/evm
+COPY pnpm-workspace.yaml .
+COPY pnpm-lock.yaml .
 
 RUN npm install -g corepack
 RUN corepack enable
 
+# We just need the contracts to be compiled here
 RUN cd packages/evm && pnpm install && pnpm compile:contracts
 
 # Build stage
