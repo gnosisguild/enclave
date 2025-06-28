@@ -1,4 +1,4 @@
-name: Support Build and Template Test
+name: TEMPLATE
 on:
   workflow_dispatch:
   pull_request:
@@ -17,7 +17,7 @@ permissions:
   packages: write
 jobs:
   build:
-    name: Build & Push Image
+    name: Compile and Push Support Dockerfile
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.version.outputs.version }}
