@@ -17,7 +17,7 @@ permissions:
   packages: write
 jobs:
   build:
-    name: Compile and Push Support Dockerfile
+    name: Compile and push Support Dockerfile
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.version.outputs.version }}
