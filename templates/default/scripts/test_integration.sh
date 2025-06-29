@@ -12,9 +12,9 @@ passed_message() {
 
 failed_message() {
   echo ""
-  echo "❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌"
+  echo "------------------------"
   echo "  ❌ Test failed  "
-  echo "❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌"
+  echo "------------------------"
   echo ""
   exit 1
 }
