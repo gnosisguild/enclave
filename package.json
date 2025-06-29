@@ -57,5 +57,10 @@
   "devDependencies": {
     "husky": "^9.1.7",
     "@changesets/cli": "^2.27.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "viem": "2.30.6"
+    }
   }
 }

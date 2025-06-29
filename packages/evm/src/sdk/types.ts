@@ -1,5 +1,4 @@
-import { type Log } from "viem";
-import { type PublicClient, type WalletClient } from "viem";
+import { type Log, type PublicClient, type WalletClient } from "viem";
 
 import {
   type CiphernodeRegistryOwnable,
@@ -183,10 +182,10 @@ export interface RegistryEventData {
 export interface EnclaveEvent<T extends AllEventTypes> {
   type: T;
   data: T extends EnclaveEventType
-    ? EnclaveEventData[T]
-    : T extends RegistryEventType
-      ? RegistryEventData[T]
-      : unknown;
+  ? EnclaveEventData[T]
+  : T extends RegistryEventType
+  ? RegistryEventData[T]
+  : unknown;
   log: Log;
   timestamp: Date;
   blockNumber: bigint;

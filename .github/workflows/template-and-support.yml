@@ -94,5 +94,8 @@ jobs:
       - name: Install node dependencies
         run: pnpm install
 
+      - name: Build the sdk
+        run: pnpm build
+
       - name: Test Template
         run: cd templates/default && pnpm test:integration
