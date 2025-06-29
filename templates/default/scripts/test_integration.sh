@@ -16,6 +16,7 @@ failed_message() {
   echo "  ❌ Test failed  "
   echo "❌❌❌❌❌❌❌❌❌❌❌❌❌❌❌"
   echo ""
+  exit 1
 }
 
 export $(enclave print-env --chain hardhat)
