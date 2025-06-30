@@ -29,6 +29,17 @@ jobs:
       - name: "Check out the repo"
         uses: "actions/checkout@v4"
 
+      - name: Install Rust 1.85.0
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.85.0
+          target: wasm32-unknown-unknown
+
+        # required so that we can compile wasm within the sdk
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: "latest"
+
       - name: "Setup node"
         uses: actions/setup-node@v3
         with:

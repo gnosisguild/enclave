@@ -6,8 +6,7 @@ use libp2p::{
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
     kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
-    mdns,
-    swarm::{behaviour::toggle::Toggle, NetworkBehaviour, SwarmEvent},
+    swarm::{NetworkBehaviour, SwarmEvent},
     Swarm,
 };
 use std::hash::{Hash, Hasher};
@@ -25,7 +24,6 @@ pub struct NodeBehaviour {
     gossipsub: gossipsub::Behaviour,
     kademlia: KademliaBehaviour<MemoryStore>,
     connection_limits: connection_limits::Behaviour,
-    mdns: Toggle<mdns::tokio::Behaviour>,
     identify: IdentifyBehaviour,
 }
 
@@ -54,7 +52,6 @@ impl NetworkPeer {
         peers: Vec<String>,
         udp_port: Option<u16>,
         topic: &str,
-        enable_mdns: bool,
     ) -> Result<Self> {
         let (event_tx, _) = broadcast::channel(100); // TODO : tune this param
         let (cmd_tx, cmd_rx) = mpsc::channel(100); // TODO : tune this param
@@ -62,7 +59,7 @@ impl NetworkPeer {
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| create_mdns_kad_behaviour(enable_mdns, key))?
+            .with_behaviour(|key| create_kad_behaviour(key))?
             .build();
 
         // TODO: Use topics to manage network traffic instead of just using a single topic
@@ -158,8 +155,7 @@ impl NetworkPeer {
 }
 
 /// Create the libp2p behaviour
-fn create_mdns_kad_behaviour(
-    enable_mdns: bool,
+fn create_kad_behaviour(
     key: &Keypair,
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
@@ -186,22 +182,12 @@ fn create_mdns_kad_behaviour(
         gossipsub_config,
     )?;
 
-    let mdns = if enable_mdns {
-        Toggle::from(Some(mdns::tokio::Behaviour::new(
-            mdns::Config::default(),
-            key.public().to_peer_id(),
-        )?))
-    } else {
-        Toggle::from(None)
-    };
-
     Ok(NodeBehaviour {
         gossipsub,
         kademlia: KademliaBehaviour::new(
             key.public().to_peer_id(),
             MemoryStore::new(key.public().to_peer_id()),
         ),
-        mdns,
         connection_limits,
         identify: identify_config,
     })
@@ -251,23 +237,6 @@ async fn process_swarm_event(
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
             debug!("Kademlia event: {:?}", e);
-        }
-
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-            for (peer_id, _multiaddr) in list {
-                trace!("mDNS discovered a new peer: {peer_id}");
-                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-            }
-        }
-
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-            for (peer_id, _multiaddr) in list {
-                trace!("mDNS discover peer has expired: {peer_id}");
-                swarm
-                    .behaviour_mut()
-                    .gossipsub
-                    .remove_explicit_peer(&peer_id);
-            }
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {

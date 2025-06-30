@@ -25,6 +25,7 @@ members = [
   "crates/support-scripts",
   "crates/test-helpers",
   "crates/tests",
+  "crates/wasm",
 ]
 exclude = [
   "examples/CRISP/apps/server",

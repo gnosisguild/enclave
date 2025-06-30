@@ -85,7 +85,6 @@ impl NetworkManager {
         peers: Vec<String>,
         cipher: &Arc<Cipher>,
         quic_port: u16,
-        enable_mdns: bool,
         repository: Repository<Vec<u8>>,
     ) -> Result<(Addr<Self>, tokio::task::JoinHandle<Result<()>>, String)> {
         let topic = "tmp-enclave-gossip-topic";
@@ -101,7 +100,7 @@ impl NetworkManager {
         // Create peer from keypair
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let mut peer = NetworkPeer::new(&keypair, peers, Some(quic_port), topic, enable_mdns)?;
+        let mut peer = NetworkPeer::new(&keypair, peers, Some(quic_port), topic)?;
 
         // Setup and start network manager
         let rx = peer.rx();

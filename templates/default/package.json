@@ -1,4 +1,26 @@
 {
+  "name": "enclave-example",
+  "scripts": {
+    "ciphernode:add": "hardhat run scripts/ciphernode-add.ts -- ",
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
+    "deploy:dev": "hardhat run scripts/deploy-local.ts",
+    "dev:all": "./scripts/dev_all.sh",
+    "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
+    "dev:evm": "hardhat node",
+    "dev:frontend": "./scripts/dev_frontend.sh",
+    "dev:program": "./scripts/dev_program.sh",
+    "dev:server": "./scripts/dev_server.sh",
+    "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile || true",
+    "test": "hardhat test",
+    "test:integration": "./scripts/test_integration.sh"
+  },
+  "dependencies": {
+    "@gnosis-guild/enclave": "workspace:*",
+    "@types/yargs": "^17.0.33",
+    "yargs": "^18.0.0",
+    "viem": "2.30.6"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
@@ -28,27 +50,6 @@
     "typechain": "^8.3.0",
     "typed-rpc": "^6.1.1",
     "typescript": ">=4.5.0",
-    "viem": "^2.30.6",
     "wait-on": "^8.0.3"
-  },
-  "dependencies": {
-    "@gnosis-guild/enclave": "workspace:*",
-    "@types/yargs": "^17.0.33",
-    "yargs": "^18.0.0"
-  },
-  "name": "enclave-example",
-  "scripts": {
-    "ciphernode:add": "hardhat run scripts/ciphernode-add.ts -- ",
-    "compile": "hardhat compile",
-    "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
-    "deploy:dev": "hardhat run scripts/deploy-local.ts",
-    "dev:evm": "hardhat node",
-    "predev:all": "[ ! -f './contracts/ImageID.sol' ] && enclave program compile || true",
-    "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
-    "dev:all": "./scripts/dev_all.sh",
-    "dev:frontend": "./scripts/dev_frontend.sh",
-    "dev:program": "./scripts/dev_program.sh",
-    "dev:server": "./scripts/dev_server.sh",
-    "test": "hardhat test"
   }
 }

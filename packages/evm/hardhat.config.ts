@@ -56,7 +56,7 @@ function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
       jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
   }
 
-  let accounts;
+  let accounts: [string] | { mnemonic: string };
   if (PRIVATE_KEY) {
     accounts = [PRIVATE_KEY];
   } else {

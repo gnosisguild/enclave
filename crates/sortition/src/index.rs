@@ -15,7 +15,7 @@ impl IndexSortition {
         }
     }
 
-    fn get_committee(&mut self) -> Vec<usize> {
+    fn _get_committee(&mut self) -> Vec<usize> {
         // Initialize a vector with indices of nodes as elements
         let mut leaf_indices: Vec<usize> = (0..self.num_nodes).collect();
         // Initialize an empty vector to store the committee

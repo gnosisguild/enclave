@@ -54,3 +54,5 @@ export {
   decodePlaintextOutput,
   type ComputeProviderParams,
 } from "./utils";
+
+export { encryptNumber } from "./wasm";

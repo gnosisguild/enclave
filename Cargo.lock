@@ -2535,6 +2535,7 @@ dependencies = [
  "fhe",
  "fhe-traits",
  "hex",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -2938,6 +2939,18 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "tokio",
+]
+
+[[package]]
+name = "e3-wasm"
+version = "0.1.0"
+dependencies = [
+ "e3-bfv-helpers",
+ "fhe",
+ "fhe-traits",
+ "getrandom 0.2.16",
+ "rand 0.8.5",
+ "wasm-bindgen",
 ]
 
 [[package]]

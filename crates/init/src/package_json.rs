@@ -4,6 +4,7 @@ use anyhow::Result;
 use serde_json::{Map, Value};
 use tokio::fs;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum DependencyType {
     Dependencies,
@@ -32,6 +33,7 @@ pub async fn get_version_from_package_json(file_path: &PathBuf) -> Result<String
         .ok_or_else(|| anyhow::anyhow!("version field not found or not a string"))
 }
 
+#[allow(dead_code)]
 fn validate_dependency_type(dep_type: &str) -> Result<()> {
     match dep_type {
         "dependencies" | "devDependencies" | "peerDependencies" => Ok(()),

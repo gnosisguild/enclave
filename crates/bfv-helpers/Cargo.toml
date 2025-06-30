@@ -11,7 +11,8 @@ alloy-dyn-abi = { workspace = true }
 alloy-primitives = { workspace = true }
 fhe-traits.workspace = true
 fhe_rs.workspace = true
+rand.workspace = true
+anyhow.workspace = true
 
 [dev-dependencies]
 hex.workspace = true
-anyhow.workspace = true

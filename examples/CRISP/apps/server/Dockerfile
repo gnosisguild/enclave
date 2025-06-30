@@ -82,6 +82,7 @@ COPY crates/sortition/Cargo.toml crates/sortition/Cargo.toml
 COPY crates/support-scripts/Cargo.toml crates/support-scripts/Cargo.toml
 COPY crates/test-helpers/Cargo.toml crates/test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml crates/tests/Cargo.toml
+COPY crates/wasm/Cargo.toml crates/wasm/Cargo.toml
 
 
 RUN set -eux; \

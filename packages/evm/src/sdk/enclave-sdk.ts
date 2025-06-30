@@ -210,6 +210,23 @@ export class EnclaveSDK {
   }
 
   /**
+   * Handle an event only once
+   */
+  public once<T extends AllEventTypes>(
+    type: T,
+    callback: EventCallback<T>,
+  ): void {
+    const handler: EventCallback<T> = (event) => {
+      this.off(type, handler);
+      const prom = callback(event);
+      if (prom) {
+        prom.catch((e) => console.log(e));
+      }
+    };
+    this.onEnclaveEvent(type, handler);
+  }
+
+  /**
    * Get historical events
    */
   public async getHistoricalEvents(

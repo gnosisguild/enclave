@@ -241,12 +241,6 @@ impl AppConfig {
         self.node_def().quic_port
     }
 
-    /// Depricated
-    #[deprecated]
-    pub fn enable_mdns(&self) -> bool {
-        false
-    }
-
     /// Get the config file path
     pub fn config_file(&self) -> PathBuf {
         self.paths.config_file()

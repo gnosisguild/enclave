@@ -4,5 +4,6 @@ packages:
   - examples/CRISP/apps/client
   - packages/enclave-react
   - packages/evm
+  - crates/wasm
   - templates/default
   - templates/default/client

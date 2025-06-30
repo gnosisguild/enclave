@@ -1,5 +1,4 @@
-import { type Log } from "viem";
-import { type PublicClient, type WalletClient } from "viem";
+import { type Log, type PublicClient, type WalletClient } from "viem";
 
 import {
   type CiphernodeRegistryOwnable,

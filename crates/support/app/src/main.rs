@@ -1,12 +1,7 @@
-use actix_web::{
-    http::Method, middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult,
-};
-use anyhow::bail;
+use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result as ActixResult};
 use e3_compute_provider::FHEInputs;
-#[cfg(feature = "risc0")]
-use e3_support_host::Risc0Output;
-use e3_support_types::{ComputeRequest, ComputeResponse, WebhookPayload};
-use serde::{Deserialize, Deserializer, Serialize};
+use e3_support_types::{ComputeRequest, WebhookPayload};
+use serde::Serialize;
 
 #[derive(Serialize, Debug)]
 struct ProcessingResponse {

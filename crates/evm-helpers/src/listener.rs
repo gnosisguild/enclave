@@ -89,7 +89,7 @@ impl EventListener {
     }
 
     pub async fn create_contract_listener(ws_url: &str, contract_address: &str) -> Result<Self> {
-        let provider = Arc::new(ProviderBuilder::new().on_builtin(ws_url).await?);
+        let provider = Arc::new(ProviderBuilder::new().connect(ws_url).await?);
         let address = contract_address.parse::<Address>()?;
         let filter = Filter::new()
             .address(address)

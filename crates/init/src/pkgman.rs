@@ -63,6 +63,7 @@ pub struct PkgMan {
     cwd: PathBuf,
 }
 
+#[allow(dead_code)]
 pub enum PkgManKind {
     NPM,
     PNPM,
@@ -87,6 +88,7 @@ impl PkgMan {
         self
     }
 
+    #[allow(dead_code)]
     pub async fn available(&self) -> bool {
         self.strategy.available().await
     }

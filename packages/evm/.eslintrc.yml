@@ -5,7 +5,9 @@ extends:
   - "prettier"
 parser: "@typescript-eslint/parser"
 parserOptions:
-  project: "tsconfig.json"
+  project:
+    - "tsconfig.json"
+    - "src/tsconfig.json"
 plugins:
   - "@typescript-eslint"
 root: true
