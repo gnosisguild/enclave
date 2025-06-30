@@ -100,4 +100,4 @@ jobs:
         run: pnpm build
 
       - name: Test Template
-        run: cd templates/default && chmod 777 contracts && chmod 777 tests && chmod 777 contracts/*.sol && pnpm test:integration
+        run: cd templates/default && chmod 777 contracts && chmod 777 tests && chmod 777 contracts/ImageID.sol && pnpm test:integration
