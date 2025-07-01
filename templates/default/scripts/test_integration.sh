@@ -21,7 +21,7 @@ failed_message() {
 
 export $(enclave print-env --chain hardhat)
 
-(pnpm concurrently \
+enclave program compile && (pnpm concurrently \
   --names "TEST,EVM,CIPHER,SERVER,PROGRAM" \
   --prefix-colors "blue,cyan,magenta,yellow,green" \
   --kill-others \
