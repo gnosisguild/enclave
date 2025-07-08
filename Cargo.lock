@@ -2900,6 +2900,7 @@ name = "e3-support-scripts"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "duct",
  "e3-config",
  "tokio",

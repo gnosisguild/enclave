@@ -84,7 +84,7 @@ impl Default for NodeDefinition {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Risc0Config {
     #[serde(default)]
     pub bonsai_api_key: Option<String>,
@@ -105,7 +105,7 @@ impl Default for Risc0Config {
 }
 
 /// Configuration for the program runner
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ProgramConfig {
     risc0: Risc0Config,
 }

@@ -1,6 +1,12 @@
+mod program;
+
 use anyhow::{bail, Result};
 use duct::cmd;
 use e3_config::ProgramConfig;
+use program::ProgramSupport;
+use program::ProgramSupportApi;
+use program::ProgramSupportDev;
+use program::ProgramSupportRisc0;
 use std::{env, path::PathBuf};
 use tokio::fs;
 use tokio::signal;
@@ -45,12 +51,8 @@ async fn ensure_script_exists(script_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub async fn program_compile() -> Result<()> {
-    let cwd = env::current_dir()?;
-    let script = cwd.join(".enclave/support/ctl/compile");
-    ensure_script_exists(&script).await?;
-    run_bash_script(&cwd, &script, &[]).await?;
-    Ok(())
+pub async fn program_compile(program_config: ProgramConfig, is_dev: bool) -> Result<()> {
+    ProgramSupport::new(program_config, is_dev).compile().await
 }
 
 pub async fn program_shell() -> Result<()> {
@@ -61,24 +63,8 @@ pub async fn program_shell() -> Result<()> {
     Ok(())
 }
 
-pub async fn program_start(program_config: &ProgramConfig) -> Result<()> {
-    let cwd = env::current_dir()?;
-    let script = cwd.join(".enclave/support/ctl/start");
-    ensure_script_exists(&script).await?;
-
-    let risc0_config = program_config.risc0();
-    let risc0_dev_mode_str = risc0_config.risc0_dev_mode.to_string();
-
-    let mut args = vec!["--risc0-dev-mode", risc0_dev_mode_str.as_str()];
-
-    if let (Some(api_key), Some(api_url)) =
-        (&risc0_config.bonsai_api_key, &risc0_config.bonsai_api_url)
-    {
-        args.extend(["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]);
-    }
-
-    run_bash_script(&cwd, &script, &args).await?;
-    Ok(())
+pub async fn program_start(program_config: ProgramConfig, is_dev: bool) -> Result<()> {
+    ProgramSupport::new(program_config, is_dev).compile().await
 }
 
 /// Purge all build caches from support
