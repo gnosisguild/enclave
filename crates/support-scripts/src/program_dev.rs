@@ -8,7 +8,6 @@ pub struct ProgramSupportDev(pub ProgramConfig);
 #[async_trait]
 impl ProgramSupportApi for ProgramSupportDev {
     async fn compile(&self) -> Result<()> {
-        println!("compile");
         Ok(())
     }
     async fn start(&self) -> Result<()> {

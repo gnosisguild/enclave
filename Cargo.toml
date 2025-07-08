@@ -35,6 +35,7 @@ exclude = [
   "examples/default/client/wasm",
   "examples/default",
   "crates/support" # client needs to be able to build this independently
+  "crates/support/dev"
 ]
 resolver = "2"
 shared-version = true

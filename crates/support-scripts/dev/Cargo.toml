@@ -1,0 +1,7 @@
+[package]
+name = "dev"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+e3-program-server = { git = "https://github.com/gnosisguild/enclave", branch = "ry/568-refactor-e3-program-server" }
