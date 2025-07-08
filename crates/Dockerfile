@@ -53,6 +53,7 @@ COPY crates/init/Cargo.toml ./init/Cargo.toml
 COPY crates/keyshare/Cargo.toml ./keyshare/Cargo.toml
 COPY crates/logger/Cargo.toml ./logger/Cargo.toml
 COPY crates/net/Cargo.toml ./net/Cargo.toml
+COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/sdk/Cargo.toml ./sdk/Cargo.toml
 COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
