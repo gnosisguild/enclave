@@ -8,7 +8,7 @@ name = "e3-support-scripts-dev"
 path = "src/main.rs"
 
 [dependencies]
-e3-program-server = { git = "https://github.com/gnosisguild/enclave", branch = "ry/568-refactor-e3-program-server" }
+e3-program-server = { git = "https://github.com/gnosisguild/enclave", branch = "ry/568-refactor-e3-program-server#620a1d69" }
 
 [workspace]
 
