@@ -617,7 +617,7 @@ dependencies = [
 [[package]]
 name = "e3-compute-provider"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave?branch=ry%2F568-refactor-e3-program-server#2f794c8341895bb55a9a1cfa9ac20a2ecd005505"
+source = "git+https://github.com/gnosisguild/enclave?rev=620a1d69#620a1d69e0b91c8f63a0b1c410a1c456d5fcd7a5"
 dependencies = [
  "ark-bn254",
  "ark-ff",
@@ -634,7 +634,7 @@ dependencies = [
 [[package]]
 name = "e3-program-server"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave?branch=ry%2F568-refactor-e3-program-server#2f794c8341895bb55a9a1cfa9ac20a2ecd005505"
+source = "git+https://github.com/gnosisguild/enclave?rev=620a1d69#620a1d69e0b91c8f63a0b1c410a1c456d5fcd7a5"
 dependencies = [
  "actix-web",
  "anyhow",
