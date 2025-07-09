@@ -96,20 +96,18 @@ impl E3ProgramServer {
         let bind_addr = self.bind_address();
         let runner = Arc::clone(&self.runner);
 
-        actix_web::rt::System::new().block_on(async move {
-            let server = HttpServer::new(move || {
-                App::new()
-                    .app_data(web::Data::new(Arc::clone(&runner)))
-                    .wrap(Logger::default())
-                    .route("/run_compute", web::post().to(handle_compute))
-                    .route("/health", web::get().to(handle_health_check))
-                    .route("/health", web::head().to(handle_health_check))
-            })
-            .bind(&bind_addr)?;
-
-            println!("🚀 E3 Program Server listening on http://{}", bind_addr);
-            server.run().await.map_err(Into::into)
+        let server = HttpServer::new(move || {
+            App::new()
+                .app_data(web::Data::new(Arc::clone(&runner)))
+                .wrap(Logger::default())
+                .route("/run_compute", web::post().to(handle_compute))
+                .route("/health", web::get().to(handle_health_check))
+                .route("/health", web::head().to(handle_health_check))
         })
+        .bind(&bind_addr)?;
+
+        println!("🚀 E3 Program Server listening on http://{}", bind_addr);
+        server.run().await.map_err(Into::into)
     }
 }
 
