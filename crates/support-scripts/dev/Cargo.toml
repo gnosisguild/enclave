@@ -11,6 +11,5 @@ path = "src/main.rs"
 e3-program-server = { git = "https://github.com/gnosisguild/enclave", rev = "9e30ebad27cd31d58cdc0d4ff8609c2b2aa1557a" }
 tokio = { version = "1.38", features = ["full"] }
 anyhow = "1.0.86"
-
-[workspace]
+e3-user-program = { path = "../../../program" }
 

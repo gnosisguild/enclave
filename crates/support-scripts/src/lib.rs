@@ -17,7 +17,7 @@ pub async fn program_compile(program_config: ProgramConfig, is_dev: bool) -> Res
 }
 
 pub async fn program_start(program_config: ProgramConfig, is_dev: bool) -> Result<()> {
-    ProgramSupport::new(program_config, is_dev).compile().await
+    ProgramSupport::new(program_config, is_dev).start().await
 }
 
 /// Open up a shell in the docker container

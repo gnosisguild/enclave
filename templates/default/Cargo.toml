@@ -1,7 +1,8 @@
 [workspace]
 members = [
   "client/wasm",
-  "program"
+  "program",
+  ".enclave/support/dev"
 ]
 
 [workspace.dependencies]
