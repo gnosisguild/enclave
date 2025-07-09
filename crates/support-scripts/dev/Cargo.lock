@@ -617,7 +617,7 @@ dependencies = [
 [[package]]
 name = "e3-compute-provider"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave?rev=620a1d69#620a1d69e0b91c8f63a0b1c410a1c456d5fcd7a5"
+source = "git+https://github.com/gnosisguild/enclave?rev=51647fd6cd10c030e8b4da6cb9d534dfcbf20499#51647fd6cd10c030e8b4da6cb9d534dfcbf20499"
 dependencies = [
  "ark-bn254",
  "ark-ff",
@@ -634,7 +634,7 @@ dependencies = [
 [[package]]
 name = "e3-program-server"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave?rev=620a1d69#620a1d69e0b91c8f63a0b1c410a1c456d5fcd7a5"
+source = "git+https://github.com/gnosisguild/enclave?rev=51647fd6cd10c030e8b4da6cb9d534dfcbf20499#51647fd6cd10c030e8b4da6cb9d534dfcbf20499"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -650,7 +650,9 @@ dependencies = [
 name = "e3-support-scripts-dev"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "e3-program-server",
+ "tokio",
 ]
 
 [[package]]
