@@ -1,7 +1,7 @@
 use std::env;
 
 use crate::{ensure_script_exists, run_bash_script, traits::ProgramSupportApi};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use async_trait::async_trait;
 use e3_config::ProgramConfig;
 
@@ -24,7 +24,9 @@ impl ProgramSupportApi for ProgramSupportRisc0 {
         let script = cwd.join(".enclave/support/ctl/start");
         ensure_script_exists(&script).await?;
 
-        let risc0_config = self.0.risc0();
+        let Some(risc0_config) = self.0.risc0() else {
+            bail!("start must be run with risc0 config available");
+        };
         let risc0_dev_mode_str = risc0_config.risc0_dev_mode.to_string();
 
         let mut args = vec!["--risc0-dev-mode", risc0_dev_mode_str.as_str()];
