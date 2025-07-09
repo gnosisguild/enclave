@@ -16,7 +16,6 @@ EXCLUDE_ARGS=()
 for path in "${EXCLUDE_PATHS[@]}"; do
     EXCLUDE_ARGS+=(-not -path "$path")
 done
-echo "find . -name \"Cargo.toml\" "${EXCLUDE_ARGS[@]}" -exec grep -l \"git = \\\"$GITHUB_REPO_URL\" {} \\;"
 CURRENT_HASH=$(git rev-parse HEAD)
 echo "Current git hash: $CURRENT_HASH"
 echo "Target repository: $GITHUB_REPO_URL"
@@ -34,5 +33,5 @@ echo "Press any key to continue with the update, or Ctrl+C to cancel..."
 read -n 1 -s
 echo "Updating dependencies..."
 # Perform the substitution
-find . -name "Cargo.toml" $EXCLUDE_ARGS -exec sed -i "s|rev = \"[^\"]*\"|rev = \"$CURRENT_HASH\"|g" {} \;
+find . -name "Cargo.toml" "${EXCLUDE_ARGS[@]}" -exec sed -i "s|rev = \"[^\"]*\"|rev = \"$CURRENT_HASH\"|g" {} \;
 echo "Done!"
