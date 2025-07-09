@@ -108,7 +108,7 @@ impl Default for Risc0Config {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ProgramConfig {
     risc0: Risc0Config,
-    dev: bool,
+    dev: Option<bool>,
 }
 
 impl ProgramConfig {
@@ -117,7 +117,10 @@ impl ProgramConfig {
     }
 
     pub fn dev(&self) -> bool {
-        self.dev
+        if let Some(dev) = self.dev {
+            return dev;
+        }
+        false
     }
 }
 
