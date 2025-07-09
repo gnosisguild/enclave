@@ -15,7 +15,7 @@ methods = { workspace = true }
 risc0-ethereum-contracts = { workspace = true }
 risc0-zkvm = { workspace = true }
 tokio = { workspace = true }
-e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "1bf6340" }
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "51647fd6cd10c030e8b4da6cb9d534dfcbf20499" }
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
