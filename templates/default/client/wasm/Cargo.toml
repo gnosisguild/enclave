@@ -16,7 +16,7 @@ rand = "0.8.5"
 ethers = "2.0.14"
 getrandom = { version = "0.2.11", features = ["js"] }
 bincode = "1.3.3"
-e3-bfv-helpers = { git = "https://github.com/gnosisguild/enclave.git", rev = "883e185709ac50ec555d8c6f168169114909ece0" }
+e3-bfv-helpers = { git = "https://github.com/gnosisguild/enclave.git", rev = "03912579f9495795dfd09fd842f2de491eb80b61" }
 rayon = "1.10.0"
 ndarray = "0.15.6"
 itertools = "0.13.0"
