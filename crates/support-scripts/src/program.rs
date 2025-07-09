@@ -6,14 +6,21 @@ use crate::{
     program_dev::ProgramSupportDev, program_risc0::ProgramSupportRisc0, traits::ProgramSupportApi,
 };
 
+fn get_mode(config: ProgramConfig, mode: Option<bool>) -> bool {
+    if let Some(m) = mode {
+        return m;
+    };
+    config.dev()
+}
+
 pub enum ProgramSupport {
     Dev(ProgramSupportDev),
     Risc0(ProgramSupportRisc0),
 }
 
 impl ProgramSupport {
-    pub fn new(config: ProgramConfig, mode: bool) -> ProgramSupport {
-        if mode {
+    pub fn new(config: ProgramConfig, mode: Option<bool>) -> ProgramSupport {
+        if get_mode(config.clone(), mode) {
             ProgramSupport::Dev(ProgramSupportDev(config))
         } else {
             ProgramSupport::Risc0(ProgramSupportRisc0(config))

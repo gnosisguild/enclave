@@ -9,14 +9,14 @@ pub enum ProgramCommands {
         /// Run the program in Dev Mode. Dev Mode is when the program will run without any proving
         /// backend at all. Your program will simply execute without being verified.
         #[arg(long)]
-        dev: bool,
+        dev: Option<bool>,
     },
 
     /// Compile the program code
     Compile {
         /// Compile the program in Dev Mode.
         #[arg(long)]
-        dev: bool,
+        dev: Option<bool>,
     },
 
     /// Get a shell into the docker environment that the program runs in

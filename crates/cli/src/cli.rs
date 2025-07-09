@@ -241,7 +241,7 @@ pub enum Commands {
     Compile {
         /// Compile the program in Dev Mode.
         #[arg(long)]
-        dev: bool,
+        dev: Option<bool>,
     },
 
     /// Return the git_sha rev that the cli was compiled against

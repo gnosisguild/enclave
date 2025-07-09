@@ -108,11 +108,16 @@ impl Default for Risc0Config {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ProgramConfig {
     risc0: Risc0Config,
+    dev: bool,
 }
 
 impl ProgramConfig {
     pub fn risc0(&self) -> &Risc0Config {
         &self.risc0
+    }
+
+    pub fn dev(&self) -> bool {
+        self.dev
     }
 }
 

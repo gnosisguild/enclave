@@ -12,11 +12,11 @@ use tokio::fs;
 use traits::ProgramSupportApi;
 use utils::{ensure_script_exists, run_bash_script};
 
-pub async fn program_compile(program_config: ProgramConfig, is_dev: bool) -> Result<()> {
+pub async fn program_compile(program_config: ProgramConfig, is_dev: Option<bool>) -> Result<()> {
     ProgramSupport::new(program_config, is_dev).compile().await
 }
 
-pub async fn program_start(program_config: ProgramConfig, is_dev: bool) -> Result<()> {
+pub async fn program_start(program_config: ProgramConfig, is_dev: Option<bool>) -> Result<()> {
     ProgramSupport::new(program_config, is_dev).start().await
 }
 
