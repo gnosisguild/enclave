@@ -36,7 +36,7 @@ exclude = [
   "examples/default",
   # client needs to be able to build crates/support independently
   "crates/support", 
-  "crates/support/dev"
+  "crates/support-scripts/dev"
 ]
 resolver = "2"
 shared-version = true

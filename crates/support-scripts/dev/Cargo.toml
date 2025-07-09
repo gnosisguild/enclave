@@ -1,7 +1,14 @@
 [package]
-name = "dev"
+name = "e3-support-scripts-dev"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "e3-support-scripts-dev"
+path = "src/main.rs"
+
 [dependencies]
 e3-program-server = { git = "https://github.com/gnosisguild/enclave", branch = "ry/568-refactor-e3-program-server" }
+
+[workspace]
+
