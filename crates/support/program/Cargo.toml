@@ -6,5 +6,5 @@ edition = "2024"
 [dependencies]
 fhe_rs = { workspace = true }
 fhe-traits = { workspace = true }
-e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "03912579f9495795dfd09fd842f2de491eb80b61" }
-e3-bfv-helpers = { git = "https://github.com/gnosisguild/enclave", rev = "03912579f9495795dfd09fd842f2de491eb80b61" }
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "906dae86128d64918e32c051cc37eb7b994275d6" }
+e3-bfv-helpers = { git = "https://github.com/gnosisguild/enclave", rev = "906dae86128d64918e32c051cc37eb7b994275d6" }
