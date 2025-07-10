@@ -340,7 +340,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: support-scripts-artifacts
-          path: templates/default/
+          path: templates/default/target/
       - name: Download SDK artifacts
         uses: actions/download-artifact@v4
         with:
