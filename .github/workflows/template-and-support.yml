@@ -64,8 +64,8 @@ jobs:
             type=gha,mode=max,scope=cargo-target
             type=gha,mode=max,scope=buildcache
 
-  build_binary:
-    name: Build Enclave Binary
+  build_enclave_cli:
+    name: Build Enclave CLI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -84,13 +84,42 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.85.0
-      - name: Install enclave CLI
+      - name: Build enclave CLI
         run: cargo install --path crates/cli --bin enclave
       - name: Upload enclave binary
         uses: actions/upload-artifact@v4
         with:
           name: enclave-binary
           path: ~/.cargo/bin/enclave
+          retention-days: 1
+
+  build_support_scripts:
+    name: Build Support Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            templates/default/target/
+          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: rust-deps-
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+      - name: Build support scripts
+        run: cd templates/default && cargo build --bin e3-support-scripts-dev
+      - name: Upload support scripts binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: support-scripts-binary
+          path: templates/default/target/debug/e3-support-scripts-dev
           retention-days: 1
 
   build_sdk:
@@ -123,15 +152,6 @@ jobs:
           node-version: "22"
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            templates/default/target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -143,48 +163,19 @@ jobs:
         run: pnpm install
       - name: Build the sdk
         run: pnpm evm:build
-      - name: Upload SDK build artifacts
+      - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: sdk-build
+          name: sdk-artifacts
           path: |
             packages/evm/dist
             crates/wasm/dist
           retention-days: 1
 
-  build_support_scripts:
-    name: Build Support Scripts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: rust-deps-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.85.0
-      - name: Build support scripts
-        run: cd templates/default && cargo build --bin e3-support-scripts-dev
-      - name: Upload support scripts binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: e3-support-scripts-dev
-          path: templates/default/target/debug/e3-support-scripts-dev
-          retention-days: 1
-
   template_integration:
     name: Template Integration
     runs-on: ubuntu-latest
-    needs: [build_binary, build_sdk, build_support_scripts]
+    needs: [build_enclave_cli, build_support_scripts, build_sdk]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -195,29 +186,25 @@ jobs:
           node-version: "22"
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install node dependencies
+        run: pnpm install
+      - name: Download enclave binary
+        uses: actions/download-artifact@v4
         with:
-          toolchain: 1.85.0
-      - name: Restore binary cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/enclave
-          key: enclave-binary-${{ github.sha }}
-      - name: Restore SDK build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            packages/evm/dist
-            crates/wasm/dist
-            node_modules
-          key: sdk-build-${{ github.sha }}
+          name: enclave-binary
+          path: ~/.cargo/bin/
       - name: Download support scripts binary
         uses: actions/download-artifact@v4
         with:
-          name: e3-support-scripts-dev
+          name: support-scripts-binary
           path: templates/default/target/debug/
-      - name: Make binary executable
-        run: chmod +x templates/default/target/debug/e3-support-scripts-dev
+      - name: Download SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-artifacts
+      - name: Make binaries executable
+        run: |
+          chmod +x ~/.cargo/bin/enclave
+          chmod +x templates/default/target/debug/e3-support-scripts-dev
       - name: Test Template
         run: cd templates/default && chmod 777 contracts && chmod 777 tests && chmod 777 contracts/ImageID.sol && pnpm test:integration
