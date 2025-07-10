@@ -116,10 +116,24 @@ jobs:
             node_modules
           key: sdk-build-${{ github.sha }}
 
+  build_program_server:
+    name: Build Dev Mode Program Server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
+      - name: Build support scripts
+        run: cd templates/default && cargo build --bin e3-support-scripts-dev
+
   template_integration:
     name: Template Integration
     runs-on: ubuntu-latest
-    needs: [build_binary, build_sdk]
+    needs: [build_binary, build_sdk, build_program_server]
     steps:
       - uses: actions/checkout@v4
         with:
