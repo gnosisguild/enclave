@@ -83,7 +83,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.85.1
       - name: Build enclave CLI
         run: cargo install --path crates/cli --bin enclave
       - name: Upload enclave binary
@@ -155,7 +155,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.85.1
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -190,6 +190,10 @@ jobs:
           node-version: "22"
       - name: Install pnpm
         uses: pnpm/action-setup@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.1
       - name: Install node dependencies
         run: pnpm install
       - name: Download enclave binary
