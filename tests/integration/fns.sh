@@ -38,7 +38,23 @@ NETWORK_PRIVATE_KEY_2="0x21a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85f
 NETWORK_PRIVATE_KEY_3="0x31a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 NETWORK_PRIVATE_KEY_4="0x41a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 
-ENCLAVE_BIN=$ROOT_DIR/target/debug/enclave
+get_enclave_bin() {
+    local enclave_bin
+    if command -v enclave >/dev/null 2>&1; then
+        echo "Found enclave in $(which enclave)"
+        enclave_bin=$(command -v enclave)
+    else
+        enclave_bin="$ROOT_DIR/target/debug/enclave"
+        if [[ ! -f "$enclave_bin" ]]; then
+            echo "COULD NOT FIND ENCLAVE BINARY!"
+            echo "Building enclave binary..."
+            cargo build --bin enclave
+        fi
+    fi
+    echo "$enclave_bin"
+}
+
+ENCLAVE_BIN=$(get_enclave_bin)
 
 # Function to clean up background processes
 cleanup() {
