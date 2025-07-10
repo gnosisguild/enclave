@@ -21,6 +21,7 @@ pub struct E3ProgramServerBuilder {
     runner: Arc<Runner>,
     port: Option<u16>,
     host: Option<String>,
+    localhost_rewrite: Option<String>,
 }
 
 impl E3ProgramServerBuilder {
@@ -34,6 +35,7 @@ impl E3ProgramServerBuilder {
             runner: Arc::new(move |inputs| Box::pin(callback(inputs))),
             port: None,
             host: None,
+            localhost_rewrite: None,
         }
     }
 
@@ -49,12 +51,19 @@ impl E3ProgramServerBuilder {
         self
     }
 
+    /// Server will rewrite localhost callbacks to whatever is provided as an argument eg. "host.local". This is usefull when running in a Docker container which does not have direct access to the host
+    pub fn with_localhost_rewrite(mut self, rewrite: &str) -> Self {
+        self.localhost_rewrite = Some(rewrite.to_string());
+        self
+    }
+
     /// Build the E3ProgramServer
     pub fn build(self) -> E3ProgramServer {
         E3ProgramServer {
             runner: self.runner,
             port: self.port.unwrap_or(13151),
             host: self.host.unwrap_or_else(|| "0.0.0.0".to_string()),
+            localhost_rewrite: self.localhost_rewrite,
         }
     }
 }
@@ -64,6 +73,7 @@ pub struct E3ProgramServer {
     runner: Arc<Runner>,
     port: u16,
     host: String,
+    localhost_rewrite: Option<String>,
 }
 
 impl E3ProgramServer {
@@ -94,11 +104,13 @@ impl E3ProgramServer {
     /// Run the HTTP server
     pub async fn run(&self) -> Result<()> {
         let bind_addr = self.bind_address();
-        let runner = Arc::clone(&self.runner);
-
+        let config = AppConfig {
+            runner: Arc::clone(&self.runner),
+            localhost_rewrite: self.localhost_rewrite.clone(),
+        };
         let server = HttpServer::new(move || {
             App::new()
-                .app_data(web::Data::new(Arc::clone(&runner)))
+                .app_data(web::Data::new(config.clone()))
                 .wrap(Logger::default())
                 .route("/run_compute", web::post().to(handle_compute))
                 .route("/health", web::get().to(handle_health_check))
@@ -109,6 +121,12 @@ impl E3ProgramServer {
         println!("🚀 E3 Program Server listening on http://{}", bind_addr);
         server.run().await.map_err(Into::into)
     }
+}
+
+#[derive(Clone)]
+pub struct AppConfig {
+    pub runner: Arc<Runner>,
+    pub localhost_rewrite: Option<String>,
 }
 
 async fn call_webhook(
@@ -164,11 +182,10 @@ async fn process_computation_background(
 }
 
 async fn handle_compute(
-    runner: web::Data<Arc<Runner>>,
+    config: web::Data<AppConfig>,
     req: web::Json<ComputeRequest>,
 ) -> ActixResult<HttpResponse> {
     println!("Processing computation...");
-
     let e3_id = req
         .e3_id
         .ok_or_else(|| actix_web::error::ErrorBadRequest("e3_id is required"))?;
@@ -184,12 +201,15 @@ async fn handle_compute(
     };
 
     println!("fhe_inputs.params = {:?}", fhe_inputs.params);
-
-    let callback_url = callback_url
-        .replace("localhost", "host.local")
-        .replace("127.0.0.1", "host.local");
-
-    let runner = Arc::clone(&**runner);
+    let callback_url = if let Some(new_host) = config.localhost_rewrite.clone() {
+        callback_url
+            .replace("localhost", &new_host)
+            .replace("127.0.0.1", &new_host)
+    } else {
+        callback_url
+    };
+    println!("callback_url:{}", callback_url);
+    let runner = config.runner.clone();
     tokio::spawn(async move {
         if let Err(e) =
             process_computation_background(runner, e3_id, &callback_url, fhe_inputs).await
