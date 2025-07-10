@@ -1,4 +1,4 @@
-name: TEMPLATE
+name: CI/CD Pipeline
 on:
   workflow_dispatch:
   pull_request:
@@ -12,6 +12,9 @@ on:
 env:
   DOCKERFILE_PATH: crates/support/Dockerfile
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
+  HARDHAT_VAR_MNEMONIC: "test test test test test test test test test test test junk"
+  HARDHAT_VAR_INFURA_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+  PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 permissions:
   contents: read
   packages: write
@@ -63,7 +66,131 @@ jobs:
             type=gha,mode=max,scope=cargo-git
             type=gha,mode=max,scope=cargo-target
             type=gha,mode=max,scope=buildcache
-
+  test-net:
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Check out the repo"
+        uses: "actions/checkout@v4"
+      - name: "Setup node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+      - name: "Run network tests"
+        run: "pnpm test:integration net --no-prebuild"
+      - name: "Add test summary"
+        run: |
+          echo "## Network test results" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+  integration_prebuild:
+    name: Prebuild Integration Tools
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Check out the repo"
+        uses: "actions/checkout@v4"
+      - name: "Setup node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+      - name: Install Rust 1.85.1
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.1
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: "Install the dependencies"
+        run: "pnpm install"
+      - name: "Lint the code"
+        run: "pnpm lint"
+      - name: "Add lint summary"
+        run: |
+          echo "## Lint results" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+      - name: "Compile the contracts and generate the TypeChain bindings"
+        run: "pnpm typechain"
+      - name: "Run prebuild"
+        run: "pnpm test:integration prebuild"
+      - name: "Verify build artifacts exist"
+        run: |
+          echo "Checking for build artifacts:"
+          ls -la target/debug/fake_encrypt || echo "fake_encrypt not found"
+          ls -la target/debug/pack_e3_params || echo "pack_e3_params not found"
+      - name: "Upload build artifacts"
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            target/debug/fake_encrypt
+            target/debug/pack_e3_params
+          if-no-files-found: error
+  ciphernode_integration_test:
+    name: Ciphernode Integration Test
+    needs: [integration_prebuild, build_enclave_cli, build_sdk]
+    runs-on: "ubuntu-latest"
+    strategy:
+      matrix:
+        test-suite: [base, persist]
+      fail-fast: false
+    steps:
+      - name: "Check out the repo"
+        uses: "actions/checkout@v4"
+      - name: "Setup node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+      - name: Install Rust 1.85.1
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.1
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: "Install the dependencies"
+        run: "pnpm install"
+      - name: "Download build artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: target/debug/
+      - name: "Download enclave binary"
+        uses: actions/download-artifact@v4
+        with:
+          name: enclave-binary
+          path: ~/.cargo/bin/
+      - name: "Download SDK artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          name: sdk-artifacts
+          path: ./
+      - name: "Verify downloaded artifacts"
+        run: |
+          echo "Checking for required artifacts:"
+          ls -la target/debug/fake_encrypt || echo "fake_encrypt not found"
+          ls -la target/debug/pack_e3_params || echo "pack_e3_params not found"
+          ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
+          ls -la packages/evm/dist || echo "SDK dist not found"
+          ls -la crates/wasm/dist || echo "WASM dist not found"
+      - name: "Set executable permissions"
+        run: |
+          chmod +x target/debug/fake_encrypt
+          chmod +x target/debug/pack_e3_params
+          chmod +x ~/.cargo/bin/enclave
+      - name: "Run ${{ matrix.test-suite }} tests"
+        run: "pnpm test:integration ${{ matrix.test-suite }} --no-prebuild"
+      - name: "Add test summary"
+        run: |
+          echo "## Test results for ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
   build_enclave_cli:
     name: Build Enclave CLI
     runs-on: ubuntu-latest
@@ -92,7 +219,6 @@ jobs:
           name: enclave-binary
           path: ~/.cargo/bin/enclave
           retention-days: 1
-
   build_support_scripts:
     name: Build Support Scripts
     runs-on: ubuntu-latest
@@ -112,16 +238,20 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.85.1
       - name: Build support scripts
         run: cd templates/default && cargo build --bin e3-support-scripts-dev
+      - name: Verify build artifacts
+        run: |
+          echo "Checking for support scripts binary:"
+          find templates/default/target/ -name "e3-support-scripts-dev" -type f -ls || echo "Binary not found"
       - name: Upload support scripts artifacts
         uses: actions/upload-artifact@v4
         with:
           name: support-scripts-artifacts
-          path: templates/default/target/
+          path: templates/default/target/debug/e3-support-scripts-dev
           retention-days: 1
-
+          if-no-files-found: error
   build_sdk:
     name: Build SDK
     runs-on: ubuntu-latest
@@ -163,19 +293,24 @@ jobs:
         run: pnpm install
       - name: Build the sdk
         run: pnpm evm:build
+      - name: List built artifacts for debugging
+        run: |
+          echo "Checking for built artifacts:"
+          ls -la packages/evm/ || echo "packages/evm/ not found"
+          ls -la crates/wasm/ || echo "crates/wasm/ not found"
+          find . -name "dist" -type d || echo "No dist directories found"
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-artifacts
           path: |
             packages/evm/dist
-            packages/evm/node_modules
             packages/evm/artifacts
             packages/evm/cache
             packages/evm/typechain-types
             crates/wasm/dist
           retention-days: 1
-
+          if-no-files-found: warn
   template_integration:
     name: Template Integration
     runs-on: ubuntu-latest
@@ -205,14 +340,27 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: support-scripts-artifacts
-          path: templates/default/target/
+          path: templates/default/target/debug/
       - name: Download SDK artifacts
         uses: actions/download-artifact@v4
         with:
           name: sdk-artifacts
+          path: ./
       - name: Make binaries executable
         run: |
           chmod +x ~/.cargo/bin/enclave
           chmod +x templates/default/target/debug/e3-support-scripts-dev
+      - name: Verify downloaded artifacts
+        run: |
+          echo "Checking downloaded artifacts:"
+          ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
+          ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
+          ls -la packages/evm/dist || echo "SDK dist not found"
+          ls -la crates/wasm/dist || echo "WASM dist not found"
       - name: Test Template
-        run: cd templates/default && chmod 777 contracts && chmod 777 tests && chmod 777 contracts/ImageID.sol && pnpm test:integration
+        run: |
+          cd templates/default
+          # Set appropriate permissions for directories and files
+          chmod 755 contracts tests
+          chmod 644 contracts/ImageID.sol
+          pnpm test:integration
