@@ -249,7 +249,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: support-scripts-artifacts
-          path: templates/default/target/debug/e3-support-scripts-dev
+          path: templates/default/target/debug/
           retention-days: 1
           if-no-files-found: error
   build_sdk:
@@ -340,7 +340,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: support-scripts-artifacts
-          path: templates/default/target/debug/
+          path: templates/default/target/
       - name: Download SDK artifacts
         uses: actions/download-artifact@v4
         with:
@@ -357,10 +357,11 @@ jobs:
           ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
           ls -la packages/evm/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
+          echo "Support scripts permissions:"
+          ls -la templates/default/target/debug/e3-support-scripts-dev
       - name: Test Template
         run: |
           cd templates/default
-          # Set appropriate permissions for directories and files
           chmod 755 contracts tests
           chmod 644 contracts/ImageID.sol
           pnpm test:integration
