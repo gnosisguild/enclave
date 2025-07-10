@@ -123,6 +123,15 @@ jobs:
           node-version: "22"
       - name: Install pnpm
         uses: pnpm/action-setup@v4
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            templates/default/target/
+          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: rust-deps-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
