@@ -115,11 +115,11 @@ jobs:
           toolchain: 1.85.0
       - name: Build support scripts
         run: cd templates/default && cargo build --bin e3-support-scripts-dev
-      - name: Upload support scripts binary
+      - name: Upload support scripts artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: support-scripts-binary
-          path: templates/default/target/debug/e3-support-scripts-dev
+          name: support-scripts-artifacts
+          path: templates/default/target/
           retention-days: 1
 
   build_sdk:
@@ -169,6 +169,10 @@ jobs:
           name: sdk-artifacts
           path: |
             packages/evm/dist
+            packages/evm/node_modules
+            packages/evm/artifacts
+            packages/evm/cache
+            packages/evm/typechain-types
             crates/wasm/dist
           retention-days: 1
 
@@ -193,11 +197,11 @@ jobs:
         with:
           name: enclave-binary
           path: ~/.cargo/bin/
-      - name: Download support scripts binary
+      - name: Download support scripts artifacts
         uses: actions/download-artifact@v4
         with:
-          name: support-scripts-binary
-          path: templates/default/target/debug/
+          name: support-scripts-artifacts
+          path: templates/default/target/
       - name: Download SDK artifacts
         uses: actions/download-artifact@v4
         with:
