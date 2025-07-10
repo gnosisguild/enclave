@@ -37,7 +37,7 @@ serde_json = "1.0.133"
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
-e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "2ca0aa5f47dd962add5d1d0f74900d9bceb957e5" }
+e3-compute-provider = { git = "https://github.com/gnosisguild/enclave", rev = "9b6029564f3c86f31e86dadcc02bf233aaef63dc" }
 tokio = { version = "1.38", features = ["full"] }
 rand = { version = "0.8.5" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
