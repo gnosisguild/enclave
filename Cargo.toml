@@ -19,6 +19,7 @@ members = [
   "crates/keyshare",
   "crates/logger",
   "crates/net", 
+  "crates/program-server", 
   "crates/request",
   "crates/sdk",
   "crates/sortition",
@@ -33,7 +34,9 @@ exclude = [
   "examples/CRISP/apps/wasm-crypto",
   "examples/default/client/wasm",
   "examples/default",
-  "crates/support" # client needs to be able to build this independently
+  # client needs to be able to build crates/support independently
+  "crates/support", 
+  "crates/support-scripts/dev"
 ]
 resolver = "2"
 shared-version = true
@@ -76,6 +79,7 @@ e3-logger = { version = "0.1.0", path = "./crates/logger" }
 e3-net = { version = "0.1.0", path = "./crates/net" }
 e3-compute-provider = { version = "0.1.0", path = "./crates/compute-provider" }
 e3-sortition = { version = "0.1.0", path = "./crates/sortition" }
+e3-program-server = { version = "0.1.0", path = "./crates/program-server" }
 e3-support-scripts = { version = "0.1.0", path = "./crates/support-scripts" }
 e3-test-helpers = { version = "0.1.0", path = "./crates/test-helpers" }
 e3-tests = { version = "0.1.0", path = "./crates/tests" }
@@ -132,7 +136,7 @@ phf = { version = "0.11", features = ["macros"] }
 rand_chacha = "0.3.1"
 rand = "0.8.5"
 regex = "1.11.1" 
-reqwest = "0.12.15"
+reqwest = { version = "0.12.15", features = ["json"] }
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.133"
 sled = "0.34.7"

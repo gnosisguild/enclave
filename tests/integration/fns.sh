@@ -38,7 +38,15 @@ NETWORK_PRIVATE_KEY_2="0x21a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85f
 NETWORK_PRIVATE_KEY_3="0x31a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 NETWORK_PRIVATE_KEY_4="0x41a1e500a548b70d88184a1e042900c0ed6c57f8710bcc35dc8c85fa33d3f580"
 
-ENCLAVE_BIN=$ROOT_DIR/target/debug/enclave
+if command -v enclave >/dev/null 2>&1; then
+   ENCLAVE_BIN="enclave"
+elif [[ -f "$ROOT_DIR/target/debug/enclave" ]]; then
+   ENCLAVE_BIN="$ROOT_DIR/target/debug/enclave"
+else
+   cargo build --bin enclave
+   ENCLAVE_BIN="$ROOT_DIR/target/debug/enclave"
+fi
+echo "Enclave binary: $ENCLAVE_BIN"
 
 # Function to clean up background processes
 cleanup() {

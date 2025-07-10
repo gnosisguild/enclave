@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+SIGNAL_FILE=/tmp/enclave_ciphernodes_ready
+
 cleanup() {
   echo "Cleaning up processes..."
   enclave nodes down
@@ -10,6 +12,8 @@ cleanup() {
   echo "Cleanup complete"
   exit 0
 }
+
+rm -rf $SIGNAL_FILE
 
 trap cleanup INT TERM
 
@@ -37,5 +41,7 @@ CN3=$(cat enclave.config.yaml | yq '.nodes.cn3.address')
 pnpm hardhat ciphernode:add --ciphernode-address $CN1 --network localhost
 pnpm hardhat ciphernode:add --ciphernode-address $CN2 --network localhost
 pnpm hardhat ciphernode:add --ciphernode-address $CN3 --network localhost
+
+touch $SIGNAL_FILE
 
 wait

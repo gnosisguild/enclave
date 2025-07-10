@@ -84,7 +84,7 @@ impl Default for NodeDefinition {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Risc0Config {
     #[serde(default)]
     pub bonsai_api_key: Option<String>,
@@ -105,14 +105,22 @@ impl Default for Risc0Config {
 }
 
 /// Configuration for the program runner
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ProgramConfig {
-    risc0: Risc0Config,
+    risc0: Option<Risc0Config>,
+    dev: Option<bool>,
 }
 
 impl ProgramConfig {
-    pub fn risc0(&self) -> &Risc0Config {
-        &self.risc0
+    pub fn risc0(&self) -> Option<&Risc0Config> {
+        self.risc0.as_ref()
+    }
+
+    pub fn dev(&self) -> bool {
+        if let Some(dev) = self.dev {
+            return dev;
+        }
+        false
     }
 }
 
@@ -446,8 +454,6 @@ pub fn combine_unique<T: Eq + std::hash::Hash + Clone + Ord>(a: &[T], b: &[T]) -
 
 #[cfg(test)]
 mod tests {
-    use std::io;
-
     use super::*;
     use crate::rpc::RpcAuth;
     use figment::Jail;
@@ -517,11 +523,11 @@ nodes:
             assert_eq!(config.quic_port(), 1234);
             assert_eq!(
                 config.program().risc0(),
-                &Risc0Config {
+                Some(&Risc0Config {
                     bonsai_api_key: Some("12345678".to_string()),
                     bonsai_api_url: Some("http://my.api.com".to_string()),
                     risc0_dev_mode: 0,
-                }
+                })
             );
             assert!(config.peers().is_empty());
         };

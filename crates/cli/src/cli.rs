@@ -151,7 +151,9 @@ impl Cli {
             Commands::Init { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }
-            Commands::Compile => e3_support_scripts::program_compile().await?,
+            Commands::Compile { dev } => {
+                e3_support_scripts::program_compile(config.program().clone(), dev).await?
+            }
             Commands::PrintEnv { vite, chain } => print_env::execute(&config, &chain, vite).await?,
             Commands::Program { command } => program::execute(command, &config).await?,
             Commands::PurgeAll => {
@@ -236,7 +238,11 @@ pub enum Commands {
     },
 
     /// Compile an Enclave project
-    Compile,
+    Compile {
+        /// Compile the program in Dev Mode.
+        #[arg(long)]
+        dev: Option<bool>,
+    },
 
     /// Return the git_sha rev that the cli was compiled against
     Rev,

@@ -2841,6 +2841,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-program-server"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "anyhow",
+ "e3-compute-provider",
+ "hex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "e3-request"
 version = "0.1.0"
 dependencies = [
@@ -2886,6 +2900,7 @@ name = "e3-support-scripts"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "duct",
  "e3-config",
  "tokio",

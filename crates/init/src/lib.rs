@@ -74,6 +74,13 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> 
     )
     .await?;
 
+    copy::copy_with_filters(
+        &PathBuf::from(TEMP_DIR).join("crates/support-scripts/dev"),
+        &cwd.join(".enclave/support/dev"),
+        &vec![],
+    )
+    .await?;
+
     println!("Removing template ignore files...");
     delete_path(&cwd.join(".gitignore")).await?;
 

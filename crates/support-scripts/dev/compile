@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+cargo build --bin e3-support-scripts-dev

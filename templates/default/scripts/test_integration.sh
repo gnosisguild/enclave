@@ -20,8 +20,7 @@ failed_message() {
 }
 
 export $(enclave print-env --chain hardhat)
-
-enclave program compile && (pnpm concurrently \
+(pnpm concurrently \
   --names "TEST,EVM,CIPHER,SERVER,PROGRAM" \
   --prefix-colors "blue,cyan,magenta,yellow,green" \
   --kill-others \
@@ -30,4 +29,4 @@ enclave program compile && (pnpm concurrently \
   "pnpm dev:evm" \
   "pnpm dev:ciphernodes" \
   "TEST_MODE=1 pnpm dev:server" \
-  "enclave program start" && passed_message) || failed_message
+  "pnpm dev:program" && passed_message) || failed_message

@@ -22,7 +22,7 @@ enclave_wallet_set ag "$PRIVATE_KEY"
 # start swarm
 enclave_nodes_up
 
-waiton-files "$ROOT_DIR/target/debug/enclave" "$ROOT_DIR/target/debug/fake_encrypt"
+waiton-files "$ROOT_DIR/target/debug/fake_encrypt"
 
 heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
 pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost

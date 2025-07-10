@@ -1,83 +1,31 @@
-use anyhow::{bail, Result};
-use duct::cmd;
+mod program;
+mod program_dev;
+mod program_risc0;
+mod traits;
+mod utils;
+
+use anyhow::Result;
 use e3_config::ProgramConfig;
-use std::{env, path::PathBuf};
+use program::ProgramSupport;
+use std::env;
 use tokio::fs;
-use tokio::signal;
+use traits::ProgramSupportApi;
+use utils::{ensure_script_exists, run_bash_script};
 
-async fn run_bash_script(cwd: &PathBuf, script: &PathBuf, args: &[&str]) -> Result<()> {
-    println!("run_bash_script: {:?} {:?} {:?}", cwd, script, args); // Delete this later as this exposes
-                                                                    // credential information
-
-    // Build the command using cmd! macro for cleaner syntax
-    let mut cmd_args = vec!["bash".to_string(), script.to_string_lossy().to_string()];
-    cmd_args.extend(args.iter().map(|s| s.to_string()));
-
-    // Note this will not end up on shell history
-    let expression = cmd("bash", &cmd_args[1..]).dir(cwd);
-
-    let handle = expression.start()?;
-
-    tokio::select! {
-        result = async { handle.wait() } => {
-            match result {
-                Ok(output) => {
-                    if output.status.success() {
-                        Ok(())
-                    } else {
-                        bail!("{} failed with exit code: {:?}", script.display(), output.status.code());
-                    }
-                }
-                Err(e) => Err(e.into()),
-            }
-        }
-        _ = signal::ctrl_c() => {
-            let _ = handle.kill();
-            bail!("Script interrupted by user");
-        }
-    }
+pub async fn program_compile(program_config: ProgramConfig, is_dev: Option<bool>) -> Result<()> {
+    ProgramSupport::new(program_config, is_dev).compile().await
 }
 
-async fn ensure_script_exists(script_path: &PathBuf) -> Result<()> {
-    if !fs::try_exists(script_path).await? {
-        bail!("Invalid or corrupted project. This command can only be run from within a valid Enclave project.");
-    }
-    Ok(())
+pub async fn program_start(program_config: ProgramConfig, is_dev: Option<bool>) -> Result<()> {
+    ProgramSupport::new(program_config, is_dev).start().await
 }
 
-pub async fn program_compile() -> Result<()> {
-    let cwd = env::current_dir()?;
-    let script = cwd.join(".enclave/support/ctl/compile");
-    ensure_script_exists(&script).await?;
-    run_bash_script(&cwd, &script, &[]).await?;
-    Ok(())
-}
-
+/// Open up a shell in the docker container
 pub async fn program_shell() -> Result<()> {
     let cwd = env::current_dir()?;
     let script = cwd.join(".enclave/support/ctl/shell");
     ensure_script_exists(&script).await?;
     run_bash_script(&cwd, &script, &[]).await?;
-    Ok(())
-}
-
-pub async fn program_start(program_config: &ProgramConfig) -> Result<()> {
-    let cwd = env::current_dir()?;
-    let script = cwd.join(".enclave/support/ctl/start");
-    ensure_script_exists(&script).await?;
-
-    let risc0_config = program_config.risc0();
-    let risc0_dev_mode_str = risc0_config.risc0_dev_mode.to_string();
-
-    let mut args = vec!["--risc0-dev-mode", risc0_dev_mode_str.as_str()];
-
-    if let (Some(api_key), Some(api_url)) =
-        (&risc0_config.bonsai_api_key, &risc0_config.bonsai_api_url)
-    {
-        args.extend(["--api-key", api_key.as_str(), "--api-url", api_url.as_str()]);
-    }
-
-    run_bash_script(&cwd, &script, &args).await?;
     Ok(())
 }
 
