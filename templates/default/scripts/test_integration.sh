@@ -29,4 +29,4 @@ enclave program compile && (pnpm concurrently \
   "pnpm dev:evm" \
   "pnpm dev:ciphernodes" \
   "TEST_MODE=1 pnpm dev:server" \
-  "enclave program start" && passed_message) || failed_message
+  "wait-on file:/tmp/enclave_ciphernodes_ready && enclave program start" && passed_message) || failed_message
