@@ -7,9 +7,13 @@ use crate::{
 };
 
 fn get_mode(config: ProgramConfig, mode: Option<bool>) -> bool {
+    println!("*************************************************************");
     if let Some(m) = mode {
+        println!("USING PASSED IN MODE! WHICH IS {}", m);
         return m;
     };
+    println!("USING CONFIG MODE! WHICH IS {}", config.dev());
+
     config.dev()
 }
 
