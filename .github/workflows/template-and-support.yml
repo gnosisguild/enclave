@@ -204,13 +204,22 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target/
+            templates/default/target/
           key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: rust-deps-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.85.1
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: rust-deps-
       - name: Build enclave CLI
         run: cargo install --path crates/cli --bin enclave
       - name: Upload enclave binary
