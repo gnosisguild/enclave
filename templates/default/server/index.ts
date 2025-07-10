@@ -4,7 +4,6 @@ import {
   EnclaveEventType,
   type E3ActivatedData,
   type InputPublishedData,
-  type E3RequestedData,
 } from "@gnosis-guild/enclave/sdk";
 import { handleTestInteraction } from "./testHandler";
 import { getCheckedEnvVars } from "./utils";
@@ -96,8 +95,8 @@ async function runProgram(e3Id: bigint): Promise<void> {
 }
 
 function defer() {
-  let resolve: () => void = () => {};
-  let reject: (e?: any) => void = () => {};
+  let resolve: () => void = () => { };
+  let reject: (e?: any) => void = () => { };
 
   const promise = new Promise<void>((res, rej) => {
     resolve = res;

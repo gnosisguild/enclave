@@ -31,7 +31,7 @@ if command -v tmux &> /dev/null; then
     sleep 1
     tmux send-keys -t 3 'TEST_MODE=1 pnpm dev:server' C-m
     sleep 1
-    tmux send-keys -t 4 'enclave program start' C-m
+    tmux send-keys -t 4 'pnpm dev:program' C-m
     sleep 1
     tmux send-keys -t 5 'pnpm dev:frontend' C-m
     

@@ -2,4 +2,7 @@
 
 set -euo pipefail
 
-pnpm wait-on http://localhost:8545 && enclave program start
+echo "Waiting on ciphernodes to be ready..."
+pnpm wait-on file:/tmp/enclave_ciphernodes_ready
+echo "Ciphernodes are ready!"
+enclave program start
