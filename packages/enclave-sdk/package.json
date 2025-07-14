@@ -3,16 +3,23 @@
   "version": "0.0.0",
   "type": "module",
   "main": "dist/index.es.js",
-  "types": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "dist/index.d.ts",
+      "default": "dist/index.es.js"
+    }
+  },
   "scripts": {
     "dev": "vite",
+    "prebuild": "cd ../../crates/wasm && pnpm build",
     "build": "tsc && vite build",
     "test": "vitest --run"
   },
   "devDependencies": {
     "@gnosis-guild/enclave-config": "workspace:*",
     "concurrently": "^9.1.2",
-    "typescript": "~5.7.2",
+    "typescript": "5.8.3",
     "vite": "^6.2.0",
     "vite-plugin-dts": "^4.5.3"
   },

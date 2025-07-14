@@ -1,9 +1,9 @@
 {
   "extends": "@gnosis-guild/enclave-config/tsconfig.json",
   "include": ["src/**/*", "tests/**/*"],
-  "compileroptions": {
+  "exclude": ["node_modules"],
+  "compilerOptions": {
     "incremental": true,
-    "tsbuildinfofile": "./dist/.tsbuildinfo",
-    "allowimportingtsextensions": true
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   }
 }

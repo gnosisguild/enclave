@@ -2,9 +2,13 @@
   "name": "@gnosis-guild/enclave-react",
   "version": "0.0.5-test.22",
   "description": "React hooks and utilities for Enclave SDK",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "dist/index.d.ts",
+      "default": "dist/index.js"
+    }
+  },
   "sideEffects": false,
   "files": [
     "dist"
@@ -42,8 +46,9 @@
     "viem": "2.30.6"
   },
   "devDependencies": {
+    "@gnosis-guild/enclave-config": "workspace:*",
     "@types/react": "^18.2.0",
-    "typescript": "^5.8.3"
+    "typescript": "5.8.3"
   },
   "repository": {
     "type": "git",

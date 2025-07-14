@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 import wasm from "vite-plugin-wasm";
@@ -20,5 +19,13 @@ export default defineConfig({
     format: "es",
     plugins: () => [wasm(), topLevelAwait(), dts({ rollupTypes: true })],
   },
-  plugins: [wasm(), topLevelAwait()],
+  plugins: [
+    wasm(),
+    topLevelAwait(),
+    dts({
+      insertTypesEntry: true,
+      outDir: "dist",
+      entryRoot: "src",
+    }),
+  ],
 });
