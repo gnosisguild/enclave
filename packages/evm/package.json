@@ -94,9 +94,10 @@
   "scripts": {
     "clean": "rimraf ./artifacts ./cache ./coverage ./types ./dist ./coverage.json && pnpm typechain",
     "build": "pnpm compile",
-    "compile": "pnpm compile:contracts && pnpm compile:scripts",
+    "compile": "pnpm compile:contracts && pnpm compile:scripts && pnpm compile:types",
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
     "compile:scripts": "tsc -p tsconfig.json --noEmitOnError false --noCheck",
+    "compile:types": "tsc -p types.tsconfig.json --noEmitOnError false --noCheck",
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
     "deploy:mocks": "hardhat deploy --tags enclave,mocks",

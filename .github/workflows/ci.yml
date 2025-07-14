@@ -66,6 +66,7 @@ jobs:
 
       - name: Run tests
         run: "pnpm ciphernode:test"
+
   build:
     name: Compile and push Support Dockerfile
     runs-on: ubuntu-latest
@@ -184,6 +185,7 @@ jobs:
         run: |
           echo "## Network test results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+
   integration_prebuild:
     name: Prebuild Integration Tools
     runs-on: "ubuntu-latest"
@@ -230,6 +232,7 @@ jobs:
             target/debug/fake_encrypt
             target/debug/pack_e3_params
           if-no-files-found: error
+
   ciphernode_integration_test:
     name: Ciphernode Integration Test
     needs: [integration_prebuild, build_enclave_cli, build_sdk]
@@ -292,6 +295,7 @@ jobs:
         run: |
           echo "## Test results for ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+
   build_enclave_cli:
     name: Build Enclave CLI
     runs-on: ubuntu-latest
@@ -329,6 +333,7 @@ jobs:
           name: enclave-binary
           path: ~/.cargo/bin/enclave
           retention-days: 1
+
   build_support_scripts:
     name: Build Support Scripts
     runs-on: ubuntu-latest
@@ -362,6 +367,7 @@ jobs:
           path: templates/default/target/
           retention-days: 1
           if-no-files-found: error
+
   build_sdk:
     name: Build SDK
     runs-on: ubuntu-latest
@@ -421,6 +427,7 @@ jobs:
             crates/wasm/dist
           retention-days: 1
           if-no-files-found: warn
+
   template_integration:
     name: Template Integration
     runs-on: ubuntu-latest
