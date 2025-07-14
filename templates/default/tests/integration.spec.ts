@@ -1,18 +1,18 @@
 import {
+  AllEventTypes,
   calculateStartWindow,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
+  E3,
+  EnclaveEvent,
   EnclaveEventType,
   EnclaveSDK,
   encodeBfvParams,
   encodeComputeProviderParams,
-  RegistryEventType,
-  AllEventTypes,
-  EnclaveEvent,
   encryptNumber,
+  RegistryEventType,
 } from "@gnosis-guild/enclave-sdk";
 import { hexToBytes } from "viem";
-import { E3 } from "@gnosis-guild/enclave-sdk/types";
 import assert from "assert";
 
 export function getContractAddresses() {

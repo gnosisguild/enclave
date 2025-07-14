@@ -7,6 +7,7 @@ export { ContractClient } from "./contract-client";
 
 // Types and interfaces
 export type {
+  E3,
   SDKConfig,
   EventListenerConfig,
   ContractInstances,
