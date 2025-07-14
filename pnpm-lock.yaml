@@ -501,6 +501,9 @@ importers:
       '@gnosis-guild/enclave':
         specifier: workspace:*
         version: link:../../packages/evm
+      '@gnosis-guild/enclave-sdk':
+        specifier: workspace:*
+        version: link:../../packages/enclave-sdk
       '@types/yargs':
         specifier: ^17.0.33
         version: 17.0.33
