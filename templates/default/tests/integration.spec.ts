@@ -10,9 +10,9 @@ import {
   AllEventTypes,
   EnclaveEvent,
   encryptNumber,
-} from "@gnosis-guild/enclave/sdk";
+} from "@gnosis-guild/enclave-sdk";
 import { hexToBytes } from "viem";
-import { E3 } from "@gnosis-guild/enclave/sdk/types.js";
+import { E3 } from "@gnosis-guild/enclave-sdk/types";
 import assert from "assert";
 
 export function getContractAddresses() {

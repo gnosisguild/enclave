@@ -5,7 +5,9 @@ description: 'Build client applications and coordination servers using the Encla
 
 # Setting Up the Client and Server
 
-Building E3 applications involves creating client-side interfaces for users and coordination logic for managing the E3 lifecycle. The Enclave SDK provides powerful TypeScript and React tools to streamline this development process.
+Building E3 applications involves creating client-side interfaces for users and coordination logic
+for managing the E3 lifecycle. The Enclave SDK provides powerful TypeScript and React tools to
+streamline this development process.
 
 ## Overview
 
@@ -17,6 +19,7 @@ Modern E3 applications typically consist of:
 4. **Contract Interactions**: Type-safe smart contract communication
 
 The Enclave SDK handles much of this complexity for you, providing:
+
 - Type-safe contract interactions
 - Real-time event listening
 - React hooks for easy frontend integration
@@ -43,44 +46,44 @@ pnpm add @gnosis-guild/enclave @gnosis-guild/enclave-react
 Create a type-safe client that can interact with Enclave contracts:
 
 ```typescript
-import { EnclaveSDK, EnclaveEventType } from "@gnosis-guild/enclave/sdk";
-import { createPublicClient, createWalletClient, http, custom } from "viem";
+import { EnclaveSDK, EnclaveEventType } from '@gnosis-guild/enclave-sdk'
+import { createPublicClient, createWalletClient, http, custom } from 'viem'
 
 // Initialize clients
 const publicClient = createPublicClient({
-  transport: http("http://localhost:8545"), // Your RPC URL
-});
+  transport: http('http://localhost:8545'), // Your RPC URL
+})
 
 const walletClient = createWalletClient({
   transport: custom(window.ethereum),
-});
+})
 
 // Create SDK instance
 const sdk = new EnclaveSDK({
   publicClient,
   walletClient,
   contracts: {
-    enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-    ciphernodeRegistry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    enclave: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
+    ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
   },
   chainId: 31337, // Hardhat local network
-});
+})
 
 // Initialize the SDK
-await sdk.initialize();
+await sdk.initialize()
 
 // Request a new E3 computation
 const hash = await sdk.requestE3({
-  filter: "0x0000000000000000000000000000000000000000",
+  filter: '0x0000000000000000000000000000000000000000',
   threshold: [2, 3],
   startWindow: [BigInt(0), BigInt(100)],
   duration: BigInt(3600),
-  e3Program: "0x9A676e781A523b5d0C0e43731313A708CB607508",
-  e3ProgramParams: "0x",
-  computeProviderParams: "0x",
-});
+  e3Program: '0x9A676e781A523b5d0C0e43731313A708CB607508',
+  e3ProgramParams: '0x',
+  computeProviderParams: '0x',
+})
 
-console.log("E3 requested with hash:", hash);
+console.log('E3 requested with hash:', hash)
 ```
 
 ### React Application with Hooks
@@ -93,7 +96,7 @@ import { useEnclaveSDK } from '@gnosis-guild/enclave-react';
 
 function E3Dashboard() {
   const [e3Data, setE3Data] = useState(null);
-  
+
   const {
     sdk,
     isInitialized,
@@ -186,35 +189,35 @@ The SDK provides comprehensive event handling for the entire E3 lifecycle:
 ```typescript
 // Listen to key E3 lifecycle events
 sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
-  console.log("New E3 computation requested:", event.data);
-});
+  console.log('New E3 computation requested:', event.data)
+})
 
 sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, (event) => {
-  console.log("E3 environment activated:", event.data);
-});
+  console.log('E3 environment activated:', event.data)
+})
 
 sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, (event) => {
-  console.log("Input data published:", event.data);
-});
+  console.log('Input data published:', event.data)
+})
 
 sdk.onEnclaveEvent(EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED, (event) => {
-  console.log("Computation result available:", event.data);
-});
+  console.log('Computation result available:', event.data)
+})
 ```
 
 ### Registry Events
 
 ```typescript
-import { RegistryEventType } from '@gnosis-guild/enclave/sdk';
+import { RegistryEventType } from '@gnosis-guild/enclave/sdk'
 
 // Monitor ciphernode network changes
 sdk.onEnclaveEvent(RegistryEventType.CIPHERNODE_ADDED, (event) => {
-  console.log("New ciphernode joined:", event.data);
-});
+  console.log('New ciphernode joined:', event.data)
+})
 
 sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (event) => {
-  console.log("Committee selection complete:", event.data);
-});
+  console.log('Committee selection complete:', event.data)
+})
 ```
 
 ## Server-Side Coordination
@@ -222,76 +225,73 @@ sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (event) => {
 For server-side applications, you can create automated coordination services:
 
 ```typescript
-import { EnclaveSDK } from "@gnosis-guild/enclave/sdk";
-import { createPublicClient, createWalletClient, http } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { EnclaveSDK } from '@gnosis-guild/enclave-sdk'
+import { createPublicClient, createWalletClient, http } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 
 class E3CoordinationServer {
-  private sdk: EnclaveSDK;
+  private sdk: EnclaveSDK
 
   constructor(privateKey: string, rpcUrl: string) {
-    const account = privateKeyToAccount(privateKey as `0x${string}`);
-    
+    const account = privateKeyToAccount(privateKey as `0x${string}`)
+
     const publicClient = createPublicClient({
       transport: http(rpcUrl),
-    });
+    })
 
     const walletClient = createWalletClient({
       account,
       transport: http(rpcUrl),
-    });
+    })
 
     this.sdk = new EnclaveSDK({
       publicClient,
       walletClient,
       contracts: {
-        enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-        ciphernodeRegistry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        enclave: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
+        ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
       },
-    });
+    })
   }
 
   async start() {
-    await this.sdk.initialize();
-    this.setupEventListeners();
-    console.log("E3 Coordination Server started");
+    await this.sdk.initialize()
+    this.setupEventListeners()
+    console.log('E3 Coordination Server started')
   }
 
   private setupEventListeners() {
     // Auto-activate E3s when they become available
     this.sdk.onEnclaveEvent(EnclaveEventType.E3_REQUESTED, async (event) => {
-      const { e3Id } = event.data;
-      console.log(`Auto-activating E3 ${e3Id}`);
-      
+      const { e3Id } = event.data
+      console.log(`Auto-activating E3 ${e3Id}`)
+
       try {
         // In a real implementation, you'd generate/retrieve the public key
-        const publicKey = "0x..."; // Your FHE public key
-        await this.sdk.activateE3(e3Id, publicKey);
+        const publicKey = '0x...' // Your FHE public key
+        await this.sdk.activateE3(e3Id, publicKey)
       } catch (error) {
-        console.error(`Failed to activate E3 ${e3Id}:`, error);
+        console.error(`Failed to activate E3 ${e3Id}:`, error)
       }
-    });
+    })
 
     // Handle input aggregation
     this.sdk.onEnclaveEvent(EnclaveEventType.INPUT_PUBLISHED, async (event) => {
-      console.log("Input published:", event.data);
+      console.log('Input published:', event.data)
       // Implement your input aggregation logic here
-    });
+    })
   }
 
   async stop() {
-    this.sdk.cleanup();
-    console.log("E3 Coordination Server stopped");
+    this.sdk.cleanup()
+    console.log('E3 Coordination Server stopped')
   }
 }
 
 // Usage
-const server = new E3CoordinationServer(
-  process.env.PRIVATE_KEY!,
-  process.env.RPC_URL!
-);
+const server = new E3CoordinationServer(process.env.PRIVATE_KEY!, process.env.RPC_URL!)
 
-server.start();
+server.start()
 ```
 
 ## Error Handling
@@ -299,29 +299,29 @@ server.start();
 The SDK includes comprehensive error handling:
 
 ```typescript
-import { SDKError } from "@gnosis-guild/enclave/sdk";
+import { SDKError } from '@gnosis-guild/enclave-sdk'
 
 try {
-  await sdk.requestE3(params);
+  await sdk.requestE3(params)
 } catch (error) {
   if (error instanceof SDKError) {
-    console.error(`SDK Error (${error.code}): ${error.message}`);
-    
+    console.error(`SDK Error (${error.code}): ${error.message}`)
+
     switch (error.code) {
-      case "MISSING_PUBLIC_CLIENT":
+      case 'MISSING_PUBLIC_CLIENT':
         // Handle missing client
-        break;
-      case "INVALID_ADDRESS":
+        break
+      case 'INVALID_ADDRESS':
         // Handle invalid contract address
-        break;
-      case "TRANSACTION_FAILED":
+        break
+      case 'TRANSACTION_FAILED':
         // Handle transaction failure
-        break;
+        break
       default:
-        console.error("Unknown SDK error:", error);
+        console.error('Unknown SDK error:', error)
     }
   } else {
-    console.error("Unexpected error:", error);
+    console.error('Unexpected error:', error)
   }
 }
 ```
@@ -335,12 +335,12 @@ For local development with the default template:
 ```typescript
 const devConfig = {
   contracts: {
-    enclave: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-    ciphernodeRegistry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    enclave: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
+    ciphernodeRegistry: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
   },
   chainId: 31337,
-  rpcUrl: "http://localhost:8545",
-};
+  rpcUrl: 'http://localhost:8545',
+}
 ```
 
 ### Production Configuration
@@ -355,7 +355,8 @@ const prodConfig = {
   },
   chainId: 1, // Mainnet
   rpcUrl: process.env.RPC_URL!,
-};
+}
 ```
 
-The Enclave SDK abstracts away much of the complexity, allowing you to focus on your application's unique business logic while ensuring robust, type-safe interaction with the Enclave protocol.
+The Enclave SDK abstracts away much of the complexity, allowing you to focus on your application's
+unique business logic while ensuring robust, type-safe interaction with the Enclave protocol.

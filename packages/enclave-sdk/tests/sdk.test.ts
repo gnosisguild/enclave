@@ -1,8 +1,8 @@
-import { expect } from "chai";
+import { describe, expect, it } from 'vitest'
 import fs from "fs/promises";
 import path from "path";
 
-import { encryptNumber } from "../src/sdk";
+import { encryptNumber } from "../src";
 
 describe("encryptNumber", () => {
   it("should encrypt a number without crashing in a node environent", async () => {

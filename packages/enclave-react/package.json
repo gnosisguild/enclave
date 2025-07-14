@@ -31,15 +31,15 @@
   "license": "LGPL-3.0-only",
   "peerDependencies": {
     "react": "^18.2.0",
-    "wagmi": "^2.14.16",
-    "viem": "2.30.6"
+    "wagmi": "^2.14.16"
   },
   "publishConfig": {
     "access": "public",
     "git-checks": false
   },
   "dependencies": {
-    "@gnosis-guild/enclave": "workspace:*"
+    "@gnosis-guild/enclave-sdk": "workspace:*",
+    "viem": "2.30.6"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

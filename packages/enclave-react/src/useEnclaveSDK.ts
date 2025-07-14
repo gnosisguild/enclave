@@ -8,7 +8,7 @@ import {
   EnclaveEventType,
   RegistryEventType,
   SDKError,
-} from "@gnosis-guild/enclave/sdk";
+} from "@gnosis-guild/enclave-sdk";
 
 export interface UseEnclaveSDKConfig {
   contracts?: {
@@ -94,8 +94,8 @@ export const useEnclaveSDK = (
       }
 
       const sdkConfig: SDKConfig = {
-        publicClient,
-        walletClient: walletClient || undefined,
+        publicClient: publicClient as SDKConfig["publicClient"],
+        walletClient: walletClient as SDKConfig["walletClient"],
         contracts: config.contracts || {
           enclave: "0x0000000000000000000000000000000000000000",
           ciphernodeRegistry: "0x0000000000000000000000000000000000000000",

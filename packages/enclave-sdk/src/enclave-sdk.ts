@@ -14,7 +14,7 @@ import { hardhat, mainnet, monadTestnet, sepolia } from "viem/chains";
 import {
   CiphernodeRegistryOwnable__factory,
   Enclave__factory,
-} from "../../types";
+} from "@gnosis-guild/enclave/types";
 import { ContractClient } from "./contract-client";
 import { EventListener } from "./event-listener";
 import {
@@ -353,9 +353,9 @@ export class EnclaveSDK {
       options.rpcUrl.startsWith("ws://") || options.rpcUrl.startsWith("wss://");
     const transport = isWebSocket
       ? webSocket(options.rpcUrl, {
-          keepAlive: { interval: 30_000 },
-          reconnect: { attempts: 5, delay: 2_000 },
-        })
+        keepAlive: { interval: 30_000 },
+        reconnect: { attempts: 5, delay: 2_000 },
+      })
       : http(options.rpcUrl);
     const publicClient = createPublicClient({
       chain,

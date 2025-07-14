@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@gnosis-guild/enclave": "workspace:*",
+    "@gnosis-guild/enclave-sdk": "workspace:*",
     "@types/yargs": "^17.0.33",
     "yargs": "^18.0.0",
     "viem": "2.30.6"

@@ -4,7 +4,7 @@ import {
   type CiphernodeRegistryOwnable,
   type Enclave,
   type MockCiphernodeRegistry,
-} from "../../types";
+} from "@gnosis-guild/enclave/types";
 
 export interface SDKConfig {
   publicClient: PublicClient;
@@ -182,10 +182,10 @@ export interface RegistryEventData {
 export interface EnclaveEvent<T extends AllEventTypes> {
   type: T;
   data: T extends EnclaveEventType
-    ? EnclaveEventData[T]
-    : T extends RegistryEventType
-      ? RegistryEventData[T]
-      : unknown;
+  ? EnclaveEventData[T]
+  : T extends RegistryEventType
+  ? RegistryEventData[T]
+  : unknown;
   log: Log;
   timestamp: Date;
   blockNumber: bigint;

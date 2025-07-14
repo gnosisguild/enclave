@@ -19,7 +19,7 @@ methods, and comprehensive error handling.
 ## Installation
 
 ```bash
-pnpm add @gnosis-guild/enclave
+pnpm add @gnosis-guild/enclave-sdk
 ```
 
 ## Quick Start
@@ -29,7 +29,7 @@ import {
   EnclaveSDK,
   EnclaveEventType,
   RegistryEventType,
-} from "@gnosis-guild/enclave/sdk";
+} from "@gnosis-guild/enclave-sdk";
 import { createPublicClient, createWalletClient, http, custom } from "viem";
 
 // Initialize clients
@@ -260,7 +260,7 @@ interface SDKConfig {
 The SDK includes comprehensive error handling:
 
 ```typescript
-import { SDKError } from "@gnosis-guild/enclave/sdk";
+import { SDKError } from "@gnosis-guild/enclave-sdk";
 
 try {
   await sdk.requestE3(params);

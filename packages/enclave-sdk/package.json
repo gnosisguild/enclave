@@ -1,0 +1,29 @@
+{
+  "name": "@gnosis-guild/enclave-sdk",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/index.es.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@gnosis-guild/enclave-config": "workspace:*",
+    "concurrently": "^9.1.2",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0",
+    "vite-plugin-dts": "^4.5.3"
+  },
+  "dependencies": {
+    "@gnosis-guild/e3-wasm": "workspace:*",
+    "@gnosis-guild/enclave": "workspace:*",
+    "comlink": "^4.4.2",
+    "viem": "2.30.6",
+    "vite-plugin-top-level-await": "^1.5.0",
+    "vite-plugin-wasm": "^3.4.1",
+    "vitest": "^1.6.1",
+    "web-worker": "^1.5.0"
+  }
+}

@@ -4,7 +4,7 @@ import {
   EnclaveEventType,
   type E3ActivatedData,
   type InputPublishedData,
-} from "@gnosis-guild/enclave/sdk";
+} from "@gnosis-guild/enclave-sdk";
 import { handleTestInteraction } from "./testHandler";
 import { getCheckedEnvVars } from "./utils";
 import { callFheRunner } from "./runner";

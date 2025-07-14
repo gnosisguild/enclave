@@ -1,0 +1,14 @@
+{
+  "name": "@gnosis-guild/enclave-config",
+  "version": "0.0.0",
+  "description": "",
+  "module": true,
+  "main": "index.js",
+  "exports": {
+    "./tsconfig.json": "./tsconfig.json",
+    "./dom.tsconfig.json": "./dom.tsconfig.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
