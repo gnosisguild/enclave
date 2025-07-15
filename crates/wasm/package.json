@@ -4,7 +4,8 @@
   "description": "Wasm modules for enclave.",
   "main": "index.js",
   "files": [
-    "dist"
+    "dist/",
+    "dist/**/*"
   ],
   "scripts": {
     "build": "./scripts/build.sh"

@@ -222,8 +222,8 @@ async function main() {
   const num1 = 12n;
   const num2 = 21n;
   const publicKeyBytes = hexToBytes(state.publicKey);
-  const enc1 = encryptNumber(num1, publicKeyBytes);
-  const enc2 = encryptNumber(num2, publicKeyBytes);
+  const enc1 = await encryptNumber(num1, publicKeyBytes);
+  const enc2 = await encryptNumber(num2, publicKeyBytes);
 
   await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
     await sdk.publishInput(
