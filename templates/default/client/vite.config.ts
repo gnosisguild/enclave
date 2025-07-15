@@ -15,10 +15,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['@rollup/browser'],
-    include: [
-      '@gnosis-guild/enclave/sdk',
-      '@gnosis-guild/enclave-react',
-    ],
+    include: ['@gnosis-guild/enclave-sdk', '@gnosis-guild/enclave-react'],
     force: true,
   },
   build: {
@@ -31,20 +28,12 @@ export default defineConfig({
       react: path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
       wagmi: path.resolve(__dirname, 'node_modules/wagmi'),
-      '@gnosis-guild/enclave-react': path.resolve(
-        __dirname,
-        'node_modules/@gnosis-guild/enclave-react'
-      ),
+      '@gnosis-guild/enclave-react': path.resolve(__dirname, 'node_modules/@gnosis-guild/enclave-react'),
       '@': path.resolve(__dirname, './src'),
       libs: path.resolve(__dirname, './libs'),
     },
   },
-  plugins: [
-    wasm(),
-    topLevelAwait(),
-    react(),
-    viteTsconfigPaths(),
-  ],
+  plugins: [wasm(), topLevelAwait(), react(), viteTsconfigPaths()],
   server: {
     open: true,
     port: 3000,
