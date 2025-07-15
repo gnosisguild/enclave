@@ -6,7 +6,7 @@ import { PoseidonT3, proxy } from "poseidon-solidity";
 const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
 const addressOne = "0x0000000000000000000000000000000000000001";
 
-const func: DeployFunction = async function(hre: HardhatRuntimeEnvironment) {
+const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
