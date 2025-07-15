@@ -2,12 +2,10 @@
   "name": "@gnosis-guild/enclave-sdk",
   "version": "0.0.0",
   "type": "module",
-  "main": "dist/index.es.js",
-  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "dist/index.d.ts",
-      "default": "dist/index.es.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.es.js"
     }
   },
   "scripts": {

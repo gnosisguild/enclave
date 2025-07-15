@@ -19,8 +19,8 @@
     "@gnosis-guild/enclave": "workspace:*",
     "@gnosis-guild/enclave-sdk": "workspace:*",
     "@types/yargs": "^17.0.33",
-    "yargs": "^18.0.0",
-    "viem": "2.30.6"
+    "viem": "2.30.6",
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
@@ -48,6 +48,7 @@
     "poseidon-lite": "^0.3.0",
     "solidity-coverage": "^0.8.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.3",
     "typechain": "^8.3.0",
     "typed-rpc": "^6.1.1",
     "typescript": "^5.8.3",

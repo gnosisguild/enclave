@@ -95,8 +95,8 @@ async function runProgram(e3Id: bigint): Promise<void> {
 }
 
 function defer() {
-  let resolve: () => void = () => { };
-  let reject: (e?: any) => void = () => { };
+  let resolve: () => void = () => {};
+  let reject: (e?: any) => void = () => {};
 
   const promise = new Promise<void>((res, rej) => {
     resolve = res;
