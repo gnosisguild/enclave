@@ -5,7 +5,7 @@
   "compilerOptions": {
     "incremental": true,
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
-    "moduleResolution": "node",
+    "module": "preserve",
     "outDir": "dist",
     "noEmit": false
   }
