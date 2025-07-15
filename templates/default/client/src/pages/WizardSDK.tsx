@@ -17,12 +17,10 @@ import {
   decodePlaintextOutput,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
-} from '@gnosis-guild/enclave/sdk'
+  encryptNumber,
+} from '@gnosis-guild/enclave-sdk'
 import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS, getContractAddresses } from '@/utils/env-config'
 import { formatContractError } from '@/utils/error-formatting'
-
-// WebAssembly hook
-import { useWebAssemblyHook } from '@/hooks/useWebAssembly'
 
 // Icons
 import {
@@ -542,7 +540,6 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ input1, input2, result, e3Sta
 
 const WizardSDK: React.FC = () => {
   const { isConnected } = useAccount()
-  const { isLoaded: isWasmLoaded, encryptInput } = useWebAssemblyHook()
 
   if (HAS_MISSING_ENV_VARS) {
     return <EnvironmentError missingVars={MISSING_ENV_VARS} />
@@ -783,8 +780,8 @@ const WizardSDK: React.FC = () => {
       const publicKeyBytes = hexToBytes(e3State.publicKey)
 
       // Encrypt both inputs
-      const encryptedInput1 = await encryptInput(num1, publicKeyBytes)
-      const encryptedInput2 = await encryptInput(num2, publicKeyBytes)
+      const encryptedInput1 = await encryptNumber(num1, publicKeyBytes)
+      const encryptedInput2 = await encryptNumber(num2, publicKeyBytes)
 
       if (!encryptedInput1 || !encryptedInput2) {
         throw new Error('Failed to encrypt inputs')
