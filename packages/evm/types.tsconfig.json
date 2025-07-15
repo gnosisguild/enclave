@@ -8,14 +8,14 @@
     "forceConsistentCasingInFileNames": true,
     "lib": ["es2022"],
     "moduleResolution": "bundler",
-    "module": "ESNext",
+    "module": "preserve",
     "outDir": "dist/types",
     "noImplicitAny": true,
     "removeComments": true,
     "resolveJsonModule": true,
     "sourceMap": true,
     "strict": true,
-    "target": "es2022"
+    "target": "esnext"
   },
   "exclude": ["node_modules"],
   "include": ["types/**/*"]

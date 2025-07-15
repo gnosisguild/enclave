@@ -24,7 +24,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     uint256 public numCiphernodes;
     LeanIMTData public ciphernodes;
 
-    mapping(uint256 e3Id => IRegistryFilter filter) public filters;
+    mapping(uint256 e3Id => IRegistryFilter filter) public registryFilters;
     mapping(uint256 e3Id => uint256 root) public roots;
     mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
 
@@ -80,10 +80,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         uint32[2] calldata threshold
     ) external onlyEnclave returns (bool success) {
         require(
-            filters[e3Id] == IRegistryFilter(address(0)),
+            registryFilters[e3Id] == IRegistryFilter(address(0)),
             CommitteeAlreadyRequested()
         );
-        filters[e3Id] = IRegistryFilter(filter);
+        registryFilters[e3Id] = IRegistryFilter(filter);
         roots[e3Id] = root();
 
         IRegistryFilter(filter).requestCommittee(e3Id, threshold);
@@ -97,7 +97,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         bytes calldata publicKey
     ) external {
         // only to be published by the filter
-        require(address(filters[e3Id]) == msg.sender, OnlyFilter());
+        require(address(registryFilters[e3Id]) == msg.sender, OnlyFilter());
 
         publicKeyHashes[e3Id] = keccak256(publicKey);
         emit CommitteePublished(e3Id, publicKey);
@@ -167,7 +167,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     function getFilter(uint256 e3Id) public view returns (IRegistryFilter) {
-        return filters[e3Id];
+        return registryFilters[e3Id];
     }
 
     function treeSize() public view returns (uint256) {

@@ -4,6 +4,7 @@ import { PoseidonT3__factory } from "../../types";
 
 export async function PoseidonT3Fixture(name?: string) {
   const [signer] = await ethers.getSigners();
+  if (!signer) throw new Error("Bad getSigners output");
   const deployment = await (
     await ethers.getContractFactory(name || "PoseidonT3")
   ).deploy();

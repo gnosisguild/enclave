@@ -25,7 +25,7 @@ export $(enclave print-env --chain hardhat)
   --prefix-colors "blue,cyan,magenta,yellow,green" \
   --kill-others \
   --success first \
-  "wait-on http://localhost:13151/health && pnpm ts-node ./tests/integration.spec.ts" \
+  "wait-on http://localhost:13151/health && pnpm ts-node --esm --swc ./tests/integration.spec.ts" \
   "pnpm dev:evm" \
   "pnpm dev:ciphernodes" \
   "TEST_MODE=1 pnpm dev:server" \
