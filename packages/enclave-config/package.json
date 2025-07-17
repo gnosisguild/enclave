@@ -4,6 +4,7 @@
   "description": "",
   "module": true,
   "main": "index.js",
+  "type": "module",
   "exports": {
     "./tsup": "./tsup.config.js",
     "./tsconfig.json": "./tsconfig.json",
