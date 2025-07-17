@@ -409,17 +409,12 @@ jobs:
         run: pnpm install
       - name: Build the sdk
         run: pnpm build
-      - name: List built artifacts for debugging
-        run: |
-          echo "Checking for built artifacts:"
-          ls -la packages/evm/ || echo "packages/evm/ not found"
-          ls -la crates/wasm/ || echo "crates/wasm/ not found"
-          find . -name "dist" -type d || echo "No dist directories found"
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-artifacts
           path: |
+            packages/enclave-sdk/dist
             packages/evm/dist
             packages/evm/artifacts
             packages/evm/cache
