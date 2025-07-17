@@ -408,7 +408,7 @@ jobs:
       - name: Install node dependencies
         run: pnpm install
       - name: Build the sdk
-        run: pnpm build
+        run: pnpm sdk:build
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4
         with:
