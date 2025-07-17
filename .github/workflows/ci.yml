@@ -408,7 +408,7 @@ jobs:
       - name: Install node dependencies
         run: pnpm install
       - name: Build the sdk
-        run: pnpm evm:build
+        run: pnpm build
       - name: List built artifacts for debugging
         run: |
           echo "Checking for built artifacts:"
