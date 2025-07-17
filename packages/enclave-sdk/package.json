@@ -5,18 +5,20 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.es.js"
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "dev": "vite",
     "prebuild": "cd ../../crates/wasm && pnpm build",
-    "build": "tsc && vite build",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
     "test": "vitest --run"
   },
   "devDependencies": {
     "@gnosis-guild/enclave-config": "workspace:*",
     "concurrently": "^9.1.2",
+    "tsup": "^8.5.0",
     "typescript": "5.8.3",
     "vite": "^6.2.0",
     "vite-plugin-dts": "^4.5.3"

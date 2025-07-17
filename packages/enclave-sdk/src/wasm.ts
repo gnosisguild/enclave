@@ -1,4 +1,5 @@
-import init, { encrypt_number } from "@gnosis-guild/e3-wasm";
+import { encrypt_number } from "@gnosis-guild/e3-wasm";
+import init from "@gnosis-guild/e3-wasm/init";
 
 export async function encryptNumber(
   data: bigint,

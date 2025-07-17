@@ -5,8 +5,8 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "dist/index.d.ts",
-      "default": "dist/index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "sideEffects": false,
@@ -14,8 +14,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build",
     "release": "pnpm publish"
@@ -48,6 +48,7 @@
   "devDependencies": {
     "@gnosis-guild/enclave-config": "workspace:*",
     "@types/react": "^18.2.0",
+    "tsup": "^8.5.0",
     "typescript": "5.8.3"
   },
   "repository": {

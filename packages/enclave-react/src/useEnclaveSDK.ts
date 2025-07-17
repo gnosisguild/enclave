@@ -94,8 +94,8 @@ export const useEnclaveSDK = (
       }
 
       const sdkConfig: SDKConfig = {
-        publicClient: publicClient as any, // TODO: fix me
-        walletClient: walletClient as any, // TODO: fix me
+        publicClient: publicClient,
+        walletClient: walletClient, // TODO: fix me
         contracts: config.contracts || {
           enclave: "0x0000000000000000000000000000000000000000",
           ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
@@ -105,7 +105,7 @@ export const useEnclaveSDK = (
 
       const newSdk = new EnclaveSDK(sdkConfig);
       await newSdk.initialize();
-
+      console.log(">>> SDK CREATED");
       setSdk(newSdk);
       sdkRef.current = newSdk;
       setIsInitialized(true);

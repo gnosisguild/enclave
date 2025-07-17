@@ -5,10 +5,14 @@
   "module": true,
   "main": "index.js",
   "exports": {
+    "./tsup": "./tsup.config.js",
     "./tsconfig.json": "./tsconfig.json",
     "./dom.tsconfig.json": "./dom.tsconfig.json"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "LGPL-3.0-only",
+  "peerDependencies": {
+    "tsup": "^8.5.0"
+  }
 }

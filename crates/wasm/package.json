@@ -11,17 +11,33 @@
     "build": "./scripts/build.sh"
   },
   "exports": {
-    "node": {
-      "types": "./dist/nodejs/e3_wasm.d.ts",
-      "default": "./dist/nodejs/e3_wasm.js"
+    ".": {
+      "node": {
+        "types": "./dist/nodejs/e3_wasm.d.ts",
+        "default": "./dist/nodejs/e3_wasm.js"
+      },
+      "browser": {
+        "types": "./dist/web/e3_wasm.d.ts",
+        "default": "./dist/web/e3_wasm.js"
+      },
+      "default": {
+        "types": "./dist/web/e3_wasm.d.ts",
+        "default": "./dist/web/e3_wasm.js"
+      }
     },
-    "browser": {
-      "types": "./dist/web/e3_wasm.d.ts",
-      "default": "./dist/web/e3_wasm.js"
-    },
-    "default": {
-      "types": "./dist/web/e3_wasm.d.ts",
-      "default": "./dist/web/e3_wasm.js"
+    "./init": {
+      "node": {
+        "types": "./init.d.ts",
+        "default": "./init_node.js"
+      },
+      "browser": {
+        "types": "./init.d.ts",
+        "default": "./init_web.js"
+      },
+      "default": {
+        "types": "./init.d.ts",
+        "default": "./init_web.js"
+      }
     }
   },
   "keywords": [],

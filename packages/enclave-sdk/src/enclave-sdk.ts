@@ -94,6 +94,8 @@ export class EnclaveSDK {
     value?: bigint;
     gasLimit?: bigint;
   }): Promise<Hash> {
+    console.log(">>> REQUEST");
+
     if (!this.initialized) {
       await this.initialize();
     }
@@ -353,9 +355,9 @@ export class EnclaveSDK {
       options.rpcUrl.startsWith("ws://") || options.rpcUrl.startsWith("wss://");
     const transport = isWebSocket
       ? webSocket(options.rpcUrl, {
-        keepAlive: { interval: 30_000 },
-        reconnect: { attempts: 5, delay: 2_000 },
-      })
+          keepAlive: { interval: 30_000 },
+          reconnect: { attempts: 5, delay: 2_000 },
+        })
       : http(options.rpcUrl);
     const publicClient = createPublicClient({
       chain,
