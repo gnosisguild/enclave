@@ -1,19 +1,11 @@
 {
   "extends": "@gnosis-guild/enclave-config/tsconfig.json",
+  "include": ["tasks/**/*", "test/**/*", "deploy/**/*", "types/**/*"],
+  "exclude": ["node_modules", "dist"],
   "compilerOptions": {
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "lib": ["es2022"],
     "module": "commonjs",
     "moduleResolution": "node",
-    "outDir": "dist",
-    "noImplicitAny": true,
-    "removeComments": true,
-    "sourceMap": true,
-    "target": "es2022",
-    "noEmit": false
-  },
-  "exclude": ["node_modules"],
-  "files": ["hardhat.config.ts"],
-  "include": ["tasks/**/*", "test/**/*", "deploy/**/*", "types/**/*"]
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  }
 }

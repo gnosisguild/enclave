@@ -9,23 +9,37 @@
   },
   "exports": {
     "./deploy/enclave": {
-      "types": "./dist/deploy/enclave.d.ts",
-      "import": "./dist/deploy/enclave.js",
-      "require": "./dist/deploy/enclave.js"
+      "import": {
+        "types": "./dist/deploy/enclave.d.mts",
+        "default": "./dist/deploy/enclave.mjs"
+      },
+      "require": {
+        "types": "./dist/deploy/enclave.d.ts",
+        "default": "./dist/deploy/enclave.js"
+      }
     },
     "./deploy/mocks": {
-      "types": "./dist/deploy/mocks.d.ts",
-      "import": "./dist/deploy/mocks.js",
-      "require": "./dist/deploy/mocks.js"
+      "import": {
+        "types": "./dist/deploy/mocks.d.mts",
+        "default": "./dist/deploy/mocks.mjs"
+      },
+      "require": {
+        "types": "./dist/deploy/mocks.d.ts",
+        "default": "./dist/deploy/mocks.js"
+      }
     },
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",
     "./types": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/types/index.js",
-      "require": "./dist/types/index.js"
-    },
-    "./types/*": "./dist/types/*"
+      "import": {
+        "types": "./dist/types/index.d.mts",
+        "default": "./dist/types/index.mjs"
+      },
+      "require": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/types/index.js"
+      }
+    }
   },
   "devDependencies": {
     "@gnosis-guild/enclave-config": "workspace:*",
@@ -68,6 +82,7 @@
     "solhint-plugin-prettier": "^0.1.0",
     "solidity-coverage": "^0.8.5",
     "ts-generator": "^0.1.1",
+    "tsup": "^8.5.0",
     "typechain": "^8.3.2",
     "typescript": "5.8.3"
   },

@@ -1,3 +1,4 @@
+import "@nomicfoundation/hardhat-chai-matchers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import {
   loadFixture,
@@ -45,7 +46,7 @@ const encodedE3ProgramParams = ethers.AbiCoder.defaultAbiCoder().encode(
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
-describe("Enclave", function () {
+describe("Enclave", function() {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
     if (!owner) throw new Error("Bad getSigners() output");
@@ -106,43 +107,43 @@ describe("Enclave", function () {
     };
   }
 
-  describe("constructor / initialize()", function () {
-    it("correctly sets owner", async function () {
+  describe("constructor / initialize()", function() {
+    it("correctly sets owner", async function() {
       const { owner, enclave } = await loadFixture(setup);
       expect(await enclave.owner()).to.equal(owner.address);
     });
 
-    it("correctly sets ciphernodeRegistry address", async function () {
+    it("correctly sets ciphernodeRegistry address", async function() {
       const { mocks, enclave } = await loadFixture(setup);
       expect(await enclave.ciphernodeRegistry()).to.equal(
         await mocks.registry.getAddress(),
       );
     });
 
-    it("correctly sets max duration", async function () {
+    it("correctly sets max duration", async function() {
       const { enclave } = await loadFixture(setup);
       expect(await enclave.maxDuration()).to.equal(60 * 60 * 24 * 30);
     });
   });
 
-  describe("setMaxDuration()", function () {
-    it("reverts if not called by owner", async function () {
+  describe("setMaxDuration()", function() {
+    it("reverts if not called by owner", async function() {
       const { enclave, notTheOwner } = await loadFixture(setup);
       await expect(enclave.connect(notTheOwner).setMaxDuration(1))
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("set max duration correctly", async function () {
+    it("set max duration correctly", async function() {
       const { enclave } = await loadFixture(setup);
       await enclave.setMaxDuration(1);
       expect(await enclave.maxDuration()).to.equal(1);
     });
-    it("returns true if max duration is set successfully", async function () {
+    it("returns true if max duration is set successfully", async function() {
       const { enclave } = await loadFixture(setup);
       const result = await enclave.setMaxDuration.staticCall(1);
       expect(result).to.be.true;
     });
-    it("emits MaxDurationSet event", async function () {
+    it("emits MaxDurationSet event", async function() {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.setMaxDuration(1))
         .to.emit(enclave, "MaxDurationSet")
@@ -150,8 +151,8 @@ describe("Enclave", function () {
     });
   });
 
-  describe("setCiphernodeRegistry()", function () {
-    it("reverts if not called by owner", async function () {
+  describe("setCiphernodeRegistry()", function() {
+    it("reverts if not called by owner", async function() {
       const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
@@ -160,13 +161,13 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("reverts if given address(0)", async function () {
+    it("reverts if given address(0)", async function() {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.setCiphernodeRegistry(ethers.ZeroAddress))
         .to.be.revertedWithCustomError(enclave, "InvalidCiphernodeRegistry")
         .withArgs(ethers.ZeroAddress);
     });
-    it("reverts if given address is the same as the current ciphernodeRegistry", async function () {
+    it("reverts if given address is the same as the current ciphernodeRegistry", async function() {
       const {
         enclave,
         mocks: { registry },
@@ -175,20 +176,20 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "InvalidCiphernodeRegistry")
         .withArgs(registry);
     });
-    it("sets ciphernodeRegistry correctly", async function () {
+    it("sets ciphernodeRegistry correctly", async function() {
       const { enclave } = await loadFixture(setup);
 
       expect(await enclave.ciphernodeRegistry()).to.not.equal(AddressTwo);
       await enclave.setCiphernodeRegistry(AddressTwo);
       expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
     });
-    it("returns true if ciphernodeRegistry is set successfully", async function () {
+    it("returns true if ciphernodeRegistry is set successfully", async function() {
       const { enclave } = await loadFixture(setup);
 
       const result = await enclave.setCiphernodeRegistry.staticCall(AddressTwo);
       expect(result).to.be.true;
     });
-    it("emits CiphernodeRegistrySet event", async function () {
+    it("emits CiphernodeRegistrySet event", async function() {
       const { enclave } = await loadFixture(setup);
 
       await expect(enclave.setCiphernodeRegistry(AddressTwo))
@@ -197,7 +198,7 @@ describe("Enclave", function () {
     });
   });
 
-  describe("setE3ProgramsParams()", function () {
+  describe("setE3ProgramsParams()", function() {
     const polynomial_degree = ethers.toBigInt(2048);
     const plaintext_modulus = ethers.toBigInt(1032193);
     const moduli = [ethers.toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
@@ -209,7 +210,7 @@ describe("Enclave", function () {
 
     const encodedE3ProgramsParams = [encodedE3ProgramParams];
 
-    it("reverts if not called by owner", async function () {
+    it("reverts if not called by owner", async function() {
       const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
@@ -221,7 +222,7 @@ describe("Enclave", function () {
         .withArgs(notTheOwner);
     });
 
-    it("sets E3 program parameters correctly", async function () {
+    it("sets E3 program parameters correctly", async function() {
       const { enclave } = await loadFixture(setup);
 
       await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
@@ -229,7 +230,7 @@ describe("Enclave", function () {
         .true;
     });
 
-    it("returns true if parameters are set successfully", async function () {
+    it("returns true if parameters are set successfully", async function() {
       const { enclave } = await loadFixture(setup);
 
       const result = await enclave.setE3ProgramsParams.staticCall(
@@ -238,7 +239,7 @@ describe("Enclave", function () {
       expect(result).to.be.true;
     });
 
-    it("emits AllowedE3ProgramsParamsSet event", async function () {
+    it("emits AllowedE3ProgramsParamsSet event", async function() {
       const { enclave } = await loadFixture(setup);
 
       await expect(enclave.setE3ProgramsParams(encodedE3ProgramsParams))
@@ -246,7 +247,7 @@ describe("Enclave", function () {
         .withArgs(encodedE3ProgramsParams);
     });
 
-    it("handles multiple parameters", async function () {
+    it("handles multiple parameters", async function() {
       const { enclave } = await loadFixture(setup);
       encodedE3ProgramsParams.push(
         "0x0000000000000000000000000000000000000000000000000000000000000001",
@@ -260,15 +261,15 @@ describe("Enclave", function () {
     });
   });
 
-  describe("getE3()", function () {
-    it("reverts if E3 does not exist", async function () {
+  describe("getE3()", function() {
+    it("reverts if E3 does not exist", async function() {
       const { enclave } = await loadFixture(setup);
 
       await expect(enclave.getE3(1))
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(1);
     });
-    it("returns correct E3 details", async function () {
+    it("returns correct E3 details", async function() {
       const { enclave, request, mocks } = await loadFixture(setup);
       await enclave.request(
         request.filter,
@@ -299,14 +300,14 @@ describe("Enclave", function () {
     });
   });
 
-  describe("getDecryptionVerifier()", function () {
-    it("returns true if encryption scheme is enabled", async function () {
+  describe("getDecryptionVerifier()", function() {
+    it("returns true if encryption scheme is enabled", async function() {
       const { enclave, mocks } = await loadFixture(setup);
       expect(await enclave.getDecryptionVerifier(encryptionSchemeId)).to.equal(
         await mocks.decryptionVerifier.getAddress(),
       );
     });
-    it("returns false if encryption scheme is not enabled", async function () {
+    it("returns false if encryption scheme is not enabled", async function() {
       const { enclave } = await loadFixture(setup);
       expect(
         await enclave.getDecryptionVerifier(newEncryptionSchemeId),
@@ -314,8 +315,8 @@ describe("Enclave", function () {
     });
   });
 
-  describe("setDecryptionVerifier()", function () {
-    it("reverts if caller is not owner", async function () {
+  describe("setDecryptionVerifier()", function() {
+    it("reverts if caller is not owner", async function() {
       const { enclave, notTheOwner, mocks } = await loadFixture(setup);
 
       await expect(
@@ -329,7 +330,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("reverts if encryption scheme is already enabled", async function () {
+    it("reverts if encryption scheme is already enabled", async function() {
       const { enclave, mocks } = await loadFixture(setup);
 
       await expect(
@@ -341,7 +342,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
         .withArgs(encryptionSchemeId);
     });
-    it("enabled decryption verifier", async function () {
+    it("enabled decryption verifier", async function() {
       const { enclave, mocks } = await loadFixture(setup);
 
       expect(
@@ -354,7 +355,7 @@ describe("Enclave", function () {
         await enclave.getDecryptionVerifier(newEncryptionSchemeId),
       ).to.equal(await mocks.decryptionVerifier.getAddress());
     });
-    it("returns true if decryption verifier is enabled successfully", async function () {
+    it("returns true if decryption verifier is enabled successfully", async function() {
       const { enclave, mocks } = await loadFixture(setup);
 
       const result = await enclave.setDecryptionVerifier.staticCall(
@@ -363,7 +364,7 @@ describe("Enclave", function () {
       );
       expect(result).to.be.true;
     });
-    it("emits EncryptionSchemeEnabled", async function () {
+    it("emits EncryptionSchemeEnabled", async function() {
       const { enclave, mocks } = await loadFixture(setup);
 
       await expect(
@@ -377,8 +378,8 @@ describe("Enclave", function () {
     });
   });
 
-  describe("disableEncryptionScheme()", function () {
-    it("reverts if caller is not owner", async function () {
+  describe("disableEncryptionScheme()", function() {
+    it("reverts if caller is not owner", async function() {
       const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
@@ -389,14 +390,14 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("reverts if encryption scheme is not already enabled", async function () {
+    it("reverts if encryption scheme is not already enabled", async function() {
       const { enclave } = await loadFixture(setup);
 
       await expect(enclave.disableEncryptionScheme(newEncryptionSchemeId))
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
         .withArgs(newEncryptionSchemeId);
     });
-    it("disables encryption scheme", async function () {
+    it("disables encryption scheme", async function() {
       const { enclave } = await loadFixture(setup);
 
       expect(await enclave.disableEncryptionScheme(encryptionSchemeId));
@@ -404,14 +405,14 @@ describe("Enclave", function () {
         ethers.ZeroAddress,
       );
     });
-    it("returns true if encryption scheme is disabled successfully", async function () {
+    it("returns true if encryption scheme is disabled successfully", async function() {
       const { enclave } = await loadFixture(setup);
 
       const result =
         await enclave.disableEncryptionScheme.staticCall(encryptionSchemeId);
       expect(result).to.be.true;
     });
-    it("emits EncryptionSchemeDisabled", async function () {
+    it("emits EncryptionSchemeDisabled", async function() {
       const { enclave } = await loadFixture(setup);
 
       await expect(await enclave.disableEncryptionScheme(encryptionSchemeId))
@@ -420,8 +421,8 @@ describe("Enclave", function () {
     });
   });
 
-  describe("enableE3Program()", function () {
-    it("reverts if not called by owner", async function () {
+  describe("enableE3Program()", function() {
+    it("reverts if not called by owner", async function() {
       const {
         notTheOwner,
         enclave,
@@ -432,7 +433,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("reverts if E3 Program is already enabled", async function () {
+    it("reverts if E3 Program is already enabled", async function() {
       const {
         enclave,
         mocks: { e3Program },
@@ -442,7 +443,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "ModuleAlreadyEnabled")
         .withArgs(e3Program);
     });
-    it("enables E3 Program correctly", async function () {
+    it("enables E3 Program correctly", async function() {
       const {
         enclave,
         mocks: { e3Program },
@@ -450,12 +451,12 @@ describe("Enclave", function () {
       const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.true;
     });
-    it("returns true if E3 Program is enabled successfully", async function () {
+    it("returns true if E3 Program is enabled successfully", async function() {
       const { enclave } = await loadFixture(setup);
       const result = await enclave.enableE3Program.staticCall(AddressTwo);
       expect(result).to.be.true;
     });
-    it("emits E3ProgramEnabled event", async function () {
+    it("emits E3ProgramEnabled event", async function() {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.enableE3Program(AddressTwo))
         .to.emit(enclave, "E3ProgramEnabled")
@@ -463,8 +464,8 @@ describe("Enclave", function () {
     });
   });
 
-  describe("disableE3Program()", function () {
-    it("reverts if not called by owner", async function () {
+  describe("disableE3Program()", function() {
+    it("reverts if not called by owner", async function() {
       const {
         notTheOwner,
         enclave,
@@ -474,13 +475,13 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
-    it("reverts if E3 Program is not enabled", async function () {
+    it("reverts if E3 Program is not enabled", async function() {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.disableE3Program(AddressTwo))
         .to.be.revertedWithCustomError(enclave, "ModuleNotEnabled")
         .withArgs(AddressTwo);
     });
-    it("disables E3 Program correctly", async function () {
+    it("disables E3 Program correctly", async function() {
       const {
         enclave,
         mocks: { e3Program },
@@ -490,7 +491,7 @@ describe("Enclave", function () {
       const enabled = await enclave.e3Programs(e3Program);
       expect(enabled).to.be.false;
     });
-    it("returns true if E3 Program is disabled successfully", async function () {
+    it("returns true if E3 Program is disabled successfully", async function() {
       const {
         enclave,
         mocks: { e3Program },
@@ -499,7 +500,7 @@ describe("Enclave", function () {
 
       expect(result).to.be.true;
     });
-    it("emits E3ProgramDisabled event", async function () {
+    it("emits E3ProgramDisabled event", async function() {
       const {
         enclave,
         mocks: { e3Program },
@@ -510,8 +511,8 @@ describe("Enclave", function () {
     });
   });
 
-  describe("request()", function () {
-    it("reverts if msg.value is 0", async function () {
+  describe("request()", function() {
+    it("reverts if msg.value is 0", async function() {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -525,7 +526,7 @@ describe("Enclave", function () {
         ),
       ).to.be.revertedWithCustomError(enclave, "PaymentRequired");
     });
-    it("reverts if threshold is 0", async function () {
+    it("reverts if threshold is 0", async function() {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -540,7 +541,7 @@ describe("Enclave", function () {
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
     });
-    it("reverts if threshold is greater than number", async function () {
+    it("reverts if threshold is greater than number", async function() {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -555,7 +556,7 @@ describe("Enclave", function () {
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
     });
-    it("reverts if duration is 0", async function () {
+    it("reverts if duration is 0", async function() {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -570,7 +571,7 @@ describe("Enclave", function () {
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
     });
-    it("reverts if duration is greater than maxDuration", async function () {
+    it("reverts if duration is greater than maxDuration", async function() {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -585,7 +586,7 @@ describe("Enclave", function () {
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
     });
-    it("reverts if E3 Program is not enabled", async function () {
+    it("reverts if E3 Program is not enabled", async function() {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -602,7 +603,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3ProgramNotAllowed")
         .withArgs(ethers.ZeroAddress);
     });
-    it("reverts if given encryption scheme is not enabled", async function () {
+    it("reverts if given encryption scheme is not enabled", async function() {
       const { enclave, request } = await loadFixture(setup);
       await enclave.disableEncryptionScheme(encryptionSchemeId);
       await expect(
@@ -626,7 +627,7 @@ describe("Enclave", function () {
         .withArgs(encryptionSchemeId);
     });
 
-    it("reverts if committee selection fails", async function () {
+    it("reverts if committee selection fails", async function() {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
@@ -641,7 +642,7 @@ describe("Enclave", function () {
         ),
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
     });
-    it("instantiates a new E3", async function () {
+    it("instantiates a new E3", async function() {
       const { enclave, request, mocks } = await loadFixture(setup);
 
       await enclave.request(
@@ -672,7 +673,7 @@ describe("Enclave", function () {
       expect(e3.ciphertextOutput).to.equal(ethers.ZeroHash);
       expect(e3.plaintextOutput).to.equal("0x");
     });
-    it("emits E3Requested event", async function () {
+    it("emits E3Requested event", async function() {
       const { enclave, request } = await loadFixture(setup);
       const tx = await enclave.request(
         request.filter,
@@ -692,15 +693,15 @@ describe("Enclave", function () {
     });
   });
 
-  describe("activate()", function () {
-    it("reverts if E3 does not exist", async function () {
+  describe("activate()", function() {
+    it("reverts if E3 does not exist", async function() {
       const { enclave } = await loadFixture(setup);
 
       await expect(enclave.activate(0, ethers.ZeroHash))
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(0);
     });
-    it("reverts if E3 has already been activated", async function () {
+    it("reverts if E3 has already been activated", async function() {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
@@ -720,7 +721,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
         .withArgs(0);
     });
-    it("reverts if E3 is not yet ready to start", async function () {
+    it("reverts if E3 is not yet ready to start", async function() {
       const { enclave, request } = await loadFixture(setup);
       const startTime = [
         (await time.latest()) + 1000,
@@ -742,7 +743,7 @@ describe("Enclave", function () {
         enclave.activate(0, ethers.ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "E3NotReady");
     });
-    it("reverts if E3 start has expired", async function () {
+    it("reverts if E3 start has expired", async function() {
       const { enclave, request } = await loadFixture(setup);
       const startTime = [
         (await time.latest()) + 1,
@@ -766,7 +767,7 @@ describe("Enclave", function () {
         enclave.activate(0, ethers.ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "E3Expired");
     });
-    it("reverts if ciphernodeRegistry does not return a public key", async function () {
+    it("reverts if ciphernodeRegistry does not return a public key", async function() {
       const { enclave, request } = await loadFixture(setup);
       const startTime = [
         (await time.latest()) + 1000,
@@ -788,7 +789,7 @@ describe("Enclave", function () {
         enclave.activate(0, ethers.ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "E3NotReady");
     });
-    it("reverts if E3 start has expired", async function () {
+    it("reverts if E3 start has expired", async function() {
       const { enclave, request } = await loadFixture(setup);
       const startTime = [await time.latest(), (await time.latest()) + 1] as [
         number,
@@ -812,7 +813,7 @@ describe("Enclave", function () {
         enclave.activate(0, ethers.ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "E3Expired");
     });
-    it("reverts if ciphernodeRegistry does not return a public key", async function () {
+    it("reverts if ciphernodeRegistry does not return a public key", async function() {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
@@ -910,8 +911,8 @@ describe("Enclave", function () {
     });
   });
 
-  describe("publishInput()", function () {
-    it("reverts if E3 does not exist", async function () {
+  describe("publishInput()", function() {
+    it("reverts if E3 does not exist", async function() {
       const { enclave } = await loadFixture(setup);
 
       await expect(enclave.publishInput(0, "0x"))
@@ -919,7 +920,7 @@ describe("Enclave", function () {
         .withArgs(0);
     });
 
-    it("reverts if E3 has not been activated", async function () {
+    it("reverts if E3 has not been activated", async function() {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
@@ -943,7 +944,7 @@ describe("Enclave", function () {
       await enclave.activate(0, ethers.ZeroHash);
     });
 
-    it("reverts if input is not valid", async function () {
+    it("reverts if input is not valid", async function() {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
@@ -963,7 +964,7 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "InvalidInput");
     });
 
-    it("reverts if outside of input window", async function () {
+    it("reverts if outside of input window", async function() {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
@@ -986,7 +987,7 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
     });
 
-    it("it allows publishing input to different requests", async function () {
+    it("it allows publishing input to different requests", async function() {
       const fixtureSetup = () => setup();
 
       const { enclave, request } = await loadFixture(fixtureSetup);
@@ -1023,7 +1024,7 @@ describe("Enclave", function () {
       );
       await enclave.publishInput(1, inputData);
     });
-    it("returns true if input is published successfully", async function () {
+    it("returns true if input is published successfully", async function() {
       const { enclave, request } = await loadFixture(setup);
       const inputData = "0x12345678";
 
@@ -1045,7 +1046,7 @@ describe("Enclave", function () {
       );
     });
 
-    it("adds inputHash to merkle tree", async function () {
+    it("adds inputHash to merkle tree", async function() {
       const { enclave, request } = await loadFixture(setup);
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
 
@@ -1077,7 +1078,7 @@ describe("Enclave", function () {
       await enclave.publishInput(e3Id, secondInputData);
       expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
     });
-    it("emits InputPublished event", async function () {
+    it("emits InputPublished event", async function() {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
@@ -1103,15 +1104,15 @@ describe("Enclave", function () {
     });
   });
 
-  describe("publishCiphertextOutput()", function () {
-    it("reverts if E3 does not exist", async function () {
+  describe("publishCiphertextOutput()", function() {
+    it("reverts if E3 does not exist", async function() {
       const { enclave } = await loadFixture(setup);
 
       await expect(enclave.publishCiphertextOutput(0, "0x", "0x"))
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(0);
     });
-    it("reverts if E3 has not been activated", async function () {
+    it("reverts if E3 has not been activated", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1129,7 +1130,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3NotActivated")
         .withArgs(e3Id);
     });
-    it("reverts if input deadline has not passed", async function () {
+    it("reverts if input deadline has not passed", async function() {
       const { enclave, request } = await loadFixture(setup);
       const tx = await enclave.request(
         request.filter,
@@ -1152,7 +1153,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "InputDeadlineNotPassed")
         .withArgs(e3Id, expectedExpiration);
     });
-    it("reverts if output has already been published", async function () {
+    it("reverts if output has already been published", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1176,7 +1177,7 @@ describe("Enclave", function () {
         )
         .withArgs(e3Id);
     });
-    it("reverts if output is not valid", async function () {
+    it("reverts if output is not valid", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1196,7 +1197,7 @@ describe("Enclave", function () {
         enclave.publishCiphertextOutput(e3Id, "0x", "0x"),
       ).to.be.revertedWithCustomError(enclave, "InvalidOutput");
     });
-    it("sets ciphertextOutput correctly", async function () {
+    it("sets ciphertextOutput correctly", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1216,7 +1217,7 @@ describe("Enclave", function () {
       const e3 = await enclave.getE3(e3Id);
       expect(e3.ciphertextOutput).to.equal(dataHash);
     });
-    it("returns true if output is published successfully", async function () {
+    it("returns true if output is published successfully", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1236,7 +1237,7 @@ describe("Enclave", function () {
         await enclave.publishCiphertextOutput.staticCall(e3Id, data, proof),
       ).to.equal(true);
     });
-    it("emits CiphertextOutputPublished event", async function () {
+    it("emits CiphertextOutputPublished event", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1258,8 +1259,8 @@ describe("Enclave", function () {
     });
   });
 
-  describe("publishPlaintextOutput()", function () {
-    it("reverts if E3 does not exist", async function () {
+  describe("publishPlaintextOutput()", function() {
+    it("reverts if E3 does not exist", async function() {
       const { enclave } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1267,7 +1268,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(e3Id);
     });
-    it("reverts if E3 has not been activated", async function () {
+    it("reverts if E3 has not been activated", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1285,7 +1286,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3NotActivated")
         .withArgs(e3Id);
     });
-    it("reverts if ciphertextOutput has not been published", async function () {
+    it("reverts if ciphertextOutput has not been published", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1304,7 +1305,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "CiphertextOutputNotPublished")
         .withArgs(e3Id);
     });
-    it("reverts if plaintextOutput has already been published", async function () {
+    it("reverts if plaintextOutput has already been published", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1329,7 +1330,7 @@ describe("Enclave", function () {
         )
         .withArgs(e3Id);
     });
-    it("reverts if output is not valid", async function () {
+    it("reverts if output is not valid", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1350,7 +1351,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "InvalidOutput")
         .withArgs(data);
     });
-    it("sets plaintextOutput correctly", async function () {
+    it("sets plaintextOutput correctly", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1372,7 +1373,7 @@ describe("Enclave", function () {
       const e3 = await enclave.getE3(e3Id);
       expect(e3.plaintextOutput).to.equal(data);
     });
-    it("returns true if output is published successfully", async function () {
+    it("returns true if output is published successfully", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 
@@ -1393,7 +1394,7 @@ describe("Enclave", function () {
         await enclave.publishPlaintextOutput.staticCall(e3Id, data, proof),
       ).to.equal(true);
     });
-    it("emits PlaintextOutputPublished event", async function () {
+    it("emits PlaintextOutputPublished event", async function() {
       const { enclave, request } = await loadFixture(setup);
       const e3Id = 0;
 

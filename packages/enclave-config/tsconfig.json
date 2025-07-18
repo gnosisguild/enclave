@@ -9,6 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "noEmit": true
   }
 }
