@@ -76,6 +76,31 @@ const hash = await sdk.requestE3({
 });
 ```
 
+## Usage within a browser
+
+Usage within a typescript project should work out of the box, however in order to use wasm related functionality of the SDK within the browser vite you must do the following:
+
+- Use `vite`
+- Use the `vite-plugin-top-level-await` plugin
+- Use the `vite-plugin-wasm` plugin
+- Exclude the `@gnosis-guild/e3-wasm` package from bundling optimization.
+
+This will enable `vite` to correctly bundle and serve the wasm bundle we use effectively.
+
+```
+import { defineConfig } from 'vite'
+import wasm from 'vite-plugin-wasm'
+import topLevelAwait from 'vite-plugin-top-level-await'
+
+export default defineConfig({
+  // other config ...
+  optimizeDeps: {
+    exclude: ['@gnosis-guild/e3-wasm'],
+  },
+  plugins: [wasm(), topLevelAwait()],
+})
+```
+
 ## Event System
 
 The SDK uses a unified event system with TypeScript enums for type safety:
