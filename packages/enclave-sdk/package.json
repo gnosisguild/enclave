@@ -9,7 +9,7 @@
     }
   },
   "scripts": {
-    "prebuild": "cd ../evm && pnpm compile:types && pnpm compile:scripts && cd ../../crates/wasm && pnpm build",
+    "prebuild": "cd ../evm && pnpm compile:ts && cd ../../crates/wasm && pnpm build",
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
