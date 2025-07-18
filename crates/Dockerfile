@@ -3,6 +3,8 @@ FROM node:22 AS evm-builder
 WORKDIR /build
 COPY crates/wasm/package.json ./crates/wasm/package.json
 COPY packages/enclave-react ./packages/enclave-react
+COPY packages/enclave-sdk ./packages/enclave-sdk
+COPY packages/enclave-config ./packages/enclave-config
 COPY packages/evm ./packages/evm
 COPY pnpm-workspace.yaml .
 COPY pnpm-lock.yaml .

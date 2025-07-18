@@ -1,4 +1,6 @@
+import "@nomicfoundation/hardhat-ethers";
 import { ethers } from "ethers";
+import "hardhat-deploy";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { PoseidonT3, proxy } from "poseidon-solidity";
@@ -10,12 +12,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
+  if (!deployer) {
+    throw new Error("Deployer not found from getNamedAccounts()");
+  }
+
   // First check if the proxy exists
   if ((await hre.ethers.provider.getCode(proxy.address)) === "0x") {
     // probably on the hardhat network
     // fund the keyless account
     const [sender] = await hre.ethers.getSigners();
-    await sender.sendTransaction({
+    await sender!.sendTransaction({
       to: proxy.from,
       value: proxy.gas,
     });
@@ -28,7 +34,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   // Then deploy the hasher, if needed
   if ((await hre.ethers.provider.getCode(PoseidonT3.address)) === "0x") {
     const [sender] = await hre.ethers.getSigners();
-    await sender.sendTransaction({
+    await sender!.sendTransaction({
       to: proxy.address,
       data: PoseidonT3.data,
     });
@@ -92,14 +98,14 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     await hre.ethers.getSigner(deployer),
   );
 
-  const registryAddress = await enclaveContract.ciphernodeRegistry();
+  const registryAddress = await enclaveContract.ciphernodeRegistry!();
 
   if (registryAddress === cypherNodeRegistry.address) {
     console.log(`Enclave contract already has registry`);
     return;
   }
 
-  const result = await enclaveContract.setCiphernodeRegistry(
+  const result = await enclaveContract.setCiphernodeRegistry!(
     cypherNodeRegistry.address,
   );
   await result.wait();

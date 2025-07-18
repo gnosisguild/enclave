@@ -1,3 +1,4 @@
+import "@nomicfoundation/hardhat-chai-matchers";
 import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import {
   loadFixture,
@@ -48,7 +49,8 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 describe("Enclave", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
-
+    if (!owner) throw new Error("Bad getSigners() output");
+    if (!notTheOwner) throw new Error("Bad getSigners() output");
     const poseidon = await PoseidonT3Fixture();
     const registry = await deployCiphernodeRegistryFixture();
     const decryptionVerifier = await deployDecryptionVerifierFixture();
@@ -224,8 +226,7 @@ describe("Enclave", function () {
       const { enclave } = await loadFixture(setup);
 
       await enclave.setE3ProgramsParams(encodedE3ProgramsParams);
-
-      expect(await enclave.e3ProgramsParams(encodedE3ProgramsParams[0])).to.be
+      expect(await enclave.e3ProgramsParams(encodedE3ProgramsParams[0]!)).to.be
         .true;
     });
 

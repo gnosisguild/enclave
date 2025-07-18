@@ -1,18 +1,18 @@
 import {
+  AllEventTypes,
   calculateStartWindow,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
+  E3,
+  EnclaveEvent,
   EnclaveEventType,
   EnclaveSDK,
   encodeBfvParams,
   encodeComputeProviderParams,
-  RegistryEventType,
-  AllEventTypes,
-  EnclaveEvent,
   encryptNumber,
-} from "@gnosis-guild/enclave/sdk";
+  RegistryEventType,
+} from "@gnosis-guild/enclave-sdk";
 import { hexToBytes } from "viem";
-import { E3 } from "@gnosis-guild/enclave/sdk/types.js";
 import assert from "assert";
 
 export function getContractAddresses() {
@@ -222,8 +222,8 @@ async function main() {
   const num1 = 12n;
   const num2 = 21n;
   const publicKeyBytes = hexToBytes(state.publicKey);
-  const enc1 = encryptNumber(num1, publicKeyBytes);
-  const enc2 = encryptNumber(num2, publicKeyBytes);
+  const enc1 = await encryptNumber(num1, publicKeyBytes);
+  const enc2 = await encryptNumber(num2, publicKeyBytes);
 
   await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
     await sdk.publishInput(

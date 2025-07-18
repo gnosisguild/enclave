@@ -21,7 +21,9 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 describe("CiphernodeRegistryOwnable", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
-
+    if (!owner) throw new Error("getSigners() did not return expected output");
+    if (!notTheOwner)
+      throw new Error("getSigners() did not return expected output");
     const poseidon = await PoseidonT3Fixture();
     const registry = await deployCiphernodeRegistryOwnableFixture(
       owner.address,
@@ -58,6 +60,7 @@ describe("CiphernodeRegistryOwnable", function () {
       const poseidonFactory = await ethers.getContractFactory("PoseidonT3");
       const poseidonDeployment = await poseidonFactory.deploy();
       const [deployer] = await ethers.getSigners();
+      if (!deployer) throw new Error("Bad getSigners() output");
       const ciphernodeRegistryFactory = await ethers.getContractFactory(
         "CiphernodeRegistryOwnable",
         {

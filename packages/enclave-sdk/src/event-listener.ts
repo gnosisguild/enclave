@@ -22,7 +22,7 @@ export class EventListener implements SDKEventEmitter {
   constructor(
     private publicClient: PublicClient,
     private config: EventListenerConfig = {},
-  ) {}
+  ) { }
 
   /**
    * Listen to specific contract events
@@ -58,14 +58,18 @@ export class EventListener implements SDKEventEmitter {
           onLogs(logs: Log[]) {
             for (let i = 0; i < logs.length; i++) {
               const log = logs[i];
+              if (!log) {
+                console.log("warning: Log was falsy when a log was expected!");
+                break;
+              }
               const event: EnclaveEvent<T> = {
                 type: eventType,
                 data: (log as unknown as { args: unknown })
                   .args as T extends EnclaveEventType
                   ? EnclaveEventData[T]
                   : T extends RegistryEventType
-                    ? RegistryEventData[T]
-                    : unknown,
+                  ? RegistryEventData[T]
+                  : unknown,
                 log,
                 timestamp: new Date(),
                 blockNumber: log.blockNumber ?? BigInt(0),

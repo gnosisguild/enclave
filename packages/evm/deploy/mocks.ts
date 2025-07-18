@@ -1,9 +1,13 @@
+import "@nomicfoundation/hardhat-ethers";
+import "hardhat-deploy";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
+  if (!deployer)
+    throw new Error("Deployer not returned from getNamedAddresses()");
 
   const computeProvider = await deploy("MockComputeProvider", {
     from: deployer,
@@ -52,7 +56,7 @@ MockE3Program:${mockE3Program.address}
   );
 
   try {
-    const tx = await enclaveContract.setDecryptionVerifier(
+    const tx = await enclaveContract.setDecryptionVerifier!(
       encryptionSchemeId,
       mockDecryptionVerifier.address,
     );

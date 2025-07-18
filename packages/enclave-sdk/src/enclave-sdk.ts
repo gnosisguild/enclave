@@ -14,7 +14,7 @@ import { hardhat, mainnet, monadTestnet, sepolia } from "viem/chains";
 import {
   CiphernodeRegistryOwnable__factory,
   Enclave__factory,
-} from "../../types";
+} from "@gnosis-guild/enclave/types";
 import { ContractClient } from "./contract-client";
 import { EventListener } from "./event-listener";
 import {
@@ -94,6 +94,8 @@ export class EnclaveSDK {
     value?: bigint;
     gasLimit?: bigint;
   }): Promise<Hash> {
+    console.log(">>> REQUEST");
+
     if (!this.initialized) {
       await this.initialize();
     }

@@ -17,12 +17,10 @@ import {
   decodePlaintextOutput,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
-} from '@gnosis-guild/enclave/sdk'
+  encryptNumber,
+} from '@gnosis-guild/enclave-sdk'
 import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS, getContractAddresses } from '@/utils/env-config'
 import { formatContractError } from '@/utils/error-formatting'
-
-// WebAssembly hook
-import { useWebAssemblyHook } from '@/hooks/useWebAssembly'
 
 // Icons
 import {
@@ -198,7 +196,7 @@ const RequestComputationStep: React.FC<RequestComputationStepProps> = ({
           </div>
         )}
 
-        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => { }} />}
+        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => {}} />}
 
         {isSuccess && transactionHash && (
           <div className='rounded-lg border border-green-200 bg-green-50 p-4'>
@@ -267,7 +265,7 @@ const ActivateE3Step: React.FC<ActivateE3StepProps> = ({ e3State, isRequesting, 
           </div>
         )}
 
-        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => { }} />}
+        {error && <ErrorDisplay error={error} showDetails={false} onToggleDetails={() => {}} />}
 
         {isSuccess && transactionHash && (
           <div className='rounded-lg border border-green-200 bg-green-50 p-4'>
@@ -542,7 +540,6 @@ const ResultsStep: React.FC<ResultsStepProps> = ({ input1, input2, result, e3Sta
 
 const WizardSDK: React.FC = () => {
   const { isConnected } = useAccount()
-  const { isLoaded: isWasmLoaded, encryptInput } = useWebAssemblyHook()
 
   if (HAS_MISSING_ENV_VARS) {
     return <EnvironmentError missingVars={MISSING_ENV_VARS} />
@@ -783,8 +780,8 @@ const WizardSDK: React.FC = () => {
       const publicKeyBytes = hexToBytes(e3State.publicKey)
 
       // Encrypt both inputs
-      const encryptedInput1 = await encryptInput(num1, publicKeyBytes)
-      const encryptedInput2 = await encryptInput(num2, publicKeyBytes)
+      const encryptedInput1 = await encryptNumber(num1, publicKeyBytes)
+      const encryptedInput2 = await encryptNumber(num2, publicKeyBytes)
 
       if (!encryptedInput1 || !encryptedInput2) {
         throw new Error('Failed to encrypt inputs')
@@ -862,8 +859,9 @@ const WizardSDK: React.FC = () => {
         {[1, 2, 3, 4, 5, 6].map((step) => (
           <div key={step} className='flex items-center'>
             <div
-              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${currentStep >= step ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
-                }`}
+              className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${
+                currentStep >= step ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
+              }`}
             >
               {getStepIcon(step as WizardStep)}
             </div>
@@ -967,12 +965,6 @@ const WizardSDK: React.FC = () => {
         {renderStepIndicator()}
 
         <div className='mx-auto max-w-2xl'>{renderStepContent()}</div>
-
-        {!isWasmLoaded && (
-          <div className='fixed bottom-4 right-4 rounded-lg border border-yellow-400 bg-yellow-100 p-3'>
-            <p className='text-sm text-yellow-800'>Loading encryption module...</p>
-          </div>
-        )}
       </div>
     </div>
   )

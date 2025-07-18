@@ -10,6 +10,6 @@ export async function deployCiphernodeRegistryFixture(name?: string) {
 
   return MockCiphernodeRegistry__factory.connect(
     await deployment.getAddress(),
-    signer.provider,
+    signer!.provider,
   );
 }

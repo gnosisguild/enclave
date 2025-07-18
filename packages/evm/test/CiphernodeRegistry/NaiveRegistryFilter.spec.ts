@@ -18,7 +18,8 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 describe("NaiveRegistryFilter", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
-
+    if (!owner) throw new Error("Bad getSigners output");
+    if (!notTheOwner) throw new Error("Bad getSigners output");
     const poseidon = await PoseidonT3Fixture();
     const registry = await deployCiphernodeRegistryOwnableFixture(
       owner.address,

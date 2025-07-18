@@ -19,7 +19,7 @@ methods, and comprehensive error handling.
 ## Installation
 
 ```bash
-pnpm add @gnosis-guild/enclave
+pnpm add @gnosis-guild/enclave-sdk
 ```
 
 ## Quick Start
@@ -29,7 +29,7 @@ import {
   EnclaveSDK,
   EnclaveEventType,
   RegistryEventType,
-} from "@gnosis-guild/enclave/sdk";
+} from "@gnosis-guild/enclave-sdk";
 import { createPublicClient, createWalletClient, http, custom } from "viem";
 
 // Initialize clients
@@ -74,6 +74,31 @@ const hash = await sdk.requestE3({
   e3ProgramParams: "0x...",
   computeProviderParams: "0x...",
 });
+```
+
+## Usage within a browser
+
+Usage within a typescript project should work out of the box, however in order to use wasm related functionality of the SDK within the browser vite you must do the following:
+
+- Use `vite`
+- Use the `vite-plugin-top-level-await` plugin
+- Use the `vite-plugin-wasm` plugin
+- Exclude the `@gnosis-guild/e3-wasm` package from bundling optimization.
+
+This will enable `vite` to correctly bundle and serve the wasm bundle we use effectively.
+
+```
+import { defineConfig } from 'vite'
+import wasm from 'vite-plugin-wasm'
+import topLevelAwait from 'vite-plugin-top-level-await'
+
+export default defineConfig({
+  // other config ...
+  optimizeDeps: {
+    exclude: ['@gnosis-guild/e3-wasm'],
+  },
+  plugins: [wasm(), topLevelAwait()],
+})
 ```
 
 ## Event System
@@ -260,7 +285,7 @@ interface SDKConfig {
 The SDK includes comprehensive error handling:
 
 ```typescript
-import { SDKError } from "@gnosis-guild/enclave/sdk";
+import { SDKError } from "@gnosis-guild/enclave-sdk";
 
 try {
   await sdk.requestE3(params);

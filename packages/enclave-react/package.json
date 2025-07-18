@@ -2,16 +2,20 @@
   "name": "@gnosis-guild/enclave-react",
   "version": "0.0.5-test.22",
   "description": "React hooks and utilities for Enclave SDK",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "sideEffects": false,
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build",
     "release": "pnpm publish"
@@ -31,19 +35,21 @@
   "license": "LGPL-3.0-only",
   "peerDependencies": {
     "react": "^18.2.0",
-    "wagmi": "^2.14.16",
-    "viem": "2.30.6"
+    "wagmi": "^2.14.16"
   },
   "publishConfig": {
     "access": "public",
     "git-checks": false
   },
   "dependencies": {
-    "@gnosis-guild/enclave": "workspace:*"
+    "@gnosis-guild/enclave-sdk": "workspace:*",
+    "viem": "2.30.6"
   },
   "devDependencies": {
+    "@gnosis-guild/enclave-config": "workspace:*",
     "@types/react": "^18.2.0",
-    "typescript": "^5.8.3"
+    "tsup": "^8.5.0",
+    "typescript": "5.8.3"
   },
   "repository": {
     "type": "git",

@@ -9,29 +9,40 @@
   },
   "exports": {
     "./deploy/enclave": {
-      "types": "./dist/deploy/enclave.d.ts",
-      "import": "./dist/deploy/enclave.js",
-      "require": "./dist/deploy/enclave.js"
+      "import": {
+        "types": "./dist/deploy/enclave.d.mts",
+        "default": "./dist/deploy/enclave.mjs"
+      },
+      "require": {
+        "types": "./dist/deploy/enclave.d.ts",
+        "default": "./dist/deploy/enclave.js"
+      }
     },
     "./deploy/mocks": {
-      "types": "./dist/deploy/mocks.d.ts",
-      "import": "./dist/deploy/mocks.js",
-      "require": "./dist/deploy/mocks.js"
+      "import": {
+        "types": "./dist/deploy/mocks.d.mts",
+        "default": "./dist/deploy/mocks.mjs"
+      },
+      "require": {
+        "types": "./dist/deploy/mocks.d.ts",
+        "default": "./dist/deploy/mocks.js"
+      }
     },
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",
-    "./sdk": {
-      "types": "./dist/src/sdk/index.d.ts",
-      "import": "./dist/src/sdk/index.js",
-      "require": "./dist/src/sdk/index.js"
-    },
-    "./sdk/*": {
-      "types": "./dist/src/sdk/*.d.ts",
-      "import": "./dist/src/sdk/*",
-      "require": "./dist/src/sdk/*"
+    "./types": {
+      "import": {
+        "types": "./dist/types/index.d.mts",
+        "default": "./dist/types/index.mjs"
+      },
+      "require": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/types/index.js"
+      }
     }
   },
   "devDependencies": {
+    "@gnosis-guild/enclave-config": "workspace:*",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
@@ -45,7 +56,7 @@
     "@types/chai": "^4.3.11",
     "@types/fs-extra": "^11.0.4",
     "@types/mocha": "^10.0.6",
-    "@types/node": "^20.10.4",
+    "@types/node": "^22.7.5",
     "@typescript-eslint/eslint-plugin": "^7.11.0",
     "@typescript-eslint/parser": "^7.11.0",
     "@zk-kit/lean-imt": "^2.1.0",
@@ -71,9 +82,9 @@
     "solhint-plugin-prettier": "^0.1.0",
     "solidity-coverage": "^0.8.5",
     "ts-generator": "^0.1.1",
-    "ts-node": "^10.9.2",
+    "tsup": "^8.5.0",
     "typechain": "^8.3.2",
-    "typescript": "^5.8.3"
+    "typescript": "5.8.3"
   },
   "files": [
     "contracts",
@@ -98,12 +109,9 @@
   "scripts": {
     "clean": "rimraf ./artifacts ./cache ./coverage ./types ./dist ./coverage.json && pnpm typechain",
     "build": "pnpm compile",
-    "compile": "pnpm compile:contracts && pnpm compile:scripts && pnpm compile:sdk",
+    "compile": "pnpm compile:contracts && pnpm compile:ts",
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
-    "compile:scripts": "tsc -p tsconfig.json --noEmitOnError false --noCheck",
-    "precompile:sdk": "cd ../../crates/wasm && pnpm build",
-    "compile:sdk": "tsc -p ./src/tsconfig.json --noEmitOnError false --noCheck",
-    "precoverage": "pnpm compile:sdk",
+    "compile:ts": "pnpm typechain && tsup",
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
     "deploy:mocks": "hardhat deploy --tags enclave,mocks",
@@ -126,8 +134,7 @@
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
     "@gnosis-guild/e3-wasm": "workspace:*",
-    "solady": "^0.1.13",
-    "viem": "2.30.6"
+    "solady": "^0.1.13"
   },
   "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808"
 }
