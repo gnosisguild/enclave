@@ -499,4 +499,10 @@ jobs:
         run: |
           ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
       - name: Enclave init
-        run: enclave init mycitest --template=${{ github.server_url }}/${{ github.repository }}.git#${{ github.sha }}:templates/default
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="${{ github.head_ref }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          enclave init mycitest --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
