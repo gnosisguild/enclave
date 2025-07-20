@@ -436,6 +436,8 @@ jobs:
           toolchain: 1.85.1
       - name: Install node dependencies
         run: pnpm install
+        with:
+          version: 10.7.1
       - name: Download enclave binary
         uses: actions/download-artifact@v4
         with:
