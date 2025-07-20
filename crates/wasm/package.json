@@ -8,7 +8,9 @@
     "dist/**/*"
   ],
   "scripts": {
-    "build": "./scripts/build.sh"
+    "build": "./scripts/build.sh",
+    "prerelease": "pnpm build",
+    "release": "pnpm publish"
   },
   "exports": {
     ".": {

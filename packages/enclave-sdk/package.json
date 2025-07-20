@@ -13,7 +13,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "prerelease": "pnpm clean && pnpm build",
+    "release": "pnpm publish"
   },
   "devDependencies": {
     "@gnosis-guild/enclave-config": "workspace:*",
