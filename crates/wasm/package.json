@@ -1,6 +1,6 @@
 {
   "name": "@gnosis-guild/e3-wasm",
-  "version": "0.0.5-test.22",
+  "version": "0.0.6-test",
   "description": "Wasm modules for enclave.",
   "main": "index.js",
   "files": [
