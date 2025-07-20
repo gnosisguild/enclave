@@ -1,6 +1,6 @@
 {
   "name": "@gnosis-guild/enclave-react",
-  "version": "0.0.5-test.22",
+  "version": "0.0.6-test",
   "description": "React hooks and utilities for Enclave SDK",
   "type": "module",
   "exports": {

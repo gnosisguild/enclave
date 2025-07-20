@@ -1,7 +1,7 @@
 {
   "name": "@gnosis-guild/enclave",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
-  "version": "0.0.5-test.22",
+  "version": "0.0.6-test",
   "license": "LGPL-3.0-only",
   "author": {
     "name": "gnosisguild",
@@ -111,7 +111,7 @@
     "build": "pnpm compile",
     "compile": "pnpm compile:contracts && pnpm compile:ts",
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
-    "compile:ts": "pnpm typechain && tsup",
+    "compile:ts": "tsup",
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
     "deploy:mocks": "hardhat deploy --tags enclave,mocks",
