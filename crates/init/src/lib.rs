@@ -12,6 +12,7 @@ use package_json::DependencyType;
 use pkgman::PkgMan;
 use std::env;
 use std::path::PathBuf;
+use std::process::exit;
 use tokio::fs;
 
 // const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#ry/support-alterations-2";
@@ -182,7 +183,7 @@ pub async fn execute(
             eprintln!("\nSorry about this but there was an error running the installer. ");
             eprintln!("\n Error: {}\n", e);
             eprintln!("Enclave is currently under active development please share this with our team:\n\n  https://github.com/gnosisguild/enclave/issues/new\n");
-            Ok(())
+            exit(1);
         }
     }
 }
