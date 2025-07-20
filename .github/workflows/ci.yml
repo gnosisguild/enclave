@@ -477,3 +477,26 @@ jobs:
           chmod 755 contracts tests
           chmod 644 contracts/ImageID.sol
           pnpm test:integration
+
+  test_enclave_init:
+    name: Test enclave init
+    runs-on: ubuntu-latest
+    needs: [build_enclave_cli, build_support_scripts]
+    steps:
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.1
+      - name: Download enclave binary
+        uses: actions/download-artifact@v4
+        with:
+          name: enclave-binary
+          path: ~/.cargo/bin/
+      - name: Make binaries executable
+        run: |
+          chmod +x ~/.cargo/bin/enclave
+      - name: Verify downloaded artifacts
+        run: |
+          ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
+      - name: Enclave init
+        run: enclave init mycitest
