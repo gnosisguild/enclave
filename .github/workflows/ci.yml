@@ -232,7 +232,7 @@ jobs:
           if-no-files-found: error
 
   ciphernode_integration_test:
-    needs: [integration_prebuild, build_enclave_cli, build_sdk]
+    needs: [integration_prebuild, build_enclave_cli]
     runs-on: "ubuntu-latest"
     strategy:
       matrix:
