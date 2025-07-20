@@ -43,6 +43,11 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> 
     )
     .await?;
 
+    println!("Getting workspace version for enclave-sdk...");
+    let sdk_version = package_json::get_version_from_package_json(
+        &PathBuf::from(TEMP_DIR).join("packages/enclave-sdk/package.json"),
+    )
+    .await?;
     let src = PathBuf::from(TEMP_DIR).join(template_path);
 
     println!("Copy with filters...");
@@ -59,6 +64,11 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> 
                 "**/package.json",
                 r#""@gnosis-guild/enclave-react":\s*"[^"]*""#,
                 &format!(r#""@gnosis-guild/enclave-react": "{}""#, react_version),
+            ),
+            Filter::new(
+                "**/package.json",
+                r#""@gnosis-guild/enclave-sdk":\s*"[^"]*""#,
+                &format!(r#""@gnosis-guild/enclave-sdk": "{}""#, sdk_version),
             ),
         ],
     )
