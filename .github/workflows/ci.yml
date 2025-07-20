@@ -499,4 +499,4 @@ jobs:
         run: |
           ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
       - name: Enclave init
-        run: enclave init mycitest
+        run: enclave init mycitest --template=${{ github.server_url }}/${{ github.repository }}.git#${{ github.ref_name }}:templates/default
