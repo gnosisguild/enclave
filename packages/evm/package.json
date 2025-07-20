@@ -111,7 +111,7 @@
     "build": "pnpm compile",
     "compile": "pnpm compile:contracts && pnpm compile:ts",
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
-    "compile:ts": "tsup",
+    "compile:ts": "pnpm typechain && tsup",
     "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
     "deploy": "hardhat deploy --tags enclave",
     "deploy:mocks": "hardhat deploy --tags enclave,mocks",
