@@ -12,6 +12,7 @@ use package_json::DependencyType;
 use pkgman::PkgMan;
 use std::env;
 use std::path::PathBuf;
+use std::process::exit;
 use tokio::fs;
 
 // const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#ry/support-alterations-2";
@@ -42,6 +43,11 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> 
     )
     .await?;
 
+    println!("Getting workspace version for enclave-sdk...");
+    let sdk_version = package_json::get_version_from_package_json(
+        &PathBuf::from(TEMP_DIR).join("packages/enclave-sdk/package.json"),
+    )
+    .await?;
     let src = PathBuf::from(TEMP_DIR).join(template_path);
 
     println!("Copy with filters...");
@@ -58,6 +64,11 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>) -> Result<()> 
                 "**/package.json",
                 r#""@gnosis-guild/enclave-react":\s*"[^"]*""#,
                 &format!(r#""@gnosis-guild/enclave-react": "{}""#, react_version),
+            ),
+            Filter::new(
+                "**/package.json",
+                r#""@gnosis-guild/enclave-sdk":\s*"[^"]*""#,
+                &format!(r#""@gnosis-guild/enclave-sdk": "{}""#, sdk_version),
             ),
         ],
     )
@@ -182,7 +193,7 @@ pub async fn execute(
             eprintln!("\nSorry about this but there was an error running the installer. ");
             eprintln!("\n Error: {}\n", e);
             eprintln!("Enclave is currently under active development please share this with our team:\n\n  https://github.com/gnosisguild/enclave/issues/new\n");
-            Ok(())
+            exit(1);
         }
     }
 }

@@ -67,8 +67,7 @@ jobs:
       - name: Run tests
         run: "pnpm ciphernode:test"
 
-  build:
-    name: Compile and push Support Dockerfile
+  build_e3_support_risc0:
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.version.outputs.version }}
@@ -168,7 +167,7 @@ jobs:
           echo "## Test results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
-  test-net:
+  test_net:
     runs-on: "ubuntu-latest"
     steps:
       - name: "Check out the repo"
@@ -187,7 +186,6 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   integration_prebuild:
-    name: Prebuild Integration Tools
     runs-on: "ubuntu-latest"
     steps:
       - name: "Check out the repo"
@@ -234,8 +232,7 @@ jobs:
           if-no-files-found: error
 
   ciphernode_integration_test:
-    name: Ciphernode Integration Test
-    needs: [integration_prebuild, build_enclave_cli, build_sdk]
+    needs: [integration_prebuild, build_enclave_cli]
     runs-on: "ubuntu-latest"
     strategy:
       matrix:
@@ -297,7 +294,6 @@ jobs:
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
   build_enclave_cli:
-    name: Build Enclave CLI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -334,8 +330,7 @@ jobs:
           path: ~/.cargo/bin/enclave
           retention-days: 1
 
-  build_support_scripts:
-    name: Build Support Scripts
+  build_e3_support_dev:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -369,7 +364,6 @@ jobs:
           if-no-files-found: error
 
   build_sdk:
-    name: Build SDK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -424,9 +418,8 @@ jobs:
           if-no-files-found: warn
 
   template_integration:
-    name: Template Integration
     runs-on: ubuntu-latest
-    needs: [build_enclave_cli, build_support_scripts, build_sdk]
+    needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -477,3 +470,39 @@ jobs:
           chmod 755 contracts tests
           chmod 644 contracts/ImageID.sol
           pnpm test:integration
+
+  test_enclave_init:
+    runs-on: ubuntu-latest
+    needs: [build_enclave_cli, build_e3_support_dev]
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.7.1
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.1
+      - name: Download enclave binary
+        uses: actions/download-artifact@v4
+        with:
+          name: enclave-binary
+          path: ~/.cargo/bin/
+      - name: Make binaries executable
+        run: |
+          chmod +x ~/.cargo/bin/enclave
+      - name: Verify downloaded artifacts
+        run: |
+          ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
+      - name: Enclave init
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="${{ github.head_ref }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          enclave init mycitest --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default

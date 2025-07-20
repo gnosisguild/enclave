@@ -1,6 +1,7 @@
 {
   "name": "@gnosis-guild/enclave-sdk",
-  "version": "0.0.0",
+  "private": false,
+  "version": "0.0.6-test",
   "type": "module",
   "exports": {
     ".": {
@@ -13,7 +14,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "prerelease": "pnpm clean && pnpm build",
+    "release": "pnpm publish --access=public"
   },
   "devDependencies": {
     "@gnosis-guild/enclave-config": "workspace:*",
