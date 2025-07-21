@@ -4,11 +4,9 @@ on:
   pull_request:
     branches:
       - main
-      - hacknet
   push:
     branches:
       - main
-      - hacknet
 env:
   DOCKERFILE_PATH: crates/support/Dockerfile
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
@@ -84,8 +82,6 @@ jobs:
           TAGS="${{ env.IMAGE_NAME }}:$VERSION"
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             TAGS="$TAGS,${{ env.IMAGE_NAME }}:latest"
-          elif [ "${{ github.ref }}" = "refs/heads/hacknet" ]; then
-            TAGS="$TAGS,${{ env.IMAGE_NAME }}:hacknet"
           fi
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
       - name: Set up BuildKit
