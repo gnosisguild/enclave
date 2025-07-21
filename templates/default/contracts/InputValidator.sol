@@ -17,7 +17,7 @@ contract InputValidator is IInputValidator {
         if (data.length == 0) revert EmptyInputData();
 
         // You can add your own validation logic here.
-        // EXAMPLE: https://github.com/gnosisguild/enclave/blob/hacknet/examples/CRISP/contracts/CRISPInputValidator.sol
+        // EXAMPLE: https://github.com/gnosisguild/enclave/blob/main/examples/CRISP/contracts/CRISPInputValidator.sol
 
         input = data;
     }
