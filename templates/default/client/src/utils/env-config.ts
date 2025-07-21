@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 export const ENCLAVE_ADDRESS = import.meta.env.VITE_ENCLAVE_ADDRESS
 export const E3_PROGRAM_ADDRESS = import.meta.env.VITE_E3_PROGRAM_ADDRESS
 export const REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS

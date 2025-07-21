@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 import { UltraHonkBackend, ProofData } from '@aztec/bb.js';
 import { Noir } from '@noir-lang/noir_js';
 import crisp_circuit from 'libs/noir/crisp_circuit.json';

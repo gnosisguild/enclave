@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 // Here we build some contract information from the EVM deployment artifacts that we can use within
 // our binaries. Specifically we wbuild out a rust file that has a structure we can import and use
 // within our configuration builder

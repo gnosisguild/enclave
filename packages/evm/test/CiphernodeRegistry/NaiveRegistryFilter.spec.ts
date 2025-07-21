@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";

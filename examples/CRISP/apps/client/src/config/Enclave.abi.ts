@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 const E3_PROGRAM_ADDRESS_FROM_ENV = import.meta.env.VITE_E3_PROGRAM_ADDRESS;
 
 if (!E3_PROGRAM_ADDRESS_FROM_ENV) {

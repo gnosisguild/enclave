@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::{build_bfv_params_arc, params::SET_2048_1032193_1};
 use anyhow::anyhow;
 use anyhow::Result;

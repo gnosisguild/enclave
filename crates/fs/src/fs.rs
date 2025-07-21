@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::traits::{DirectoryManager, FileCopier, FileFinder, FileReader, FileWriter, Replacer};
 use anyhow::Result;
 use futures::io::AsyncWriteExt;
