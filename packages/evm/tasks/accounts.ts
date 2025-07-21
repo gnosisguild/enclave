@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
 import { task } from "hardhat/config";
 
 task("accounts", "Prints the list of accounts", async (_taskArgs, hre) => {

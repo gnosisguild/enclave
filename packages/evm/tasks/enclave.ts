@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
 import fs from "fs";
 import { task, types } from "hardhat/config";
 import type { TaskArguments } from "hardhat/types";

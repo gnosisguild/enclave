@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
 import { ethers } from "hardhat";
 
 import { Enclave__factory } from "../../types/factories/contracts/Enclave__factory";
