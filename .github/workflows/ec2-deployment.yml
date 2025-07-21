@@ -4,7 +4,6 @@ on:
     branches:
       - release
       - main
-      - hacknet
     paths:
       - "Cargo.*"
       - "crates/**"
@@ -13,7 +12,6 @@ on:
     branches:
       - release
       - main
-      - hacknet
     paths:
       - "Cargo.*"
       - "crates/**"
