@@ -57,7 +57,7 @@ tmux -V
 Install the Enclave CLI tool from the official repository:
 
 ```bash
-cargo install --git https://github.com/gnosisguild/enclave --branch hacknet e3-cli
+cargo install --git https://github.com/gnosisguild/enclave --branch main e3-cli
 ```
 
 ### 2. Install wasm-pack

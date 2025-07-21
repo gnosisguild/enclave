@@ -28,7 +28,7 @@ fn get_remote_commit_hash() -> Option<String> {
         .args(&[
             "ls-remote",
             "https://github.com/gnosisguild/enclave",
-            "refs/heads/hacknet", // change to main branch once committed
+            "refs/heads/main",
         ])
         .output()
         .ok()?;

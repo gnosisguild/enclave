@@ -17,7 +17,7 @@ use tokio::fs;
 
 // const GIT_URL: &str = "https://github.com/gnosisguild/enclave.git#ry/support-alterations-2";
 const DEFAULT_TEMPLATE_URL: &str =
-    "https://github.com/gnosisguild/enclave.git#hacknet:templates/default";
+    "https://github.com/gnosisguild/enclave.git#main:templates/default";
 const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 const DEFAULT_TEMPLATE_PATH: &str = ".";
 const DEFAULT_BRANCH: &str = "main";
