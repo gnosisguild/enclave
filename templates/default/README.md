@@ -29,11 +29,11 @@ pnpm --version
 # Expected output: 10.7.1
 ```
 
-**Rust** (version 1.85.1 or later)
+**Rust** (version 1.86.0 or later)
 
 ```bash
 rustc --version
-# Expected output: rustc 1.85.1 (4eb161250 2025-03-15)
+# Expected output: rustc 1.86.0 (05f9846f8 2025-03-31)
 ```
 
 ### Optional Software

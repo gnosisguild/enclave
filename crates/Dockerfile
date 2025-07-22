@@ -16,7 +16,7 @@ RUN corepack enable
 RUN cd packages/evm && pnpm install && pnpm compile:contracts
 
 # Build stage
-FROM rust:1.85 AS ciphernode-builder
+FROM rust:1.86 AS ciphernode-builder
 
 # Force incremental 
 ENV CARGO_INCREMENTAL=1
