@@ -1,5 +1,6 @@
 ARG RUST_VERSION=1.86.0
 ARG RISC0_VERSION=2.1.0
+ARG RISC0_TOOLCHAIN=1.85.0
 ARG SKIP_SOLIDITY=0
 FROM rust:${RUST_VERSION}-slim-bookworm AS base-dev
 
@@ -33,7 +34,7 @@ ENV SHELL=/bin/bash
 
 ENV PATH="/home/${USERNAME}/.risc0/bin:${PATH}"
 RUN curl -L https://risczero.com/install | bash
-RUN rzup install rust ${RUST_VERSION}
+RUN rzup install rust ${RISC0_TOOLCHAIN}
 RUN rzup install r0vm ${RISC0_VERSION}
 RUN rzup install cargo-risczero ${RISC0_VERSION}
 

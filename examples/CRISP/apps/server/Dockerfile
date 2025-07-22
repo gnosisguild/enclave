@@ -1,6 +1,7 @@
 ############### stage 0: base-dev ###############
 ARG RUST_VERSION=1.86.0
 ARG RISC0_VERSION=2.1.0
+ARG RISC0_TOOLCHAIN=1.85.0
 ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base-dev
@@ -15,7 +16,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl -sSfL https://risczero.com/install | bash
-RUN rzup install rust ${RUST_VERSION}
+RUN rzup install rust ${RISC0_TOOLCHAIN}
 RUN rzup install r0vm ${RISC0_VERSION}
 RUN rzup install cargo-risczero ${RISC0_VERSION}
 

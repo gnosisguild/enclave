@@ -4,6 +4,7 @@
 FROM ubuntu:24.04
 
 ARG RISCZERO_VERSION=2.1.0
+ARG RISC0_TOOLCHAIN=1.85.0
 ARG CPP_VERSION=2024.1.5
 ARG RUST_VERSION=1.86.0
 
@@ -64,7 +65,7 @@ RUN curl -L https://foundry.paradigm.xyz | bash \
 ENV PATH="/home/${USERNAME}/.risc0/bin:${PATH}"
 
 RUN curl -L https://risczero.com/install | bash \
- && rzup install rust ${RUST_VERSION} \
+ && rzup install rust ${RISC0_TOOLCHAIN} \
  && rzup install cpp  ${CPP_VERSION} \
  && rzup install r0vm ${RISCZERO_VERSION} \
  && rzup install cargo-risczero ${RISCZERO_VERSION}
