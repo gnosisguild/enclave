@@ -58,7 +58,7 @@ if [[ -n "${TEST_FILES:-}" ]]; then
     # Use test files if provided (for testing)
     FILES="$TEST_FILES"
 else
-    FILES=$(find . -type f \( -name "*.rs" -o -name "*.sol" -o -name "*.ts" \) \
+    FILES=$(find . -type f \( -name "*.rs" -o -name "*.sol" -o -name "*.ts" -o -name "*.tsx" \) \
         -not -path "./node_modules/*" \
         -not -path "./.git/*" \
         -not -path "./target/*" \
@@ -86,6 +86,7 @@ is_excluded_file() {
     local excluded_patterns=(
         "*/ImageID.sol"                    # RISC Zero generated file with Apache license
         "*/templates/*/contracts/ImageID.sol"  # Alternative path pattern
+        "*/examples/CRISP/deploy/Deploy.s.sol"
     )
     
     for pattern in "${excluded_patterns[@]}"; do
