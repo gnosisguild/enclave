@@ -5,5 +5,5 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 fn main() {
-    println!("Intentially left blank");
+    println!("Intentionally left blank");
 }
