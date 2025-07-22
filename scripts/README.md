@@ -22,6 +22,7 @@ This directory contains utility scripts for the Enclave project.
 ### What it does
 
 - Scans all `.rs`, `.sol`, and `.ts` files in the repository
+- Excludes certain files with different licensing (e.g., `ImageID.sol` from RISC Zero with Apache license)
 - Checks for the required SPDX license header:
   ```
   // SPDX-License-Identifier: LGPL-3.0-only

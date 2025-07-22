@@ -78,6 +78,25 @@ MISSING_FILES=()
 INVALID_FILES=()
 FIXED_FILES=()
 
+# Function to check if a file should be excluded from license checking
+is_excluded_file() {
+    local file="$1"
+    
+    # List of files to exclude (can use patterns)
+    local excluded_patterns=(
+        "*/ImageID.sol"                    # RISC Zero generated file with Apache license
+        "*/templates/*/contracts/ImageID.sol"  # Alternative path pattern
+    )
+    
+    for pattern in "${excluded_patterns[@]}"; do
+        if [[ "$file" == $pattern ]]; then
+            return 0  # File should be excluded
+        fi
+    done
+    
+    return 1  # File should not be excluded
+}
+
 # Function to check if a file has the correct license header
 check_license_header() {
     local file="$1"
@@ -98,7 +117,7 @@ check_license_header() {
     
     if [[ "$actual_line1" == "$expected_line1" ]] && \
        [[ "$actual_line2" == "$expected_line2" ]] && \
-       [[ "$actual_line3" == "$expected_line3"* ]]; then
+       [[ "$actual_line3" == "$expected_line3" ]]; then
         return 0  # Header is correct
     elif echo "$first_lines" | grep -q "SPDX-License-Identifier:"; then
         return 2  # Has SPDX but wrong format/license
@@ -133,6 +152,12 @@ while IFS= read -r file; do
     
     # Skip if file doesn't exist
     if [[ ! -f "$file" ]]; then
+        continue
+    fi
+    
+    # Skip excluded files
+    if is_excluded_file "$file"; then
+        echo -e "Checking: $file ${BLUE}⏭️  Excluded${NC}"
         continue
     fi
     
