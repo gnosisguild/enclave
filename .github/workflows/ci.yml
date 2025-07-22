@@ -24,10 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.85.1
+      - name: Install Rust 1.86.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
 
         # We must install foundry in order to be able to test anvil
       - name: Install Foundry
@@ -116,10 +116,10 @@ jobs:
       - name: "Check out the repo"
         uses: "actions/checkout@v4"
 
-      - name: Install Rust 1.85.1
+      - name: Install Rust 1.86.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
           target: wasm32-unknown-unknown
 
         # required so that we can compile wasm within the sdk
@@ -192,10 +192,10 @@ jobs:
           node-version: 22
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
-      - name: Install Rust 1.85.1
+      - name: Install Rust 1.86.0
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -243,10 +243,10 @@ jobs:
           node-version: 22
       - name: pnpm-setup
         uses: pnpm/action-setup@v4
-      - name: Install Rust 1.85.1
+      - name: Install Rust 1.86.0
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -307,7 +307,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
@@ -344,7 +344,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
       - name: Build support scripts
         run: cd templates/default && cargo build --bin e3-support-scripts-dev
       - name: Verify build artifacts
@@ -391,7 +391,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -429,7 +429,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
       - name: Install node dependencies
         run: pnpm install
       - name: Download enclave binary
@@ -482,7 +482,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.1
+          toolchain: 1.86.0
       - name: Download enclave binary
         uses: actions/download-artifact@v4
         with:
