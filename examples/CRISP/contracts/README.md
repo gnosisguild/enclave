@@ -12,7 +12,7 @@ Tests are defined in the `tests` directory in the root of this template.
 ## Generated Contracts
 
 As part of the build process, this template generates the `ImageID.sol` and `Elf.sol` contracts.
-Running `cargo build` will generate these contracts with up to date references to your guest code.
+Running `cargo build --locked` will generate these contracts with up to date references to your guest code.
 
 - `ImageID.sol`: contains the [Image IDs][image-id] for the guests implemented in the [methods] directory.
 - `Elf.sol`: contains the path of the guest binaries implemented in the [methods] directory.

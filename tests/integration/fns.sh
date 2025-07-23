@@ -43,7 +43,7 @@ if command -v enclave >/dev/null 2>&1; then
 elif [[ -f "$ROOT_DIR/target/debug/enclave" ]]; then
    ENCLAVE_BIN="$ROOT_DIR/target/debug/enclave"
 else
-   cargo build --bin enclave
+   cargo build --locked --bin enclave
    ENCLAVE_BIN="$ROOT_DIR/target/debug/enclave"
 fi
 echo "Enclave binary: $ENCLAVE_BIN"

@@ -42,7 +42,7 @@ jobs:
           ref: ${{ env.RISC0_MONOREPO_REF }}
 
       - name: build rust guest
-        run: cargo build
+        run: cargo build --locked
 
       - name: build solidity contracts
         run: forge build
@@ -82,7 +82,7 @@ jobs:
           ref: ${{ env.RISC0_MONOREPO_REF }}
 
       - name: build rust guest
-        run: cargo build
+        run: cargo build --locked
 
       - name: build solidity contracts
         run: forge build

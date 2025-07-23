@@ -1,7 +1,9 @@
 [workspace]
-resolver = "2"
+resolver = "3"
+msrv = "1.86.0"
 members = ["host", "core", "methods", "app", "client"]
 exclude = ["methods/guests"]
+
 
 [workspace.package]
 version = "0.1.0"

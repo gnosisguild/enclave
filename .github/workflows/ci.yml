@@ -346,7 +346,7 @@ jobs:
         with:
           toolchain: 1.86.0
       - name: Build support scripts
-        run: cd templates/default && cargo build --bin e3-support-scripts-dev
+        run: cd templates/default && cargo build --locked --bin e3-support-scripts-dev
       - name: Verify build artifacts
         run: |
           echo "Checking for support scripts binary:"

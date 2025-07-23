@@ -1,5 +1,6 @@
 [workspace]
-resolver = "2"
+resolver = "3"
+msrv = "1.86.0"
 members = ["app", "host", "methods", "types"]
 exclude = ["methods/guest"]
 

@@ -3,7 +3,10 @@ name = "guests"
 version = "0.1.0"
 edition = "2021"
 
+
 [workspace]
+resolver = "3"
+msrv = "1.86.0"
 
 [[bin]]
 name = "program"

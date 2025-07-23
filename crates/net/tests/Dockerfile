@@ -4,7 +4,7 @@ FROM rust:1.81 AS builder
 WORKDIR /app
 COPY . .
 
-RUN cargo build --release --bin p2p_test
+RUN cargo build --locked --release --bin p2p_test
 
 FROM debian:bookworm-slim
 
