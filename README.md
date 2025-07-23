@@ -23,7 +23,7 @@ Join the Enclave [Telegram group][telegram].
 
 ## Contributing
 
-See [CONTRIBUTING.md][CONTRIBUTING].
+See [CONTRIBUTING.md][contributing].
 
 ### Contributors
 
@@ -101,3 +101,4 @@ This repo created under the [LGPL-3.0+ license](LICENSE).
 [quick-start]: https://docs.enclave.gg/quick-start
 [crisp]: https://docs.enclave.gg/CRISP/introduction
 [telegram]: https://t.me/+raYAZgrwgOw2ODJh
+[contributing]: CONTRIBUTING.md
