@@ -17,11 +17,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
 
-      - name: Install commitlint
+      - name: Install commitlint globally
         run: |
-          npm install --save-dev @commitlint/config-conventional @commitlint/cli
+          npm install -g @commitlint/config-conventional @commitlint/cli
 
       - name: Create commitlint config
         run: |
@@ -35,15 +35,7 @@ jobs:
                 [
                   'feat',
                   'fix', 
-                  'chore',
-                  'docs',
-                  'style',
-                  'refactor',
-                  'perf',
-                  'test',
-                  'ci',
-                  'build',
-                  'revert'
+                  'chore'
                 ]
               ],
               'scope-case': [2, 'always', 'lower-case'],
@@ -59,8 +51,44 @@ jobs:
 
       - name: Validate PR commits
         run: |
-          echo "Validating commits from ${{ github.event.pull_request.base.sha }} to ${{ github.event.pull_request.head.sha }}"
-          npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+
+          # Get only the commits that are in this PR (not in base branch)
+          echo "Getting commits unique to this PR..."
+          COMMITS=$(git rev-list --reverse ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+
+          if [ -z "$COMMITS" ]; then
+            echo "No commits found in this PR to validate"
+            exit 0
+          fi
+
+          echo "Commits to validate:"
+          git log --oneline ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+
+          # Validate each commit message individually
+          echo "Validating PR-specific commits..."
+          FAILED=0
+
+          for commit in $COMMITS; do
+            echo "Validating commit: $commit"
+            COMMIT_MSG=$(git log --format="%s" -n 1 $commit)
+            echo "Commit message: $COMMIT_MSG"
+            
+            if ! echo "$COMMIT_MSG" | commitlint --verbose; then
+              echo "❌ Commit $commit failed validation"
+              FAILED=1
+            else
+              echo "✅ Commit $commit passed validation"
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "One or more commits failed validation"
+            exit 1
+          fi
+
+          echo "All commits passed validation!"
 
       - name: Comment on PR if validation fails
         if: failure()
@@ -80,12 +108,12 @@ jobs:
             <type>[optional scope]: <description>
             \`\`\`
 
-            **Valid types:** feat, fix, chore, docs, style, refactor, perf, test, ci, build, revert
+            **Valid types:** feat, fix, chore
 
             **Examples:**
             - \`feat: add new encryption provider\`
             - \`fix(cli): resolve template initialization bug\`
-            - \`docs(contributing): update commit message guidelines\`
+            - \`chore(ci): update GitHub Actions\`
             - \`feat!: breaking change to API\`
 
             You can fix this by:

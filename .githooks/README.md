@@ -18,16 +18,18 @@ git config core.hooksPath .githooks
 ### What it validates
 
 The hook ensures commit messages follow this format:
+
 ```
 <type>[optional scope]: <description>
 ```
 
-**Valid types:** feat, fix, chore, docs, style, refactor, perf, test, ci, build, revert
+**Valid types:** feat, fix, chore
 
 **Examples:**
+
 - `feat: add new encryption provider`
 - `fix(cli): resolve template initialization bug`
-- `docs(contributing): update commit message guidelines`
+- `chore(ci): update GitHub Actions`
 - `feat!: breaking change to API`
 
 ### Disabling the hook
