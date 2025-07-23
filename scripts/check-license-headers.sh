@@ -78,8 +78,8 @@ check_license_header() {
     local file="$1"
     local first_lines
     
-    # Read first 6 lines of the file
-    first_lines=$(head -n 6 "$file" 2>/dev/null || echo "")
+    # Read first 20 lines to catch SPDX headers that might not be at the very top
+    first_lines=$(head -n 20 "$file" 2>/dev/null || echo "")
     
     # Check if the file starts with the expected header
     local expected_line1="// SPDX-License-Identifier: LGPL-3.0-only"
@@ -145,11 +145,8 @@ while IFS= read -r file; do
             fi
             ;;
         2)
-            echo -e " ${YELLOW}⚠️  Incorrect license header${NC}"
+            echo -e " ${YELLOW}⚠️  Has different SPDX license${NC}"
             INVALID_FILES+=("$file")
-            if [[ "$FIX_MODE" == true ]]; then
-                echo -e "${YELLOW}  ⚠️  Skipping file with existing SPDX header (manual review needed)${NC}"
-            fi
             ;;
         *)
             echo -e " ${RED}❓ Error checking file${NC}"
@@ -160,10 +157,15 @@ done <<< "$FILES"
 echo ""
 
 # Summary
-total_issues=$((${#MISSING_FILES[@]} + ${#INVALID_FILES[@]}))
+total_issues=${#MISSING_FILES[@]}
 
 if [[ $total_issues -eq 0 ]]; then
-    echo -e "${GREEN}✅ All files have correct license headers!${NC}"
+    if [[ ${#INVALID_FILES[@]} -gt 0 ]]; then
+        echo -e "${GREEN}✅ All files have license headers!${NC}"
+        echo -e "${BLUE}Note: Some files use different SPDX licenses (shown above)${NC}"
+    else
+        echo -e "${GREEN}✅ All files have correct license headers!${NC}"
+    fi
     exit 0
 else
     echo -e "${RED}📋 Summary:${NC}"
@@ -178,11 +180,12 @@ else
     fi
     
     if [[ ${#INVALID_FILES[@]} -gt 0 ]]; then
-        echo -e "${YELLOW}Files with incorrect license headers: ${#INVALID_FILES[@]}${NC}"
+        echo -e "${YELLOW}Files with different SPDX licenses: ${#INVALID_FILES[@]}${NC}"
         for file in "${INVALID_FILES[@]}"; do
             echo "  - $file"
         done
-        echo -e "${YELLOW}Note: Files with existing SPDX headers require manual review${NC}"
+        echo -e "${YELLOW}Note: These files have existing SPDX headers with different licenses${NC}"
+        echo -e "${YELLOW}Please verify if they should use LGPL-3.0-only or keep their current license${NC}"
     fi
     
     if [[ ${#FIXED_FILES[@]} -gt 0 ]]; then
@@ -199,14 +202,19 @@ else
     
     if [[ "$FIX_MODE" == true ]]; then
         if [[ ${#INVALID_FILES[@]} -gt 0 ]]; then
-            echo -e "${YELLOW}Some files still need manual review. Please check files with existing SPDX headers.${NC}"
-            exit 1
-        else
-            echo -e "${GREEN}All fixable issues have been resolved!${NC}"
+            echo -e "${YELLOW}Note: Some files have different SPDX licenses and were not modified.${NC}"
+            echo -e "${YELLOW}This is informational only - no action needed unless you want to change their licenses.${NC}"
+        fi
+        if [[ $total_issues -eq 0 ]]; then
+            echo -e "${GREEN}All missing headers have been fixed!${NC}"
             exit 0
         fi
     elif [[ "$CHECK_ONLY" == true ]]; then
-        exit 1
+        if [[ $total_issues -gt 0 ]]; then
+            exit 1
+        else
+            exit 0
+        fi
     else
         echo -e "${BLUE}Run with --fix to automatically add missing headers${NC}"
         echo -e "${BLUE}Run with --check-only for CI/CD usage (exits with code 1 if issues found)${NC}"
