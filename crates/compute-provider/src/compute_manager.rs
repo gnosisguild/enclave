@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::ciphertext_output::ComputeProvider;
 use crate::compute_input::{ComputeInput, FHEInputs};
 use crate::merkle_tree::MerkleTree;

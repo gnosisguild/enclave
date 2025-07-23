@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use actix_web::{middleware::Logger, web, App, HttpResponse, HttpServer, Result};
 use e3_compute_provider::FHEInputs;
 use program_client::{ComputeRequest, ComputeResponse};
