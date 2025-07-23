@@ -12,7 +12,7 @@ echo "pnpm install"
 echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"
-(cd /app && cargo build --locked -p e3-cli && cargo install --path crates/cli)
+(cd /app && cargo build --locked -p e3-cli && cargo install --locked --path crates/cli)
 echo "program"
 (cd ./apps/program && cargo build --locked --bin crisp-program)
 echo "server"

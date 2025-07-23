@@ -1,7 +1,7 @@
 # !/bin/bash
 
 # Install the enclave binary
-cargo install --path ./crates/cli --bin enclave -f
+cargo install --locked --path ./crates/cli --bin enclave -f
 
 concurrently \
   --names "ANVIL,NODES" \

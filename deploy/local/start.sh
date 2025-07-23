@@ -37,7 +37,7 @@ echo "✅ All dependencies found"
 
 # Install the enclave binary
 echo "🔧 Installing Enclave CLI..."
-cargo install --path ./crates/cli --bin enclave -f
+cargo install --locked --path ./crates/cli --bin enclave -f
 
 # Function to wait for a service to be ready
 wait_for_service() {
