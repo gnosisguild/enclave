@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use crate::{GetHasNode, Sortition};
 /// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
 /// forwards a CiphernodeSelected event to the event bus

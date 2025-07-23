@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 /// This trait allows our keys to be responsive to multiple inputs
 pub trait IntoKey {
     fn into_key(self) -> Vec<u8>;

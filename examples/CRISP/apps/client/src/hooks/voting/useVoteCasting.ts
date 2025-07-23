@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVoteManagementContext } from '@/context/voteManagement';

@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
 import { E3, IE3Program } from "./IE3.sol";
