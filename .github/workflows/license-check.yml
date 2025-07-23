@@ -33,7 +33,7 @@ jobs:
               repo: context.repo.repo,
               body: `❌ **License Header Check Failed**
               
-              Some files are missing the required SPDX license header. Please add the following header to the beginning of all \`.rs\`, \`.sol\`, and \`.ts\` files:
+              Some files are missing the required SPDX license header. Please add the following header to the beginning of all \`.js\`, \`.jsx\`, \`.nr\`, \`.rs\`, \`.sol\`, \`.ts\`, and \`.tsx\` files:
               
               \`\`\`
               // SPDX-License-Identifier: LGPL-3.0-only

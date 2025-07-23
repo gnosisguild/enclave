@@ -50,27 +50,20 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo -e "${BLUE}Checking license headers in .rs, .sol, and .ts files...${NC}"
+echo -e "${BLUE}Checking license headers in source files...${NC}"
 echo ""
 
-# Find all relevant files
+# Use git ls-files to find tracked files with specified extensions
 if [[ -n "${TEST_FILES:-}" ]]; then
     # Use test files if provided (for testing)
     FILES="$TEST_FILES"
 else
-    FILES=$(find . -type f \( -name "*.rs" -o -name "*.sol" -o -name "*.ts" -o -name "*.tsx" \) \
-        -not -path "./node_modules/*" \
-        -not -path "./.git/*" \
-        -not -path "./target/*" \
-        -not -path "./build/*" \
-        -not -path "./dist/*" \
-        -not -path "./packages/*/node_modules/*" \
-        -not -path "./docs/node_modules/*" \
-        2>/dev/null | sort)
+    # Find all tracked files with the specified extensions
+    FILES=$(git ls-files '*.js' '*.jsx' '*.nr' '*.rs' '*.sol' '*.ts' '*.tsx' 2>/dev/null | sort)
 fi
 
 if [[ -z "$FILES" ]]; then
-    echo -e "${YELLOW}No .rs, .sol, or .ts files found.${NC}"
+    echo -e "${YELLOW}No source files found.${NC}"
     exit 0
 fi
 
@@ -78,25 +71,7 @@ MISSING_FILES=()
 INVALID_FILES=()
 FIXED_FILES=()
 
-# Function to check if a file should be excluded from license checking
-is_excluded_file() {
-    local file="$1"
-    
-    # List of files to exclude (can use patterns)
-    local excluded_patterns=(
-        "*/ImageID.sol"                    # RISC Zero generated file with Apache license
-        "*/templates/*/contracts/ImageID.sol"  # Alternative path pattern
-        "*/examples/CRISP/deploy/Deploy.s.sol"
-    )
-    
-    for pattern in "${excluded_patterns[@]}"; do
-        if [[ "$file" == $pattern ]]; then
-            return 0  # File should be excluded
-        fi
-    done
-    
-    return 1  # File should not be excluded
-}
+
 
 # Function to check if a file has the correct license header
 check_license_header() {
@@ -107,7 +82,6 @@ check_license_header() {
     first_lines=$(head -n 6 "$file" 2>/dev/null || echo "")
     
     # Check if the file starts with the expected header
-    # Use a more robust comparison by checking line by line
     local expected_line1="// SPDX-License-Identifier: LGPL-3.0-only"
     local expected_line2="//"
     local expected_line3="// This file is provided WITHOUT ANY WARRANTY;"
@@ -150,17 +124,6 @@ add_license_header() {
 while IFS= read -r file; do
     # Skip empty lines
     [[ -n "$file" ]] || continue
-    
-    # Skip if file doesn't exist
-    if [[ ! -f "$file" ]]; then
-        continue
-    fi
-    
-    # Skip excluded files
-    if is_excluded_file "$file"; then
-        echo -e "Checking: $file ${BLUE}⏭️  Excluded${NC}"
-        continue
-    fi
     
     echo -n "Checking: $file"
     
