@@ -4,7 +4,7 @@
 commit_message=$(cat "$1")
 
 # Check if commit message starts with valid type
-if echo "$commit_message" | grep -qE '^(feat|fix|chore)(\(.+\))?(!)?: .{1,72}'; then
+if echo "$commit_message" | grep -qE '^(feat|fix|chore)(\(.+\))?(!)?: .{1,72}$'; then
     echo "✅ Commit message format is valid"
     exit 0
 else
