@@ -25,6 +25,11 @@ Join the Enclave [Telegram group][telegram].
 
 See [CONTRIBUTING.md][CONTRIBUTING].
 
+### Contributors
+
+<!-- readme: contributors -start -->
+<!-- readme: contributors -end -->
+
 ## Minimum Rust version
 
 This workspace's minimum supported rustc version is 1.86.0.
