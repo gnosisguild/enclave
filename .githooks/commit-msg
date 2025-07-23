@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Conventional commit regex pattern
+conventional_commit_regex='^(feat|fix|chore|docs|style|refactor|perf|test|ci|build|revert)(\(.+\))?(!)?: .{1,72}'
+
+# Get the commit message
+commit_message=$(cat "$1")
+
+# Check if commit message matches conventional commit format
+if ! echo "$commit_message" | grep -qE "$conventional_commit_regex"; then
+    echo "❌ Invalid commit message format!"
+    echo ""
+    echo "Commit message must follow Conventional Commits specification:"
+    echo "  <type>[optional scope]: <description>"
+    echo ""
+    echo "Examples:"
+    echo "  feat: add new feature"
+    echo "  fix(api): resolve authentication bug"
+    echo "  feat!: breaking change"
+    echo ""
+    echo "Valid types: feat, fix, chore, docs, style, refactor, perf, test, ci, build, revert"
+    echo ""
+    echo "Your commit message:"
+    echo "  $commit_message"
+    exit 1
+fi
+
+echo "✅ Commit message format is valid"

@@ -1,0 +1,97 @@
+name: Validate Commit Messages
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate-commits:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install commitlint
+        run: |
+          npm install --save-dev @commitlint/config-conventional @commitlint/cli
+
+      - name: Create commitlint config
+        run: |
+          cat > commitlint.config.js << 'EOF'
+          module.exports = {
+            extends: ['@commitlint/config-conventional'],
+            rules: {
+              'type-enum': [
+                2,
+                'always',
+                [
+                  'feat',
+                  'fix', 
+                  'chore',
+                  'docs',
+                  'style',
+                  'refactor',
+                  'perf',
+                  'test',
+                  'ci',
+                  'build',
+                  'revert'
+                ]
+              ],
+              'scope-case': [2, 'always', 'lower-case'],
+              'subject-case': [2, 'never', ['sentence-case', 'start-case', 'pascal-case', 'upper-case']],
+              'subject-empty': [2, 'never'],
+              'subject-full-stop': [2, 'never', '.'],
+              'type-case': [2, 'always', 'lower-case'],
+              'type-empty': [2, 'never'],
+              'header-max-length': [2, 'always', 72]
+            }
+          };
+          EOF
+
+      - name: Validate PR commits
+        run: |
+          echo "Validating commits from ${{ github.event.pull_request.base.sha }} to ${{ github.event.pull_request.head.sha }}"
+          npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+      - name: Comment on PR if validation fails
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ❌ Commit Message Validation Failed
+
+            One or more commit messages in this PR don't follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+            Please ensure your commit messages follow this format:
+            \`\`\`
+            <type>[optional scope]: <description>
+            \`\`\`
+
+            **Valid types:** feat, fix, chore, docs, style, refactor, perf, test, ci, build, revert
+
+            **Examples:**
+            - \`feat: add new encryption provider\`
+            - \`fix(cli): resolve template initialization bug\`
+            - \`docs(contributing): update commit message guidelines\`
+            - \`feat!: breaking change to API\`
+
+            You can fix this by:
+            1. Amending your commit messages using \`git commit --amend\` (for the last commit)
+            2. Using \`git rebase -i\` to edit multiple commit messages
+            3. Or squashing commits when merging the PR
+
+            For more details, see our [Contributing Guidelines](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md#conventional-commits).`
+            })

@@ -82,6 +82,24 @@ feat(compute-provider): Add Risc Zero as a compute provider (#123)
 feat(bfv): improve DKG performance for BFV (#123)
 ```
 
+### Conventional Commits: Automated Validation
+
+We have automated validation in place to ensure commit messages follow the Conventional Commits specification:
+
+1. **GitHub Actions**: All pull requests are automatically validated. If any commit messages don't follow the specification, the CI will fail and provide feedback.
+
+2. **Local Git Hook (Optional)**: Developers can optionally enable a local git hook to validate commit messages before they're committed:
+   ```bash
+   # Enable the git hook
+   chmod +x .githooks/commit-msg
+   git config core.hooksPath .githooks
+   ```
+
+If your commit messages don't pass validation, you can fix them using:
+- `git commit --amend` to fix the last commit message
+- `git rebase -i HEAD~N` to edit multiple commit messages
+- Squash commits when merging the PR
+
 ## Pull Requests
 
 Before you create a pull request, search for any issues related to the change you are making. If none exist already, create an issue that thoroughly describes the problem that you are trying to solve. These are used to inform reviewers of the original intent and should be referenced via the pull request template.

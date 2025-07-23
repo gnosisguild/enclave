@@ -510,7 +510,22 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Contribute List
         uses: akhilmhdh/contributors-readme-action@v2.3.10
+        with:
+          image_size: 100
+          readme_path: README.md
+          use_username: false
+          columns_per_row: 6
+          collaborators: direct
+          commit_message: "docs(contributor): contrib-readme-action has updated readme"
+          auto_detect_branch_protection: true
+          pr_title_on_protected: "docs(contributor): contributors readme action update"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
