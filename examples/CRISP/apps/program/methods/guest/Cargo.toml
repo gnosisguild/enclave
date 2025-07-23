@@ -2,6 +2,8 @@
 name = "guests"
 version = "0.1.0"
 edition = "2021"
+resolver = "3"
+rust-version = "1.86.0"
 
 [workspace]
 
