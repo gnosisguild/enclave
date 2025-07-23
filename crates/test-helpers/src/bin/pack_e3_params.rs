@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use clap::{command, Parser};
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
 use std::{error::Error, num::ParseIntError, process};

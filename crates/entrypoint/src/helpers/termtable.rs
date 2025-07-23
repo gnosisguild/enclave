@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 pub fn print_table(headers: &[&str], data: &[Vec<String>]) {
     // Calculate the maximum width needed for each column
     let mut col_widths = vec![0; headers.len()];

@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 import React, { useCallback, useEffect, useState } from 'react'
 import PollCard from '@/components/Cards/PollCard'
 import { PollResult } from '@/model/poll.model'

@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 export const FarcasterLogo = ({ size = 24 }: { size?: number }) => {
   return (
     <svg width={size} viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>

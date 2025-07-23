@@ -12,6 +12,7 @@
     "clean": "cd packages/evm && pnpm clean",
     "compile": "pnpm evm:build && pnpm sdk:build && pnpm react:build && pnpm ciphernode:build",
     "lint": "pnpm evm:lint && pnpm ciphernode:lint",
+    "check:license": "./scripts/check-license-headers.sh",
     "typechain": "pnpm evm:typechain",
     "test": "pnpm evm:test && pnpm ciphernode:test && pnpm sdk:test",
     "test:integration": "cd ./tests/integration && ./test.sh",

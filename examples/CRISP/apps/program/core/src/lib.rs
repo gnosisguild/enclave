@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use e3_bfv_helpers::decode_bfv_params_arc;
 use e3_compute_provider::FHEInputs;
 use fhe_rs::bfv::Ciphertext;
