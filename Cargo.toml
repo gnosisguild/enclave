@@ -85,74 +85,73 @@ e3-support-scripts = { version = "0.1.0", path = "./crates/support-scripts" }
 e3-test-helpers = { version = "0.1.0", path = "./crates/test-helpers" }
 e3-tests = { version = "0.1.0", path = "./crates/tests" }
 
-actix = "0.13.5"
-actix-web = "4.10.2"
-aes-gcm = "0.10.3"
-alloy = { version = "1.0.11", features = ["node-bindings", "full"] }
-alloy-primitives = { version = "1.0", default-features = false, features = [
+actix = "=0.13.5"
+actix-web = "=4.11.0"
+aes-gcm = "=0.10.3"
+alloy = { version = "=1.0.23", features = ["node-bindings", "full"] }
+alloy-primitives = { version = "=1.3.0", default-features = false, features = [
   "rlp",
   "serde",
   "std",
 ] }
-alloy-sol-types = "1.0"
-alloy-dyn-abi = "1.1.0"
-argon2 = "0.5.2"
-anyhow = "1.0.86"
-async-std = { version = "1.12", features = ["attributes"] }
-async-trait = "0.1"
-async-recursion = "1.1.1"
-bincode = "1.3.3"
-bloom = "0.3.2"
-bs58 = "0.5.1"
-base64 = "0.22.1"
-clap = { version = "4.5.17", features = ["derive"] }
-compile-time = "0.2.0"
-dirs = "5.0.1"
-dialoguer = "0.11.0"
-duct = "1.0.0"
-eyre = { version = "0.6.12" }
+alloy-sol-types = "=1.3.0"
+alloy-dyn-abi = "=1.3.0"
+argon2 = "=0.5.3"
+anyhow = "=1.0.98"
+async-std = { version = "=1.13.1", features = ["attributes"] }
+async-trait = "=0.1.88"
+async-recursion = "=1.1.1"
+bincode = "=1.3.3"
+bloom = "=0.3.2"
+bs58 = "=0.5.1"
+base64 = "=0.22.1"
+clap = { version = "=4.5.41", features = ["derive"] }
+compile-time = "=0.2.0"
+dirs = "=5.0.1"
+dialoguer = "=0.11.0"
+duct = "=1.0.0"
+eyre = { version = "=0.6.12" }
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
-figment = { version = "0.10.19", features = ["yaml", "test"] }
-futures = "0.3.30"
-futures-util = "0.3"
-glob = "0.3.2"
-git2 = "0.20.2"
-hex = "0.4.3"
-jsonrpsee = { version = "0.25.1", features = ["http-client"] }
-lazy_static = "1.5.0"
-num = "0.4.3"
-num-bigint = "0.4.6"
-num-traits = "0.2"
-once_cell = "1.19.0"
-opentelemetry = "0.29.0"
-opentelemetry-otlp = { version = "0.29.0", features = ["grpc-tonic"] }
-opentelemetry_sdk = "0.29.0"
-opentelemetry-stdout = "0.29.0"
-path-clean = "1.0.1"
-petname = "2.0.2"
-phf = { version = "0.11", features = ["macros"] }
-rand_chacha = "0.3.1"
-rand = "0.8.5"
-regex = "1.11.1" 
-reqwest = { version = "0.12.15", features = ["json"] }
-serde = { version = "1.0.208", features = ["derive"] }
-serde_json = "1.0.133"
-sled = "0.34.7"
-serde_yaml = "0.9.34"
-sha2 = "0.10.8"
-shellexpand = "3.1.0"
-tempfile = "3.20.0"
-thiserror =  { version = "1.0.58" }
-tokio = { version = "1.38", features = ["full"] }
-tracing = "0.1.37"
-tracing-opentelemetry = "0.30.0"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
-url = "2.5.4"
+figment = { version = "=0.10.19", features = ["yaml", "test"] }
+futures = "=0.3.31"
+futures-util = "=0.3.31"
+glob = "=0.3.2"
+git2 = "=0.20.2"
+hex = "=0.4.3"
+lazy_static = "=1.5.0"
+num = "=0.4.3"
+num-bigint = "=0.4.6"
+num-traits = "=0.2.19"
+once_cell = "=1.21.3"
+opentelemetry = "=0.29.0"
+opentelemetry-otlp = { version = "=0.29.0", features = ["grpc-tonic"] }
+opentelemetry_sdk = "=0.29.0"
+opentelemetry-stdout = "=0.29.0"
+path-clean = "=1.0.1"
+petname = "=2.0.2"
+phf = { version = "=0.11.3", features = ["macros"] }
+rand_chacha = "=0.3.1"
+rand = "=0.8.5"
+regex = "=1.11.1" 
+reqwest = { version = "=0.12.22", features = ["json"] }
+serde = { version = "=1.0.219", features = ["derive"] }
+serde_json = "=1.0.141"
+sled = "=0.34.7"
+serde_yaml = "=0.9.34"
+sha2 = "=0.10.9"
+shellexpand = "=3.1.1"
+tempfile = "=3.20.0"
+thiserror =  { version = "=1.0.69" }
+tokio = { version = "=1.46.1", features = ["full"] }
+tracing = "=0.1.41"
+tracing-opentelemetry = "=0.30.0"
+tracing-subscriber = { version = "=0.3.19", features = ["env-filter", "time"] }
+url = "=2.5.4"
 vfs = { git = "https://github.com/ryardley/rust-vfs.git", features = ["async-vfs"] }
-libp2p = { version = "0.54.1", features = [
+libp2p = { version = "=0.54.1", features = [
   "gossipsub",
   "identify",
   "kad",
@@ -162,4 +161,4 @@ libp2p = { version = "0.54.1", features = [
   "quic",
   "tokio",
 ]}
-zeroize = "1.6.0"
+zeroize = "=1.8.1"

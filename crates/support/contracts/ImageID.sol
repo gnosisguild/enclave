@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
-
 // Copyright 2024 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,5 +19,5 @@
 pragma solidity ^0.8.20;
 
 library ImageID {
-    bytes32 public constant PROGRAM_ID = bytes32(0xa56efeb96ad1ed58ab6606e39504329affb555f71046de19ccbfbe7d09c967af);
+    bytes32 public constant PROGRAM_ID = bytes32(0x915f4f08e9ebdecd75618d7bd902f04612f901840717693a7aea756a91ccb0d2);
 }

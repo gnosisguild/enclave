@@ -3180,7 +3180,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
+source = "git+https://github.com/gnosisguild/fhe.rs#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -3194,6 +3194,8 @@ dependencies = [
  "prost-build",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "rand_distr",
+ "rayon",
  "serde",
  "thiserror 1.0.69",
  "zeroize",
@@ -3203,7 +3205,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
+source = "git+https://github.com/gnosisguild/fhe.rs#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3225,7 +3227,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
+source = "git+https://github.com/gnosisguild/fhe.rs#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3233,13 +3235,14 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#11cdd749a8e01c486160d5f62572c4520af5358f"
+source = "git+https://github.com/gnosisguild/fhe.rs#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
  "num-traits",
  "prime_factorization",
  "rand 0.8.5",
+ "rand_distr",
  "rayon",
 ]
 
@@ -5226,6 +5229,7 @@ checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
 dependencies = [
  "num-integer",
  "num-traits",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -5434,9 +5438,9 @@ dependencies = [
 
 [[package]]
 name = "opentelemetry"
-version = "0.29.1"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e87237e2775f74896f9ad219d26a2081751187eb7c9f5c58dde20a23b95d16c"
+checksum = "768ee97dc5cd695a4dd4a69a0678fb42789666b5a89e8c0af48bb06c6e427120"
 dependencies = [
  "futures-core",
  "futures-sink",
@@ -5869,9 +5873,9 @@ dependencies = [
 
 [[package]]
 name = "prettyplease"
-version = "0.2.35"
+version = "0.2.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "061c1221631e079b26479d25bbf2275bfe5917ae8419cd7e34f13bfc2aa7539a"
+checksum = "ff24dfcda44452b9816fff4cd4227e1bb73ff5a2f1bc1105aa92fb8565ce44d2"
 dependencies = [
  "proc-macro2",
  "syn 2.0.104",
@@ -6223,6 +6227,16 @@ checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
 dependencies = [
  "getrandom 0.3.3",
  "serde",
+]
+
+[[package]]
+name = "rand_distr"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
+dependencies = [
+ "num-traits",
+ "rand 0.8.5",
 ]
 
 [[package]]

@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
-
 // Copyright 2024 RISC Zero, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,5 +20,5 @@ pragma solidity ^0.8.20;
 
 library Elf {
     string public constant PROGRAM_PATH =
-        "/app/target/riscv-guest/methods/guests/riscv32im-risc0-zkvm-elf/release/program.bin";
+        "/home/ace/main/gnosis/enclave/crates/support/target/riscv-guest/methods/guests/riscv32im-risc0-zkvm-elf/release/program.bin";
 }
