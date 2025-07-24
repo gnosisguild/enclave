@@ -1,0 +1,125 @@
+name: Validate Commit Messages
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate-commits:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install commitlint globally
+        run: |
+          npm install -g @commitlint/config-conventional @commitlint/cli
+
+      - name: Create commitlint config
+        run: |
+          cat > commitlint.config.js << 'EOF'
+          module.exports = {
+            extends: ['@commitlint/config-conventional'],
+            rules: {
+              'type-enum': [
+                2,
+                'always',
+                [
+                  'feat',
+                  'fix', 
+                  'chore'
+                ]
+              ],
+              'scope-case': [2, 'always', 'lower-case'],
+              'subject-case': [2, 'never', ['sentence-case', 'start-case', 'pascal-case', 'upper-case']],
+              'subject-empty': [2, 'never'],
+              'subject-full-stop': [2, 'never', '.'],
+              'type-case': [2, 'always', 'lower-case'],
+              'type-empty': [2, 'never'],
+              'header-max-length': [2, 'always', 72]
+            }
+          };
+          EOF
+
+      - name: Validate PR commits
+        run: |
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+
+          # Get only the commits that are in this PR (not in base branch)
+          echo "Getting commits unique to this PR..."
+          COMMITS=$(git rev-list --reverse ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+
+          if [ -z "$COMMITS" ]; then
+            echo "No commits found in this PR to validate"
+            exit 0
+          fi
+
+          echo "Commits to validate:"
+          git log --oneline ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+
+          # Validate each commit message individually
+          echo "Validating PR-specific commits..."
+          FAILED=0
+
+          for commit in $COMMITS; do
+            echo "Validating commit: $commit"
+            COMMIT_MSG=$(git log --format="%s" -n 1 $commit)
+            echo "Commit message: $COMMIT_MSG"
+            
+            if ! echo "$COMMIT_MSG" | commitlint --verbose; then
+              echo "❌ Commit $commit failed validation"
+              FAILED=1
+            else
+              echo "✅ Commit $commit passed validation"
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "One or more commits failed validation"
+            exit 1
+          fi
+
+          echo "All commits passed validation!"
+
+      - name: Comment on PR if validation fails
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ❌ Commit Message Validation Failed
+
+            One or more commit messages in this PR don't follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+            Please ensure your commit messages follow this format:
+            \`\`\`
+            <type>[optional scope]: <description>
+            \`\`\`
+
+            **Valid types:** feat, fix, chore
+
+            **Examples:**
+            - \`feat: add new encryption provider\`
+            - \`fix(cli): resolve template initialization bug\`
+            - \`chore(ci): update GitHub Actions\`
+            - \`feat!: breaking change to API\`
+
+            You can fix this by:
+            1. Amending your commit messages using \`git commit --amend\` (for the last commit)
+            2. Using \`git rebase -i\` to edit multiple commit messages
+            3. Or squashing commits when merging the PR
+
+            For more details, see our [Contributing Guidelines](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md#conventional-commits).`
+            })
