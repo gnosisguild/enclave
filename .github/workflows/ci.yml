@@ -39,10 +39,6 @@ jobs:
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
 
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get install -y protobuf-compiler
-
         # We need to setup node in order to compile the hardhat contracts to get the artifacts
       - name: "Setup node"
         uses: actions/setup-node@v3
@@ -126,11 +122,6 @@ jobs:
           toolchain: 1.86.0
           target: wasm32-unknown-unknown
 
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update -y \
-          && sudo apt-get install -y protobuf-compiler
-
         # required so that we can compile wasm within the sdk
       - uses: jetli/wasm-pack-action@v0.4.0
         with:
@@ -205,10 +196,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.86.0
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update -y \
-          && sudo apt-get install -y protobuf-compiler
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -308,10 +295,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update -y \
-          && sudo apt-get install -y protobuf-compiler
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
@@ -349,10 +332,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update -y \
-          && sudo apt-get install -y protobuf-compiler
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
@@ -414,10 +393,6 @@ jobs:
         with:
           toolchain: 1.86.0
           targets: wasm32-unknown-unknown
-      - name: Install protobuf compiler
-        run: |
-          sudo apt-get update -y \
-          && sudo apt-get install -y protobuf-compiler
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       - name: Install node dependencies
