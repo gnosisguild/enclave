@@ -1,4 +1,9 @@
 name: ci
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   pull_request:
@@ -502,3 +507,36 @@ jobs:
             BRANCH="${{ github.ref_name }}"
           fi
           enclave init mycitest --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
+
+  contrib-readme-job:
+    runs-on: ubuntu-latest
+    name: A job to automate contrib in readme
+    # Only run on main branch to avoid branch conflicts
+    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, 'contrib-readme-action')
+    concurrency:
+      group: contrib-readme-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Contribute List
+        uses: akhilmhdh/contributors-readme-action@0a23a85030ccbff8ffb42e8e32db5e55e0e1d4c4
+        with:
+          image_size: 100
+          readme_path: README.md
+          use_username: false
+          columns_per_row: 6
+          collaborators: direct
+          commit_message: "docs(contributor): contrib-readme-action has updated readme [skip ci]"
+          committer_username: "github-actions[bot]"
+          committer_email: "github-actions[bot]@users.noreply.github.com"
+          auto_detect_branch_protection: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
