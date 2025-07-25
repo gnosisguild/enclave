@@ -6,6 +6,9 @@
   ],
   "solidity.formatter": "prettier",
   "typescript.tsdk": "node_modules/typescript/lib",
+  "rust-analyzer.cargo.extraArgs": [
+    "--locked"
+  ],
   "rust-analyzer.linkedProjects": [
     "crates/evm/Cargo.toml",
     "crates/evm-helpers/Cargo.toml",

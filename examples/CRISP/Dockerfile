@@ -50,7 +50,7 @@ ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 RUN rustup component add rustfmt clippy
 ENV RUSTFLAGS="-C debuginfo=0 -C strip=symbols" \
     CARGO_TERM_COLOR=always
-RUN cargo install wasm-pack
+RUN cargo install --locked wasm-pack
 
 # ────────────────────────────────────────────────────────────────────────────────
 #   Foundry

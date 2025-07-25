@@ -23,7 +23,7 @@
     "ciphernode:add": "cd packages/evm && pnpm ciphernode:add",
     "ciphernode:remove": "cd packages/evm && pnpm ciphernode:remove",
     "ciphernode:test": "cd crates && ./scripts/test.sh",
-    "ciphernode:build": "cargo build --release",
+    "ciphernode:build": "cargo build --locked --release",
     "preciphernode:build": "pnpm evm:build",
     "committee:new": "cd packages/evm && pnpm committee:new",
     "committee:publish": "cd packages/evm && pnpm hardhat committee:publish",
