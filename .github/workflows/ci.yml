@@ -323,7 +323,7 @@ jobs:
           key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: rust-deps-
       - name: Build enclave CLI
-        run: cargo install --path crates/cli --bin enclave
+        run: cargo install --locked --path crates/cli --bin enclave
       - name: Upload enclave binary
         uses: actions/upload-artifact@v4
         with:
@@ -351,7 +351,7 @@ jobs:
         with:
           toolchain: 1.86.0
       - name: Build support scripts
-        run: cd templates/default && cargo build --bin e3-support-scripts-dev
+        run: cd templates/default && cargo build --locked --bin e3-support-scripts-dev
       - name: Verify build artifacts
         run: |
           echo "Checking for support scripts binary:"
@@ -399,7 +399,9 @@ jobs:
           toolchain: 1.86.0
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: |
+          export VERSION=v0.13.1
+          curl -sSf https://raw.githubusercontent.com/alexcrichton/wasm-pack/master/docs/_installer/init.sh | sh
       - name: Install node dependencies
         run: pnpm install
       - name: Build the sdk

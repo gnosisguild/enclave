@@ -12,11 +12,11 @@ echo "pnpm install"
 echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"
-(cd /app && cargo build -p e3-cli && cargo install --path crates/cli)
+(cd /app && cargo build --locked -p e3-cli && cargo install --locked --path crates/cli)
 echo "program"
-(cd ./apps/program && cargo build --bin crisp-program)
+(cd ./apps/program && cargo build --locked --bin crisp-program)
 echo "server"
-(cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo build --bin cli && cargo build --bin server)
+(cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo build --locked --bin cli && cargo build --locked --bin server)
 echo "crisp-wasm-crypto"
 (cd ./apps/wasm-crypto && cargo check)
 echo "client"

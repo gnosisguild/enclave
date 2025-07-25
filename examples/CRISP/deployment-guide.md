@@ -37,7 +37,7 @@ You can deploy your contracts and run an end-to-end test or demo as follows:
 3. Build your project:
 
     ```bash
-    cargo build
+    cargo build --locked
     ```
 
 4. Deploy your contract by running:
@@ -111,7 +111,7 @@ You can deploy your contracts on the `Sepolia` testnet and run an end-to-end tes
 2. Build your project:
 
     ```bash
-    cargo build
+    cargo build --locked
     ```
 
 3. Deploy your contract by running:
@@ -186,7 +186,7 @@ You can deploy your contract on Ethereum Mainnet as follows:
 2. Build your project:
 
     ```bash
-    cargo build
+    cargo build --locked
     ```
 
 3. Deploy your contract by running:

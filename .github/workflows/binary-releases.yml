@@ -51,10 +51,10 @@ jobs:
 
 
       - name: Build enclave
-        run: cargo build --release --target ${{ matrix.target }} --bin enclave
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin enclave
 
       - name: Build enclaveup
-        run: cargo build --release --target ${{ matrix.target }} --bin enclaveup
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin enclaveup
 
       - name: Create release archives
         run: |
