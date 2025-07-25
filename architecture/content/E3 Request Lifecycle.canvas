@@ -2,23 +2,25 @@
 	"nodes":[
 		{"id":"ce3acf9aad941c57","type":"file","file":"EventReader.md","x":-920,"y":-448,"width":250,"height":79},
 		{"id":"6f66814895c79600","type":"file","file":"E3Requested.md","x":-937,"y":-280,"width":284,"height":74,"color":"2"},
-		{"id":"fe90e40224eefc54","x":-995,"y":-100,"width":400,"height":70,"type":"file","file":"CiphernodeSelector.md"},
+		{"id":"fe90e40224eefc54","type":"file","file":"CiphernodeSelector.md","x":-995,"y":-100,"width":400,"height":70},
 		{"id":"f3ec9653046c181f","type":"file","file":"CiphernodeSelected.md","x":-995,"y":120,"width":400,"height":70,"color":"2"},
 		{"id":"2498e408f90e216a","type":"file","file":"E3Router.md","x":-897,"y":300,"width":204,"height":68},
-		{"id":"08d18d8da38cd6c3","x":-420,"y":-462,"width":411,"height":365,"color":"5","type":"text","text":"# E3 request life cycle\n\nEVM events "},
-		{"id":"1e3cafdbd34bc863","type":"file","file":"KeyshareCreated.md","x":-995,"y":600,"width":400,"height":83,"color":"2"},
-		{"id":"dd57b64523b242b8","x":-360,"y":606,"width":400,"height":72,"type":"file","file":"NetworkManager.md"},
-		{"id":"edce872bfc039b23","type":"file","file":"Keyshare.md","x":-214,"y":287,"width":284,"height":81},
-		{"id":"e290efb22b2a838f","x":-360,"y":800,"width":400,"height":92,"type":"file","file":"NetworkPeer.md"}
+		{"id":"edce872bfc039b23","type":"file","file":"Keyshare.md","x":-937,"y":560,"width":284,"height":81},
+		{"id":"1e3cafdbd34bc863","type":"file","file":"KeyshareCreated.md","x":-995,"y":1680,"width":400,"height":83,"color":"2"},
+		{"id":"dd57b64523b242b8","type":"file","file":"NetworkManager.md","x":-995,"y":1860,"width":400,"height":72},
+		{"id":"e290efb22b2a838f","type":"file","file":"NetworkPeer.md","x":-995,"y":2033,"width":400,"height":92},
+		{"id":"4b2d4b82ad20df3c","type":"file","file":"HeavyComputeRequest.md","x":-995,"y":880,"width":400,"height":240,"color":"2"},
+		{"id":"dea7f0b5596a605d","type":"file","file":"HeavyCompute.md","x":-995,"y":1240,"width":400,"height":80}
 	],
 	"edges":[
-		{"id":"4e9994c9dcc73393","fromNode":"edce872bfc039b23","fromSide":"bottom","toNode":"1e3cafdbd34bc863","toSide":"top"},
 		{"id":"499e85935b31a9db","fromNode":"ce3acf9aad941c57","fromSide":"bottom","toNode":"6f66814895c79600","toSide":"top"},
 		{"id":"3fc4c93caf375c9f","fromNode":"6f66814895c79600","fromSide":"bottom","toNode":"fe90e40224eefc54","toSide":"top"},
-		{"id":"03eec14263d561bb","fromNode":"2498e408f90e216a","fromSide":"right","toNode":"edce872bfc039b23","toSide":"left","label":"create and forward \nall future events\nfor this e3id"},
+		{"id":"03eec14263d561bb","fromNode":"2498e408f90e216a","fromSide":"bottom","toNode":"edce872bfc039b23","toSide":"top","label":"create and forward \nall future events\nfor this e3id"},
 		{"id":"5c08ab0be0a148bb","fromNode":"fe90e40224eefc54","fromSide":"bottom","toNode":"f3ec9653046c181f","toSide":"top"},
 		{"id":"62f6663b9ea530d6","fromNode":"f3ec9653046c181f","fromSide":"bottom","toNode":"2498e408f90e216a","toSide":"top"},
-		{"id":"e5ec4aff9ee4827b","fromNode":"1e3cafdbd34bc863","fromSide":"right","toNode":"dd57b64523b242b8","toSide":"left"},
-		{"id":"89f06592d4a89555","fromNode":"dd57b64523b242b8","fromSide":"bottom","toNode":"e290efb22b2a838f","toSide":"top"}
+		{"id":"89f06592d4a89555","fromNode":"dd57b64523b242b8","fromSide":"bottom","toNode":"e290efb22b2a838f","toSide":"top"},
+		{"id":"2397b48f01ddab9a","fromNode":"1e3cafdbd34bc863","fromSide":"bottom","toNode":"dd57b64523b242b8","toSide":"top"},
+		{"id":"8fc299dd2bb960a5","fromNode":"4b2d4b82ad20df3c","fromSide":"bottom","toNode":"dea7f0b5596a605d","toSide":"top"},
+		{"id":"c7485be96e3ee85a","fromNode":"edce872bfc039b23","fromSide":"bottom","toNode":"4b2d4b82ad20df3c","toSide":"top","label":"`TrBfvGenerateBroadcastShares`"}
 	]
 }
