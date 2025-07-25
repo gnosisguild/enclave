@@ -29,6 +29,12 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Clean working directory
+        run: |
+          # Remove any generated artifacts that might interfere with release-plz
+          git clean -fd
+          git reset --hard HEAD
+
       - name: Run release-plz
         id: release-plz
         uses: MarcoIeni/release-plz-action@v0.5.64
