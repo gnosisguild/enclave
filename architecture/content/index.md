@@ -1,4 +1,5 @@
-# Architecture
+# High Level Architecture
 
-[[Ciphernode Architecture]]
-[[trBFV Scheme]]
+## Components
+
+- [[Ciphernode]]
