@@ -53,13 +53,19 @@ done
 echo -e "${BLUE}Checking license headers in source files...${NC}"
 echo ""
 
+# Define exclusion patterns for git pathspec
+# start with :(exclude,glob)**/foo/**/* etc
+EXCLUDE_PATTERNS=(
+  ':(exclude,glob)**/.obsidian/**'
+)
+
 # Use git ls-files to find tracked files with specified extensions
 if [[ -n "${TEST_FILES:-}" ]]; then
     # Use test files if provided (for testing)
     FILES="$TEST_FILES"
 else
     # Find all tracked files with the specified extensions
-    FILES=$(git ls-files '*.js' '*.jsx' '*.nr' '*.rs' '*.sol' '*.ts' '*.tsx' 2>/dev/null | sort)
+    FILES=$(git ls-files '*.js' '*.jsx' '*.nr' '*.rs' '*.sol' '*.ts' '*.tsx' "${EXCLUDE_PATTERNS[@]}" 2>/dev/null | sort)
 fi
 
 if [[ -z "$FILES" ]]; then
