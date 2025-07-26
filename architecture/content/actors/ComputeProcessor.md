@@ -4,6 +4,7 @@ description: Runs expensive jobs that require a threadpool to execute
 tags:
   - todo
   - trbfv
+  - compute
 ---
 ## `=this.file.name`
 

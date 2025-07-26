@@ -1,6 +1,8 @@
 ---
 type: lib
 description: Exposes libp2p commands and events as channel messages
+tags:
+  - net
 ---
 ## `=this.file.name`
 

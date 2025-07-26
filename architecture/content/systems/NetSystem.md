@@ -1,6 +1,8 @@
 ---
 type: system
 description: Coordinates sending and receiving messages from the network (libp2p) interface
+tags:
+  - net
 ---
 ## `=this.file.name`
 
@@ -9,7 +11,7 @@ description: Coordinates sending and receiving messages from the network (libp2p
 ```mermaid
 flowchart TB
     subgraph s1["Net System"]
-        NET["NetEventTranslater"]
+        NET["NetEventTranslator"]
         NBDP["NetBroadcastDocumentPublisher"]
         EB["EventBus"]
         NCC["NetCommandChannel"]
@@ -46,13 +48,10 @@ flowchart TB
     linkStyle 9 stroke:#CCCCCC,fill:none
 ```
 
-### Description
-- **[[EventBus]]** is the central application event bus
-- **[[NetCommandChannel]]** is an mpsc channel for sending `NetCommand`s to the `NetInterface`
-- **[[NetEventChannel]]** is an broadcast channel for broadcasting `NetEvent`s from the `NetInterface`
-- **[[NetEventTranslator]]** works bidirectionally converting `EnclaveEvent`s to the appropriate `NetCommand` for the network peer and `NetEvent`s to the appropriate `EnclaveEvent`s
-- **[[NetBroadcastDocumentPublisher]]** listens for specific `PublishDocumentRequested` events and will send appropriate events to the `NetInterface` in order to publish the document payload to the DHT as well as publish a libp2p gossipsub `DocumentPublished` event on the `NetInterface`
-- **[[NetInterface]]** exposes two channels for control: `NetEventChannel` and `NetCommandChannel` 
+```dataview
+TABLE description as Description
+FROM #net
+```
 ### Benefits
 
 - Extensive: Can use channels to control the network interface from multiple actors.
