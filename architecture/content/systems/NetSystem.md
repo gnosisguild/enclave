@@ -1,40 +1,38 @@
 ---
 type: system
-description: Coordinates sending and receiving messages from the network (libp2p) interface
+description: Manages sending and receiving messages to and from from the network using libp2p
 tags:
   - net
 ---
+
 ## `=this.file.name`
 
 `=this.description`
 
+
+Here we separate command and query according to the principle of [CQRS](https://cqrs.wordpress.com/wp-content/uploads/2010/11/cqrs_documents.pdf): 
+
 ```mermaid
 flowchart TB
-    subgraph s1["Net System"]
+    subgraph s1["Network Events Received"]
         NET["NetEventTranslator"]
         NBDP["NetBroadcastDocumentPublisher"]
         EB["EventBus"]
-        NCC["NetCommandChannel"]
         NEC["NetEventChannel"]
         NI["NetInterface"]
         FC["Future Component"]
     end
-    EB <--> NET & NBDP
-    NET --> NCC
-    NET -.- NEC
-    NCC --> NI
-    NEC -.- NI
-    NBDP --> NCC
-    NBDP -.- NEC
-    FC -.- NEC
-    FC --> NCC
-
-    NCC@{ shape: h-cyl}
+    NI --> NEC
+    NEC --> NET
+    NET --> EB
+    NBDP --> EB
+    NEC --> NBDP
+    NEC --> FC
+    
     NEC@{ shape: h-cyl}
     style NET fill:#FFCDD2
     style NBDP fill:#FFCDD2
     style EB fill:#FFCDD2
-    style NCC stroke-width:1px,stroke-dasharray: 0,fill:#BBDEFB
     style NEC stroke-width:1px,stroke-dasharray: 0,fill:#BBDEFB
     style NI stroke-width:1px,stroke-dasharray: 0,fill:#C8E6C9
     style FC fill:#CCCCCC,stroke-width:2px,stroke-dasharray: 2,stroke:#CCCCCC
@@ -44,9 +42,39 @@ flowchart TB
 	class NCC internal-link
 	class NEC internal-link
 	class NBDP internal-link
-    linkStyle 8 stroke:#CCCCCC,fill:none
-    linkStyle 9 stroke:#CCCCCC,fill:none
 ```
+```mermaid
+flowchart TB
+    subgraph s1["Network Commands Sent"]
+        EB["EventBus"]
+        NET["NetEventTranslator"]
+        NBDP["NetBroadcastDocumentPublisher"]
+        NCC["NetCommandChannel"]
+        NI["NetInterface"]
+        FC["Future Component"]
+    end
+    EB --> NET & NBDP
+    NET --> NCC
+    NCC --> NI
+    NBDP --> NCC
+    FC --> NCC
+
+    NCC@{ shape: h-cyl}
+    style NET fill:#FFCDD2
+    style NBDP fill:#FFCDD2
+    style EB fill:#FFCDD2
+    style NCC stroke-width:1px,stroke-dasharray: 0,fill:#BBDEFB
+    style NI stroke-width:1px,stroke-dasharray: 0,fill:#C8E6C9
+    style FC fill:#CCCCCC,stroke-width:2px,stroke-dasharray: 2,stroke:#CCCCCC
+	class EB internal-link
+	class NET internal-link
+	class NI internal-link
+	class NCC internal-link
+	class NEC internal-link
+	class NBDP internal-link
+```
+
+This we can easily extend to a future networking component by listening to the [[EventBus]] and sending to the [[NetCommandChannel]] or reading from the [[NetEventChannel]] and publishing to the [[EventBus]]
 
 ```dataview
 TABLE description as Description
