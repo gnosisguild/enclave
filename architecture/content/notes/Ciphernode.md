@@ -7,7 +7,7 @@ description: A node that is responsible for managing keyshares to form a decrypt
 
 ### Overview
 
-- [[CiphernodeSystemOverview |System Structure]]
+- [[Ciphernode System Overview|System Structure]]
 
 ### Components
 
