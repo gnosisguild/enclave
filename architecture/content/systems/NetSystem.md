@@ -16,7 +16,7 @@ Here we separate command and query according to the principle of [CQRS](https://
 flowchart TB
     subgraph s1["Network Events Received"]
         NET["NetEventTranslator"]
-        NBDP["NetBroadcastDocumentPublisher"]
+        NBDP["NetDHTPublisher"]
         EB["EventBus"]
         NEC["NetEventChannel"]
         NI["NetInterface"]
@@ -48,7 +48,7 @@ flowchart TB
     subgraph s1["Network Commands Sent"]
         EB["EventBus"]
         NET["NetEventTranslator"]
-        NBDP["NetBroadcastDocumentPublisher"]
+        NBDP["NetDHTPublisher"]
         NCC["NetCommandChannel"]
         NI["NetInterface"]
         FC["Future Component"]
@@ -77,7 +77,7 @@ flowchart TB
 This we can easily extend to a future networking component by listening to the [[EventBus]] and sending to the [[NetCommandChannel]] or reading from the [[NetEventChannel]] and publishing to the [[EventBus]]
 
 ```dataview
-TABLE description as Description
+TABLE type, description as Description
 FROM #net
 ```
 ### Benefits
