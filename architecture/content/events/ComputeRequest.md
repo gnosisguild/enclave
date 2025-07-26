@@ -4,6 +4,7 @@ description: Requests a computation
 tags:
   - todo
   - trbfv
+  - compute
 ---
 
 ## `=this.file.name`
@@ -34,22 +35,22 @@ enum ComputeCommand {
 That way we can match on various schemes and commands.
 
 ### TrbfvCommand
-#### GenerateBroadcastShares
+#### TrBfv::GenerateBroadcastShares
 
 Generate broadcast shares for sharing with other parties
 
-#### DecryptCiphertext
+#### Trbfv::DecryptCiphertext
 
 Decrypt ciphertext
 
-#### SumCollectedShares
+#### Trbfv::SumCollectedShares
 
 Sum collected shares into the SecretKeyshare
 
-#### GetAggregatePublicKey
+#### Trbfv::GetAggregatePublicKey
 
 Aggregate a public key from publickey shares
 
-#### GetAggregatePlaintext
+#### Trbfv::GetAggregatePlaintext
 
 Aggregate a plaintext from decryption shares
