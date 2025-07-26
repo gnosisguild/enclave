@@ -1,6 +1,9 @@
 ---
 type: system
 description: Manages multithread threaded compute by ensuring compute is run on a rayon threadpool
+tags:
+  - todo
+  - compute
 ---
 ## `=this.file.name`
 
@@ -36,6 +39,6 @@ flowchart TB
 ```
 
 ```dataview
-TABLE description as Description
+TABLE type, description as Description
 FROM #compute
 ```

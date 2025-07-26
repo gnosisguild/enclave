@@ -43,15 +43,15 @@ flowchart TB
     SS:::internal-link
     P:::internal-link
 
-    style EVM fill:#E1BEE7
+    style EVM fill:#BBDEFB
     style EB fill:#FFCDD2
-    style NET fill:#E1BEE7
-    style R fill:#E1BEE7
-	style KS fill:#E1BEE7
-    style COM fill:#E1BEE7
-    style AS fill:#E1BEE7
-    style SS fill:#E1BEE7
-	style P fill:#E1BEE7
+    style NET fill:#BBDEFB
+    style R fill:#BBDEFB
+	style KS fill:#BBDEFB
+    style COM fill:#BBDEFB
+    style AS fill:#BBDEFB
+    style SS fill:#BBDEFB
+	style P fill:#BBDEFB
 ```
 
 

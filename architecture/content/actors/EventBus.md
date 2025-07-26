@@ -8,6 +8,7 @@ tags:
   - net
   - sortition
   - compute
+  - evm
 ---
 
 ## `=this.file.name`

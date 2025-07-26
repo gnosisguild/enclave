@@ -39,6 +39,6 @@ flowchart TB
 ```
 
 ```dataview
-TABLE description as Description
+TABLE type, description as Description
 FROM #e3request
 ```
