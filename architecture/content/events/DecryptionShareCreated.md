@@ -2,6 +2,6 @@
 type: event
 description: A decryption share has been created and published
 ---
-## DecryptionShareCreated
+## `=this.file.name`
 
-A decryption share has been created and published
+`=this.description`

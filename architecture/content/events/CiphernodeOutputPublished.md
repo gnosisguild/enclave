@@ -2,6 +2,6 @@
 type: event
 description: Output was published on-chain
 ---
-## CiphernodeOutputPublished
+## `=this.file.name`
 
-Output was published on-chain
+`=this.description`

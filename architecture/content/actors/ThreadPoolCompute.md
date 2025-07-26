@@ -1,13 +1,15 @@
 ---
 type: actor
 description: Runs expensive jobs that require a threadpool to execute
+tags:
+  - todo
+  - trbfv
 ---
-#todo #trbfv
+## `=this.file.name`
 
+`=this.description`
 
-# ThreadPoolCompute
-
-
+---
 
 Responsible for running slow multithreaded computations using thread parallelization systems such as rayon.
 

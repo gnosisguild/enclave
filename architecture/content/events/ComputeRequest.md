@@ -5,9 +5,10 @@ tags:
   - todo
   - trbfv
 ---
-## ComputeRequest
 
-Requests a computation.
+## `=this.file.name`
+
+`=this.description`
 
 Often payloads here are sensitive. Eg. `SecretKeyshare`, `BroadcastShares`
 

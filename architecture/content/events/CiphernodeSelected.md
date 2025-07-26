@@ -2,6 +2,6 @@
 type: event
 description: This Ciphernode has been selected in the committee
 ---
-## CiphernodeSelected
+## `=this.file.name`
 
-This Ciphernode has been selected in the committee
+`=this.description`

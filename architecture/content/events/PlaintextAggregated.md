@@ -2,6 +2,6 @@
 type: event
 description: The plaintext has been aggregated by the aggregator
 ---
-## PlaintextAggregated
+## `=this.file.name`
 
-The plaintext has been aggregated by the aggregator
+`=this.description`

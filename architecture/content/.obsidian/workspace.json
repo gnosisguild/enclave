@@ -13,6 +13,20 @@
             "state": {
               "type": "markdown",
               "state": {
+                "file": "notes/Ciphernode.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Ciphernode"
+            }
+          },
+          {
+            "id": "bd2fb77262d2eb75",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
                 "file": "systems/Net System.md",
                 "mode": "source",
                 "source": false
@@ -20,24 +34,51 @@
               "icon": "lucide-file",
               "title": "Net System"
             }
-          }
-        ]
-      },
-      {
-        "id": "b3c4fda8f3b954ba",
-        "type": "tabs",
-        "children": [
+          },
           {
-            "id": "4ec4dcd1934375d3",
+            "id": "3257cb0e6233a89b",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "libs/NetInterface.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "NetInterface"
+            }
+          },
+          {
+            "id": "4860f0a9ce1d84d0",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "libs/NetCommandChannel.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "NetCommandChannel"
+            }
+          },
+          {
+            "id": "3b8312694cb3fa56",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "libs/NetCommandChannel.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "NetCommandChannel"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -56,7 +97,8 @@
             "state": {
               "type": "file-explorer",
               "state": {
-                "sortOrder": "alphabetical"
+                "sortOrder": "alphabetical",
+                "autoReveal": false
               },
               "icon": "lucide-folder-closed",
               "title": "Files"
@@ -178,39 +220,39 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "d1474ddba93b914a",
+  "active": "bd2fb77262d2eb75",
   "lastOpenFiles": [
-    "libs/NetworkPeerCommand.md",
+    "systems/SystemOverview.md",
+    "notes/Ciphernode.md",
+    "index.md",
     "systems/Net System.md",
-    "systems/Untitled.canvas",
-    "systems",
-    "libs/ThreadPoolComputeJobType.md",
+    "events/CiphernodeRemoved.md",
     "libs/Cipher.md",
-    "notes/Untitled.canvas",
-    "notes/DKG.canvas",
-    "notes/_E3 Request Lifecycle.canvas",
-    "events/ComputeRequest.md",
-    "actors/ThreadPoolCompute.md",
+    "libs/NetInterface.md",
+    "libs/NetworkPeerCommand.md",
+    "libs/NetEventChannel.md",
+    "libs/NetCommandChannel.md",
     "events/PublickeyAggregated.md",
+    "events/ThreadPoolComputeRequestFailed.md",
+    "events/ThreadPoolComputeRequestCompleted.md",
     "events/PlaintextAggregated.md",
     "events/KeyshareCreated.md",
     "events/KeygenSharesGenerated.md",
     "events/E3Requested.md",
     "events/E3RequestComplete.md",
     "events/DecryptionShareCreated.md",
+    "events/ComputeRequest.md",
     "events/CiphernodeSelected.md",
-    "events/CiphernodeRemoved.md",
     "events/CiphernodeOutputPublished.md",
     "events/CiphernodeAdded.md",
-    "actors/CiphernodeSelector.md",
-    "actors/DhtKeygenSharesPublisher.md",
-    "notes/Event Driven Architecture.md",
-    "notes/Events.md",
-    "notes/Persistence.md",
-    "notes/The Actor Model.md",
-    "notes/trBFV Scheme.md",
-    "notes/Mermaid Test.md",
-    "Foo.md",
+    "actors/ThresholdKeyshare.md",
+    "actors/Keyshare.md",
+    "actors/ThreadPoolCompute.md",
+    "notes/Untitled.canvas",
+    "systems/Untitled.canvas",
+    "systems",
+    "notes/DKG.canvas",
+    "notes/_E3 Request Lifecycle.canvas",
     "notes",
     "libs",
     "actors",

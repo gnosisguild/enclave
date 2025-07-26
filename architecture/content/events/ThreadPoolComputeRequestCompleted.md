@@ -2,7 +2,9 @@
 type: event
 description: Dispatched when a thread pool compute request has completed
 ---
-## ThreadPoolComputeRequestCompleted
+## `=this.file.name`
+
+`=this.description`
 
 
 
