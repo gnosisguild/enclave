@@ -2,6 +2,6 @@
 type: event
 description: The committee public key has been aggregated
 ---
-## PublickeyAggregated
+## `=this.file.name`
 
-The committee public key has been aggregated
+`=this.description`
