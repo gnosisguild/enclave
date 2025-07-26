@@ -48,8 +48,7 @@ flowchart TB
 	style RFW fill:#FFCDD2
 ```
 
-[[EnclaveSolReader]]
-[[EventReader]]
-[[EnclaveSolWriter]]
-[[CiphernodeRegistryReader]]
-[[RegistryFilterSolWriter]]
+```dataview
+TABLE type, description as Description
+FROM #evm
+```

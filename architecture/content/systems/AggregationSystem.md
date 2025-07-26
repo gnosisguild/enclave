@@ -1,6 +1,8 @@
 ---
 type: system
 description: Components for aggregating shared data
+tags:
+  - aggregator
 ---
 ## `=this.file.name`
 
@@ -33,3 +35,10 @@ flowchart TB
 	style PK fill:#FFCDD2
 	style C fill:#FFCDD2
 ```
+
+
+```dataview
+TABLE type, description as Description
+FROM #aggregator
+```
+
