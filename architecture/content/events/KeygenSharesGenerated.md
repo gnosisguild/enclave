@@ -2,6 +2,6 @@
 type: event
 description: Event broadcasted once DKG Keygen Shares have been generated
 ---
-## KeygenSharesGenerated
+## `=this.file.name`
 
-Event broadcasted once DKG Keygen Shares have been generated
+`=this.description`

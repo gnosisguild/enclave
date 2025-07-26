@@ -2,6 +2,6 @@
 type: event
 description: The E3Request is complete
 ---
-## E3RequestComplete
+## `=this.file.name`
 
-The E3Request is complete
+`=this.description`

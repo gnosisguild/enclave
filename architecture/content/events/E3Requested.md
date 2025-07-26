@@ -2,6 +2,6 @@
 type: event
 description: An E3Request has been made
 ---
-## E3Requested
+## `=this.file.name`
 
-An E3Request has been made
+`=this.description`
