@@ -1,0 +1,71 @@
+---
+description: Demonstrate an overview of the structure of the ciphernode component system
+---
+## `=this.file.name`
+
+`=this.description`
+
+
+```mermaid
+flowchart TB
+    subgraph s1["Ciphernode"]
+        EVM["EvmSystem"]
+        EB["EventBus"]
+        NET["NetSystem"]
+		R["E3RequestSystem"]
+        KS["KeyshareSystem"]
+        COM["ComputeSystem"]
+        AS["AggregationSystem"]
+        SS["SortitionSystem"]
+    end
+    EB --- EVM
+    EB --- NET
+    R --- AS
+    R --- KS
+    EB --- R
+    AS --- COM
+    KS --- COM
+    AS --- SS
+    EB --- SS
+
+    EVM:::internal-link
+    EB:::internal-link
+    NET:::internal-link
+    COM:::internal-link
+    R:::internal-link
+    AS:::internal-link
+    KS:::internal-link
+    SS:::internal-link
+
+    style EVM fill:#E1BEE7
+    style EB fill:#FFCDD2
+    style NET fill:#E1BEE7
+    style R fill:#E1BEE7
+	style KS fill:#E1BEE7
+    style COM fill:#E1BEE7
+    style AS fill:#E1BEE7
+    style SS fill:#E1BEE7
+```
+
+
+
+### Systems
+
+```dataview
+TABLE description as Description
+WHERE type = "system"
+```
+
+
+## Bootstrap
+
+When you run `enclave start`, the CLI establishes an actor configuration based on your  requirements. For a concrete implementation example, [see the start configuration](https://github.com/gnosisguild/enclave/blob/main/crates/entrypoint/src/start/start.rs) 
+
+This process instantiates several key components:
+
+- An [[EventBus]] for system-wide message coordination
+- [[EvmSystem]] actors that handle blockchain connectivity
+- [[NetSystem]] components for peer-to-peer network communication
+- Core E3 business logic components essential for proper system operation
+
+The configuration ensures all necessary subsystems are properly initialized and can communicate effectively within the enclave architecture.

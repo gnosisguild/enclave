@@ -5,6 +5,7 @@ source: https://github.com/gnosisguild/enclave/blob/main/crates/crypto/src/ciphe
 tags:
   - todo
   - trbfv
+  - crypto
 ---
 
 ## `=this.file.name`
