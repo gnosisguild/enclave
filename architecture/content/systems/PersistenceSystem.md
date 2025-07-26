@@ -1,4 +1,12 @@
-# On Persistence patterns
+---
+type: system
+description: Store data using an actor and provide interfaces to make this simple.
+---
+## `=this.file.name`
+
+`=this.description`
+
+## On Persistence patterns
 
 _The way persistence is managed within this codebase has a few elements to it. So here is the story as to how this works and why it has been done like this_
 
