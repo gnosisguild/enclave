@@ -27,26 +27,54 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "notes/Ciphernode.md",
+                "file": "actors/NetBroadcastDocumentPublisher.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ciphernode"
+              "title": "NetBroadcastDocumentPublisher"
             }
           },
           {
-            "id": "bf147538147e23b0",
+            "id": "e9847d43e9d98974",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "index.md",
+                "file": "actors/NetBroadcastDocumentPublisher.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "index"
+              "title": "NetBroadcastDocumentPublisher"
+            }
+          },
+          {
+            "id": "1987696f2f153771",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "notes/Events.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Events"
+            }
+          },
+          {
+            "id": "2376e8d371887ff8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "libs/NetInterface.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "NetInterface"
             }
           },
           {
@@ -148,7 +176,7 @@
             }
           }
         ],
-        "currentTab": 2
+        "currentTab": 3
       }
     ],
     "direction": "vertical"
@@ -290,35 +318,35 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "bf147538147e23b0",
+  "active": "1987696f2f153771",
   "lastOpenFiles": [
-    "systems/SortitionSystem.md",
-    "systems/Ciphernode System Overview.md",
-    "systems/KeyshareSystem.md",
-    "systems/AggregationSystem.md",
+    "notes/Data Security.md",
     "notes/Ciphernode.md",
-    "index.md",
-    "systems/ComputeSystem.md",
-    "systems/EvmSystem.md",
-    "systems/E3RequestSystem.md",
-    "actors/EventReader.md",
-    "actors/EventBus.md",
-    "actors/ComputeProcessor.md",
-    "actors/CiphernodeSelector.md",
-    "actors/Sortition.md",
-    "actors/E3Router.md",
+    "events/EnclaveEvent.md",
+    "events/ComputeRequestSuccess.md",
+    "events/CiphernodeOutputPublished.md",
+    "events/CiphernodeSelected.md",
+    "events/ComputeRequestFailed.md",
+    "events/DecryptionShareCreated.md",
+    "events/E3Requested.md",
+    "libs/Cipher.md",
+    "libs/NetCommand.md",
     "libs/E3Context.md",
     "libs/NetCommandChannel.md",
-    "libs/NetEventChannel.md",
-    "libs/NetInterface.md",
-    "libs/Cipher.md",
-    "actors/Keyshare.md",
-    "systems/NetSystem.md",
-    "actors/PublickeyAggregator.md",
+    "libs/NetEvent.md",
+    "notes/Events.md",
+    "events/PublickeyAggregated.md",
+    "events/PlaintextAggregated.md",
+    "events/KeyshareCreated.md",
+    "events/KeygenSharesGenerated.md",
+    "events/E3RequestComplete.md",
+    "events/ComputeRequest.md",
+    "events/CiphernodeRemoved.md",
+    "events/CiphernodeAdded.md",
+    "notes/Event Driven Architecture.md",
+    "actors/NetEventTranslator.md",
+    "actors/Sortition.md",
     "evm",
-    "evm/Contracts.md",
-    "notes/Persistence.md",
-    "events/ComputeRequestFailed.md",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "systems",
