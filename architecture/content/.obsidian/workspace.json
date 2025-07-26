@@ -1,0 +1,279 @@
+{
+  "main": {
+    "id": "382545f4b1655972",
+    "type": "split",
+    "children": [
+      {
+        "id": "dff6aaa5c525f29c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d1474ddba93b914a",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "systems/CiphernodeSystemOverview.md",
+                "mode": "preview",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "CiphernodeSystemOverview"
+            }
+          },
+          {
+            "id": "bd2fb77262d2eb75",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "systems/CiphernodeSystemOverview.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "CiphernodeSystemOverview"
+            }
+          },
+          {
+            "id": "435e63edf05f10f2",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "systems/CiphernodeSystemOverview.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "CiphernodeSystemOverview"
+            }
+          },
+          {
+            "id": "3257cb0e6233a89b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "libs/NetInterface.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "NetInterface"
+            }
+          },
+          {
+            "id": "4860f0a9ce1d84d0",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "libs/NetCommandChannel.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "NetCommandChannel"
+            }
+          },
+          {
+            "id": "3b8312694cb3fa56",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "libs/NetCommandChannel.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "NetCommandChannel"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "eda7effde3142deb",
+    "type": "split",
+    "children": [
+      {
+        "id": "de9036a179c03e59",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b5dfe506c3f95c26",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "1d8d474e9d2f366a",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "tag:#trbfv",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "e1536ccba0f930f9",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "6b6677e64c1270ea",
+    "type": "split",
+    "children": [
+      {
+        "id": "f59bb59a7d9ec6cb",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6200d991ce5f53b2",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "CiphernodeRemoved.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for CiphernodeRemoved"
+            }
+          },
+          {
+            "id": "a918c4b15e43e15b",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "CiphernodeRemoved.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from CiphernodeRemoved"
+            }
+          },
+          {
+            "id": "d830e9b504a426f3",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "b99540af252c3f04",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "CiphernodeRemoved.md"
+              },
+              "icon": "lucide-list",
+              "title": "Outline of CiphernodeRemoved"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false
+    }
+  },
+  "active": "d1474ddba93b914a",
+  "lastOpenFiles": [
+    "systems/AggregationSystem.md",
+    "notes/Persistence.md",
+    "systems/SortitionSystem.md",
+    "systems/NetSystem.md",
+    "systems/CiphernodeSystemOverview.md",
+    "systems/ComputeSystem.md",
+    "systems/EvmSystem.md",
+    "systems/KeyshareSystem.md",
+    "events/ComputeRequestFailed.md",
+    "events/ComputeRequestSuccess.md",
+    "actors/ComputeProcessor.md",
+    "events/ComputeRequest.md",
+    "actors/EventBus.md",
+    "events/DecryptionShareCreated.md",
+    "events/CiphernodeOutputPublished.md",
+    "notes/Ciphernode.md",
+    "notes/Event Driven Architecture.md",
+    "index.md",
+    "libs/NetInterface.md",
+    "actors/NetBroadcastDocumentPublisher.md",
+    "actors/NetEventTranslator.md",
+    "libs/NetEventChannel.md",
+    "libs/Cipher.md",
+    "libs/NetCommandChannel.md",
+    "actors/Sortition.md",
+    "actors/ThresholdKeyshare.md",
+    "notes/Untitled.canvas",
+    "systems/Untitled.canvas",
+    "systems",
+    "notes/DKG.canvas",
+    "notes/_E3 Request Lifecycle.canvas",
+    "notes",
+    "libs",
+    "actors",
+    "events",
+    "events",
+    "RayonComputeRequest.md~",
+    "Event Driven Architecture.md~",
+    "HeavyComputeJobType.md~",
+    "Data Security.md~"
+  ]
+}

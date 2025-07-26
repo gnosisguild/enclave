@@ -1,0 +1,21 @@
+{
+	"nodes":[
+		{"id":"8c3e31b059916fae","type":"file","file":"actors/CiphernodeSelector.md","x":-340,"y":-180,"width":400,"height":60,"subpath":"#CiphernodeSelector"},
+		{"id":"8676a6fdd6e8d483","type":"file","file":"actors/E3Router.md","subpath":"#E3Router","x":-340,"y":100,"width":400,"height":60},
+		{
+			"id":"dcfd6cdd27e21036",
+			"type":"file",
+			"file":"events/CiphernodeSelected.md",
+			"styleAttributes":{"border":"dashed"},
+			"x":-260,
+			"y":-40,
+			"width":400,
+			"height":60
+		}
+	],
+	"edges":[],
+	"metadata":{
+		"version":"1.0-1.0",
+		"frontmatter":{}
+	}
+}
