@@ -1,6 +1,8 @@
 ---
 type: actor
-description: Coordinate key generation and decryption for a specific E3Request with trbfv 
+description: Coordinate key generation and decryption for a specific E3Request with trbfv
+tags:
+  - keyshare
 ---
 
 ## `=this.file.name`

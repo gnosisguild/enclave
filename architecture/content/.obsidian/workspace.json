@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "notes/Ciphernode.md",
-                "mode": "source",
+                "file": "systems/CiphernodeSystemOverview.md",
+                "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ciphernode"
+              "title": "CiphernodeSystemOverview"
             }
           },
           {
@@ -27,12 +27,26 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "systems/Net System.md",
+                "file": "systems/CiphernodeSystemOverview.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Net System"
+              "title": "CiphernodeSystemOverview"
+            }
+          },
+          {
+            "id": "435e63edf05f10f2",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "systems/CiphernodeSystemOverview.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "CiphernodeSystemOverview"
             }
           },
           {
@@ -77,8 +91,7 @@
               "title": "NetCommandChannel"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -220,34 +233,34 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "bd2fb77262d2eb75",
+  "active": "d1474ddba93b914a",
   "lastOpenFiles": [
-    "systems/SystemOverview.md",
-    "notes/Ciphernode.md",
-    "index.md",
-    "systems/Net System.md",
-    "events/CiphernodeRemoved.md",
-    "libs/Cipher.md",
-    "libs/NetInterface.md",
-    "libs/NetworkPeerCommand.md",
-    "libs/NetEventChannel.md",
-    "libs/NetCommandChannel.md",
-    "events/PublickeyAggregated.md",
-    "events/ThreadPoolComputeRequestFailed.md",
-    "events/ThreadPoolComputeRequestCompleted.md",
-    "events/PlaintextAggregated.md",
-    "events/KeyshareCreated.md",
-    "events/KeygenSharesGenerated.md",
-    "events/E3Requested.md",
-    "events/E3RequestComplete.md",
-    "events/DecryptionShareCreated.md",
+    "systems/AggregationSystem.md",
+    "notes/Persistence.md",
+    "systems/SortitionSystem.md",
+    "systems/NetSystem.md",
+    "systems/CiphernodeSystemOverview.md",
+    "systems/ComputeSystem.md",
+    "systems/EvmSystem.md",
+    "systems/KeyshareSystem.md",
+    "events/ComputeRequestFailed.md",
+    "events/ComputeRequestSuccess.md",
+    "actors/ComputeProcessor.md",
     "events/ComputeRequest.md",
-    "events/CiphernodeSelected.md",
+    "actors/EventBus.md",
+    "events/DecryptionShareCreated.md",
     "events/CiphernodeOutputPublished.md",
-    "events/CiphernodeAdded.md",
+    "notes/Ciphernode.md",
+    "notes/Event Driven Architecture.md",
+    "index.md",
+    "libs/NetInterface.md",
+    "actors/NetBroadcastDocumentPublisher.md",
+    "actors/NetEventTranslator.md",
+    "libs/NetEventChannel.md",
+    "libs/Cipher.md",
+    "libs/NetCommandChannel.md",
+    "actors/Sortition.md",
     "actors/ThresholdKeyshare.md",
-    "actors/Keyshare.md",
-    "actors/ThreadPoolCompute.md",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "systems",
