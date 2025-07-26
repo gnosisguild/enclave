@@ -7,3 +7,6 @@ tags:
 ## `=this.file.name`
 
 `=this.description`
+
+#todo
+This component was previously known as `NetworkManager`

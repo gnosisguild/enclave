@@ -1,6 +1,6 @@
 ---
 type: lib
-description: An mpsc channel for sending `NetCommand`s to the `NetInterface`
+description: An mpsc channel for sending [[NetCommand]] s to the [[NetInterface]]
 tags:
   - net
 ---

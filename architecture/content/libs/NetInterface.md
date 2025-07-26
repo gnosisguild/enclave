@@ -8,7 +8,7 @@ tags:
 
 `=this.description`
 
-
-
-
 Set's up libp2p specific connection and listening. This is the only point at which we connect to the libp2p library. 
+
+#todo 
+This component used to be known as `NetworkPeer`
