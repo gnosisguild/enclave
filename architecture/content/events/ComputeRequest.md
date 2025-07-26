@@ -5,6 +5,7 @@ tags:
   - todo
   - trbfv
   - compute
+source: https://github.com/gnosisguild/enclave/tree/main/crates/events/src/enclave_event/compute_requested.rs
 ---
 
 ## `=this.file.name`
@@ -31,10 +32,10 @@ enum ComputeCommand {
 }
 ```
 
-
 That way we can match on various schemes and commands.
 
 ### TrbfvCommand
+
 #### TrBfv::GenerateBroadcastShares
 
 Generate broadcast shares for sharing with other parties

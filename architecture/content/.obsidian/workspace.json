@@ -4,179 +4,24 @@
     "type": "split",
     "children": [
       {
-        "id": "dff6aaa5c525f29c",
+        "id": "88fd400e97974c50",
         "type": "tabs",
         "children": [
           {
-            "id": "d1474ddba93b914a",
+            "id": "eb30bbb824683532",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "index.md",
+                "file": "actors/ThresholdKeyshare.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "index"
-            }
-          },
-          {
-            "id": "0f4db1600eb5835b",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "actors/NetBroadcastDocumentPublisher.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "NetBroadcastDocumentPublisher"
-            }
-          },
-          {
-            "id": "e9847d43e9d98974",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "actors/NetBroadcastDocumentPublisher.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "NetBroadcastDocumentPublisher"
-            }
-          },
-          {
-            "id": "1987696f2f153771",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "notes/Events.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Events"
-            }
-          },
-          {
-            "id": "2376e8d371887ff8",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "libs/NetInterface.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "NetInterface"
-            }
-          },
-          {
-            "id": "0bfb2041d91ee584",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "systems/Ciphernode System Overview.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Ciphernode System Overview"
-            }
-          },
-          {
-            "id": "f2b201e974732067",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "evm/Contracts.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Contracts"
-            }
-          },
-          {
-            "id": "bd2fb77262d2eb75",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "systems/CiphernodeSystemOverview.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "CiphernodeSystemOverview"
-            }
-          },
-          {
-            "id": "435e63edf05f10f2",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "systems/CiphernodeSystemOverview.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "CiphernodeSystemOverview"
-            }
-          },
-          {
-            "id": "3257cb0e6233a89b",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "libs/NetInterface.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "NetInterface"
-            }
-          },
-          {
-            "id": "4860f0a9ce1d84d0",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "libs/NetCommandChannel.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "NetCommandChannel"
-            }
-          },
-          {
-            "id": "3b8312694cb3fa56",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "libs/NetCommandChannel.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "NetCommandChannel"
+              "title": "ThresholdKeyshare"
             }
           }
-        ],
-        "currentTab": 3
+        ]
       }
     ],
     "direction": "vertical"
@@ -318,34 +163,34 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "1987696f2f153771",
+  "active": "eb30bbb824683532",
   "lastOpenFiles": [
-    "notes/Data Security.md",
+    "actors/Sortition.md",
+    "actors/PublickeyAggregator.md",
+    "actors/NetEventTranslator.md",
+    "actors/NetBroadcastDocumentPublisher.md",
+    "actors/Keyshare.md",
+    "actors/PlaintextAggregator.md",
+    "actors/RegistryFilterSolWriter.md",
+    "systems/EvmSystem.md",
+    "systems/E3RequestSystem.md",
+    "systems/SortitionSystem.md",
+    "systems/NetSystem.md",
+    "actors/EnclaveSolWriter.md",
+    "actors/EnclaveSolReader.md",
+    "actors/CiphernodeRegistryReader.md",
+    "systems/AggregationSystem.md",
+    "systems/ComputeSystem.md",
+    "systems/Ciphernode System Overview.md",
+    "index.md",
+    "systems/PersistenceSystem.md",
     "notes/Ciphernode.md",
-    "events/EnclaveEvent.md",
-    "events/ComputeRequestSuccess.md",
-    "events/CiphernodeOutputPublished.md",
-    "events/CiphernodeSelected.md",
-    "events/ComputeRequestFailed.md",
-    "events/DecryptionShareCreated.md",
-    "events/E3Requested.md",
-    "libs/Cipher.md",
-    "libs/NetCommand.md",
-    "libs/E3Context.md",
-    "libs/NetCommandChannel.md",
+    "actors/ComputeProcessor.md",
     "libs/NetEvent.md",
-    "notes/Events.md",
-    "events/PublickeyAggregated.md",
-    "events/PlaintextAggregated.md",
-    "events/KeyshareCreated.md",
-    "events/KeygenSharesGenerated.md",
-    "events/E3RequestComplete.md",
     "events/ComputeRequest.md",
     "events/CiphernodeRemoved.md",
+    "events/CiphernodeOutputPublished.md",
     "events/CiphernodeAdded.md",
-    "notes/Event Driven Architecture.md",
-    "actors/NetEventTranslator.md",
-    "actors/Sortition.md",
     "evm",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",

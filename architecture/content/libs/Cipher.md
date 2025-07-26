@@ -12,7 +12,9 @@ tags:
 
 `=this.description`
 
-### Notes
+#### Description
+
+This is used by the [[Keyshare]] actor to store it's single secret share. It is also used by the [[Sensitive]] container.
 
 The cipher is a library that encrypts data to the key found in the keyfile the location of which is configured within the `enclave.config.yaml` 
 
