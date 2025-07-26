@@ -18,5 +18,5 @@ description: A node that is responsible for managing keyshares to form a decrypt
 
 - [[The Actor Model]]
 - [[Event Driven Architecture]]
-- [[Persistence]]
+- [[PersistenceSystem]]
 - [[Data Security]]

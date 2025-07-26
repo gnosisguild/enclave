@@ -15,10 +15,12 @@ flowchart TB
 		R["E3RequestSystem"]
         KS["KeyshareSystem"]
         COM["ComputeSystem"]
+        P["PersistenceSystem"]
         AS["AggregationSystem"]
         SS["SortitionSystem"]
     end
-    EB --- EVM
+
+	EB --- EVM
     EB --- NET
     R --- AS
     R --- KS
@@ -27,6 +29,9 @@ flowchart TB
     KS --- COM
     AS --- SS
     EB --- SS
+    AS -.- P
+    KS -.- P
+    R -.- P
 
     EVM:::internal-link
     EB:::internal-link
@@ -36,6 +41,7 @@ flowchart TB
     AS:::internal-link
     KS:::internal-link
     SS:::internal-link
+    P:::internal-link
 
     style EVM fill:#E1BEE7
     style EB fill:#FFCDD2
@@ -45,6 +51,7 @@ flowchart TB
     style COM fill:#E1BEE7
     style AS fill:#E1BEE7
     style SS fill:#E1BEE7
+	style P fill:#E1BEE7
 ```
 
 
