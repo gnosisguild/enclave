@@ -5,21 +5,16 @@ This is an Obsidian vault for the Enclave project architecture design. It is des
 ## Broad Structure
 
 ```mermaid
-flowchart TB
+flowchart LR
+	subgraph SDK
+	    T["Typescript SDK"]
+	    R["Rust SDK"]
+	    N["Noir SDK"]
+	end
     S["Support"]
     C["Ciphernode"]
     EVM["Contracts"]
-    T["Typescript SDK"]
-    R["Rust SDK"]
-    N["Noir SDK"]
     CLI["CLI"]
-
-    CLI --> S
-    CLI --> C
-    C ---> EVM
-    T ---> EVM
-    R ---> EVM
-	N ---> EVM
 
     C:::internal-link
     S:::internal-link
