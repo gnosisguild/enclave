@@ -30,7 +30,6 @@ flowchart TB
     CLI:::internal-link
 ```
 
-
 ---
 
 ## Getting Started With Obsidian
