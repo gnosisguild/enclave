@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "ARCHITECTURE.md",
+                "file": "crates/support/Risc0 Docker Runner.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "ARCHITECTURE"
+              "title": "Risc0 Docker Runner"
             }
           }
         ]
@@ -165,10 +165,26 @@
   },
   "active": "b5dfe506c3f95c26",
   "lastOpenFiles": [
+    "target/release/deps/doclinker-15f819b5f823242a",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.00.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.02.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.08.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.10.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.09.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.04.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.07.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.01.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.05.rcgu.o",
+    "target/release/deps/doclinker-15f819b5f823242a.doclinker.1a1a9a5f2f15a607-cgu.06.rcgu.o",
+    "crates/doclinker/README.md",
+    "crates/mermaid-linker/README.md",
+    "crates/support-scripts/Support.md",
+    "ARCHITECTURE.md",
+    "crates/sortition/docs/CiphernodeSelector.md",
+    "crates/request/E3RequestSystem.md",
     "crates/Ciphernode.md",
-    "ARCHITECTURE.md",
+    "crates/evm/EvmSystem.md",
     "crates/cli/CLI.md",
-    "ARCHITECTURE.md",
     "CLI.md",
     "Noir SDK.md",
     "Rust SDK.md",
@@ -185,25 +201,9 @@
     "events/Insert.md",
     "actors/Persistable.md",
     "actors/DataStore.md",
-    "systems/PersistenceSystem.md",
-    "actors/EnclaveSolWriter.md",
-    "actors/PublickeyAggregator.md",
-    "actors/SledStore.md",
-    "actors/RegistryFilterSolWriter.md",
-    "actors/Sortition.md",
-    "Untitled",
-    "evm",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
-    "systems",
     "notes/DKG.canvas",
-    "notes/_E3 Request Lifecycle.canvas",
-    "notes",
-    "libs",
-    "actors",
-    "events",
-    "events",
-    "RayonComputeRequest.md~",
-    "Event Driven Architecture.md~"
+    "notes/_E3 Request Lifecycle.canvas"
   ]
 }
