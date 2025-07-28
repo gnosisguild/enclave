@@ -52,6 +52,16 @@ flowchart TB
     style AS fill:#BBDEFB
     style SS fill:#BBDEFB
 	style P fill:#BBDEFB
+
+    click EVM "https://github.com/gnosisguild/enclave/tree/main/crates/evm/EvmSystem.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click NET "https://github.com/gnosisguild/enclave/tree/main/crates/net/NetSystem.md"
+    click COM "https://github.com/gnosisguild/enclave/tree/main/crates/compute/ComputeSystem.md"
+    click R "https://github.com/gnosisguild/enclave/tree/main/crates/request/E3RequestSystem.md"
+    click AS "https://github.com/gnosisguild/enclave/tree/main/crates/aggregator/AggregationSystem.md"
+    click KS "https://github.com/gnosisguild/enclave/tree/main/crates/keyshare/KeyshareSystem.md"
+    click SS "https://github.com/gnosisguild/enclave/tree/main/crates/sortition/SortitionSystem.md"
+    click P "https://github.com/gnosisguild/enclave/tree/main/crates/data/PersistenceSystem.md"
 ```
 
 

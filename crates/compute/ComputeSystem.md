@@ -36,6 +36,12 @@ flowchart TB
     style CR fill:#C8E6C9
     style EB fill:#FFCDD2
     style C fill:#FFCDD2
+
+    click CRS "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequestSuccess.md"
+    click CR "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequest.md"
+    click CRF "https://github.com/gnosisguild/enclave/tree/main/architecture/content/.trash/ComputeRequestFailed.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click C "https://github.com/gnosisguild/enclave/tree/main/crates/compute/docs/ComputeProcessor.md"
 ```
 
 ```dataview
