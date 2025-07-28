@@ -2,22 +2,51 @@
 
 This is an Obsidian vault for the Enclave project architecture design. It is designed to help onboard and orient new team members to the project so that the structure and design decisions are understandable and accessible.
 
-## Entrypoints
+## Broad Structure
 
-- [[Contracts|Enclave Contract Architecture]]
-- [[Ciphernode|Ciphernode Architecture]]
-- [[Enclave Application Structure]]
+```mermaid
+flowchart TB
+    S["Support"]
+    C["Ciphernode"]
+    EVM["Contracts"]
+    T["Typescript SDK"]
+    R["Rust SDK"]
+    N["Noir SDK"]
+    CLI["CLI"]
+
+    CLI --> S
+    CLI --> C
+    C ---> EVM
+    T ---> EVM
+    R ---> EVM
+	N ---> EVM
+
+    C:::internal-link
+    S:::internal-link
+    EVM:::internal-link
+    T:::internal-link
+    R:::internal-link
+    N:::internal-link
+    CLI:::internal-link
+```
+
+
+---
 
 ## Getting Started With Obsidian
+
 ### Prerequisites
+
 - [Obsidian](https://obsidian.md/) installed on your system
 
 ### Opening the Vault
 
 1. **Download/Clone the Repository**
+
    - Ensure you have access to the repository containing this architecture documentation
 
 2. **Open in Obsidian**
+
    - Launch Obsidian
    - Click "Open folder as vault"
    - Navigate to and select the `./architecture/content/` directory
@@ -34,6 +63,7 @@ This is an Obsidian vault for the Enclave project architecture design. It is des
 All architecture documentation is contained within this vault. The content is organized to provide a logical flow from high-level concepts to detailed implementation specifics. Use Obsidian's graph view and linking features to explore relationships between different architectural components.
 
 You can navigate through the documentation using:
+
 - The file explorer on the left sidebar
 - Internal links within documents (shown as `[[Page Name]]`)
 - The graph view to visualize document relationships
@@ -42,4 +72,3 @@ You can navigate through the documentation using:
 ### Using the Vault
 
 This vault leverages Obsidian's linking and graph capabilities to create an interconnected view of the Enclave architecture. The Dataview plugin enables dynamic content generation and querying across documents, making it easier to find related information and maintain consistency across the documentation.
-

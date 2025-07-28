@@ -1,5 +1,5 @@
 ---
-description: Demonstrate an overview of the structure of the ciphernode component system
+description: A node that is responsible for managing keyshares to form a decryption committee for enclave encrypted data
 ---
 ## `=this.file.name`
 
@@ -63,6 +63,18 @@ TABLE description as Description
 WHERE type = "system"
 ```
 
+
+### Components
+
+- [[Actors]]
+- [[Events]]
+
+### Information
+
+- [[The Actor Model]]
+- [[Event Driven Architecture]]
+- [[PersistenceSystem|On Persistence]]
+- [[Data Security]]
 
 ## Bootstrap
 
