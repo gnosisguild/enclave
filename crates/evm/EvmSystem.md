@@ -27,6 +27,11 @@ flowchart TB
 	style ER fill:#FFCDD2
 	style CRR fill:#FFCDD2
 	style EB fill:#FFCDD2
+
+    click ESR "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolReader.md"
+    click ER "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EventReader.md"
+    click CRR "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/CiphernodeRegistryReader.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
 ```
 
 ```mermaid
@@ -46,6 +51,10 @@ flowchart TB
 	style ESW fill:#FFCDD2
 	style EB fill:#FFCDD2
 	style RFW fill:#FFCDD2
+
+    click ESW "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolWriter.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click RFW "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/RegistryFilterSolWriter.md"
 ```
 
 ```dataview
