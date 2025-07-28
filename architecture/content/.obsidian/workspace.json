@@ -1,24 +1,20 @@
 {
   "main": {
-    "id": "382545f4b1655972",
+    "id": "e8da689fc23b572f",
     "type": "split",
     "children": [
       {
-        "id": "620dbc0a6a514fe0",
+        "id": "75a26756740021f8",
         "type": "tabs",
         "children": [
           {
-            "id": "b0dfa483a1ad28ee",
+            "id": "870e28b0929e428d",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "ARCHITECTURE.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "ARCHITECTURE"
+              "title": "New tab"
             }
           }
         ]
@@ -27,15 +23,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "eda7effde3142deb",
+    "id": "d09a49a1b2ff45d0",
     "type": "split",
     "children": [
       {
-        "id": "de9036a179c03e59",
+        "id": "f0a4858963c7e854",
         "type": "tabs",
         "children": [
           {
-            "id": "b5dfe506c3f95c26",
+            "id": "f574d74e5d438c43",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -48,12 +44,12 @@
             }
           },
           {
-            "id": "1d8d474e9d2f366a",
+            "id": "68c137e1ebb056c3",
             "type": "leaf",
             "state": {
               "type": "search",
               "state": {
-                "query": "tag:#todo",
+                "query": "",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -65,7 +61,7 @@
             }
           },
           {
-            "id": "e1536ccba0f930f9",
+            "id": "d576ffb15cd39428",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -78,23 +74,23 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
-    "id": "6b6677e64c1270ea",
+    "id": "e871540281273051",
     "type": "split",
     "children": [
       {
-        "id": "f59bb59a7d9ec6cb",
+        "id": "6d3e0222ee67f8af",
         "type": "tabs",
         "children": [
           {
-            "id": "6200d991ce5f53b2",
+            "id": "ca039ba18ad83406",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
-                "file": "CiphernodeRemoved.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,46 +100,49 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for CiphernodeRemoved"
+              "title": "Backlinks"
             }
           },
           {
-            "id": "a918c4b15e43e15b",
+            "id": "e0bb6b359ade1749",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "CiphernodeRemoved.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from CiphernodeRemoved"
+              "title": "Outgoing links"
             }
           },
           {
-            "id": "d830e9b504a426f3",
+            "id": "72150809a46c80e3",
             "type": "leaf",
             "state": {
               "type": "tag",
               "state": {
                 "sortOrder": "frequency",
-                "useHierarchy": true
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-tags",
               "title": "Tags"
             }
           },
           {
-            "id": "b99540af252c3f04",
+            "id": "b1c36f261defe193",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
-                "file": "CiphernodeRemoved.md"
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of CiphernodeRemoved"
+              "title": "Outline"
             }
           }
         ]
@@ -163,47 +162,6 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "b5dfe506c3f95c26",
-  "lastOpenFiles": [
-    "crates/Ciphernode.md",
-    "ARCHITECTURE.md",
-    "crates/cli/CLI.md",
-    "ARCHITECTURE.md",
-    "CLI.md",
-    "Noir SDK.md",
-    "Rust SDK.md",
-    "Typescript SDK.md",
-    "Support.md",
-    "Risc0 Docker Runner.md",
-    "Dev Runner.md",
-    "systems/Ciphernode.md",
-    "events/ComputeRequest.md",
-    "systems/E3RequestSystem.md",
-    "notes/Actors.md",
-    "notes/CiphernodeBak.md",
-    "notes/Data Security.md",
-    "events/Insert.md",
-    "actors/Persistable.md",
-    "actors/DataStore.md",
-    "systems/PersistenceSystem.md",
-    "actors/EnclaveSolWriter.md",
-    "actors/PublickeyAggregator.md",
-    "actors/SledStore.md",
-    "actors/RegistryFilterSolWriter.md",
-    "actors/Sortition.md",
-    "Untitled",
-    "evm",
-    "notes/Untitled.canvas",
-    "systems/Untitled.canvas",
-    "systems",
-    "notes/DKG.canvas",
-    "notes/_E3 Request Lifecycle.canvas",
-    "notes",
-    "libs",
-    "actors",
-    "events",
-    "events",
-    "RayonComputeRequest.md~",
-    "Event Driven Architecture.md~"
-  ]
+  "active": "870e28b0929e428d",
+  "lastOpenFiles": []
 }
