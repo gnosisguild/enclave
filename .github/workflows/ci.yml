@@ -399,9 +399,7 @@ jobs:
           toolchain: 1.86.0
           targets: wasm32-unknown-unknown
       - name: Install wasm-pack
-        run: |
-          export VERSION=v0.13.1
-          curl -sSf https://raw.githubusercontent.com/alexcrichton/wasm-pack/master/docs/_installer/init.sh | sh
+        run: npm install -g wasm-pack
       - name: Install node dependencies
         run: pnpm install
       - name: Build the sdk
