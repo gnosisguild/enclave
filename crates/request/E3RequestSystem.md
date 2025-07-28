@@ -36,6 +36,14 @@ flowchart TB
     style PTA fill:#FFCDD2
     style EB fill:#FFCDD2
     style CS fill:#FFCDD2
+
+    click EC "https://github.com/gnosisguild/enclave/crates/request/docs/E3Context.md"
+    click ER "https://github.com/gnosisguild/enclave/crates/request/docs/E3Router.md"
+    click PKA "https://github.com/gnosisguild/enclave/crates/aggregator/docs/PublickeyAggregator.md"
+    click PTA "https://github.com/gnosisguild/enclave/crates/aggregator/docs/PlaintextAggregator.md"
+    click K "https://github.com/gnosisguild/enclave/crates/keyshare/docs/Keyshare.md"
+    click EB "https://github.com/gnosisguild/enclave/crates/events/docs/EventBus.md"
+    click CS "https://github.com/gnosisguild/enclave/crates/sortition/docs/CiphernodeSelector.md"
 ```
 
 ```dataview

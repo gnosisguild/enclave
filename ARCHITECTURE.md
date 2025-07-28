@@ -28,6 +28,14 @@ flowchart TB
     R:::internal-link
     N:::internal-link
     CLI:::internal-link
+
+    click C "https://github.com/gnosisguild/enclave/crates/Ciphernode.md"
+    click S "https://github.com/gnosisguild/enclave/crates/support-scripts/Support.md"
+    click EVM "https://github.com/gnosisguild/enclave/packages/evm/docs/Contracts.md"
+    click T "https://github.com/gnosisguild/enclave/packages/enclave-sdk/Typescript SDK.md"
+    click R "https://github.com/gnosisguild/enclave/crates/sdk/Rust SDK.md"
+    click N "https://github.com/gnosisguild/enclave/architecture/content/Noir SDK.md"
+    click CLI "https://github.com/gnosisguild/enclave/crates/cli/CLI.md"
 ```
 
 ---
