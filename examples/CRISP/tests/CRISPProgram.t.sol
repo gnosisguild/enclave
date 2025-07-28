@@ -27,7 +27,7 @@ import {console2} from "forge-std/console2.sol";
 import {Test} from "forge-std/Test.sol";
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {CRISPProgram} from "../contracts/CRISPProgram.sol";
-import {Elf} from "./Elf.sol"; // auto-generated contract after running `cargo build`.
+import {Elf} from "./Elf.sol"; // auto-generated contract after running `cargo build --locked`.
 
 contract CRISPProgramTest is RiscZeroCheats, Test {
     CRISPProgram public crispProgram;

@@ -22,7 +22,7 @@ This is a Rust-based server implementation for CRISP, which is built on top of t
 1. Install dependencies:
 
    ```
-   cargo build --release
+   cargo build --locked --release
    ```
 
 2. Set up environment variables:

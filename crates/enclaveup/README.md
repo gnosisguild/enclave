@@ -69,7 +69,7 @@ To build `enclaveup` from source:
 
 ```bash
 cd enclaveup
-cargo build --release
+cargo build --locked --release
 ```
 
 The binary will be available at `target/release/enclaveup`.

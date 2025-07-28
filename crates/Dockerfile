@@ -78,12 +78,12 @@ RUN for d in ./*/ ; do \
         fi \
     done
 
-RUN cargo build --release
+RUN cargo build --locked --release
 
 COPY ./crates .
 
 RUN find . -name "*.rs" -exec touch {} +
-RUN cargo build --release -p e3-cli
+RUN cargo build --locked --release -p e3-cli
 
 # Runtime stage
 FROM debian:stable-slim

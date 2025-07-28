@@ -127,7 +127,7 @@ WORKDIR /app/examples/CRISP/apps/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \
-    cargo build --release --bin server && \
+    cargo build --locked --release --bin server && \
     mkdir -p /app/dist && cp target/release/server /app/dist/server
 
 ############### stage 4: runtime ###############
