@@ -6,7 +6,6 @@
       {
         "id": "42479e0cd80ab23a",
         "type": "tabs",
-        "dimension": 74.67948717948718,
         "children": [
           {
             "id": "7a09ebbe677de6f8",
@@ -14,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "DOCS_ROOT.md",
-                "mode": "source",
+                "file": "crates/request/E3RequestSystem.md",
+                "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "DOCS_ROOT"
+              "title": "E3RequestSystem"
             }
           },
           {
@@ -48,50 +47,6 @@
               },
               "icon": "lucide-file",
               "title": "ThreadpoolSystem"
-            }
-          }
-        ]
-      },
-      {
-        "id": "cdc03909aef8bd67",
-        "type": "tabs",
-        "dimension": 25.320512820512818,
-        "children": [
-          {
-            "id": "44877baad8b8dd23",
-            "type": "leaf",
-            "state": {
-              "type": "localgraph",
-              "state": {
-                "file": "DOCS_ROOT.md",
-                "options": {
-                  "collapse-filter": false,
-                  "search": "",
-                  "localJumps": 1,
-                  "localBacklinks": true,
-                  "localForelinks": false,
-                  "localInterlinks": false,
-                  "showTags": false,
-                  "showAttachments": false,
-                  "hideUnresolved": false,
-                  "collapse-color-groups": true,
-                  "colorGroups": [],
-                  "collapse-display": true,
-                  "showArrow": false,
-                  "textFadeMultiplier": 0,
-                  "nodeSizeMultiplier": 1,
-                  "lineSizeMultiplier": 1,
-                  "collapse-forces": true,
-                  "centerStrength": 0.518713248970312,
-                  "repelStrength": 10,
-                  "linkStrength": 1,
-                  "linkDistance": 250,
-                  "scale": 1,
-                  "close": true
-                }
-              },
-              "icon": "lucide-git-fork",
-              "title": "Graph of DOCS_ROOT"
             }
           }
         ]
@@ -165,7 +120,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "6b6677e64c1270ea",
@@ -252,10 +208,18 @@
   },
   "active": "7a09ebbe677de6f8",
   "lastOpenFiles": [
-    "README.md",
-    "DOCS_ROOT.md",
-    "crates/Ciphernode.md",
+    "crates/sortition/docs/CiphernodeSelector.md",
     "crates/request/E3RequestSystem.md",
+    "crates/request/docs/E3Context.md",
+    "crates/Ciphernode.md",
+    "DOCS_ROOT.md",
+    "crates/evm/EvmSystem.md",
+    "crates/evm/docs/CiphernodeRegistryReader.md",
+    "theory/2021-1397.pdf",
+    "theory/2024-1285.pdf",
+    "theory/VAT 3.pdf",
+    "theory",
+    "README.md",
     "architecture/notes/Data Security.md",
     "architecture/notes/Actors.md",
     "crates/aggregator/AggregationSystem.md",
@@ -263,8 +227,6 @@
     "crates/threadpool/ThreadpoolSystem.md",
     "crates/keyshare/KeyshareSystem.md",
     "crates/net/NetSystem.md",
-    "crates/evm/EvmSystem.md",
-    "crates/evm/docs/CiphernodeRegistryReader.md",
     "crates/support-scripts/Support.md",
     "crates/program-server/E3ProgramServer.md",
     "crates/support-scripts/Dev Runner.md",
@@ -276,18 +238,12 @@
     "crates/README.md",
     "crates/crypto/docs/Cipher.md",
     "crates/crypto/docs/Sensitive.md",
-    "crates/keyshare/docs/ThresholdKeyshare.md",
-    "crates/fhe/docs/TrBFV.md",
     "crates/fhe/docs",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/work-products.bin",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/query-cache.bin",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/dep-graph.bin",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw",
     "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-7rj845lhflr0ivvfhehpbvi63/work-products.bin",
-    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-7rj845lhflr0ivvfhehpbvi63/query-cache.bin",
-    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-7rj845lhflr0ivvfhehpbvi63/dep-graph.bin",
-    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-7rj845lhflr0ivvfhehpbvi63",
-    "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-working/dep-graph.part.bin",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "notes/DKG.canvas",
