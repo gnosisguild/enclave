@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::correlation_id::CorrelationId;
-use crate::events::NetworkPeerCommand;
-use crate::events::NetworkPeerEvent;
+use crate::events::NetCommand;
+use crate::events::NetEvent;
 use crate::NetworkPeer;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -26,7 +26,7 @@ use tracing::{error, info, instrument, trace};
 /// NetworkPeer for propagation over the p2p network
 pub struct NetworkManager {
     bus: Addr<EventBus<EnclaveEvent>>,
-    tx: mpsc::Sender<NetworkPeerCommand>,
+    tx: mpsc::Sender<NetCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
 }
@@ -44,7 +44,7 @@ impl NetworkManager {
     /// Create a new NetworkManager actor
     pub fn new(
         bus: Addr<EventBus<EnclaveEvent>>,
-        tx: mpsc::Sender<NetworkPeerCommand>,
+        tx: mpsc::Sender<NetCommand>,
         topic: &str,
     ) -> Self {
         Self {
@@ -57,8 +57,8 @@ impl NetworkManager {
 
     pub fn setup(
         bus: Addr<EventBus<EnclaveEvent>>,
-        tx: mpsc::Sender<NetworkPeerCommand>,
-        mut rx: broadcast::Receiver<NetworkPeerEvent>,
+        tx: mpsc::Sender<NetCommand>,
+        mut rx: broadcast::Receiver<NetEvent>,
         topic: &str,
     ) -> Addr<Self> {
         let addr = NetworkManager::new(bus.clone(), tx, topic).start();
@@ -74,7 +74,7 @@ impl NetworkManager {
             async move {
                 while let Ok(event) = rx.recv().await {
                     match event {
-                        NetworkPeerEvent::GossipData(data) => addr.do_send(LibP2pEvent(data)),
+                        NetEvent::GossipData(data) => addr.do_send(LibP2pEvent(data)),
                         _ => (),
                     }
                 }
@@ -157,7 +157,7 @@ impl Handler<EnclaveEvent> for NetworkManager {
             match evt.to_bytes() {
                 Ok(data) => {
                     if let Err(e) = tx
-                        .send(NetworkPeerCommand::GossipPublish {
+                        .send(NetCommand::GossipPublish {
                             topic,
                             data,
                             correlation_id: CorrelationId::new(),

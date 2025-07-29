@@ -22,8 +22,8 @@ use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, info, trace, warn};
 
 use crate::dialer::dial_peers;
-use crate::events::NetworkPeerCommand;
-use crate::events::NetworkPeerEvent;
+use crate::events::NetCommand;
+use crate::events::NetEvent;
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -44,12 +44,12 @@ pub struct NetworkPeer {
     udp_port: Option<u16>,
     /// The gossipsub topic that the peer should listen on
     topic: gossipsub::IdentTopic,
-    /// Broadcast channel to report NetworkPeerEvents to listeners
-    event_tx: broadcast::Sender<NetworkPeerEvent>,
-    /// Transmission channel to send NetworkPeerCommands to the NetworkPeer
-    cmd_tx: mpsc::Sender<NetworkPeerCommand>,
-    /// Local receiver to process NetworkPeerCommands from
-    cmd_rx: mpsc::Receiver<NetworkPeerCommand>,
+    /// Broadcast channel to report NetEvents to listeners
+    event_tx: broadcast::Sender<NetEvent>,
+    /// Transmission channel to send NetCommands to the NetworkPeer
+    cmd_tx: mpsc::Sender<NetCommand>,
+    /// Local receiver to process NetCommands from
+    cmd_rx: mpsc::Receiver<NetCommand>,
 }
 
 impl NetworkPeer {
@@ -82,11 +82,11 @@ impl NetworkPeer {
         })
     }
 
-    pub fn rx(&mut self) -> broadcast::Receiver<NetworkPeerEvent> {
+    pub fn rx(&mut self) -> broadcast::Receiver<NetEvent> {
         self.event_tx.subscribe()
     }
 
-    pub fn tx(&self) -> mpsc::Sender<NetworkPeerCommand> {
+    pub fn tx(&self) -> mpsc::Sender<NetCommand> {
         self.cmd_tx.clone()
     }
 
@@ -126,26 +126,26 @@ impl NetworkPeer {
                  // Process commands
                 Some(command) = cmd_rx.recv() => {
                     match command {
-                        NetworkPeerCommand::GossipPublish { data, topic, correlation_id } => {
+                        NetCommand::GossipPublish { data, topic, correlation_id } => {
                             let gossipsub_behaviour = &mut self.swarm.behaviour_mut().gossipsub;
                             match gossipsub_behaviour
                                 .publish(gossipsub::IdentTopic::new(topic), data) {
                                 Ok(message_id) => {
-                                    event_tx.send(NetworkPeerEvent::GossipPublished { correlation_id, message_id })?;
+                                    event_tx.send(NetEvent::GossipPublished { correlation_id, message_id })?;
                                 },
                                 Err(e) => {
                                     warn!(error=?e, "Could not publish to swarm. Retrying...");
-                                    event_tx.send(NetworkPeerEvent::GossipPublishError { correlation_id, error: Arc::new(e) })?;
+                                    event_tx.send(NetEvent::GossipPublishError { correlation_id, error: Arc::new(e) })?;
                                 }
                             }
                         },
-                        NetworkPeerCommand::Dial(multi) => {
+                        NetCommand::Dial(multi) => {
                             trace!("DIAL: {:?}", multi);
                             match self.swarm.dial(multi) {
                                 Ok(v) => trace!("Dial returned {:?}", v),
                                 Err(error) => {
                                     warn!("Dialing error! {}", error);
-                                    event_tx.send(NetworkPeerEvent::DialError { error: error.into() })?;
+                                    event_tx.send(NetEvent::DialError { error: error.into() })?;
                                 }
                             }
                         }
@@ -202,7 +202,7 @@ fn create_kad_behaviour(
 /// Process all swarm events
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
-    event_tx: &broadcast::Sender<NetworkPeerEvent>,
+    event_tx: &broadcast::Sender<NetEvent>,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
     match event {
@@ -222,7 +222,7 @@ async fn process_swarm_event(
             trace!("Added address to kademlia {}", remote_addr);
             swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
             trace!("Added peer to gossipsub {}", remote_addr);
-            event_tx.send(NetworkPeerEvent::ConnectionEstablished { connection_id })?;
+            event_tx.send(NetEvent::ConnectionEstablished { connection_id })?;
         }
 
         SwarmEvent::OutgoingConnectionError {
@@ -231,7 +231,7 @@ async fn process_swarm_event(
             connection_id,
         } => {
             warn!("Failed to dial {peer_id:?}: {error}");
-            event_tx.send(NetworkPeerEvent::OutgoingConnectionError {
+            event_tx.send(NetEvent::OutgoingConnectionError {
                 connection_id,
                 error: Arc::new(error),
             })?;
@@ -251,7 +251,7 @@ async fn process_swarm_event(
             message,
         })) => {
             trace!("Got message with id: {id} from peer: {peer_id}",);
-            event_tx.send(NetworkPeerEvent::GossipData(message.data))?;
+            event_tx.send(NetEvent::GossipData(message.data))?;
         }
         SwarmEvent::NewListenAddr { address, .. } => {
             trace!("Local node is listening on {address}");

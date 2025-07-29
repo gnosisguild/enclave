@@ -15,7 +15,7 @@ use libp2p::{
 use crate::correlation_id::CorrelationId;
 
 /// NetworkPeer Commands are sent to the network peer over a mspc channel
-pub enum NetworkPeerCommand {
+pub enum NetCommand {
     GossipPublish {
         topic: String,
         data: Vec<u8>,
@@ -24,10 +24,10 @@ pub enum NetworkPeerCommand {
     Dial(DialOpts),
 }
 
-/// NetworkPeerEvents are broadcast over a broadcast channel to whom ever wishes to listen
+/// NetEvents are broadcast over a broadcast channel to whom ever wishes to listen
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "anyhow::Result<()>")]
-pub enum NetworkPeerEvent {
+pub enum NetEvent {
     /// Bytes have been broadcast over the network
     GossipData(Vec<u8>),
     /// There was an Error publishing bytes over the network

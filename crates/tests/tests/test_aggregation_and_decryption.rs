@@ -21,7 +21,7 @@ use e3_fhe::ext::FheExtension;
 use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_keyshare::ext::KeyshareExtension;
 use e3_logger::SimpleLogger;
-use e3_net::{events::NetworkPeerEvent, NetworkManager};
+use e3_net::{events::NetEvent, NetworkManager};
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sortition::SortitionRepositoryFactory;
@@ -518,11 +518,11 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
             // the event bus as if it was gossiped from the network and ended up as an external
             // message this simulates a rebroadcast message
             if let Some(msg) = match cmd {
-                e3_net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
+                e3_net::events::NetCommand::GossipPublish { data, .. } => Some(data),
                 _ => None,
             } {
                 msgs_loop.lock().await.push(msg.clone());
-                event_tx.send(NetworkPeerEvent::GossipData(msg))?;
+                event_tx.send(NetEvent::GossipData(msg))?;
             }
             // if this  manages to broadcast an event to the
             // event bus we will expect to see an extra event on
@@ -674,7 +674,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     });
 
     // lets send an event from the network
-    let _ = event_tx.send(NetworkPeerEvent::GossipData(event.to_bytes()?));
+    let _ = event_tx.send(NetEvent::GossipData(event.to_bytes()?));
 
     sleep(Duration::from_millis(1)).await; // need to push to next tick
 

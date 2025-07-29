@@ -22,14 +22,14 @@ use tracing::trace;
 use tracing::warn;
 
 use crate::{
-    events::{NetworkPeerCommand, NetworkPeerEvent},
+    events::{NetCommand, NetEvent},
     retry::{retry_with_backoff, to_retry, RetryError, BACKOFF_DELAY, BACKOFF_MAX_RETRIES},
 };
 
 /// Dial a single Multiaddr with retries and return an error should those retries not work
 async fn dial_multiaddr(
-    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
-    event_tx: &broadcast::Sender<NetworkPeerEvent>,
+    cmd_tx: &mpsc::Sender<NetCommand>,
+    event_tx: &broadcast::Sender<NetEvent>,
     multiaddr_str: &str,
 ) -> Result<()> {
     let multiaddr = &multiaddr_str.parse()?;
@@ -56,8 +56,8 @@ fn trace_error(r: Result<()>) {
 /// * `event_tx` - Broadcast sender for peer events
 /// * `peers` - List of peer addresses to connect to
 pub async fn dial_peers(
-    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
-    event_tx: &broadcast::Sender<NetworkPeerEvent>,
+    cmd_tx: &mpsc::Sender<NetCommand>,
+    event_tx: &broadcast::Sender<NetEvent>,
     peers: &Vec<String>,
 ) -> Result<()> {
     let futures: Vec<_> = peers
@@ -71,8 +71,8 @@ pub async fn dial_peers(
 
 /// Attempt a connection with retrys to a multiaddr return an error if the connection could not be resolved after the retries.
 async fn attempt_connection(
-    cmd_tx: &mpsc::Sender<NetworkPeerCommand>,
-    event_tx: &broadcast::Sender<NetworkPeerEvent>,
+    cmd_tx: &mpsc::Sender<NetCommand>,
+    event_tx: &broadcast::Sender<NetEvent>,
     multiaddr: &Multiaddr,
 ) -> Result<(), RetryError> {
     let mut event_rx = event_tx.subscribe();
@@ -81,7 +81,7 @@ async fn attempt_connection(
     let dial_connection = opts.connection_id();
     trace!("Dialing: '{}' with connection '{}'", multi, dial_connection);
     cmd_tx
-        .send(NetworkPeerCommand::Dial(opts))
+        .send(NetCommand::Dial(opts))
         .await
         .map_err(to_retry)?;
     wait_for_connection(&mut event_rx, dial_connection).await
@@ -90,7 +90,7 @@ async fn attempt_connection(
 /// Wait for results of a retry based on a given correlation id and return the correct variant of
 /// RetryError depending on the result from the downstream event
 async fn wait_for_connection(
-    event_rx: &mut broadcast::Receiver<NetworkPeerEvent>,
+    event_rx: &mut broadcast::Receiver<NetEvent>,
     dial_connection: ConnectionId,
 ) -> Result<(), RetryError> {
     loop {
@@ -98,13 +98,13 @@ async fn wait_for_connection(
         select! {
             result = event_rx.recv() => {
                 match result.map_err(to_retry)? {
-                    NetworkPeerEvent::ConnectionEstablished { connection_id } => {
+                    NetEvent::ConnectionEstablished { connection_id } => {
                         if connection_id == dial_connection {
                             trace!("Connection Established");
                             return Ok(());
                         }
                     }
-                    NetworkPeerEvent::DialError { error } => {
+                    NetEvent::DialError { error } => {
                         warn!("DialError!");
                         return match error.as_ref() {
                             // If we are dialing ourself then we should just fail
@@ -116,7 +116,7 @@ async fn wait_for_connection(
                             _ => Err(RetryError::Retry(error.clone().into())),
                         };
                     }
-                    NetworkPeerEvent::OutgoingConnectionError {
+                    NetEvent::OutgoingConnectionError {
                         connection_id,
                         error,
                     } => {
