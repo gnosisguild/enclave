@@ -32,11 +32,11 @@ flowchart TB
     EB:::internal-link
     C:::internal-link
 
-    click CRS "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequestSuccess.md"
-    click CR "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequest.md"
-    click CRF "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequestFailed.md"
-    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ThreadpoolComputeProcessor.md"
+    click CRS "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequestSuccess.md"
+    click CR "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequest.md"
+    click CRF "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequestFailed.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click C "https://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ThreadpoolComputeProcessor.md"
 ```
 <details>
 <summary>Links</summary>

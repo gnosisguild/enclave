@@ -43,14 +43,14 @@ flowchart TB
     style KSL stroke-width:1px,stroke-dasharray: 5
     style BFV stroke-width:1px,stroke-dasharray: 5
 
-    click KS "http://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/ThresholdKeyshare.md"
-    click KSL "http://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/Keyshare.md"
-    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click S "http://github.com/gnosisguild/enclave/tree/main/crates/crypto/docs/Sensitive.md"
-    click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ThreadpoolComputeProcessor.md"
-    click TRB "http://github.com/gnosisguild/enclave/tree/main/crates/fhe/docs/TrBFV.md"
-    click TFHE "http://github.com/gnosisguild/enclave/tree/main/crates/fhe/docs/TFHE.md"
-    click BFV "http://github.com/gnosisguild/enclave/tree/main/crates/fhe/docs/Bfv.md"
+    click KS "https://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/ThresholdKeyshare.md"
+    click KSL "https://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/Keyshare.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click S "https://github.com/gnosisguild/enclave/tree/main/crates/crypto/docs/Sensitive.md"
+    click C "https://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ThreadpoolComputeProcessor.md"
+    click TRB "https://github.com/gnosisguild/enclave/tree/main/crates/fhe/docs/TrBFV.md"
+    click TFHE "https://github.com/gnosisguild/enclave/tree/main/crates/fhe/docs/TFHE.md"
+    click BFV "https://github.com/gnosisguild/enclave/tree/main/crates/fhe/docs/Bfv.md"
 ```
 <details>
 <summary>Links</summary>
