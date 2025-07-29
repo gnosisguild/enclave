@@ -36,13 +36,27 @@ flowchart TB
     style NEC stroke-width:1px,stroke-dasharray: 0,fill:#BBDEFB
     style NI stroke-width:1px,stroke-dasharray: 0,fill:#C8E6C9
     style FC fill:#CCCCCC,stroke-width:2px,stroke-dasharray: 2,stroke:#CCCCCC
-	class EB internal-link
-	class NET internal-link
-	class NI internal-link
-	class NCC internal-link
-	class NEC internal-link
-	class NBDP internal-link
+	NET:::internal-link
+	NBDP:::internal-link
+	EB:::internal-link
+	NEC:::internal-link
+	NI:::internal-link
+
+    click NET "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventTranslator.md"
+    click NBDP "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetDHTPublisher.md"
+    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click NEC "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventChannel.md"
+    click NI "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetInterface.md"
 ```
+<details>
+<summary>Links</summary>
+
+[[EventBus]]
+[[NetDHTPublisher]]
+[[NetEventChannel]]
+[[NetEventTranslator]]
+[[NetInterface]]
+</details>
 
 ```mermaid
 flowchart TB
@@ -67,13 +81,28 @@ flowchart TB
     style NCC stroke-width:1px,stroke-dasharray: 0,fill:#BBDEFB
     style NI stroke-width:1px,stroke-dasharray: 0,fill:#C8E6C9
     style FC fill:#CCCCCC,stroke-width:2px,stroke-dasharray: 2,stroke:#CCCCCC
-	class EB internal-link
-	class NET internal-link
-	class NI internal-link
-	class NCC internal-link
-	class NEC internal-link
-	class NBDP internal-link
+	
+	EB:::internal-link
+	NET:::internal-link
+	NBDP:::internal-link
+	NCC:::internal-link
+	NI:::internal-link
+
+    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click NET "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventTranslator.md"
+    click NBDP "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetDHTPublisher.md"
+    click NCC "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetCommandChannel.md"
+    click NI "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetInterface.md"
 ```
+<details>
+<summary>Links</summary>
+
+[[EventBus]]
+[[NetCommandChannel]]
+[[NetDHTPublisher]]
+[[NetEventTranslator]]
+[[NetInterface]]
+</details>
 
 
 This we can easily extend to a future networking component by listening to the [[EventBus]] and sending to the [[NetCommandChannel]] or reading from the [[NetEventChannel]] and publishing to the [[EventBus]]
