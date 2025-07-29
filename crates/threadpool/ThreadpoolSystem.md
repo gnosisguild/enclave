@@ -43,6 +43,24 @@ flowchart TB
     click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
     click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ComputeProcessor.md"
 ```
+<details>
+<summary><i>Links</i></summary>
+
+[[ComputeRequestFailed]]
+[[ComputeRequestSuccess]]
+[[ComputeRequest]]
+[[EventBus]]
+[[ThreadpoolComputeProcessor]]
+</details>
+<details>
+<summary><i>Links</i></summary>
+
+[[ComputeRequestFailed]]
+[[ComputeRequestSuccess]]
+[[ComputeRequest]]
+[[EventBus]]
+[[ThreadpoolComputeProcessor]]
+</details>
 
 ```dataview
 TABLE type, description as Description
