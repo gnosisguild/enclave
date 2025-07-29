@@ -48,16 +48,6 @@ flowchart TB
     SS:::internal-link
     P:::internal-link
 
-    style EVM fill:#BBDEFB
-    style EB fill:#FFCDD2
-    style NET fill:#BBDEFB
-    style R fill:#BBDEFB
-	style KS fill:#BBDEFB
-    style COM fill:#BBDEFB
-    style AS fill:#BBDEFB
-    style SS fill:#BBDEFB
-	style P fill:#BBDEFB
-
     click EVM "http://github.com/gnosisguild/enclave/tree/main/crates/evm/EvmSystem.md"
     click EE "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EnclaveEvent.md"
     click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"

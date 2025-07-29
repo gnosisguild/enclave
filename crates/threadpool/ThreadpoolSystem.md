@@ -31,11 +31,6 @@ flowchart TB
 	CRF:::internal-link
     EB:::internal-link
     C:::internal-link
-    style CRS fill:#C8E6C9
-    style CRF fill:#C8E6C9
-    style CR fill:#C8E6C9
-    style EB fill:#FFCDD2
-    style C fill:#FFCDD2
 
     click CRS "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequestSuccess.md"
     click CR "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequest.md"

@@ -29,11 +29,6 @@ flowchart TB
     EB:::internal-link
     C:::internal-link
 	S:::internal-link
-	style EB fill:#FFCDD2
-	style S fill:#FFCDD2
-	style PT fill:#FFCDD2
-	style PK fill:#FFCDD2
-	style C fill:#FFCDD2
 
     click PT "http://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PlaintextAggregator.md"
     click PK "http://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PublickeyAggregator.md"
