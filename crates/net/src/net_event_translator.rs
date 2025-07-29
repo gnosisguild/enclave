@@ -22,26 +22,26 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tracing::{error, info, instrument, trace};
 
-/// NetworkManager Actor converts between EventBus events and Libp2p events forwarding them to a
+/// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetInterface for propagation over the p2p network
-pub struct NetworkManager {
+pub struct NetEventTranslator {
     bus: Addr<EventBus<EnclaveEvent>>,
     tx: mpsc::Sender<NetCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
 }
 
-impl Actor for NetworkManager {
+impl Actor for NetEventTranslator {
     type Context = Context<Self>;
 }
 
-/// Libp2pEvent is used to send data to the NetInterface from the NetworkManager
+/// Libp2pEvent is used to send data to the NetInterface from the NetEventTranslator
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "anyhow::Result<()>")]
 struct LibP2pEvent(pub Vec<u8>);
 
-impl NetworkManager {
-    /// Create a new NetworkManager actor
+impl NetEventTranslator {
+    /// Create a new NetEventTranslator actor
     pub fn new(
         bus: Addr<EventBus<EnclaveEvent>>,
         tx: mpsc::Sender<NetCommand>,
@@ -61,7 +61,7 @@ impl NetworkManager {
         mut rx: broadcast::Receiver<NetEvent>,
         topic: &str,
     ) -> Addr<Self> {
-        let addr = NetworkManager::new(bus.clone(), tx, topic).start();
+        let addr = NetEventTranslator::new(bus.clone(), tx, topic).start();
 
         // Listen on all events
         bus.do_send(Subscribe {
@@ -110,14 +110,14 @@ impl NetworkManager {
 
         // Setup and start network manager
         let rx = peer.rx();
-        let p2p_addr = NetworkManager::setup(bus, peer.tx(), rx, topic);
+        let p2p_addr = NetEventTranslator::setup(bus, peer.tx(), rx, topic);
         let handle = tokio::spawn(async move { Ok(peer.start().await?) });
 
         Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
 
-impl Handler<LibP2pEvent> for NetworkManager {
+impl Handler<LibP2pEvent> for NetEventTranslator {
     type Result = anyhow::Result<()>;
     fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
         let LibP2pEvent(bytes) = msg;
@@ -132,7 +132,7 @@ impl Handler<LibP2pEvent> for NetworkManager {
     }
 }
 
-impl Handler<EnclaveEvent> for NetworkManager {
+impl Handler<EnclaveEvent> for NetEventTranslator {
     type Result = ResponseFuture<()>;
     fn handle(&mut self, event: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let sent_events = self.sent_events.clone();
