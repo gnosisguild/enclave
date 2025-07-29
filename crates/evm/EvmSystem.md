@@ -27,11 +27,6 @@ flowchart TB
     EB:::internal-link
     EE:::internal-link
 
-	style ESR fill:#FFCDD2
-	style ER fill:#FFCDD2
-	style CRR fill:#FFCDD2
-	style EB fill:#FFCDD2
-
     click ESR "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolReader.md"
     click ER "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EventReader.md"
     click CRR "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/CiphernodeRegistryReader.md"
@@ -65,10 +60,6 @@ flowchart TB
     EB:::internal-link
 	RFW:::internal-link
 	EE:::internal-link
-
-	style ESW fill:#FFCDD2
-	style EB fill:#FFCDD2
-	style RFW fill:#FFCDD2
 
     click ESW "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolWriter.md"
     click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"

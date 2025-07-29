@@ -30,11 +30,7 @@ flowchart TB
     NEC --> FC
     
     NEC@{ shape: h-cyl}
-    style NET fill:#FFCDD2
-    style NBDP fill:#FFCDD2
-    style EB fill:#FFCDD2
-    style NEC stroke-width:1px,stroke-dasharray: 0,fill:#BBDEFB
-    style NI stroke-width:1px,stroke-dasharray: 0,fill:#C8E6C9
+
     style FC fill:#CCCCCC,stroke-width:2px,stroke-dasharray: 2,stroke:#CCCCCC
 	NET:::internal-link
 	NBDP:::internal-link
@@ -75,11 +71,7 @@ flowchart TB
     FC --> NCC
 
     NCC@{ shape: h-cyl}
-    style NET fill:#FFCDD2
-    style NBDP fill:#FFCDD2
-    style EB fill:#FFCDD2
-    style NCC stroke-width:1px,stroke-dasharray: 0,fill:#BBDEFB
-    style NI stroke-width:1px,stroke-dasharray: 0,fill:#C8E6C9
+
     style FC fill:#CCCCCC,stroke-width:2px,stroke-dasharray: 2,stroke:#CCCCCC
 	
 	EB:::internal-link

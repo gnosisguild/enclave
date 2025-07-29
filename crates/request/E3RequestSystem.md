@@ -30,13 +30,6 @@ flowchart TB
      K:::internal-link
      EB:::internal-link
      CS:::internal-link
-    style ER fill:#FFCDD2
-    style EC fill:#BBDEFB
-    style K fill:#FFCDD2
-    style PKA fill:#FFCDD2
-    style PTA fill:#FFCDD2
-    style EB fill:#FFCDD2
-    style CS fill:#FFCDD2
 
     click EC "http://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Context.md"
     click ER "http://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Router.md"
