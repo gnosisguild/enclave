@@ -1,6 +1,7 @@
 ---
 type: system
 description: Runtime support systems for an Enclave Application
+links: "[[ARCHITECTURE]]"
 ---
 
 ## `=this.file.name`
@@ -20,9 +21,9 @@ flowchart TB
     DR:::internal-link
     PS:::internal-link
 
-    click RDR "https://github.com/gnosisguild/enclave/tree/main/crates/support/Risc0 Docker Runner.md"
-    click DR "https://github.com/gnosisguild/enclave/tree/main/crates/support-scripts/Dev Runner.md"
-    click PS "https://github.com/gnosisguild/enclave/tree/main/path/to/E3ProgramServer.md"
+    click RDR "http://github.com/gnosisguild/enclave/tree/main/crates/support/Risc0 Docker Runner.md"
+    click DR "http://github.com/gnosisguild/enclave/tree/main/crates/support-scripts/Dev Runner.md"
+    click PS "http://github.com/gnosisguild/enclave/tree/main/crates/program-server/E3ProgramServer.md"
 ```
 
 This package is designed so that the following are installed in an enclave template in order to run programs within an enclave project.

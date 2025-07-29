@@ -28,10 +28,10 @@ flowchart TB
 	style CRR fill:#FFCDD2
 	style EB fill:#FFCDD2
 
-    click ESR "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolReader.md"
-    click ER "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EventReader.md"
-    click CRR "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/CiphernodeRegistryReader.md"
-    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click ESR "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolReader.md"
+    click ER "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EventReader.md"
+    click CRR "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/CiphernodeRegistryReader.md"
+    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
 ```
 
 ```mermaid
@@ -52,9 +52,9 @@ flowchart TB
 	style EB fill:#FFCDD2
 	style RFW fill:#FFCDD2
 
-    click ESW "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolWriter.md"
-    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click RFW "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/RegistryFilterSolWriter.md"
+    click ESW "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolWriter.md"
+    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click RFW "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/RegistryFilterSolWriter.md"
 ```
 
 ```dataview
