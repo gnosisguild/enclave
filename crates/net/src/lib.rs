@@ -7,11 +7,11 @@
 pub mod correlation_id;
 mod dialer;
 pub mod events;
+mod net_event_translator;
 mod net_interface;
-mod network_manager;
 mod repo;
 mod retry;
 
+pub use net_event_translator::*;
 pub use net_interface::*;
-pub use network_manager::*;
 pub use repo::*;
