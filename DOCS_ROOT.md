@@ -62,6 +62,8 @@ flowchart LR
 
 3. **Enable Required Plugin**
    - Once the vault is open you will be prompted to Trust the author of the repo. You can choose to do and have the plugin self install so or deny and install the Dataview plugin yourself. Inspect source code [here](https://github.com/blacksmithgu/obsidian-dataview)
+   - <img width="616" height="353" alt="image" src="https://github.com/user-attachments/assets/f51fd939-7b5c-4fc2-bcd5-3ca64686a8dc" />
+
 
 ### Using the Vault
 
