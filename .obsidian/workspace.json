@@ -4,36 +4,69 @@
     "type": "split",
     "children": [
       {
-        "id": "359be81fc7ab0303",
+        "id": "412567148dda9cd9",
         "type": "tabs",
+        "dimension": 68.21581196581197,
         "children": [
           {
-            "id": "4ec3c9969f551a25",
+            "id": "ddb86617b506ecb1",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "crates/net/NetSystem.md",
+                "file": "crates/evm/EvmSystem.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "NetSystem"
-            }
-          },
+              "title": "EvmSystem"
+            },
+            "group": "c8e95fcfce441f75"
+          }
+        ]
+      },
+      {
+        "id": "42479e0cd80ab23a",
+        "type": "tabs",
+        "dimension": 31.784188034188034,
+        "children": [
           {
-            "id": "1b307a9563a7384e",
+            "id": "44877baad8b8dd23",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "localgraph",
               "state": {
-                "file": "architecture/notes/The Actor Model.md",
-                "mode": "source",
-                "source": false
+                "file": "crates/evm/EvmSystem.md",
+                "options": {
+                  "collapse-filter": true,
+                  "search": "",
+                  "localJumps": 1,
+                  "localBacklinks": true,
+                  "localForelinks": true,
+                  "localInterlinks": false,
+                  "showTags": false,
+                  "showAttachments": false,
+                  "hideUnresolved": false,
+                  "collapse-color-groups": true,
+                  "colorGroups": [],
+                  "collapse-display": true,
+                  "showArrow": false,
+                  "textFadeMultiplier": 0,
+                  "nodeSizeMultiplier": 1,
+                  "lineSizeMultiplier": 1,
+                  "collapse-forces": true,
+                  "centerStrength": 0.518713248970312,
+                  "repelStrength": 10,
+                  "linkStrength": 1,
+                  "linkDistance": 250,
+                  "scale": 1,
+                  "close": true
+                }
               },
-              "icon": "lucide-file",
-              "title": "The Actor Model"
-            }
+              "icon": "lucide-git-fork",
+              "title": "Graph of EvmSystem"
+            },
+            "group": "c8e95fcfce441f75"
           }
         ]
       }
@@ -67,7 +100,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "link",
+                "query": "",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -102,11 +135,13 @@
               "title": "Bookmarks"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "6b6677e64c1270ea",
@@ -191,44 +226,44 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "4ec3c9969f551a25",
+  "active": "ddb86617b506ecb1",
   "lastOpenFiles": [
-    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9nsg9y4wb-0nkfj1n-0vzwx4plti0mpdi6477wqnv2d/work-products.bin",
-    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9nsg9y4wb-0nkfj1n-0vzwx4plti0mpdi6477wqnv2d/query-cache.bin",
-    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9nsg9y4wb-0nkfj1n-0vzwx4plti0mpdi6477wqnv2d/dep-graph.bin",
-    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9nsg9y4wb-0nkfj1n-0vzwx4plti0mpdi6477wqnv2d",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-eudd95udliojkdgly6sjig02z/work-products.bin",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-eudd95udliojkdgly6sjig02z/query-cache.bin",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-eudd95udliojkdgly6sjig02z/dep-graph.bin",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-eudd95udliojkdgly6sjig02z",
-    "target/debug/incremental/helpers-2o7ai8docotgl/s-h9nsg9y5dc-06hqk2a-working/dep-graph.part.bin",
-    "target/debug/incremental/helpers-2o7ai8docotgl/s-h9nsg9y5dc-06hqk2a-working",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-working/work-products.bin",
+    "crates/evm/docs/EnclaveSolReader.md",
+    "crates/evm/EvmSystem.md",
+    "crates/events/docs/EnclaveEvent.md",
     "crates/Ciphernode.md",
-    "architecture/notes/The Actor Model.md",
     "ARCHITECTURE.md",
-    "architecture/Noir SDK.md",
-    "crates/threadpool/ThreadpoolSystem.md",
-    "crates/events/docs/ComputeRequest.md",
+    "crates/support-scripts/Support.md",
     "crates/sdk/Rust SDK.md",
     "packages/enclave-sdk/Typescript SDK.md",
-    "crates/support-scripts/Support.md",
-    "crates/support-scripts/Dev Runner.md",
-    "crates/support/Risc0 Docker Runner.md",
-    "crates/evm/EvmSystem.md",
+    "crates/evm/docs/RegistryFilterSolWriter.md",
+    "architecture/Noir SDK.md",
+    "crates/evm/docs/EventReader.md",
     "crates/evm/docs/EnclaveSolWriter.md",
-    "crates/cli/CLI.md",
-    "architecture/content/Noir SDK.md",
     "crates/program-server/E3ProgramServer.md",
+    "crates/support-scripts/Dev Runner.md",
+    "crates/cli/CLI.md",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/work-products.bin",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/query-cache.bin",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/f4phy5g9yziv9q7r9gmu6ke6q.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/f4boaaeocto3mmre3gxvebuq6.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/egko8tymk6apj4pg2w5kjl52l.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/edibyal6ymofhkfgwwuvupupq.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/ecxtgy4t4mjvh7tm9jyy1jid7.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/eca5u8rvmx6mxbfmh7dz282i0.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/ec76hy37s17mov9uhe866rb48.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nukd3hkf-1x7tdzh-9cpieroy0gev0grfmycec10d3/eb60ouylrpc2ci50fiehta32k.o",
+    "architecture/notes/The Actor Model.md",
+    "crates/evm/docs/CiphernodeRegistryReader.md",
+    "crates/net/NetSystem.md",
+    "crates/events/docs/EventBus.md",
+    "architecture/notes/CiphernodeBak.md",
+    "crates/support/Risc0 Docker Runner.md",
+    "crates/threadpool/ThreadpoolSystem.md",
+    "crates/events/docs/ComputeRequest.md",
+    "architecture/content/Noir SDK.md",
     "crates/program-server/docs/E3ProgramServer.md",
     "crates/support/methods/README.md",
-    "crates/support/README.md",
-    "crates/keyshare/KeyshareSystem.md",
-    "crates/keyshare/docs/ThresholdKeyshare.md",
-    "crates/keyshare/docs/Keyshare.md",
-    "crates/net/NetSystem.md",
-    "crates/net/docs/NetInterface.md",
-    "crates/net/docs/NetEventTranslator.md",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "notes/DKG.canvas",

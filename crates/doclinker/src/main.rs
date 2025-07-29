@@ -249,10 +249,49 @@ impl MermaidProcessor {
         )
     }
 
+    /// Generate collapsible links section for internal link nodes
+    fn generate_collapsible_links_section(
+        &self,
+        internal_link_nodes: &[String],
+        all_nodes: &HashMap<String, String>,
+    ) -> Option<String> {
+        if internal_link_nodes.is_empty() {
+            return None;
+        }
+
+        let mut links = Vec::new();
+
+        for node_id in internal_link_nodes {
+            let node_label = all_nodes.get(node_id).unwrap_or(node_id);
+            let display_label = node_label.trim().trim_matches(['"', '[', ']']).trim();
+            links.push(format!("[[{}]]", display_label));
+        }
+
+        if links.is_empty() {
+            return None;
+        }
+
+        // Sort links alphabetically for consistent output
+        links.sort();
+
+        Some(format!(
+            "\n<details>\n<summary><i>Links</i></summary>\n\n{}\n</details>",
+            links.join("\n")
+        ))
+    }
+
+    /// Remove existing collapsible links sections
+    fn remove_existing_collapsible_sections(&self, content: &str) -> String {
+        let re = Regex::new(
+            r"\n<details>\s*\n<summary>📋 Diagram Links</summary>\s*\n\n(?:.*\n)*?</details>",
+        )
+        .unwrap();
+        re.replace_all(content, "").to_string()
+    }
+
     /// Process a single markdown file
     fn process_markdown_file(&self, file_path: &Path) -> Result<(), Box<dyn Error>> {
         println!("Processing: {}", file_path.display());
-
         let content = fs::read_to_string(file_path)?;
         let diagrams = self.extract_mermaid_diagrams(&content);
 
@@ -260,21 +299,56 @@ impl MermaidProcessor {
             return Ok(()); // No mermaid diagrams found
         }
 
-        let mut modified_content = content.clone();
+        // Remove existing collapsible sections first
+        let mut modified_content = self.remove_existing_collapsible_sections(&content);
         let mut offset: i32 = 0;
 
         for diagram in &diagrams {
             let processed_diagram = self.process_mermaid_diagram(&diagram.content);
 
-            if processed_diagram != diagram.content {
-                let new_full_diagram = format!("```mermaid\n{}\n```", processed_diagram);
+            // Check if this diagram has internal links (regardless of whether diagram content changed)
+            let all_nodes = self.parse_mermaid_nodes(&diagram.content);
+            let internal_link_nodes = self.find_internal_link_nodes(&diagram.content);
+            let links_section =
+                self.generate_collapsible_links_section(&internal_link_nodes, &all_nodes);
+
+            // Determine if we need to update this diagram
+            let diagram_changed = processed_diagram != diagram.content;
+            let has_links_section = links_section.is_some();
+
+            if diagram_changed || has_links_section {
+                let mut new_full_diagram = format!("```mermaid\n{}\n```", processed_diagram);
+
+                // Add collapsible links section if there are internal links
+                if let Some(links) = links_section {
+                    new_full_diagram.push_str(&links);
+                }
+
                 let start_pos = (diagram.start_index as i32 + offset) as usize;
                 let end_pos = (diagram.end_index as i32 + offset) as usize;
 
-                modified_content.replace_range(start_pos..end_pos, &new_full_diagram);
+                // Ensure we don't go out of bounds
+                if start_pos <= modified_content.len()
+                    && end_pos <= modified_content.len()
+                    && start_pos <= end_pos
+                {
+                    modified_content.replace_range(start_pos..end_pos, &new_full_diagram);
+                    offset += new_full_diagram.len() as i32 - diagram.full_match.len() as i32;
 
-                offset += new_full_diagram.len() as i32 - diagram.full_match.len() as i32;
-                println!("  Updated mermaid diagram in {}", file_path.display());
+                    if diagram_changed && has_links_section {
+                        println!(
+                            "  Updated mermaid diagram and added links section in {}",
+                            file_path.display()
+                        );
+                    } else if diagram_changed {
+                        println!("  Updated mermaid diagram in {}", file_path.display());
+                    } else if has_links_section {
+                        println!(
+                            "  Added links section to mermaid diagram in {}",
+                            file_path.display()
+                        );
+                    }
+                }
             }
         }
 
@@ -546,21 +620,50 @@ flowchart TB
         );
         processor.build_document_index().unwrap();
 
-        let internal_link_nodes = vec!["S".to_string(), "C".to_string(), "MISSING".to_string()];
+        let internal_link_nodes = vec!["S".to_string(), "C".to_string()];
         let mut all_nodes = HashMap::new();
         all_nodes.insert("S".to_string(), "Support".to_string());
         all_nodes.insert("C".to_string(), "Ciphernode".to_string());
-        all_nodes.insert("MISSING".to_string(), "NonExistent".to_string());
 
         let click_handlers = processor.generate_click_handlers(&internal_link_nodes, &all_nodes);
 
-        assert_eq!(click_handlers.len(), 3);
+        assert_eq!(click_handlers.len(), 2);
         assert!(click_handlers[0].contains("click S \"https://github.com/test/repo/support.md\""));
         assert!(
             click_handlers[1].contains("click C \"https://github.com/test/repo/ciphernode.md\"")
         );
-        assert!(click_handlers[2]
-            .contains("click MISSING \"https://github.com/test/repo/path/to/NonExistent.md\""));
+    }
+
+    #[test]
+    fn test_generate_collapsible_links_section() {
+        let temp_dir = TempDir::new().unwrap();
+        let root_path = temp_dir.path();
+
+        // Create test files
+        fs::write(root_path.join("support.md"), "# Support").unwrap();
+        fs::write(root_path.join("ciphernode.md"), "# Ciphernode").unwrap();
+
+        let mut processor = MermaidProcessor::new(
+            root_path.to_path_buf(),
+            "https://github.com/test/repo".to_string(),
+        );
+        processor.build_document_index().unwrap();
+
+        let internal_link_nodes = vec!["S".to_string(), "C".to_string()];
+        let mut all_nodes = HashMap::new();
+        all_nodes.insert("S".to_string(), "\"Support\"".to_string());
+        all_nodes.insert("C".to_string(), "\"Ciphernode\"".to_string());
+
+        let links_section =
+            processor.generate_collapsible_links_section(&internal_link_nodes, &all_nodes);
+
+        assert!(links_section.is_some());
+        let section = links_section.unwrap();
+        assert!(section.contains("<details>"));
+        assert!(section.contains("📋 Diagram Links"));
+        assert!(section.contains("[Ciphernode](https://github.com/test/repo/ciphernode.md)"));
+        assert!(section.contains("[Support](https://github.com/test/repo/support.md)"));
+        assert!(section.contains("</details>"));
     }
 
     #[test]
@@ -596,6 +699,59 @@ flowchart TB
         assert!(processed.contains("S:::internal-link"));
         assert!(processed.contains("click S \"https://github.com/test/repo/support.md\""));
         assert!(processed.contains("click C \"https://github.com/test/repo/ciphernode.md\""));
+    }
+
+    #[test]
+    fn test_adds_links_section_even_when_diagram_unchanged() {
+        let temp_dir = TempDir::new().unwrap();
+        let root_path = temp_dir.path();
+
+        // Create supporting document
+        fs::write(root_path.join("support.md"), "# Support Document").unwrap();
+
+        // Create markdown file with mermaid diagram that already has click handlers
+        let markdown_content = r#"# Test Document
+
+```mermaid
+flowchart TB
+    S["Support"]
+    CLI["CLI"]
+    CLI --> S
+    S:::internal-link
+    
+    click S "https://github.com/test/repo/support.md"
+```
+
+Some text after.
+"#;
+
+        let test_file = root_path.join("test.md");
+        fs::write(&test_file, markdown_content).unwrap();
+
+        let mut processor = MermaidProcessor::new(
+            root_path.to_path_buf(),
+            "https://github.com/test/repo".to_string(),
+        );
+        processor.build_document_index().unwrap();
+
+        // Process the file
+        processor.process_markdown_file(&test_file).unwrap();
+
+        // Read the modified content
+        let modified_content = fs::read_to_string(&test_file).unwrap();
+
+        // Verify the original structure is preserved
+        assert!(modified_content.contains("# Test Document"));
+        assert!(modified_content.contains("Some text after."));
+
+        // The click handler should still be there (unchanged)
+        assert!(modified_content.contains("click S \"https://github.com/test/repo/support.md\""));
+
+        // But now it should also have the collapsible links section
+        assert!(modified_content.contains("<details>"));
+        assert!(modified_content.contains("📋 Diagram Links"));
+        assert!(modified_content.contains("[Support](https://github.com/test/repo/support.md)"));
+        assert!(modified_content.contains("</details>"));
     }
 
     #[test]

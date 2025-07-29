@@ -41,6 +41,24 @@ flowchart TB
     click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ComputeProcessor.md"
     click S "http://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/Sortition.md"
 ```
+<details>
+<summary><i>Links</i></summary>
+
+[[ComputeProcessor]]
+[[EventBus]]
+[[PlaintextAggregator]]
+[[PublickeyAggregator]]
+[[Sortition]]
+</details>
+<details>
+<summary><i>Links</i></summary>
+
+[[ComputeProcessor]]
+[[EventBus]]
+[[PlaintextAggregator]]
+[[PublickeyAggregator]]
+[[Sortition]]
+</details>
 
 
 ```dataview

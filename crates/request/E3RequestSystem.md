@@ -45,6 +45,28 @@ flowchart TB
     click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
     click CS "http://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/CiphernodeSelector.md"
 ```
+<details>
+<summary><i>Links</i></summary>
+
+[[CiphernodeSelector]]
+[[E3Context]]
+[[E3Router]]
+[[EventBus]]
+[[Keyshare]]
+[[PlaintextAggregator]]
+[[PublickeyAggregator]]
+</details>
+<details>
+<summary><i>Links</i></summary>
+
+[[CiphernodeSelector]]
+[[E3Context]]
+[[E3Router]]
+[[EventBus]]
+[[Keyshare]]
+[[PlaintextAggregator]]
+[[PublickeyAggregator]]
+</details>
 
 ```dataview
 TABLE type, description as Description
