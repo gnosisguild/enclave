@@ -15,9 +15,11 @@ flowchart TB
         PTA["PlaintextAggregator"]
         EB["EventBus"]
         CS["CiphernodeSelector"]
+        S["Sortition"]
   end
     EB --> CS
     CS --> ER
+    CS --am_selected?--> S
     ER --- EC
     ER -. filter(e3_id) <br> .-> K & PTA
     ER -. filter(e3_id) </br> .-> PKA
@@ -30,6 +32,7 @@ flowchart TB
      K:::internal-link
      EB:::internal-link
      CS:::internal-link
+     S:::internal-link
 
     click EC "https://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Context.md"
     click ER "https://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Router.md"
