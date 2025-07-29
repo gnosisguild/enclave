@@ -41,6 +41,7 @@ flowchart TB
     click K "https://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/Keyshare.md"
     click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
     click CS "https://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/CiphernodeSelector.md"
+    click S "https://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/Sortition.md"
 ```
 <details>
 <summary>Links</summary>
@@ -52,6 +53,7 @@ flowchart TB
 [[Keyshare]]
 [[PlaintextAggregator]]
 [[PublickeyAggregator]]
+[[Sortition]]
 </details>
 
 ```dataview
