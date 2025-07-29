@@ -14,12 +14,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "crates/Ciphernode.md",
+                "file": "DOCS_ROOT.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ciphernode"
+              "title": "DOCS_ROOT"
             }
           },
           {
@@ -50,8 +50,7 @@
               "title": "ThreadpoolSystem"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       },
       {
         "id": "cdc03909aef8bd67",
@@ -64,7 +63,7 @@
             "state": {
               "type": "localgraph",
               "state": {
-                "file": "architecture/notes/Actors.md",
+                "file": "DOCS_ROOT.md",
                 "options": {
                   "collapse-filter": false,
                   "search": "",
@@ -92,7 +91,7 @@
                 }
               },
               "icon": "lucide-git-fork",
-              "title": "Graph of Actors"
+              "title": "Graph of DOCS_ROOT"
             }
           }
         ]
@@ -166,8 +165,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "6b6677e64c1270ea",
@@ -252,15 +250,18 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "2a704beeb5ce40ed",
+  "active": "7a09ebbe677de6f8",
   "lastOpenFiles": [
-    "crates/Ciphernode.md",
+    "README.md",
     "DOCS_ROOT.md",
+    "crates/Ciphernode.md",
+    "crates/request/E3RequestSystem.md",
+    "architecture/notes/Data Security.md",
+    "architecture/notes/Actors.md",
     "crates/aggregator/AggregationSystem.md",
     "crates/aggregator/docs/PlaintextAggregator.md",
     "crates/threadpool/ThreadpoolSystem.md",
     "crates/keyshare/KeyshareSystem.md",
-    "crates/request/E3RequestSystem.md",
     "crates/net/NetSystem.md",
     "crates/evm/EvmSystem.md",
     "crates/evm/docs/CiphernodeRegistryReader.md",
@@ -271,15 +272,12 @@
     "architecture/Noir SDK.md",
     "crates/sdk/Rust SDK.md",
     "packages/enclave-sdk/Typescript SDK.md",
-    "README.md",
     "CONTRIBUTING.md",
     "crates/README.md",
     "crates/crypto/docs/Cipher.md",
     "crates/crypto/docs/Sensitive.md",
     "crates/keyshare/docs/ThresholdKeyshare.md",
     "crates/fhe/docs/TrBFV.md",
-    "crates/fhe/docs/TFHE.md",
-    "crates/keyshare/docs/Keyshare.md",
     "crates/fhe/docs",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/work-products.bin",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/query-cache.bin",

@@ -11,10 +11,18 @@ flowchart LR
 	    R["Rust SDK"]
 	    N["Noir SDK"]
 	end
-    S["Support"]
-    C["Ciphernode"]
-    EVM["Contracts"]
-    CLI["CLI"]
+	subgraph cli2["Command line systems"]
+		CLI["CLI"]
+	    S["Support"]
+	end
+
+	subgraph cn["Ciphernode"]
+	    C["Ciphernode"]
+    end
+
+	subgraph evm["On-chain systems"]
+        EVM["Contracts"]
+    end
 
     C:::internal-link
     S:::internal-link
