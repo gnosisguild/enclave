@@ -38,11 +38,11 @@ flowchart TB
 	NEC:::internal-link
 	NI:::internal-link
 
-    click NET "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventTranslator.md"
-    click NBDP "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetDHTPublisher.md"
-    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click NEC "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventChannel.md"
-    click NI "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetInterface.md"
+    click NET "https://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventTranslator.md"
+    click NBDP "https://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetDHTPublisher.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click NEC "https://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventChannel.md"
+    click NI "https://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetInterface.md"
 ```
 <details>
 <summary>Links</summary>
@@ -80,11 +80,11 @@ flowchart TB
 	NCC:::internal-link
 	NI:::internal-link
 
-    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click NET "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventTranslator.md"
-    click NBDP "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetDHTPublisher.md"
-    click NCC "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetCommandChannel.md"
-    click NI "http://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetInterface.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click NET "https://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetEventTranslator.md"
+    click NBDP "https://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetDHTPublisher.md"
+    click NCC "https://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetCommandChannel.md"
+    click NI "https://github.com/gnosisguild/enclave/tree/main/crates/net/docs/NetInterface.md"
 ```
 <details>
 <summary>Links</summary>

@@ -31,13 +31,13 @@ flowchart TB
      EB:::internal-link
      CS:::internal-link
 
-    click EC "http://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Context.md"
-    click ER "http://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Router.md"
-    click PKA "http://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PublickeyAggregator.md"
-    click PTA "http://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PlaintextAggregator.md"
-    click K "http://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/Keyshare.md"
-    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click CS "http://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/CiphernodeSelector.md"
+    click EC "https://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Context.md"
+    click ER "https://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Router.md"
+    click PKA "https://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PublickeyAggregator.md"
+    click PTA "https://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PlaintextAggregator.md"
+    click K "https://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/Keyshare.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click CS "https://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/CiphernodeSelector.md"
 ```
 <details>
 <summary>Links</summary>

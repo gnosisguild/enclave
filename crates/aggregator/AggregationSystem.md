@@ -30,11 +30,11 @@ flowchart TB
     C:::internal-link
 	S:::internal-link
 
-    click PT "http://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PlaintextAggregator.md"
-    click PK "http://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PublickeyAggregator.md"
-    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ThreadpoolComputeProcessor.md"
-    click S "http://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/Sortition.md"
+    click PT "https://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PlaintextAggregator.md"
+    click PK "https://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PublickeyAggregator.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click C "https://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ThreadpoolComputeProcessor.md"
+    click S "https://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/Sortition.md"
 ```
 <details>
 <summary>Links</summary>

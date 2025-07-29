@@ -24,13 +24,13 @@ flowchart LR
     N:::internal-link
     CLI:::internal-link
 
-    click C "http://github.com/gnosisguild/enclave/tree/main/crates/Ciphernode.md"
-    click S "http://github.com/gnosisguild/enclave/tree/main/crates/support-scripts/Support.md"
-    click EVM "http://github.com/gnosisguild/enclave/tree/main/packages/evm/docs/Contracts.md"
-    click T "http://github.com/gnosisguild/enclave/tree/main/packages/enclave-sdk/Typescript SDK.md"
-    click R "http://github.com/gnosisguild/enclave/tree/main/crates/sdk/Rust SDK.md"
-    click N "http://github.com/gnosisguild/enclave/tree/main/architecture/Noir SDK.md"
-    click CLI "http://github.com/gnosisguild/enclave/tree/main/crates/cli/CLI.md"
+    click C "https://github.com/gnosisguild/enclave/tree/main/crates/Ciphernode.md"
+    click S "https://github.com/gnosisguild/enclave/tree/main/crates/support-scripts/Support.md"
+    click EVM "https://github.com/gnosisguild/enclave/tree/main/packages/evm/docs/Contracts.md"
+    click T "https://github.com/gnosisguild/enclave/tree/main/packages/enclave-sdk/Typescript SDK.md"
+    click R "https://github.com/gnosisguild/enclave/tree/main/crates/sdk/Rust SDK.md"
+    click N "https://github.com/gnosisguild/enclave/tree/main/architecture/Noir SDK.md"
+    click CLI "https://github.com/gnosisguild/enclave/tree/main/crates/cli/CLI.md"
 ```
 <details>
 <summary>Links</summary>

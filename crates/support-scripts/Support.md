@@ -20,9 +20,9 @@ flowchart TB
     DR:::internal-link
     PS:::internal-link
 
-    click RDR "http://github.com/gnosisguild/enclave/tree/main/crates/support/Risc0 Docker Runner.md"
-    click DR "http://github.com/gnosisguild/enclave/tree/main/crates/support-scripts/Dev Runner.md"
-    click PS "http://github.com/gnosisguild/enclave/tree/main/crates/program-server/E3ProgramServer.md"
+    click RDR "https://github.com/gnosisguild/enclave/tree/main/crates/support/Risc0 Docker Runner.md"
+    click DR "https://github.com/gnosisguild/enclave/tree/main/crates/support-scripts/Dev Runner.md"
+    click PS "https://github.com/gnosisguild/enclave/tree/main/crates/program-server/E3ProgramServer.md"
 ```
 <details>
 <summary>Links</summary>

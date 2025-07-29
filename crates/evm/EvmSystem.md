@@ -27,11 +27,11 @@ flowchart TB
     EB:::internal-link
     EE:::internal-link
 
-    click ESR "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolReader.md"
-    click ER "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EventReader.md"
-    click CRR "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/CiphernodeRegistryReader.md"
-    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click EE "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EnclaveEvent.md"
+    click ESR "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolReader.md"
+    click ER "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EventReader.md"
+    click CRR "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/CiphernodeRegistryReader.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click EE "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EnclaveEvent.md"
 ```
 <details>
 <summary>Links</summary>
@@ -61,10 +61,10 @@ flowchart TB
 	RFW:::internal-link
 	EE:::internal-link
 
-    click ESW "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolWriter.md"
-    click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click RFW "http://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/RegistryFilterSolWriter.md"
-    click EE "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EnclaveEvent.md"
+    click ESW "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/EnclaveSolWriter.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click RFW "https://github.com/gnosisguild/enclave/tree/main/crates/evm/docs/RegistryFilterSolWriter.md"
+    click EE "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EnclaveEvent.md"
 ```
 <details>
 <summary>Links</summary>

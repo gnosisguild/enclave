@@ -13,7 +13,7 @@
     "compile": "pnpm evm:build && pnpm sdk:build && pnpm react:build && pnpm ciphernode:build",
     "lint": "pnpm evm:lint && pnpm ciphernode:lint",
     "check:license": "./scripts/check-license-headers.sh",
-    "doclinker": "cargo run --bin doclinker . http://github.com/gnosisguild/enclave",
+    "doclinker": "cargo run --bin doclinker . https://github.com/gnosisguild/enclave",
     "typechain": "pnpm evm:typechain",
     "test": "pnpm evm:test && pnpm ciphernode:test && pnpm sdk:test",
     "test:integration": "cd ./tests/integration && ./test.sh",
