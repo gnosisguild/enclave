@@ -13,6 +13,7 @@ flowchart TB
     subgraph s1["Ciphernode"]
         EVM["EvmSystem"]
         EB["EventBus"]
+        EE["EnclaveEvent"]
         NET["NetSystem"]
 		R["E3RequestSystem"]
         KS["KeyshareSystem"]
@@ -22,20 +23,22 @@ flowchart TB
         SS["SortitionSystem"]
     end
 
-	EB --- EVM
-    EB --- NET
+	EB --- EE
+	EE --- EVM
+    EE --- NET
     R --- AS
     R --- KS
-    EB --- R
+    EE --- R
     AS --- COM
     KS --- COM
     AS --- SS
-    EB --- SS
+    EE --- SS
     AS -.- P
     KS -.- P
     R -.- P
 
     EVM:::internal-link
+    EE:::internal-link
     EB:::internal-link
     NET:::internal-link
     COM:::internal-link
@@ -56,6 +59,7 @@ flowchart TB
 	style P fill:#BBDEFB
 
     click EVM "http://github.com/gnosisguild/enclave/tree/main/crates/evm/EvmSystem.md"
+    click EE "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EnclaveEvent.md"
     click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
     click NET "http://github.com/gnosisguild/enclave/tree/main/crates/net/NetSystem.md"
     click COM "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/ThreadpoolSystem.md"
@@ -70,6 +74,7 @@ flowchart TB
 
 [[AggregationSystem]]
 [[E3RequestSystem]]
+[[EnclaveEvent]]
 [[EventBus]]
 [[EvmSystem]]
 [[KeyshareSystem]]

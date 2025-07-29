@@ -6,7 +6,7 @@
       {
         "id": "412567148dda9cd9",
         "type": "tabs",
-        "dimension": 68.21581196581197,
+        "dimension": 72.11538461538461,
         "children": [
           {
             "id": "ddb86617b506ecb1",
@@ -14,12 +14,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "crates/net/NetSystem.md",
+                "file": "crates/Ciphernode.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "NetSystem"
+              "title": "Ciphernode"
             },
             "group": "c8e95fcfce441f75"
           }
@@ -28,7 +28,7 @@
       {
         "id": "42479e0cd80ab23a",
         "type": "tabs",
-        "dimension": 31.784188034188034,
+        "dimension": 27.884615384615387,
         "children": [
           {
             "id": "44877baad8b8dd23",
@@ -36,13 +36,13 @@
             "state": {
               "type": "localgraph",
               "state": {
-                "file": "crates/net/NetSystem.md",
+                "file": "crates/Ciphernode.md",
                 "options": {
-                  "collapse-filter": true,
+                  "collapse-filter": false,
                   "search": "",
                   "localJumps": 1,
                   "localBacklinks": true,
-                  "localForelinks": true,
+                  "localForelinks": false,
                   "localInterlinks": false,
                   "showTags": false,
                   "showAttachments": false,
@@ -64,7 +64,7 @@
                 }
               },
               "icon": "lucide-git-fork",
-              "title": "Graph of NetSystem"
+              "title": "Graph of Ciphernode"
             },
             "group": "c8e95fcfce441f75"
           }
@@ -135,8 +135,7 @@
               "title": "Bookmarks"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "horizontal",
@@ -228,6 +227,19 @@
   },
   "active": "ddb86617b506ecb1",
   "lastOpenFiles": [
+    "crates/net/NetSystem.md",
+    "crates/Ciphernode.md",
+    "DOCS_ROOT.md",
+    "crates/threadpool/ThreadpoolSystem.md",
+    "crates/request/E3RequestSystem.md",
+    "packages/enclave-sdk/Typescript SDK.md",
+    "crates/evm/EvmSystem.md",
+    "crates/evm/docs/CiphernodeRegistryReader.md",
+    "packages/evm/docs/Contracts.md",
+    "crates/events/docs/ComputeRequest.md",
+    "crates/events/docs/EventBus.md",
+    "crates/net/docs/NetEventChannel.md",
+    "crates/net/docs/NetCommandChannel.md",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/work-products.bin",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/query-cache.bin",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/dep-graph.bin",
@@ -238,32 +250,19 @@
     "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-7rj845lhflr0ivvfhehpbvi63",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-working/dep-graph.part.bin",
     "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-working/dep-graph.part.bin",
-    "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-working/work-products.bin",
     "crates/threadpool/docs/ComputeProcessor.md",
-    "crates/threadpool/ThreadpoolSystem.md",
-    "Architecture.md",
     "crates/compute/docs/ComputeProcessor.md",
     "crates/compute/ComputeSystem.md",
     "ARCHITECTURE.md",
-    "crates/net/docs/NetEventChannel.md",
-    "crates/net/NetSystem.md",
-    "crates/Ciphernode.md",
-    "crates/evm/EvmSystem.md",
-    "crates/events/docs/EventBus.md",
-    "crates/evm/docs/CiphernodeRegistryReader.md",
     "crates/events/docs/EnclaveEvent.md",
     "crates/aggregator/AggregationSystem.md",
     "crates/evm/docs/EnclaveSolReader.md",
     "crates/support-scripts/Support.md",
     "crates/sdk/Rust SDK.md",
-    "packages/enclave-sdk/Typescript SDK.md",
     "crates/evm/docs/RegistryFilterSolWriter.md",
     "architecture/Noir SDK.md",
     "crates/evm/docs/EventReader.md",
     "crates/evm/docs/EnclaveSolWriter.md",
-    "crates/program-server/E3ProgramServer.md",
-    "crates/support-scripts/Dev Runner.md",
-    "crates/cli/CLI.md",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "notes/DKG.canvas",
