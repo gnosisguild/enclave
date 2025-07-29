@@ -14,12 +14,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "crates/evm/EvmSystem.md",
+                "file": "crates/net/NetSystem.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "EvmSystem"
+              "title": "NetSystem"
             },
             "group": "c8e95fcfce441f75"
           }
@@ -36,7 +36,7 @@
             "state": {
               "type": "localgraph",
               "state": {
-                "file": "crates/evm/EvmSystem.md",
+                "file": "crates/net/NetSystem.md",
                 "options": {
                   "collapse-filter": true,
                   "search": "",
@@ -64,7 +64,7 @@
                 }
               },
               "icon": "lucide-git-fork",
-              "title": "Graph of EvmSystem"
+              "title": "Graph of NetSystem"
             },
             "group": "c8e95fcfce441f75"
           }
@@ -228,6 +228,15 @@
   },
   "active": "ddb86617b506ecb1",
   "lastOpenFiles": [
+    "crates/net/docs/NetEventChannel.md",
+    "crates/net/NetSystem.md",
+    "crates/Ciphernode.md",
+    "crates/evm/EvmSystem.md",
+    "crates/events/docs/EventBus.md",
+    "crates/evm/docs/CiphernodeRegistryReader.md",
+    "crates/events/docs/EnclaveEvent.md",
+    "Architecture.md",
+    "crates/aggregator/AggregationSystem.md",
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nvah87kh-105z9y4-0baar4fltrkrqgwoo0um4lm67/work-products.bin",
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nvah87kh-105z9y4-0baar4fltrkrqgwoo0um4lm67/query-cache.bin",
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nvah87kh-105z9y4-0baar4fltrkrqgwoo0um4lm67/f4phy5g9yziv9q7r9gmu6ke6q.o",
@@ -238,12 +247,7 @@
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nvah87kh-105z9y4-0baar4fltrkrqgwoo0um4lm67/eca5u8rvmx6mxbfmh7dz282i0.o",
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nvah87kh-105z9y4-0baar4fltrkrqgwoo0um4lm67/ec76hy37s17mov9uhe866rb48.o",
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nvah87kh-105z9y4-0baar4fltrkrqgwoo0um4lm67/eb60ouylrpc2ci50fiehta32k.o",
-    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9nvah87kh-105z9y4-0baar4fltrkrqgwoo0um4lm67/e947qsmpk2gq8v8g395131i0d.o",
     "crates/evm/docs/EnclaveSolReader.md",
-    "crates/evm/EvmSystem.md",
-    "crates/events/docs/EnclaveEvent.md",
-    "crates/Ciphernode.md",
-    "ARCHITECTURE.md",
     "crates/support-scripts/Support.md",
     "crates/sdk/Rust SDK.md",
     "packages/enclave-sdk/Typescript SDK.md",
@@ -255,15 +259,11 @@
     "crates/support-scripts/Dev Runner.md",
     "crates/cli/CLI.md",
     "architecture/notes/The Actor Model.md",
-    "crates/evm/docs/CiphernodeRegistryReader.md",
-    "crates/net/NetSystem.md",
-    "crates/events/docs/EventBus.md",
     "architecture/notes/CiphernodeBak.md",
     "crates/support/Risc0 Docker Runner.md",
     "crates/threadpool/ThreadpoolSystem.md",
     "crates/events/docs/ComputeRequest.md",
     "architecture/content/Noir SDK.md",
-    "crates/program-server/docs/E3ProgramServer.md",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "notes/DKG.canvas",

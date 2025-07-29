@@ -1,4 +1,4 @@
-<# Enclave Architecture Living Document
+# Enclave Architecture Living Document
 
 This is an Obsidian vault for the Enclave project architecture design. It is designed to help onboard and orient new team members to the project so that the structure and design decisions are understandable and accessible.
 
