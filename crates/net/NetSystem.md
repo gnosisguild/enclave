@@ -43,6 +43,7 @@ flowchart TB
 	class NEC internal-link
 	class NBDP internal-link
 ```
+
 ```mermaid
 flowchart TB
     subgraph s1["Network Commands Sent"]
@@ -73,6 +74,7 @@ flowchart TB
 	class NEC internal-link
 	class NBDP internal-link
 ```
+
 
 This we can easily extend to a future networking component by listening to the [[EventBus]] and sending to the [[NetCommandChannel]] or reading from the [[NetEventChannel]] and publishing to the [[EventBus]]
 
