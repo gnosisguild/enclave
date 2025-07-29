@@ -44,16 +44,7 @@ flowchart TB
     click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ComputeProcessor.md"
 ```
 <details>
-<summary><i>Links</i></summary>
-
-[[ComputeRequestFailed]]
-[[ComputeRequestSuccess]]
-[[ComputeRequest]]
-[[EventBus]]
-[[ThreadpoolComputeProcessor]]
-</details>
-<details>
-<summary><i>Links</i></summary>
+<summary>Links</summary>
 
 [[ComputeRequestFailed]]
 [[ComputeRequestSuccess]]

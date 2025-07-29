@@ -33,18 +33,7 @@ flowchart LR
     click CLI "http://github.com/gnosisguild/enclave/tree/main/crates/cli/CLI.md"
 ```
 <details>
-<summary><i>Links</i></summary>
-
-[[CLI]]
-[[Ciphernode]]
-[[Contracts]]
-[[Noir SDK]]
-[[Rust SDK]]
-[[Support]]
-[[Typescript SDK]]
-</details>
-<details>
-<summary><i>Links</i></summary>
+<summary>Links</summary>
 
 [[CLI]]
 [[Ciphernode]]
@@ -77,4 +66,3 @@ flowchart LR
 ### Using the Vault
 
 This vault leverages Obsidian's linking and graph capabilities to create an interconnected view of the Enclave architecture. The Dataview plugin enables dynamic content generation and querying across documents, making it easier to find related information and maintain consistency across the documentation.
-

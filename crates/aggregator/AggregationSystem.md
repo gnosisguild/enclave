@@ -4,10 +4,10 @@ description: Components for aggregating shared data
 tags:
   - aggregator
 ---
+
 ## `=this.file.name`
 
 `=this.description`
-
 
 ```mermaid
 flowchart TB
@@ -42,7 +42,7 @@ flowchart TB
     click S "http://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/Sortition.md"
 ```
 <details>
-<summary><i>Links</i></summary>
+<summary>Links</summary>
 
 [[ComputeProcessor]]
 [[EventBus]]
@@ -50,19 +50,8 @@ flowchart TB
 [[PublickeyAggregator]]
 [[Sortition]]
 </details>
-<details>
-<summary><i>Links</i></summary>
-
-[[ComputeProcessor]]
-[[EventBus]]
-[[PlaintextAggregator]]
-[[PublickeyAggregator]]
-[[Sortition]]
-</details>
-
 
 ```dataview
 TABLE type, description as Description
 FROM #aggregator
 ```
-
