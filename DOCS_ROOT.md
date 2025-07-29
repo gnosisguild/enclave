@@ -6,7 +6,7 @@ This is an Obsidian vault for the Enclave project architecture design. It is des
 
 ```mermaid
 flowchart LR
-	subgraph SDK
+	subgraph SDK["Application SDKs"]
 	    T["Typescript SDK"]
 	    R["Rust SDK"]
 	    N["Noir SDK"]
