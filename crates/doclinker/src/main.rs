@@ -4,12 +4,16 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use clap::{Arg, Command};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use regex::Regex;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+
+// Ignore
+static IGNORE_LIST: [&str; 3] = ["**/node_modules/**", "**/.git/**", "**/target/**"];
 
 #[derive(Debug)]
 struct MermaidDiagram {
@@ -25,6 +29,15 @@ struct MermaidProcessor {
     document_index: HashMap<String, PathBuf>,
 }
 
+fn create_ignore_set() -> Result<GlobSet, Box<dyn Error>> {
+    let mut builder = GlobSetBuilder::new();
+    for gstr in IGNORE_LIST {
+        builder.add(Glob::new(gstr)?);
+    }
+    let ignore_set = builder.build()?;
+    Ok(ignore_set)
+}
+
 impl MermaidProcessor {
     fn new(root_folder: PathBuf, base_github_url: String) -> Self {
         Self {
@@ -37,10 +50,11 @@ impl MermaidProcessor {
     /// Build an index of all markdown documents for quick lookup
     fn build_document_index(&mut self) -> Result<(), Box<dyn Error>> {
         println!("Building document index...");
-
+        let ignore_set = create_ignore_set()?;
         for entry in WalkDir::new(&self.root_folder)
             .into_iter()
             .filter_map(|e| e.ok())
+            .filter(|e| !ignore_set.is_match(e.path()))
             .filter(|e| e.file_type().is_file())
             .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
         {
@@ -187,13 +201,11 @@ impl MermaidProcessor {
                 let github_url = format!("{}/{}", self.base_github_url, doc_path_str);
                 click_handlers.push(format!("    click {} \"{}\"", node_id, github_url));
             } else {
-                eprintln!(
+                // Panic and exit program if we cannot find a document to click to
+                panic!(
                     "Warning: Could not find document for node \"{}\" (label: \"{}\")",
                     node_id, node_label
                 );
-                // Still add a placeholder click handler
-                let github_url = format!("{}/path/to/{}.md", self.base_github_url, node_label);
-                click_handlers.push(format!("    click {} \"{}\"", node_id, github_url));
             }
         }
 
@@ -278,9 +290,11 @@ impl MermaidProcessor {
     fn process_markdown_files(&self) -> Result<(), Box<dyn Error>> {
         println!("Processing markdown files...");
 
+        let ignore_set = create_ignore_set()?;
         for entry in WalkDir::new(&self.root_folder)
             .into_iter()
             .filter_map(|e| e.ok())
+            .filter(|e| !ignore_set.is_match(e.path()))
             .filter(|e| e.file_type().is_file())
             .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
         {

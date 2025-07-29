@@ -4,21 +4,35 @@
     "type": "split",
     "children": [
       {
-        "id": "6c6c4dbcd9979fb1",
+        "id": "359be81fc7ab0303",
         "type": "tabs",
         "children": [
           {
-            "id": "3c20865ddc13ed0a",
+            "id": "4ec3c9969f551a25",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "crates/support-scripts/Dev Runner.md",
+                "file": "crates/net/NetSystem.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Dev Runner"
+              "title": "NetSystem"
+            }
+          },
+          {
+            "id": "1b307a9563a7384e",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "architecture/notes/The Actor Model.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "The Actor Model"
             }
           }
         ]
@@ -53,7 +67,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "tag:#todo",
+                "query": "link",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -177,43 +191,44 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "3c20865ddc13ed0a",
+  "active": "4ec3c9969f551a25",
   "lastOpenFiles": [
+    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9nsg9y4wb-0nkfj1n-0vzwx4plti0mpdi6477wqnv2d/work-products.bin",
+    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9nsg9y4wb-0nkfj1n-0vzwx4plti0mpdi6477wqnv2d/query-cache.bin",
+    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9nsg9y4wb-0nkfj1n-0vzwx4plti0mpdi6477wqnv2d/dep-graph.bin",
+    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9nsg9y4wb-0nkfj1n-0vzwx4plti0mpdi6477wqnv2d",
+    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-eudd95udliojkdgly6sjig02z/work-products.bin",
+    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-eudd95udliojkdgly6sjig02z/query-cache.bin",
+    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-eudd95udliojkdgly6sjig02z/dep-graph.bin",
+    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-eudd95udliojkdgly6sjig02z",
+    "target/debug/incremental/helpers-2o7ai8docotgl/s-h9nsg9y5dc-06hqk2a-working/dep-graph.part.bin",
+    "target/debug/incremental/helpers-2o7ai8docotgl/s-h9nsg9y5dc-06hqk2a-working",
+    "target/debug/incremental/enclave-2izy62j84py1t/s-h9nsg9y66a-0hnwx8f-working/work-products.bin",
+    "crates/Ciphernode.md",
+    "architecture/notes/The Actor Model.md",
+    "ARCHITECTURE.md",
+    "architecture/Noir SDK.md",
+    "crates/threadpool/ThreadpoolSystem.md",
+    "crates/events/docs/ComputeRequest.md",
+    "crates/sdk/Rust SDK.md",
+    "packages/enclave-sdk/Typescript SDK.md",
     "crates/support-scripts/Support.md",
     "crates/support-scripts/Dev Runner.md",
     "crates/support/Risc0 Docker Runner.md",
+    "crates/evm/EvmSystem.md",
+    "crates/evm/docs/EnclaveSolWriter.md",
+    "crates/cli/CLI.md",
+    "architecture/content/Noir SDK.md",
     "crates/program-server/E3ProgramServer.md",
-    "crates/support-scripts/Support.md~",
-    "crates/program-server/E3ProgramServer.md~",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9naz0bznw-0v4hw9x-85x5mkd62odoqc3j9wjw1s9ya/work-products.bin",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9naz0bznw-0v4hw9x-85x5mkd62odoqc3j9wjw1s9ya/query-cache.bin",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9naz0bznw-0v4hw9x-85x5mkd62odoqc3j9wjw1s9ya/dep-graph.bin",
-    "target/debug/incremental/enclave-2izy62j84py1t/s-h9naz0bznw-0v4hw9x-85x5mkd62odoqc3j9wjw1s9ya",
-    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9naz0boha-0iv0qm8-7xa039157y04gtbi1cqrpabha/work-products.bin",
-    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9naz0boha-0iv0qm8-7xa039157y04gtbi1cqrpabha/query-cache.bin",
-    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9naz0boha-0iv0qm8-7xa039157y04gtbi1cqrpabha/dep-graph.bin",
-    "target/debug/incremental/enclave-2mtmddvy9o3s0/s-h9naz0boha-0iv0qm8-7xa039157y04gtbi1cqrpabha",
     "crates/program-server/docs/E3ProgramServer.md",
     "crates/support/methods/README.md",
     "crates/support/README.md",
-    "crates/Ciphernode.md",
-    "ARCHITECTURE.md",
-    "crates/evm/EvmSystem.md",
     "crates/keyshare/KeyshareSystem.md",
     "crates/keyshare/docs/ThresholdKeyshare.md",
     "crates/keyshare/docs/Keyshare.md",
     "crates/net/NetSystem.md",
     "crates/net/docs/NetInterface.md",
     "crates/net/docs/NetEventTranslator.md",
-    "crates/cli/CLI.md",
-    "crates/doclinker/README.md",
-    "crates/sortition/SortitionSystem.md",
-    "crates/sdk/Rust SDK.md",
-    "crates/request/docs/E3Router.md",
-    "crates/request/docs/E3Context.md",
-    "crates/request/E3RequestSystem.md",
-    "crates/net/docs/NetEventChannel.md",
-    "crates/net/docs/NetEvent.md",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "notes/DKG.canvas",

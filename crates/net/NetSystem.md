@@ -84,4 +84,4 @@ FROM #net
 
 - Extensive: Can use channels to control the network interface from multiple actors.
 - Separates Domain Logic (EventBus) from lower level implementation (Net System)
-- [[NetInterface]] is a dumb component that exposes libp2p functionality and can be called using channel commands.
+- [[NetInterface]] should remain a dumb component that exposes libp2p functionality and can be called using channel commands.
