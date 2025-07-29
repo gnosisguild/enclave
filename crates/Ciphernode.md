@@ -1,9 +1,11 @@
 ---
 description: A node that is responsible for managing keyshares to form a decryption committee for enclave encrypted data
 ---
+
 ## `=this.file.name`
 
 `=this.description`
+
 ## Ciphernode Map
 
 ```mermaid
@@ -64,20 +66,7 @@ flowchart TB
     click P "http://github.com/gnosisguild/enclave/tree/main/crates/data/PersistenceSystem.md"
 ```
 <details>
-<summary><i>Links</i></summary>
-
-[[AggregationSystem]]
-[[E3RequestSystem]]
-[[EventBus]]
-[[EvmSystem]]
-[[KeyshareSystem]]
-[[NetSystem]]
-[[PersistenceSystem]]
-[[SortitionSystem]]
-[[ThreadpoolSystem]]
-</details>
-<details>
-<summary><i>Links</i></summary>
+<summary>Links</summary>
 
 [[AggregationSystem]]
 [[E3RequestSystem]]
@@ -92,7 +81,7 @@ flowchart TB
 
 ## Design
 
-A ciphernode is designed as an event driven actor model system. Some key considerations around this design decision are listed below. 
+A ciphernode is designed as an event driven actor model system. Some key considerations around this design decision are listed below.
 
 - [[The Actor Model]]
 - [[Event Driven Architecture]]
@@ -101,7 +90,7 @@ A ciphernode is designed as an event driven actor model system. Some key conside
 
 ## Bootstrap
 
-When you run `enclave start`, the CLI establishes an actor configuration based on your  requirements. For a concrete implementation example, [see the start configuration](https://github.com/gnosisguild/enclave/blob/main/crates/entrypoint/src/start/start.rs) 
+When you run `enclave start`, the CLI establishes an actor configuration based on your requirements. For a concrete implementation example, [see the start configuration](https://github.com/gnosisguild/enclave/blob/main/crates/entrypoint/src/start/start.rs)
 
 This process instantiates several key components:
 
@@ -112,8 +101,6 @@ This process instantiates several key components:
 
 The configuration ensures all necessary subsystems are properly initialized and can communicate effectively within the enclave architecture.
 
-
-
 ### Systems
 
 ```dataview
@@ -121,9 +108,7 @@ TABLE description as Description
 WHERE type = "system"
 ```
 
-
 ### Resources
 
 - [[Actors]]
 - [[Events]]
-

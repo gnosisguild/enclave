@@ -4,6 +4,7 @@ description: Filter and forward events by e3_id and manage the e3 request conten
 tags:
   - e3request
 ---
+
 ```mermaid
 flowchart TB
  subgraph subGraph0["E3Request System"]
@@ -46,18 +47,7 @@ flowchart TB
     click CS "http://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/CiphernodeSelector.md"
 ```
 <details>
-<summary><i>Links</i></summary>
-
-[[CiphernodeSelector]]
-[[E3Context]]
-[[E3Router]]
-[[EventBus]]
-[[Keyshare]]
-[[PlaintextAggregator]]
-[[PublickeyAggregator]]
-</details>
-<details>
-<summary><i>Links</i></summary>
+<summary>Links</summary>
 
 [[CiphernodeSelector]]
 [[E3Context]]

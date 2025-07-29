@@ -25,14 +25,7 @@ flowchart TB
     click PS "http://github.com/gnosisguild/enclave/tree/main/crates/program-server/E3ProgramServer.md"
 ```
 <details>
-<summary><i>Links</i></summary>
-
-[[Dev Runner]]
-[[E3ProgramServer]]
-[[Risc0 Docker Runner]]
-</details>
-<details>
-<summary><i>Links</i></summary>
+<summary>Links</summary>
 
 [[Dev Runner]]
 [[E3ProgramServer]]
