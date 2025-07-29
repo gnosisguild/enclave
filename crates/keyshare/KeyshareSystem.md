@@ -46,6 +46,7 @@ flowchart TB
     click KS "http://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/ThresholdKeyshare.md"
     click KSL "http://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/Keyshare.md"
     click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click S "http://github.com/gnosisguild/enclave/tree/main/crates/crypto/docs/Sensitive.md"
     click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ThreadpoolComputeProcessor.md"
     click TRB "http://github.com/gnosisguild/enclave/tree/main/crates/fhe/docs/TrBFV.md"
     click TFHE "http://github.com/gnosisguild/enclave/tree/main/crates/fhe/docs/TFHE.md"
@@ -57,6 +58,7 @@ flowchart TB
 [[BFV]]
 [[EventBus]]
 [[Keyshare]]
+[[Sensitive]]
 [[TFHE]]
 [[ThreadpoolComputeProcessor]]
 [[ThresholdKeyshare]]
