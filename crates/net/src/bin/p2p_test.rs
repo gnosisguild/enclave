@@ -7,7 +7,7 @@
 use anyhow::Result;
 use e3_net::correlation_id::CorrelationId;
 use e3_net::events::{NetCommand, NetEvent};
-use e3_net::NetworkPeer;
+use e3_net::NetInterface;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::time::{sleep, timeout};
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
     let peers: Vec<String> = dial_to.iter().cloned().collect();
 
     let id = libp2p::identity::Keypair::generate_ed25519();
-    let mut peer = NetworkPeer::new(&id, peers, udp_port, "test-topic")?;
+    let mut peer = NetInterface::new(&id, peers, udp_port, "test-topic")?;
 
     // Extract input and outputs
     let tx = peer.tx();

@@ -35,7 +35,7 @@ pub struct NodeBehaviour {
 
 /// Manage the peer to peer connection. This struct wraps a libp2p Swarm and enables communication
 /// with it using channels.
-pub struct NetworkPeer {
+pub struct NetInterface {
     /// The Libp2p Swarm instance
     swarm: Swarm<NodeBehaviour>,
     /// A list of peers to automatically dial
@@ -46,13 +46,13 @@ pub struct NetworkPeer {
     topic: gossipsub::IdentTopic,
     /// Broadcast channel to report NetEvents to listeners
     event_tx: broadcast::Sender<NetEvent>,
-    /// Transmission channel to send NetCommands to the NetworkPeer
+    /// Transmission channel to send NetCommands to the NetInterface
     cmd_tx: mpsc::Sender<NetCommand>,
     /// Local receiver to process NetCommands from
     cmd_rx: mpsc::Receiver<NetCommand>,
 }
 
-impl NetworkPeer {
+impl NetInterface {
     pub fn new(
         id: &Keypair,
         peers: Vec<String>,

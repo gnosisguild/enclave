@@ -7,7 +7,7 @@
 use crate::correlation_id::CorrelationId;
 use crate::events::NetCommand;
 use crate::events::NetEvent;
-use crate::NetworkPeer;
+use crate::NetInterface;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
@@ -23,7 +23,7 @@ use tokio::sync::mpsc;
 use tracing::{error, info, instrument, trace};
 
 /// NetworkManager Actor converts between EventBus events and Libp2p events forwarding them to a
-/// NetworkPeer for propagation over the p2p network
+/// NetInterface for propagation over the p2p network
 pub struct NetworkManager {
     bus: Addr<EventBus<EnclaveEvent>>,
     tx: mpsc::Sender<NetCommand>,
@@ -35,7 +35,7 @@ impl Actor for NetworkManager {
     type Context = Context<Self>;
 }
 
-/// Libp2pEvent is used to send data to the NetworkPeer from the NetworkManager
+/// Libp2pEvent is used to send data to the NetInterface from the NetworkManager
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "anyhow::Result<()>")]
 struct LibP2pEvent(pub Vec<u8>);
@@ -106,7 +106,7 @@ impl NetworkManager {
         // Create peer from keypair
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let mut peer = NetworkPeer::new(&keypair, peers, Some(quic_port), topic)?;
+        let mut peer = NetInterface::new(&keypair, peers, Some(quic_port), topic)?;
 
         // Setup and start network manager
         let rx = peer.rx();
