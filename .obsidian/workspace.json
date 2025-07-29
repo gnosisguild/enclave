@@ -4,31 +4,44 @@
     "type": "split",
     "children": [
       {
-        "id": "412567148dda9cd9",
+        "id": "42479e0cd80ab23a",
         "type": "tabs",
-        "dimension": 72.11538461538461,
+        "dimension": 74.67948717948718,
         "children": [
           {
-            "id": "ddb86617b506ecb1",
+            "id": "7a09ebbe677de6f8",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "crates/Ciphernode.md",
+                "file": "crates/keyshare/KeyshareSystem.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Ciphernode"
-            },
-            "group": "c8e95fcfce441f75"
+              "title": "KeyshareSystem"
+            }
+          },
+          {
+            "id": "c5b37974ef776cbd",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "crates/threadpool/ThreadpoolSystem.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "ThreadpoolSystem"
+            }
           }
         ]
       },
       {
-        "id": "42479e0cd80ab23a",
+        "id": "cdc03909aef8bd67",
         "type": "tabs",
-        "dimension": 27.884615384615387,
+        "dimension": 25.320512820512818,
         "children": [
           {
             "id": "44877baad8b8dd23",
@@ -36,7 +49,7 @@
             "state": {
               "type": "localgraph",
               "state": {
-                "file": "crates/Ciphernode.md",
+                "file": "crates/keyshare/KeyshareSystem.md",
                 "options": {
                   "collapse-filter": false,
                   "search": "",
@@ -64,9 +77,8 @@
                 }
               },
               "icon": "lucide-git-fork",
-              "title": "Graph of Ciphernode"
-            },
-            "group": "c8e95fcfce441f75"
+              "title": "Graph of KeyshareSystem"
+            }
           }
         ]
       }
@@ -139,8 +151,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "6b6677e64c1270ea",
@@ -225,19 +236,30 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "ddb86617b506ecb1",
+  "active": "7a09ebbe677de6f8",
   "lastOpenFiles": [
-    "crates/net/NetSystem.md",
-    "crates/Ciphernode.md",
-    "DOCS_ROOT.md",
+    "crates/keyshare/docs/ThresholdKeyshare.md",
+    "crates/fhe/docs/TrBFV.md",
+    "crates/fhe/docs/TFHE.md",
+    "crates/keyshare/KeyshareSystem.md",
+    "crates/keyshare/docs/Keyshare.md",
+    "crates/fhe/docs/Bfv.md",
     "crates/threadpool/ThreadpoolSystem.md",
+    "crates/fhe/docs",
+    "crates/Ciphernode.md",
+    "crates/aggregator/AggregationSystem.md",
+    "crates/threadpool/docs/ThreadpoolComputeProcessor.md",
+    "ThreadpoolComputeProcessor.md",
+    "DOCS_ROOT.md",
+    "crates/events/docs/EventBus.md",
+    "crates/sortition/docs/Sortition.md",
+    "crates/net/NetSystem.md",
+    "crates/evm/EvmSystem.md",
     "crates/request/E3RequestSystem.md",
     "packages/enclave-sdk/Typescript SDK.md",
-    "crates/evm/EvmSystem.md",
     "crates/evm/docs/CiphernodeRegistryReader.md",
     "packages/evm/docs/Contracts.md",
     "crates/events/docs/ComputeRequest.md",
-    "crates/events/docs/EventBus.md",
     "crates/net/docs/NetEventChannel.md",
     "crates/net/docs/NetCommandChannel.md",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-3hpr1iioh6yi9ty43t9u2e4dw/work-products.bin",
@@ -249,20 +271,9 @@
     "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-7rj845lhflr0ivvfhehpbvi63/dep-graph.bin",
     "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-7rj845lhflr0ivvfhehpbvi63",
     "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9nvfbwp5j-04jnus6-working/dep-graph.part.bin",
-    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9nvfbweno-1w22yru-working/dep-graph.part.bin",
-    "crates/threadpool/docs/ComputeProcessor.md",
     "crates/compute/docs/ComputeProcessor.md",
     "crates/compute/ComputeSystem.md",
     "ARCHITECTURE.md",
-    "crates/events/docs/EnclaveEvent.md",
-    "crates/aggregator/AggregationSystem.md",
-    "crates/evm/docs/EnclaveSolReader.md",
-    "crates/support-scripts/Support.md",
-    "crates/sdk/Rust SDK.md",
-    "crates/evm/docs/RegistryFilterSolWriter.md",
-    "architecture/Noir SDK.md",
-    "crates/evm/docs/EventReader.md",
-    "crates/evm/docs/EnclaveSolWriter.md",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "notes/DKG.canvas",

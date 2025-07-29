@@ -41,7 +41,7 @@ flowchart TB
     click CR "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequest.md"
     click CRF "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/ComputeRequestFailed.md"
     click EB "http://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
-    click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ComputeProcessor.md"
+    click C "http://github.com/gnosisguild/enclave/tree/main/crates/threadpool/docs/ThreadpoolComputeProcessor.md"
 ```
 <details>
 <summary>Links</summary>
