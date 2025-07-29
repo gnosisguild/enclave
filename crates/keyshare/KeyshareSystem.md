@@ -8,26 +8,33 @@ tags:
 
 `=this.description`
 
+_note: in the following diagram dotted components are deprecated_
+
 ```mermaid
 flowchart TB
 	subgraph subGraph0["ThesholdKeyshare"]
 	    KS["ThresholdKeyshare"]
-	    KSL["Keyshare"]
+	    S["Sensitive"]
 	    EB["EventBus"]
 	    C["ThreadpoolComputeProcessor"]
 	    TRB["TrBFV"]
 	    TFHE["TFHE"]
 	    BFV["BFV"]
+	    KSL["Keyshare"]
 	end
-    EB --> KS & KSL
+    EB --> KS
     KS --> C
-    KSL --> BFV
+    KS --> S
     C --> TRB
+    C --> S
 	C --> TFHE
+	EB --> KSL
+    KSL --> BFV
 		
 	KS:::internal-link
 	KSL:::internal-link
 	EB:::internal-link
+	S:::internal-link
 	C:::internal-link
 	TRB:::internal-link
 	TFHE:::internal-link
