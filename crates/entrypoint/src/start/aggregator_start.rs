@@ -89,7 +89,7 @@ pub async fn execute(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = NetEventTranslator::setup_with_peer(
+    let (_, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),
         config.peers(),
         &cipher,

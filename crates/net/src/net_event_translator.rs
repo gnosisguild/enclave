@@ -84,9 +84,9 @@ impl NetEventTranslator {
         addr
     }
 
-    /// Spawn a Libp2p peer and hook it up to this actor
+    /// Spawn a Libp2p interface and hook it up to this actor
     #[instrument(name = "libp2p", skip_all)]
-    pub async fn setup_with_peer(
+    pub async fn setup_with_interface(
         bus: Addr<EventBus<EnclaveEvent>>,
         peers: Vec<String>,
         cipher: &Arc<Cipher>,
@@ -106,14 +106,14 @@ impl NetEventTranslator {
         // Create peer from keypair
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let mut peer = NetInterface::new(&keypair, peers, Some(quic_port), topic)?;
+        let mut interface = NetInterface::new(&keypair, peers, Some(quic_port), topic)?;
 
-        // Setup and start network manager
-        let rx = peer.rx();
-        let p2p_addr = NetEventTranslator::setup(bus, peer.tx(), rx, topic);
-        let handle = tokio::spawn(async move { Ok(peer.start().await?) });
+        // Setup and start net event translator
+        let rx = interface.rx();
+        let addr = NetEventTranslator::setup(bus, interface.tx(), rx, topic);
+        let handle = tokio::spawn(async move { Ok(interface.start().await?) });
 
-        Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
+        Ok((addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
 
