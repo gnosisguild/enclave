@@ -5,9 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::correlation_id::CorrelationId;
-use crate::events::NetworkPeerCommand;
-use crate::events::NetworkPeerEvent;
-use crate::NetworkPeer;
+use crate::events::NetCommand;
+use crate::events::NetEvent;
+use crate::NetInterface;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
 use actix::prelude::*;
@@ -22,29 +22,29 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tracing::{error, info, instrument, trace};
 
-/// NetworkManager Actor converts between EventBus events and Libp2p events forwarding them to a
-/// NetworkPeer for propagation over the p2p network
-pub struct NetworkManager {
+/// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
+/// NetInterface for propagation over the p2p network
+pub struct NetEventTranslator {
     bus: Addr<EventBus<EnclaveEvent>>,
-    tx: mpsc::Sender<NetworkPeerCommand>,
+    tx: mpsc::Sender<NetCommand>,
     sent_events: HashSet<EventId>,
     topic: String,
 }
 
-impl Actor for NetworkManager {
+impl Actor for NetEventTranslator {
     type Context = Context<Self>;
 }
 
-/// Libp2pEvent is used to send data to the NetworkPeer from the NetworkManager
+/// Libp2pEvent is used to send data to the NetInterface from the NetEventTranslator
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "anyhow::Result<()>")]
 struct LibP2pEvent(pub Vec<u8>);
 
-impl NetworkManager {
-    /// Create a new NetworkManager actor
+impl NetEventTranslator {
+    /// Create a new NetEventTranslator actor
     pub fn new(
         bus: Addr<EventBus<EnclaveEvent>>,
-        tx: mpsc::Sender<NetworkPeerCommand>,
+        tx: mpsc::Sender<NetCommand>,
         topic: &str,
     ) -> Self {
         Self {
@@ -57,11 +57,11 @@ impl NetworkManager {
 
     pub fn setup(
         bus: Addr<EventBus<EnclaveEvent>>,
-        tx: mpsc::Sender<NetworkPeerCommand>,
-        mut rx: broadcast::Receiver<NetworkPeerEvent>,
+        tx: mpsc::Sender<NetCommand>,
+        mut rx: broadcast::Receiver<NetEvent>,
         topic: &str,
     ) -> Addr<Self> {
-        let addr = NetworkManager::new(bus.clone(), tx, topic).start();
+        let addr = NetEventTranslator::new(bus.clone(), tx, topic).start();
 
         // Listen on all events
         bus.do_send(Subscribe {
@@ -74,7 +74,7 @@ impl NetworkManager {
             async move {
                 while let Ok(event) = rx.recv().await {
                     match event {
-                        NetworkPeerEvent::GossipData(data) => addr.do_send(LibP2pEvent(data)),
+                        NetEvent::GossipData(data) => addr.do_send(LibP2pEvent(data)),
                         _ => (),
                     }
                 }
@@ -84,9 +84,9 @@ impl NetworkManager {
         addr
     }
 
-    /// Spawn a Libp2p peer and hook it up to this actor
+    /// Spawn a Libp2p interface and hook it up to this actor
     #[instrument(name = "libp2p", skip_all)]
-    pub async fn setup_with_peer(
+    pub async fn setup_with_interface(
         bus: Addr<EventBus<EnclaveEvent>>,
         peers: Vec<String>,
         cipher: &Arc<Cipher>,
@@ -106,18 +106,18 @@ impl NetworkManager {
         // Create peer from keypair
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let mut peer = NetworkPeer::new(&keypair, peers, Some(quic_port), topic)?;
+        let mut interface = NetInterface::new(&keypair, peers, Some(quic_port), topic)?;
 
-        // Setup and start network manager
-        let rx = peer.rx();
-        let p2p_addr = NetworkManager::setup(bus, peer.tx(), rx, topic);
-        let handle = tokio::spawn(async move { Ok(peer.start().await?) });
+        // Setup and start net event translator
+        let rx = interface.rx();
+        let addr = NetEventTranslator::setup(bus, interface.tx(), rx, topic);
+        let handle = tokio::spawn(async move { Ok(interface.start().await?) });
 
-        Ok((p2p_addr, handle, keypair.public().to_peer_id().to_string()))
+        Ok((addr, handle, keypair.public().to_peer_id().to_string()))
     }
 }
 
-impl Handler<LibP2pEvent> for NetworkManager {
+impl Handler<LibP2pEvent> for NetEventTranslator {
     type Result = anyhow::Result<()>;
     fn handle(&mut self, msg: LibP2pEvent, _: &mut Self::Context) -> Self::Result {
         let LibP2pEvent(bytes) = msg;
@@ -132,7 +132,7 @@ impl Handler<LibP2pEvent> for NetworkManager {
     }
 }
 
-impl Handler<EnclaveEvent> for NetworkManager {
+impl Handler<EnclaveEvent> for NetEventTranslator {
     type Result = ResponseFuture<()>;
     fn handle(&mut self, event: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         let sent_events = self.sent_events.clone();
@@ -157,7 +157,7 @@ impl Handler<EnclaveEvent> for NetworkManager {
             match evt.to_bytes() {
                 Ok(data) => {
                     if let Err(e) = tx
-                        .send(NetworkPeerCommand::GossipPublish {
+                        .send(NetCommand::GossipPublish {
                             topic,
                             data,
                             correlation_id: CorrelationId::new(),

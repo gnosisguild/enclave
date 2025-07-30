@@ -21,7 +21,7 @@ use e3_fhe::ext::FheExtension;
 use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_keyshare::ext::KeyshareExtension;
 use e3_logger::SimpleLogger;
-use e3_net::{events::NetworkPeerEvent, NetworkManager};
+use e3_net::{events::NetEvent, NetEventTranslator};
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sortition::SortitionRepositoryFactory;
@@ -504,8 +504,8 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
     let event_rx = event_tx.subscribe();
-    // Pas cmd and event channels to NetworkManager
-    NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
+    // Pas cmd and event channels to NetEventTranslator
+    NetEventTranslator::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
     let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
@@ -518,11 +518,11 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
             // the event bus as if it was gossiped from the network and ended up as an external
             // message this simulates a rebroadcast message
             if let Some(msg) = match cmd {
-                e3_net::events::NetworkPeerCommand::GossipPublish { data, .. } => Some(data),
+                e3_net::events::NetCommand::GossipPublish { data, .. } => Some(data),
                 _ => None,
             } {
                 msgs_loop.lock().await.push(msg.clone());
-                event_tx.send(NetworkPeerEvent::GossipData(msg))?;
+                event_tx.send(NetEvent::GossipData(msg))?;
             }
             // if this  manages to broadcast an event to the
             // event bus we will expect to see an extra event on
@@ -560,14 +560,14 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     assert_eq!(
         *msgs.lock().await,
         vec![evt_1.to_bytes()?, evt_2.to_bytes()?], // notice no local events
-        "NetworkManager did not transmit correct events to the network"
+        "NetEventTranslator did not transmit correct events to the network"
     );
 
     assert_eq!(
         history,
         vec![evt_1, evt_2, local_evt_3], // all local events that have been broadcast but no
         // events from the loopback
-        "NetworkManager must not retransmit forwarded event to event bus"
+        "NetEventTranslator must not retransmit forwarded event to event bus"
     );
 
     Ok(())
@@ -663,7 +663,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
 
-    NetworkManager::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
+    NetEventTranslator::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
 
     // Capture messages from output on msgs vec
     let event = EnclaveEvent::from(E3Requested {
@@ -674,7 +674,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     });
 
     // lets send an event from the network
-    let _ = event_tx.send(NetworkPeerEvent::GossipData(event.to_bytes()?));
+    let _ = event_tx.send(NetEvent::GossipData(event.to_bytes()?));
 
     sleep(Duration::from_millis(1)).await; // need to push to next tick
 

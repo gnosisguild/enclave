@@ -18,7 +18,7 @@ use e3_evm::{
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::KeyshareExtension;
-use e3_net::{NetRepositoryFactory, NetworkManager};
+use e3_net::{NetEventTranslator, NetRepositoryFactory};
 use e3_request::E3Router;
 use e3_sortition::CiphernodeSelector;
 use e3_sortition::Sortition;
@@ -87,7 +87,7 @@ pub async fn execute(
         .build()
         .await?;
 
-    let (_, join_handle, peer_id) = NetworkManager::setup_with_peer(
+    let (_, join_handle, peer_id) = NetEventTranslator::setup_with_interface(
         bus.clone(),
         config.peers(),
         &cipher,
