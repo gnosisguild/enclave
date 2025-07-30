@@ -6,8 +6,8 @@
 
 use anyhow::Result;
 use e3_net::correlation_id::CorrelationId;
-use e3_net::events::{NetworkPeerCommand, NetworkPeerEvent};
-use e3_net::NetworkPeer;
+use e3_net::events::{NetCommand, NetEvent};
+use e3_net::NetInterface;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::time::{sleep, timeout};
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
     let peers: Vec<String> = dial_to.iter().cloned().collect();
 
     let id = libp2p::identity::Keypair::generate_ed25519();
-    let mut peer = NetworkPeer::new(&id, peers, udp_port, "test-topic")?;
+    let mut peer = NetInterface::new(&id, peers, udp_port, "test-topic")?;
 
     // Extract input and outputs
     let tx = peer.tx();
@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
 
     // Send our message first
     println!("{} sending message", name);
-    tx.send(NetworkPeerCommand::GossipPublish {
+    tx.send(NetCommand::GossipPublish {
         correlation_id: CorrelationId::new(),
         topic: topic.to_string(),
         data: name.as_bytes().to_vec(),
@@ -88,7 +88,7 @@ async fn main() -> Result<()> {
     let receive_result = timeout(Duration::from_secs(10), async {
         while received != expected {
             match rx.recv().await? {
-                NetworkPeerEvent::GossipData(msg) => match String::from_utf8(msg) {
+                NetEvent::GossipData(msg) => match String::from_utf8(msg) {
                     Ok(msg) => {
                         if !received.contains(&msg) {
                             println!("{} received '{}'", name, msg);
