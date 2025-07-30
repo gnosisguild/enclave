@@ -3,7 +3,7 @@ use anyhow::Result;
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
-/// A secure container that holds encrypted data with automatic memory cleanup
+/// A container that holds encrypted data
 /// We could just use cipher to encrypt and decrypt bytes and pass that around but this
 /// means we get the type system indicating when data is encrypted
 #[derive(Clone)]
