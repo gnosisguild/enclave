@@ -537,6 +537,6 @@ jobs:
           commit_message: "docs(contributor): contrib-readme-action has updated readme [skip ci]"
           committer_username: "github-actions[bot]"
           committer_email: "github-actions[bot]@users.noreply.github.com"
-          auto_detect_branch_protection: false
+          auto_detect_branch_protection: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
