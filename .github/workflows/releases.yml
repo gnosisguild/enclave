@@ -40,9 +40,9 @@ jobs:
           git status --porcelain || true
 
           echo "Checking for problematic files:"
-          ls -la packages/evm/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ 2>/dev/null || echo "ICiphernodeRegistry.json not found"
-          ls -la packages/evm/artifacts/contracts/interfaces/IEnclave.sol/ 2>/dev/null || echo "IEnclave.json not found"
-          ls -la packages/evm/artifacts/contracts/registry/NaiveRegistryFilter.sol/ 2>/dev/null || echo "NaiveRegistryFilter.json not found"
+          ls -la packages/evm/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ 2>/dev/null || echo "ICiphernodeRegistry.sol directory not found"
+          ls -la packages/evm/artifacts/contracts/interfaces/IEnclave.sol/ 2>/dev/null || echo "IEnclave.sol directory not found"
+          ls -la packages/evm/artifacts/contracts/registry/NaiveRegistryFilter.sol/ 2>/dev/null || echo "NaiveRegistryFilter.sol directory not found"
 
           # Remove the specific problematic files from git tracking if they exist
           git rm --cached --ignore-unmatch "packages/evm/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json" || true
