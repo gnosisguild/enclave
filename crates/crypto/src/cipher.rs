@@ -207,13 +207,6 @@ const PURGE_TIME_SECONDS: u64 = 5;
 /// - [`from_file`](Self::from_file): File on disk
 /// - [`from_config`](Self::from_config): Application configuration
 ///
-/// # Performance Characteristics
-///
-/// - **Encryption**: ~2-10ms for small data (depends on Argon2 parameters)
-/// - **Decryption**: Similar to encryption time
-/// - **Memory Usage**: ~19 MiB during key derivation
-/// - **Key Derivation**: Computationally expensive by design (security feature)
-///
 /// # Thread Safety
 ///
 /// This struct is `Send` but not `Sync`. Create separate instances for concurrent use.
