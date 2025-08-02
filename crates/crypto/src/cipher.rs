@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -18,6 +18,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::{
     password_manager::{EnvPasswordManager, InMemPasswordManager, PasswordManager},
+    secret_holder::TimedSecretHolder,
     FilePasswordManager,
 };
 
@@ -109,48 +110,74 @@ fn decrypt_data(password_bytes: &Zeroizing<Vec<u8>>, encrypted_data: &[u8]) -> R
 }
 
 pub struct Cipher {
-    key: Zeroizing<Vec<u8>>,
+    key: TimedSecretHolder,
+    pm: Box<dyn PasswordManager>,
 }
 
 impl Cipher {
-    pub async fn new<P>(pm: P) -> Result<Self>
+    pub fn new<P>(pm: P) -> Result<Self>
     where
-        P: PasswordManager,
+        P: PasswordManager + 'static,
     {
         // Get the key from the password manager when created
-        let key = pm.get_key().await?;
-        Ok(Self { key })
+        let key = TimedSecretHolder::new(pm.get_key_sync()?, Duration::from_secs(1));
+        Ok(Self {
+            key,
+            pm: Box::new(pm),
+        })
     }
 
-    pub async fn from_password(value: &str) -> Result<Self> {
-        Ok(Self::new(InMemPasswordManager::from_str(value)).await?)
+    pub fn from_password(value: &str) -> Result<Self> {
+        Ok(Self::new(InMemPasswordManager::from_str(value))?)
     }
 
-    pub async fn from_env(value: &str) -> Result<Self> {
-        Ok(Self::new(EnvPasswordManager::new(value)?).await?)
+    pub fn from_env(value: &str) -> Result<Self> {
+        Ok(Self::new(EnvPasswordManager::new(value)?)?)
     }
 
-    pub async fn from_file(value: impl AsRef<Path>) -> Result<Self> {
-        Ok(Self::new(FilePasswordManager::new(value)).await?)
+    pub fn from_file(value: impl AsRef<Path>) -> Result<Self> {
+        Ok(Self::new(FilePasswordManager::new(value))?)
     }
 
-    pub async fn from_config(config: &AppConfig) -> Result<Self> {
-        Ok(Self::new(FilePasswordManager::new(config.key_file())).await?)
+    pub fn from_config(config: &AppConfig) -> Result<Self> {
+        Ok(Self::new(FilePasswordManager::new(config.key_file()))?)
     }
 
-    /// Encrypt the given data and zeroize the data after encryption
+    /// Run an operation with the local
+    pub fn with_key<F, R>(&self, operation_name: &str, mut op: F) -> Result<R>
+    where
+        F: FnMut(&Zeroizing<Vec<u8>>) -> R,
+    {
+        // Try with current key first
+        if let Some(result) = self.key.access(|key| op(key)) {
+            return Ok(result);
+        }
+
+        // Didn't work so get the key again
+        let fresh_key = self.pm.get_key_sync()?;
+
+        // Update the key on the container
+        self.key.update(fresh_key);
+
+        // Run the operation again
+        Ok(self
+            .key
+            .access(|key| op(key))
+            .ok_or_else(|| anyhow!("Could not complete {}: key update failed", operation_name))?)
+    }
+
     pub fn encrypt_data(&self, data: &mut Vec<u8>) -> Result<Vec<u8>> {
-        encrypt_data(&self.key, data)
+        Ok(self.with_key("encryption", |key| encrypt_data(key, data))??)
     }
 
     pub fn decrypt_data(&self, encrypted_data: &[u8]) -> Result<Vec<u8>> {
-        decrypt_data(&self.key, encrypted_data)
+        Ok(self.with_key("decryption", |key| decrypt_data(key, encrypted_data))??)
     }
 }
 
 impl Zeroize for Cipher {
     fn zeroize(&mut self) {
-        self.key.zeroize();
+        self.key.purge();
     }
 }
 
@@ -167,7 +194,7 @@ mod tests {
 
         let start = Instant::now();
 
-        let cipher = Cipher::from_password("test_password").await?;
+        let cipher = Cipher::from_password("test_password")?;
         let encrypted = cipher.encrypt_data(&mut data.to_vec()).unwrap();
         let encryption_time = start.elapsed();
 
@@ -185,7 +212,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_data() -> Result<()> {
-        let cipher = Cipher::from_password("test_password").await?;
+        let cipher = Cipher::from_password("test_password")?;
         let data = vec![];
 
         let encrypted = cipher.encrypt_data(&mut data.clone()).unwrap();
@@ -197,7 +224,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_large_data() -> Result<()> {
-        let cipher = Cipher::from_password("test_password").await?;
+        let cipher = Cipher::from_password("test_password")?;
         let data = vec![1u8; 1024 * 1024]; // 1MB of data
 
         let start = Instant::now();
@@ -218,13 +245,13 @@ mod tests {
     #[tokio::test]
     async fn test_different_passwords() -> Result<()> {
         // Encrypt with one password
-        let cipher = Cipher::from_password("password1").await?;
+        let cipher = Cipher::from_password("password1")?;
 
         let data = b"Secret message";
         let encrypted = cipher.encrypt_data(&mut data.to_vec()).unwrap();
 
         // Try to decrypt with a different password
-        let cipher = Cipher::from_password("password2").await?;
+        let cipher = Cipher::from_password("password2")?;
         let result = cipher.decrypt_data(&encrypted);
 
         assert!(result.is_err());
@@ -233,7 +260,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_binary_data() -> Result<()> {
-        let cipher = Cipher::from_password("test_password").await?;
+        let cipher = Cipher::from_password("test_password")?;
 
         let data = vec![0xFF, 0x00, 0xAA, 0x55, 0x12, 0xED];
 
@@ -246,7 +273,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_unicode_data() -> Result<()> {
-        let cipher = Cipher::from_password("test_password").await?;
+        let cipher = Cipher::from_password("test_password")?;
         let data = "Hello 🌍 привет 世界".as_bytes().to_vec();
 
         let encrypted = cipher.encrypt_data(&mut data.clone()).unwrap();
@@ -259,14 +286,14 @@ mod tests {
     #[tokio::test]
     #[should_panic(expected = "Invalid encrypted data length")]
     async fn test_invalid_encrypted_data() {
-        let cipher = Cipher::from_password("test_password").await.unwrap();
+        let cipher = Cipher::from_password("test_password").unwrap();
         let invalid_data = vec![0u8; 10]; // Too short to be valid encrypted data
         cipher.decrypt_data(&invalid_data).unwrap();
     }
 
     #[tokio::test]
     async fn test_multiple_encrypt_decrypt_cycles() {
-        let cipher = Cipher::from_password("test_password").await.unwrap();
+        let cipher = Cipher::from_password("test_password").unwrap();
         let original_data = b"Multiple encryption cycles test";
 
         let mut data = original_data.to_vec();
@@ -280,7 +307,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_corrupted_data() {
-        let cipher = Cipher::from_password("test_password").await.unwrap();
+        let cipher = Cipher::from_password("test_password").unwrap();
         let data = b"Test corrupted data";
 
         let mut encrypted = cipher.encrypt_data(&mut data.to_vec()).unwrap();

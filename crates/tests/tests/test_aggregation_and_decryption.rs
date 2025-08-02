@@ -301,7 +301,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, history_collector) = get_common_setup()?;
     let e3_id = E3id::new("1234", 1);
-    let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
+    let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret")?);
 
     // Setup actual ciphernodes and dispatch add events
     let ciphernode_addrs = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
@@ -410,7 +410,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let (bus, rng, seed, params, crpoly, error_collector, history_collector) = get_common_setup()?;
     let e3_id = E3id::new("1234", 1);
 
-    let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
+    let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret")?);
 
     let eth_addrs = create_random_eth_addrs(2);
 
@@ -577,7 +577,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Setup
     let (bus, rng, seed, params, crpoly, _, history_collector) = get_common_setup()?;
-    let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
+    let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret")?);
 
     // Setup actual ciphernodes and dispatch add events
     let ciphernode_addrs = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
