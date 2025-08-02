@@ -109,6 +109,9 @@ fn decrypt_data(password_bytes: &Zeroizing<Vec<u8>>, encrypted_data: &[u8]) -> R
     Ok(plaintext)
 }
 
+/// Configure the purge time here. Currently set to 5 seconds
+const PURGE_TIME_SECONDS: u64 = 5;
+
 pub struct Cipher {
     key: TimedSecretHolder,
     pm: Box<dyn PasswordManager>,
@@ -120,7 +123,8 @@ impl Cipher {
         P: PasswordManager + 'static,
     {
         // Get the key from the password manager when created
-        let key = TimedSecretHolder::new(pm.get_key_sync()?, Duration::from_secs(1));
+        let key =
+            TimedSecretHolder::new(pm.get_key_sync()?, Duration::from_secs(PURGE_TIME_SECONDS));
         Ok(Self {
             key,
             pm: Box::new(pm),
