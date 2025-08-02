@@ -127,10 +127,8 @@ jobs:
           toolchain: 1.86.0
           target: wasm32-unknown-unknown
 
-        # required so that we can compile wasm within the sdk
-      - uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: "latest"
+      - name: Install wasm-pack
+        uses: ./.github/actions/install-wasm-pack
 
       - name: "Setup node"
         uses: actions/setup-node@v3
@@ -398,12 +396,16 @@ jobs:
         with:
           toolchain: 1.86.0
           targets: wasm32-unknown-unknown
+
       - name: Install wasm-pack
-        run: npm install -g wasm-pack
+        uses: ./.github/actions/install-wasm-pack
+
       - name: Install node dependencies
         run: pnpm install
+
       - name: Build the sdk
         run: pnpm sdk:build
+
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4
         with:
