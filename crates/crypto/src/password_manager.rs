@@ -16,8 +16,9 @@ use std::{
 use zeroize::Zeroizing;
 
 #[async_trait]
-pub trait PasswordManager {
+pub trait PasswordManager: Sync + Send {
     async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>>;
+    fn get_key_sync(&self) -> Result<Zeroizing<Vec<u8>>>;
     async fn delete_key(&mut self) -> Result<()>;
     async fn set_key(&mut self, contents: Zeroizing<Vec<u8>>) -> Result<()>;
     fn is_set(&self) -> bool;
@@ -47,6 +48,10 @@ impl EnvPasswordManager {
 #[async_trait]
 impl PasswordManager for EnvPasswordManager {
     async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+        self.get_key_sync()
+    }
+
+    fn get_key_sync(&self) -> Result<Zeroizing<Vec<u8>>> {
         if let Some(key) = self.0.clone() {
             return Ok(key);
         }
@@ -70,6 +75,10 @@ impl PasswordManager for EnvPasswordManager {
 #[async_trait]
 impl PasswordManager for InMemPasswordManager {
     async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+        self.get_key_sync()
+    }
+
+    fn get_key_sync(&self) -> Result<Zeroizing<Vec<u8>>> {
         if let Some(key) = self.0.clone() {
             return Ok(key);
         }
@@ -111,6 +120,11 @@ impl PasswordManager for FilePasswordManager {
     //   https://kubernetes.io/docs/concepts/configuration/secret/
     //   https://developer.hashicorp.com/vault/docs/platform/k8s/injector
     async fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+        // TODO: Provide an efficient async version
+        self.get_key_sync()
+    }
+
+    fn get_key_sync(&self) -> Result<Zeroizing<Vec<u8>>> {
         let path = &self.path;
 
         ensure_file_permissions(path, 0o400)?;
