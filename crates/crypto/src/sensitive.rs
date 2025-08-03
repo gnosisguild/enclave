@@ -40,7 +40,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sensitive_basic_functionality() -> Result<()> {
-        let cipher = Cipher::from_password("1243").await?;
+        let cipher = Cipher::from_password("1243")?;
         let original_data = b"Hello, World!".to_vec();
         let expected_data = original_data.clone();
 
@@ -60,7 +60,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sensitive_with_string() -> Result<()> {
-        let cipher = Cipher::from_password("1243").await?;
+        let cipher = Cipher::from_password("1243")?;
         let original_string = "Secret message".to_string();
         let expected_bytes = original_string.clone();
 
