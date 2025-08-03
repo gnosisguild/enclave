@@ -28,6 +28,70 @@ See [CONTRIBUTING.md][contributing].
 ### Contributors
 
 <!-- readme: contributors -start -->
+<table>
+	<tbody>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/ryardley">
+                    <img src="https://avatars.githubusercontent.com/u/1256409?v=4" width="100;" alt="ryardley"/>
+                    <br />
+                    <sub><b>гλ</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/auryn-macmillan">
+                    <img src="https://avatars.githubusercontent.com/u/8453294?v=4" width="100;" alt="auryn-macmillan"/>
+                    <br />
+                    <sub><b>Auryn Macmillan</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/hmzakhalid">
+                    <img src="https://avatars.githubusercontent.com/u/36852564?v=4" width="100;" alt="hmzakhalid"/>
+                    <br />
+                    <sub><b>Hamza Khalid</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/samepant">
+                    <img src="https://avatars.githubusercontent.com/u/6718506?v=4" width="100;" alt="samepant"/>
+                    <br />
+                    <sub><b>samepant</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/cristovaoth">
+                    <img src="https://avatars.githubusercontent.com/u/12870300?v=4" width="100;" alt="cristovaoth"/>
+                    <br />
+                    <sub><b>Cristóvão</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/nginnever">
+                    <img src="https://avatars.githubusercontent.com/u/7103153?v=4" width="100;" alt="nginnever"/>
+                    <br />
+                    <sub><b>Nathan Ginnever</b></sub>
+                </a>
+            </td>
+		</tr>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/0xjei">
+                    <img src="https://avatars.githubusercontent.com/u/20580910?v=4" width="100;" alt="0xjei"/>
+                    <br />
+                    <sub><b>Giacomo</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/Subhasish-Behera">
+                    <img src="https://avatars.githubusercontent.com/u/92573882?v=4" width="100;" alt="Subhasish-Behera"/>
+                    <br />
+                    <sub><b>SUBHASISH BEHERA</b></sub>
+                </a>
+            </td>
+		</tr>
+	<tbody>
+</table>
 <!-- readme: contributors -end -->
 
 ## Minimum Rust version
