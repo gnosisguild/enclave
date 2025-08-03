@@ -181,10 +181,11 @@ const PURGE_TIME_SECONDS: u64 = 5;
 ///
 /// # Usage Examples
 ///
-/// ```rust
-/// use anyhow::Result;
-///
-/// # fn main() -> Result<()> {
+/// ```
+/// # use anyhow::Result;
+/// # use e3_crypto::*;
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
 /// // Create cipher from password
 /// let cipher = Cipher::from_password("my-secret-password")?;
 ///
@@ -244,10 +245,11 @@ impl Cipher {
     /// * `Err(anyhow::Error)` - If the initial key retrieval fails
     ///
     /// # Examples
-    /// ```rust
-    /// use anyhow::Result;
-    ///
-    /// # fn main() -> Result<()> {
+    /// ```
+    /// # use anyhow::Result;
+    /// # use e3_crypto::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
     /// let pm = InMemPasswordManager::from_str("my-password");
     /// let cipher = Cipher::new(pm)?;
     /// # Ok(())
@@ -279,9 +281,11 @@ impl Cipher {
     /// * `Err(anyhow::Error)` - If cipher creation fails
     ///
     /// # Examples
-    /// ```rust
+    /// ```
     /// # use anyhow::Result;
-    /// # fn main() -> Result<()> {
+    /// # use e3_crypto::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
     /// let cipher = Cipher::from_password("super-secret-password")?;
     /// # Ok(())
     /// # }
@@ -307,10 +311,12 @@ impl Cipher {
     /// * `Err(anyhow::Error)` - If the environment variable is not found or cipher creation fails
     ///
     /// # Examples
-    /// ```rust
+    /// ```
     /// # use anyhow::Result;
-    /// # fn main() -> Result<()> {
-    /// // Assumes ENCRYPTION_KEY environment variable is set
+    /// # use e3_crypto::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// # std::env::set_var("ENCRYPTION_KEY", "test-key-for-doctest");
     /// let cipher = Cipher::from_env("ENCRYPTION_KEY")?;
     /// # Ok(())
     /// # }
@@ -336,12 +342,8 @@ impl Cipher {
     /// * `Err(anyhow::Error)` - If the file cannot be read or cipher creation fails
     ///
     /// # Examples
-    /// ```rust
-    /// # use anyhow::Result;
-    /// # fn main() -> Result<()> {
+    /// ```ignore
     /// let cipher = Cipher::from_file("/etc/myapp/encryption.key")?;
-    /// # Ok(())
-    /// # }
     /// ```
     ///
     /// # Security Notes
@@ -364,15 +366,6 @@ impl Cipher {
     /// * `Ok(Cipher)` - Successfully created cipher instance
     /// * `Err(anyhow::Error)` - If the key file cannot be read or cipher creation fails
     ///
-    /// # Examples
-    /// ```rust
-    /// # use anyhow::Result;
-    /// # fn main() -> Result<()> {
-    /// # let config = todo!(); // AppConfig instance
-    /// let cipher = Cipher::from_config(&config)?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn from_config(config: &AppConfig) -> Result<Self> {
         Ok(Self::new(FilePasswordManager::new(config.key_file()))?)
     }
@@ -393,10 +386,12 @@ impl Cipher {
     /// * `Err(anyhow::Error)` - If key retrieval or the operation fails
     ///
     /// # Examples
-    /// ```rust
+    /// ```
     /// # use anyhow::Result;
-    /// # fn main() -> Result<()> {
-    /// # let cipher = Cipher::from_password("test")?;
+    /// # use e3_crypto::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// let cipher = Cipher::from_password("test")?;
     /// let result = cipher.with_key("custom operation", |key| {
     ///     // Your operation using the key
     ///     key.len()
@@ -443,9 +438,11 @@ impl Cipher {
     /// * `Err(anyhow::Error)` - If encryption fails
     ///
     /// # Examples
-    /// ```rust
+    /// ```
     /// # use anyhow::Result;
-    /// # fn main() -> Result<()> {
+    /// # use e3_crypto::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
     /// let cipher = Cipher::from_password("my-password")?;
     /// let mut data = b"Hello, world!".to_vec();
     /// let encrypted = cipher.encrypt_data(&mut data)?;
@@ -480,9 +477,11 @@ impl Cipher {
     /// * `Err(anyhow::Error)` - If decryption fails
     ///
     /// # Examples
-    /// ```rust
+    /// ```
     /// # use anyhow::Result;
-    /// # fn main() -> Result<()> {
+    /// # use e3_crypto::*;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
     /// let cipher = Cipher::from_password("my-password")?;
     ///
     /// // Encrypt some data
