@@ -161,7 +161,7 @@ fn decrypt_data(password_bytes: &Zeroizing<Vec<u8>>, encrypted_data: &[u8]) -> R
     Ok(plaintext)
 }
 
-/// Configure the purge time here. Currently set to 2 seconds
+/// Configure the purge time here.
 const PURGE_TIME_SECONDS: u64 = 2;
 
 /// A high-level cryptographic interface providing secure data encryption and decryption.
@@ -169,7 +169,7 @@ const PURGE_TIME_SECONDS: u64 = 2;
 /// `Cipher` combines industry-standard cryptographic primitives with secure key management:
 /// - **Key Derivation**: Argon2id with OWASP-recommended parameters
 /// - **Encryption**: AES-256-GCM for authenticated encryption
-/// - **Key Management**: Automatic key purging after 5 seconds
+/// - **Key Management**: Automatic key purging
 /// - **Memory Safety**: Zeroization of sensitive data
 ///
 /// # Security Features
@@ -214,7 +214,7 @@ const PURGE_TIME_SECONDS: u64 = 2;
 ///
 /// # Security Considerations
 ///
-/// - Keys are automatically purged from memory after 5 seconds of inactivity
+/// - Keys are automatically purged from memory after inactivity
 /// - Input data is zeroized after encryption to prevent memory disclosure
 /// - Uses cryptographically secure random number generation
 /// - Resistant to timing attacks through constant-time operations
