@@ -8,72 +8,102 @@ THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Source the file from the same directory
 source "$THIS_DIR/fns.sh"
 
-heading "Start the EVM node"
+time {
+  heading "Start the EVM node"
 
-launch_evm
+  launch_evm
 
-until curl -f -s "http://localhost:8545" > /dev/null; do
-  sleep 1
-done
+  until curl -f -s "http://localhost:8545" > /dev/null; do
+    sleep 1
+  done
 
-# set wallet to ag specifically
-enclave_wallet_set ag "$PRIVATE_KEY"
+  # set wallet to ag specifically
+  enclave_wallet_set ag "$PRIVATE_KEY"
 
-# start swarm
-enclave_nodes_up
+  # start swarm
+  enclave_nodes_up
 
-waiton-files "$ROOT_DIR/target/debug/fake_encrypt"
+  waiton-files "$ROOT_DIR/target/debug/fake_encrypt"
+  timefooter
+}
 
-heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
-pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
+time {
+  heading "Add ciphernode $CIPHERNODE_ADDRESS_1"
+  pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_1 --network localhost
+  timefooter
+}
 
-heading "Add ciphernode $CIPHERNODE_ADDRESS_2"
-pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_2 --network localhost
+time {
+  heading "Add ciphernode $CIPHERNODE_ADDRESS_2"
+  pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_2 --network localhost
+  timefooter
+}
 
-heading "Add ciphernode $CIPHERNODE_ADDRESS_3"
-pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localhost
+time {
+  heading "Add ciphernode $CIPHERNODE_ADDRESS_3"
+  pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_3 --network localhost
+  timefooter
+}
 
-heading "Add ciphernode $CIPHERNODE_ADDRESS_4"
-pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
+time {
+  heading "Add ciphernode $CIPHERNODE_ADDRESS_4"
+  pnpm ciphernode:add --ciphernode-address $CIPHERNODE_ADDRESS_4 --network localhost
+  timefooter
+}
 
-heading "Request Committee"
+time {
+  heading "Request Committee"
 
-ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
+  ENCODED_PARAMS=0x$($SCRIPT_DIR/lib/pack_e3_params.sh --moduli 0x3FFFFFFF000001 --degree 2048 --plaintext-modulus 1032193)
 
-pnpm committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
+  pnpm committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
 
-waiton "$SCRIPT_DIR/output/pubkey.bin"
-PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
+  waiton "$SCRIPT_DIR/output/pubkey.bin"
+  PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
 
 
-# kill aggregator
-enclave_nodes_stop ag
+  # kill aggregator
+  enclave_nodes_stop ag
 
-sleep 2
+  sleep 2
 
-# relaunch the aggregator
-enclave_nodes_start ag
+  # relaunch the aggregator
+  enclave_nodes_start ag
 
-sleep 2
+  sleep 2
+  timefooter
+}
 
-heading "Mock encrypted plaintext"
-$SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT
+time {
+  heading "Mock encrypted plaintext"
+  $SCRIPT_DIR/lib/fake_encrypt.sh --input "$SCRIPT_DIR/output/pubkey.bin" --output "$SCRIPT_DIR/output/output.bin" --plaintext $PLAINTEXT
+  timefooter
+}
 
-heading "Mock activate e3-id"
-# NOTE using -s to avoid key spaming the output
-pnpm -s e3:activate --e3-id 0 --public-key "0x$PUBLIC_KEY" --network localhost
+time {
+  heading "Mock activate e3-id"
+  # NOTE using -s to avoid key spaming the output
+  pnpm -s e3:activate --e3-id 0 --public-key "0x$PUBLIC_KEY" --network localhost
+  timefooter
+}
 
-heading "Mock publish input e3-id"
-pnpm e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
+time {
+  heading "Mock publish input e3-id"
+  pnpm e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
 
-sleep 4 # wait for input deadline to pass
+  sleep 4 # wait for input deadline to pass
 
-waiton "$SCRIPT_DIR/output/output.bin"
+  waiton "$SCRIPT_DIR/output/output.bin"
+  timefooter
+}
 
-heading "Publish ciphertext to EVM"
-pnpm e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR/output/output.bin" --proof 0x12345678
+time {
+  heading "Publish ciphertext to EVM"
+  pnpm e3:publishCiphertext --e3-id 0 --network localhost --data-file "$SCRIPT_DIR/output/output.bin" --proof 0x12345678
 
-waiton "$SCRIPT_DIR/output/plaintext.txt"
+  waiton "$SCRIPT_DIR/output/plaintext.txt"
+  timefooter
+}
 
 ACTUAL=$(cat $SCRIPT_DIR/output/plaintext.txt)
  
