@@ -26,7 +26,7 @@ Join the Enclave [Telegram group][telegram].
 See [CONTRIBUTING.md][contributing].
 
 ### Contributors
-
+ 
 <!-- readme: contributors -start -->
 <table>
 	<tbody>
