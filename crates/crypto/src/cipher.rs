@@ -208,16 +208,11 @@ const PURGE_TIME_SECONDS: u64 = 2;
 /// - [`from_file`](Self::from_file): File on disk
 /// - [`from_config`](Self::from_config): Application configuration
 ///
-/// # Thread Safety
-///
-/// This struct is `Send` but not `Sync`. Create separate instances for concurrent use.
-///
 /// # Security Considerations
 ///
 /// - Keys are automatically purged from memory after inactivity
 /// - Input data is zeroized after encryption to prevent memory disclosure
 /// - Uses cryptographically secure random number generation
-/// - Resistant to timing attacks through constant-time operations
 /// - Each encryption operation derives a fresh key (CPU intensive but secure)
 ///
 /// # Error Handling
