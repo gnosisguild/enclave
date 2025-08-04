@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use tokio::sync::watch;
 use tokio::time::{sleep, Duration, Instant};
+use tracing::info;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// A secure holder for sensitive data that auto-zeroizes on drop
@@ -38,6 +39,7 @@ impl SecretHolder {
     pub fn is_purged(&self) -> bool {
         self.data.iter().all(|&b| b == 0)
     }
+
     /// Replace the current secret data with new data
     pub fn update(&mut self, new_data: Zeroizing<Vec<u8>>) {
         // First zeroize the old data
@@ -108,6 +110,7 @@ impl TimedSecretHolder {
                 timer
                     .start(move || {
                         if let Ok(mut guard) = secret_clone.try_lock() {
+                            info!("Purging key data from memory");
                             guard.purge();
                         }
                     })
@@ -129,6 +132,7 @@ impl TimedSecretHolder {
         }
 
         let result = guard.access(f);
+        info!("Resetting key purge timer");
         self.timer.reset();
         Some(result)
     }

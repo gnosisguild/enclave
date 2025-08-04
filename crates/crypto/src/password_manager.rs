@@ -6,6 +6,7 @@
 
 use anyhow::*;
 use async_trait::async_trait;
+use std::time::Instant;
 use std::{
     env,
     fs::{self, OpenOptions, Permissions},
@@ -13,6 +14,7 @@ use std::{
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
 };
+use tracing::{info, trace};
 use zeroize::Zeroizing;
 
 #[async_trait]
@@ -125,11 +127,16 @@ impl PasswordManager for FilePasswordManager {
     }
 
     fn get_key_sync(&self) -> Result<Zeroizing<Vec<u8>>> {
+        let start = Instant::now();
         let path = &self.path;
 
         ensure_file_permissions(path, 0o400)?;
 
         let bytes = fs::read(&self.path).context("Failed to access keyfile")?;
+        info!(
+            "FilePasswordManager::get_key_sync took: {:?}",
+            start.elapsed()
+        );
 
         Ok(Zeroizing::new(bytes))
     }

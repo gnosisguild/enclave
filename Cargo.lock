@@ -2615,6 +2615,7 @@ dependencies = [
  "e3-config",
  "rand 0.8.5",
  "tokio",
+ "tracing",
  "zeroize",
 ]
 
