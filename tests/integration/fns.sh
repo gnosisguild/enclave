@@ -55,12 +55,15 @@ cleanup() {
     exit ${1:-1}
 }
 
+CURRENT_HEADING=""
+
 heading() {
+    CURRENT_HEADING=$1
     echo ""
     echo ""
     echo "--------------------------------------------------------------"
     echo " $1     "
-    echo "--------------------------------------------------------------"
+    echo ""
     echo ""
 }
 
@@ -198,6 +201,13 @@ gracefull_shutdown() {
   sleep 5
   ensure_process_count_equals "target/debug/enclave" 0 || return 1
   kill_em_all
+}
+
+timefooter() {
+  echo ""
+  echo ""
+  echo " END: $CURRENT_HEADING"
+  echo "--------------------------------------------------------------"
 }
 
 # Run this at the start of every test to ensure we start with a clean slate
