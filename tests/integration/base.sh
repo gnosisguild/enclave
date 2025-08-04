@@ -8,6 +8,8 @@ THIS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Source the file from the same directory
 source "$THIS_DIR/fns.sh"
 
+E3_DURATION=6
+
 time {
   heading "Start the EVM node"
 
@@ -64,7 +66,7 @@ time {
 
   sleep 4
 
-  pnpm committee:new --network localhost --duration 4 --e3-params "$ENCODED_PARAMS"
+  pnpm committee:new --network localhost --duration $E3_DURATION --e3-params "$ENCODED_PARAMS"
 
   waiton "$SCRIPT_DIR/output/pubkey.bin"
   PUBLIC_KEY=$(xxd -p -c 10000000 "$SCRIPT_DIR/output/pubkey.bin")
@@ -88,7 +90,7 @@ time {
   heading "Mock publish input e3-id"
   pnpm e3:publishInput --network localhost  --e3-id 0 --data 0x12345678
 
-  sleep 4 # wait for input deadline to pass
+  sleep $E3_DURATION # wait for input deadline to pass
 
   waiton "$SCRIPT_DIR/output/output.bin"
   timefooter
