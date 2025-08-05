@@ -29,8 +29,14 @@ pub enum ComputeResponse {
     // Eg. TFHE(TFHEResponse)
 }
 
+/// An error from a threadpool computation
+/// This enum provides protocol disambiguation
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ComputeRequestError {}
+pub enum ComputeRequestError {
+    /// By Protocol
+    TrBFV(trbfv::TrBFVError),
+    // Eg. TFHE(TFHEError)
+}
 
 // Actix messages
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -30,6 +30,11 @@ pub enum TrBFVResponse {
     ThresholdDecrypt(threshold_decrypt::Response),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TrBFVError {
+    // Add errors here as required
+}
+
 pub mod gen_esi_sss {
     /// This module defines event payloads that will generate esi smudging noise shamir shares to be shared with other members of the committee.
     /// This has been separated from the general setup in order to be able to take advantage of parallelism
