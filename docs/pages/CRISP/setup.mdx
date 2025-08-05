@@ -1,6 +1,6 @@
 ---
-title: 'Setup - CRISP'  
-description: ''
+title: 'Setup - CRISP'
+description: 'Setup and build the development environment for CRISP'
 ---
 
 import { Steps } from 'nextra/components'
@@ -12,7 +12,7 @@ This guide will walk you through the steps to set up and run CRISP locally. CRIS
 The setup includes the following:
 
 - **CRISP contracts**: Smart contracts located in the `contracts/` directory
-- **Applications**: Frontend, server, and computation programs in the `apps/` directory  
+- **Applications**: Frontend, server, and computation programs in the `apps/` directory
 - **Ciphernodes**: Distributed nodes managed through the Enclave CLI
 - **Development environment**: Hardhat + Foundry hybrid setup
 
@@ -21,6 +21,11 @@ The setup includes the following:
 The fastest way to get CRISP running is using the Docker development environment:
 
 ```sh
+# Clone the repository first
+git clone https://github.com/gnosisguild/enclave.git
+cd enclave
+
+# Navigate to the CRISP example
 cd examples/CRISP
 
 # Setup and build the development environment
@@ -53,6 +58,15 @@ Once everything is running, you can:
 ## Manual Setup
 
 If you prefer to set up CRISP manually or want to understand each component:
+
+### Clone the Repository
+
+First, clone the Enclave repository which contains the CRISP example:
+
+```sh
+git clone https://github.com/gnosisguild/enclave.git
+cd enclave
+```
 
 ## Prerequisites
 
@@ -127,7 +141,7 @@ At this point, you should have all the necessary tools to develop and deploy app
 
 The Client is a React application used to interact with the CRISP Server. Follow these steps to set it up locally:
 
-1. Navigate to the client directory:
+1. Navigate to the client directory (from the cloned repository root):
 
    ```sh
    cd examples/CRISP/apps/client
@@ -163,26 +177,19 @@ Keep this terminal open and running. Open a new terminal for the next steps.
 
 ### Deploy the Enclave Contracts
 
-1. Clone the [Enclave Repository](https://github.com/gnosisguild/enclave) if you haven't already:
-
-   ```sh
-   git clone https://github.com/gnosisguild/enclave.git
-   cd enclave
-   ```
-
-2. Install the dependencies:
+1. Install the dependencies:
 
    ```sh
    pnpm install
    ```
 
-3. Navigate to the `packages/evm` directory:
+2. Navigate to the `packages/evm` directory:
 
    ```sh
    cd packages/evm
    ```
 
-4. Deploy the Enclave contracts on the local testnet:
+3. Deploy the Enclave contracts on the local testnet:
 
    ```sh
    rm -rf deployments/localhost
@@ -198,7 +205,7 @@ After deployment, take note of the addresses for the following contracts:
 
 ### Deploy the CRISP Contracts
 
-1. Navigate to the CRISP directory:
+1. Navigate to the CRISP directory (from the cloned repository root):
 
    ```sh
    cd examples/CRISP
@@ -246,9 +253,9 @@ Start the ciphernodes using the Enclave CLI:
 3. Add ciphernodes to the registry:
 
    ```sh
-   # Navigate back to the Enclave repository
+   # Navigate back to the Enclave repository root
    cd ../../packages/evm
-   
+
    # Add the ciphernodes
    pnpm ciphernode:add --ciphernode-address "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E" --network "localhost"
    pnpm ciphernode:add --ciphernode-address "0xdD2FD4581271e230360230F9337D5c0430Bf44C0" --network "localhost"
