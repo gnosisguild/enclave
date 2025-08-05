@@ -11,32 +11,12 @@ use crate::CorrelationId;
 use actix::Message;
 use serde::{Deserialize, Serialize};
 
-/// Input format for TrBFVRequest
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TrBFVRequest {
-    GenEsiSss(trbfv::gen_esi_sss::Request),
-    GenPkShareAndSkSss(trbfv::gen_pk_share_and_sk_sss::Request),
-    GenDecryptionKey(trbfv::gen_decryption_key::Request),
-    GenDecryptionShare(trbfv::gen_decryption_share::Request),
-    ThresholdDecrypt(trbfv::threshold_decrypt::Request),
-}
-
-/// Result format for TrBFVResponse
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum TrBFVResponse {
-    GenEsiSss(trbfv::gen_esi_sss::Response),
-    GenPkShareAndSkSss(trbfv::gen_pk_share_and_sk_sss::Response),
-    GenDecryptionKey(trbfv::gen_decryption_key::Response),
-    GenDecryptionShare(trbfv::gen_decryption_share::Response),
-    ThresholdDecrypt(trbfv::threshold_decrypt::Response),
-}
-
 /// The compute instruction for a threadpool computation.
 /// This enum provides protocol disambiguation
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ComputeRequest {
     /// By Protocol
-    TrBFV(TrBFVRequest),
+    TrBFV(trbfv::TrBFVRequest),
     // Eg. TFHE(TFHERequest)
 }
 
@@ -45,7 +25,7 @@ pub enum ComputeRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ComputeResponse {
     /// By Protocol
-    TrBFV(TrBFVResponse),
+    TrBFV(trbfv::TrBFVResponse),
     // Eg. TFHE(TFHEResponse)
 }
 

@@ -4,9 +4,31 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use serde::{Deserialize, Serialize};
+
 /// TrBFV modules defining the API for multithreaded compute
 /// Each module defines the event payloads that make up a compute request
 /// Each compute request should live independently and be self contained
+
+/// Input format for TrBFVRequest
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TrBFVRequest {
+    GenEsiSss(gen_esi_sss::Request),
+    GenPkShareAndSkSss(gen_pk_share_and_sk_sss::Request),
+    GenDecryptionKey(gen_decryption_key::Request),
+    GenDecryptionShare(gen_decryption_share::Request),
+    ThresholdDecrypt(threshold_decrypt::Request),
+}
+
+/// Result format for TrBFVResponse
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TrBFVResponse {
+    GenEsiSss(gen_esi_sss::Response),
+    GenPkShareAndSkSss(gen_pk_share_and_sk_sss::Response),
+    GenDecryptionKey(gen_decryption_key::Response),
+    GenDecryptionShare(gen_decryption_share::Response),
+    ThresholdDecrypt(threshold_decrypt::Response),
+}
 
 pub mod gen_esi_sss {
     /// This module defines event payloads that will generate esi smudging noise shamir shares to be shared with other members of the committee.
