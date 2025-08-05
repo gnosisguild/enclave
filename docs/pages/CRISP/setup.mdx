@@ -21,8 +21,8 @@ The setup includes the following:
 The fastest way to get CRISP running is using the Docker development environment:
 
 ```sh
-# Clone the repository first
-git clone https://github.com/gnosisguild/enclave.git
+# Clone the repository first (shallow clone for faster setup)
+git clone --depth 1 https://github.com/gnosisguild/enclave.git
 cd enclave
 
 # Navigate to the CRISP example
@@ -135,10 +135,10 @@ At this point, you should have all the necessary tools to develop and deploy app
 
 ### Clone the Repository
 
-Now clone the Enclave repository which contains the CRISP example:
+If you haven't already cloned the repository from the [Quick Start](#quick-start-with-docker-recommended) section above, do so now:
 
 ```sh
-git clone https://github.com/gnosisguild/enclave.git
+git clone --depth 1 https://github.com/gnosisguild/enclave.git
 cd enclave
 ```
 
@@ -147,7 +147,7 @@ cd enclave
 If you prefer to build the Enclave CLI from source instead of using the installer:
 
 ```sh
-# Make sure you're in the cloned repository root (you should be after the clone step)
+# Make sure you're in the cloned repository root (cd enclave if not already there)
 cargo install --locked --path ./crates/cli --bin enclave -f
 ```
 
@@ -158,6 +158,7 @@ The Client is a React application used to interact with the CRISP Server. Follow
 1. Navigate to the client directory (from the cloned repository root):
 
    ```sh
+   # Make sure you're in the repository root (cd enclave if not already there)
    cd examples/CRISP/apps/client
    ```
 
@@ -200,6 +201,7 @@ Keep this terminal open and running. Open a new terminal for the next steps.
 2. Navigate to the `packages/evm` directory:
 
    ```sh
+   # Make sure you're in the repository root (cd enclave if not already there)
    cd packages/evm
    ```
 
@@ -222,6 +224,7 @@ After deployment, take note of the addresses for the following contracts:
 1. Navigate to the CRISP directory (from the cloned repository root):
 
    ```sh
+   # Make sure you're in the repository root (cd enclave if not already there)
    cd examples/CRISP
    ```
 
