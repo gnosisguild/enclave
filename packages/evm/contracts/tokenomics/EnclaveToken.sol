@@ -140,6 +140,7 @@ contract EnclaveToken is
     }
 
     /**
+     * @notice Whitelist contracts that are allowed to transfer tokens
      * @param bondingManager BondingManager address
      * @param vestingEscrow VestingEscrow address
      */
