@@ -50,10 +50,10 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
     }
 
     /// @notice The ENCL token contract
-    IERC20 public immutable token;
+    IERC20 public immutable ENCL_TOKEN;
 
     /// @notice Mapping of beneficiary to their vesting stream
-    mapping(address => VestingStream) public vestingStreams;
+    mapping(address beneficiary => VestingStream stream) public vestingStreams;
 
     /// @notice Total amount of tokens held in escrow
     uint256 public totalEscrowed;
@@ -86,7 +86,7 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
      */
     constructor(address _token, address _owner) Ownable(_owner) {
         require(_token != address(0), ZeroTokenAddress());
-        token = IERC20(_token);
+        ENCL_TOKEN = IERC20(_token);
     }
 
     /**
@@ -114,7 +114,7 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
         );
 
         // Transfer tokens to escrow
-        token.safeTransferFrom(msg.sender, address(this), totalAmount);
+        ENCL_TOKEN.safeTransferFrom(msg.sender, address(this), totalAmount);
 
         // Create vesting stream
         vestingStreams[beneficiary] = VestingStream({
@@ -168,12 +168,12 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
 
         // Check allowance before attempting transfer
         require(
-            token.allowance(msg.sender, address(this)) >= totalTransfer,
+            ENCL_TOKEN.allowance(msg.sender, address(this)) >= totalTransfer,
             InsufficientAllowance()
         );
 
         // Transfer all tokens in one transaction
-        token.safeTransferFrom(msg.sender, address(this), totalTransfer);
+        ENCL_TOKEN.safeTransferFrom(msg.sender, address(this), totalTransfer);
 
         // Create all streams
         for (uint256 i = 0; i < beneficiaries.length; i++) {
@@ -240,7 +240,7 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
         stream.claimed += claimable;
         totalClaimed += claimable;
 
-        token.safeTransfer(beneficiary, claimable);
+        ENCL_TOKEN.safeTransfer(beneficiary, claimable);
 
         emit TokensClaimed(beneficiary, claimable);
     }
@@ -272,14 +272,14 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
         if (claimable > 0) {
             stream.claimed += claimable;
             totalClaimed += claimable;
-            token.safeTransfer(beneficiary, claimable);
+            ENCL_TOKEN.safeTransfer(beneficiary, claimable);
             emit TokensClaimed(beneficiary, claimable);
         }
 
         // Return unvested tokens to owner
         if (unvested > 0) {
             totalEscrowed -= unvested;
-            token.safeTransfer(owner(), unvested);
+            ENCL_TOKEN.safeTransfer(owner(), unvested);
         }
 
         emit VestingStreamRevoked(beneficiary, unvested);
@@ -364,7 +364,7 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
      * @param amount Amount of tokens to withdraw
      */
     function emergencyWithdraw(uint256 amount) external onlyOwner {
-        uint256 contractBalance = token.balanceOf(address(this));
+        uint256 contractBalance = ENCL_TOKEN.balanceOf(address(this));
         require(amount <= contractBalance, InsufficientBalance());
 
         uint256 reservedTokens = totalEscrowed - totalClaimed;
@@ -373,7 +373,7 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
             WouldBreakVestingInvariant()
         );
 
-        token.safeTransfer(owner(), amount);
+        ENCL_TOKEN.safeTransfer(owner(), amount);
     }
 
     /**
@@ -385,7 +385,7 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
         address tokenAddress,
         uint256 amount
     ) external onlyOwner {
-        require(tokenAddress != address(token), CannotSweepVestingToken());
+        require(tokenAddress != address(ENCL_TOKEN), CannotSweepVestingToken());
         IERC20(tokenAddress).safeTransfer(owner(), amount);
     }
 }
