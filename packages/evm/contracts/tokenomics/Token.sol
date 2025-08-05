@@ -3,8 +3,10 @@ pragma solidity >=0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract EnclaveToken is ERC20, AccessControl {
+contract EnclaveToken is ERC20, AccessControl, ReentrancyGuard, Ownable {
     uint256 public constant TOTAL_SUPPLY = 1_200_000_000e18;
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
@@ -14,11 +16,22 @@ contract EnclaveToken is ERC20, AccessControl {
         uint256 amount,
         string allocation
     );
+    mapping(address => bool) public transferWhitelisted;
+    bool public transfersRestricted;
 
-    constructor(address _owner) ERC20("Enclave", "ENCL") {
+    event TransferRestrictionUpdated(bool restricted);
+    event TransferWhitelistUpdated(address indexed account, bool whitelisted);
+
+    constructor(address _owner) ERC20("Enclave", "ENCL") Ownable(_owner) {
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(MINTER_ROLE, _owner);
         totalMinted = 0;
+
+        transfersRestricted = true;
+        transferWhitelisted[_owner] = true;
+
+        emit TransferRestrictionUpdated(true);
+        emit TransferWhitelistUpdated(_owner, true);
     }
 
     function mint(
@@ -70,5 +83,52 @@ contract EnclaveToken is ERC20, AccessControl {
         }
 
         totalMinted += totalAmount;
+    }
+
+    function setTransferRestriction(bool restricted) external onlyOwner {
+        transfersRestricted = restricted;
+        emit TransferRestrictionUpdated(restricted);
+    }
+
+    function setTransferWhitelist(
+        address account,
+        bool whitelisted
+    ) external onlyOwner {
+        transferWhitelisted[account] = whitelisted;
+        emit TransferWhitelistUpdated(account, whitelisted);
+    }
+
+    function toggleTransferWhitelist(address account) external onlyOwner {
+        transferWhitelisted[account] = !transferWhitelisted[account];
+        emit TransferWhitelistUpdated(account, transferWhitelisted[account]);
+    }
+
+    function whitelistContracts(
+        address bondingManager,
+        address vestingEscrow
+    ) external onlyOwner {
+        if (bondingManager != address(0)) {
+            transferWhitelisted[bondingManager] = true;
+            emit TransferWhitelistUpdated(bondingManager, true);
+        }
+        if (vestingEscrow != address(0)) {
+            transferWhitelisted[vestingEscrow] = true;
+            emit TransferWhitelistUpdated(vestingEscrow, true);
+        }
+    }
+
+    function _update(
+        address from,
+        address to,
+        uint256 value
+    ) internal override {
+        if (from != address(0) && to != address(0) && transfersRestricted) {
+            require(
+                transferWhitelisted[from] || transferWhitelisted[to],
+                "Transfer not allowed"
+            );
+        }
+
+        super._update(from, to, value);
     }
 }
