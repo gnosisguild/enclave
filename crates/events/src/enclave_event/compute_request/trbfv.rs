@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 /// TrBFV modules defining the API for multithreaded compute
 /// Each module defines the events that make up a compute request
 /// Each compute request should live independently and be self contained
