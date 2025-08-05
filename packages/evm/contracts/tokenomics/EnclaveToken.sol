@@ -35,7 +35,7 @@ contract EnclaveToken is
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     uint256 public totalMinted;
-    mapping(address => bool) public transferWhitelisted;
+    mapping(address account => bool whitelisted) public transferWhitelisted;
     bool public transfersRestricted;
 
     event AllocationMinted(
