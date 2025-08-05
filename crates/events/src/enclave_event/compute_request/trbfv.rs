@@ -8,8 +8,8 @@
 /// Each module defines the events that make up a compute request
 /// Each compute request should live independently and be self contained
 
-/// This method will generate esi smudging noise shamir shares to be shared with other members of the comittee
-pub mod generate_esi_shares {
+/// This method will generate esi smudging noise shamir shares to be shared with other members of the committee
+pub mod gen_esi_shares {
     use crate::bytes::Bytes;
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ pub mod generate_esi_shares {
         /// BFV Params
         params: Bytes,
         /// Max number of ciphertexts
-        max_ciphertexts: u64,
+        max_num_ciphertexts: u64,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -29,8 +29,8 @@ pub mod generate_esi_shares {
     }
 }
 
-/// This method will generate sk shamir shares to be shared with other members of the committee
-pub mod generate_secret_shares {
+/// This method will generate the public key share as well as the sk shamir secret shares to be distributed to other members of the committee
+pub mod gen_pk_share_and_sk_sss {
     use crate::bytes::Bytes;
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
@@ -50,8 +50,8 @@ pub mod generate_secret_shares {
     }
 }
 
-/// This method will generate the decryption key material used to generate a decryption key
-pub mod generate_decryption_key {
+/// This method will generate the decryption key material to create a decryption share
+pub mod gen_decryption_key {
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
 
@@ -73,7 +73,7 @@ pub mod generate_decryption_key {
 }
 
 /// This method will generate a decryption share for the party
-pub mod generate_decryption_share {
+pub mod gen_decryption_share {
     use crate::bytes::Bytes;
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};

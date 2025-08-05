@@ -14,20 +14,20 @@ use serde::{Deserialize, Serialize};
 /// Input format for TrBFVRequest
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVRequest {
-    GenerateEsiShares(trbfv::generate_esi_shares::Request),
-    GenerateSecretShares(trbfv::generate_secret_shares::Request),
-    GenerateDecryptionKey(trbfv::generate_decryption_key::Request),
-    GenerateDecryptionShare(trbfv::generate_decryption_share::Request),
+    GenEsiShares(trbfv::gen_esi_shares::Request),
+    GenPkShareAndSkSss(trbfv::gen_pk_share_and_sk_sss::Request),
+    GenDecryptionKey(trbfv::gen_decryption_key::Request),
+    GenDecryptionShare(trbfv::gen_decryption_share::Request),
     ThresholdDecrypt(trbfv::threshold_decrypt::Request),
 }
 
 /// Result format for TrBFVResponse
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVResponse {
-    GenerateEsiShares(trbfv::generate_esi_shares::Response),
-    GenerateSecretShares(trbfv::generate_secret_shares::Response),
-    GenerateDecryptionKey(trbfv::generate_decryption_key::Response),
-    GenerateDecryptionShare(trbfv::generate_decryption_share::Response),
+    GenEsiShares(trbfv::gen_esi_shares::Response),
+    GenPkShareAndSkSss(trbfv::gen_pk_share_and_sk_sss::Response),
+    GenDecryptionKey(trbfv::gen_decryption_key::Response),
+    GenDecryptionShare(trbfv::gen_decryption_share::Response),
     ThresholdDecrypt(trbfv::threshold_decrypt::Response),
 }
 
