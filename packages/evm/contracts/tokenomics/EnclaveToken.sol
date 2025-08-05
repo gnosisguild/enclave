@@ -18,6 +18,12 @@ contract EnclaveToken is
     Ownable,
     AccessControl
 {
+    error ZeroAddress();
+    error ZeroAmount();
+    error ExceedsTotalSupply();
+    error ArrayLengthMismatch();
+    error TransferNotAllowed();
+
     uint256 public constant TOTAL_SUPPLY = 1_200_000_000e18;
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
@@ -60,12 +66,9 @@ contract EnclaveToken is
         uint256 amount,
         string memory allocation
     ) external onlyRole(MINTER_ROLE) {
-        require(recipient != address(0), "EnclaveToken: zero address");
-        require(amount > 0, "EnclaveToken: zero amount");
-        require(
-            totalMinted + amount <= TOTAL_SUPPLY,
-            "EnclaveToken: exceeds total supply"
-        );
+        require(recipient != address(0), ZeroAddress());
+        require(amount > 0, ZeroAmount());
+        require(totalMinted + amount <= TOTAL_SUPPLY, ExceedsTotalSupply());
 
         _mint(recipient, amount);
         totalMinted += amount;
@@ -85,7 +88,7 @@ contract EnclaveToken is
         require(
             recipients.length == amounts.length &&
                 amounts.length == allocations.length,
-            "EnclaveToken: array length mismatch"
+            ArrayLengthMismatch()
         );
 
         uint256 totalAmount = 0;
@@ -94,12 +97,12 @@ contract EnclaveToken is
         }
         require(
             totalMinted + totalAmount <= TOTAL_SUPPLY,
-            "EnclaveToken: exceeds total supply"
+            ExceedsTotalSupply()
         );
 
         for (uint256 i = 0; i < recipients.length; i++) {
-            require(recipients[i] != address(0), "EnclaveToken: zero address");
-            require(amounts[i] > 0, "EnclaveToken: zero amount");
+            require(recipients[i] != address(0), ZeroAddress());
+            require(amounts[i] > 0, ZeroAmount());
 
             _mint(recipients[i], amounts[i]);
             emit AllocationMinted(recipients[i], amounts[i], allocations[i]);
@@ -165,7 +168,7 @@ contract EnclaveToken is
         if (from != address(0) && to != address(0) && transfersRestricted) {
             require(
                 transferWhitelisted[from] || transferWhitelisted[to],
-                "EnclaveToken: transfer not allowed"
+                TransferNotAllowed()
             );
         }
 
