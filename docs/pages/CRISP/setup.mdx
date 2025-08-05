@@ -59,16 +59,7 @@ Once everything is running, you can:
 
 If you prefer to set up CRISP manually or want to understand each component:
 
-### Clone the Repository
-
-First, clone the Enclave repository which contains the CRISP example:
-
-```sh
-git clone https://github.com/gnosisguild/enclave.git
-cd enclave
-```
-
-## Prerequisites
+### Prerequisites
 
 Before getting started, ensure you have the following tools installed:
 
@@ -80,6 +71,19 @@ Before getting started, ensure you have the following tools installed:
 - **Enclave CLI** (for managing ciphernodes)
 
 ## Install Dependencies
+
+### Install Node.js
+
+The client application requires Node.js for running the React/Vite development server and managing dependencies. Install Node.js (version 22 or higher recommended):
+
+```sh
+# Using nvm (recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+nvm install 22
+nvm use 22
+
+# Or download from https://nodejs.org/
+```
 
 ### Install Enclave CLI
 
@@ -96,14 +100,6 @@ enclaveup install
 ```
 
 For more installation options and details, see the [Installation Guide](/installation).
-
-**Alternative: Build from Source**
-
-If you prefer to build from source:
-
-```sh
-cargo install --locked --path ./crates/cli --bin enclave -f
-```
 
 ### Install Rust and Foundry
 
@@ -136,6 +132,24 @@ cargo risczero --version
 ```
 
 At this point, you should have all the necessary tools to develop and deploy applications with [RISC Zero](https://www.risczero.com).
+
+### Clone the Repository
+
+Now clone the Enclave repository which contains the CRISP example:
+
+```sh
+git clone https://github.com/gnosisguild/enclave.git
+cd enclave
+```
+
+**Alternative: Build Enclave CLI from Source**
+
+If you prefer to build the Enclave CLI from source instead of using the installer:
+
+```sh
+# Make sure you're in the cloned repository root (you should be after the clone step)
+cargo install --locked --path ./crates/cli --bin enclave -f
+```
 
 ## Setting Up the Client
 
@@ -236,7 +250,7 @@ Make sure to take note of the **CRISP Program Contract Address**, as this will s
 
 ### Set Up Ciphernodes
 
-Start the ciphernodes using the Enclave CLI:
+Start the ciphernodes using the Enclave CLI (make sure you're in the `examples/CRISP` directory):
 
 1. Set up the aggregator wallet:
 
@@ -253,7 +267,7 @@ Start the ciphernodes using the Enclave CLI:
 3. Add ciphernodes to the registry:
 
    ```sh
-   # Navigate back to the Enclave repository root
+   # Navigate to the `packages/evm` directory to add ciphernodes to the registry
    cd ../../packages/evm
 
    # Add the ciphernodes
