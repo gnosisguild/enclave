@@ -9,7 +9,7 @@
 /// Each compute request should live independently and be self contained
 
 /// This method will generate esi smudging noise shamir shares to be shared with other members of the committee
-pub mod gen_esi_shares {
+pub mod gen_esi_sss {
     use crate::bytes::Bytes;
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};

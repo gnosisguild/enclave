@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// Input format for TrBFVRequest
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVRequest {
-    GenEsiShares(trbfv::gen_esi_shares::Request),
+    GenEsiSss(trbfv::gen_esi_sss::Request),
     GenPkShareAndSkSss(trbfv::gen_pk_share_and_sk_sss::Request),
     GenDecryptionKey(trbfv::gen_decryption_key::Request),
     GenDecryptionShare(trbfv::gen_decryption_share::Request),
@@ -24,7 +24,7 @@ pub enum TrBFVRequest {
 /// Result format for TrBFVResponse
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVResponse {
-    GenEsiShares(trbfv::gen_esi_shares::Response),
+    GenEsiSss(trbfv::gen_esi_sss::Response),
     GenPkShareAndSkSss(trbfv::gen_pk_share_and_sk_sss::Response),
     GenDecryptionKey(trbfv::gen_decryption_key::Response),
     GenDecryptionShare(trbfv::gen_decryption_share::Response),
