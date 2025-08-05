@@ -99,4 +99,56 @@ contract VestingEscrow is Ownable, ReentrancyGuard {
         uint256 timeElapsed = currentTime - stream.startTime;
         return (stream.totalAmount * timeElapsed) / stream.vestingDuration;
     }
+
+    function revokeVestingStream(address beneficiary) external onlyOwner {
+        VestingStream storage stream = vestingStreams[beneficiary];
+        require(stream.totalAmount > 0, "No stream");
+        require(!stream.revoked, "Already revoked");
+
+        uint256 claimable = getClaimableAmount(beneficiary);
+        uint256 unvested = stream.totalAmount - stream.claimed - claimable;
+
+        stream.revoked = true;
+
+        if (claimable > 0) {
+            stream.claimed += claimable;
+            totalClaimed += claimable;
+            token.transfer(beneficiary, claimable);
+        }
+
+        if (unvested > 0) {
+            totalEscrowed -= unvested;
+            token.transfer(owner(), unvested);
+        }
+    }
+
+    function getRemainingVestingTime(
+        address beneficiary
+    ) external view returns (uint256) {
+        VestingStream memory stream = vestingStreams[beneficiary];
+        if (stream.totalAmount == 0) return 0;
+
+        uint256 endTime = stream.startTime + stream.vestingDuration;
+        uint256 currentTime = block.timestamp;
+
+        return currentTime >= endTime ? 0 : endTime - currentTime;
+    }
+
+    function emergencyWithdraw(uint256 amount) external onlyOwner {
+        uint256 contractBalance = token.balanceOf(address(this));
+        require(amount <= contractBalance, "Too much");
+
+        uint256 reserved = totalEscrowed - totalClaimed;
+        require(contractBalance - amount >= reserved, "Would break vesting");
+
+        token.transfer(owner(), amount);
+    }
+
+    function sweepToken(
+        address tokenAddress,
+        uint256 amount
+    ) external onlyOwner {
+        require(tokenAddress != address(token), "Can't sweep vesting token");
+        IERC20(tokenAddress).transfer(owner(), amount);
+    }
 }
