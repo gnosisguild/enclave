@@ -8,9 +8,9 @@
 /// Each module defines the events that make up a compute request
 /// Each compute request should live independently and be self contained
 
-/// This method will generate esi smudging noise shamir shares to be shared with other members of the committee.
-/// This has been separated from the general setup in order to be able to take advantage of parallelism
 pub mod gen_esi_sss {
+    /// This module defines events that will generate esi smudging noise shamir shares to be shared with other members of the committee.
+    /// This has been separated from the general setup in order to be able to take advantage of parallelism
     use crate::bytes::Bytes;
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
@@ -30,9 +30,9 @@ pub mod gen_esi_sss {
     }
 }
 
-/// This method will generate the public key share as well as the sk shamir secret shares to be distributed to other members of the committee
-/// This has been separated from the esi setup in order to be able to take advantage of parallelism
 pub mod gen_pk_share_and_sk_sss {
+    /// This module defines events that will generate the public key share as well as the sk shamir secret shares to be distributed to other members of the committee.
+    /// This has been separated from the esi setup in order to be able to take advantage of parallelism
     use crate::bytes::Bytes;
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
@@ -52,8 +52,8 @@ pub mod gen_pk_share_and_sk_sss {
     }
 }
 
-/// This method will generate the decryption key material to create a decryption share
 pub mod gen_decryption_key {
+    /// This module defines events that will generate the decryption key material to create a decryption share
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
 
@@ -74,8 +74,8 @@ pub mod gen_decryption_key {
     }
 }
 
-/// This method will generate a decryption share for the given ciphertext for this node
 pub mod gen_decryption_share {
+    /// This module defines events that will generate a decryption share for the given ciphertext for this node
     use crate::bytes::Bytes;
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
@@ -99,8 +99,8 @@ pub mod gen_decryption_share {
     }
 }
 
-/// This method will decrypt a ciphertext with a threshold quorum of decryption shares
 pub mod threshold_decrypt {
+    /// This module defines events that will decrypt a ciphertext with a threshold quorum of decryption shares
     use crate::bytes::Bytes;
     use serde::{Deserialize, Serialize};
 
