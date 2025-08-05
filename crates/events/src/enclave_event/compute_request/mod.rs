@@ -49,6 +49,9 @@ pub enum ComputeResponse {
     // Eg. TFHE(TFHEResponse)
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ComputeRequestError {}
+
 // Actix messages
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
@@ -62,6 +65,7 @@ pub struct ComputeRequested {
 pub struct ComputeRequestFailed {
     correlation_id: CorrelationId,
     request: ComputeRequest,
+    error: ComputeRequestError,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
