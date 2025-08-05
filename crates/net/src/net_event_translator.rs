@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::correlation_id::CorrelationId;
 use crate::events::NetCommand;
 use crate::events::NetEvent;
 use crate::NetInterface;
@@ -14,7 +13,7 @@ use actix::prelude::*;
 use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
-use e3_events::{EnclaveEvent, EventBus, EventId, Subscribe};
+use e3_events::{CorrelationId, EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
 use std::sync::Arc;

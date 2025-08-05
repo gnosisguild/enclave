@@ -12,7 +12,7 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 
-use crate::correlation_id::CorrelationId;
+use e3_events::CorrelationId;
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
 pub enum NetCommand {

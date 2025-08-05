@@ -2612,8 +2612,8 @@ dependencies = [
  "anyhow",
  "argon2",
  "async-trait",
- "e3-config",
  "rand 0.8.5",
+ "serde",
  "tokio",
  "zeroize",
 ]
@@ -2684,6 +2684,7 @@ dependencies = [
  "bincode",
  "bloom",
  "bs58",
+ "e3-crypto",
  "futures-util",
  "once_cell",
  "serde",
