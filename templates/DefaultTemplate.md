@@ -2,9 +2,9 @@
 flowchart TD
     subgraph s1["templates/default"]
         CL["Client"]
-        SDK["TypescriptSdk"]
+        SDK["Typescript SDK"]
         TSS["TypescriptEventServer"]
-        CLI["EnclaveCLI"]
+        CLI["CLI"]
         C["Contracts"]
         D["DeployScripts"]
         HH["hardhat"]
@@ -22,5 +22,9 @@ flowchart TD
         TSS --listens--> SDK
         CLI --"enclave program --dev"--> PS
         PS --> P
+		SDK:::internal-link
+		C:::internal-link
+		PS:::internal-link
+		CLI:::internal-link
     end
 ```

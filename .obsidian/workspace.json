@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "DOCS_ROOT.md",
+                "file": "templates/DefaultTemplate.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "DOCS_ROOT"
+              "title": "DefaultTemplate"
             }
           },
           {
@@ -27,16 +27,15 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "templates/DefaultTemplate.md",
+                "file": "architecture/notes/Actors.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "DefaultTemplate"
+              "title": "Actors"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -107,8 +106,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "6b6677e64c1270ea",
@@ -197,11 +195,15 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "2a704beeb5ce40ed",
+  "active": "7a09ebbe677de6f8",
   "lastOpenFiles": [
-    "architecture/notes/Actors.md",
-    "DOCS_ROOT.md",
+    "crates/cli/CLI.md",
     "templates/DefaultTemplate.md",
+    "crates/program-server/E3ProgramServer.md",
+    "packages/evm/docs/Contracts.md",
+    "packages/enclave-sdk/Typescript SDK.md",
+    "DOCS_ROOT.md",
+    "architecture/notes/Actors.md",
     "target/debug/doclinker.d",
     "target/debug/doclinker",
     "target/debug/deps/doclinker-75a3c4d8defcdac3",
@@ -214,7 +216,6 @@
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/ecxtgy4t4mjvh7tm9jyy1jid7.o",
     "templates/default/README.md",
     "crates/Ciphernode.md",
-    "packages/evm/docs/Contracts.md",
     "crates/net/NetSystem.md",
     "crates/data/PersistenceSystem.md",
     "README.md",
@@ -232,8 +233,6 @@
     "architecture/notes/Data Security.md",
     "crates/aggregator/AggregationSystem.md",
     "crates/aggregator/docs/PlaintextAggregator.md",
-    "crates/support-scripts/Support.md",
-    "crates/program-server/E3ProgramServer.md",
     "notes/Untitled.canvas",
     "systems/Untitled.canvas",
     "notes/DKG.canvas",
