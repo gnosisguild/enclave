@@ -23,11 +23,8 @@ export interface CurrentRound {
 
 export interface BroadcastVoteRequest {
   round_id: number;
-  enc_vote_bytes: number[];
-  proof: number[];
-  public_inputs: string[];
+  crisp_inputs: string;
   address: string;
-  proof_sem: number[];
 }
 
 export type VoteResponseStatus = 'success' | 'user_already_voted' | 'failed_broadcast';

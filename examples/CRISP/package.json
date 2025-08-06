@@ -7,7 +7,6 @@
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
   },
-  "type": "module",
   "scripts": {
     "hardhat": "hardhat",
     "compile": "forge compile",
@@ -18,18 +17,22 @@
     "dev:down": "bash ./scripts/clean.sh",
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "test": "pnpm test:e2e",
+    "test:contracts": "hardhat test test/crisp.contracts.test.ts --network localhost",
     "sh": "bash ./scripts/tasks/dockerize.sh",
     "report": "playwright show-report"
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
     "@gnosis-guild/enclave": "workspace:*",
+    "@gnosis-guild/enclave-sdk": "workspace:*",
     "@semaphore-protocol/contracts": "github:hmzakhalid/semaphore-noir#dist-contracts",
     "@zk-kit/lean-imt.sol": "2.0.0",
+    "ethers": "^6.15.0",
     "poseidon-solidity": "^0.0.5",
     "solady": "^0.1.13"
   },
   "devDependencies": {
+    "@gnosis-guild/enclave-config": "workspace:*",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-foundry": "^1.1.2",
@@ -40,6 +43,8 @@
     "@nomicfoundation/hardhat-verify": "^2.0.0",
     "@nomicfoundation/ignition-core": "^0.15.5",
     "@playwright/test": "1.52.0",
+    "@semaphore-protocol/core": "github:hmzakhalid/semaphore-noir#dist-core",
+    "@semaphore-protocol/data": "^4.9.2",
     "@synthetixio/synpress": "^4.1.0",
     "@synthetixio/synpress-cache": "^0.0.12",
     "@typechain/ethers-v6": "^0.5.0",
@@ -47,6 +52,7 @@
     "@types/chai": "^4.2.0",
     "@types/mocha": ">=9.1.0",
     "concurrently": "^9.1.2",
+    "dotenv": "^16.4.5",
     "hardhat": "^2.22.10",
     "hardhat-deploy": "^0.12.4",
     "hardhat-gas-reporter": "^1.0.8",
@@ -55,6 +61,7 @@
     "ts-node": "^10.9.2",
     "typechain": "^8.3.0",
     "typescript": "5.8.3",
+    "viem": "2.30.6",
     "wait-on": "^8.0.3"
   },
   "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808"

@@ -1,12 +1,12 @@
 {
+  "extends": "@gnosis-guild/enclave-config/tsconfig.json",
+  "include": ["tasks/**/*", "test/**/*", "deploy/**/*", "types/**/*"],
+  "exclude": ["node_modules", "dist"],
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "bundler",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "resolveJsonModule": true,
   }
 }

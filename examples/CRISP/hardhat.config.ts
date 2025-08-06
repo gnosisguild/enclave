@@ -8,13 +8,16 @@ import "@nomicfoundation/hardhat-foundry";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-deploy";
 import type { HardhatUserConfig } from "hardhat/config";
-import { vars } from "hardhat/config";
 import type { NetworkUserConfig } from "hardhat/types";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 // Run 'npx hardhat vars setup' to see the list of variables that need to be set
 
-const mnemonic: string = vars.get("MNEMONIC");
-const infuraApiKey: string = vars.get("INFURA_API_KEY");
+const privateKey: string = process.env.PRIVATE_KEY!
+const mnemonic: string = process.env.MNEMONIC!
+const infuraApiKey: string = process.env.INFURA_API_KEY!
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -79,10 +82,13 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
-      accounts: {
-        mnemonic,
-      },
+      accounts: [{privateKey, balance: "1000000000000000000000000000000000000000"}],
       chainId: chainIds.hardhat,
+    },
+    localhost: {
+      accounts: [privateKey],
+      chainId: chainIds.hardhat,
+      url: "http://localhost:8545",
     },
     ganache: {
       accounts: {

@@ -12,10 +12,7 @@ use crate::server::{
     CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
-use alloy::{
-    dyn_abi::DynSolValue,
-    primitives::{Bytes, U256},
-};
+use alloy::primitives::{Bytes, U256};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveWrite};
 use eyre::Error;
 use log::{error, info};
@@ -69,27 +66,16 @@ async fn broadcast_encrypted_vote(
         return HttpResponse::InternalServerError().json("Internal server error");
     }
 
-    // Prepare vote data for blockchain
-    let public_inputs_array = if vote.public_inputs.is_empty() {
-        DynSolValue::Array(vec![])
-    } else {
-        DynSolValue::Array(
-            vote.public_inputs
-                .into_iter()
-                .map(|pi_array_u8| DynSolValue::FixedBytes(pi_array_u8.into(), 32))
-                .collect(),
-        )
-    };
-
     let e3_id = U256::from(vote.round_id);
-    let params_value = DynSolValue::Tuple(vec![
-        DynSolValue::Bytes(vote.proof_sem),
-        DynSolValue::Bytes(vote.proof),
-        public_inputs_array,
-        DynSolValue::Bytes(vote.enc_vote_bytes),
-    ]);
 
-    let encoded_params = Bytes::from(params_value.abi_encode_params());
+    // Decode hex string to Vec<u8>, then convert to Bytes
+    let input_bytes = hex::decode(vote.crisp_inputs.strip_prefix("0x").unwrap_or(&vote.crisp_inputs))
+    .map_err(|e| {
+        log::error!("Failed to decode hex string: {:?}", e);
+        HttpResponse::InternalServerError().json("Invalid hex string")
+    }).unwrap();
+
+    let input_bytes_alloy = Bytes::from(input_bytes);
 
     // Broadcast vote to blockchain
     let contract = match EnclaveContract::new(
@@ -106,7 +92,7 @@ async fn broadcast_encrypted_vote(
         }
     };
 
-    match contract.publish_input(e3_id, encoded_params).await {
+    match contract.publish_input(e3_id, input_bytes_alloy).await {
         Ok(hash) => HttpResponse::Ok().json(VoteResponse {
             status: VoteResponseStatus::Success,
             tx_hash: Some(hash.transaction_hash.to_string()),

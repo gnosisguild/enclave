@@ -382,7 +382,10 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         let nonce = next_pending_nonce(&*self.provider).await?;
 
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.publishInput(e3_id, data).nonce(nonce);
+        let builder = contract
+            .publishInput(e3_id, data)
+            .nonce(nonce)
+            .gas(10_000_000);
         let receipt = builder.send().await?.get_receipt().await?;
 
         Ok(receipt)

@@ -11,6 +11,8 @@ import {
   type SDKConfig,
   type AllEventTypes,
   type EventCallback,
+  type FheProtocol,
+  type ProtocolParams,
   EnclaveEventType,
   RegistryEventType,
   SDKError,
@@ -23,6 +25,8 @@ export interface UseEnclaveSDKConfig {
   };
   chainId?: number;
   autoConnect?: boolean;
+  protocol: FheProtocol;
+  protocolParams?: ProtocolParams;
 }
 
 export interface UseEnclaveSDKReturn {
@@ -69,7 +73,13 @@ export interface UseEnclaveSDKReturn {
  *     contracts: {
  *       enclave: '0x...',
  *       ciphernodeRegistry: '0x...'
- *     }
+ *     },
+ *     protocol: EFheProtocol.BFV,
+ *     protocolParams: {
+ *       degree: 2048,
+ *       plaintextModulus: 1032193n,
+ *       moduli: new BigUint64Array([0x3FFFFFFF000001n]),
+ *     },
  *   });
  *
  *   // Use the SDK...
@@ -107,6 +117,8 @@ export const useEnclaveSDK = (
           ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
         },
         chainId: config.chainId,
+        protocol: config.protocol,
+        protocolParams: config.protocolParams,
       };
 
       const newSdk = new EnclaveSDK(sdkConfig);

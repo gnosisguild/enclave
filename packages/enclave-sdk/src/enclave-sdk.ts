@@ -16,6 +16,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { hardhat, mainnet, monadTestnet, sepolia } from "viem/chains";
+import initializeWasm from "@gnosis-guild/e3-wasm/init";
 
 import {
   CiphernodeRegistryOwnable__factory,
@@ -23,14 +24,20 @@ import {
 } from "@gnosis-guild/enclave/types";
 import { ContractClient } from "./contract-client";
 import { EventListener } from "./event-listener";
-import {
-  type AllEventTypes,
-  type E3,
-  EnclaveEventType,
-  type EventCallback,
-  type SDKConfig,
-} from "./types";
+import { FheProtocol, EnclaveEventType, BfvProtocolParams } from "./types";
 import { SDKError, isValidAddress } from "./utils";
+
+import type {
+  AllEventTypes,
+  E3,
+  EventCallback,
+  SDKConfig,
+  ProtocolParams,
+  VerifiableEncryptionResult,
+} from "./types";
+import { bfv_encrypt_number, bfv_verifiable_encrypt_number } from "@gnosis-guild/e3-wasm";
+import { CircuitInputs, defaultParams, generateProof } from "./greco";
+import { CompiledCircuit } from "@noir-lang/noir_js";
 
 export class EnclaveSDK {
   public static readonly chains = {
@@ -43,6 +50,8 @@ export class EnclaveSDK {
   private eventListener: EventListener;
   private contractClient: ContractClient;
   private initialized = false;
+  private protocol: FheProtocol;
+  private protocolParams: ProtocolParams;
 
   constructor(private config: SDKConfig) {
     if (!config.publicClient) {
@@ -66,6 +75,20 @@ export class EnclaveSDK {
       config.walletClient,
       config.contracts,
     );
+
+    this.protocol = config.protocol;
+
+    if (config.protocolParams) {
+      this.protocolParams = config.protocolParams;
+    } else {
+      switch (this.protocol) {
+        case FheProtocol.BFV:
+          this.protocolParams = BfvProtocolParams.BFV_NORMAL;
+          break;
+        default:
+          throw new Error("Protocol not supported")
+      }
+    }
   }
 
   /**
@@ -83,6 +106,64 @@ export class EnclaveSDK {
         `Failed to initialize SDK: ${error}`,
         "SDK_INITIALIZATION_FAILED",
       );
+    }
+  }
+
+  /**
+   * Encrypt a number using the configured protocol
+   * @param data - The number to encrypt
+   * @param publicKey - The public key to use for encryption
+   * @returns The encrypted number
+   */
+  public async encryptNumber(data: bigint, publicKey: Uint8Array): Promise<Uint8Array> {
+    await initializeWasm();
+    switch (this.protocol) {
+      case FheProtocol.BFV:
+        return bfv_encrypt_number(
+          data, 
+          publicKey,
+          this.protocolParams.degree,
+          this.protocolParams.plaintextModulus,
+          this.protocolParams.moduli,
+        );
+      default:
+        throw new Error("Protocol not supported")
+    }
+  }
+
+  /**
+   * Encrypt a number using the configured protocol and generate a zk-SNARK proof using Greco
+   * @param data - The number to encrypt
+   * @param publicKey - The public key to use for encryption
+   * @param circuit - The circuit to use for proof generation
+   * @returns The encrypted number and the proof
+   */
+  public async encryptNumberAndGenProof(
+    data: bigint, 
+    publicKey: Uint8Array,
+    circuit: CompiledCircuit,
+  ): Promise<VerifiableEncryptionResult> {
+    await initializeWasm();
+    switch (this.protocol) {
+      case FheProtocol.BFV:
+        const [encryptedVote, circuitInputs] = bfv_verifiable_encrypt_number(
+          data, 
+          publicKey,
+          this.protocolParams.degree,
+          this.protocolParams.plaintextModulus,
+          this.protocolParams.moduli,
+        );
+
+        const inputs = JSON.parse(circuitInputs) as CircuitInputs;
+        inputs.params = defaultParams;
+        const proof = await generateProof(inputs, circuit);
+
+        return {
+          encryptedVote,
+          proof,
+        };
+      default:
+        throw new Error("Protocol not supported")
     }
   }
 
@@ -354,6 +435,8 @@ export class EnclaveSDK {
     };
     privateKey?: `0x${string}`;
     chainId: keyof typeof EnclaveSDK.chains;
+    protocol: FheProtocol;
+    protocolParams?: ProtocolParams;
   }): EnclaveSDK {
     const chain = EnclaveSDK.chains[options.chainId];
 
@@ -383,6 +466,9 @@ export class EnclaveSDK {
       publicClient,
       walletClient,
       contracts: options.contracts,
+      chainId: options.chainId,
+      protocol: options.protocol,
+      protocolParams: options.protocolParams,
     });
   }
 }
