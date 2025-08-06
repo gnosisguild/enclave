@@ -24,6 +24,11 @@ flowchart LR
         EVM["Contracts"]
     end
 
+	subgraph app["Application Templates"]
+		CR["Crisp"]
+		DEF["DefaultTemplate"]
+	end
+
     C:::internal-link
     S:::internal-link
     EVM:::internal-link
@@ -31,6 +36,8 @@ flowchart LR
     R:::internal-link
     N:::internal-link
     CLI:::internal-link
+    CR:::internal-link
+    DEF:::internal-link
 
     click C "https://github.com/gnosisguild/enclave/tree/main/crates/Ciphernode.md"
     click S "https://github.com/gnosisguild/enclave/tree/main/crates/support-scripts/Support.md"
