@@ -22,14 +22,5 @@ flowchart TD
         TSS --listens--> SDK
         CLI --"enclave program --dev"--> PS
         PS --> P
-    
-
-        CL:::internal-link
-        CLI:::internal-link
-        C:::internal-link
-        D:::internal-link
-        P:::internal-link
-        PS:::internal-link
-        TSS:::internal-link
     end
 ```
