@@ -43,8 +43,10 @@ flowchart TD
      SDK:::internal-link
      CLI:::internal-link
      C:::internal-link
+
     click PS "https://github.com/gnosisguild/enclave/tree/main/crates/program-server/E3ProgramServer.md"
-    click SDK "https://github.com/gnosisguild/enclave/tree/main/packages/enclave-sdk/Typescript%20SDK.md"
+    click PSS "https://github.com/gnosisguild/enclave/tree/main/crates/program-server/E3ProgramServer.md"
+    click SDK "https://github.com/gnosisguild/enclave/tree/main/packages/enclave-sdk/Typescript SDK.md"
     click CLI "https://github.com/gnosisguild/enclave/tree/main/crates/cli/CLI.md"
     click C "https://github.com/gnosisguild/enclave/tree/main/packages/evm/docs/Contracts.md"
 ```
@@ -53,6 +55,7 @@ flowchart TD
 
 [[CLI]]
 [[Contracts]]
+[[E3ProgramServer]]
 [[E3ProgramServer]]
 [[Typescript SDK]]
 </details>
