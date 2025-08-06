@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "templates/DefaultTemplate.md",
+                "file": "DOCS_ROOT.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "DefaultTemplate"
+              "title": "DOCS_ROOT"
             }
           },
           {
@@ -120,8 +120,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "6b6677e64c1270ea",
@@ -183,13 +182,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "templates/DefaultTemplate.md",
+                "file": "DOCS_ROOT.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of DefaultTemplate"
+              "title": "Outline of DOCS_ROOT"
             }
           }
         ],
@@ -212,19 +211,18 @@
   },
   "active": "7a09ebbe677de6f8",
   "lastOpenFiles": [
-    "examples/CRISP/apps/program/target/debug/deps/libactix_web-b3069a68e704fe88.rmeta",
-    "examples/CRISP/apps/program/target/debug/deps/rmetaq2SdCO/lib.rmeta",
-    "examples/CRISP/apps/program/target/debug/deps/rmetaq2SdCO",
-    "examples/CRISP/apps/program/target/debug/deps/actix_web-b3069a68e704fe88.d",
-    "examples/CRISP/apps/program/target/debug/deps/libactix_http-016c2c5fd7a39b75.rmeta",
-    "examples/CRISP/apps/program/target/debug/deps/rmetaqWxL0T/lib.rmeta",
-    "examples/CRISP/apps/program/target/debug/deps/rmetaqWxL0T",
-    "examples/CRISP/apps/program/target/debug/deps/libenv_logger-eba822b86de2a8b5.rmeta",
-    "examples/CRISP/apps/program/target/debug/deps/rmeta4YbqVX/lib.rmeta",
-    "examples/CRISP/apps/program/target/debug/deps/rmeta4YbqVX",
-    "examples/CRISP/apps/program/target/debug/deps/env_logger-eba822b86de2a8b5.d",
-    "DOCS_ROOT.md",
     "templates/DefaultTemplate.md",
+    "target/debug/doclinker.d",
+    "target/debug/doclinker",
+    "target/debug/deps/doclinker-75a3c4d8defcdac3",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/work-products.bin",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/query-cache.bin",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/f4phy5g9yziv9q7r9gmu6ke6q.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/f4boaaeocto3mmre3gxvebuq6.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/egko8tymk6apj4pg2w5kjl52l.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/edibyal6ymofhkfgwwuvupupq.o",
+    "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/ecxtgy4t4mjvh7tm9jyy1jid7.o",
+    "DOCS_ROOT.md",
     "templates/default/README.md",
     "crates/Ciphernode.md",
     "packages/evm/docs/Contracts.md",

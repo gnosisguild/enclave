@@ -36,7 +36,6 @@ flowchart LR
     R:::internal-link
     N:::internal-link
     CLI:::internal-link
-    CR:::internal-link
     DEF:::internal-link
 
     click C "https://github.com/gnosisguild/enclave/tree/main/crates/Ciphernode.md"
