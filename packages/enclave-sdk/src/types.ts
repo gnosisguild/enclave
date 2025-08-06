@@ -214,3 +214,17 @@ export interface SDKEventEmitter {
   off<T extends AllEventTypes>(eventType: T, callback: EventCallback<T>): void;
   emit<T extends AllEventTypes>(event: EnclaveEvent<T>): void;
 }
+
+/**
+ * Result of verifiable encryption using BFV
+ */
+export interface BfvVerifiableEncryptionResult {
+  /**
+   * The encrypted vote
+   */
+  encryptedVote: Uint8Array;
+  /**
+   * The circuit inputs to pass to Greco for ciphertext validation
+   */
+  circuitInputs: string;
+}

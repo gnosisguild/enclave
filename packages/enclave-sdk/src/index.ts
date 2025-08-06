@@ -62,4 +62,4 @@ export {
   type ComputeProviderParams,
 } from "./utils";
 
-export { encryptNumber } from "./wasm";
+export { bfvEncryptNumber, bfvVerifiableEncryptNumber } from "./wasm";
