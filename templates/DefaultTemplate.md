@@ -25,7 +25,6 @@ flowchart TD
     
 
         CL:::internal-link
-        SDK:::internal-link
         CLI:::internal-link
         C:::internal-link
         D:::internal-link

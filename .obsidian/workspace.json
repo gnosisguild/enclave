@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "architecture/notes/Actors.md",
+                "file": "templates/DefaultTemplate.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Actors"
+              "title": "DefaultTemplate"
             }
           },
           {
@@ -49,7 +49,8 @@
               "title": "ThreadpoolSystem"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -182,13 +183,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "DOCS_ROOT.md",
+                "file": "templates/DefaultTemplate.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of DOCS_ROOT"
+              "title": "Outline of DefaultTemplate"
             }
           }
         ],
@@ -209,8 +210,10 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "7a09ebbe677de6f8",
+  "active": "2a704beeb5ce40ed",
   "lastOpenFiles": [
+    "architecture/notes/Actors.md",
+    "DOCS_ROOT.md",
     "templates/DefaultTemplate.md",
     "target/debug/doclinker.d",
     "target/debug/doclinker",
@@ -222,7 +225,6 @@
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/egko8tymk6apj4pg2w5kjl52l.o",
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/edibyal6ymofhkfgwwuvupupq.o",
     "target/debug/incremental/doclinker-3kigt6lw91sei/s-h9wqj64zy8-0anb37s-0baar4fltrkrqgwoo0um4lm67/ecxtgy4t4mjvh7tm9jyy1jid7.o",
-    "DOCS_ROOT.md",
     "templates/default/README.md",
     "crates/Ciphernode.md",
     "packages/evm/docs/Contracts.md",
@@ -241,7 +243,6 @@
     "crates/request/docs/E3Context.md",
     "crates/evm/docs/CiphernodeRegistryReader.md",
     "architecture/notes/Data Security.md",
-    "architecture/notes/Actors.md",
     "crates/aggregator/AggregationSystem.md",
     "crates/aggregator/docs/PlaintextAggregator.md",
     "crates/support-scripts/Support.md",
