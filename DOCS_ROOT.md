@@ -45,6 +45,7 @@ flowchart LR
     click R "https://github.com/gnosisguild/enclave/tree/main/crates/sdk/Rust SDK.md"
     click N "https://github.com/gnosisguild/enclave/tree/main/architecture/Noir SDK.md"
     click CLI "https://github.com/gnosisguild/enclave/tree/main/crates/cli/CLI.md"
+    click DEF "https://github.com/gnosisguild/enclave/tree/main/templates/DefaultTemplate.md"
 ```
 <details>
 <summary>Links</summary>
@@ -52,6 +53,7 @@ flowchart LR
 [[CLI]]
 [[Ciphernode]]
 [[Contracts]]
+[[DefaultTemplate]]
 [[Noir SDK]]
 [[Rust SDK]]
 [[Support]]
