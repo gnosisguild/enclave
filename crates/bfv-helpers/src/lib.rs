@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod client;
+mod util;
 
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::U256;

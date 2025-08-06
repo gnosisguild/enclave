@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import init from "./dist/web/e3_wasm.js";
-export default async function initializeWasm(initParams) {
-  return await init(initParams);
+module.exports = async function initializeWasm() {
+  // Node does not need to be loaded async
 }

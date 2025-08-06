@@ -23,4 +23,5 @@ export default defineWalletSetup(PASSWORD, async (context, walletPage) => {
     symbol: "ETH",
   };
   await metamask.addNetwork(customNetwork);
+  await metamask.switchNetwork("localwallet");
 });

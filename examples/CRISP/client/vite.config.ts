@@ -31,6 +31,9 @@ export default defineConfig({
       libs: path.resolve(__dirname, './libs'),
     },
   },
+  worker: {
+    format: 'es',
+  },
   plugins: [
     // here is the main update
     wasm(),

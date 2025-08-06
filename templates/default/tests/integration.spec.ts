@@ -15,8 +15,8 @@ import {
   EnclaveSDK,
   encodeBfvParams,
   encodeComputeProviderParams,
-  encryptNumber,
   RegistryEventType,
+  FheProtocol,
 } from "@gnosis-guild/enclave-sdk";
 import { hexToBytes } from "viem";
 import assert from "assert";
@@ -167,6 +167,7 @@ async function main() {
     rpcUrl: "ws://localhost:8545",
     privateKey:
       "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    protocol: FheProtocol.BFV,
   });
 
   const { waitForEvent } = await setupEventListeners(sdk, store);
@@ -228,23 +229,19 @@ async function main() {
   const num1 = 12n;
   const num2 = 21n;
   const publicKeyBytes = hexToBytes(state.publicKey);
-  const enc1 = await encryptNumber(num1, publicKeyBytes);
-  const enc2 = await encryptNumber(num2, publicKeyBytes);
+  const enc1 = await sdk.encryptNumber(num1, publicKeyBytes);
+  const enc2 = await sdk.encryptNumber(num2, publicKeyBytes);
 
   await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
     await sdk.publishInput(
       e3Id,
-      `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, "0")).join(
-        ""
-      )}` as `0x${string}`
+      `0x${Array.from(enc1, (b) => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`,
     );
   });
   await waitForEvent(EnclaveEventType.INPUT_PUBLISHED, async () => {
     const hash2 = await sdk.publishInput(
       e3Id,
-      `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, "0")).join(
-        ""
-      )}` as `0x${string}`
+      `0x${Array.from(enc2, (b) => b.toString(16).padStart(2, "0")).join("")}` as `0x${string}`,
     );
   });
 
