@@ -7,6 +7,7 @@ pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
+import { IBondingManager } from "../interfaces/IBondingManager.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -20,6 +21,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     ////////////////////////////////////////////////////////////
     //                                                        //
+    //                        Events                          //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Event emitted when bonding manager is set
+    event BondingManagerSet(address indexed bondingManager);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
     //                 Storage Variables                      //
     //                                                        //
     ////////////////////////////////////////////////////////////
@@ -27,6 +37,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     address public enclave;
     uint256 public numCiphernodes;
     LeanIMTData public ciphernodes;
+    IBondingManager public bondingManager;
 
     mapping(uint256 e3Id => IRegistryFilter filter) public registryFilters;
     mapping(uint256 e3Id => uint256 root) public roots;
@@ -44,6 +55,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     error CommitteeNotPublished();
     error CiphernodeNotEnabled(address node);
     error OnlyEnclave();
+    error OnlyBondingManager();
+    error NotOwnerOrBondingManager();
+    error NodeNotBonded(address node);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -53,6 +67,19 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     modifier onlyEnclave() {
         require(msg.sender == enclave, OnlyEnclave());
+        _;
+    }
+
+    modifier onlyBondingManager() {
+        require(msg.sender == address(bondingManager), OnlyBondingManager());
+        _;
+    }
+
+    modifier onlyOwnerOrBondingManager() {
+        require(
+            msg.sender == owner() || msg.sender == address(bondingManager),
+            NotOwnerOrBondingManager()
+        );
         _;
     }
 
@@ -107,7 +134,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         emit CommitteePublished(e3Id, publicKey);
     }
 
-    function addCiphernode(address node) external onlyOwner {
+    function addCiphernode(address node) external onlyOwnerOrBondingManager {
+        if (msg.sender == address(bondingManager)) {
+            require(bondingManager.isBonded(node), NodeNotBonded(node));
+        }
+
+        if (isEnabled(node)) {
+            return;
+        }
+
         uint160 ciphernode = uint160(node);
         ciphernodes._insert(ciphernode);
         numCiphernodes++;
@@ -122,7 +157,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function removeCiphernode(
         address node,
         uint256[] calldata siblingNodes
-    ) external onlyOwner {
+    ) external onlyOwnerOrBondingManager {
+        require(isEnabled(node), CiphernodeNotEnabled(node));
+
         uint160 ciphernode = uint160(node);
         uint256 index = ciphernodes._indexOf(ciphernode);
         ciphernodes._remove(ciphernode, siblingNodes);
@@ -141,6 +178,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         emit EnclaveSet(_enclave);
     }
 
+    /**
+     * @notice Set the bonding manager contract
+     * @param _bondingManager Address of the bonding manager
+     */
+    function setBondingManager(address _bondingManager) public onlyOwner {
+        bondingManager = IBondingManager(_bondingManager);
+        emit BondingManagerSet(_bondingManager);
+    }
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Get Functions                        //
@@ -155,7 +201,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     function isCiphernodeEligible(address node) external view returns (bool) {
-        return isEnabled(node);
+        return
+            isEnabled(node) &&
+            (address(bondingManager) == address(0) ||
+                bondingManager.isBonded(node));
     }
 
     function isEnabled(address node) public view returns (bool) {
@@ -176,5 +225,17 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function treeSize() public view returns (uint256) {
         return ciphernodes.size;
+    }
+
+    /**
+     * @notice Get the bonding manager address
+     * @return bondingManagerAddress Address of the bonding manager
+     */
+    function getBondingManager()
+        external
+        view
+        returns (address bondingManagerAddress)
+    {
+        return address(bondingManager);
     }
 }
