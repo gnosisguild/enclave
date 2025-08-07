@@ -6,6 +6,7 @@
 
 mod cipher;
 mod password_manager;
+mod secret_holder;
 mod sensitive;
 pub use cipher::Cipher;
 pub use password_manager::*;
