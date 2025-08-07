@@ -47,7 +47,10 @@ pub mod gen_esi_sss {
         /// BFV Params
         params: Bytes,
         /// Max number of ciphertexts
-        max_num_ciphertexts: u64,
+        max_num_ciphertexts: u64, // called num_summed in the example
+                                  // NOTE: we are using u64 for these values instead of usize
+                                  // so that the protocol has specific size
+                                  // not based on architecture
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -68,6 +71,10 @@ pub mod gen_pk_share_and_sk_sss {
     pub struct Request {
         /// BFV Params
         params: Bytes,
+        /// Num parties
+        num_parties: u64,
+        /// Threshold
+        threshold: u64,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
