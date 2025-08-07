@@ -9,6 +9,9 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "prebuild": "cd ../evm && pnpm compile:ts && cd ../../crates/wasm && pnpm build",
     "build": "tsup",
