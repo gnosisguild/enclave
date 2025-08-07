@@ -5,10 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::server::app_data::AppData;
-use crate::server::config::CONFIG;
 use crate::server::models::{
     CTRequest, ComputeProviderParams, CronRequestE3, JsonResponse, PKRequest,
 };
+use crate::config::CONFIG;
+
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
 use chrono::Utc;

@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod app_data;
-pub mod config;
 mod database;
 mod indexer;
 mod models;
@@ -24,7 +23,7 @@ use indexer::start_indexer;
 use tokio::sync::RwLock;
 
 use crate::logger::init_logger;
-use config::CONFIG;
+use crate::config::CONFIG;
 
 #[actix_web::main]
 pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
