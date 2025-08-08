@@ -60,6 +60,13 @@ interface IBondingManager {
         string reason
     );
 
+    /// @notice Event emitted when a node is at risk of being removed from the registry
+    event NodeAtRisk(
+        address indexed node,
+        uint256 currentBond,
+        uint256 requiredBond
+    );
+
     /// @notice Event emitted when the chainlink price feed fails
     event ChainlinkPriceFailed();
 

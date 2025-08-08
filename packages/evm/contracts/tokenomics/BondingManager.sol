@@ -287,6 +287,7 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
         if (bond.active && bond.totalUsdValue < minBondUsd) {
             bond.active = false;
             bond.bondedAt = 0;
+            emit NodeAtRisk(node, bond.totalUsdValue, minBondUsd);
             if (address(ciphernodeRegistry) != address(0)) {
                 CiphernodeRegistryOwnable reg = CiphernodeRegistryOwnable(
                     address(ciphernodeRegistry)
