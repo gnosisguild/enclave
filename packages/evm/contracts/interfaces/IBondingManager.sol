@@ -60,6 +60,15 @@ interface IBondingManager {
         string reason
     );
 
+    /// @notice Event emitted when the chainlink price feed fails
+    event ChainlinkPriceFailed();
+
+    /// @notice Event emitted when a slasher is added
+    event SlasherAdded(address indexed slasher);
+
+    /// @notice Event emitted when a slasher is removed
+    event SlasherRemoved(address indexed slasher);
+
     /// @notice Event emitted when minimum bond requirement is updated
     event MinBondUpdated(uint256 newMinBondUsd);
 

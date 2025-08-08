@@ -75,16 +75,6 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
     /// @notice Addresses authorized to slash nodes
     mapping(address slasher => bool authorized) public slashers;
 
-    // Events are inherited from IBondingManager interface
-    event NodeAtRisk(
-        address indexed node,
-        uint256 currentBond,
-        uint256 requiredBond
-    );
-    event ChainlinkPriceFailed();
-    event SlasherAdded(address indexed slasher);
-    event SlasherRemoved(address indexed slasher);
-
     /**
      * @param _usdc USDC token address
      * @param _encl ENCL token address
@@ -297,7 +287,6 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
         if (bond.active && bond.totalUsdValue < minBondUsd) {
             bond.active = false;
             bond.bondedAt = 0;
-            emit NodeAtRisk(node, bond.totalUsdValue, minBondUsd);
             if (address(ciphernodeRegistry) != address(0)) {
                 CiphernodeRegistryOwnable reg = CiphernodeRegistryOwnable(
                     address(ciphernodeRegistry)
