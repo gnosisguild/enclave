@@ -5,13 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod commands;
-mod config;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};
 use reqwest::Client;
 
 use commands::initialize_crisp_round;
-use config::CONFIG;
 use crisp::logger::init_logger;
 use log::info;
 

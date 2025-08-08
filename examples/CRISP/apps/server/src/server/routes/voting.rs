@@ -6,10 +6,10 @@
 
 use crate::server::{
     app_data::AppData,
-    config::CONFIG,
     database::SledDB,
     models::{EncryptedVote, VoteResponse, VoteResponseStatus},
     repo::CrispE3Repository,
+    CONFIG,
 };
 use actix_web::{web, HttpResponse, Responder};
 use alloy::{
