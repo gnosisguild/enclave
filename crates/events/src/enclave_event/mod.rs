@@ -17,6 +17,7 @@ mod enclave_error;
 mod keyshare_created;
 mod plaintext_aggregated;
 mod publickey_aggregated;
+mod publish_document;
 mod shutdown;
 mod test_event;
 
