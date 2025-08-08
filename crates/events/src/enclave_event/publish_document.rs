@@ -13,7 +13,7 @@ use crate::E3id;
 pub type PartyId = u64;
 pub type Cid = Vec<u8>;
 
-/// Can filter based on our rank in the committee (party_id) incase a payload is split between documents.
+/// PartialOrd Filter. Can filter based on our rank in the committee (party_id) incase a payload is split between documents.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Filter<T> {
     /// Range is inclusive but means nothing for non PartialOrd T
@@ -34,6 +34,7 @@ impl<T: PartialOrd> Filter<T> {
     }
 }
 
+/// Metadata for a published document
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 enum DocumentMeta {
     TrBFVShares {
@@ -49,27 +50,29 @@ enum DocumentMeta {
     // TFHEShares ...
 }
 
+/// EnclaveEvent for signaling that a document be published
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct PublishDocumentRequested {
-    /// Key will be a simple hash eg. Sha256Hash of the content so we need not put it here
     meta: DocumentMeta,
+    /// Key will be a simple hash eg. Sha256Hash of the value so we need not put it here
     value: Vec<u8>,
 }
 
-/// Net event sent/received from net command/event channel
+/// NetEvent payload sent/received from net command/event channel
 pub struct DocumentPublished {
     meta: DocumentMeta,
     cid: Cid,
 }
 
-/// Net Command sent over net command channel to actually publish the Kademlia Document
+/// NetCommand payload sent over net command channel to actually publish the Kademlia Document
 pub struct PublishDocument {
     meta: DocumentMeta,
     value: Vec<u8>,
     cid: Cid,
 }
 
+/// EnclaveEvent for receiving a document
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct DocumentReceived {
