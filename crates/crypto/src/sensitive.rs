@@ -6,18 +6,19 @@
 
 use crate::Cipher;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
 /// A container that holds encrypted data
 /// We could just use cipher to encrypt and decrypt bytes and pass that around but this
 /// means we get the type system indicating when data is encrypted
-#[derive(Clone)]
-pub struct Sensitive {
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SensitiveBytes {
     encrypted: Arc<Vec<u8>>,
 }
 
-impl Sensitive {
+impl SensitiveBytes {
     /// Create a new Sensitive container by encrypting the provided data
     pub fn new(input: impl Into<Vec<u8>>, cipher: &Cipher) -> Result<Self> {
         let mut bytes = input.into();
@@ -45,7 +46,7 @@ mod tests {
         let expected_data = original_data.clone();
 
         // Create sensitive container
-        let sensitive = Sensitive::new(original_data, &cipher).unwrap();
+        let sensitive = SensitiveBytes::new(original_data, &cipher).unwrap();
 
         // Access the data
         let accessed_data = sensitive.access(&cipher).unwrap();
@@ -64,7 +65,7 @@ mod tests {
         let original_string = "Secret message".to_string();
         let expected_bytes = original_string.clone();
 
-        let sensitive = Sensitive::new(original_string, &cipher).unwrap();
+        let sensitive = SensitiveBytes::new(original_string, &cipher).unwrap();
         let accessed_data = sensitive.access(&cipher).unwrap();
 
         assert_eq!(accessed_data.as_slice(), expected_bytes.as_bytes());

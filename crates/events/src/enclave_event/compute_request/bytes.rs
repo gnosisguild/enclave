@@ -3,10 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+use std::sync::Arc;
 
-mod cipher;
-mod password_manager;
-mod sensitive;
-pub use cipher::Cipher;
-pub use password_manager::*;
-pub use sensitive::*;
+/// Reference count bytes so event can be cloned and shared between threads
+pub type Bytes = Arc<Vec<u8>>;

@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod correlation_id;
 mod dialer;
 pub mod events;
 mod net_event_translator;
