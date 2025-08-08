@@ -132,6 +132,7 @@
     "release": "pnpm publish"
   },
   "dependencies": {
+    "@chainlink/contracts": "^1.4.0",
     "@excubiae/contracts": "^0.4.0",
     "@gnosis-guild/e3-wasm": "workspace:*",
     "solady": "^0.1.13"
