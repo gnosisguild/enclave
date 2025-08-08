@@ -10,3 +10,4 @@ repository = "https://github.com/gnosisguild/enclave/crates/sdk"
 e3-evm-helpers.workspace = true
 e3-bfv-helpers.workspace = true
 e3-indexer.workspace = true
+e3-encrypt.workspace = true

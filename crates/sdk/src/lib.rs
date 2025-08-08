@@ -5,5 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub use e3_bfv_helpers as bfv_helpers;
+pub use e3_encrypt as encrypt;
 pub use e3_evm_helpers as evm_helpers;
 pub use e3_indexer as indexer;

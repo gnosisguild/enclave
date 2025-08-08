@@ -69,6 +69,9 @@ importers:
       '@gnosis-guild/enclave':
         specifier: workspace:*
         version: link:../../packages/evm
+      '@gnosis-guild/enclave-sdk':
+        specifier: workspace:*
+        version: link:../../packages/enclave-sdk
       '@semaphore-protocol/contracts':
         specifier: github:hmzakhalid/semaphore-noir#dist-contracts
         version: '@semaphore-protocol/contracts-noir@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/9cd8034957a6f66b787639e224e517d9b2a4c972'
