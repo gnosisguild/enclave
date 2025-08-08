@@ -1,0 +1,241 @@
+{
+  "main": {
+    "id": "382545f4b1655972",
+    "type": "split",
+    "children": [
+      {
+        "id": "42479e0cd80ab23a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7a09ebbe677de6f8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "templates/DefaultTemplate.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "DefaultTemplate"
+            }
+          },
+          {
+            "id": "2a704beeb5ce40ed",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "architecture/notes/Actors.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Actors"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "eda7effde3142deb",
+    "type": "split",
+    "children": [
+      {
+        "id": "de9036a179c03e59",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b5dfe506c3f95c26",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "1d8d474e9d2f366a",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "b0dfa483a1ad28ee",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "crates/support-scripts/Support.md",
+                "mode": "source",
+                "source": true
+              },
+              "icon": "lucide-file",
+              "title": "Support"
+            }
+          },
+          {
+            "id": "e1536ccba0f930f9",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "6b6677e64c1270ea",
+    "type": "split",
+    "children": [
+      {
+        "id": "f59bb59a7d9ec6cb",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6200d991ce5f53b2",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "crates/net/NetSystem.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for NetSystem"
+            }
+          },
+          {
+            "id": "a918c4b15e43e15b",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "CiphernodeRemoved.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from CiphernodeRemoved"
+            }
+          },
+          {
+            "id": "d830e9b504a426f3",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "b99540af252c3f04",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "templates/DefaultTemplate.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of DefaultTemplate"
+            }
+          }
+        ],
+        "currentTab": 3
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false
+    }
+  },
+  "active": "7a09ebbe677de6f8",
+  "lastOpenFiles": [
+    "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9wqvt2k3f-0oruhkk-86q7i7lme21tvn5zezxxc67ex/work-products.bin",
+    "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9wqvt2k3f-0oruhkk-86q7i7lme21tvn5zezxxc67ex/query-cache.bin",
+    "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9wqvt2k3f-0oruhkk-86q7i7lme21tvn5zezxxc67ex/dep-graph.bin",
+    "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9wqvt2k3f-0oruhkk-86q7i7lme21tvn5zezxxc67ex",
+    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9wqvt2lub-127lgnr-3x6j5krgt2904b8xhhe6odqj4/work-products.bin",
+    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9wqvt2lub-127lgnr-3x6j5krgt2904b8xhhe6odqj4/query-cache.bin",
+    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9wqvt2lub-127lgnr-3x6j5krgt2904b8xhhe6odqj4/dep-graph.bin",
+    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9wqvt2lub-127lgnr-3x6j5krgt2904b8xhhe6odqj4",
+    "target/debug/incremental/enclave-1ffp1fjome9r5/s-h9wqvt2k3f-0oruhkk-working/dep-graph.part.bin",
+    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9wqvt2lub-127lgnr-working/work-products.bin",
+    "target/debug/incremental/enclave-304nmx0t9gddj/s-h9wqvt2lub-127lgnr-working/query-cache.bin",
+    "crates/program-server/E3ProgramServer.md",
+    "templates/DefaultTemplate.md",
+    "crates/cli/CLI.md",
+    "packages/evm/docs/Contracts.md",
+    "packages/enclave-sdk/Typescript SDK.md",
+    "DOCS_ROOT.md",
+    "architecture/notes/Actors.md",
+    "templates/default/README.md",
+    "crates/Ciphernode.md",
+    "crates/net/NetSystem.md",
+    "crates/data/PersistenceSystem.md",
+    "README.md",
+    "crates/threadpool/ThreadpoolSystem.md",
+    "crates/threadpool/docs/ThreadpoolComputeProcessor.md",
+    "crates/keyshare/KeyshareSystem.md",
+    "crates/net/docs/NetDHTPublisher.md",
+    "crates/net/docs/NetInterface.md",
+    "crates/evm/EvmSystem.md",
+    "crates/evm/docs/EventReader.md",
+    "crates/request/E3RequestSystem.md",
+    "crates/sortition/docs/CiphernodeSelector.md",
+    "crates/request/docs/E3Context.md",
+    "crates/evm/docs/CiphernodeRegistryReader.md",
+    "architecture/notes/Data Security.md",
+    "crates/aggregator/AggregationSystem.md",
+    "notes/Untitled.canvas",
+    "systems/Untitled.canvas",
+    "notes/DKG.canvas",
+    "notes/_E3 Request Lifecycle.canvas"
+  ]
+}
