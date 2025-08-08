@@ -145,7 +145,7 @@ interface IBondingManager {
      * @notice Complete decommission and withdraw collateral
      * @dev Can only be called after decommission delay has passed
      */
-    function completeDecommission() external;
+    function completeDecommission(uint256[] calldata siblingNodes) external;
 
     /**
      * @notice Slash a node's collateral for misbehavior
@@ -156,6 +156,7 @@ interface IBondingManager {
     function slash(
         address node,
         uint256 usdAmount,
-        string calldata reason
+        string calldata reason,
+        uint256[] calldata siblingNodes
     ) external;
 }

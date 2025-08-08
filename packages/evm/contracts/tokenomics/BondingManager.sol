@@ -199,7 +199,9 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
     /**
      * @notice Complete decommission and withdraw collateral
      */
-    function completeDecommission() external nonReentrant {
+    function completeDecommission(
+        uint256[] calldata siblingNodes
+    ) external nonReentrant {
         Bond storage bond = bonds[msg.sender];
         require(bond.active, NotBonded());
         require(bond.decommissionRequestedAt > 0, DecommissionNotRequested());
@@ -220,6 +222,15 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
             ENCL_TOKEN.safeTransfer(msg.sender, enclAmount);
         }
 
+        if (address(ciphernodeRegistry) != address(0)) {
+            CiphernodeRegistryOwnable reg = CiphernodeRegistryOwnable(
+                address(ciphernodeRegistry)
+            );
+            if (reg.isEnabled(msg.sender)) {
+                reg.removeCiphernode(msg.sender, siblingNodes);
+            }
+        }
+
         emit NodeDecommissioned(msg.sender, usdcAmount, enclAmount);
     }
 
@@ -231,7 +242,8 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
     function slash(
         address node,
         uint256 usdAmount,
-        string calldata reason
+        string calldata reason,
+        uint256[] calldata siblingNodes
     ) external nonReentrant {
         require(slashers[msg.sender], NotAuthorizedSlasher());
         require(usdAmount > 0, ZeroSlashAmount());
@@ -282,7 +294,19 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
             reason
         );
 
-        _maybeAutoRemove(node, bond);
+        if (bond.active && bond.totalUsdValue < minBondUsd) {
+            bond.active = false;
+            bond.bondedAt = 0;
+            emit NodeAtRisk(node, bond.totalUsdValue, minBondUsd);
+            if (address(ciphernodeRegistry) != address(0)) {
+                CiphernodeRegistryOwnable reg = CiphernodeRegistryOwnable(
+                    address(ciphernodeRegistry)
+                );
+                if (reg.isEnabled(node)) {
+                    reg.removeCiphernode(node, siblingNodes);
+                }
+            }
+        }
     }
 
     /**
@@ -362,16 +386,6 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
                 CiphernodeRegistryOwnable(address(ciphernodeRegistry))
                     .addCiphernode(msg.sender);
             }
-        }
-    }
-
-    /**
-     * @dev Check bond threshold and emit removal event
-     */
-    function _maybeAutoRemove(address node, Bond storage bond) internal {
-        if (bond.active && bond.totalUsdValue < minBondUsd) {
-            bond.active = false;
-            emit NodeAtRisk(node, bond.totalUsdValue, minBondUsd);
         }
     }
 
