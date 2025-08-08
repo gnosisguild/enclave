@@ -449,11 +449,17 @@ contract BondingManager is IBondingManager, Ownable, ReentrancyGuard {
                     block.timestamp - updatedAt <= PRICE_STALENESS_THRESHOLD
                 ) {
                     return uint256(answer) * 1e10;
+                } else {
+                    // Oracle value is stale or invalid, fallback
+                    return enclPriceUsd;
                 }
             } catch {
+                // Oracle call failed, fallback
                 return enclPriceUsd;
             }
         }
+        // No price feed configured, fallback
+        return enclPriceUsd;
     }
 
     /**
