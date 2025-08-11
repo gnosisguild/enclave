@@ -4,24 +4,32 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Arc;
-
 use actix::Message;
+use e3_events::{CorrelationId, DocumentMeta};
 use libp2p::{
     gossipsub::{MessageId, PublishError},
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
+use std::sync::Arc;
 
-use e3_events::CorrelationId;
+type Cid = Vec<u8>;
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
 pub enum NetCommand {
+    /// Publish message to gossipsub
     GossipPublish {
         topic: String,
         data: Vec<u8>,
         correlation_id: CorrelationId,
     },
+    /// Dial peer
     Dial(DialOpts),
+    /// PublishDocument to Kademlia
+    PublishDocument {
+        meta: DocumentMeta,
+        value: Vec<u8>,
+        cid: Cid,
+    },
 }
 
 /// NetEvents are broadcast over a broadcast channel to whom ever wishes to listen
@@ -49,4 +57,6 @@ pub enum NetEvent {
         connection_id: ConnectionId,
         error: Arc<DialError>,
     },
+    /// A document was pubilshed to kademlia
+    DocumentPublished { meta: DocumentMeta, cid: Cid },
 }

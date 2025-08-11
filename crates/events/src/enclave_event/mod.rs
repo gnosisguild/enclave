@@ -34,6 +34,7 @@ pub use enclave_error::*;
 pub use keyshare_created::*;
 pub use plaintext_aggregated::*;
 pub use publickey_aggregated::*;
+pub use publish_document::*;
 pub use shutdown::*;
 pub use test_event::*;
 

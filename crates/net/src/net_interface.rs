@@ -148,7 +148,9 @@ impl NetInterface {
                                     event_tx.send(NetEvent::DialError { error: error.into() })?;
                                 }
                             }
-                        }
+                        },
+                        NetCommand::PublishDocument { meta, value, cid } => (),
+
                     }
                 }
                 // Process events
