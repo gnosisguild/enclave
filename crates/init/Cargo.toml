@@ -18,3 +18,4 @@ url.workspace = true
 e3-fs.workspace = true
 regex.workspace = true
 tracing.workspace = true
+indicatif = "0.18.0"
