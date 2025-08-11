@@ -150,7 +150,7 @@ impl NetInterface {
                             }
                         },
                         NetCommand::PublishDocument { meta:_, value:_, cid:_ } => todo!(),
-                        NetCommand::FetchDocument { cid:_ } => todo!(),
+                        NetCommand::FetchDocument { correlation_id:_, cid:_ } => todo!(),
 
                     }
                 }
