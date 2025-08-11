@@ -21,6 +21,9 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tracing::{error, info, instrument, trace};
 
+// TODO: store event filtering here on this actor instead of is_local_only() on the event. We
+// should do this as this functionality is not global and ramifications should stay local to here
+
 /// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetInterface for propagation over the p2p network
 pub struct NetEventTranslator {

@@ -45,6 +45,8 @@ pub struct PublishDocumentRequested {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct DocumentReceived {
+    /// Document metadata
     meta: DocumentMeta,
+    /// Document value from kademlia
     value: Vec<u8>,
 }
