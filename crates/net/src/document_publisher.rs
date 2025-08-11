@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 // TODO: Create DocumentPublisher actor
 // 1. Accept EnclaveEvent::CiphernodeSelected and store selected e3_ids in a blume filter
 // 1. Accept EnclaveEvent::PublishDocumentRequested
