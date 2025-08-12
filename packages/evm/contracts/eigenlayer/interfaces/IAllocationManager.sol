@@ -17,6 +17,11 @@ interface IAllocationManager {
         string description;
     }
 
+    function slashOperator(
+        address avs,
+        SlashingParams calldata slashingParams
+    ) external returns (uint256 slashingNonce);
+
     function getAllocatedMagnitude(
         address operator,
         OperatorSet calldata operatorSet,
@@ -27,4 +32,12 @@ interface IAllocationManager {
         address operator,
         IStrategy strategy
     ) external view returns (uint256 magnitude);
+
+    event OperatorSlashed(
+        address indexed operator,
+        OperatorSet indexed operatorSet,
+        IStrategy[] strategies,
+        uint256[] wadsSlashed,
+        string description
+    );
 }
