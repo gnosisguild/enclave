@@ -162,7 +162,7 @@ fn decrypt_data(password_bytes: &Zeroizing<Vec<u8>>, encrypted_data: &[u8]) -> R
 }
 
 /// Configure the purge time here.
-const PURGE_TIME_SECONDS: u64 = 2;
+const PURGE_TIME_SECONDS: u64 = 120;
 
 /// A high-level cryptographic interface providing secure data encryption and decryption.
 ///
