@@ -9,6 +9,14 @@ interface IAllocationManager {
         uint32 operatorSetId;
     }
 
+    struct SlashingParams {
+        address operator;
+        uint32 operatorSetId;
+        IStrategy[] strategies;
+        uint256[] wadsToSlash;
+        string description;
+    }
+
     function getAllocatedMagnitude(
         address operator,
         OperatorSet calldata operatorSet,
