@@ -5,10 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-/**
- * @title IBondingManager
- * @notice Interface for the simplified EigenLayer-integrated bonding manager
- */
 interface IBondingManager {
     /// @notice Custom errors
     error ZeroAddress();
