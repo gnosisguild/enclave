@@ -6,6 +6,8 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface IStrategy {
     function underlyingToken() external view returns (IERC20);
 
+    function shares(address user) external view returns (uint256);
+
     function sharesToUnderlying(
         uint256 amountShares
     ) external view returns (uint256);
