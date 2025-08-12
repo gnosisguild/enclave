@@ -148,7 +148,10 @@ impl NetInterface {
                                     event_tx.send(NetEvent::DialError { error: error.into() })?;
                                 }
                             }
-                        }
+                        },
+                        NetCommand::PublishDocument { meta:_, value:_, cid:_ } => todo!(),
+                        NetCommand::FetchDocument { correlation_id:_, cid:_ } => todo!(),
+
                     }
                 }
                 // Process events
@@ -250,7 +253,10 @@ async fn process_swarm_event(
             message_id: id,
             message,
         })) => {
-            trace!("Got message with id: {id} from peer: {peer_id}",);
+            trace!("Got message with id: {id} from peer: {peer_id}");
+            // TODO: attempt to deserialize a DocumentPublishedPayload from the message.data if
+            // that works then send NetEvent::DocumentPublishedNotification over the event_tx otherwise send
+            // GossipData
             event_tx.send(NetEvent::GossipData(message.data))?;
         }
         SwarmEvent::NewListenAddr { address, .. } => {

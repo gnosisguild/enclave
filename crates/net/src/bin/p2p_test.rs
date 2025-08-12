@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use e3_net::correlation_id::CorrelationId;
+use e3_events::CorrelationId;
 use e3_net::events::{NetCommand, NetEvent};
 use e3_net::NetInterface;
 use std::time::Duration;

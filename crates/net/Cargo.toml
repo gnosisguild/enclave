@@ -11,11 +11,13 @@ repository = "https://github.com/gnosisguild/enclave/crates/net"
 [dependencies]
 async-std = { workspace = true }
 async-trait = { workspace = true }
+bincode = { workspace = true }
 futures = { workspace = true }
 e3-crypto = { workspace = true }
 e3-config = { workspace = true }
 e3-data = { workspace = true }
 libp2p = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
