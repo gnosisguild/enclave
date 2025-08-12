@@ -12,6 +12,7 @@ pub async fn execute(
     location: Option<PathBuf>,
     template: Option<String>,
     skip_cleanup: bool,
+    verbose: bool,
 ) -> Result<()> {
-    e3_init::execute(location, template, skip_cleanup).await
+    e3_init::execute(location, template, skip_cleanup, verbose).await
 }
