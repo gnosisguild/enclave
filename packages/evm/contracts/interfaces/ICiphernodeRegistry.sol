@@ -51,6 +51,23 @@ interface ICiphernodeRegistry {
 
     function isCiphernodeEligible(address ciphernode) external returns (bool);
 
+    /// @notice Check if a ciphernode is enabled in the registry
+    /// @param node Address of the ciphernode
+    /// @return enabled Whether the ciphernode is enabled
+    function isEnabled(address node) external view returns (bool enabled);
+
+    /// @notice Add a ciphernode to the registry
+    /// @param node Address of the ciphernode to add
+    function addCiphernode(address node) external;
+
+    /// @notice Remove a ciphernode from the registry
+    /// @param node Address of the ciphernode to remove
+    /// @param siblingNodes Array of sibling node indices for tree operations
+    function removeCiphernode(
+        address node,
+        uint256[] calldata siblingNodes
+    ) external;
+
     /// @notice Initiates the committee selection process for a specified E3.
     /// @dev This function MUST revert when not called by the Enclave contract.
     /// @param e3Id ID of the E3 for which to select the committee.
