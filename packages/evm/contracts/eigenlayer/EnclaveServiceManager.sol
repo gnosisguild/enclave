@@ -197,6 +197,104 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         emit CiphernodeDeregistered(msg.sender);
     }
 
+    // ============ Slashing ============
+
+    function addSlasher(address slasher) external onlyOwner {
+        require(slasher != address(0), "zero slasher");
+        slashers[slasher] = true;
+    }
+
+    function removeSlasher(address slasher) external onlyOwner {
+        slashers[slasher] = false;
+    }
+
+    function slashOperator(
+        address operator,
+        uint256 slashingPercentage, // bps
+        string calldata reason
+    ) external nonReentrant {
+        require(slashers[msg.sender], "not slasher");
+        require(registeredOperators[operator], "operator not registered");
+        require(slashingPercentage <= 10000, "bps too high");
+
+        (
+            IStrategy[] memory strategies,
+            uint256[] memory wadsToSlash
+        ) = _calculateSlashingWads(operator, slashingPercentage);
+
+        if (strategies.length == 0) {
+            return;
+        }
+
+        try
+            allocationManager.slashOperator(
+                address(this),
+                IAllocationManager.SlashingParams({
+                    operator: operator,
+                    operatorSetId: operatorSetId,
+                    strategies: strategies,
+                    wadsToSlash: wadsToSlash,
+                    description: reason
+                })
+            )
+        returns (uint256 /*slashId*/, uint256[] memory slashedShares) {
+            emit OperatorSlashed(
+                operator,
+                slashingPercentage,
+                reason,
+                strategies,
+                slashedShares
+            );
+
+            (bool ok, uint256 newCollateralUsd) = checkOperatorEligibility(
+                operator
+            );
+            if (!ok) {
+                registeredOperators[operator] = false;
+                bondingManager.deregisterOperator(operator);
+                emit CiphernodeDeregistered(operator);
+            } else {
+                bondingManager.updateOperatorCollateral(
+                    operator,
+                    newCollateralUsd
+                );
+            }
+        } catch Error(string memory err) {
+            revert(string(abi.encodePacked("slashing failed: ", err)));
+        }
+    }
+
+    // ============ Internal helpers ============
+
+    function _calculateSlashingWads(
+        address operator,
+        uint256 slashingPercentage
+    )
+        internal
+        view
+        returns (IStrategy[] memory strategies, uint256[] memory wadsToSlash)
+    {
+        uint256 count = 0;
+        for (uint256 i = 0; i < allowedStrategies.length; i++) {
+            if (getOperatorShares(operator, allowedStrategies[i]) > 0) {
+                count++;
+            }
+        }
+        strategies = new IStrategy[](count);
+        wadsToSlash = new uint256[](count);
+
+        uint256 idx = 0;
+        uint256 wad = (slashingPercentage * 1e18) / 10000; // bps -> wad
+        for (uint256 i = 0; i < allowedStrategies.length; i++) {
+            IStrategy s = allowedStrategies[i];
+            if (getOperatorShares(operator, s) > 0) {
+                strategies[idx] = s;
+                wadsToSlash[idx] = wad;
+                idx++;
+            }
+        }
+    }
+
     // ============ View Functions ============
 
     function checkOperatorEligibility(
