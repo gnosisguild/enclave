@@ -185,7 +185,11 @@ describe("VestingEscrow", function () {
     it("Should revert if stream already exists", async function () {
       const startTime = await time.latest();
 
-      await enclaveToken.mintAllocation(owner.address, VESTING_AMOUNT * 2n, "Dup");
+      await enclaveToken.mintAllocation(
+        owner.address,
+        VESTING_AMOUNT * 2n,
+        "Dup",
+      );
       await enclaveToken.approve(
         await vestingEscrow.getAddress(),
         VESTING_AMOUNT * 2n,
@@ -318,7 +322,11 @@ describe("VestingEscrow", function () {
     beforeEach(async function () {
       startTime = await time.latest();
 
-      await enclaveToken.mintAllocation(owner.address, VESTING_AMOUNT, "Revoke");
+      await enclaveToken.mintAllocation(
+        owner.address,
+        VESTING_AMOUNT,
+        "Revoke",
+      );
       await enclaveToken.approve(
         await vestingEscrow.getAddress(),
         VESTING_AMOUNT,
@@ -350,7 +358,9 @@ describe("VestingEscrow", function () {
             return null;
           }
         })
-        .filter(Boolean) as Array<ReturnType<typeof vestingEscrow.interface.parseLog>>;
+        .filter(Boolean) as Array<
+        ReturnType<typeof vestingEscrow.interface.parseLog>
+      >;
 
       const claimedEvt = parsed.find((p) => p!.name === "TokensClaimed");
       const revokedEvt = parsed.find((p) => p!.name === "VestingStreamRevoked");

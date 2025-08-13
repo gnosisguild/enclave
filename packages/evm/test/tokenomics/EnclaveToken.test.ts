@@ -105,7 +105,11 @@ describe("ERC20 Functionality", function () {
     token = await EnclaveToken.deploy(owner.address);
     await token.waitForDeployment();
     await token.setTransferRestriction(false);
-    await token.mintAllocation(addr1.address, ethers.parseEther("1000"), "Test");
+    await token.mintAllocation(
+      addr1.address,
+      ethers.parseEther("1000"),
+      "Test",
+    );
   });
 
   it("Should allow transfers", async function () {
@@ -119,7 +123,9 @@ describe("ERC20 Functionality", function () {
   it("Should allow approvals and transferFrom", async function () {
     const amount = ethers.parseEther("100");
     await token.connect(addr1).approve(addr2.address, amount);
-    await token.connect(addr2).transferFrom(addr1.address, addr2.address, amount);
+    await token
+      .connect(addr2)
+      .transferFrom(addr1.address, addr2.address, amount);
     expect(await token.balanceOf(addr2.address)).to.equal(amount);
   });
 });
@@ -140,11 +146,15 @@ describe("Governance Features", function () {
   it("Should support delegation", async function () {
     await token.mintAllocation(addr1.address, ethers.parseEther("1000"), "Gov");
     await token.connect(addr1).delegate(addr2.address);
-    expect(await token.getVotes(addr2.address)).to.equal(ethers.parseEther("1000"));
+    expect(await token.getVotes(addr2.address)).to.equal(
+      ethers.parseEther("1000"),
+    );
   });
 
   it("Should support permit functionality", async function () {
-    expect(await token.nonces((await ethers.getSigners())[1].address)).to.equal(0);
+    expect(await token.nonces((await ethers.getSigners())[1].address)).to.equal(
+      0,
+    );
   });
 });
 

@@ -28,26 +28,16 @@ import {
     ReentrancyGuard
 } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {
-    IEnclaveServiceManager
-} from "../interfaces/IEnclaveServiceManager.sol";
+import { IServiceManager } from "../interfaces/IServiceManager.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingManager } from "../interfaces/IBondingManager.sol";
 
-contract EnclaveServiceManager is
+contract ServiceManager is
     ServiceManagerBase,
-    IEnclaveServiceManager,
+    IServiceManager,
     Ownable,
     ReentrancyGuard
 {
-    /// @notice Strategy configuration
-    struct StrategyConfig {
-        bool isAllowed;
-        uint256 minShares;
-        address priceFeed; // Chainlink price feed for USD conversion (address(0) for stablecoins)
-        uint8 decimals; // Token decimals for proper scaling
-    }
-
     /// @notice Minimum collateral requirement in USD (18 decimals)
     uint256 public minCollateralUsd;
 
@@ -109,9 +99,6 @@ contract EnclaveServiceManager is
 
     // ============ Strategy Management ============
 
-    /**
-     * @notice Add a supported strategy for collateral
-     */
     function addStrategy(
         IStrategy strategy,
         uint256 minShares,
@@ -139,9 +126,6 @@ contract EnclaveServiceManager is
         emit StrategyAdded(strategy, minShares, priceFeed);
     }
 
-    /**
-     * @notice Remove a supported strategy
-     */
     function removeStrategy(IStrategy strategy) external onlyOwner {
         require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
 
@@ -162,9 +146,6 @@ contract EnclaveServiceManager is
         emit StrategyRemoved(strategy);
     }
 
-    /**
-     * @notice Update strategy parameters
-     */
     function updateStrategy(
         IStrategy strategy,
         uint256 newMinShares,
@@ -178,9 +159,6 @@ contract EnclaveServiceManager is
         emit StrategyUpdated(strategy, newMinShares, newPriceFeed);
     }
 
-    /**
-     * @notice Set minimum collateral requirement in USD
-     */
     function setMinCollateralUsd(uint256 _minCollateralUsd) external onlyOwner {
         require(_minCollateralUsd > 0, InvalidMinCollateral());
         minCollateralUsd = _minCollateralUsd;
@@ -189,9 +167,6 @@ contract EnclaveServiceManager is
 
     // ============ Operator Registration ============
 
-    /**
-     * @notice Register as a ciphernode (permissionless)
-     */
     function registerCiphernode() external nonReentrant {
         require(!registeredOperators[msg.sender], OperatorNotRegistered());
 
@@ -219,9 +194,6 @@ contract EnclaveServiceManager is
         emit CiphernodeRegistered(msg.sender, collateralUsd);
     }
 
-    /**
-     * @notice Deregister from being a ciphernode
-     */
     function deregisterCiphernode(
         uint256[] calldata siblingNodes
     ) external nonReentrant {
@@ -240,27 +212,15 @@ contract EnclaveServiceManager is
 
     // ============ Slashing ============
 
-    /**
-     * @notice Add authorized slasher
-     */
     function addSlasher(address slasher) external onlyOwner {
         require(slasher != address(0), ZeroAddress());
         slashers[slasher] = true;
     }
 
-    /**
-     * @notice Remove authorized slasher
-     */
     function removeSlasher(address slasher) external onlyOwner {
         slashers[slasher] = false;
     }
 
-    /**
-     * @notice Slash an operator's collateral for misbehavior
-     * @param operator Address of the operator to slash
-     * @param slashingPercentage Percentage to slash (in basis points, e.g., 500 = 5%)
-     * @param reason Description of the slashing reason
-     */
     function slashOperator(
         address operator,
         uint256 slashingPercentage,
@@ -268,7 +228,7 @@ contract EnclaveServiceManager is
     ) external nonReentrant {
         require(slashers[msg.sender], NotAuthorizedSlasher());
         require(registeredOperators[operator], OperatorNotRegistered());
-        require(slashingPercentage <= 10000, "Slashing percentage too high"); // Max 100%
+        require(slashingPercentage <= 10000, InvalidSlashingPercentage());
 
         // Get strategies where operator has stake
         (
@@ -328,9 +288,6 @@ contract EnclaveServiceManager is
 
     // ============ View Functions ============
 
-    /**
-     * @notice Check if an operator meets collateral requirements
-     */
     function checkOperatorEligibility(
         address operator
     ) public view returns (bool isEligible, uint256 collateralUsd) {
@@ -338,9 +295,6 @@ contract EnclaveServiceManager is
         isEligible = collateralUsd >= minCollateralUsd;
     }
 
-    /**
-     * @notice Get total collateral value for an operator across all strategies
-     */
     function getOperatorCollateralValue(
         address operator
     ) public view returns (uint256 totalUsdValue) {
@@ -354,9 +308,6 @@ contract EnclaveServiceManager is
         }
     }
 
-    /**
-     * @notice Get operator's shares in a specific strategy
-     */
     function getOperatorShares(
         address operator,
         IStrategy strategy
@@ -364,18 +315,12 @@ contract EnclaveServiceManager is
         return _strategyManager.stakerStrategyShares(operator, strategy);
     }
 
-    /**
-     * @notice Check if a strategy is allowed for collateral
-     */
     function isStrategyAllowed(
         IStrategy strategy
     ) external view returns (bool isAllowed) {
         return strategyConfigs[strategy].isAllowed;
     }
 
-    /**
-     * @notice Get all allowed strategies
-     */
     function getAllowedStrategies()
         external
         view
@@ -384,9 +329,6 @@ contract EnclaveServiceManager is
         return allowedStrategies;
     }
 
-    /**
-     * @notice Get strategy configuration
-     */
     function getStrategyConfig(
         IStrategy strategy
     ) external view returns (uint256 minShares, address priceFeed) {
@@ -394,18 +336,12 @@ contract EnclaveServiceManager is
         return (config.minShares, config.priceFeed);
     }
 
-    /**
-     * @notice Get minimum collateral requirement
-     */
     function getMinCollateralUsd() external view returns (uint256) {
         return minCollateralUsd;
     }
 
     // ============ Internal Functions ============
 
-    /**
-     * @notice Convert strategy shares to USD value
-     */
     function _convertSharesToUsd(
         IStrategy strategy,
         uint256 shares
@@ -426,9 +362,6 @@ contract EnclaveServiceManager is
         }
     }
 
-    /**
-     * @notice Get token price from Chainlink feed
-     */
     function _getTokenPrice(
         address priceFeed
     ) internal view returns (uint256 price) {
@@ -452,13 +385,6 @@ contract EnclaveServiceManager is
         }
     }
 
-    /**
-     * @notice Calculate slashing proportions (wads) for each strategy
-     * @param operator Address of the operator to slash
-     * @param slashingPercentage Percentage to slash in basis points (e.g., 500 = 5%)
-     * @return strategies Array of strategies to slash
-     * @return wadsToSlash Array of proportions to slash (as wads - parts per 1e18)
-     */
     function _calculateSlashingWads(
         address operator,
         uint256 slashingPercentage

@@ -9,7 +9,7 @@ import {
     IStrategy
 } from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
-interface IEnclaveServiceManager {
+interface IServiceManager {
     /// @notice Custom errors
     error ZeroAddress();
     error StrategyNotAllowed();
@@ -19,6 +19,7 @@ interface IEnclaveServiceManager {
     error InvalidMinCollateral();
     error StrategyAlreadyAllowed();
     error StrategyNotFound();
+    error InvalidSlashingPercentage();
 
     /// @notice Events
     event StrategyAdded(
@@ -42,6 +43,14 @@ interface IEnclaveServiceManager {
         IStrategy[] strategies,
         uint256[] slashedShares
     );
+
+    /// @notice Strategy configuration
+    struct StrategyConfig {
+        bool isAllowed;
+        uint256 minShares;
+        address priceFeed;
+        uint8 decimals;
+    }
 
     /**
      * @notice Add a supported strategy for collateral
