@@ -25,8 +25,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @notice Event emitted when bonding manager is set
-    event BondingManagerSet(address indexed bondingManager);
+    event ServiceManagerSet(address indexed serviceManager);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -35,9 +34,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     address public enclave;
+    address public serviceManager;
     uint256 public numCiphernodes;
     LeanIMTData public ciphernodes;
-    IBondingManager public bondingManager;
 
     mapping(uint256 e3Id => IRegistryFilter filter) public registryFilters;
     mapping(uint256 e3Id => uint256 root) public roots;
@@ -55,9 +54,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     error CommitteeNotPublished();
     error CiphernodeNotEnabled(address node);
     error OnlyEnclave();
-    error OnlyBondingManager();
-    error NotOwnerOrBondingManager();
+    error OnlyServiceManager();
+    error NotOwnerOrServiceManager();
     error NodeNotBonded(address node);
+    error ZeroAddress();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -70,15 +70,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         _;
     }
 
-    modifier onlyBondingManager() {
-        require(msg.sender == address(bondingManager), OnlyBondingManager());
+    modifier onlyServiceManager() {
+        require(msg.sender == serviceManager, OnlyServiceManager());
         _;
     }
 
-    modifier onlyOwnerOrBondingManager() {
+    modifier onlyOwnerOrServiceManager() {
         require(
-            msg.sender == owner() || msg.sender == address(bondingManager),
-            NotOwnerOrBondingManager()
+            msg.sender == owner() || msg.sender == serviceManager,
+            NotOwnerOrServiceManager()
         );
         _;
     }
@@ -89,13 +89,22 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    constructor(address _owner, address _enclave) {
-        initialize(_owner, _enclave);
+    constructor(address _owner, address _enclave, address _serviceManager) {
+        initialize(_owner, _enclave, _serviceManager);
     }
 
-    function initialize(address _owner, address _enclave) public initializer {
+    function initialize(
+        address _owner,
+        address _enclave,
+        address _serviceManager
+    ) public initializer {
+        require(_owner != address(0), ZeroAddress());
+        require(_enclave != address(0), ZeroAddress());
+        require(_serviceManager != address(0), ZeroAddress());
+
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
+        setServiceManager(_serviceManager);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -134,11 +143,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         emit CommitteePublished(e3Id, publicKey);
     }
 
-    function addCiphernode(address node) external onlyOwnerOrBondingManager {
-        if (msg.sender == address(bondingManager)) {
-            require(bondingManager.isBonded(node), NodeNotBonded(node));
-        }
-
+    function addCiphernode(address node) external onlyOwnerOrServiceManager {
         if (isEnabled(node)) {
             return;
         }
@@ -157,7 +162,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function removeCiphernode(
         address node,
         uint256[] calldata siblingNodes
-    ) external onlyOwnerOrBondingManager {
+    ) external onlyOwnerOrServiceManager {
         require(isEnabled(node), CiphernodeNotEnabled(node));
 
         uint160 ciphernode = uint160(node);
@@ -174,17 +179,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function setEnclave(address _enclave) public onlyOwner {
+        require(_enclave != address(0), ZeroAddress());
         enclave = _enclave;
         emit EnclaveSet(_enclave);
     }
 
-    /**
-     * @notice Set the bonding manager contract
-     * @param _bondingManager Address of the bonding manager
-     */
-    function setBondingManager(address _bondingManager) public onlyOwner {
-        bondingManager = IBondingManager(_bondingManager);
-        emit BondingManagerSet(_bondingManager);
+    function setServiceManager(address _serviceManager) public onlyOwner {
+        require(_serviceManager != address(0), ZeroAddress());
+        serviceManager = _serviceManager;
+        emit ServiceManagerSet(_serviceManager);
     }
 
     ////////////////////////////////////////////////////////////
@@ -201,10 +204,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     function isCiphernodeEligible(address node) external view returns (bool) {
-        return
-            isEnabled(node) &&
-            (address(bondingManager) == address(0) ||
-                bondingManager.isBonded(node));
+        if (!isEnabled(node)) {
+            return false;
+        }
+        return IBondingManager(serviceManager).isBonded(node);
     }
 
     function isEnabled(address node) public view returns (bool) {
@@ -227,15 +230,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         return ciphernodes.size;
     }
 
-    /**
-     * @notice Get the bonding manager address
-     * @return bondingManagerAddress Address of the bonding manager
-     */
-    function getBondingManager()
+    function getServiceManager()
         external
         view
-        returns (address bondingManagerAddress)
+        returns (address serviceManagerAddress)
     {
-        return address(bondingManager);
+        return serviceManager;
     }
 }
