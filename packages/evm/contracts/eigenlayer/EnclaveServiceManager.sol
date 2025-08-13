@@ -40,6 +40,21 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         uint8 decimals;
     }
 
+    event CiphernodeRegistered(address indexed operator, uint256 collateralUsd);
+    event CiphernodeDeregistered(address indexed operator);
+
+    uint256 public minCollateralUsd;
+    mapping(IStrategy => StrategyConfig) public strategyConfigs;
+    IStrategy[] public allowedStrategies;
+    mapping(IStrategy => uint256) private strategyToIndex;
+
+    ICiphernodeRegistry public ciphernodeRegistry;
+    IBondingManager public bondingManager;
+    IAllocationManager public allocationManager;
+
+    mapping(address => bool) public registeredOperators;
+    uint32 public operatorSetId;
+
     /// @notice Minimum collateral requirement in USD
     uint256 public minCollateralUsd;
 
@@ -148,6 +163,38 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
     function setMinCollateralUsd(uint256 _minCollateralUsd) external onlyOwner {
         require(_minCollateralUsd > 0, "invalid min collateral");
         minCollateralUsd = _minCollateralUsd;
+    }
+
+    function registerCiphernode() external nonReentrant {
+        require(!registeredOperators[msg.sender], "already registered");
+
+        // must be an EigenLayer operator
+        require(_delegationManager.isOperator(msg.sender), "not EL operator");
+
+        // meet collateral
+        (bool ok, uint256 collateralUsd) = checkOperatorEligibility(msg.sender);
+        require(ok, "insufficient collateral");
+
+        registeredOperators[msg.sender] = true;
+
+        // reflect in bonding + registry
+        bondingManager.registerOperator(msg.sender, collateralUsd);
+        ciphernodeRegistry.addCiphernode(msg.sender);
+
+        emit CiphernodeRegistered(msg.sender, collateralUsd);
+    }
+
+    function deregisterCiphernode(
+        uint256[] calldata siblingNodes
+    ) external nonReentrant {
+        require(registeredOperators[msg.sender], "not registered");
+
+        registeredOperators[msg.sender] = false;
+
+        bondingManager.deregisterOperator(msg.sender);
+        ciphernodeRegistry.removeCiphernode(msg.sender, siblingNodes);
+
+        emit CiphernodeDeregistered(msg.sender);
     }
 
     // ============ View Functions ============
