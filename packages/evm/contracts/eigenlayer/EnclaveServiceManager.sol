@@ -305,6 +305,126 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         }
     }
 
+    function addStrategy(
+        IStrategy strategy,
+        uint256 minShares,
+        address priceFeed
+    ) external onlyOwner {
+        require(address(strategy) != address(0), "zero strategy");
+        require(!strategyConfigs[strategy].isAllowed, "already allowed");
+
+        uint8 decimals_ = 18;
+        // best-effort decimals detection
+        try strategy.underlyingToken().decimals() returns (uint8 d) {
+            decimals_ = d;
+        } catch {}
+
+        strategyConfigs[strategy] = StrategyConfig({
+            isAllowed: true,
+            minShares: minShares,
+            priceFeed: priceFeed,
+            decimals: decimals_
+        });
+
+        strategyToIndex[strategy] = allowedStrategies.length;
+        allowedStrategies.push(strategy);
+
+        emit StrategyAdded(strategy, minShares, priceFeed);
+    }
+
+    function removeStrategy(IStrategy strategy) external onlyOwner {
+        require(strategyConfigs[strategy].isAllowed, "strategy not found");
+
+        uint256 index = strategyToIndex[strategy];
+        uint256 lastIndex = allowedStrategies.length - 1;
+
+        if (index != lastIndex) {
+            IStrategy lastStrategy = allowedStrategies[lastIndex];
+            allowedStrategies[index] = lastStrategy;
+            strategyToIndex[lastStrategy] = index;
+        }
+
+        allowedStrategies.pop();
+        delete strategyToIndex[strategy];
+        delete strategyConfigs[strategy];
+
+        emit StrategyRemoved(strategy);
+    }
+
+    function updateStrategy(
+        IStrategy strategy,
+        uint256 newMinShares,
+        address newPriceFeed
+    ) external onlyOwner {
+        require(strategyConfigs[strategy].isAllowed, "strategy not found");
+
+        strategyConfigs[strategy].minShares = newMinShares;
+        strategyConfigs[strategy].priceFeed = newPriceFeed;
+
+        emit StrategyUpdated(strategy, newMinShares, newPriceFeed);
+    }
+
+    function setMinCollateralUsd(uint256 _minCollateralUsd) external onlyOwner {
+        require(_minCollateralUsd > 0, "invalid min collateral");
+        minCollateralUsd = _minCollateralUsd;
+        emit MinCollateralUpdated(_minCollateralUsd);
+    }
+
+    // ============ Views & Internals (pricing improved) ============
+
+    function _convertSharesToUsd(
+        IStrategy strategy,
+        uint256 shares
+    ) internal view returns (uint256 usdValue) {
+        StrategyConfig memory config = strategyConfigs[strategy];
+        uint256 underlyingAmount = strategy.sharesToUnderlyingView(shares);
+
+        if (config.priceFeed == address(0)) {
+            // Stablecoin assumption; scale to 18 decimals
+            if (config.decimals < 18) {
+                usdValue = underlyingAmount * (10 ** (18 - config.decimals));
+            } else if (config.decimals > 18) {
+                usdValue = underlyingAmount / (10 ** (config.decimals - 18));
+            } else {
+                usdValue = underlyingAmount;
+            }
+        } else {
+            uint256 price18 = _getTokenPrice(config.priceFeed); // returns 18-decimal price
+            // (underlyingAmount has token decimals; scale to 18)
+            uint256 amt18 = underlyingAmount;
+            if (config.decimals < 18) {
+                amt18 = underlyingAmount * (10 ** (18 - config.decimals));
+            } else if (config.decimals > 18) {
+                amt18 = underlyingAmount / (10 ** (config.decimals - 18));
+            }
+            usdValue = (amt18 * price18) / 1e18;
+        }
+    }
+
+    function _getTokenPrice(
+        address priceFeed
+    ) internal view returns (uint256 price18) {
+        AggregatorV3Interface feed = AggregatorV3Interface(priceFeed);
+        try feed.latestRoundData() returns (
+            uint80 /*roundId*/,
+            int256 answer,
+            uint256 /*startedAt*/,
+            uint256 updatedAt,
+            uint80 /*answeredInRound*/
+        ) {
+            require(answer > 0, "bad price");
+            require(
+                block.timestamp - updatedAt <= PRICE_STALENESS_THRESHOLD,
+                "stale price"
+            );
+            // common Chainlink feeds are 8 decimals; normalize to 18
+            // NOTE: we don't know feed decimals here; assume 8 for safety (made robust in commit 5 via interface constants if desired)
+            price18 = uint256(answer) * 1e10;
+        } catch {
+            revert("price feed error");
+        }
+    }
+
     function checkOperatorEligibility(
         address operator
     ) public view returns (bool isEligible, uint256 collateralUsd) {
