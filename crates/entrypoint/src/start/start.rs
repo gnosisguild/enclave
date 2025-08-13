@@ -39,7 +39,7 @@ pub async fn execute(
     let rng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::from_rng(OsRng)?));
 
     let bus = get_enclave_event_bus();
-    let cipher = Arc::new(Cipher::from_config(&config).await?);
+    let cipher = Arc::new(Cipher::from_config(&config)?);
     let store = setup_datastore(&config, &bus)?;
 
     let repositories = store.repositories();

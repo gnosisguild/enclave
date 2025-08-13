@@ -44,22 +44,29 @@ test("CRISP smoke test", async ({
     extensionId,
   );
 
+  console.log("** Running cli init...");
   await runCliInit();
   await page.goto("/");
   await ensureHomePageLoaded(page);
+  console.log("** Connecting to wallet");
   await page.locator('button:has-text("Connect Wallet")').click();
   await page.locator('button:has-text("MetaMask")').click();
   await metamask.connectToDapp();
+  console.log("** Clicking TRY DEMO...");
   await page.locator('button:has-text("Try Demo")').click();
   await page
     .locator("[data-test-id='poll-button-0'] > [data-test-id='card']")
     .click();
+  console.log("** Clicking CAST VOTE...");
   await page.locator('button:has-text("Cast Vote")').click();
+  console.log("** Clicking REGISTER IDENTITY...");
   await page.locator('button:has-text("Register Identity")').click();
   await page.waitForTimeout(1000);
   await metamask.confirmTransaction();
+  console.log("** Clicking CAST VOTE (AGAIN)...");
   await page.locator('button:has-text("Cast Vote")').click();
   await page.waitForTimeout(180_000);
+  console.log("** Clicking HISTORICAL POLLS...");
   await page.locator('a:has-text("Historic polls")').click();
   await expect(page.locator("h1")).toHaveText("Historic polls");
   await expect(
