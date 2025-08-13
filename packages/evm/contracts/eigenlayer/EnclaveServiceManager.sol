@@ -42,6 +42,18 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
 
     event CiphernodeRegistered(address indexed operator, uint256 collateralUsd);
     event CiphernodeDeregistered(address indexed operator);
+    event StrategyAdded(
+        IStrategy indexed strategy,
+        uint256 minShares,
+        address priceFeed
+    );
+    event StrategyRemoved(IStrategy indexed strategy);
+    event StrategyUpdated(
+        IStrategy indexed strategy,
+        uint256 newMinShares,
+        address newPriceFeed
+    );
+    event MinCollateralUpdated(uint256 newMinCollateralUsd);
 
     uint256 public minCollateralUsd;
     mapping(IStrategy => StrategyConfig) public strategyConfigs;
@@ -264,8 +276,6 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         }
     }
 
-    // ============ Internal helpers ============
-
     function _calculateSlashingWads(
         address operator,
         uint256 slashingPercentage
@@ -294,8 +304,6 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
             }
         }
     }
-
-    // ============ View Functions ============
 
     function checkOperatorEligibility(
         address operator
