@@ -28,47 +28,31 @@ import {
     ReentrancyGuard
 } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+import {
+    IEnclaveServiceManager
+} from "../interfaces/IEnclaveServiceManager.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingManager } from "../interfaces/IBondingManager.sol";
 
-contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
+contract EnclaveServiceManager is
+    ServiceManagerBase,
+    IEnclaveServiceManager,
+    Ownable,
+    ReentrancyGuard
+{
     /// @notice Strategy configuration
     struct StrategyConfig {
         bool isAllowed;
         uint256 minShares;
-        address priceFeed;
-        uint8 decimals;
+        address priceFeed; // Chainlink price feed for USD conversion (address(0) for stablecoins)
+        uint8 decimals; // Token decimals for proper scaling
     }
 
-    event CiphernodeRegistered(address indexed operator, uint256 collateralUsd);
-    event CiphernodeDeregistered(address indexed operator);
-    event StrategyAdded(
-        IStrategy indexed strategy,
-        uint256 minShares,
-        address priceFeed
-    );
-    event StrategyRemoved(IStrategy indexed strategy);
-    event StrategyUpdated(
-        IStrategy indexed strategy,
-        uint256 newMinShares,
-        address newPriceFeed
-    );
-    event MinCollateralUpdated(uint256 newMinCollateralUsd);
-
+    /// @notice Minimum collateral requirement in USD (18 decimals)
     uint256 public minCollateralUsd;
-    mapping(IStrategy => StrategyConfig) public strategyConfigs;
-    IStrategy[] public allowedStrategies;
-    mapping(IStrategy => uint256) private strategyToIndex;
 
-    ICiphernodeRegistry public ciphernodeRegistry;
-    IBondingManager public bondingManager;
-    IAllocationManager public allocationManager;
-
-    mapping(address => bool) public registeredOperators;
-    uint32 public operatorSetId;
-
-    /// @notice Minimum collateral requirement in USD
-    uint256 public minCollateralUsd;
+    /// @notice Price feed staleness threshold (24 hours)
+    uint256 public constant PRICE_STALENESS_THRESHOLD = 86400;
 
     /// @notice Supported strategies mapping
     mapping(IStrategy => StrategyConfig) public strategyConfigs;
@@ -88,10 +72,13 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
     /// @notice EigenLayer AllocationManager for slashing
     IAllocationManager public allocationManager;
 
+    /// @notice Addresses authorized to slash operators
+    mapping(address => bool) public slashers;
+
     /// @notice Registered operators
     mapping(address => bool) public registeredOperators;
 
-    /// @notice Operator set ID for slashing
+    /// @notice Operator set ID for slashing (AVS-specific)
     uint32 public operatorSetId;
 
     constructor(
@@ -108,13 +95,10 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         ServiceManagerBase(_avsDirectory, _registryCoordinator, _stakeRegistry)
         Ownable(_owner)
     {
-        require(_ciphernodeRegistry != address(0), "zero ciphernodeRegistry");
-        require(_bondingManager != address(0), "zero bondingManager");
-        require(
-            address(_allocationManager) != address(0),
-            "zero allocationMgr"
-        );
-        require(_minCollateralUsd > 0, "invalid min collateral");
+        require(_ciphernodeRegistry != address(0), ZeroAddress());
+        require(_bondingManager != address(0), ZeroAddress());
+        require(address(_allocationManager) != address(0), ZeroAddress());
+        require(_minCollateralUsd > 0, InvalidMinCollateral());
 
         ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
         bondingManager = IBondingManager(_bondingManager);
@@ -125,205 +109,28 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
 
     // ============ Strategy Management ============
 
+    /**
+     * @notice Add a supported strategy for collateral
+     */
     function addStrategy(
         IStrategy strategy,
         uint256 minShares,
         address priceFeed
     ) external onlyOwner {
-        require(address(strategy) != address(0), "zero strategy");
-        require(!strategyConfigs[strategy].isAllowed, "already allowed");
+        require(address(strategy) != address(0), ZeroAddress());
+        require(!strategyConfigs[strategy].isAllowed, StrategyAlreadyAllowed());
 
-        strategyConfigs[strategy] = StrategyConfig({
-            isAllowed: true,
-            minShares: minShares,
-            priceFeed: priceFeed,
-            decimals: 18
-        });
-
-        strategyToIndex[strategy] = allowedStrategies.length;
-        allowedStrategies.push(strategy);
-    }
-
-    function removeStrategy(IStrategy strategy) external onlyOwner {
-        require(strategyConfigs[strategy].isAllowed, "strategy not found");
-
-        uint256 index = strategyToIndex[strategy];
-        uint256 lastIndex = allowedStrategies.length - 1;
-
-        if (index != lastIndex) {
-            IStrategy lastStrategy = allowedStrategies[lastIndex];
-            allowedStrategies[index] = lastStrategy;
-            strategyToIndex[lastStrategy] = index;
-        }
-
-        allowedStrategies.pop();
-        delete strategyToIndex[strategy];
-        delete strategyConfigs[strategy];
-    }
-
-    function updateStrategy(
-        IStrategy strategy,
-        uint256 newMinShares,
-        address newPriceFeed
-    ) external onlyOwner {
-        require(strategyConfigs[strategy].isAllowed, "strategy not found");
-
-        strategyConfigs[strategy].minShares = newMinShares;
-        strategyConfigs[strategy].priceFeed = newPriceFeed;
-    }
-
-    function setMinCollateralUsd(uint256 _minCollateralUsd) external onlyOwner {
-        require(_minCollateralUsd > 0, "invalid min collateral");
-        minCollateralUsd = _minCollateralUsd;
-    }
-
-    function registerCiphernode() external nonReentrant {
-        require(!registeredOperators[msg.sender], "already registered");
-
-        // must be an EigenLayer operator
-        require(_delegationManager.isOperator(msg.sender), "not EL operator");
-
-        // meet collateral
-        (bool ok, uint256 collateralUsd) = checkOperatorEligibility(msg.sender);
-        require(ok, "insufficient collateral");
-
-        registeredOperators[msg.sender] = true;
-
-        // reflect in bonding + registry
-        bondingManager.registerOperator(msg.sender, collateralUsd);
-        ciphernodeRegistry.addCiphernode(msg.sender);
-
-        emit CiphernodeRegistered(msg.sender, collateralUsd);
-    }
-
-    function deregisterCiphernode(
-        uint256[] calldata siblingNodes
-    ) external nonReentrant {
-        require(registeredOperators[msg.sender], "not registered");
-
-        registeredOperators[msg.sender] = false;
-
-        bondingManager.deregisterOperator(msg.sender);
-        ciphernodeRegistry.removeCiphernode(msg.sender, siblingNodes);
-
-        emit CiphernodeDeregistered(msg.sender);
-    }
-
-    // ============ Slashing ============
-
-    function addSlasher(address slasher) external onlyOwner {
-        require(slasher != address(0), "zero slasher");
-        slashers[slasher] = true;
-    }
-
-    function removeSlasher(address slasher) external onlyOwner {
-        slashers[slasher] = false;
-    }
-
-    function slashOperator(
-        address operator,
-        uint256 slashingPercentage, // bps
-        string calldata reason
-    ) external nonReentrant {
-        require(slashers[msg.sender], "not slasher");
-        require(registeredOperators[operator], "operator not registered");
-        require(slashingPercentage <= 10000, "bps too high");
-
-        (
-            IStrategy[] memory strategies,
-            uint256[] memory wadsToSlash
-        ) = _calculateSlashingWads(operator, slashingPercentage);
-
-        if (strategies.length == 0) {
-            return;
-        }
-
-        try
-            allocationManager.slashOperator(
-                address(this),
-                IAllocationManager.SlashingParams({
-                    operator: operator,
-                    operatorSetId: operatorSetId,
-                    strategies: strategies,
-                    wadsToSlash: wadsToSlash,
-                    description: reason
-                })
-            )
-        returns (uint256 /*slashId*/, uint256[] memory slashedShares) {
-            emit OperatorSlashed(
-                operator,
-                slashingPercentage,
-                reason,
-                strategies,
-                slashedShares
-            );
-
-            (bool ok, uint256 newCollateralUsd) = checkOperatorEligibility(
-                operator
-            );
-            if (!ok) {
-                registeredOperators[operator] = false;
-                bondingManager.deregisterOperator(operator);
-                emit CiphernodeDeregistered(operator);
-            } else {
-                bondingManager.updateOperatorCollateral(
-                    operator,
-                    newCollateralUsd
-                );
-            }
-        } catch Error(string memory err) {
-            revert(string(abi.encodePacked("slashing failed: ", err)));
-        }
-    }
-
-    function _calculateSlashingWads(
-        address operator,
-        uint256 slashingPercentage
-    )
-        internal
-        view
-        returns (IStrategy[] memory strategies, uint256[] memory wadsToSlash)
-    {
-        uint256 count = 0;
-        for (uint256 i = 0; i < allowedStrategies.length; i++) {
-            if (getOperatorShares(operator, allowedStrategies[i]) > 0) {
-                count++;
-            }
-        }
-        strategies = new IStrategy[](count);
-        wadsToSlash = new uint256[](count);
-
-        uint256 idx = 0;
-        uint256 wad = (slashingPercentage * 1e18) / 10000; // bps -> wad
-        for (uint256 i = 0; i < allowedStrategies.length; i++) {
-            IStrategy s = allowedStrategies[i];
-            if (getOperatorShares(operator, s) > 0) {
-                strategies[idx] = s;
-                wadsToSlash[idx] = wad;
-                idx++;
-            }
-        }
-    }
-
-    function addStrategy(
-        IStrategy strategy,
-        uint256 minShares,
-        address priceFeed
-    ) external onlyOwner {
-        require(address(strategy) != address(0), "zero strategy");
-        require(!strategyConfigs[strategy].isAllowed, "already allowed");
-
-        uint8 decimals_ = 18;
-        // best-effort decimals detection
+        // Get token decimals from strategy
+        uint8 decimals = 18; // Default to 18
         try strategy.underlyingToken().decimals() returns (uint8 d) {
-            decimals_ = d;
+            decimals = d;
         } catch {}
 
         strategyConfigs[strategy] = StrategyConfig({
             isAllowed: true,
             minShares: minShares,
             priceFeed: priceFeed,
-            decimals: decimals_
+            decimals: decimals
         });
 
         strategyToIndex[strategy] = allowedStrategies.length;
@@ -332,9 +139,13 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         emit StrategyAdded(strategy, minShares, priceFeed);
     }
 
+    /**
+     * @notice Remove a supported strategy
+     */
     function removeStrategy(IStrategy strategy) external onlyOwner {
-        require(strategyConfigs[strategy].isAllowed, "strategy not found");
+        require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
 
+        // Remove from allowedStrategies array
         uint256 index = strategyToIndex[strategy];
         uint256 lastIndex = allowedStrategies.length - 1;
 
@@ -351,12 +162,15 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         emit StrategyRemoved(strategy);
     }
 
+    /**
+     * @notice Update strategy parameters
+     */
     function updateStrategy(
         IStrategy strategy,
         uint256 newMinShares,
         address newPriceFeed
     ) external onlyOwner {
-        require(strategyConfigs[strategy].isAllowed, "strategy not found");
+        require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
 
         strategyConfigs[strategy].minShares = newMinShares;
         strategyConfigs[strategy].priceFeed = newPriceFeed;
@@ -364,67 +178,159 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         emit StrategyUpdated(strategy, newMinShares, newPriceFeed);
     }
 
+    /**
+     * @notice Set minimum collateral requirement in USD
+     */
     function setMinCollateralUsd(uint256 _minCollateralUsd) external onlyOwner {
-        require(_minCollateralUsd > 0, "invalid min collateral");
+        require(_minCollateralUsd > 0, InvalidMinCollateral());
         minCollateralUsd = _minCollateralUsd;
         emit MinCollateralUpdated(_minCollateralUsd);
     }
 
-    // ============ Views & Internals (pricing improved) ============
+    // ============ Operator Registration ============
 
-    function _convertSharesToUsd(
-        IStrategy strategy,
-        uint256 shares
-    ) internal view returns (uint256 usdValue) {
-        StrategyConfig memory config = strategyConfigs[strategy];
-        uint256 underlyingAmount = strategy.sharesToUnderlyingView(shares);
+    /**
+     * @notice Register as a ciphernode (permissionless)
+     */
+    function registerCiphernode() external nonReentrant {
+        require(!registeredOperators[msg.sender], OperatorNotRegistered());
 
-        if (config.priceFeed == address(0)) {
-            // Stablecoin assumption; scale to 18 decimals
-            if (config.decimals < 18) {
-                usdValue = underlyingAmount * (10 ** (18 - config.decimals));
-            } else if (config.decimals > 18) {
-                usdValue = underlyingAmount / (10 ** (config.decimals - 18));
-            } else {
-                usdValue = underlyingAmount;
+        // Verify operator is registered with EigenLayer
+        require(
+            _delegationManager.isOperator(msg.sender),
+            OperatorNotRegistered()
+        );
+
+        // Check collateral requirements
+        (bool isEligible, uint256 collateralUsd) = checkOperatorEligibility(
+            msg.sender
+        );
+        require(isEligible, InsufficientCollateral());
+
+        // Register with our system
+        registeredOperators[msg.sender] = true;
+
+        // Register with bonding manager
+        bondingManager.registerOperator(msg.sender, collateralUsd);
+
+        // Add to ciphernode registry
+        ciphernodeRegistry.addCiphernode(msg.sender);
+
+        emit CiphernodeRegistered(msg.sender, collateralUsd);
+    }
+
+    /**
+     * @notice Deregister from being a ciphernode
+     */
+    function deregisterCiphernode(
+        uint256[] calldata siblingNodes
+    ) external nonReentrant {
+        require(registeredOperators[msg.sender], OperatorNotRegistered());
+
+        registeredOperators[msg.sender] = false;
+
+        // Deregister from bonding manager
+        bondingManager.deregisterOperator(msg.sender);
+
+        // Remove from ciphernode registry
+        ciphernodeRegistry.removeCiphernode(msg.sender, siblingNodes);
+
+        emit CiphernodeDeregistered(msg.sender);
+    }
+
+    // ============ Slashing ============
+
+    /**
+     * @notice Add authorized slasher
+     */
+    function addSlasher(address slasher) external onlyOwner {
+        require(slasher != address(0), ZeroAddress());
+        slashers[slasher] = true;
+    }
+
+    /**
+     * @notice Remove authorized slasher
+     */
+    function removeSlasher(address slasher) external onlyOwner {
+        slashers[slasher] = false;
+    }
+
+    /**
+     * @notice Slash an operator's collateral for misbehavior
+     * @param operator Address of the operator to slash
+     * @param slashingPercentage Percentage to slash (in basis points, e.g., 500 = 5%)
+     * @param reason Description of the slashing reason
+     */
+    function slashOperator(
+        address operator,
+        uint256 slashingPercentage,
+        string calldata reason
+    ) external nonReentrant {
+        require(slashers[msg.sender], NotAuthorizedSlasher());
+        require(registeredOperators[operator], OperatorNotRegistered());
+        require(slashingPercentage <= 10000, "Slashing percentage too high"); // Max 100%
+
+        // Get strategies where operator has stake
+        (
+            IStrategy[] memory strategies,
+            uint256[] memory wadsToSlash
+        ) = _calculateSlashingWads(operator, slashingPercentage);
+
+        if (strategies.length > 0) {
+            // Create slashing parameters for EigenLayer AllocationManager
+            IAllocationManager.SlashingParams
+                memory slashingParams = IAllocationManager.SlashingParams({
+                    operator: operator,
+                    operatorSetId: operatorSetId,
+                    strategies: strategies,
+                    wadsToSlash: wadsToSlash,
+                    description: reason
+                });
+
+            // Execute slashing through EigenLayer AllocationManager
+            try
+                allocationManager.slashOperator(
+                    address(this), // AVS address
+                    slashingParams
+                )
+            returns (uint256 slashId, uint256[] memory slashedShares) {
+                emit OperatorSlashed(
+                    operator,
+                    slashingPercentage,
+                    reason,
+                    strategies,
+                    slashedShares
+                );
+
+                // Check if operator still meets requirements after slashing
+                (
+                    bool isEligible,
+                    uint256 newCollateralUsd
+                ) = checkOperatorEligibility(operator);
+                if (!isEligible) {
+                    // Auto-deregister if below minimum
+                    registeredOperators[operator] = false;
+                    bondingManager.deregisterOperator(operator);
+                    emit CiphernodeDeregistered(operator);
+                } else {
+                    // Update collateral amount
+                    bondingManager.updateOperatorCollateral(
+                        operator,
+                        newCollateralUsd
+                    );
+                }
+            } catch Error(string memory errorMsg) {
+                // Handle slashing failure
+                revert(string(abi.encodePacked("Slashing failed: ", errorMsg)));
             }
-        } else {
-            uint256 price18 = _getTokenPrice(config.priceFeed); // returns 18-decimal price
-            // (underlyingAmount has token decimals; scale to 18)
-            uint256 amt18 = underlyingAmount;
-            if (config.decimals < 18) {
-                amt18 = underlyingAmount * (10 ** (18 - config.decimals));
-            } else if (config.decimals > 18) {
-                amt18 = underlyingAmount / (10 ** (config.decimals - 18));
-            }
-            usdValue = (amt18 * price18) / 1e18;
         }
     }
 
-    function _getTokenPrice(
-        address priceFeed
-    ) internal view returns (uint256 price18) {
-        AggregatorV3Interface feed = AggregatorV3Interface(priceFeed);
-        try feed.latestRoundData() returns (
-            uint80 /*roundId*/,
-            int256 answer,
-            uint256 /*startedAt*/,
-            uint256 updatedAt,
-            uint80 /*answeredInRound*/
-        ) {
-            require(answer > 0, "bad price");
-            require(
-                block.timestamp - updatedAt <= PRICE_STALENESS_THRESHOLD,
-                "stale price"
-            );
-            // common Chainlink feeds are 8 decimals; normalize to 18
-            // NOTE: we don't know feed decimals here; assume 8 for safety (made robust in commit 5 via interface constants if desired)
-            price18 = uint256(answer) * 1e10;
-        } catch {
-            revert("price feed error");
-        }
-    }
+    // ============ View Functions ============
 
+    /**
+     * @notice Check if an operator meets collateral requirements
+     */
     function checkOperatorEligibility(
         address operator
     ) public view returns (bool isEligible, uint256 collateralUsd) {
@@ -432,18 +338,25 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         isEligible = collateralUsd >= minCollateralUsd;
     }
 
+    /**
+     * @notice Get total collateral value for an operator across all strategies
+     */
     function getOperatorCollateralValue(
         address operator
     ) public view returns (uint256 totalUsdValue) {
         for (uint256 i = 0; i < allowedStrategies.length; i++) {
             IStrategy strategy = allowedStrategies[i];
             uint256 shares = getOperatorShares(operator, strategy);
+
             if (shares > 0) {
                 totalUsdValue += _convertSharesToUsd(strategy, shares);
             }
         }
     }
 
+    /**
+     * @notice Get operator's shares in a specific strategy
+     */
     function getOperatorShares(
         address operator,
         IStrategy strategy
@@ -451,12 +364,18 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         return _strategyManager.stakerStrategyShares(operator, strategy);
     }
 
+    /**
+     * @notice Check if a strategy is allowed for collateral
+     */
     function isStrategyAllowed(
         IStrategy strategy
     ) external view returns (bool isAllowed) {
         return strategyConfigs[strategy].isAllowed;
     }
 
+    /**
+     * @notice Get all allowed strategies
+     */
     function getAllowedStrategies()
         external
         view
@@ -465,6 +384,9 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         return allowedStrategies;
     }
 
+    /**
+     * @notice Get strategy configuration
+     */
     function getStrategyConfig(
         IStrategy strategy
     ) external view returns (uint256 minShares, address priceFeed) {
@@ -472,33 +394,104 @@ contract EnclaveServiceManager is ServiceManagerBase, Ownable, ReentrancyGuard {
         return (config.minShares, config.priceFeed);
     }
 
+    /**
+     * @notice Get minimum collateral requirement
+     */
     function getMinCollateralUsd() external view returns (uint256) {
         return minCollateralUsd;
     }
 
-    // ============ Internal ============
+    // ============ Internal Functions ============
 
+    /**
+     * @notice Convert strategy shares to USD value
+     */
     function _convertSharesToUsd(
         IStrategy strategy,
         uint256 shares
     ) internal view returns (uint256 usdValue) {
         StrategyConfig memory config = strategyConfigs[strategy];
+
+        // Convert shares to underlying tokens
         uint256 underlyingAmount = strategy.sharesToUnderlyingView(shares);
 
         if (config.priceFeed == address(0)) {
-            usdValue = underlyingAmount;
+            // For stablecoins, assume 1:1 USD parity
+            // Scale to 18 decimals
+            usdValue = underlyingAmount * (10 ** (18 - config.decimals));
         } else {
+            // Use Chainlink price feed
             uint256 price = _getTokenPrice(config.priceFeed);
-            usdValue = (underlyingAmount * price) / 1e8;
+            usdValue = (underlyingAmount * price) / (10 ** config.decimals);
         }
     }
 
+    /**
+     * @notice Get token price from Chainlink feed
+     */
     function _getTokenPrice(
         address priceFeed
     ) internal view returns (uint256 price) {
         AggregatorV3Interface feed = AggregatorV3Interface(priceFeed);
-        (, int256 answer, , , ) = feed.latestRoundData();
-        require(answer > 0, "bad price");
-        return uint256(answer);
+
+        try feed.latestRoundData() returns (
+            uint80 /* roundId */,
+            int256 answer,
+            uint256 /* startedAt */,
+            uint256 updatedAt,
+            uint80 /* answeredInRound */
+        ) {
+            require(
+                answer > 0 &&
+                    block.timestamp - updatedAt <= PRICE_STALENESS_THRESHOLD,
+                "Invalid or stale price"
+            );
+            return uint256(answer) * 1e10; // Convert to 18 decimals
+        } catch {
+            revert("Price feed error");
+        }
+    }
+
+    /**
+     * @notice Calculate slashing proportions (wads) for each strategy
+     * @param operator Address of the operator to slash
+     * @param slashingPercentage Percentage to slash in basis points (e.g., 500 = 5%)
+     * @return strategies Array of strategies to slash
+     * @return wadsToSlash Array of proportions to slash (as wads - parts per 1e18)
+     */
+    function _calculateSlashingWads(
+        address operator,
+        uint256 slashingPercentage
+    )
+        internal
+        view
+        returns (IStrategy[] memory strategies, uint256[] memory wadsToSlash)
+    {
+        // Get all strategies with non-zero shares
+        uint256 strategiesCount = 0;
+        for (uint256 i = 0; i < allowedStrategies.length; i++) {
+            if (getOperatorShares(operator, allowedStrategies[i]) > 0) {
+                strategiesCount++;
+            }
+        }
+
+        strategies = new IStrategy[](strategiesCount);
+        wadsToSlash = new uint256[](strategiesCount);
+
+        uint256 index = 0;
+        // Convert basis points to wad (parts per 1e18)
+        // e.g., 500 basis points (5%) = 5e16 wad
+        uint256 slashingWad = (slashingPercentage * 1e18) / 10000;
+
+        for (uint256 i = 0; i < allowedStrategies.length; i++) {
+            IStrategy strategy = allowedStrategies[i];
+            uint256 shares = getOperatorShares(operator, strategy);
+
+            if (shares > 0) {
+                strategies[index] = strategy;
+                wadsToSlash[index] = slashingWad; // Apply same percentage to all strategies
+                index++;
+            }
+        }
     }
 }
