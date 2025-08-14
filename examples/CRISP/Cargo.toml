@@ -1,19 +1,29 @@
 [workspace]
+members = [
+  "server",
+  "wasm-crypto",
+  ".enclave/support/dev",
+  "program/host",
+  "program/core",
+  "program/methods",
+  "program/app",
+  "program/client",
+]
+exclude = ["program/methods/guests"]
 resolver = "3"
-msrv = "1.86.0"
-members = ["host", "core", "methods", "app", "client"]
-exclude = ["methods/guests"]
-
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+license = "LGPL-3.0-only"
+description = "CRISP — Voting Application on Enclave"
+repository = "https://github.com/gnosisguild/enclave"
 
 [workspace.dependencies]
-voting-host = { path = "./host" }
-voting-core = { path = "./core" }
-methods = { path = "./methods" }
-program-client = { path = "./client" }
+voting-host = { path = "./program/host" }
+voting-core = { path = "./program/core" }
+methods = { path = "./program/methods" }
+program-client = { path = "./program/client" }
 
 alloy-primitives = { version = "=1.3.0", default-features = false, features = [
     "rlp",
@@ -29,21 +39,17 @@ env_logger = "=0.11.8"
 hex = { version = "=0.4.3" }
 log = { version = "=0.4.27" }
 reqwest = { version = "=0.12.22", features = ["json"] }
-risc0-build = { version = "=2.1.2", features = ["docker"] }
+risc0-build = { version = "=2.2.0", features = ["docker"] }
 risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.2.0" }
 risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v2.2.0" }
-risc0-zkvm = { version = "=2.1.0" }
-risc0-zkp = { version = "=2.0.1", default-features = false }
+risc0-zkvm = { version = "=2.2.0" }
+risc0-zkp = { version = "=2.0.2", default-features = false }
 serde = { version = "=1.0.219", features = ["derive", "std"] }
 serde_json = "=1.0.141"
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
-e3-compute-provider = { path = "../../../../crates/compute-provider" }
+e3-compute-provider = { path = "../../../crates/compute-provider" }
 tokio = { version = "=1.46.1", features = ["full"] }
 rand = { version = "=0.8.5" }
 tracing-subscriber = { version = "=0.3.19", features = ["env-filter"] }
-
-[profile.release]
-debug = 1
-lto = true

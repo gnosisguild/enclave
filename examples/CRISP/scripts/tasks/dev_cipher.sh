@@ -3,7 +3,8 @@
 set -euo pipefail
 
 # nuke past installations as we are adding these nodes to the contract
-rm -rf /app/examples/CRISP/.enclave/*
+rm -rf /app/examples/CRISP/.enclave/data
+rm -rf /app/examples/CRISP/.enclave/config
 
 PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 

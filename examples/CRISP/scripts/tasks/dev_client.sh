@@ -4,4 +4,4 @@ set -euo pipefail
 
 sleep 4
 
-(cd ./apps/client && pnpm dev)
+(cd ./client && pnpm dev)

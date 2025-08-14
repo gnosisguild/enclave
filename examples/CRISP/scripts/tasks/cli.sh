@@ -2,4 +2,4 @@
 
 set -e
 
-(cd ./apps/server && ./target/debug/cli "$@")
+(./target/debug/cli "$@")

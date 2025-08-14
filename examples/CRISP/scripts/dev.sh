@@ -3,4 +3,3 @@
 set -e
 
 ./scripts/tasks/dockerize.sh ./scripts/tasks/dev.sh
-

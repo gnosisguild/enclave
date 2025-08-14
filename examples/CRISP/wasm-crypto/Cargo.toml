@@ -1,7 +1,8 @@
 [package]
 name = "crisp-wasm-crypto"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+license.workspace = true
 repository = "https://github.com/gnosisguild/enclave"
 resolver     = "3"
 rust-version = "1.86.0"
@@ -15,13 +16,13 @@ fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 rand = "=0.8.5"
-e3-bfv-helpers = { path = "../../../../crates/bfv-helpers" }
+e3-bfv-helpers = { path = "../../../crates/bfv-helpers" }
 num-bigint = "=0.4.6"
 num-traits = "=0.2.19"
 wasm-bindgen = "=0.2.100"
 wasm-bindgen-test = "=0.3.50"
 console_log = "=0.2.2"
-log = "=0.4.27"
+log.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]

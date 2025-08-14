@@ -4,6 +4,6 @@
 set -e
 
 export CARGO_INCREMENTAL=1
-export RISC0_DEV_MODE=1
+export RISC0_DEV_MODE=0
 
-(cd ./apps/program && cargo run --bin crisp-program)
+enclave program start --dev true

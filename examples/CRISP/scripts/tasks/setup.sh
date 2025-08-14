@@ -13,14 +13,14 @@ echo "evm"
 (cd /app/packages/evm && pnpm compile)
 echo "ciphernode"
 (cd /app && cargo build --locked -p e3-cli && cargo install --locked --path crates/cli)
-echo "program"
-(cd ./apps/program && cargo build --locked --bin crisp-program)
+# echo "program"
+# (cd ./program && cargo build --locked --bin crisp-program)
 echo "server"
-(cd ./apps/server && [[ ! -f .env ]] && cp .env.example .env; cargo build --locked --bin cli && cargo build --locked --bin server)
+(cd ./server && [[ ! -f .env ]] && cp .env.example ../.env; cargo build --locked --bin cli && cargo build --locked --bin server)
 echo "crisp-wasm-crypto"
-(cd ./apps/wasm-crypto && cargo check)
+(cd ./wasm-crypto && cargo check)
 echo "client"
-(cd ./apps/client && if [[ ! -f .env ]]; then cp .env.example .env; fi)
+(cd ./client && if [[ ! -f .env ]]; then cp .env.example .env; fi)
 # echo "noir"
 # ./scripts/tasks/compile_circuits.sh
 echo "Skipping circuit compilation - using pre-compiled circuits"
