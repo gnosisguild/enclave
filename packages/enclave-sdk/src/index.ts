@@ -34,6 +34,9 @@ export type {
   CommitteePublishedData,
   EnclaveEventData,
   RegistryEventData,
+  EFheProtocol as EProtocol,
+  ProtocolParams,
+  VerifiableEncryptionResult,
 } from "./types";
 
 // Event enums
@@ -62,4 +65,4 @@ export {
   type ComputeProviderParams,
 } from "./utils";
 
-export { encryptNumber } from "./wasm";
+export { generateProof } from "./greco";

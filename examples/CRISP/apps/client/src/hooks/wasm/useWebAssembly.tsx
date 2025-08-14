@@ -41,8 +41,10 @@ export const useWebAssemblyHook = () => {
         const { type, success, encryptedVote, error } = event.data
         if (type === 'encrypt_vote') {
           if (success) {
-            const { vote, circuitInputs } = encryptedVote;
-            const { proof, publicInputs } = await generateProof(circuitInputs as CircuitInputs);
+            const { vote, proof, publicInputs } = encryptedVote;
+            // console.log("Vote", vote)
+            // const { proof, publicInputs } = await generateProof(circuitInputs as CircuitInputs);
+
             resolve({
               vote: vote,
               proof: proof,

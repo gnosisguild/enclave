@@ -22,11 +22,11 @@ import init, { encrypt_number } from "@gnosis-guild/e3-wasm";
 import init from "@gnosis-guild/e3-wasm/init";
 import { encrypt_number } from "@gnosis-guild/e3-wasm";
 
-export async function encryptNumber(
+export async function bfvEncryptNumber(
   data: bigint,
   public_key: Uint8Array,
 ): Promise<Uint8Array> {
   await init();
-  return encrypt_number(data, public_key);
+  return bfv_encrypt_number(data, public_key);
 }
 ```
