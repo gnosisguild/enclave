@@ -35,8 +35,8 @@ fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
 fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
 
 # Local dependencies
-e3-compute-provider = { path = "../../../../crates/compute-provider" }
-e3-sdk = { path = "../../../../crates/sdk" }
+e3-compute-provider = { path = "../../../crates/compute-provider" }
+e3-sdk = { path = "../../../crates/sdk" }
 program-client = { path = "../program/client" }
 
 # CLI and user interaction
@@ -60,8 +60,8 @@ clap = { version = "=4.5.41", features = ["derive"] }
 sled = "=0.34.7"
 
 # Logging
-env_logger = "=0.11.5"
-log = "=0.4.22"
+env_logger.workspace = true
+log.workspace = true
 
 # Configuration
 config = "=0.14.0"
