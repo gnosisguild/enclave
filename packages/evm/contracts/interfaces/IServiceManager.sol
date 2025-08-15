@@ -43,6 +43,10 @@ interface IServiceManager {
         IStrategy[] strategies,
         uint256[] slashedShares
     );
+    event SlashingOperatorSetReady(
+        uint32 indexed operatorSetId,
+        IStrategy[] strategies
+    );
 
     /// @notice Strategy configuration
     struct StrategyConfig {
@@ -101,11 +105,17 @@ interface IServiceManager {
     function deregisterCiphernode(uint256[] calldata siblingNodes) external;
 
     /**
+     * @notice Ensure slashing operator set is ready for EigenLayer integration
+     * @dev Creates minimal operator set for slashing without requiring operator allocation management
+     */
+    function ensureSlashingOperatorSet() external;
+
+    /**
      * @notice Slash an operator's collateral for misbehavior
      * @param operator Address of the operator to slash
      * @param slashingPercentage Percentage to slash in basis points (e.g., 500 = 5%)
      * @param reason Reason for slashing
-     * @dev Only authorized slashers can call this
+     * @dev Only authorized slashers can call this.
      */
     function slashOperator(
         address operator,
