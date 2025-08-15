@@ -7,6 +7,7 @@ pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
+import { IBondingManager } from "../interfaces/IBondingManager.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -20,11 +21,20 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     ////////////////////////////////////////////////////////////
     //                                                        //
+    //                        Events                          //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    event ServiceManagerSet(address indexed serviceManager);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
     //                 Storage Variables                      //
     //                                                        //
     ////////////////////////////////////////////////////////////
 
     address public enclave;
+    address public serviceManager;
     uint256 public numCiphernodes;
     LeanIMTData public ciphernodes;
 
@@ -44,6 +54,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     error CommitteeNotPublished();
     error CiphernodeNotEnabled(address node);
     error OnlyEnclave();
+    error OnlyServiceManager();
+    error NotOwnerOrServiceManager();
+    error NodeNotBonded(address node);
+    error ZeroAddress();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -56,19 +70,41 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         _;
     }
 
+    modifier onlyServiceManager() {
+        require(msg.sender == serviceManager, OnlyServiceManager());
+        _;
+    }
+
+    modifier onlyOwnerOrServiceManager() {
+        require(
+            msg.sender == owner() || msg.sender == serviceManager,
+            NotOwnerOrServiceManager()
+        );
+        _;
+    }
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Initialization                       //
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    constructor(address _owner, address _enclave) {
-        initialize(_owner, _enclave);
+    constructor(address _owner, address _enclave, address _serviceManager) {
+        initialize(_owner, _enclave, _serviceManager);
     }
 
-    function initialize(address _owner, address _enclave) public initializer {
+    function initialize(
+        address _owner,
+        address _enclave,
+        address _serviceManager
+    ) public initializer {
+        require(_owner != address(0), ZeroAddress());
+        require(_enclave != address(0), ZeroAddress());
+        require(_serviceManager != address(0), ZeroAddress());
+
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
+        setServiceManager(_serviceManager);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -107,7 +143,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         emit CommitteePublished(e3Id, publicKey);
     }
 
-    function addCiphernode(address node) external onlyOwner {
+    function addCiphernode(address node) external onlyOwnerOrServiceManager {
+        if (isEnabled(node)) {
+            return;
+        }
+
         uint160 ciphernode = uint160(node);
         ciphernodes._insert(ciphernode);
         numCiphernodes++;
@@ -122,7 +162,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function removeCiphernode(
         address node,
         uint256[] calldata siblingNodes
-    ) external onlyOwner {
+    ) external onlyOwnerOrServiceManager {
+        require(isEnabled(node), CiphernodeNotEnabled(node));
+
         uint160 ciphernode = uint160(node);
         uint256 index = ciphernodes._indexOf(ciphernode);
         ciphernodes._remove(ciphernode, siblingNodes);
@@ -137,8 +179,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function setEnclave(address _enclave) public onlyOwner {
+        require(_enclave != address(0), ZeroAddress());
         enclave = _enclave;
         emit EnclaveSet(_enclave);
+    }
+
+    function setServiceManager(address _serviceManager) public onlyOwner {
+        require(_serviceManager != address(0), ZeroAddress());
+        serviceManager = _serviceManager;
+        emit ServiceManagerSet(_serviceManager);
     }
 
     ////////////////////////////////////////////////////////////
@@ -155,7 +204,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     function isCiphernodeEligible(address node) external view returns (bool) {
-        return isEnabled(node);
+        if (!isEnabled(node)) {
+            return false;
+        }
+        return IBondingManager(serviceManager).isBonded(node);
     }
 
     function isEnabled(address node) public view returns (bool) {
@@ -176,5 +228,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function treeSize() public view returns (uint256) {
         return ciphernodes.size;
+    }
+
+    function getServiceManager()
+        external
+        view
+        returns (address serviceManagerAddress)
+    {
+        return serviceManager;
     }
 }
