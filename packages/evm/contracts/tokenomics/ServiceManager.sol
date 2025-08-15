@@ -51,13 +51,13 @@ contract ServiceManager is
     uint256 public constant PRICE_STALENESS_THRESHOLD = 86400;
 
     /// @notice Supported strategies mapping
-    mapping(IStrategy => StrategyConfig) public strategyConfigs;
+    mapping(IStrategy strategy => StrategyConfig config) public strategyConfigs;
 
     /// @notice Array of all allowed strategies
     IStrategy[] public allowedStrategies;
 
     /// @notice Mapping of strategy to its index in allowedStrategies array
-    mapping(IStrategy => uint256) private strategyToIndex;
+    mapping(IStrategy strategy => uint256 index) private strategyToIndex;
 
     /// @notice CiphernodeRegistry contract
     ICiphernodeRegistry public ciphernodeRegistry;
@@ -72,16 +72,16 @@ contract ServiceManager is
     IStrategyManager public strategyManager;
 
     /// @notice Addresses authorized to slash operators
-    mapping(address => bool) public slashers;
+    mapping(address slasher => bool isAuthorized) public slashers;
 
     /// @notice Registered operators
-    mapping(address => bool) public registeredOperators;
+    mapping(address operator => bool isRegistered) public registeredOperators;
 
     /// @notice Operator set ID
     uint32 public operatorSetId;
 
     /// @notice Mapping of operators to their allocated magnitudes per strategy
-    mapping(address => mapping(IStrategy => uint256))
+    mapping(address operator => mapping(IStrategy strategy => uint256 allocatedMagnitude))
         public operatorAllocatedMagnitudes;
 
     constructor(
@@ -126,7 +126,9 @@ contract ServiceManager is
         uint8 decimals = 18;
         try strategy.underlyingToken().decimals() returns (uint8 d) {
             decimals = d;
-        } catch {}
+        } catch {
+            revert("Strategy decimals not found");
+        }
 
         strategyConfigs[strategy] = StrategyConfig({
             isAllowed: true,
@@ -252,7 +254,7 @@ contract ServiceManager is
         // 3. Verify operator has allocated sufficient magnitude to our operator set
         require(
             _verifyMagnitudeAllocation(msg.sender),
-            "Insufficient magnitude allocation"
+            InsufficientMagnitudeAllocation()
         );
 
         // 4. Check collateral requirements based on allocated stake
@@ -419,7 +421,6 @@ contract ServiceManager is
         IAllocationManager.OperatorSet memory operatorSet = IAllocationManager
             .OperatorSet({ avs: address(this), operatorSetId: operatorSetId });
 
-        uint256 totalRequiredCollateral = 0;
         uint256 totalAllocatedCollateral = 0;
 
         for (uint256 i = 0; i < allowedStrategies.length; i++) {

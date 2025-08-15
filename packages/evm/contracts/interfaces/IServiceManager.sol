@@ -20,6 +20,7 @@ interface IServiceManager {
     error StrategyAlreadyAllowed();
     error StrategyNotFound();
     error InvalidSlashingPercentage();
+    error InsufficientMagnitudeAllocation();
 
     /// @notice Events
     event StrategyAdded(

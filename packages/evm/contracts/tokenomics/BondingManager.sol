@@ -15,7 +15,7 @@ contract BondingManager is Ownable, IBondingManager {
     uint256 public decommissionDelay;
 
     /// @notice Mapping of operator address to their information
-    mapping(address => OperatorInfo) public operators;
+    mapping(address operator => OperatorInfo info) public operators;
 
     /// @notice ServiceManager contract
     address public serviceManager;
