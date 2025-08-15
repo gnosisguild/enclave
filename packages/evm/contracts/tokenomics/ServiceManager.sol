@@ -21,6 +21,12 @@ import {
     IAllocationManager
 } from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
 import {
+    IAVSDirectory
+} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
+import {
+    IStrategyManager
+} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {
     AggregatorV3Interface
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
@@ -62,20 +68,28 @@ contract ServiceManager is
     /// @notice EigenLayer AllocationManager for slashing
     IAllocationManager public allocationManager;
 
+    /// @notice EigenLayer StrategyManager for share queries
+    IStrategyManager public strategyManager;
+
     /// @notice Addresses authorized to slash operators
     mapping(address => bool) public slashers;
 
     /// @notice Registered operators
     mapping(address => bool) public registeredOperators;
 
-    /// @notice Operator set ID for slashing (AVS-specific)
+    /// @notice Operator set ID
     uint32 public operatorSetId;
+
+    /// @notice Mapping of operators to their allocated magnitudes per strategy
+    mapping(address => mapping(IStrategy => uint256))
+        public operatorAllocatedMagnitudes;
 
     constructor(
         IAVSDirectory _avsDirectory,
         IRegistryCoordinator _registryCoordinator,
         IStakeRegistry _stakeRegistry,
         IAllocationManager _allocationManager,
+        IStrategyManager _strategyManager,
         address _ciphernodeRegistry,
         address _bondingManager,
         address _owner,
@@ -88,11 +102,13 @@ contract ServiceManager is
         require(_ciphernodeRegistry != address(0), ZeroAddress());
         require(_bondingManager != address(0), ZeroAddress());
         require(address(_allocationManager) != address(0), ZeroAddress());
+        require(address(_strategyManager) != address(0), ZeroAddress());
         require(_minCollateralUsd > 0, InvalidMinCollateral());
 
         ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
         bondingManager = IBondingManager(_bondingManager);
         allocationManager = _allocationManager;
+        strategyManager = _strategyManager;
         minCollateralUsd = _minCollateralUsd;
         operatorSetId = _operatorSetId;
     }
@@ -107,8 +123,7 @@ contract ServiceManager is
         require(address(strategy) != address(0), ZeroAddress());
         require(!strategyConfigs[strategy].isAllowed, StrategyAlreadyAllowed());
 
-        // Get token decimals from strategy
-        uint8 decimals = 18; // Default to 18
+        uint8 decimals = 18;
         try strategy.underlyingToken().decimals() returns (uint8 d) {
             decimals = d;
         } catch {}
@@ -129,7 +144,6 @@ contract ServiceManager is
     function removeStrategy(IStrategy strategy) external onlyOwner {
         require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
 
-        // Remove from allowedStrategies array
         uint256 index = strategyToIndex[strategy];
         uint256 lastIndex = allowedStrategies.length - 1;
 
@@ -165,30 +179,95 @@ contract ServiceManager is
         emit MinCollateralUpdated(_minCollateralUsd);
     }
 
+    // ============ Operator Set Management ============
+
+    function setOperatorSetId(uint32 _operatorSetId) external onlyOwner {
+        require(_operatorSetId > 0, "Invalid operator set ID");
+        require(
+            operatorSetId == 0 || operatorSetId != _operatorSetId,
+            "Already set to this ID"
+        );
+
+        uint32 previousId = operatorSetId;
+        operatorSetId = _operatorSetId;
+
+        emit OperatorSetIdUpdated(previousId, _operatorSetId);
+    }
+
+    function getAllocatedMagnitude(
+        address operator,
+        IStrategy strategy
+    ) external view returns (uint256) {
+        IAllocationManager.OperatorSet memory operatorSet = IAllocationManager
+            .OperatorSet({ avs: address(this), operatorSetId: operatorSetId });
+
+        return
+            allocationManager.getAllocatedMagnitude(
+                operator,
+                operatorSet,
+                strategy
+            );
+    }
+
+    function getTotalMagnitude(
+        address operator,
+        IStrategy strategy
+    ) external view returns (uint256) {
+        return allocationManager.getTotalMagnitude(operator, strategy);
+    }
+
     // ============ Operator Registration ============
 
-    function registerCiphernode() external nonReentrant {
+    function registerOperatorToAVS(
+        address operator,
+        bytes calldata operatorSignature
+    ) external onlyOwner {
+        _avsDirectory.registerOperatorToAVS(operator, operatorSignature);
+
+        emit OperatorRegisteredToAVS(operator);
+    }
+
+    function deregisterOperatorFromAVS(address operator) external onlyOwner {
+        _avsDirectory.deregisterOperatorFromAVS(operator);
+
+        emit OperatorDeregisteredFromAVS(operator);
+    }
+
+    function registerCiphernode(
+        bytes calldata avsSignature
+    ) external nonReentrant {
         require(!registeredOperators[msg.sender], OperatorNotRegistered());
 
-        // Verify operator is registered with EigenLayer
+        // 1. Verify operator is registered with EigenLayer DelegationManager
         require(
             _delegationManager.isOperator(msg.sender),
             OperatorNotRegistered()
         );
 
-        // Check collateral requirements
+        // 2. Register operator to our AVS (if not already registered)
+        if (avsSignature.length > 0) {
+            _avsDirectory.registerOperatorToAVS(msg.sender, avsSignature);
+        }
+
+        // 3. Verify operator has allocated sufficient magnitude to our operator set
+        require(
+            _verifyMagnitudeAllocation(msg.sender),
+            "Insufficient magnitude allocation"
+        );
+
+        // 4. Check collateral requirements based on allocated stake
         (bool isEligible, uint256 collateralUsd) = checkOperatorEligibility(
             msg.sender
         );
         require(isEligible, InsufficientCollateral());
 
-        // Register with our system
+        // 5. Register with our system
         registeredOperators[msg.sender] = true;
 
-        // Register with bonding manager
+        // 6. Register with bonding manager
         bondingManager.registerOperator(msg.sender, collateralUsd);
 
-        // Add to ciphernode registry
+        // 7. Add to ciphernode registry
         ciphernodeRegistry.addCiphernode(msg.sender);
 
         emit CiphernodeRegistered(msg.sender, collateralUsd);
@@ -200,11 +279,7 @@ contract ServiceManager is
         require(registeredOperators[msg.sender], OperatorNotRegistered());
 
         registeredOperators[msg.sender] = false;
-
-        // Deregister from bonding manager
         bondingManager.deregisterOperator(msg.sender);
-
-        // Remove from ciphernode registry
         ciphernodeRegistry.removeCiphernode(msg.sender, siblingNodes);
 
         emit CiphernodeDeregistered(msg.sender);
@@ -230,7 +305,6 @@ contract ServiceManager is
         require(registeredOperators[operator], OperatorNotRegistered());
         require(slashingPercentage <= 10000, InvalidSlashingPercentage());
 
-        // Get strategies where operator has stake
         (
             IStrategy[] memory strategies,
             uint256[] memory wadsToSlash
@@ -247,12 +321,8 @@ contract ServiceManager is
                     description: reason
                 });
 
-            // Execute slashing through EigenLayer AllocationManager
             try
-                allocationManager.slashOperator(
-                    address(this), // AVS address
-                    slashingParams
-                )
+                allocationManager.slashOperator(address(this), slashingParams)
             returns (uint256 slashId, uint256[] memory slashedShares) {
                 emit OperatorSlashed(
                     operator,
@@ -262,7 +332,6 @@ contract ServiceManager is
                     slashedShares
                 );
 
-                // Check if operator still meets requirements after slashing
                 (
                     bool isEligible,
                     uint256 newCollateralUsd
@@ -273,14 +342,12 @@ contract ServiceManager is
                     bondingManager.deregisterOperator(operator);
                     emit CiphernodeDeregistered(operator);
                 } else {
-                    // Update collateral amount
                     bondingManager.updateOperatorCollateral(
                         operator,
                         newCollateralUsd
                     );
                 }
             } catch Error(string memory errorMsg) {
-                // Handle slashing failure
                 revert(string(abi.encodePacked("Slashing failed: ", errorMsg)));
             }
         }
@@ -312,7 +379,7 @@ contract ServiceManager is
         address operator,
         IStrategy strategy
     ) public view returns (uint256 shares) {
-        return _strategyManager.stakerStrategyShares(operator, strategy);
+        return strategyManager.stakerStrategyShares(operator, strategy);
     }
 
     function isStrategyAllowed(
@@ -340,7 +407,49 @@ contract ServiceManager is
         return minCollateralUsd;
     }
 
+    function getOperatorSetInfo() external view returns (uint32, address) {
+        return (operatorSetId, address(this));
+    }
+
     // ============ Internal Functions ============
+
+    function _verifyMagnitudeAllocation(
+        address operator
+    ) internal view returns (bool) {
+        IAllocationManager.OperatorSet memory operatorSet = IAllocationManager
+            .OperatorSet({ avs: address(this), operatorSetId: operatorSetId });
+
+        uint256 totalRequiredCollateral = 0;
+        uint256 totalAllocatedCollateral = 0;
+
+        for (uint256 i = 0; i < allowedStrategies.length; i++) {
+            IStrategy strategy = allowedStrategies[i];
+
+            uint256 totalMagnitude = allocationManager.getTotalMagnitude(
+                operator,
+                strategy
+            );
+
+            uint256 allocatedMagnitude = allocationManager
+                .getAllocatedMagnitude(operator, operatorSet, strategy);
+
+            if (totalMagnitude == 0) continue;
+            uint256 totalShares = getOperatorShares(operator, strategy);
+
+            if (totalShares > 0 && allocatedMagnitude > 0) {
+                uint256 allocatedShares = (totalShares * allocatedMagnitude) /
+                    totalMagnitude;
+
+                uint256 allocatedUsd = _convertSharesToUsd(
+                    strategy,
+                    allocatedShares
+                );
+                totalAllocatedCollateral += allocatedUsd;
+            }
+        }
+
+        return totalAllocatedCollateral >= minCollateralUsd;
+    }
 
     function _convertSharesToUsd(
         IStrategy strategy,
@@ -348,15 +457,11 @@ contract ServiceManager is
     ) internal view returns (uint256 usdValue) {
         StrategyConfig memory config = strategyConfigs[strategy];
 
-        // Convert shares to underlying tokens
         uint256 underlyingAmount = strategy.sharesToUnderlyingView(shares);
 
         if (config.priceFeed == address(0)) {
-            // For stablecoins, assume 1:1 USD parity
-            // Scale to 18 decimals
             usdValue = underlyingAmount * (10 ** (18 - config.decimals));
         } else {
-            // Use Chainlink price feed
             uint256 price = _getTokenPrice(config.priceFeed);
             usdValue = (underlyingAmount * price) / (10 ** config.decimals);
         }
@@ -379,7 +484,7 @@ contract ServiceManager is
                     block.timestamp - updatedAt <= PRICE_STALENESS_THRESHOLD,
                 "Invalid or stale price"
             );
-            return uint256(answer) * 1e10; // Convert to 18 decimals
+            return uint256(answer) * 1e10;
         } catch {
             revert("Price feed error");
         }
@@ -393,7 +498,6 @@ contract ServiceManager is
         view
         returns (IStrategy[] memory strategies, uint256[] memory wadsToSlash)
     {
-        // Get all strategies with non-zero shares
         uint256 strategiesCount = 0;
         for (uint256 i = 0; i < allowedStrategies.length; i++) {
             if (getOperatorShares(operator, allowedStrategies[i]) > 0) {
@@ -405,8 +509,6 @@ contract ServiceManager is
         wadsToSlash = new uint256[](strategiesCount);
 
         uint256 index = 0;
-        // Convert basis points to wad (parts per 1e18)
-        // e.g., 500 basis points (5%) = 5e16 wad
         uint256 slashingWad = (slashingPercentage * 1e18) / 10000;
 
         for (uint256 i = 0; i < allowedStrategies.length; i++) {
@@ -415,7 +517,7 @@ contract ServiceManager is
 
             if (shares > 0) {
                 strategies[index] = strategy;
-                wadsToSlash[index] = slashingWad; // Apply same percentage to all strategies
+                wadsToSlash[index] = slashingWad;
                 index++;
             }
         }
