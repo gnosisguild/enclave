@@ -44,7 +44,7 @@ contract ServiceManager is
     Ownable,
     ReentrancyGuard
 {
-    /// @notice Minimum collateral requirement in USD (18 decimals)
+    /// @notice Minimum collateral requirement in USD
     uint256 public minCollateralUsd;
 
     /// @notice Price feed staleness threshold (24 hours)
@@ -244,7 +244,7 @@ contract ServiceManager is
             OperatorNotRegistered()
         );
 
-        // 2. Register operator to our AVS (if not already registered)
+        // 2. Register operator to our AVS
         if (avsSignature.length > 0) {
             _avsDirectory.registerOperatorToAVS(msg.sender, avsSignature);
         }

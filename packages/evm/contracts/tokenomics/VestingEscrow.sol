@@ -14,11 +14,6 @@ import {
     ReentrancyGuard
 } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/**
- * @title VestingEscrow
- * @notice Handles vesting schedules for ENCL token allocations
- * @dev Supports cliff periods and linear vesting
- */
 contract VestingEscrow is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 

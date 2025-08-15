@@ -29,11 +29,16 @@ describe("CiphernodeRegistryOwnable", function () {
     if (!owner) throw new Error("getSigners() did not return expected output");
     if (!notTheOwner)
       throw new Error("getSigners() did not return expected output");
+
+    const mockServiceManagerFactory = await ethers.getContractFactory("MockServiceManager");
+    const mockServiceManager = await mockServiceManagerFactory.deploy();
+
     const poseidon = await PoseidonT3Fixture();
     const registry = await deployCiphernodeRegistryOwnableFixture(
       owner.address,
       owner.address,
       await poseidon.getAddress(),
+      await mockServiceManager.getAddress(),
     );
     const filter = await naiveRegistryFilterFixture(
       owner.address,
@@ -52,6 +57,7 @@ describe("CiphernodeRegistryOwnable", function () {
       registry,
       filter,
       tree,
+      mockServiceManager,
       request: {
         e3Id: 1,
         filter: await filter.getAddress(),
@@ -61,11 +67,16 @@ describe("CiphernodeRegistryOwnable", function () {
   }
 
   describe("constructor / initialize()", function () {
-    it("correctly sets `_owner` and `enclave` ", async function () {
+    it("correctly sets `_owner`, `enclave`, and `serviceManager`", async function () {
       const poseidonFactory = await ethers.getContractFactory("PoseidonT3");
       const poseidonDeployment = await poseidonFactory.deploy();
       const [deployer] = await ethers.getSigners();
       if (!deployer) throw new Error("Bad getSigners() output");
+
+      // Deploy mock service manager
+      const mockServiceManagerFactory = await ethers.getContractFactory("MockServiceManager");
+      const mockServiceManager = await mockServiceManagerFactory.deploy();
+
       const ciphernodeRegistryFactory = await ethers.getContractFactory(
         "CiphernodeRegistryOwnable",
         {
@@ -77,9 +88,11 @@ describe("CiphernodeRegistryOwnable", function () {
       const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
         deployer.address,
         AddressTwo,
+        await mockServiceManager.getAddress(),
       );
       expect(await ciphernodeRegistry.owner()).to.equal(deployer.address);
       expect(await ciphernodeRegistry.enclave()).to.equal(AddressTwo);
+      expect(await ciphernodeRegistry.serviceManager()).to.equal(await mockServiceManager.getAddress());
     });
   });
 
@@ -215,15 +228,16 @@ describe("CiphernodeRegistryOwnable", function () {
   });
 
   describe("addCiphernode()", function () {
-    it("reverts if the caller is not the owner", async function () {
+    it("reverts if the caller is not the owner or service manager", async function () {
       const { registry, notTheOwner } = await loadFixture(setup);
-      await expect(registry.connect(notTheOwner).addCiphernode(AddressThree))
-        .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
-        .withArgs(notTheOwner.address);
+      await expect(
+        registry.connect(notTheOwner).addCiphernode(AddressThree),
+      ).to.be.revertedWithCustomError(registry, "NotOwnerOrServiceManager");
     });
     it("adds the ciphernode to the registry", async function () {
-      const { registry } = await loadFixture(setup);
+      const { registry, mockServiceManager } = await loadFixture(setup);
       expect(await registry.addCiphernode(AddressThree));
+      await mockServiceManager.setBondingStatus(AddressThree, true);
       expect(await registry.isCiphernodeEligible(AddressThree)).to.be.true;
     });
     it("increments numCiphernodes", async function () {
@@ -250,13 +264,11 @@ describe("CiphernodeRegistryOwnable", function () {
   });
 
   describe("removeCiphernode()", function () {
-    it("reverts if the caller is not the owner", async function () {
+    it("reverts if the caller is not the owner or service manager", async function () {
       const { registry, notTheOwner } = await loadFixture(setup);
       await expect(
         registry.connect(notTheOwner).removeCiphernode(AddressOne, []),
-      )
-        .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
-        .withArgs(notTheOwner.address);
+      ).to.be.revertedWithCustomError(registry, "NotOwnerOrServiceManager");
     });
     it("removes the ciphernode from the registry", async function () {
       const { registry } = await loadFixture(setup);
@@ -344,13 +356,20 @@ describe("CiphernodeRegistryOwnable", function () {
   });
 
   describe("isCiphernodeEligible()", function () {
-    it("returns true if the ciphernode is in the registry", async function () {
-      const { registry } = await loadFixture(setup);
+    it("returns true if the ciphernode is in the registry and bonded", async function () {
+      const { registry, mockServiceManager } = await loadFixture(setup);
+      await mockServiceManager.setBondingStatus(AddressOne, true);
       expect(await registry.isCiphernodeEligible(AddressOne)).to.be.true;
     });
     it("returns false if the ciphernode is not in the registry", async function () {
-      const { registry } = await loadFixture(setup);
+      const { registry, mockServiceManager } = await loadFixture(setup);
+      await mockServiceManager.setBondingStatus(AddressThree, true);
       expect(await registry.isCiphernodeEligible(AddressThree)).to.be.false;
+    });
+    it("returns false if the ciphernode is in the registry but not bonded", async function () {
+      const { registry, mockServiceManager } = await loadFixture(setup);
+      await mockServiceManager.setBondingStatus(AddressOne, false);
+      expect(await registry.isCiphernodeEligible(AddressOne)).to.be.false;
     });
   });
 
