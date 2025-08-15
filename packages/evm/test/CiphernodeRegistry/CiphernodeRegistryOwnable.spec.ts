@@ -30,7 +30,8 @@ describe("CiphernodeRegistryOwnable", function () {
     if (!notTheOwner)
       throw new Error("getSigners() did not return expected output");
 
-    const mockServiceManagerFactory = await ethers.getContractFactory("MockServiceManager");
+    const mockServiceManagerFactory =
+      await ethers.getContractFactory("MockServiceManager");
     const mockServiceManager = await mockServiceManagerFactory.deploy();
 
     const poseidon = await PoseidonT3Fixture();
@@ -74,7 +75,8 @@ describe("CiphernodeRegistryOwnable", function () {
       if (!deployer) throw new Error("Bad getSigners() output");
 
       // Deploy mock service manager
-      const mockServiceManagerFactory = await ethers.getContractFactory("MockServiceManager");
+      const mockServiceManagerFactory =
+        await ethers.getContractFactory("MockServiceManager");
       const mockServiceManager = await mockServiceManagerFactory.deploy();
 
       const ciphernodeRegistryFactory = await ethers.getContractFactory(
@@ -92,7 +94,9 @@ describe("CiphernodeRegistryOwnable", function () {
       );
       expect(await ciphernodeRegistry.owner()).to.equal(deployer.address);
       expect(await ciphernodeRegistry.enclave()).to.equal(AddressTwo);
-      expect(await ciphernodeRegistry.serviceManager()).to.equal(await mockServiceManager.getAddress());
+      expect(await ciphernodeRegistry.serviceManager()).to.equal(
+        await mockServiceManager.getAddress(),
+      );
     });
   });
 
