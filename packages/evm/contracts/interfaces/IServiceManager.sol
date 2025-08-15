@@ -90,7 +90,7 @@ interface IServiceManager {
 
     /**
      * @notice Register as a ciphernode (permissionless)
-     * @dev Operator must have sufficient restaked collateral across allowed strategies
+     * @dev Operator must be registered with EigenLayer and have sufficient restaked collateral
      */
     function registerCiphernode() external;
 
