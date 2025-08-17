@@ -62,7 +62,7 @@ fn argon2_derive_key(
     .map_err(|_| anyhow!("Could not create params"))?;
 
     Argon2::new(ARGON2_ALGORITHM, ARGON2_VERSION, params)
-        .hash_password_into(&password_bytes, &salt, &mut derived_key)
+        .hash_password_into(password_bytes, salt, &mut derived_key)
         .map_err(|_| anyhow!("Key derivation error"))?;
 
     Ok(derived_key)
