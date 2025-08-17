@@ -21,7 +21,7 @@ pub fn validate_private_key(input: &String) -> Result<()> {
 }
 
 pub async fn execute(config: &AppConfig, input: String) -> Result<()> {
-    let cipher = Cipher::from_config(config)?;
+    let cipher = Cipher::from_config(config).await?;
     let encrypted = cipher.encrypt_data(&mut input.as_bytes().to_vec())?;
     let repositories = get_repositories(config)?;
     repositories
