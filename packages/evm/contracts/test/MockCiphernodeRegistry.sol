@@ -7,7 +7,7 @@ pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 
-contract MockCiphernodeRegistry is ICiphernodeRegistry {
+abstract contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function requestCommittee(
         uint256,
         address filter,
@@ -40,7 +40,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     }
 }
 
-contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
+abstract contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function requestCommittee(
         uint256,
         address filter,

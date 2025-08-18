@@ -7,13 +7,13 @@ pragma solidity >=0.8.27;
 
 import {
     ServiceManagerBase
-} from "eigenlayer-middleware/ServiceManagerBase.sol";
+} from "@eigenlayer-middleware/src/ServiceManagerBase.sol";
 import {
     IRegistryCoordinator
-} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
+} from "@eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {
     IStakeRegistry
-} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+} from "@eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {
     IStrategy
 } from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
