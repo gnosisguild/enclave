@@ -57,7 +57,7 @@ RUN cargo install --locked wasm-pack
 # ────────────────────────────────────────────────────────────────────────────────
 ENV PATH="/home/${USERNAME}/.foundry/bin:${PATH}"
 RUN curl -L https://foundry.paradigm.xyz | bash \
- && foundryup --version v1.3.0
+ && foundryup
 
 # ────────────────────────────────────────────────────────────────────────────────
 #   Risc Zero tool-chain
