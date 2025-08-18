@@ -7,7 +7,7 @@ pragma solidity >=0.8.27;
 
 import {
     IStrategy
-} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
 interface IServiceManager {
     /// @notice Custom errors

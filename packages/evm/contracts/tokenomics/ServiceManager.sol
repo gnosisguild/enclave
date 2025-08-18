@@ -7,25 +7,32 @@ pragma solidity >=0.8.27;
 
 import {
     ServiceManagerBase
-} from "../../lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
+} from "eigenlayer-middleware/ServiceManagerBase.sol";
 import {
     IRegistryCoordinator
-} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
 import {
     IStakeRegistry
-} from "../../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
+} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
 import {
     IStrategy
-} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {
     IAllocationManager
-} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
+} from "eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
+import {
+    IDelegationManager
+} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {
     IAVSDirectory
-} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
+} from "eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
 import {
     IStrategyManager
-} from "../../lib/eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {
+    OperatorSetLib,
+    OperatorSet
+} from "eigenlayer-contracts/src/contracts/libraries/OperatorSetLib.sol";
 import {
     AggregatorV3Interface
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -71,6 +78,9 @@ contract ServiceManager is
     /// @notice EigenLayer StrategyManager for share queries
     IStrategyManager public strategyManager;
 
+    /// @notice EigenLayer DelegationManager for operator registration
+    IDelegationManager public delegationManager;
+
     /// @notice Addresses authorized to slash operators
     mapping(address slasher => bool isAuthorized) public slashers;
 
@@ -90,6 +100,7 @@ contract ServiceManager is
         IStakeRegistry _stakeRegistry,
         IAllocationManager _allocationManager,
         IStrategyManager _strategyManager,
+        IDelegationManager _delegationManager,
         address _ciphernodeRegistry,
         address _bondingManager,
         address _owner,
@@ -103,12 +114,14 @@ contract ServiceManager is
         require(_bondingManager != address(0), ZeroAddress());
         require(address(_allocationManager) != address(0), ZeroAddress());
         require(address(_strategyManager) != address(0), ZeroAddress());
+        require(address(_delegationManager) != address(0), ZeroAddress());
         require(_minCollateralUsd > 0, InvalidMinCollateral());
 
         ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
         bondingManager = IBondingManager(_bondingManager);
         allocationManager = _allocationManager;
         strategyManager = _strategyManager;
+        delegationManager = _delegationManager;
         minCollateralUsd = _minCollateralUsd;
         operatorSetId = _operatorSetId;
     }
@@ -200,8 +213,10 @@ contract ServiceManager is
         address operator,
         IStrategy strategy
     ) external view returns (uint256) {
-        IAllocationManager.OperatorSet memory operatorSet = IAllocationManager
-            .OperatorSet({ avs: address(this), operatorSetId: operatorSetId });
+        OperatorSet memory operatorSet = OperatorSet({
+            avs: address(this),
+            id: operatorSetId
+        });
 
         return
             allocationManager.getAllocatedMagnitude(
@@ -242,7 +257,7 @@ contract ServiceManager is
 
         // 1. Verify operator is registered with EigenLayer DelegationManager
         require(
-            _delegationManager.isOperator(msg.sender),
+            delegationManager.isOperator(msg.sender),
             OperatorNotRegistered()
         );
 
@@ -418,8 +433,10 @@ contract ServiceManager is
     function _verifyMagnitudeAllocation(
         address operator
     ) internal view returns (bool) {
-        IAllocationManager.OperatorSet memory operatorSet = IAllocationManager
-            .OperatorSet({ avs: address(this), operatorSetId: operatorSetId });
+        OperatorSet memory operatorSet = OperatorSet({
+            avs: address(this),
+            id: operatorSetId
+        });
 
         uint256 totalAllocatedCollateral = 0;
 
