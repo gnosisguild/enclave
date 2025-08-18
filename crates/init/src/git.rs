@@ -4,25 +4,32 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::Path;
+use std::{path::Path, vec};
 
 use anyhow::{Context, Result};
 use tokio::process::Command;
 use url::Url;
 
-pub async fn shallow_clone(git_repo: &str, branch: &str, target_folder: &str) -> Result<()> {
-    let status = Command::new("git")
-        .args([
-            "clone",
-            "--depth",
-            "1",
-            "--branch",
-            branch,
-            git_repo,
-            target_folder,
-        ])
-        .status()
-        .await?;
+pub async fn shallow_clone(
+    git_repo: &str,
+    branch: &str,
+    target_folder: &str,
+    verbose: bool,
+) -> Result<()> {
+    let mut args = vec![
+        "clone",
+        "--depth",
+        "1",
+        "--branch",
+        branch,
+        git_repo,
+        target_folder,
+    ];
+    if !verbose {
+        args.push("--quiet");
+    }
+
+    let status = Command::new("git").args(&args).status().await?;
 
     if !status.success() {
         return Err(anyhow::anyhow!(
@@ -35,12 +42,16 @@ pub async fn shallow_clone(git_repo: &str, branch: &str, target_folder: &str) ->
     Ok(())
 }
 
-pub async fn init(path: impl AsRef<Path>) -> Result<()> {
+pub async fn init(path: impl AsRef<Path>, verbose: bool) -> Result<()> {
     let path = path.as_ref();
+
+    let mut args = vec!["init", "-b", "main"];
+    if !verbose {
+        args.push("--quiet");
+    }
+
     Command::new("git")
-        .arg("init")
-        .arg("-b")
-        .arg("main")
+        .args(&args)
         .current_dir(path)
         .output()
         .await
@@ -53,11 +64,16 @@ pub async fn init(path: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-pub async fn add_all(path: impl AsRef<Path>) -> Result<()> {
+pub async fn add_all(path: impl AsRef<Path>, verbose: bool) -> Result<()> {
     let path = path.as_ref();
+
+    let mut args = vec!["add", "."];
+    if !verbose {
+        args.push("--quiet");
+    }
+
     Command::new("git")
-        .arg("add")
-        .arg(".")
+        .args(&args)
         .current_dir(path)
         .output()
         .await
@@ -65,12 +81,16 @@ pub async fn add_all(path: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-pub async fn commit(path: impl AsRef<Path>, message: &str) -> Result<()> {
+pub async fn commit(path: impl AsRef<Path>, message: &str, verbose: bool) -> Result<()> {
     let path = path.as_ref();
+
+    let mut args = vec!["commit", "-m", message];
+    if !verbose {
+        args.push("--quiet");
+    }
+
     Command::new("git")
-        .arg("commit")
-        .arg("-m")
-        .arg(message)
+        .args(&args)
         .current_dir(path)
         .output()
         .await
@@ -87,13 +107,17 @@ pub async fn add_submodule(
     repo_path: impl AsRef<Path>,
     submodule_url: &str,
     submodule_path: &str,
+    verbose: bool,
 ) -> Result<()> {
     let repo_path = repo_path.as_ref();
+
+    let mut args = vec!["submodule", "add", submodule_url, submodule_path];
+    if !verbose {
+        args.insert(2, "--quiet");
+    }
+
     Command::new("git")
-        .arg("submodule")
-        .arg("add")
-        .arg(submodule_url)
-        .arg(submodule_path)
+        .args(&args)
         .current_dir(repo_path)
         .output()
         .await
@@ -105,6 +129,7 @@ pub async fn add_submodule(
                 repo_path.display()
             )
         })?;
+
     Ok(())
 }
 

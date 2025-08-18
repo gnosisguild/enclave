@@ -94,7 +94,7 @@ impl Cli {
                     Commands::Rev => rev::execute().await?,
                     Commands::Init {path, template, skip_cleanup} => {
                         setup_simple_tracing(log_level);
-                        init::execute(path, template, skip_cleanup).await?
+                        init::execute(path, template, skip_cleanup, self.verbose > 0).await?
                     },
                     Commands::ConfigSet {
                         rpc_url,

@@ -18,14 +18,14 @@ pub async fn ensure_empty_folder<P: AsRef<Path>>(path: P) -> Result<()> {
     }
 
     if !path.is_dir() {
-        bail!("Path '{}' is not a directory", path.display());
+        bail!("❌ Path '{}' is not a directory", path.display());
     }
 
     let mut entries = std::fs::read_dir(path)
         .map_err(|e| anyhow::anyhow!("Failed to read directory '{}': {}", path.display(), e))?;
 
     if entries.next().is_some() {
-        bail!("Directory '{}' is not empty", path.display());
+        bail!("❌ Directory '{}' is not empty", path.display());
     }
 
     Ok(())

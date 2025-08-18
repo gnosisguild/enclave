@@ -514,7 +514,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Populate Contributors List
     # Only run on main branch to avoid branch conflicts
-    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, 'contrib-readme-action')
+    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, 'contrib-readme-action')
     concurrency:
       group: contrib-readme-${{ github.ref }}
       cancel-in-progress: true
@@ -536,7 +536,7 @@ jobs:
           use_username: false
           columns_per_row: 6
           collaborators: direct
-          commit_message: "docs(contributor): contrib-readme-action has updated readme [skip ci]"
+          commit_message: "docs(contributor): contrib-readme-action has updated readme"
           committer_username: "github-actions[bot]"
           committer_email: "github-actions[bot]@users.noreply.github.com"
           auto_detect_branch_protection: true
