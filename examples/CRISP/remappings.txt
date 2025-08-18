@@ -6,5 +6,5 @@ risc0/=lib/risc0-ethereum/contracts/src/
 @excubiae/contracts/=node_modules/@excubiae/contracts/
 solady/=node_modules/solady/
 @semaphore-protocol/contracts/=node_modules/@semaphore-protocol/contracts/
-@zk-kit/lean-imt.sol/=node_modules/@zk-kit/lean-imt.sol/
+@zk-kit/lean-imt.sol=node_modules/@zk-kit/lean-imt.sol
 poseidon-solidity/=node_modules/poseidon-solidity/
