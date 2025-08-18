@@ -35,7 +35,10 @@ jobs:
                 [
                   'feat',
                   'fix', 
-                  'chore'
+                  'chore',
+                  'refactor',
+                  'docs',
+                  'test'
                 ]
               ],
               'scope-case': [2, 'always', 'lower-case'],
@@ -108,7 +111,7 @@ jobs:
             <type>[optional scope]: <description>
             \`\`\`
 
-            **Valid types:** feat, fix, chore
+            **Valid types:** feat, fix, chore, refactor, docs, test
 
             **Examples:**
             - \`feat: add new encryption provider\`
