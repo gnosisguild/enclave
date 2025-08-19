@@ -12,4 +12,11 @@ if ! (nargo fmt --check); then
     exit 1
 fi
 
+# Compile the circuit
+echo "Compiling Noir circuit..."
+if ! (nargo compile --workspace); then
+    echo "Error: Noir circuit compilation failed"
+    exit 1
+fi
+
 echo "Noir circuits compiled successfully"
