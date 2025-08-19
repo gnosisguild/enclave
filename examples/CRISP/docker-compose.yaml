@@ -18,7 +18,6 @@ services:
       - client-node-modules:/app/examples/CRISP/apps/client/node_modules
       - crisp-node-modules:/app/examples/CRISP/node_modules
       - crisp-foundry-cache:/app/examples/CRISP/out
-      - test-results:/app/examples/CRISP/test-results
     entrypoint:
       - ""
     ports:
@@ -42,4 +41,3 @@ volumes:
   crisp-node-modules:
   crisp-foundry-cache:
   git-folder:
-  test-results:
