@@ -31,6 +31,7 @@ services:
       /bin/bash -c '
       sudo chown -R ubuntu:ubuntu /app &&
       sudo chown -R ubuntu:ubuntu /home/ubuntu &&
+      sudo chown -R ubuntu:ubuntu /app/examples/CRISP/.cache-synpress &&
       sudo chmod -R 777 /app/examples/CRISP &&
       tail -f /dev/null
       '
