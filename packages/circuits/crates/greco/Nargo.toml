@@ -1,0 +1,6 @@
+[package]
+name = "greco"
+type = "bin"
+authors = ["Gnosis Guild"]
+
+[dependencies]

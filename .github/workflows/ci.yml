@@ -329,6 +329,40 @@ jobs:
           path: ~/.cargo/bin/enclave
           retention-days: 1
 
+  test_enclave_circuits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.3
+        with:
+          toolchain: stable
+
+      - name: Navigate to circuits
+        run: cd packages/circuits
+
+      - name: Check formatting
+        run: nargo fmt --check
+
+      - name: Compile Noir circuits
+        run: |
+          nargo compile --workspace
+
+      - name: Test Noir circuits
+        run: |
+          nargo test --workspace
+
+      - name: Upload circuit artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: circuit-artifacts
+          path: packages/circuits/target/
+          retention-days: 1
+          if-no-files-found: warn
+
   build_e3_support_dev:
     runs-on: ubuntu-latest
     steps:

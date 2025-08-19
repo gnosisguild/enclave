@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/greco",
+    "crates/libs/safe/",
+    "crates/libs/polynomial"
+]

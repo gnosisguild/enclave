@@ -1,0 +1,6 @@
+[package]
+name = "polynomial"
+type = "lib"
+authors = ["Gnosis Guild"]
+
+[dependencies]

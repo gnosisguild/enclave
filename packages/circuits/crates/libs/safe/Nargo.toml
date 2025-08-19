@@ -1,0 +1,6 @@
+[package]
+name = "safe"
+type = "lib"
+authors = ["Gnosis Guild"]
+
+[dependencies]
