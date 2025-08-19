@@ -341,17 +341,17 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Navigate to circuits
-        run: cd packages/circuits
-
       - name: Check formatting
+        working-directory: ./packages/circuits
         run: nargo fmt --check
 
       - name: Compile Noir circuits
+        working-directory: ./packages/circuits
         run: |
           nargo compile --workspace
 
       - name: Test Noir circuits
+        working-directory: ./packages/circuits
         run: |
           nargo test --workspace
 
