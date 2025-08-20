@@ -29,24 +29,13 @@ interface IServiceManager {
     error NotLicensed();
 
     /// @notice Events
-    event StrategyAdded(
-        IStrategy indexed strategy,
-        uint256 minShares,
-        address priceFeed
-    );
-    event StrategyRemoved(IStrategy indexed strategy);
-    event StrategyUpdated(
-        IStrategy indexed strategy,
-        uint256 newMinShares,
-        address newPriceFeed
-    );
     event MinCollateralUpdated(uint256 newMinCollateralUsd);
     event CiphernodeRegistered(address indexed operator, uint256 collateralUsd);
     event CiphernodeDeregistered(address indexed operator);
     event OperatorSlashed(
         address indexed operator,
-        uint256 slashingPercentage,
-        string reason,
+        uint256 wadToSlash,
+        string description,
         IStrategy[] strategies,
         uint256[] slashedShares
     );
@@ -56,6 +45,15 @@ interface IServiceManager {
     );
     event OperatorRegisteredToAVS(address indexed operator);
     event OperatorDeregisteredFromAVS(address indexed operator);
+    event AVSRegistrarSet(address indexed registrar);
+    event SlasherAdded(address indexed slasher);
+    event SlasherRemoved(address indexed slasher);
+    event StrategyAdded(address indexed strategy, address indexed priceFeed);
+    event StrategyRemoved(address indexed strategy);
+    event StrategyUpdated(
+        address indexed strategy,
+        address indexed newPriceFeed
+    );
 
     event LicenseAcquired(address indexed operator, uint256 enclAmount);
     event LicenseRevoked(address indexed operator);
@@ -71,7 +69,6 @@ interface IServiceManager {
     /// @notice Strategy configuration
     struct StrategyConfig {
         bool isAllowed;
-        uint256 minShares;
         address priceFeed;
         uint8 decimals;
     }
@@ -87,14 +84,9 @@ interface IServiceManager {
     /**
      * @notice Add a supported strategy for collateral
      * @param strategy The EigenLayer strategy contract
-     * @param minShares Minimum shares required in this strategy
      * @param priceFeed Chainlink price feed for USD conversion (address(0) for stablecoins)
      */
-    function addStrategy(
-        IStrategy strategy,
-        uint256 minShares,
-        address priceFeed
-    ) external;
+    function addStrategy(IStrategy strategy, address priceFeed) external;
 
     /**
      * @notice Remove a supported strategy
@@ -105,14 +97,9 @@ interface IServiceManager {
     /**
      * @notice Update strategy parameters
      * @param strategy The strategy to update
-     * @param newMinShares New minimum shares requirement
      * @param newPriceFeed New price feed address
      */
-    function updateStrategy(
-        IStrategy strategy,
-        uint256 newMinShares,
-        address newPriceFeed
-    ) external;
+    function updateStrategy(IStrategy strategy, address newPriceFeed) external;
 
     /**
      * @notice Set minimum collateral requirement in USD
@@ -159,14 +146,24 @@ interface IServiceManager {
     /**
      * @notice Slash an operator's collateral for misbehavior
      * @param operator Address of the operator to slash
-     * @param slashingPercentage Percentage to slash in basis points (e.g., 500 = 5%)
-     * @param reason Reason for slashing
+     * @param wadToSlash Amount to slash in WAD format (18 decimals, 1e18 = 100%)
+     * @param description Description of the slashing event
      * @dev Only authorized slashers can call this
      */
     function slashOperator(
         address operator,
-        uint256 slashingPercentage,
-        string calldata reason
+        uint256 wadToSlash,
+        string calldata description
+    ) external;
+
+    /**
+     * @notice Deregister operator from operator sets
+     * @param operator The operator to deregister
+     * @param operatorSetIds Array of operator set IDs to deregister from
+     */
+    function deregisterOperatorFromOperatorSets(
+        address operator,
+        uint32[] memory operatorSetIds
     ) external;
 
     /**
@@ -220,12 +217,11 @@ interface IServiceManager {
     /**
      * @notice Get strategy configuration
      * @param strategy The strategy contract
-     * @return minShares Minimum shares required
      * @return priceFeed Price feed address for USD conversion
      */
     function getStrategyConfig(
         IStrategy strategy
-    ) external view returns (uint256 minShares, address priceFeed);
+    ) external view returns (address priceFeed);
 
     /**
      * @notice Get minimum collateral requirement
@@ -256,4 +252,8 @@ interface IServiceManager {
      * @return ticketPrice Price per ticket in USDC
      */
     function getTicketPrice() external view returns (uint256 ticketPrice);
+
+    function getAvailableTicketBudget(
+        address operator
+    ) external view returns (uint256);
 }
