@@ -51,10 +51,8 @@ import {
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 import { ReentrancyGuard } from "@oz/utils/ReentrancyGuard.sol";
-import {
-    OwnableUpgradeable
-} from "@oz-upgradeable/access/OwnableUpgradeable.sol";
 import { IERC20Metadata } from "@oz/token/ERC20/extensions/IERC20Metadata.sol";
+import { SafeERC20 } from "@oz/token/ERC20/utils/SafeERC20.sol";
 
 import { IServiceManager } from "../interfaces/IServiceManager.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
@@ -65,6 +63,8 @@ contract ServiceManager is
     IServiceManager,
     ReentrancyGuard
 {
+    using SafeERC20 for IERC20Metadata;
+
     /// @notice Minimum collateral requirement in USD
     uint256 public minCollateralUsd;
 
@@ -104,9 +104,25 @@ contract ServiceManager is
     /// @notice Operator set ID
     uint32 public operatorSetId;
 
-    /// @notice Mapping of operators to their allocated magnitudes per strategy
-    mapping(address operator => mapping(IStrategy strategy => uint256 allocatedMagnitude))
-        public operatorAllocatedMagnitudes;
+    // ============ Dual Bonding System Variables ============
+
+    /// @notice ENCL token strategy for license staking
+    IStrategy public enclStrategy;
+
+    /// @notice USDC token strategy for ticket purchases
+    IStrategy public usdcStrategy;
+
+    /// @notice Amount of ENCL required to acquire license (18 decimals)
+    uint256 public licenseStake;
+
+    /// @notice Price per selection ticket in USDC (6 decimals)
+    uint256 public ticketPrice;
+
+    /// @notice Operator information mapping
+    mapping(address operator => OperatorInfo info) public operatorInfos;
+
+    /// @notice Reward distributor address
+    address public rewardDistributor;
 
     constructor(
         IAVSDirectory _avsDirectory,
@@ -114,14 +130,7 @@ contract ServiceManager is
         ISlashingRegistryCoordinator _registryCoordinator,
         IStakeRegistry _stakeRegistry,
         IPermissionController _permissionController,
-        IAllocationManager _allocationManager,
-        IStrategyManager _strategyManager,
-        IDelegationManager _delegationManager,
-        address _ciphernodeRegistry,
-        address _bondingManager,
-        address _owner,
-        uint256 _minCollateralUsd,
-        uint32 _operatorSetId
+        IAllocationManager _allocationManager
     )
         ServiceManagerBase(
             _avsDirectory,
@@ -132,23 +141,127 @@ contract ServiceManager is
             _allocationManager
         )
     {
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initialize the ServiceManager with dual bonding configuration
+     * @param _owner Owner of the contract
+     * @param _rewardsInitiator Address that can initiate rewards
+     * @param _strategyManager EigenLayer StrategyManager
+     * @param _delegationManager EigenLayer DelegationManager
+     * @param _ciphernodeRegistry Ciphernode registry contract
+     * @param _bondingManager Bonding manager contract
+     * @param _enclStrategy Strategy for ENCL token
+     * @param _usdcStrategy Strategy for USDC token
+     * @param _licenseStake Required ENCL stake for license
+     * @param _ticketPrice Price per ticket in USDC
+     * @param _minCollateralUsd Minimum collateral in USD
+     * @param _operatorSetId Operator set ID
+     */
+    function initialize(
+        address _owner,
+        address _rewardsInitiator,
+        IStrategyManager _strategyManager,
+        IDelegationManager _delegationManager,
+        address _ciphernodeRegistry,
+        address _bondingManager,
+        IStrategy _enclStrategy,
+        IStrategy _usdcStrategy,
+        uint256 _licenseStake,
+        uint256 _ticketPrice,
+        uint256 _minCollateralUsd,
+        uint32 _operatorSetId
+    ) external initializer {
         require(_ciphernodeRegistry != address(0), ZeroAddress());
         require(_bondingManager != address(0), ZeroAddress());
-        require(address(_allocationManager) != address(0), ZeroAddress());
         require(address(_strategyManager) != address(0), ZeroAddress());
         require(address(_delegationManager) != address(0), ZeroAddress());
+        require(address(_enclStrategy) != address(0), ZeroAddress());
+        require(address(_usdcStrategy) != address(0), ZeroAddress());
+        require(_licenseStake > 0, InvalidMinCollateral());
+        require(_ticketPrice > 0, InvalidTicketAmount());
         require(_minCollateralUsd > 0, InvalidMinCollateral());
 
+        // Initialize ServiceManagerBase
+        __ServiceManagerBase_init(_owner, _rewardsInitiator);
+
+        // Set contract addresses
+        strategyManager = _strategyManager;
+        delegationManager = _delegationManager;
         ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
         bondingManager = IBondingManager(_bondingManager);
         allocationManager = _allocationManager;
-        strategyManager = _strategyManager;
-        delegationManager = _delegationManager;
+
+        // Set dual bonding parameters
+        enclStrategy = _enclStrategy;
+        usdcStrategy = _usdcStrategy;
+        licenseStake = _licenseStake;
+        ticketPrice = _ticketPrice;
         minCollateralUsd = _minCollateralUsd;
         operatorSetId = _operatorSetId;
 
-        // Initialize the upgradeable owner
-        _transferOwnership(_owner);
+        // Add default strategies
+        _addStrategyInternal(_enclStrategy, 0, address(0)); // ENCL - price feed TBD
+        _addStrategyInternal(_usdcStrategy, 0, address(0)); // USDC - stablecoin, no price feed
+    }
+
+    // ============ Dual Bonding System - License Management ============
+
+    /**
+     * @notice Acquire license by staking required ENCL tokens
+     * @dev Operator must be an EigenLayer operator and stake ENCL
+     */
+    function acquireLicense() external nonReentrant {
+        require(
+            delegationManager.isOperator(msg.sender),
+            OperatorNotRegistered()
+        );
+        require(!operatorInfos[msg.sender].isLicensed, AlreadyLicensed());
+
+        // Check if operator has enough ENCL staked
+        uint256 enclShares = strategyManager.stakerDepositShares(
+            msg.sender,
+            enclStrategy
+        );
+        uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
+
+        require(enclAmount >= licenseStake, InsufficientLicenseStake());
+
+        // Grant license
+        operatorInfos[msg.sender] = OperatorInfo({
+            isLicensed: true,
+            licenseStake: enclAmount,
+            ticketBalance: 0,
+            registeredAt: block.timestamp
+        });
+
+        emit LicenseAcquired(msg.sender, enclAmount);
+    }
+
+    /**
+     * @notice Purchase selection tickets with USDC
+     * @param ticketCount Number of tickets to purchase
+     */
+    function purchaseTickets(uint256 ticketCount) external nonReentrant {
+        require(ticketCount > 0, InvalidTicketAmount());
+        require(operatorInfos[msg.sender].isLicensed, NotLicensed());
+
+        uint256 totalCost = ticketCount * ticketPrice;
+
+        // Check if operator has enough USDC staked
+        uint256 usdcShares = strategyManager.stakerDepositShares(
+            msg.sender,
+            usdcStrategy
+        );
+        uint256 usdcAmount = usdcStrategy.sharesToUnderlyingView(usdcShares);
+
+        require(usdcAmount >= totalCost, InsufficientTicketBalance());
+
+        // Update ticket balance
+        operatorInfos[msg.sender].ticketBalance += ticketCount;
+
+        emit TicketsPurchased(msg.sender, totalCost, ticketCount);
     }
 
     // ============ Strategy Management ============
@@ -158,6 +271,14 @@ contract ServiceManager is
         uint256 minShares,
         address priceFeed
     ) external onlyOwner {
+        _addStrategyInternal(strategy, minShares, priceFeed);
+    }
+
+    function _addStrategyInternal(
+        IStrategy strategy,
+        uint256 minShares,
+        address priceFeed
+    ) internal {
         require(address(strategy) != address(0), ZeroAddress());
         require(!strategyConfigs[strategy].isAllowed, StrategyAlreadyAllowed());
 
@@ -185,6 +306,10 @@ contract ServiceManager is
 
     function removeStrategy(IStrategy strategy) external onlyOwner {
         require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
+        require(
+            strategy != enclStrategy && strategy != usdcStrategy,
+            "Cannot remove core strategies"
+        );
 
         uint256 index = strategyToIndex[strategy];
         uint256 lastIndex = allowedStrategies.length - 1;
@@ -219,6 +344,18 @@ contract ServiceManager is
         require(_minCollateralUsd > 0, InvalidMinCollateral());
         minCollateralUsd = _minCollateralUsd;
         emit MinCollateralUpdated(_minCollateralUsd);
+    }
+
+    function setLicenseStake(uint256 _licenseStake) external onlyOwner {
+        require(_licenseStake > 0, InvalidMinCollateral());
+        licenseStake = _licenseStake;
+        emit LicenseStakeUpdated(_licenseStake);
+    }
+
+    function setTicketPrice(uint256 _ticketPrice) external onlyOwner {
+        require(_ticketPrice > 0, InvalidTicketAmount());
+        ticketPrice = _ticketPrice;
+        emit TicketPriceUpdated(_ticketPrice);
     }
 
     // ============ Operator Set Management ============
@@ -274,7 +411,6 @@ contract ServiceManager is
             memory operatorSignature
     ) public override onlyOwner {
         _avsDirectory.registerOperatorToAVS(operator, operatorSignature);
-
         emit OperatorRegisteredToAVS(operator);
     }
 
@@ -282,12 +418,12 @@ contract ServiceManager is
         address operator
     ) public override onlyOwner {
         _avsDirectory.deregisterOperatorFromAVS(operator);
-
         emit OperatorDeregisteredFromAVS(operator);
     }
 
     function registerCiphernode() external nonReentrant {
         require(!registeredOperators[msg.sender], OperatorNotRegistered());
+        require(operatorInfos[msg.sender].isLicensed, NotLicensed());
 
         // 1. Verify operator is registered with EigenLayer DelegationManager
         require(
@@ -295,27 +431,27 @@ contract ServiceManager is
             OperatorNotRegistered()
         );
 
-        // 2. Register operator to our AVS (note: signature should be handled separately)
-
-        // 3. Verify operator has allocated sufficient magnitude to our operator set
-        require(
-            _verifyMagnitudeAllocation(msg.sender),
-            InsufficientMagnitudeAllocation()
+        // 2. Check license stake is still sufficient
+        uint256 enclShares = strategyManager.stakerDepositShares(
+            msg.sender,
+            enclStrategy
         );
+        uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
+        require(enclAmount >= licenseStake, InsufficientLicenseStake());
 
-        // 4. Check collateral requirements based on allocated stake
+        // 3. Check collateral requirements based on allocated stake
         (bool isEligible, uint256 collateralUsd) = checkOperatorEligibility(
             msg.sender
         );
         require(isEligible, InsufficientCollateral());
 
-        // 5. Register with our system
+        // 4. Register with our system
         registeredOperators[msg.sender] = true;
 
-        // 6. Register with bonding manager
+        // 5. Register with bonding manager
         bondingManager.registerOperator(msg.sender, collateralUsd);
 
-        // 7. Add to ciphernode registry
+        // 6. Add to ciphernode registry
         ciphernodeRegistry.addCiphernode(msg.sender);
 
         emit CiphernodeRegistered(msg.sender, collateralUsd);
@@ -353,6 +489,7 @@ contract ServiceManager is
         require(registeredOperators[operator], OperatorNotRegistered());
         require(slashingPercentage <= 10000, InvalidSlashingPercentage());
 
+        // Calculate slashing for all strategies (including ENCL and USDC)
         (
             IStrategy[] memory strategies,
             uint256[] memory wadsToSlash
@@ -380,16 +517,15 @@ contract ServiceManager is
                     slashedShares
                 );
 
+                // Check if operator still meets license requirements after slashing
+                _checkAndUpdateLicenseStatus(operator);
+
+                // Update collateral in bonding manager
                 (
                     bool isEligible,
                     uint256 newCollateralUsd
                 ) = checkOperatorEligibility(operator);
-                if (!isEligible) {
-                    // Auto-deregister if below minimum
-                    registeredOperators[operator] = false;
-                    bondingManager.deregisterOperator(operator);
-                    emit CiphernodeDeregistered(operator);
-                } else {
+                if (isEligible) {
                     bondingManager.updateOperatorCollateral(
                         operator,
                         newCollateralUsd
@@ -399,6 +535,54 @@ contract ServiceManager is
                 revert(string(abi.encodePacked("Slashing failed: ", errorMsg)));
             }
         }
+    }
+
+    // ============ Rewards ============
+
+    function setRewardDistributor(
+        address _rewardDistributor
+    ) external onlyOwner {
+        require(_rewardDistributor != address(0), ZeroAddress());
+        rewardDistributor = _rewardDistributor;
+    }
+
+    /**
+     * @notice Distribute rewards to operators
+     * @param recipients Array of operator addresses
+     * @param amounts Array of reward amounts in ENCL tokens
+     */
+    function distributeRewards(
+        address[] calldata recipients,
+        uint256[] calldata amounts
+    ) external {
+        require(msg.sender == rewardDistributor, "Only reward distributor");
+        require(recipients.length == amounts.length, "Array length mismatch");
+
+        IERC20Metadata enclToken = IERC20Metadata(
+            address(enclStrategy.underlyingToken())
+        );
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            if (amounts[i] > 0 && registeredOperators[recipients[i]]) {
+                enclToken.safeTransfer(recipients[i], amounts[i]);
+            }
+        }
+    }
+
+    /**
+     * @notice Use tickets for committee selection (called by registry filter)
+     * @param operator Operator using tickets
+     * @param ticketCount Number of tickets to use
+     */
+    function useTickets(address operator, uint256 ticketCount) external {
+        require(msg.sender == address(ciphernodeRegistry), "Only registry");
+        require(
+            operatorInfos[operator].ticketBalance >= ticketCount,
+            InsufficientTicketBalance()
+        );
+
+        operatorInfos[operator].ticketBalance -= ticketCount;
+        emit TicketsUsed(operator, ticketCount);
     }
 
     // ============ View Functions ============
@@ -459,53 +643,58 @@ contract ServiceManager is
         return (operatorSetId, address(this));
     }
 
+    function getOperatorInfo(
+        address operator
+    ) external view returns (OperatorInfo memory info) {
+        return operatorInfos[operator];
+    }
+
+    function getLicenseStake() external view returns (uint256) {
+        return licenseStake;
+    }
+
+    function getTicketPrice() external view returns (uint256) {
+        return ticketPrice;
+    }
+
     // ============ Internal Functions ============
 
-    function _verifyMagnitudeAllocation(
-        address operator
-    ) internal view returns (bool) {
-        OperatorSet memory operatorSet = OperatorSet({
-            avs: address(this),
-            id: operatorSetId
-        });
+    function _checkAndUpdateLicenseStatus(address operator) internal {
+        if (!operatorInfos[operator].isLicensed) return;
 
-        uint256 totalAllocatedCollateral = 0;
+        // Check if ENCL stake is still sufficient after slashing
+        uint256 enclShares = strategyManager.stakerDepositShares(
+            operator,
+            enclStrategy
+        );
+        uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
 
-        for (uint256 i = 0; i < allowedStrategies.length; i++) {
-            IStrategy strategy = allowedStrategies[i];
+        if (enclAmount < licenseStake) {
+            // Revoke license if below threshold
+            operatorInfos[operator].isLicensed = false;
 
-            uint256 totalMagnitude = uint256(
-                allocationManager.getEncumberedMagnitude(operator, strategy)
-            ) +
-                uint256(
-                    allocationManager.getAllocatableMagnitude(
-                        operator,
-                        strategy
-                    )
-                );
-
-            uint256 allocatedMagnitude = uint256(
-                allocationManager
-                    .getAllocation(operator, operatorSet, strategy)
-                    .currentMagnitude
-            );
-
-            if (totalMagnitude == 0) continue;
-            uint256 totalShares = getOperatorShares(operator, strategy);
-
-            if (totalShares > 0 && allocatedMagnitude > 0) {
-                uint256 allocatedShares = (totalShares * allocatedMagnitude) /
-                    totalMagnitude;
-
-                uint256 allocatedUsd = _convertSharesToUsd(
-                    strategy,
-                    allocatedShares
-                );
-                totalAllocatedCollateral += allocatedUsd;
+            // Auto-deregister from ciphernode registry
+            if (registeredOperators[operator]) {
+                registeredOperators[operator] = false;
+                bondingManager.deregisterOperator(operator);
+                // Note: Cannot auto-remove from registry without sibling nodes
+                emit CiphernodeDeregistered(operator);
             }
+
+            emit LicenseRevoked(operator);
         }
 
-        return totalAllocatedCollateral >= minCollateralUsd;
+        // Check if stake dropped below 50% (decomission threshold)
+        if (enclAmount < (operatorInfos[operator].licenseStake / 2)) {
+            // Initiate decommission process
+            operatorInfos[operator].isLicensed = false;
+            if (registeredOperators[operator]) {
+                registeredOperators[operator] = false;
+                bondingManager.deregisterOperator(operator);
+                emit CiphernodeDeregistered(operator);
+            }
+            emit LicenseRevoked(operator);
+        }
     }
 
     function _convertSharesToUsd(
@@ -517,6 +706,7 @@ contract ServiceManager is
         uint256 underlyingAmount = strategy.sharesToUnderlyingView(shares);
 
         if (config.priceFeed == address(0)) {
+            // Treat as stablecoin (e.g., USDC)
             usdValue = underlyingAmount * (10 ** (18 - config.decimals));
         } else {
             uint256 price = _getTokenPrice(config.priceFeed);
@@ -541,7 +731,7 @@ contract ServiceManager is
                     block.timestamp - updatedAt <= PRICE_STALENESS_THRESHOLD,
                 "Invalid or stale price"
             );
-            return uint256(answer) * 1e10;
+            return uint256(answer) * 1e10; // Convert to 18 decimals
         } catch {
             revert("Price feed error");
         }

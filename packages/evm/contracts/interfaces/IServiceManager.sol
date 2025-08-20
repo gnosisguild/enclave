@@ -21,6 +21,12 @@ interface IServiceManager {
     error StrategyNotFound();
     error InvalidSlashingPercentage();
     error InsufficientMagnitudeAllocation();
+    error InsufficientLicenseStake();
+    error InsufficientTicketBalance();
+    error InvalidTicketAmount();
+    error TicketPurchaseFailed();
+    error AlreadyLicensed();
+    error NotLicensed();
 
     /// @notice Events
     event StrategyAdded(
@@ -51,12 +57,31 @@ interface IServiceManager {
     event OperatorRegisteredToAVS(address indexed operator);
     event OperatorDeregisteredFromAVS(address indexed operator);
 
+    event LicenseAcquired(address indexed operator, uint256 enclAmount);
+    event LicenseRevoked(address indexed operator);
+    event TicketsPurchased(
+        address indexed operator,
+        uint256 usdcAmount,
+        uint256 ticketCount
+    );
+    event TicketsUsed(address indexed operator, uint256 ticketCount);
+    event LicenseStakeUpdated(uint256 newLicenseStake);
+    event TicketPriceUpdated(uint256 newTicketPrice);
+
     /// @notice Strategy configuration
     struct StrategyConfig {
         bool isAllowed;
         uint256 minShares;
         address priceFeed;
         uint8 decimals;
+    }
+
+    /// @notice Operator license and ticket information
+    struct OperatorInfo {
+        bool isLicensed; // Has operator acquired license with ENCL stake?
+        uint256 licenseStake; // Amount of ENCL staked for license
+        uint256 ticketBalance; // Number of selection tickets owned
+        uint256 registeredAt; // Timestamp when license was acquired
     }
 
     /**
@@ -96,8 +121,32 @@ interface IServiceManager {
     function setMinCollateralUsd(uint256 minCollateralUsd) external;
 
     /**
-     * @notice Register as a ciphernode (permissionless)
-     * @dev Operator must have sufficient restaked collateral across allowed strategies
+     * @notice Set minimum ENCL stake required for license
+     * @param licenseStake Amount of ENCL required for license
+     */
+    function setLicenseStake(uint256 licenseStake) external;
+
+    /**
+     * @notice Set price per selection ticket in USDC
+     * @param ticketPrice Price per ticket in USDC (6 decimals)
+     */
+    function setTicketPrice(uint256 ticketPrice) external;
+
+    /**
+     * @notice Acquire license to become a ciphernode by staking ENCL
+     * @dev Operator must first stake ENCL tokens to get license
+     */
+    function acquireLicense() external;
+
+    /**
+     * @notice Purchase selection tickets with USDC
+     * @param ticketCount Number of tickets to purchase
+     */
+    function purchaseTickets(uint256 ticketCount) external;
+
+    /**
+     * @notice Register as a ciphernode (requires license)
+     * @dev Operator must have license and meet collateral requirements
      */
     function registerCiphernode() external;
 
@@ -186,4 +235,25 @@ interface IServiceManager {
         external
         view
         returns (uint256 minCollateralUsd);
+
+    /**
+     * @notice Get operator information (license and tickets)
+     * @param operator Address of the operator
+     * @return info OperatorInfo struct with license and ticket data
+     */
+    function getOperatorInfo(
+        address operator
+    ) external view returns (OperatorInfo memory info);
+
+    /**
+     * @notice Get current license stake requirement
+     * @return licenseStake Amount of ENCL required for license
+     */
+    function getLicenseStake() external view returns (uint256 licenseStake);
+
+    /**
+     * @notice Get current ticket price
+     * @return ticketPrice Price per ticket in USDC
+     */
+    function getTicketPrice() external view returns (uint256 ticketPrice);
 }
