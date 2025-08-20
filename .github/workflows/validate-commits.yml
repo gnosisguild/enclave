@@ -1,18 +1,16 @@
-name: Validate Commit Messages
+name: Validate PR Title
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
-  validate-commits:
-    name: Validate Commit Messages
+  validate-pr-title:
+    name: Validate PR Title
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -52,61 +50,42 @@ jobs:
           };
           EOF
 
-      - name: Validate PR commits
+      - name: Validate PR title
         run: |
-          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
-          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
-
-          # Get only the commits that are in this PR (not in base branch)
-          echo "Getting commits unique to this PR..."
-          COMMITS=$(git rev-list --reverse ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
-
-          if [ -z "$COMMITS" ]; then
-            echo "No commits found in this PR to validate"
-            exit 0
-          fi
-
-          echo "Commits to validate:"
-          git log --oneline ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
-
-          # Validate each commit message individually
-          echo "Validating PR-specific commits..."
-          FAILED=0
-
-          for commit in $COMMITS; do
-            echo "Validating commit: $commit"
-            COMMIT_MSG=$(git log --format="%s" -n 1 $commit)
-            echo "Commit message: $COMMIT_MSG"
-            
-            if ! echo "$COMMIT_MSG" | commitlint --verbose; then
-              echo "❌ Commit $commit failed validation"
-              FAILED=1
-            else
-              echo "✅ Commit $commit passed validation"
-            fi
-          done
-
-          if [ $FAILED -eq 1 ]; then
-            echo "One or more commits failed validation"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "PR Title: $PR_TITLE"
+          
+          if echo "$PR_TITLE" | commitlint --verbose; then
+            echo "✅ PR title passed validation"
+          else
+            echo "❌ PR title failed validation"
             exit 1
           fi
-
-          echo "All commits passed validation!"
 
       - name: Comment on PR if validation fails
         if: failure()
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            // First, check if we already commented on this PR
+            const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## ❌ Commit Message Validation Failed
+              issue_number: context.issue.number,
+            });
 
-            One or more commit messages in this PR don't follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('PR Title Validation Failed')
+            );
 
-            Please ensure your commit messages follow this format:
+            const commentBody = `## ❌ PR Title Validation Failed
+
+            Your PR title doesn't follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+            **Current title:** \`${{ github.event.pull_request.title }}\`
+
+            Please ensure your PR title follows this format:
             \`\`\`
             <type>[optional scope]: <description>
             \`\`\`
@@ -119,10 +98,47 @@ jobs:
             - \`chore(ci): update GitHub Actions\`
             - \`feat!: breaking change to API\`
 
-            You can fix this by:
-            1. Amending your commit messages using \`git commit --amend\` (for the last commit)
-            2. Using \`git rebase -i\` to edit multiple commit messages
-            3. Or squashing commits when merging the PR
+            Please update your PR title to follow this format.`;
 
-            For more details, see our [Contributing Guidelines](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md#conventional-commits).`
-            })
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: commentBody
+              });
+            }
+
+      - name: Remove validation comment if title is valid
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Remove any existing validation failure comments if the title is now valid
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('PR Title Validation Failed')
+            );
+
+            if (botComment) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id
+              });
+            }
