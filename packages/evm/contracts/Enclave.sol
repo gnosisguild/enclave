@@ -11,7 +11,7 @@ import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+} from "@oz-upgradeable/access/OwnableUpgradeable.sol";
 import {
     InternalLeanIMT,
     LeanIMTData,

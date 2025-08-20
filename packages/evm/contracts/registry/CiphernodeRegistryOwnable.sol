@@ -10,7 +10,7 @@ import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import { IBondingManager } from "../interfaces/IBondingManager.sol";
 import {
     OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+} from "@oz-upgradeable/access/OwnableUpgradeable.sol";
 import {
     InternalLeanIMT,
     LeanIMTData

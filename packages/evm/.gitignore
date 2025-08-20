@@ -13,6 +13,8 @@ dist
 node_modules
 types
 deployments/localhost
+out/
+cache_forge/
 
 # files
 *.env

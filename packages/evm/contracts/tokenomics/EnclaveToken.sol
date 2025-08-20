@@ -5,18 +5,14 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "@oz/token/ERC20/ERC20.sol";
 import {
     ERC20Permit,
     Nonces
-} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import {
-    ERC20Votes
-} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import {
-    AccessControl
-} from "@openzeppelin/contracts/access/AccessControl.sol";
+} from "@oz/token/ERC20/extensions/ERC20Permit.sol";
+import { ERC20Votes } from "@oz/token/ERC20/extensions/ERC20Votes.sol";
+import { Ownable } from "@oz/access/Ownable.sol";
+import { AccessControl } from "@oz/access/AccessControl.sol";
 
 contract EnclaveToken is
     ERC20,

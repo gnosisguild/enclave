@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Ownable } from "@oz/access/Ownable.sol";
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingManager } from "../interfaces/IBondingManager.sol";

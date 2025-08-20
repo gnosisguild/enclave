@@ -9,7 +9,7 @@ import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import {
     OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+} from "@oz-upgradeable/access/OwnableUpgradeable.sol";
 
 contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     struct Committee {

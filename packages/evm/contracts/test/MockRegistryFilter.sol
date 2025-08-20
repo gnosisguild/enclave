@@ -8,7 +8,7 @@ pragma solidity >=0.8.27;
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import {
     OwnableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+} from "@oz-upgradeable/access/OwnableUpgradeable.sol";
 
 interface IRegistry {
     function publishCommittee(

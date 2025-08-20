@@ -15,10 +15,23 @@ import {
     IStakeRegistry
 } from "@eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {
+    IRewardsCoordinator
+} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+import {
+    IPermissionController
+} from "eigenlayer-contracts/src/contracts/interfaces/IPermissionController.sol";
+import {
+    ISlashingRegistryCoordinator
+} from "@eigenlayer-middleware/src/interfaces/ISlashingRegistryCoordinator.sol";
+import {
+    ISignatureUtilsMixinTypes
+} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtilsMixin.sol";
+import {
     IStrategy
 } from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {
-    IAllocationManager
+    IAllocationManager,
+    IAllocationManagerTypes
 } from "eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
 import {
     IDelegationManager
@@ -36,10 +49,12 @@ import {
 import {
     AggregatorV3Interface
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
+import { ReentrancyGuard } from "@oz/utils/ReentrancyGuard.sol";
 import {
-    ReentrancyGuard
-} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+    OwnableUpgradeable
+} from "@oz-upgradeable/access/OwnableUpgradeable.sol";
+import { IERC20Metadata } from "@oz/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { IServiceManager } from "../interfaces/IServiceManager.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
@@ -48,7 +63,6 @@ import { IBondingManager } from "../interfaces/IBondingManager.sol";
 contract ServiceManager is
     ServiceManagerBase,
     IServiceManager,
-    Ownable,
     ReentrancyGuard
 {
     /// @notice Minimum collateral requirement in USD
@@ -96,8 +110,10 @@ contract ServiceManager is
 
     constructor(
         IAVSDirectory _avsDirectory,
-        IRegistryCoordinator _registryCoordinator,
+        IRewardsCoordinator _rewardsCoordinator,
+        ISlashingRegistryCoordinator _registryCoordinator,
         IStakeRegistry _stakeRegistry,
+        IPermissionController _permissionController,
         IAllocationManager _allocationManager,
         IStrategyManager _strategyManager,
         IDelegationManager _delegationManager,
@@ -107,8 +123,14 @@ contract ServiceManager is
         uint256 _minCollateralUsd,
         uint32 _operatorSetId
     )
-        ServiceManagerBase(_avsDirectory, _registryCoordinator, _stakeRegistry)
-        Ownable(_owner)
+        ServiceManagerBase(
+            _avsDirectory,
+            _rewardsCoordinator,
+            _registryCoordinator,
+            _stakeRegistry,
+            _permissionController,
+            _allocationManager
+        )
     {
         require(_ciphernodeRegistry != address(0), ZeroAddress());
         require(_bondingManager != address(0), ZeroAddress());
@@ -124,6 +146,9 @@ contract ServiceManager is
         delegationManager = _delegationManager;
         minCollateralUsd = _minCollateralUsd;
         operatorSetId = _operatorSetId;
+
+        // Initialize the upgradeable owner
+        _transferOwnership(_owner);
     }
 
     // ============ Strategy Management ============
@@ -137,10 +162,12 @@ contract ServiceManager is
         require(!strategyConfigs[strategy].isAllowed, StrategyAlreadyAllowed());
 
         uint8 decimals = 18;
-        try strategy.underlyingToken().decimals() returns (uint8 d) {
+        try
+            IERC20Metadata(address(strategy.underlyingToken())).decimals()
+        returns (uint8 d) {
             decimals = d;
         } catch {
-            revert("Strategy decimals not found");
+            // Use default 18 decimals if token doesn't implement IERC20Metadata
         }
 
         strategyConfigs[strategy] = StrategyConfig({
@@ -219,10 +246,10 @@ contract ServiceManager is
         });
 
         return
-            allocationManager.getAllocatedMagnitude(
-                operator,
-                operatorSet,
-                strategy
+            uint256(
+                allocationManager
+                    .getAllocation(operator, operatorSet, strategy)
+                    .currentMagnitude
             );
     }
 
@@ -230,29 +257,36 @@ contract ServiceManager is
         address operator,
         IStrategy strategy
     ) external view returns (uint256) {
-        return allocationManager.getTotalMagnitude(operator, strategy);
+        return
+            uint256(
+                allocationManager.getEncumberedMagnitude(operator, strategy)
+            ) +
+            uint256(
+                allocationManager.getAllocatableMagnitude(operator, strategy)
+            );
     }
 
     // ============ Operator Registration ============
 
     function registerOperatorToAVS(
         address operator,
-        bytes calldata operatorSignature
-    ) external onlyOwner {
+        ISignatureUtilsMixinTypes.SignatureWithSaltAndExpiry
+            memory operatorSignature
+    ) public override onlyOwner {
         _avsDirectory.registerOperatorToAVS(operator, operatorSignature);
 
         emit OperatorRegisteredToAVS(operator);
     }
 
-    function deregisterOperatorFromAVS(address operator) external onlyOwner {
+    function deregisterOperatorFromAVS(
+        address operator
+    ) public override onlyOwner {
         _avsDirectory.deregisterOperatorFromAVS(operator);
 
         emit OperatorDeregisteredFromAVS(operator);
     }
 
-    function registerCiphernode(
-        bytes calldata avsSignature
-    ) external nonReentrant {
+    function registerCiphernode() external nonReentrant {
         require(!registeredOperators[msg.sender], OperatorNotRegistered());
 
         // 1. Verify operator is registered with EigenLayer DelegationManager
@@ -261,10 +295,7 @@ contract ServiceManager is
             OperatorNotRegistered()
         );
 
-        // 2. Register operator to our AVS
-        if (avsSignature.length > 0) {
-            _avsDirectory.registerOperatorToAVS(msg.sender, avsSignature);
-        }
+        // 2. Register operator to our AVS (note: signature should be handled separately)
 
         // 3. Verify operator has allocated sufficient magnitude to our operator set
         require(
@@ -329,8 +360,8 @@ contract ServiceManager is
 
         if (strategies.length > 0) {
             // Create slashing parameters for EigenLayer AllocationManager
-            IAllocationManager.SlashingParams
-                memory slashingParams = IAllocationManager.SlashingParams({
+            IAllocationManagerTypes.SlashingParams
+                memory slashingParams = IAllocationManagerTypes.SlashingParams({
                     operator: operator,
                     operatorSetId: operatorSetId,
                     strategies: strategies,
@@ -396,7 +427,7 @@ contract ServiceManager is
         address operator,
         IStrategy strategy
     ) public view returns (uint256 shares) {
-        return strategyManager.stakerStrategyShares(operator, strategy);
+        return strategyManager.stakerDepositShares(operator, strategy);
     }
 
     function isStrategyAllowed(
@@ -443,13 +474,21 @@ contract ServiceManager is
         for (uint256 i = 0; i < allowedStrategies.length; i++) {
             IStrategy strategy = allowedStrategies[i];
 
-            uint256 totalMagnitude = allocationManager.getTotalMagnitude(
-                operator,
-                strategy
-            );
+            uint256 totalMagnitude = uint256(
+                allocationManager.getEncumberedMagnitude(operator, strategy)
+            ) +
+                uint256(
+                    allocationManager.getAllocatableMagnitude(
+                        operator,
+                        strategy
+                    )
+                );
 
-            uint256 allocatedMagnitude = allocationManager
-                .getAllocatedMagnitude(operator, operatorSet, strategy);
+            uint256 allocatedMagnitude = uint256(
+                allocationManager
+                    .getAllocation(operator, operatorSet, strategy)
+                    .currentMagnitude
+            );
 
             if (totalMagnitude == 0) continue;
             uint256 totalShares = getOperatorShares(operator, strategy);

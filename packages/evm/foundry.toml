@@ -2,24 +2,27 @@
 src = 'contracts'
 out = 'out'
 libs = ['lib', 'node_modules']
+# Exclude EigenLayer subdirectories from automatic compilation to prevent conflicts
+excluded_paths = ['lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test']
 solc = "0.8.27"
 optimizer = true
 via_ir = true
 cache_path = 'cache_forge'
 
 remappings = [
-  "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
-  "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+  # --- EigenLayer OZ v4.9 mappings ---
+  "@openzeppelin/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
+  "@openzeppelin-upgrades/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/",
+  
+  # --- Enclave OZ v5 to avoid conflicts with EigenLayer OZ v4.9 ---
+  "@oz/=node_modules/@openzeppelin/contracts/",
+  "@oz-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
 
   # --- EigenLayer imports  ---
   "eigenlayer-contracts/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/",
   "@eigenlayer-scripts/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/script/",
   "@eigenlayer-middleware/=lib/eigenlayer-middleware/",
   "forge-std/=lib/forge-std/src/",
-
-  # --- EigenLayer OZ ---
-  "openzeppelin-contracts-v4.9.0/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
-  "openzeppelin-contracts-upgradeable-v4.9.0/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/",
 ]
 
 # Avoid noisy warnings from their repo
