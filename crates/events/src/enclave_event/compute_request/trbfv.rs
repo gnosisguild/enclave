@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::bytes::Bytes;
+
 /// TrBFV modules defining the API for multithreaded compute
 /// Each module defines the event payloads that make up a compute request
 /// Each compute request should live independently and be self contained
@@ -30,10 +32,50 @@ pub enum TrBFVResponse {
     ThresholdDecrypt(threshold_decrypt::Response),
 }
 
+/// Convenience struct for holding threshold BFV configuration parameters
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct TrBFVConfig {
+    /// BFV Params
+    params: Bytes,
+    /// Number of ciphernodes
+    num_parties: u64,
+    /// Threshold required
+    threshold: u64,
+}
+
+impl TrBFVConfig {
+    /// Constructor for the TrBFVConfig
+    pub fn new(params: Bytes, num_parties: u64, threshold: u64) -> Self {
+        Self {
+            params,
+            num_parties,
+            threshold,
+        }
+    }
+
+    pub fn params(&self) -> Bytes {
+        self.params.clone() // NOTE: It might make sense to deserialize
+                            // stright to BfvParameters here
+                            // but leaving like this for now
+    }
+
+    pub fn num_parties(&self) -> u64 {
+        self.num_parties
+    }
+
+    pub fn threshold(&self) -> u64 {
+        self.threshold
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVError {
     // Add errors here as required
 }
+
+// NOTE: All size values use u64 instead of usize to maintain a stable
+// protocol that works across different architectures. Convert these
+// u64 values to usize when entering the library's internal APIs.
 
 pub mod gen_esi_sss {
     /// This module defines event payloads that will generate esi smudging noise shamir shares to be shared with other members of the committee.
@@ -42,15 +84,16 @@ pub mod gen_esi_sss {
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
 
+    use super::TrBFVConfig;
+
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct Request {
-        /// BFV Params
-        params: Bytes,
-        /// Max number of ciphertexts
-        max_num_ciphertexts: u64, // called num_summed in the example
-                                  // NOTE: we are using u64 for these values instead of usize
-                                  // so that the protocol has specific size
-                                  // not based on architecture
+        /// TrBFV configuration
+        trbfv_config: TrBFVConfig,
+        /// Error Size extracted from the E3 Program Parameters
+        error_size: Bytes,
+        /// Smudging noise per ciphertext
+        esi_per_ct: u64,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -67,14 +110,14 @@ pub mod gen_pk_share_and_sk_sss {
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
 
+    use super::TrBFVConfig;
+
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct Request {
-        /// BFV Params
-        params: Bytes,
-        /// Num parties
-        num_parties: u64,
-        /// Threshold
-        threshold: u64,
+        /// TrBFV configuration
+        trbfv_config: TrBFVConfig,
+        /// Crp
+        crp: Bytes,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -91,8 +134,12 @@ pub mod gen_decryption_key {
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
 
+    use super::TrBFVConfig;
+
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct Request {
+        /// TrBFV configuration
+        trbfv_config: TrBFVConfig,
         /// All collected secret key shamir shares
         sk_sss_collected: Vec<SensitiveBytes>,
         /// All collected smudging noise shamir shares
@@ -114,10 +161,12 @@ pub mod gen_decryption_share {
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
 
+    use super::TrBFVConfig;
+
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct Request {
-        /// BFV Params
-        params: Bytes,
+        /// TrBFV configuration
+        trbfv_config: TrBFVConfig,
         /// Ciphertext to decrypt
         ciphertext: Bytes,
         /// A single summed polynomial for this nodes secret key.
@@ -138,10 +187,12 @@ pub mod threshold_decrypt {
     use crate::bytes::Bytes;
     use serde::{Deserialize, Serialize};
 
+    use super::TrBFVConfig;
+
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct Request {
-        /// BFV Params
-        params: Bytes,
+        /// TrBFV configuration
+        trbfv_config: TrBFVConfig,
         /// Ciphertext to decrypt
         ciphertext: Bytes,
         /// All decryption shares from a threshold quorum of nodes

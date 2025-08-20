@@ -1,0 +1,16 @@
+```mermaid
+sequenceDiagram
+        actor Node1
+        actor DHT
+        actor Node2
+        
+        Node1->>Node1: calculate_pk_share_and_sk_sss
+        Node2->>Node2: calculate_pk_share_and_sk_sss
+        Node1->>Node1: calculate_esi_sss
+        Node2->>Node2: calculate_esi_sss
+        Node1->>DHT: PublishDocument(sk_sss,esi_sss)
+        Node1->>Node2: DocumentPublishedNotification
+        Node2->>DHT: FetchDocument
+        DHT-->>Node2: FetchDocumentSucceeded
+        
+```
