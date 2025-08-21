@@ -32,6 +32,9 @@ pub enum TrBFVResponse {
     ThresholdDecrypt(threshold_decrypt::Response),
 }
 
+/// Semantic PartyId
+pub type PartyId = u64;
+
 /// Convenience struct for holding threshold BFV configuration parameters
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TrBFVConfig {
@@ -181,13 +184,11 @@ pub mod gen_decryption_share {
         d_share_poly: Bytes,
     }
 }
-
 pub mod threshold_decrypt {
-    /// This module defines event payloads that will decrypt a ciphertext with a threshold quorum of decryption shares
+    /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
+    use super::{PartyId, TrBFVConfig};
     use crate::bytes::Bytes;
     use serde::{Deserialize, Serialize};
-
-    use super::TrBFVConfig;
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct Request {
@@ -195,8 +196,8 @@ pub mod threshold_decrypt {
         trbfv_config: TrBFVConfig,
         /// Ciphertext to decrypt
         ciphertext: Bytes,
-        /// All decryption shares from a threshold quorum of nodes polys
-        d_share_polys: Vec<(u64, Bytes)>,
+        /// All decryption shares from a threshold quorum of nodes polys.
+        d_share_polys: Vec<(PartyId, Bytes)>,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
