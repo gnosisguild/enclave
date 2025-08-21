@@ -181,7 +181,7 @@ pub mod gen_decryption_share {
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct Response {
         /// The decryption share for the given ciphertext
-        d_share_poly: Bytes,
+        d_share_poly: Vec<Bytes>,
     }
 }
 pub mod threshold_decrypt {
