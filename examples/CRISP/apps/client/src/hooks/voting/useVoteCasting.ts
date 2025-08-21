@@ -11,7 +11,7 @@ import { useNotificationAlertContext } from '@/context/NotificationAlert/Notific
 import { Poll } from '@/model/poll.model';
 import { BroadcastVoteRequest } from '@/model/vote.model';
 import { Group, generateNoirProof, SemaphoreNoirProof, initSemaphoreNoirBackend } from '@semaphore-protocol/core';
-import { encodeCrispInputs, encodeSemaphoreProof } from '@/utils/proof-encoding';
+import { encodeSemaphoreProof } from '@/utils/proof-encoding';
 
 export const useVoteCasting = () => {
     const {
