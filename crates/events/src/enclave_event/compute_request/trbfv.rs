@@ -195,8 +195,8 @@ pub mod threshold_decrypt {
         trbfv_config: TrBFVConfig,
         /// Ciphertext to decrypt
         ciphertext: Bytes,
-        /// All decryption shares from a threshold quorum of nodes
-        d_share_polys: Vec<Bytes>,
+        /// All decryption shares from a threshold quorum of nodes polys
+        d_share_polys: Vec<(u64, Bytes)>,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
