@@ -154,7 +154,7 @@ pub mod gen_decryption_key {
         /// A single summed polynomial for this nodes secret key.
         sk_poly_sum: SensitiveBytes,
         /// A single summed polynomial for this partys smudging noise
-        es_poly_sum: SensitiveBytes,
+        es_poly_sum: Vec<SensitiveBytes>,
     }
 }
 
