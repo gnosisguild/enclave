@@ -174,8 +174,8 @@ pub mod gen_decryption_share {
         ciphertext: Bytes,
         /// A single summed polynomial for this nodes secret key.
         sk_poly_sum: SensitiveBytes,
-        /// A single summed polynomial for this partys smudging noise
-        es_poly_sum: SensitiveBytes,
+        /// A vector of summed polynomials for this parties smudging noise
+        es_poly_sum: Vec<SensitiveBytes>,
     }
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
