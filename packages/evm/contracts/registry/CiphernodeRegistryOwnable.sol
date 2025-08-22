@@ -58,6 +58,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     error NotOwnerOrServiceManager();
     error NodeNotBonded(address node);
     error ZeroAddress();
+    error ServiceManagerNotSet();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -71,11 +72,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     modifier onlyServiceManager() {
+        require(serviceManager != address(0), ServiceManagerNotSet());
         require(msg.sender == serviceManager, OnlyServiceManager());
         _;
     }
 
     modifier onlyOwnerOrServiceManager() {
+        require(serviceManager != address(0), ServiceManagerNotSet());
         require(
             msg.sender == owner() || msg.sender == serviceManager,
             NotOwnerOrServiceManager()
@@ -89,22 +92,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    constructor(address _owner, address _enclave, address _serviceManager) {
-        initialize(_owner, _enclave, _serviceManager);
+    constructor(address _owner, address _enclave) {
+        initialize(_owner, _enclave);
     }
 
-    function initialize(
-        address _owner,
-        address _enclave,
-        address _serviceManager
-    ) public initializer {
+    function initialize(address _owner, address _enclave) public initializer {
         require(_owner != address(0), ZeroAddress());
         require(_enclave != address(0), ZeroAddress());
-        require(_serviceManager != address(0), ZeroAddress());
 
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
-        setServiceManager(_serviceManager);
         if (_owner != owner()) transferOwnership(_owner);
     }
 

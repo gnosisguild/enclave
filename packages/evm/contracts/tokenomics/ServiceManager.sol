@@ -8,9 +8,7 @@ pragma solidity >=0.8.27;
 import {
     ServiceManagerBase
 } from "@eigenlayer-middleware/src/ServiceManagerBase.sol";
-import {
-    IRegistryCoordinator
-} from "@eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+
 import {
     IStakeRegistry
 } from "@eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
@@ -34,6 +32,9 @@ import {
     IAllocationManagerTypes
 } from "eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
 import {
+    IAVSRegistrar
+} from "eigenlayer-contracts/src/contracts/interfaces/IAVSRegistrar.sol";
+import {
     IDelegationManager
 } from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {
@@ -53,6 +54,7 @@ import {
 import { ReentrancyGuard } from "@oz/utils/ReentrancyGuard.sol";
 import { IERC20Metadata } from "@oz/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeERC20 } from "@oz/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "@oz/utils/math/Math.sol";
 
 import { IServiceManager } from "../interfaces/IServiceManager.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
@@ -85,9 +87,6 @@ contract ServiceManager is
 
     /// @notice EigenLayer BondingManager contract
     IBondingManager public bondingManager;
-
-    /// @notice EigenLayer AllocationManager for slashing
-    IAllocationManager public allocationManager;
 
     /// @notice EigenLayer StrategyManager for share queries
     IStrategyManager public strategyManager;
@@ -123,6 +122,9 @@ contract ServiceManager is
 
     /// @notice Reward distributor address
     address public rewardDistributor;
+
+    /// @notice Track USDC spent on tickets per operator
+    mapping(address operator => uint256 spent) public ticketBudgetSpent;
 
     constructor(
         IAVSDirectory _avsDirectory,
@@ -172,7 +174,7 @@ contract ServiceManager is
         uint256 _ticketPrice,
         uint256 _minCollateralUsd,
         uint32 _operatorSetId
-    ) external initializer {
+    ) external reinitializer(1) {
         require(_ciphernodeRegistry != address(0), ZeroAddress());
         require(_bondingManager != address(0), ZeroAddress());
         require(address(_strategyManager) != address(0), ZeroAddress());
@@ -182,6 +184,7 @@ contract ServiceManager is
         require(_licenseStake > 0, InvalidMinCollateral());
         require(_ticketPrice > 0, InvalidTicketAmount());
         require(_minCollateralUsd > 0, InvalidMinCollateral());
+        require(_operatorSetId > 0, "Invalid operator set ID");
 
         // Initialize ServiceManagerBase
         __ServiceManagerBase_init(_owner, _rewardsInitiator);
@@ -191,9 +194,8 @@ contract ServiceManager is
         delegationManager = _delegationManager;
         ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
         bondingManager = IBondingManager(_bondingManager);
-        allocationManager = _allocationManager;
 
-        // Set dual bonding parameters
+        // Dual bonding parameters
         enclStrategy = _enclStrategy;
         usdcStrategy = _usdcStrategy;
         licenseStake = _licenseStake;
@@ -201,9 +203,9 @@ contract ServiceManager is
         minCollateralUsd = _minCollateralUsd;
         operatorSetId = _operatorSetId;
 
-        // Add default strategies
-        _addStrategyInternal(_enclStrategy, 0, address(0)); // ENCL - price feed TBD
-        _addStrategyInternal(_usdcStrategy, 0, address(0)); // USDC - stablecoin, no price feed
+        // Default strategies
+        _addStrategyInternal(_enclStrategy, address(0));
+        _addStrategyInternal(_usdcStrategy, address(0));
     }
 
     // ============ Dual Bonding System - License Management ============
@@ -219,16 +221,11 @@ contract ServiceManager is
         );
         require(!operatorInfos[msg.sender].isLicensed, AlreadyLicensed());
 
-        // Check if operator has enough ENCL staked
-        uint256 enclShares = strategyManager.stakerDepositShares(
-            msg.sender,
-            enclStrategy
-        );
+        uint256 enclShares = getOperatorShares(msg.sender, enclStrategy);
         uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
 
         require(enclAmount >= licenseStake, InsufficientLicenseStake());
 
-        // Grant license
         operatorInfos[msg.sender] = OperatorInfo({
             isLicensed: true,
             licenseStake: enclAmount,
@@ -248,17 +245,18 @@ contract ServiceManager is
         require(operatorInfos[msg.sender].isLicensed, NotLicensed());
 
         uint256 totalCost = ticketCount * ticketPrice;
+        require(totalCost / ticketPrice == ticketCount, "Cost overflow");
 
-        // Check if operator has enough USDC staked
-        uint256 usdcShares = strategyManager.stakerDepositShares(
-            msg.sender,
-            usdcStrategy
-        );
+        uint256 usdcShares = getOperatorShares(msg.sender, usdcStrategy);
         uint256 usdcAmount = usdcStrategy.sharesToUnderlyingView(usdcShares);
+        uint256 alreadySpent = ticketBudgetSpent[msg.sender];
+        uint256 availableBudget = usdcAmount > alreadySpent
+            ? usdcAmount - alreadySpent
+            : 0;
 
-        require(usdcAmount >= totalCost, InsufficientTicketBalance());
+        require(availableBudget >= totalCost, "Insufficient ticket budget");
 
-        // Update ticket balance
+        ticketBudgetSpent[msg.sender] = alreadySpent + totalCost;
         operatorInfos[msg.sender].ticketBalance += ticketCount;
 
         emit TicketsPurchased(msg.sender, totalCost, ticketCount);
@@ -268,15 +266,13 @@ contract ServiceManager is
 
     function addStrategy(
         IStrategy strategy,
-        uint256 minShares,
         address priceFeed
     ) external onlyOwner {
-        _addStrategyInternal(strategy, minShares, priceFeed);
+        _addStrategyInternal(strategy, priceFeed);
     }
 
     function _addStrategyInternal(
         IStrategy strategy,
-        uint256 minShares,
         address priceFeed
     ) internal {
         require(address(strategy) != address(0), ZeroAddress());
@@ -288,12 +284,11 @@ contract ServiceManager is
         returns (uint8 d) {
             decimals = d;
         } catch {
-            // Use default 18 decimals if token doesn't implement IERC20Metadata
+            // Defaults to 18 decimals
         }
 
         strategyConfigs[strategy] = StrategyConfig({
             isAllowed: true,
-            minShares: minShares,
             priceFeed: priceFeed,
             decimals: decimals
         });
@@ -301,7 +296,7 @@ contract ServiceManager is
         strategyToIndex[strategy] = allowedStrategies.length;
         allowedStrategies.push(strategy);
 
-        emit StrategyAdded(strategy, minShares, priceFeed);
+        emit StrategyAdded(address(strategy), priceFeed);
     }
 
     function removeStrategy(IStrategy strategy) external onlyOwner {
@@ -324,20 +319,18 @@ contract ServiceManager is
         delete strategyToIndex[strategy];
         delete strategyConfigs[strategy];
 
-        emit StrategyRemoved(strategy);
+        emit StrategyRemoved(address(strategy));
     }
 
     function updateStrategy(
         IStrategy strategy,
-        uint256 newMinShares,
         address newPriceFeed
     ) external onlyOwner {
         require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
 
-        strategyConfigs[strategy].minShares = newMinShares;
         strategyConfigs[strategy].priceFeed = newPriceFeed;
 
-        emit StrategyUpdated(strategy, newMinShares, newPriceFeed);
+        emit StrategyUpdated(address(strategy), newPriceFeed);
     }
 
     function setMinCollateralUsd(uint256 _minCollateralUsd) external onlyOwner {
@@ -373,6 +366,11 @@ contract ServiceManager is
         emit OperatorSetIdUpdated(previousId, _operatorSetId);
     }
 
+    function setAVSRegistrar(IAVSRegistrar registrar) external onlyOwner {
+        _allocationManager.setAVSRegistrar(address(this), registrar);
+        emit AVSRegistrarSet(address(registrar));
+    }
+
     function getAllocatedMagnitude(
         address operator,
         IStrategy strategy
@@ -384,7 +382,7 @@ contract ServiceManager is
 
         return
             uint256(
-                allocationManager
+                _allocationManager
                     .getAllocation(operator, operatorSet, strategy)
                     .currentMagnitude
             );
@@ -396,10 +394,10 @@ contract ServiceManager is
     ) external view returns (uint256) {
         return
             uint256(
-                allocationManager.getEncumberedMagnitude(operator, strategy)
+                _allocationManager.getEncumberedMagnitude(operator, strategy)
             ) +
             uint256(
-                allocationManager.getAllocatableMagnitude(operator, strategy)
+                _allocationManager.getAllocatableMagnitude(operator, strategy)
             );
     }
 
@@ -409,49 +407,62 @@ contract ServiceManager is
         address operator,
         ISignatureUtilsMixinTypes.SignatureWithSaltAndExpiry
             memory operatorSignature
-    ) public override onlyOwner {
+    ) public override onlyRegistryCoordinator {
         _avsDirectory.registerOperatorToAVS(operator, operatorSignature);
         emit OperatorRegisteredToAVS(operator);
     }
 
     function deregisterOperatorFromAVS(
         address operator
-    ) public override onlyOwner {
+    ) public override onlyRegistryCoordinator {
         _avsDirectory.deregisterOperatorFromAVS(operator);
         emit OperatorDeregisteredFromAVS(operator);
     }
 
+    function deregisterOperatorFromOperatorSets(
+        address operator,
+        uint32[] memory operatorSetIds
+    )
+        public
+        override(ServiceManagerBase, IServiceManager)
+        onlyRegistryCoordinator
+    {
+        super.deregisterOperatorFromOperatorSets(operator, operatorSetIds);
+
+        for (uint256 i = 0; i < operatorSetIds.length; i++) {
+            if (operatorSetIds[i] == operatorSetId) {
+                registeredOperators[operator] = false;
+                operatorInfos[operator].isLicensed = false;
+            }
+        }
+    }
+
     function registerCiphernode() external nonReentrant {
-        require(!registeredOperators[msg.sender], OperatorNotRegistered());
+        require(
+            !registeredOperators[msg.sender],
+            "Already registered as ciphernode"
+        );
         require(operatorInfos[msg.sender].isLicensed, NotLicensed());
 
-        // 1. Verify operator is registered with EigenLayer DelegationManager
+        // 1. Verify operator registration
         require(
             delegationManager.isOperator(msg.sender),
             OperatorNotRegistered()
         );
 
         // 2. Check license stake is still sufficient
-        uint256 enclShares = strategyManager.stakerDepositShares(
-            msg.sender,
-            enclStrategy
-        );
+        uint256 enclShares = getOperatorShares(msg.sender, enclStrategy);
         uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
         require(enclAmount >= licenseStake, InsufficientLicenseStake());
 
-        // 3. Check collateral requirements based on allocated stake
+        // 3. Check collateral requirements
         (bool isEligible, uint256 collateralUsd) = checkOperatorEligibility(
             msg.sender
         );
         require(isEligible, InsufficientCollateral());
 
-        // 4. Register with our system
         registeredOperators[msg.sender] = true;
-
-        // 5. Register with bonding manager
         bondingManager.registerOperator(msg.sender, collateralUsd);
-
-        // 6. Add to ciphernode registry
         ciphernodeRegistry.addCiphernode(msg.sender);
 
         emit CiphernodeRegistered(msg.sender, collateralUsd);
@@ -474,66 +485,82 @@ contract ServiceManager is
     function addSlasher(address slasher) external onlyOwner {
         require(slasher != address(0), ZeroAddress());
         slashers[slasher] = true;
+        emit SlasherAdded(slasher);
     }
 
     function removeSlasher(address slasher) external onlyOwner {
         slashers[slasher] = false;
+        emit SlasherRemoved(slasher);
     }
 
     function slashOperator(
         address operator,
-        uint256 slashingPercentage,
-        string calldata reason
+        uint256 wadToSlash,
+        string calldata description
     ) external nonReentrant {
         require(slashers[msg.sender], NotAuthorizedSlasher());
         require(registeredOperators[operator], OperatorNotRegistered());
-        require(slashingPercentage <= 10000, InvalidSlashingPercentage());
+        require(wadToSlash <= 1e18 && wadToSlash > 0, "wad out of range");
+        require(allowedStrategies.length > 0, "No strategies configured");
 
-        // Calculate slashing for all strategies (including ENCL and USDC)
-        (
-            IStrategy[] memory strategies,
-            uint256[] memory wadsToSlash
-        ) = _calculateSlashingWads(operator, slashingPercentage);
+        // Filter to strategies where operator has shares
+        IStrategy[] memory tmpStrategies = new IStrategy[](
+            allowedStrategies.length
+        );
+        uint256 count = 0;
 
-        if (strategies.length > 0) {
-            // Create slashing parameters for EigenLayer AllocationManager
-            IAllocationManagerTypes.SlashingParams
-                memory slashingParams = IAllocationManagerTypes.SlashingParams({
-                    operator: operator,
-                    operatorSetId: operatorSetId,
-                    strategies: strategies,
-                    wadsToSlash: wadsToSlash,
-                    description: reason
-                });
-
-            try
-                allocationManager.slashOperator(address(this), slashingParams)
-            returns (uint256 slashId, uint256[] memory slashedShares) {
-                emit OperatorSlashed(
-                    operator,
-                    slashingPercentage,
-                    reason,
-                    strategies,
-                    slashedShares
-                );
-
-                // Check if operator still meets license requirements after slashing
-                _checkAndUpdateLicenseStatus(operator);
-
-                // Update collateral in bonding manager
-                (
-                    bool isEligible,
-                    uint256 newCollateralUsd
-                ) = checkOperatorEligibility(operator);
-                if (isEligible) {
-                    bondingManager.updateOperatorCollateral(
-                        operator,
-                        newCollateralUsd
-                    );
-                }
-            } catch Error(string memory errorMsg) {
-                revert(string(abi.encodePacked("Slashing failed: ", errorMsg)));
+        for (uint256 i = 0; i < allowedStrategies.length; i++) {
+            if (getOperatorShares(operator, allowedStrategies[i]) > 0) {
+                tmpStrategies[count] = allowedStrategies[i];
+                count++;
             }
+        }
+
+        require(count > 0, "Operator has no stake in any strategy");
+
+        IStrategy[] memory strategies = new IStrategy[](count);
+        uint256[] memory wadsToSlash = new uint256[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            strategies[i] = tmpStrategies[i];
+            wadsToSlash[i] = wadToSlash;
+        }
+
+        IAllocationManagerTypes.SlashingParams
+            memory params = IAllocationManagerTypes.SlashingParams({
+                operator: operator,
+                operatorSetId: operatorSetId,
+                strategies: strategies,
+                wadsToSlash: wadsToSlash,
+                description: description
+            });
+
+        try _allocationManager.slashOperator(address(this), params) returns (
+            uint256 /* slashId */,
+            uint256[] memory slashedShares
+        ) {
+            emit OperatorSlashed(
+                operator,
+                wadToSlash,
+                description,
+                strategies,
+                slashedShares
+            );
+
+            _checkAndUpdateLicenseStatus(operator);
+
+            (
+                bool isEligible,
+                uint256 newCollateralUsd
+            ) = checkOperatorEligibility(operator);
+            if (isEligible) {
+                bondingManager.updateOperatorCollateral(
+                    operator,
+                    newCollateralUsd
+                );
+            }
+        } catch Error(string memory errorMsg) {
+            revert(string(abi.encodePacked("Slashing failed: ", errorMsg)));
         }
     }
 
@@ -546,11 +573,6 @@ contract ServiceManager is
         rewardDistributor = _rewardDistributor;
     }
 
-    /**
-     * @notice Distribute rewards to operators
-     * @param recipients Array of operator addresses
-     * @param amounts Array of reward amounts in ENCL tokens
-     */
     function distributeRewards(
         address[] calldata recipients,
         uint256[] calldata amounts
@@ -569,11 +591,6 @@ contract ServiceManager is
         }
     }
 
-    /**
-     * @notice Use tickets for committee selection (called by registry filter)
-     * @param operator Operator using tickets
-     * @param ticketCount Number of tickets to use
-     */
     function useTickets(address operator, uint256 ticketCount) external {
         require(msg.sender == address(ciphernodeRegistry), "Only registry");
         require(
@@ -599,8 +616,13 @@ contract ServiceManager is
     ) public view returns (uint256 totalUsdValue) {
         for (uint256 i = 0; i < allowedStrategies.length; i++) {
             IStrategy strategy = allowedStrategies[i];
-            uint256 shares = getOperatorShares(operator, strategy);
 
+            // Skip ENCL strategy - license tokens don't count as collateral
+            if (strategy == enclStrategy) {
+                continue;
+            }
+
+            uint256 shares = getOperatorShares(operator, strategy);
             if (shares > 0) {
                 totalUsdValue += _convertSharesToUsd(strategy, shares);
             }
@@ -611,7 +633,14 @@ contract ServiceManager is
         address operator,
         IStrategy strategy
     ) public view returns (uint256 shares) {
-        return strategyManager.stakerDepositShares(operator, strategy);
+        // Use delegated shares (operator stake) instead of self-deposits
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = strategy;
+        uint256[] memory operatorShares = delegationManager.getOperatorShares(
+            operator,
+            strategies
+        );
+        return operatorShares[0];
     }
 
     function isStrategyAllowed(
@@ -630,9 +659,9 @@ contract ServiceManager is
 
     function getStrategyConfig(
         IStrategy strategy
-    ) external view returns (uint256 minShares, address priceFeed) {
+    ) external view returns (address priceFeed) {
         StrategyConfig memory config = strategyConfigs[strategy];
-        return (config.minShares, config.priceFeed);
+        return config.priceFeed;
     }
 
     function getMinCollateralUsd() external view returns (uint256) {
@@ -657,16 +686,21 @@ contract ServiceManager is
         return ticketPrice;
     }
 
+    function getAvailableTicketBudget(
+        address operator
+    ) external view returns (uint256) {
+        uint256 usdcShares = getOperatorShares(operator, usdcStrategy);
+        uint256 usdcAmount = usdcStrategy.sharesToUnderlyingView(usdcShares);
+        uint256 alreadySpent = ticketBudgetSpent[operator];
+        return usdcAmount > alreadySpent ? usdcAmount - alreadySpent : 0;
+    }
+
     // ============ Internal Functions ============
 
     function _checkAndUpdateLicenseStatus(address operator) internal {
         if (!operatorInfos[operator].isLicensed) return;
 
-        // Check if ENCL stake is still sufficient after slashing
-        uint256 enclShares = strategyManager.stakerDepositShares(
-            operator,
-            enclStrategy
-        );
+        uint256 enclShares = getOperatorShares(operator, enclStrategy);
         uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
 
         if (enclAmount < licenseStake) {
@@ -682,10 +716,7 @@ contract ServiceManager is
             }
 
             emit LicenseRevoked(operator);
-        }
-
-        // Check if stake dropped below 50% (decomission threshold)
-        if (enclAmount < (operatorInfos[operator].licenseStake / 2)) {
+        } else if (enclAmount < (operatorInfos[operator].licenseStake / 2)) {
             // Initiate decommission process
             operatorInfos[operator].isLicensed = false;
             if (registeredOperators[operator]) {
@@ -706,11 +737,19 @@ contract ServiceManager is
         uint256 underlyingAmount = strategy.sharesToUnderlyingView(shares);
 
         if (config.priceFeed == address(0)) {
-            // Treat as stablecoin (e.g., USDC)
-            usdValue = underlyingAmount * (10 ** (18 - config.decimals));
+            usdValue = Math.mulDiv(
+                underlyingAmount,
+                1e18,
+                10 ** config.decimals
+            );
         } else {
             uint256 price = _getTokenPrice(config.priceFeed);
-            usdValue = (underlyingAmount * price) / (10 ** config.decimals);
+
+            usdValue = Math.mulDiv(
+                underlyingAmount,
+                price,
+                10 ** config.decimals
+            );
         }
     }
 
@@ -731,42 +770,19 @@ contract ServiceManager is
                     block.timestamp - updatedAt <= PRICE_STALENESS_THRESHOLD,
                 "Invalid or stale price"
             );
-            return uint256(answer) * 1e10; // Convert to 18 decimals
+
+            uint8 feedDecimals = feed.decimals();
+            uint256 rawPrice = uint256(answer);
+
+            if (feedDecimals < 18) {
+                return rawPrice * (10 ** (18 - feedDecimals));
+            } else if (feedDecimals > 18) {
+                return rawPrice / (10 ** (feedDecimals - 18));
+            } else {
+                return rawPrice;
+            }
         } catch {
             revert("Price feed error");
-        }
-    }
-
-    function _calculateSlashingWads(
-        address operator,
-        uint256 slashingPercentage
-    )
-        internal
-        view
-        returns (IStrategy[] memory strategies, uint256[] memory wadsToSlash)
-    {
-        uint256 strategiesCount = 0;
-        for (uint256 i = 0; i < allowedStrategies.length; i++) {
-            if (getOperatorShares(operator, allowedStrategies[i]) > 0) {
-                strategiesCount++;
-            }
-        }
-
-        strategies = new IStrategy[](strategiesCount);
-        wadsToSlash = new uint256[](strategiesCount);
-
-        uint256 index = 0;
-        uint256 slashingWad = (slashingPercentage * 1e18) / 10000;
-
-        for (uint256 i = 0; i < allowedStrategies.length; i++) {
-            IStrategy strategy = allowedStrategies[i];
-            uint256 shares = getOperatorShares(operator, strategy);
-
-            if (shares > 0) {
-                strategies[index] = strategy;
-                wadsToSlash[index] = slashingWad;
-                index++;
-            }
         }
     }
 }
