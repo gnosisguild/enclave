@@ -32,7 +32,7 @@ sequenceDiagram
     K ->>+ K: pvw::encrypt(sk_sss, esi_sss)
     K ->>- L: PublishDocument (shares)
     L --)+ K: DocumentReceived (shares)
-    K ->>- K: extract_collected_sss()
+    K ->>- K: extract_collected_sss(pvw::decrypt())
     K ->>+ M: ComputeRequest(TrBFV::GenDecryptionKey)
     M ->> M: trbfv::gen_decryption_key()
     M --)- K: ComputeResponse(TrBFV::GenDecryptionKey)
