@@ -3,13 +3,9 @@ members = [
   "server",
   "wasm-crypto",
   ".enclave/support/dev",
-  "program/host",
   "program/core",
-  "program/methods",
-  "program/app",
   "program/client",
 ]
-exclude = ["program/methods/guests"]
 resolver = "3"
 
 [workspace.package]
@@ -20,9 +16,7 @@ description = "CRISP — Voting Application on Enclave"
 repository = "https://github.com/gnosisguild/enclave"
 
 [workspace.dependencies]
-voting-host = { path = "./program/host" }
 voting-core = { path = "./program/core" }
-methods = { path = "./program/methods" }
 program-client = { path = "./program/client" }
 
 alloy-primitives = { version = "=1.3.0", default-features = false, features = [

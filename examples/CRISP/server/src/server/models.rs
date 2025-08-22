@@ -7,6 +7,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct WebhookPayload {
+    pub e3_id: u64,
+    pub ciphertext: Vec<u8>,
+    pub proof: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct JsonResponse {
     pub response: String,
 }

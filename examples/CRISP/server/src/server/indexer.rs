@@ -71,29 +71,32 @@ pub async fn register_e3_activated(
                     info!("Starting computation for E3: {}", e3_id);
                     repo.update_status("Computing").await?;
 
-                    let (risc0_output, ciphertext) =
-                        run_compute(fhe_inputs.params, fhe_inputs.ciphertexts)
-                            .await
-                            .map_err(|e| eyre::eyre!("Error running compute: {e}"))?;
+                    // call /run_compute 
+                    // 0.0.0.0:13151 
+                    // pub e3_id: Option<u64>,
+                    // #[serde(deserialize_with = "deserialize_hex_string")]
+                    // pub params: Vec<u8>,
+                    // #[serde(deserialize_with = "deserialize_hex_tuple")]
+                    // pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
+                    // pub callback_url: Option<String>,
 
-                    info!("Computation completed for E3: {}", e3_id);
-                    info!("RISC0 Output: {:?}", risc0_output);
+                    // @todo store the callback url on a const somewhere
+                    let (id, status) =
+                        run_compute(e3_id, fhe_inputs.params, fhe_inputs.ciphertexts, "127.0.0.1:4000/state/result".to_string())
+                            .await
+                            .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
+
+                    if id != e3_id {
+                        return Err(eyre::eyre!("Computation request returned unexpected E3 ID: expected {}, got {}", e3_id, id).into());
+                    }
+
+                    if status != "processing" {
+                        return Err(eyre::eyre!("Computation request failed with status: {}", status).into());
+                    }
+
+                    info!("Request Computation for E3: {}", e3_id);
 
                     repo.update_status("PublishingCiphertext").await?;
-
-                    let tx = contract
-                        .clone()
-                        .publish_ciphertext_output(
-                            event.e3Id,
-                            ciphertext.into(),
-                            risc0_output.into(),
-                        )
-                        .await?;
-
-                    info!(
-                        "CiphertextOutputPublished event published with tx: {:?}",
-                        tx.transaction_hash
-                    );
                 } else {
                     info!("E3 has no votes to decrypt. Setting status to Finished.");
                     repo.update_status("Finished").await?;

@@ -4,19 +4,75 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::app_data::AppData;
-use crate::server::models::GetRoundRequest;
+use crate::server::{
+    app_data::AppData,
+    models::{GetRoundRequest, WebhookPayload},
+    CONFIG,
+};
+use alloy::primitives::U256;
 use actix_web::{web, HttpResponse, Responder};
 use log::{error, info};
+use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
         web::scope("/state")
             .route("/result", web::post().to(get_round_result))
             .route("/all", web::get().to(get_all_round_results))
-            .route("/lite", web::post().to(get_round_state_lite)),
+            .route("/lite", web::post().to(get_round_state_lite))
+            // This endpoint should be protected to only accept callbacks from a known program server
+            .route("/result", web::post().to(handle_program_server_result)),
     );
 }
+
+
+/// Webhook callback from program server
+/// 
+/// # Arguments
+/// * `data` - The request data containing the result from the program server
+/// 
+/// # Returns
+/// * A JSON response indicating the success of the operation
+async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl Responder {
+    let incoming = data.into_inner();
+
+    info!("Received program server result: {:?}", incoming.e3_id);
+
+    // call the contract to publish output 
+    let contract: EnclaveContract<ReadWrite> = match EnclaveContractFactory::create_write(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.enclave_address,
+    ).await {
+        Ok(contract) => contract,
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .json(format!("Failed to create contract: {}", e));
+        }
+    };
+
+    let tx = contract.publish_ciphertext_output(
+        U256::from(incoming.e3_id),
+        incoming.ciphertext.into(),
+        incoming.proof.into(),
+    ).await;
+
+    // Handle the result of the transaction
+    if let Err(e) = tx {
+        error!("Failed to publish ciphertext output: {:?}", e);
+        return HttpResponse::InternalServerError().json(format!(
+            "Failed to publish ciphertext output: {:?}",
+            e
+        ));
+    }
+    info!("Ciphertext output published successfully for E3 ID: {}", incoming.e3_id);
+    // Return a success response    
+    HttpResponse::Ok().json(format!(
+        "Ciphertext output published successfully for E3 ID: {}",
+        incoming.e3_id
+    ))
+}
+
 
 /// Get the result for a given round
 ///

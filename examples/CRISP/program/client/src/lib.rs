@@ -9,32 +9,38 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct ComputeRequest {
+    pub e3_id: u64,
     pub params: Vec<u8>,
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
+    pub webhook_url: String,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct ComputeResponse {
-    pub ciphertext: Vec<u8>,
-    pub proof: Vec<u8>,
+    pub status: String,
+    pub e3_id: u64,
 }
 
 pub async fn run_compute(
+    e3_id: u64,
     params: Vec<u8>,
     ciphertext_inputs: Vec<(Vec<u8>, u64)>,
-) -> Result<(Vec<u8>, Vec<u8>)> {
+    webhook_url: String,
+) -> Result<(u64, String)> {
     let request = ComputeRequest {
+        e3_id,
+        webhook_url,
         params,
         ciphertext_inputs,
     };
 
     let response: ComputeResponse = reqwest::Client::new()
-        .post("http://127.0.0.1:4001/run_compute")
+        .post("http://127.0.0.1:13151/run_compute")
         .json(&request)
         .send()
         .await?
         .json()
         .await?;
 
-    Ok((response.proof, response.ciphertext))
+    Ok((response.e3_id, response.status))
 }
