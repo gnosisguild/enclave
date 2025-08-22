@@ -49,13 +49,13 @@ sequenceDiagram
 
   rect rgb(230, 245, 255)
     Note over P,M: Plaintext Aggregation
+    L --)+ P: DecryptionShareCreated
     L --) P: DecryptionShareCreated
     L --) P: DecryptionShareCreated
-    L --) P: DecryptionShareCreated
-    P ->> M: ComputeRequest(TrBFV::ThresholdDecrypt)
+    P ->>+ M: ComputeRequest(TrBFV::ThresholdDecrypt)
     M ->> M: trbfv::threshold_decrypt()
-    M ->> P: ComputeResponse(TrBFV::ThresholdDecrypt)
-    P ->> E: PlaintextAggregated
+    M ->>- P: ComputeResponse(TrBFV::ThresholdDecrypt)
+    P ->>- E: PlaintextAggregated
   end
 
   autonumber
