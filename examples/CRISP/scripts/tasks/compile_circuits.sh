@@ -15,11 +15,11 @@ fi
 
 # Create the public circuits directory
 echo "Creating public circuits directory..."
-mkdir -p apps/client/libs/noir
+mkdir -p client/libs/noir
 
 # Copy the compiled artifacts
 echo "Copying circuit artifacts..."
-if ! cp -r circuits/target/* apps/client/libs/noir/; then
+if ! cp -r circuits/target/* client/libs/noir/; then
     echo "Error: Failed to copy circuit artifacts"
     exit 1
 fi

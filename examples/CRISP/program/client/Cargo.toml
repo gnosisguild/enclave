@@ -7,3 +7,4 @@ edition.workspace = true
 serde.workspace = true
 reqwest.workspace = true
 anyhow.workspace = true
+hex.workspace = true 

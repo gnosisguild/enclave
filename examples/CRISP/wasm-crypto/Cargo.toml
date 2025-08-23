@@ -11,11 +11,11 @@ rust-version = "1.86.0"
 [dependencies]
 greco = { package = "e3-greco-generator", git = "https://github.com/gnosisguild/greco" } 
 web-sys = { version = "0.3.77", features = ["console"] }
-fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
-fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
-rand = "=0.8.5"
+fhe_rs.workspace = true
+fhe-traits.workspace = true
+fhe-math.workspace = true
+fhe-util.workspace = true
+rand.workspace = true
 e3-bfv-helpers = { path = "../../../crates/bfv-helpers" }
 num-bigint = "=0.4.6"
 num-traits = "=0.2.19"

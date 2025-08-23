@@ -1,13 +1,9 @@
 ############### stage 0: base-dev ###############
 ARG RUST_VERSION=1.86.0
-ARG RISC0_VERSION=2.1.0
-ARG RISC0_TOOLCHAIN=1.85.0
 ARG SKIP_SOLIDITY=0
 
 FROM rust:${RUST_VERSION}-slim-bullseye AS base-dev
 
-ENV RISC0_HOME=/root/.risc0
-ENV PATH="${RISC0_HOME}/bin:${PATH}"
 ENV CARGO_HOME=/usr/local/cargo
 
 RUN apt-get update && \
@@ -16,9 +12,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl -sSfL https://risczero.com/install | bash
-RUN rzup install rust ${RISC0_TOOLCHAIN}
-RUN rzup install r0vm ${RISC0_VERSION}
-RUN rzup install cargo-risczero ${RISC0_VERSION}
 
 RUN cargo install --locked cargo-chef
 
@@ -27,16 +20,19 @@ RUN cargo install --locked cargo-chef
 FROM base-dev AS chef
 WORKDIR /app
 
-COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
-COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
-COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
-COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
+# COPY examples/CRISP/.enclave/support/dev/Cargo.toml examples/CRISP/.enclave/support/dev/
+COPY examples/CRISP/server/Cargo.toml examples/CRISP/server/
+COPY examples/CRISP/program/Cargo.toml examples/CRISP/program/
+COPY examples/CRISP/program/client/Cargo.toml examples/CRISP/program/client/
+COPY examples/CRISP/program/core/Cargo.toml examples/CRISP/program/core/
+COPY examples/CRISP/wasm-crypto/Cargo.toml examples/CRISP/wasm-crypto/
+COPY examples/CRISP/Cargo.toml examples/CRISP/
+
 COPY crates/sdk/Cargo.toml crates/sdk/
 COPY Cargo.toml Cargo.lock ./
 COPY crates/compute-provider/Cargo.toml crates/compute-provider/
 
-WORKDIR /app/examples/CRISP/apps/server
+WORKDIR /app/examples/CRISP/server
 RUN cargo chef prepare --recipe-path recipe.json
 
 ############### stage 2: planner ###############
@@ -46,14 +42,11 @@ ARG SKIP_SOLIDITY
 ENV SKIP_SOLIDITY=${SKIP_SOLIDITY}
 
 WORKDIR /app
-COPY --from=chef /app/examples/CRISP/apps/server/recipe.json \
-    /app/examples/CRISP/apps/server/recipe.json
+COPY --from=chef /app/examples/CRISP/server/recipe.json \
+    /app/examples/CRISP/server/recipe.json
 
-COPY examples/CRISP/apps/server/Cargo.toml examples/CRISP/apps/server/Cargo.lock examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/Cargo.toml examples/CRISP/apps/program/
-COPY examples/CRISP/apps/program/host/Cargo.toml examples/CRISP/apps/program/host/
-COPY examples/CRISP/apps/program/core/Cargo.toml examples/CRISP/apps/program/core/
-COPY examples/CRISP/apps/program/methods/Cargo.toml examples/CRISP/apps/program/methods/
+COPY examples/CRISP/server/Cargo.toml examples/CRISP/server/Cargo.lock examples/CRISP/server/
+COPY examples/CRISP/program/core/Cargo.toml examples/CRISP/program/core/
 
 COPY Cargo.lock ./Cargo.lock
 COPY Cargo.toml ./Cargo.toml
@@ -86,15 +79,14 @@ COPY crates/test-helpers/Cargo.toml crates/test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml crates/tests/Cargo.toml
 COPY crates/wasm/Cargo.toml crates/wasm/Cargo.toml
 
-
 RUN set -eux; \
     find \
-    examples/CRISP/apps/program \
+    examples/CRISP/program \
     crates \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
     | while IFS= read -r -d '' manifest_path; do \
         crate_dir="$(dirname "$manifest_path")"; \
-        if [ "$manifest_path" = "examples/CRISP/apps/program/Cargo.toml" ]; then \
+        if [ "$manifest_path" = "examples/CRISP/program/Cargo.toml" ]; then \
             continue; \
         fi; \
         mkdir -p "$crate_dir/src"; \
@@ -103,7 +95,7 @@ RUN set -eux; \
         fi; \
     done
 
-WORKDIR /app/examples/CRISP/apps/server
+WORKDIR /app/examples/CRISP/server
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \
@@ -117,13 +109,16 @@ ENV SKIP_SOLIDITY=${SKIP_SOLIDITY}
 
 WORKDIR /app
 
-COPY examples/CRISP/apps/server/    examples/CRISP/apps/server/
-COPY examples/CRISP/apps/program/   examples/CRISP/apps/program/
+COPY examples/CRISP/.enclave/   examples/CRISP/.enclave/
+COPY examples/CRISP/server/    examples/CRISP/server/
+COPY examples/CRISP/program/   examples/CRISP/program/
+COPY examples/CRISP/wasm-crypto/   examples/CRISP/wasm-crypto/
+COPY examples/CRISP/Cargo.*    examples/CRISP/
 COPY Cargo.*                        ./
 COPY crates/           crates/
 COPY crates/compute-provider/     crates/compute-provider/
 
-WORKDIR /app/examples/CRISP/apps/server
+WORKDIR /app/examples/CRISP
 RUN --mount=type=cache,id=cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=cargo-target,target=/app/target,sharing=locked \

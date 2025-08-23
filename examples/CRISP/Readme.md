@@ -84,7 +84,7 @@ To set up the CRISP dApp in your local environment, follow these steps:
 1. Navigate to the `client` directory:
 
    ```sh
-   cd CRISP/client
+   cd examples/CRISP/client
    ```
 
 2. Install dependencies:

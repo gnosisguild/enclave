@@ -4,10 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Arc;
-
 use e3_sdk::indexer::SharedStore;
-use tokio::sync::RwLock;
 
 use super::{
     database::SledDB,

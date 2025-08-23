@@ -12,10 +12,10 @@ services:
       - git-folder:/app/.git
       - cargo-bin:/home/ubuntu/.cargo/bin
       - cargo-registry:/home/ubuntu/.cargo/registry
-      - server-target:/app/examples/CRISP/apps/server/target
+      - server-target:/app/examples/CRISP/server/target
       - evm-node-modules:/app/packages/evm/node_modules
       - root-node-modules:/app/node_modules
-      - client-node-modules:/app/examples/CRISP/apps/client/node_modules
+      - client-node-modules:/app/examples/CRISP/client/node_modules
       - crisp-node-modules:/app/examples/CRISP/node_modules
       - crisp-foundry-cache:/app/examples/CRISP/out
       - synpress-cache:/app/examples/CRISP/.cache-synpress

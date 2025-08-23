@@ -5,18 +5,42 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct ComputeRequest {
-    pub e3_id: u64,
+    pub e3_id: Option<u64>,
+    #[serde(serialize_with = "serialize_as_hex")]
     pub params: Vec<u8>,
+    #[serde(serialize_with = "serialize_hex_tuple")]
     pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
-    pub webhook_url: String,
+    pub callback_url: Option<String>,
+}
+
+fn serialize_as_hex<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let hex_string = format!("0x{}", hex::encode(bytes));
+    serializer.serialize_str(&hex_string)
+}
+
+fn serialize_hex_tuple<S>(
+    tuples: &Vec<(Vec<u8>, u64)>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let hex_tuples: Vec<(String, u64)> = tuples
+        .iter()
+        .map(|(bytes, num)| (format!("0x{}", hex::encode(bytes)), *num))
+        .collect();
+    hex_tuples.serialize(serializer)
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct ComputeResponse {
+pub struct ProcessingResponse {
     pub status: String,
     pub e3_id: u64,
 }
@@ -28,13 +52,15 @@ pub async fn run_compute(
     webhook_url: String,
 ) -> Result<(u64, String)> {
     let request = ComputeRequest {
-        e3_id,
-        webhook_url,
+        e3_id: Some(e3_id),
+        callback_url: Some(webhook_url),
         params,
         ciphertext_inputs,
     };
 
-    let response: ComputeResponse = reqwest::Client::new()
+    println!("Sending request");
+
+    let response: ProcessingResponse = reqwest::Client::new()
         .post("http://127.0.0.1:13151/run_compute")
         .json(&request)
         .send()

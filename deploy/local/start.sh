@@ -89,7 +89,7 @@ deploy_contracts() {
     
     # Clean up local database
     echo "   Cleaning up local database..."
-    rm -rf ./examples/CRISP/apps/server/database
+    rm -rf ./examples/CRISP/server/database
     
     echo "✅ Contracts deployed successfully!"
 }

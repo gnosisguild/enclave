@@ -1848,6 +1848,7 @@ dependencies = [
  "alloy",
  "alloy-primitives",
  "alloy-sol-types",
+ "anyhow",
  "async-trait",
  "bincode",
  "chrono",
@@ -4152,6 +4153,7 @@ name = "program-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "hex",
  "reqwest",
  "serde",
 ]
