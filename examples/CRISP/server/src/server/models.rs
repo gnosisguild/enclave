@@ -4,13 +4,25 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use serde::{Deserialize, Serialize};
+use anyhow::Result;
+use serde::{Deserialize, Deserializer, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Debug)]
 pub struct WebhookPayload {
     pub e3_id: u64,
+    #[serde(deserialize_with = "deserialize_hex_string")]
     pub ciphertext: Vec<u8>,
+    #[serde(deserialize_with = "deserialize_hex_string")]
     pub proof: Vec<u8>,
+}
+
+pub fn deserialize_hex_string<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    let hex_str = s.strip_prefix("0x").unwrap_or(&s);
+    hex::decode(hex_str).map_err(serde::de::Error::custom)
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -9,7 +9,7 @@ use crate::server::{
     models::{GetRoundRequest, WebhookPayload},
     CONFIG,
 };
-use alloy::primitives::U256;
+use alloy::primitives::{U256, Bytes};
 use actix_web::{web, HttpResponse, Responder};
 use log::{error, info};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite};
@@ -20,11 +20,11 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
             .route("/result", web::post().to(get_round_result))
             .route("/all", web::get().to(get_all_round_results))
             .route("/lite", web::post().to(get_round_state_lite))
-            // This endpoint should be protected to only accept callbacks from a known program server
-            .route("/result", web::post().to(handle_program_server_result)),
+            // Do we need protection on this endpoint? technically they would need to send a valid proof for it to 
+            // be included on chain 
+            .route("/add-result", web::post().to(handle_program_server_result)),
     );
 }
-
 
 /// Webhook callback from program server
 /// 
@@ -36,37 +36,42 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
 async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl Responder {
     let incoming = data.into_inner();
 
-    info!("Received program server result: {:?}", incoming.e3_id);
+    info!("Received program server result for E3 ID: {:?}", incoming.e3_id);
 
-    // call the contract to publish output 
+    // Create the contract
     let contract: EnclaveContract<ReadWrite> = match EnclaveContractFactory::create_write(
         &CONFIG.http_rpc_url,
-        &CONFIG.private_key,
         &CONFIG.enclave_address,
+        &CONFIG.private_key,
     ).await {
         Ok(contract) => contract,
         Err(e) => {
+            info!("Failed to create contract: {:?}", e);
             return HttpResponse::InternalServerError()
                 .json(format!("Failed to create contract: {}", e));
         }
     };
 
-    let tx = contract.publish_ciphertext_output(
-        U256::from(incoming.e3_id),
-        incoming.ciphertext.into(),
-        incoming.proof.into(),
-    ).await;
+    // Try the direct call
+    let tx_result = contract
+        .publish_ciphertext_output(
+            U256::from(incoming.e3_id),
+            Bytes::from(incoming.ciphertext.clone()),
+            Bytes::from(incoming.proof.clone()),
+        )
+        .await;
 
-    // Handle the result of the transaction
-    if let Err(e) = tx {
-        error!("Failed to publish ciphertext output: {:?}", e);
-        return HttpResponse::InternalServerError().json(format!(
-            "Failed to publish ciphertext output: {:?}",
-            e
-        ));
-    }
-    info!("Ciphertext output published successfully for E3 ID: {}", incoming.e3_id);
-    // Return a success response    
+    let pending_tx = match tx_result {
+        Ok(tx) => tx,
+        Err(e) => {
+            error!("Failed to send transaction: {:?}", e);
+            return HttpResponse::InternalServerError()
+                .json(format!("Failed to send transaction: {}", e));
+        }
+    };
+
+    info!("Ciphertext output published successfully for E3 ID: {} with tx: {}", incoming.e3_id, pending_tx.transaction_hash);
+    
     HttpResponse::Ok().json(format!(
         "Ciphertext output published successfully for E3 ID: {}",
         incoming.e3_id

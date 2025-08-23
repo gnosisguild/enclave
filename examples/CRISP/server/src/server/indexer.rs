@@ -7,8 +7,8 @@
 use crate::server::{
     models::CurrentRound,
     repo::{CrispE3Repository, CurrentRoundRepository},
+    CONFIG,
 };
-use e3_compute_provider::FHEInputs;
 use e3_sdk::{
     evm_helpers::{
         contracts::{
@@ -24,7 +24,6 @@ use e3_sdk::{
 use log::info;
 use program_client::run_compute;
 use std::error::Error;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
 
@@ -32,9 +31,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
 pub async fn register_e3_activated(
     mut indexer: EnclaveIndexer<impl DataStore>,
-    contract: EnclaveContract<ReadWrite>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
-    let contract = Arc::new(contract);
     // E3Activated
     indexer
         .add_event_handler(move |event: E3Activated, store| {
@@ -42,7 +39,7 @@ pub async fn register_e3_activated(
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
             let mut current_round_repo = CurrentRoundRepository::new(store);
             let expiration = event.expiration.to::<u64>();
-            let contract = contract.clone();
+            
             info!("Handling E3 request with id {}", e3_id);
             async move {
                 repo.initialize_round().await?;
@@ -63,26 +60,11 @@ pub async fn register_e3_activated(
                 repo.update_status("Expired").await?;
 
                 if repo.get_vote_count().await? > 0 {
-                    let fhe_inputs = FHEInputs {
-                        params: e3.e3_params,
-                        ciphertexts: e3.ciphertext_inputs,
-                    };
-
                     info!("Starting computation for E3: {}", e3_id);
                     repo.update_status("Computing").await?;
 
-                    // call /run_compute 
-                    // 0.0.0.0:13151 
-                    // pub e3_id: Option<u64>,
-                    // #[serde(deserialize_with = "deserialize_hex_string")]
-                    // pub params: Vec<u8>,
-                    // #[serde(deserialize_with = "deserialize_hex_tuple")]
-                    // pub ciphertext_inputs: Vec<(Vec<u8>, u64)>,
-                    // pub callback_url: Option<String>,
-
-                    // @todo store the callback url on a const somewhere
                     let (id, status) =
-                        run_compute(e3_id, fhe_inputs.params, fhe_inputs.ciphertexts, "127.0.0.1:4000/state/result".to_string())
+                        run_compute(e3_id, e3.e3_params, e3.ciphertext_inputs, format!("{}/state/add-result", CONFIG.enclave_server_url))
                             .await
                             .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
 
@@ -219,7 +201,7 @@ pub async fn start_indexer(
     // CRISP indexer
     let crisp_indexer =
         EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store).await?;
-    let crisp_indexer = register_e3_activated(crisp_indexer, readwrite_contract.clone()).await?;
+    let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
     crisp_indexer.start();
