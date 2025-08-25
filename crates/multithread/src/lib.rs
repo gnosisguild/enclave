@@ -1,8 +1,8 @@
 use actix::prelude::*;
 use actix::{Actor, Handler};
+use anyhow::Result;
 use e3_events::trbfv::TrBFVRequest;
 use e3_events::{ComputeRequest, ComputeRequested, EnclaveEvent};
-
 pub struct Multithread;
 
 impl Multithread {
@@ -26,10 +26,13 @@ impl Handler<EnclaveEvent> for Multithread {
 }
 
 impl Handler<ComputeRequested> for Multithread {
-    type Result = ();
+    type Result = ResponseFuture<Result<()>>;
+
     fn handle(&mut self, msg: ComputeRequested, _ctx: &mut Self::Context) -> Self::Result {
-        // XXX:
-        // handle_compute_request(msg.request)
+        Box::pin(async move {
+            let _ = handle_compute_request(msg.request).await;
+            Ok(())
+        })
     }
 }
 

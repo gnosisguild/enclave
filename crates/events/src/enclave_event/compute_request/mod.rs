@@ -40,7 +40,7 @@ pub enum ComputeRequestError {
 
 // Actix messages
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[rtype(result = "()")]
+#[rtype(result = "anyhow::Result<()>")]
 pub struct ComputeRequested {
     pub correlation_id: CorrelationId,
     pub request: ComputeRequest,
