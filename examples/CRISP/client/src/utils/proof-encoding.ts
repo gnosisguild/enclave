@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { hexToBytes, encodeAbiParameters, parseAbiParameters, bytesToHex } from 'viem';
-import { type SemaphoreNoirProof } from '@semaphore-protocol/core';
+import { type SemaphoreNoirProof } from '@hashcloak/semaphore-noir-proof';
 
 const abi = parseAbiParameters(
     '(uint256,uint256,uint256,uint256,uint256,bytes)'
