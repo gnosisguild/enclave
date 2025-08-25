@@ -22,3 +22,4 @@ serde = { workspace = true }
 sha2 = { workspace = true }
 tracing = { workspace = true }
 e3-crypto = { workspace = true }
+e3-trbfv = { workspace = true }

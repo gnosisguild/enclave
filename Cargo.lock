@@ -2701,6 +2701,7 @@ dependencies = [
  "bs58",
  "chrono",
  "e3-crypto",
+ "e3-trbfv",
  "futures-util",
  "once_cell",
  "serde",
@@ -2993,6 +2994,9 @@ dependencies = [
 [[package]]
 name = "e3-trbfv"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "e3-wasm"
