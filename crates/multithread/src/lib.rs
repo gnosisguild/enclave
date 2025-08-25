@@ -76,20 +76,16 @@ async fn handle_compute_request(request: ComputeRequest) {
             .await;
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(r)) => {
-            let _ = e3_trbfv::calculate_decryption_key(
+            let _ = e3_trbfv::calculate_decryption_share(
                 r.trbfv_config,
-                vec![], // XXX:
-                vec![], // XXX:
+                r.ciphertext, // XXX:
+                vec![],       // XXX:
+                vec![vec![]], // XXX:
             )
             .await;
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateThresholdDecryption(r)) => {
-            let _ = e3_trbfv::calculate_threshold_decryption(
-                r.trbfv_config,
-                r.ciphertext,
-                r.d_share_polys,
-            )
-            .await;
+            let _ = e3_trbfv::calculate_threshold_decryption(r.trbfv_config, r.d_share_polys).await;
         }
         _ => (),
     }

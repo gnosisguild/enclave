@@ -110,7 +110,6 @@ pub struct CalculateThresholdDecryptionResponse {
 }
 pub async fn calculate_threshold_decryption(
     trbfv_config: TrBFVConfig,
-    ciphertext: ArcBytes,
     d_share_polys: Vec<(PartyId, ArcBytes)>,
 ) -> CalculateThresholdDecryptionResponse {
     CalculateThresholdDecryptionResponse { plaintext: vec![] }

@@ -145,8 +145,6 @@ pub mod calculate_threshold_decyption {
     pub struct Request {
         /// TrBFV configuration
         pub trbfv_config: TrBFVConfig,
-        /// Ciphertext to decrypt
-        pub ciphertext: ArcBytes,
         /// All decryption shares from a threshold quorum of nodes polys.
         pub d_share_polys: Vec<(PartyId, ArcBytes)>,
     }
