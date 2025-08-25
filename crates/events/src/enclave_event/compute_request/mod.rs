@@ -42,21 +42,21 @@ pub enum ComputeRequestError {
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ComputeRequested {
-    correlation_id: CorrelationId,
-    request: ComputeRequest,
+    pub correlation_id: CorrelationId,
+    pub request: ComputeRequest,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ComputeRequestFailed {
-    correlation_id: CorrelationId,
-    request: ComputeRequest,
-    error: ComputeRequestError,
+    pub correlation_id: CorrelationId,
+    pub request: ComputeRequest,
+    pub error: ComputeRequestError,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ComputeRequestSucceeded {
-    correlation_id: CorrelationId,
-    response: ComputeResponse,
+    pub correlation_id: CorrelationId,
+    pub response: ComputeResponse,
 }

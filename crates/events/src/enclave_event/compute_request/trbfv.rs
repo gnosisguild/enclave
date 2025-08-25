@@ -17,9 +17,9 @@ use super::bytes::Bytes;
 pub enum TrBFVRequest {
     GenEsiSss(gen_esi_sss::Request),
     GenPkShareAndSkSss(gen_pk_share_and_sk_sss::Request),
-    GenDecryptionKey(gen_decryption_key::Request),
-    GenDecryptionShare(gen_decryption_share::Request),
-    ThresholdDecrypt(threshold_decrypt::Request),
+    CalculateDecryptionKey(calculate_decryption_key::Request),
+    CalculateDecryptionShare(calculate_decryption_share::Request),
+    CalculateThresholdDecryption(calculate_threshold_decyption::Request),
 }
 
 /// Result format for TrBFVResponse
@@ -27,9 +27,9 @@ pub enum TrBFVRequest {
 pub enum TrBFVResponse {
     GenEsiSss(gen_esi_sss::Response),
     GenPkShareAndSkSss(gen_pk_share_and_sk_sss::Response),
-    GenDecryptionKey(gen_decryption_key::Response),
-    GenDecryptionShare(gen_decryption_share::Response),
-    ThresholdDecrypt(threshold_decrypt::Response),
+    CalculateDecryptionKey(calculate_decryption_key::Response),
+    CalculateDecryptionShare(calculate_decryption_share::Response),
+    CalculateThresholdDecryption(calculate_threshold_decyption::Response),
 }
 
 /// Semantic PartyId
@@ -132,7 +132,7 @@ pub mod gen_pk_share_and_sk_sss {
     }
 }
 
-pub mod gen_decryption_key {
+pub mod calculate_decryption_key {
     /// This module defines event payloads that will generate the decryption key material to create a decryption share
     use e3_crypto::SensitiveBytes;
     use serde::{Deserialize, Serialize};
@@ -158,7 +158,7 @@ pub mod gen_decryption_key {
     }
 }
 
-pub mod gen_decryption_share {
+pub mod calculate_decryption_share {
     /// This module defines event payloads that will generate a decryption share for the given ciphertext for this node
     use crate::bytes::Bytes;
     use e3_crypto::SensitiveBytes;
@@ -184,7 +184,7 @@ pub mod gen_decryption_share {
         d_share_poly: Vec<Bytes>,
     }
 }
-pub mod threshold_decrypt {
+pub mod calculate_threshold_decyption {
     /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
     use super::{PartyId, TrBFVConfig};
     use crate::bytes::Bytes;

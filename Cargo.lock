@@ -2839,6 +2839,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-multithread"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "e3-crypto",
+ "e3-data",
+ "e3-events",
+ "e3-trbfv",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "e3-net"
 version = "0.1.0"
 dependencies = [
@@ -2975,6 +2989,10 @@ dependencies = [
  "rand_chacha 0.3.1",
  "tokio",
 ]
+
+[[package]]
+name = "e3-trbfv"
+version = "0.1.0"
 
 [[package]]
 name = "e3-wasm"

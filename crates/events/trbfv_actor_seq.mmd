@@ -34,7 +34,7 @@ sequenceDiagram
     L --)+ K: DocumentReceived (shares)
     K ->>- K: extract_collected_sss(pvw::decrypt())
     K ->>+ M: ComputeRequest(TrBFV::GenDecryptionKey)
-    M ->> M: trbfv::gen_decryption_key()
+    M ->> M: trbfv::calculate_decryption_key()
     M --)- K: ComputeResponse(TrBFV::GenDecryptionKey)
   end
 
@@ -42,7 +42,7 @@ sequenceDiagram
     Note over K,M: Generate Decryption Share
     E --) K: CiphertextOutputPublished
     K ->>+ M: ComputeRequest(TrBFV::GenDecryptionShare)
-    M ->> M: trbfv::gen_decryption_share()
+    M ->> M: trbfv::calculate_decryption_share()
     M --)- K: ComputeResponse(TrBFV::GenDecryptionShare)
     K ->> L: DecryptionShareCreated
   end
@@ -53,7 +53,7 @@ sequenceDiagram
     L --) P: DecryptionShareCreated
     L --) P: DecryptionShareCreated
     P ->>+ M: ComputeRequest(TrBFV::ThresholdDecrypt)
-    M ->> M: trbfv::threshold_decrypt()
+    M ->> M: trbfv::calculate_threshold_decryption()
     M ->>- P: ComputeResponse(TrBFV::ThresholdDecrypt)
     P ->>- E: PlaintextAggregated
   end

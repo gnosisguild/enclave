@@ -113,15 +113,23 @@ pub enum EnclaveEvent {
         id: EventId,
         data: Shutdown,
     },
+    ComputeRequested {
+        id: EventId,
+        data: ComputeRequested,
+    },
+    ComputeRequestFailed {
+        id: EventId,
+        data: ComputeRequestFailed,
+    },
+    ComputeRequestSucceeded {
+        id: EventId,
+        data: ComputeRequestSucceeded,
+    },
     /// This is a test event to use in testing
     TestEvent {
         id: EventId,
         data: TestEvent,
     },
-    // CommitteeSelected,
-    // OutputDecrypted,
-    // CiphernodeRegistered,
-    // CiphernodeDeregistered,
 }
 
 impl EnclaveEvent {
@@ -194,6 +202,9 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::EnclaveError { id, .. } => id,
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
+            EnclaveEvent::ComputeRequested { id, .. } => id,
+            EnclaveEvent::ComputeRequestSucceeded { id, .. } => id,
+            EnclaveEvent::ComputeRequestFailed { id, .. } => id,
             EnclaveEvent::TestEvent { id, .. } => id,
         }
     }
@@ -226,6 +237,9 @@ impl EnclaveEvent {
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
+            EnclaveEvent::ComputeRequested { data, .. } => format!("{:?}", data),
+            EnclaveEvent::ComputeRequestSucceeded { data, .. } => format!("{:?}", data),
+            EnclaveEvent::ComputeRequestFailed { data, .. } => format!("{:?}", data),
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
