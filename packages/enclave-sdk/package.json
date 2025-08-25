@@ -6,9 +6,14 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     }
   },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -30,6 +35,8 @@
     "vite-plugin-dts": "^4.5.3"
   },
   "dependencies": {
+    "@aztec/bb.js": "^0.82.2",
+    "@noir-lang/noir_js": "1.0.0-beta.3",
     "@gnosis-guild/e3-wasm": "workspace:*",
     "@gnosis-guild/enclave": "workspace:*",
     "comlink": "^4.4.2",

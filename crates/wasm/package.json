@@ -3,7 +3,9 @@
   "private": false,
   "version": "0.0.6-test",
   "description": "Wasm modules for enclave.",
-  "main": "index.js",
+  "main": "dist/nodejs/e3_wasm.js",
+  "module": "dist/web/e3_wasm.js",
+  "types": "dist/web/e3_wasm.d.ts",
   "files": [
     "dist/",
     "dist/**/*"
@@ -31,7 +33,8 @@
     "./init": {
       "node": {
         "types": "./init.d.ts",
-        "default": "./init_node.js"
+        "import": "./init_node.js",
+        "require": "./init_node.cjs"
       },
       "browser": {
         "types": "./init.d.ts",
@@ -39,6 +42,8 @@
       },
       "default": {
         "types": "./init.d.ts",
+        "import": "./init_node.js",
+        "require": "./init_node.cjs",
         "default": "./init_web.js"
       }
     }

@@ -22,8 +22,8 @@ use eyre::OptionExt;
 use indexer::start_indexer;
 use tokio::sync::RwLock;
 
-use crate::logger::init_logger;
 use crate::config::CONFIG;
+use crate::logger::init_logger;
 
 #[actix_web::main]
 pub async fn start() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

@@ -69,7 +69,7 @@ jobs:
         run: pnpm --version && pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        working-directory: ./examples/CRISP
+        working-directory: ./examples/CRISP/apps/client
         run: pnpm exec playwright install chromium
 
       - name: Run Playwright tests

@@ -12,7 +12,7 @@ This is because in modern node there is no need for preloading however in the br
 
 ```ts
 // Bad! Because this uses the raw loader which doesn't exist in node contexts
-import init, { encrypt_number } from "@gnosis-guild/e3-wasm";
+import init, { bfvEncryptNumber } from "@gnosis-guild/e3-wasm";
 ```
 
 ##### ✅ DO USE THE EXPORTED SUBMODULE
@@ -20,13 +20,16 @@ import init, { encrypt_number } from "@gnosis-guild/e3-wasm";
 ```ts
 // Good! Use the universal loader
 import init from "@gnosis-guild/e3-wasm/init";
-import { encrypt_number } from "@gnosis-guild/e3-wasm";
+import { bfvEncryptNumber } from "@gnosis-guild/e3-wasm";
 
-export async function encryptNumber(
+export async function bfvEncryptNumber(
   data: bigint,
   public_key: Uint8Array,
+  degree: number,
+  plaintext_modulus: bigint,
+  moduli: bigint,
 ): Promise<Uint8Array> {
   await init();
-  return encrypt_number(data, public_key);
+  return bfv_encrypt_number(data, public_key, degree, plaintext_modulus, moduli);
 }
 ```

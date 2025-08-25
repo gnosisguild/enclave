@@ -72,11 +72,10 @@ export const useVoteCasting = () => {
 
             const group = new Group(currentGroupMembers);
             const scope = String(roundState.id);
-            const message = String(pollSelected.value);
+            const message = "0";
             const merkleTreeDepth = 10;
             const noirBackend = await initSemaphoreNoirBackend(merkleTreeDepth);
             const fullProof: SemaphoreNoirProof = await generateNoirProof(semaphoreIdentity, group, message, scope, noirBackend, true);
-            console.log("Full generated proof object:", fullProof);
             const proofBytes = encodeSemaphoreProof(fullProof);
 
             const voteRequest: BroadcastVoteRequest = {
@@ -89,7 +88,6 @@ export const useVoteCasting = () => {
             };
 
             const broadcastVoteResponse = await broadcastVote(voteRequest);
-            console.log('broadcastVoteResponse', broadcastVoteResponse)
 
             if (broadcastVoteResponse) {
                 switch (broadcastVoteResponse.status) {
@@ -111,6 +109,11 @@ export const useVoteCasting = () => {
                         });
                         break;
                     case 'failed_broadcast':
+                        showToast({
+                            type: 'danger',
+                            message: 'Failed to broadcast the vote'
+                        })
+                        break;
                     default:
                         showToast({
                             type: 'danger',

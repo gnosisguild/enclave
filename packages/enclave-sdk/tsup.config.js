@@ -7,7 +7,31 @@
 import { defineConfig } from "tsup";
 import { baseConfig } from "@gnosis-guild/enclave-config/tsup";
 
-export default defineConfig({
-  ...baseConfig,
-  include: ["./src/**/*.ts"],
-});
+export default defineConfig([
+  {
+    ...baseConfig,
+    include: ["./src/**/*.ts"],
+    format: ["esm"],
+    outExtension: () => ({
+      js: ".js",
+    }),
+    esbuildOptions: (options) => {
+      options.alias = {
+        "@gnosis-guild/e3-wasm/init": "../../../crates/wasm/init_node.js",
+      };
+    },
+  },
+  {
+    ...baseConfig,
+    include: ["./src/**/*.ts"],
+    format: ["cjs"],
+    outExtension: () => ({
+      js: ".cjs",
+    }),
+    esbuildOptions: (options) => {
+      options.alias = {
+        "@gnosis-guild/e3-wasm/init": "../../../crates/wasm/init_node.cjs",
+      };
+    },
+  },
+]);
