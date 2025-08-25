@@ -72,7 +72,8 @@ export const useVoteCasting = () => {
 
             const group = new Group(currentGroupMembers);
             const scope = String(roundState.id);
-            const message = String(pollSelected.value);
+            // the message does not matter 
+            const message = "e3";
             const merkleTreeDepth = 10;
             const noirBackend = await initSemaphoreNoirBackend(merkleTreeDepth);
             const fullProof: SemaphoreNoirProof = await generateNoirProof(semaphoreIdentity, group, message, scope, noirBackend, true);
