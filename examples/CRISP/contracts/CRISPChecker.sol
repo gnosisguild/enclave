@@ -6,7 +6,7 @@
 pragma solidity >=0.8.27;
 
 import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphoreNoir.sol";
+import {ISemaphore} from "@hashcloak/semaphore-contracts-noir/interfaces/ISemaphoreNoir.sol";
 
 /// @title CRISPChecker.
 /// @notice Enclave Input Validator

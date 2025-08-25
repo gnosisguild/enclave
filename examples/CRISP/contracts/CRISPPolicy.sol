@@ -7,7 +7,7 @@ pragma solidity >=0.8.27;
 
 import {BasePolicy} from "@excubiae/contracts/policy/BasePolicy.sol";
 import {BaseChecker} from "@excubiae/contracts/checker/BaseChecker.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphoreNoir.sol";
+import {ISemaphore} from "@hashcloak/semaphore-contracts-noir/interfaces/ISemaphoreNoir.sol";
 
 /// @title CRISPPolicy
 /// @notice Policy contract for validating inputs based on Semaphore proofs and usage limits.
