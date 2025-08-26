@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::correlation_id::CorrelationId;
 use crate::events::NetCommand;
 use crate::events::NetEvent;
 use crate::NetInterface;
@@ -14,13 +13,16 @@ use actix::prelude::*;
 use anyhow::{bail, Result};
 use e3_crypto::Cipher;
 use e3_data::Repository;
-use e3_events::{EnclaveEvent, EventBus, EventId, Subscribe};
+use e3_events::{CorrelationId, EnclaveEvent, EventBus, EventId, Subscribe};
 use libp2p::identity::ed25519;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tracing::{error, info, instrument, trace};
+
+// TODO: store event filtering here on this actor instead of is_local_only() on the event. We
+// should do this as this functionality is not global and ramifications should stay local to here
 
 /// NetEventTranslator Actor converts between EventBus events and Libp2p events forwarding them to a
 /// NetInterface for propagation over the p2p network
