@@ -3,4 +3,10 @@
 	url = https://github.com/risc0/risc0-ethereum
 [submodule "templates/default/lib/risc0-ethereum"]
 	path = templates/default/lib/risc0-ethereum
-  url = https://github.com/gnosisguild/risc0-ethereum
+  	url = https://github.com/gnosisguild/risc0-ethereum
+[submodule "packages/evm/lib/eigenlayer-contracts"]
+	path = packages/evm/lib/eigenlayer-contracts
+	url = https://github.com/Layr-Labs/eigenlayer-contracts.git
+[submodule "packages/evm/lib/eigenlayer-middleware"]
+	path = packages/evm/lib/eigenlayer-middleware
+	url = https://github.com/Layr-Labs/eigenlayer-middleware.git
