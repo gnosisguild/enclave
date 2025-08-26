@@ -12,11 +12,13 @@
     "hardhat": "hardhat",
     "compile": "forge compile",
     "cli": "pnpm sh ./scripts/cli.sh",
+    "cli:local": "bash ./scripts/tasks/cli.sh",
     "dev:setup": "bash ./scripts/setup.sh",
     "dev:build": "bash ./scripts/build.sh",
     "dev:up": "bash ./scripts/dev.sh",
     "dev:down": "bash ./scripts/clean.sh",
     "test:e2e": "bash ./scripts/test_e2e.sh",
+    "test:e2e:local": "bash ./scripts/local-e2e/test_e2e_local.sh",
     "test": "pnpm test:e2e",
     "sh": "bash ./scripts/tasks/dockerize.sh",
     "report": "playwright show-report"
