@@ -2851,6 +2851,7 @@ dependencies = [
  "e3-trbfv",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -2995,7 +2996,9 @@ dependencies = [
 name = "e3-trbfv"
 version = "0.1.0"
 dependencies = [
+ "e3-crypto",
  "serde",
+ "zeroize",
 ]
 
 [[package]]

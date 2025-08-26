@@ -8,3 +8,5 @@ repository.workspace = true
 
 [dependencies]
 serde.workspace = true
+zeroize.workspace = true
+e3-crypto.workspace = true

@@ -28,6 +28,17 @@ impl SensitiveBytes {
         })
     }
 
+    /// Helper to access a vector of sensitive bytes
+    pub fn access_vec(
+        sensitive_vec: Vec<SensitiveBytes>,
+        cipher: &Cipher,
+    ) -> Result<Vec<Zeroizing<Vec<u8>>>> {
+        sensitive_vec
+            .into_iter()
+            .map(|s| s.access(cipher))
+            .collect()
+    }
+
     /// Access the decrypted data, wrapped in a ZeroizeOnDrop container
     pub fn access(&self, cipher: &Cipher) -> Result<Zeroizing<Vec<u8>>> {
         let decrypted_data = cipher.decrypt_data(&self.encrypted)?;

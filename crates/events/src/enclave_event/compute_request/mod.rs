@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod trbfv;
-
 use crate::CorrelationId;
 use actix::Message;
 use serde::{Deserialize, Serialize};
@@ -15,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ComputeRequest {
     /// By Protocol
-    TrBFV(trbfv::TrBFVRequest),
+    TrBFV(e3_trbfv::TrBFVRequest),
     // Eg. TFHE(TFHERequest)
 }
 
@@ -24,7 +22,7 @@ pub enum ComputeRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ComputeResponse {
     /// By Protocol
-    TrBFV(trbfv::TrBFVResponse),
+    TrBFV(e3_trbfv::TrBFVResponse),
     // Eg. TFHE(TFHEResponse)
 }
 
@@ -33,7 +31,7 @@ pub enum ComputeResponse {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ComputeRequestError {
     /// By Protocol
-    TrBFV(trbfv::TrBFVError),
+    TrBFV(e3_trbfv::TrBFVError),
     // Eg. TFHE(TFHEError)
 }
 
