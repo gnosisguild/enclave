@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
 use crate::{ArcBytes, PartyId, TrBFVConfig};
 use e3_crypto::Cipher;
