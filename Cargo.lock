@@ -2996,7 +2996,15 @@ dependencies = [
 name = "e3-trbfv"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bincode",
+ "e3-bfv-helpers",
  "e3-crypto",
+ "fhe",
+ "fhe-traits",
+ "ndarray",
+ "num-bigint",
+ "rand_chacha 0.3.1",
  "serde",
  "zeroize",
 ]
@@ -5168,6 +5176,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rawpointer",
+ "serde",
 ]
 
 [[package]]

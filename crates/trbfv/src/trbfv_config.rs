@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
+use fhe_rs::bfv::BfvParameters;
 use serde::{Deserialize, Serialize};
 
 use crate::ArcBytes;
+use e3_bfv_helpers::decode_bfv_params_arc;
 
 /// Convenience struct for holding threshold BFV configuration parameters
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -23,10 +27,8 @@ impl TrBFVConfig {
         }
     }
 
-    pub fn params(&self) -> ArcBytes {
-        self.params.clone() // NOTE: It might make sense to deserialize
-                            // stright to BfvParameters here
-                            // but leaving like this for now
+    pub fn params(&self) -> Arc<BfvParameters> {
+        decode_bfv_params_arc(&self.params)
     }
 
     pub fn num_parties(&self) -> u64 {
