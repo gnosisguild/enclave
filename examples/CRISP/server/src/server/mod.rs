@@ -10,6 +10,7 @@ mod indexer;
 mod models;
 mod repo;
 mod routes;
+mod program_server_request;
 
 use std::sync::Arc;
 

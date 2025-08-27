@@ -11,6 +11,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub program_server_url: String,
     pub enclave_server_url: String,
     pub private_key: String,
     pub http_rpc_url: String,

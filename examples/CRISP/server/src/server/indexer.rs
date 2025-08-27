@@ -8,6 +8,7 @@ use crate::server::{
     models::CurrentRound,
     repo::{CrispE3Repository, CurrentRoundRepository},
     CONFIG,
+    program_server_request::run_compute,
 };
 use e3_sdk::{
     evm_helpers::{
@@ -22,7 +23,6 @@ use e3_sdk::{
     indexer::{DataStore, EnclaveIndexer},
 };
 use log::info;
-use program_client::run_compute;
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
