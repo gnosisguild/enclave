@@ -37,5 +37,11 @@ fn main(
         p1is,
         p2is,
     );
+    assert(
+        0
+            == k1.coefficients[2048 - 1]
+                * (params.crypto_params().q_mod_t - k1.coefficients[2048 - 1]),
+    );
+
     circuit.verify_correct_ciphertext_encryption();
 }
