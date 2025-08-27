@@ -4,25 +4,26 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use greco::constants::{L, N};
-use greco::crypto::pk_encryption::BfvPkEncryptionCircuit;
-use greco::math::polynomial::Polynomial;
+use greco::{Greco, Params};
+use polynomial::Polynomial;
 
 fn main(
-    pk0is: [Polynomial<N>; L],
-    pk1is: [Polynomial<N>; L],
-    ct0is: [Polynomial<N>; L],
-    ct1is: [Polynomial<N>; L],
-    u: Polynomial<N>,
-    e0: Polynomial<N>,
-    e1: Polynomial<N>,
-    k1: Polynomial<N>,
-    r1is: [Polynomial<(2 * N) - 1>; L],
-    r2is: [Polynomial<N - 1>; L],
-    p1is: [Polynomial<(2 * N) - 1>; L],
-    p2is: [Polynomial<N - 1>; L],
+    params: pub Params<2048, 1>,
+    pk0is: pub [Polynomial<2048>; 1],
+    pk1is: pub [Polynomial<2048>; 1],
+    ct0is: pub [Polynomial<2048>; 1],
+    ct1is: pub [Polynomial<2048>; 1],
+    u: Polynomial<2048>,
+    e0: Polynomial<2048>,
+    e1: Polynomial<2048>,
+    k1: Polynomial<2048>,
+    r1is: [Polynomial<4095>; 1],
+    r2is: [Polynomial<2047>; 1],
+    p1is: [Polynomial<4095>; 1],
+    p2is: [Polynomial<2047>; 1],
 ) {
-    let circuit = BfvPkEncryptionCircuit::new(
+    let circuit = Greco::new(
+        params,
         pk0is,
         pk1is,
         ct0is,
@@ -36,5 +37,5 @@ fn main(
         p1is,
         p2is,
     );
-    circuit.correct_encryption();
+    circuit.verify_correct_ciphertext_encryption();
 }
