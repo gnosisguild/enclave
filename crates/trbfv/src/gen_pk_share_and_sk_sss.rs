@@ -15,7 +15,6 @@ use fhe_rs::{
     trbfv::ShareManager,
 };
 use fhe_traits::Serialize as FheSerialize;
-use ndarray::{ArrayBase, Dim, OwnedRepr};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
