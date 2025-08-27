@@ -3,9 +3,11 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { ethers } from "hardhat";
+import { network } from "hardhat";
 
-import { MockCiphernodeRegistry__factory } from "../../types";
+const { ethers } = await network.connect();
+
+import { MockCiphernodeRegistry__factory } from "../../types/ethers-contracts";
 
 export async function deployCiphernodeRegistryFixture(name?: string) {
   const [signer] = await ethers.getSigners();
