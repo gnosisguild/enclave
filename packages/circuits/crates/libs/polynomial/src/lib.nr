@@ -63,7 +63,7 @@ impl<let N: u32> Polynomial<N> {
     /// * `upper_bound` - The symmetric bound for coefficient range checking
     ///                   Coefficients must satisfy: -upper_bound <= c <= upper_bound
     pub fn range_check_1bound(self, upper_bound: u64) {
-        let shifted_bound = (2 * upper_bound) as Field;
+        let shifted_bound = (upper_bound as Field) + (upper_bound as Field);
 
         for i in 0..self.coefficients.len() {
             let shifted_coefficient = self.coefficients[i] + upper_bound as Field;

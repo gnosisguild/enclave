@@ -26,7 +26,7 @@ In your _Nargo.toml_ file, add this library as a dependency:
 
 ```toml
 [dependencies]
-greco = { tag = "v0.1.0", git = "https://github.com/gnosisguild/enclave", directory = "packages/circuits/greco"}
+greco = { tag = "v0.1.0", git = "https://github.com/gnosisguild/enclave", directory = "packages/circuits/crates/libs/greco"}
 ```
 
 ## API Reference
