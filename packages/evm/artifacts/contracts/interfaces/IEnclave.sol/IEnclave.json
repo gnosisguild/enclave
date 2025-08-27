@@ -548,39 +548,46 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "filter",
-          "type": "address"
-        },
-        {
-          "internalType": "uint32[2]",
-          "name": "threshold",
-          "type": "uint32[2]"
-        },
-        {
-          "internalType": "uint256[2]",
-          "name": "startWindow",
-          "type": "uint256[2]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "duration",
-          "type": "uint256"
-        },
-        {
-          "internalType": "contract IE3Program",
-          "name": "e3Program",
-          "type": "address"
-        },
-        {
-          "internalType": "bytes",
-          "name": "e3ProgramParams",
-          "type": "bytes"
-        },
-        {
-          "internalType": "bytes",
-          "name": "computeProviderParams",
-          "type": "bytes"
+          "components": [
+            {
+              "internalType": "address",
+              "name": "filter",
+              "type": "address"
+            },
+            {
+              "internalType": "uint32[2]",
+              "name": "threshold",
+              "type": "uint32[2]"
+            },
+            {
+              "internalType": "uint256[2]",
+              "name": "startWindow",
+              "type": "uint256[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "duration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "contract IE3Program",
+              "name": "e3Program",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "e3ProgramParams",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "computeProviderParams",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct IEnclave.RequestParams",
+          "name": "requestParams",
+          "type": "tuple"
         }
       ],
       "name": "request",
