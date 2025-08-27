@@ -1,0 +1,62 @@
+---
+type: system
+description: Filter and forward events by e3_id and manage the e3 request content
+tags:
+  - e3request
+---
+
+```mermaid
+flowchart TB
+ subgraph subGraph0["E3Request System"]
+        ER["E3Router"]
+        EC["E3Context"]
+        K["Keyshare"]
+        PKA["PublickeyAggregator"]
+        PTA["PlaintextAggregator"]
+        EB["EventBus"]
+        CS["CiphernodeSelector"]
+        S["Sortition"]
+  end
+    EB --> CS
+    CS --> ER
+    CS --am_selected?--> S
+    ER --- EC
+    ER -. filter(e3_id) <br> .-> K & PTA
+    ER -. filter(e3_id) </br> .-> PKA
+
+    EC@{ shape: cyl}
+     EC:::internal-link
+     ER:::internal-link
+     PKA:::internal-link
+     PTA:::internal-link
+     K:::internal-link
+     EB:::internal-link
+     CS:::internal-link
+     S:::internal-link
+
+    click EC "https://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Context.md"
+    click ER "https://github.com/gnosisguild/enclave/tree/main/crates/request/docs/E3Router.md"
+    click PKA "https://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PublickeyAggregator.md"
+    click PTA "https://github.com/gnosisguild/enclave/tree/main/crates/aggregator/docs/PlaintextAggregator.md"
+    click K "https://github.com/gnosisguild/enclave/tree/main/crates/keyshare/docs/Keyshare.md"
+    click EB "https://github.com/gnosisguild/enclave/tree/main/crates/events/docs/EventBus.md"
+    click CS "https://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/CiphernodeSelector.md"
+    click S "https://github.com/gnosisguild/enclave/tree/main/crates/sortition/docs/Sortition.md"
+```
+<details>
+<summary>Links</summary>
+
+[[CiphernodeSelector]]
+[[E3Context]]
+[[E3Router]]
+[[EventBus]]
+[[Keyshare]]
+[[PlaintextAggregator]]
+[[PublickeyAggregator]]
+[[Sortition]]
+</details>
+
+```dataview
+TABLE type, description as Description
+FROM #e3request
+```

@@ -153,6 +153,8 @@ sequenceDiagram
     Enclave-->>Users: success
 ```
 
+
+For more information on our architecture see our [Obsidian Architectural Reference](./DOCS_ROOT.md)
 ## Security and Liability
 
 This repo is provided WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

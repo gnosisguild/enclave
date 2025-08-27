@@ -1,3 +1,12 @@
+---
+type: system
+description: Allow enclave programs to be proven in a risc0 docker environment
+link: "[[Support]]"
+---
+## `=this.file.name`
+
+`=this.description`
+
 This is a project to build the support container to allow risc0 to be run within docker by `enclave program start`
 
 The conatiner is built using the github workflow [here](../../.github/workflows/support-docker.yml)
