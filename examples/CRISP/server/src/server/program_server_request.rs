@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::server::CONFIG;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -61,7 +63,7 @@ pub async fn run_compute(
     println!("Sending request");
 
     let response: ProcessingResponse = reqwest::Client::new()
-        .post("http://127.0.0.1:13151/run_compute")
+        .post(format!("{}/{}", CONFIG.program_server_url, "run_compute"))
         .json(&request)
         .send()
         .await?
