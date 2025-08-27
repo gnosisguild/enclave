@@ -6,15 +6,14 @@
 
 use std::sync::Arc;
 
+use crate::helpers::{try_poly_from_sensitive_bytes, try_polys_from_sensitive_bytes_vec};
 /// This module defines event payloads that will generate a decryption share for the given ciphertext for this node
 use crate::{ArcBytes, TrBFVConfig};
 use anyhow::*;
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe_math::rq::Poly;
-use fhe_rs::bfv::BfvParameters;
 use fhe_rs::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_traits::DeserializeParametrized;
-use fhe_traits::DeserializeWithContext;
 use fhe_traits::Serialize;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -33,31 +32,6 @@ pub struct Request {
 pub struct Response {
     /// The decryption share for the given ciphertext
     pub d_share_poly: Vec<ArcBytes>,
-}
-
-fn try_poly_from_sensitive_bytes(
-    bytes: SensitiveBytes,
-    params: Arc<BfvParameters>,
-    cipher: &Cipher,
-) -> Result<Poly> {
-    Ok(Poly::from_bytes(
-        &bytes.access(cipher)?,
-        &Arc::new(fhe_math::rq::Context::new(
-            params.moduli(),
-            params.degree(),
-        )?),
-    )?)
-}
-
-fn try_polys_from_sensitive_bytes_vec(
-    bytes_vec: Vec<SensitiveBytes>,
-    params: Arc<BfvParameters>,
-    cipher: &Cipher,
-) -> Result<Vec<Poly>> {
-    bytes_vec
-        .into_iter()
-        .map(|s| try_poly_from_sensitive_bytes(s, params.clone(), cipher))
-        .collect::<Result<Vec<_>>>()
 }
 
 pub async fn calculate_decryption_share(cipher: &Cipher, req: Request) -> Result<Response> {

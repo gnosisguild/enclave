@@ -93,7 +93,7 @@ async fn handle_compute_request(
             let _ = calculate_decryption_share(&cipher, req).await;
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateThresholdDecryption(req)) => {
-            let _ = calculate_threshold_decryption(&cipher, req).await;
+            let _ = calculate_threshold_decryption(req).await;
         }
         _ => (),
     };
