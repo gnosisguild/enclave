@@ -13,7 +13,7 @@ import { execSync } from "child_process";
 async function runCliInit() {
   try {
     // Execute the command and wait for it to complete
-    const output = execSync("pnpm cli:local init", { encoding: "utf-8" });
+    const output = execSync("pnpm cli init", { encoding: "utf-8" });
     console.log("Command output:", output);
     return output;
   } catch (error) {
