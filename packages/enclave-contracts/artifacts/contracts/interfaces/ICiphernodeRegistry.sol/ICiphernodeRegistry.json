@@ -1,5 +1,5 @@
 {
-  "_format": "hh-sol-artifact-1",
+  "_format": "hh3-artifact-1",
   "contractName": "ICiphernodeRegistry",
   "sourceName": "contracts/interfaces/ICiphernodeRegistry.sol",
   "abi": [
@@ -216,5 +216,8 @@
   "bytecode": "0x",
   "deployedBytecode": "0x",
   "linkReferences": {},
-  "deployedLinkReferences": {}
+  "deployedLinkReferences": {},
+  "immutableReferences": {},
+  "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
+  "buildInfoId": "solc-0_8_27-22cf4542a53b794660fa7b86d88f66178e1d1d0b"
 }

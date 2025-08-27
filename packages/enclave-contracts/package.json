@@ -3,6 +3,7 @@
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
   "version": "0.0.10-test",
   "license": "LGPL-3.0-only",
+  "type": "module",
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
@@ -43,11 +44,8 @@
   },
   "devDependencies": {
     "@enclave-e3/config": "workspace:*",
-    "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
-    "@nomicfoundation/hardhat-ethers": "^3.0.5",
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
-    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "@nomicfoundation/hardhat-verify": "^2.0.2",
+    "@nomicfoundation/hardhat-ignition": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.0",
     "@openzeppelin/contracts": "^5.0.2",
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
@@ -68,8 +66,7 @@
     "eslint-config-prettier": "^9.1.0",
     "ethers": "^6.9.0",
     "fs-extra": "^11.2.0",
-    "hardhat": "^2.22.0",
-    "hardhat-deploy": "^0.12.1",
+    "hardhat": "^3.0.1",
     "hardhat-gas-reporter": "^2.2.0",
     "lodash": "^4.17.21",
     "mocha": "^10.2.0",
@@ -126,7 +123,6 @@
     "task:deployLock": "hardhat task:deployLock",
     "task:withdraw": "hardhat task:withdraw",
     "test": "hardhat test",
-    "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
     "release": "pnpm publish"
   },
