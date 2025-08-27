@@ -1021,7 +1021,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "e3-program-server",
- "e3-user-program 0.1.0 (git+https://github.com/gnosisguild/enclave)",
+ "e3-user-program",
  "tokio",
 ]
 
@@ -1035,17 +1035,6 @@ dependencies = [
  "fhe",
  "fhe-traits",
  "rand 0.8.5",
-]
-
-[[package]]
-name = "e3-user-program"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave#3ecf7dd65142af9509ed37530152c273b1f06f0d"
-dependencies = [
- "e3-bfv-helpers",
- "e3-compute-provider",
- "fhe",
- "fhe-traits",
 ]
 
 [[package]]
