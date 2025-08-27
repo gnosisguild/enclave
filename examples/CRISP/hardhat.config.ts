@@ -7,6 +7,7 @@
 import type { HardhatUserConfig } from "hardhat/config";
 import { configVariable } from "hardhat/config";
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
+
 import { ConfigurationVariable } from "hardhat/types/config";
 
 const mnemonic = configVariable("MNEMONIC");

@@ -9,7 +9,9 @@
 
 import type { HardhatUserConfig } from "hardhat/config";
 import { configVariable } from "hardhat/config";
-import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
+import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
+import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
 import { ConfigurationVariable } from "hardhat/types/config";
 
 const mnemonic = configVariable("MNEMONIC");
@@ -69,7 +71,7 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
 }
 
 const config: HardhatUserConfig = {
-  plugins: [hardhatToolboxViemPlugin],
+  plugins: [hardhatToolboxMochaEthersPlugin, hardhatTypechainPlugin, hardhatNetworkHelpers],
   networks: {
     hardhat: {
       accounts: {
@@ -102,6 +104,9 @@ const config: HardhatUserConfig = {
     sources: "./contracts",
     tests: "./test",
   },
+  typechain: {
+    tsNocheck: false,
+  },
   solidity: {
     // version: "0.8.27",
     compilers: [
@@ -110,38 +115,24 @@ const config: HardhatUserConfig = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 800,
-          },
-          metadata: {
-            // Not including the metadata hash
-            // https://github.com/paulrberg/hardhat-template/issues/31
-            bytecodeHash: "none",
+            runs: 2 ** 32 - 1,
           },
           viaIR: true,
         },
-      },
-      {
-        version: "0.7.0",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 2 ** 32 - 1,
-          },
-        },
-      },
+      }
     ],
     
-    overrides: {
-      "node_modules/poseidon-solidity/PoseidonT3.sol": {
-        version: "0.7.0",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 2 ** 32 - 1,
-          },
-        },
-      },
-    },
+    // overrides: {
+    //   "node_modules/poseidon-solidity/PoseidonT3.sol": {
+    //     version: "0.8.27",
+    //     settings: {
+    //       optimizer: {
+    //         enabled: true,
+    //         runs: 2 ** 32 - 1,
+    //       },
+    //     },
+    //   },
+    // },
   },
 };
 

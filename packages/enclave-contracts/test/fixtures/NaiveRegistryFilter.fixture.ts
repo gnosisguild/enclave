@@ -3,9 +3,11 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { ethers } from "hardhat";
+import { network } from "hardhat";
 
-import { NaiveRegistryFilter__factory } from "../../types";
+const { ethers } = await network.connect();
+
+import { NaiveRegistryFilter__factory } from "../../types/ethers-contracts";
 
 export async function naiveRegistryFilterFixture(
   owner: string,

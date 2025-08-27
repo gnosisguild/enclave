@@ -6,7 +6,7 @@
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
 import { deployCiphernodeRegistryOwnableFixture } from "../fixtures/CiphernodeRegistryOwnable.fixture";
@@ -16,6 +16,8 @@ import { PoseidonT3Fixture } from "../fixtures/PoseidonT3.fixture";
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressThree = "0x0000000000000000000000000000000000000003";
+
+const { ethers } = await network.connect();
 
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);

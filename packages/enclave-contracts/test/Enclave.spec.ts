@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import "@nomicfoundation/hardhat-chai-matchers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+// import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import {
   loadFixture,
   mine,
@@ -12,8 +12,8 @@ import {
 } from "@nomicfoundation/hardhat-network-helpers";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { ZeroHash } from "ethers";
-import { ethers } from "hardhat";
+import { ZeroHash, AbiCoder, keccak256, toBigInt } from "ethers";
+import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
 import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
@@ -24,7 +24,7 @@ import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
 import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
 import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
-const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+const abiCoder = AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressSix = "0x0000000000000000000000000000000000000006";
 const encryptionSchemeId =
@@ -36,20 +36,23 @@ const FilterFail = AddressTwo;
 const FilterOkay = AddressSix;
 
 const data = "0xda7a";
-const dataHash = ethers.keccak256(data);
-const _publicKeyHash = ethers.keccak256(abiCoder.encode(["uint256"], [0]));
+const dataHash = keccak256(data);
+const _publicKeyHash = keccak256(abiCoder.encode(["uint256"], [0]));
 const proof = "0x1337";
-const polynomial_degree = ethers.toBigInt(2048);
-const plaintext_modulus = ethers.toBigInt(1032193);
-const moduli = [ethers.toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
+const polynomial_degree = toBigInt(2048);
+const plaintext_modulus = toBigInt(1032193);
+const moduli = [toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
 
-const encodedE3ProgramParams = ethers.AbiCoder.defaultAbiCoder().encode(
+const encodedE3ProgramParams = AbiCoder.defaultAbiCoder().encode(
   ["uint256", "uint256", "uint256[]"],
   [polynomial_degree, plaintext_modulus, moduli],
 );
 
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
+
+const { ethers } = await network.connect();
+
 
 describe("Enclave", function () {
   async function setup() {
