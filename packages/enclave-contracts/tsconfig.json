@@ -2,10 +2,4 @@
   "extends": "@enclave-e3/config/tsconfig.json",
   "include": ["tasks/**/*", "test/**/*", "deploy/**/*", "types/**/*"],
   "exclude": ["node_modules", "dist"],
-  "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
-  }
 }

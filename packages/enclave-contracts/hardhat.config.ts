@@ -4,6 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+// import "./tasks/ciphernode";
+// import "./tasks/enclave";
+
 import type { HardhatUserConfig } from "hardhat/config";
 import { configVariable } from "hardhat/config";
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
@@ -97,21 +100,46 @@ const config: HardhatUserConfig = {
     artifacts: "./artifacts",
     cache: "./cache",
     sources: "./contracts",
-    tests: "./tests",
+    tests: "./test",
   },
   solidity: {
-    version: "0.8.28",
-    settings: {
-      metadata: {
-        // Not including the metadata hash
-        // https://github.com/paulrberg/hardhat-template/issues/31
-        bytecodeHash: "none",
+    // version: "0.8.27",
+    compilers: [
+      {
+        version: "0.8.27",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 800,
+          },
+          metadata: {
+            // Not including the metadata hash
+            // https://github.com/paulrberg/hardhat-template/issues/31
+            bytecodeHash: "none",
+          },
+          viaIR: true,
+        },
       },
-      // Disable the optimizer when debugging
-      // https://hardhat.org/hardhat-network/#solidity-optimizer-support
-      optimizer: {
-        enabled: true,
-        runs: 800,
+      {
+        version: "0.7.0",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 2 ** 32 - 1,
+          },
+        },
+      },
+    ],
+    
+    overrides: {
+      "node_modules/poseidon-solidity/PoseidonT3.sol": {
+        version: "0.7.0",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 2 ** 32 - 1,
+          },
+        },
       },
     },
   },
