@@ -98,6 +98,40 @@ impl<let N: u32> Polynomial<N> {
     }
 }
 
+/// Flattens an array of polynomials into a 1D array of Field elements.
+///
+/// This helper function serializes polynomial coefficients maintaining a deterministic
+/// ordering of coefficients to ensure reproducible challenge values.
+///
+/// # Generic Parameters
+/// * `A` - The degree of each polynomial in the array
+/// * `L` - The number of polynomials in the array
+/// * `SIZE` - The total size of the target array
+///
+/// # Arguments
+/// * `inputs` - The target array to store flattened coefficients
+/// * `poly` - Array of polynomials to flatten
+/// * `offset` - Starting position in the inputs array
+///
+/// # Returns
+/// A tuple containing:
+/// * The updated inputs array with flattened coefficients
+/// * The new offset position after flattening
+pub fn flatten<let A: u32, let L: u32, let SIZE: u32>(
+    mut inputs: [Field; SIZE],
+    poly: [Polynomial<A>; L],
+    mut offset: u32,
+) -> ([Field; SIZE], u32) {
+    for j in 0..L {
+        for i in 0..A {
+            inputs[i + offset] = poly[j].coefficients[i];
+        }
+        offset += A;
+    }
+
+    (inputs, offset)
+}
+
 #[test]
 fn test_polynomial_eval() {
     let coeffs = [1, 2, 3]; // represents 1x^2 + 2x + 3
@@ -145,4 +179,41 @@ fn test_polynomial_out_of_bounds_coefficients() {
     // Test double bounds check - constrains to [-9, 99]
     // Should fail because -100 is out of bounds.
     poly.range_check_2bounds(99, -9);
+}
+
+#[test]
+fn test_flatten() {
+    // Create test polynomials
+    let poly1 = Polynomial::new([1, 2, 3]); // degree 2
+    let poly2 = Polynomial::new([4, 5, 6]); // degree 2
+    let poly3 = Polynomial::new([7, 8, 9]); // degree 2
+
+    let polynomials = [poly1, poly2, poly3];
+
+    // Initialize target array with zeros
+    let mut inputs = [0; 10]; // Size to accommodate 3 polynomials of degree 2 + offset
+    let offset = 1; // Start at position 1
+
+    // Flatten the polynomials
+    let (result, new_offset): ([Field; 10], u32) = flatten(inputs, polynomials, offset);
+
+    // Verify the flattened coefficients are in the correct positions
+    // Expected: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    //           ^     ^^^^^^^^  ^^^^^^^^  ^^^^^^^^
+    //           |     poly1     poly2     poly3
+    //           offset
+
+    assert_eq(result[0], 0); // Should remain unchanged (before offset)
+    assert_eq(result[1], 1); // poly1[0]
+    assert_eq(result[2], 2); // poly1[1]
+    assert_eq(result[3], 3); // poly1[2]
+    assert_eq(result[4], 4); // poly2[0]
+    assert_eq(result[5], 5); // poly2[1]
+    assert_eq(result[6], 6); // poly2[2]
+    assert_eq(result[7], 7); // poly3[0]
+    assert_eq(result[8], 8); // poly3[1]
+    assert_eq(result[9], 9); // poly3[2]
+
+    // Verify the new offset is correct (original offset + total coefficients)
+    assert_eq(new_offset, offset + 3 * 3); // offset + num_polynomials * degree
 }

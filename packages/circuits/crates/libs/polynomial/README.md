@@ -19,7 +19,13 @@ polynomial = { tag = "v0.1.0", git = "https://github.com/gnosisguild/enclave", d
 This has been developed and tested with
 
 ```bash
-nargo version = 1.0.0-beta.3
-noirc version = 1.0.0-beta.3+ceaa1986628197bd1170147f6a07f0f98d21030a
-(git version hash: ceaa1986628197bd1170147f6a07f0f98d21030a, is dirty: false)
+nargo --version
+nargo version = 1.0.0-beta.11
+noirc version = 1.0.0-beta.11+fd3925aaaeb76c76319f44590d135498ef41ea6c
+(git version hash: fd3925aaaeb76c76319f44590d135498ef41ea6c, is dirty: false)
+```
+
+```bash
+bb --version
+v0.87.0
 ```
