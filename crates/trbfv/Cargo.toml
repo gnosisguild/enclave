@@ -12,6 +12,7 @@ zeroize.workspace = true
 e3-crypto.workspace = true
 fhe_rs.workspace = true
 fhe-traits.workspace = true
+fhe-math.workspace = true
 e3-bfv-helpers.workspace = true
 rand_chacha.workspace = true
 anyhow.workspace = true

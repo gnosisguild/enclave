@@ -9,12 +9,12 @@ use anyhow::Result;
 /// This module defines event payloads that will generate the decryption key material to create a decryption share
 use anyhow::*;
 use e3_crypto::{Cipher, SensitiveBytes};
-use fhe_rs::{proto::bfv::Poly, trbfv::ShareManager};
+use fhe_rs::trbfv::ShareManager;
+use fhe_traits::Serialize;
 use ndarray::Array2;
-use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Request {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
@@ -24,7 +24,7 @@ pub struct Request {
     pub esi_sss_collected: Vec<Vec<SensitiveBytes>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Response {
     /// A single summed polynomial for this nodes secret key.
     pub sk_poly_sum: SensitiveBytes,
@@ -70,10 +70,14 @@ pub async fn calculate_decryption_key(cipher: &Cipher, req: Request) -> Result<R
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let sk_poly_serialized: Vec<u8> = bincode::serialize(&sk_poly_sum)?;
-    // Ok(Response {
-    //     es_poly_sum: SensitiveBytes::new(bincode::serialize(&es_poly_sum)?, &cipher),
-    //     sk_poly_sum: SensitiveBytes::new(bincode::serialize(&sk_poly_sum)?, &cipher)?,
-    // })
-    todo!()
+    Ok(Response {
+        es_poly_sum: SensitiveBytes::try_from_vec(
+            es_poly_sum
+                .into_iter()
+                .map(|s| s.to_bytes())
+                .collect::<Vec<_>>(),
+            cipher,
+        )?,
+        sk_poly_sum: SensitiveBytes::new(sk_poly_sum.to_bytes(), &cipher)?,
+    })
 }

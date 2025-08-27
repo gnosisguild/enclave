@@ -20,6 +20,7 @@ pub struct SensitiveBytes {
 
 impl SensitiveBytes {
     /// Create a new Sensitive container by encrypting the provided data
+    // TODO: rename to try_new
     pub fn new(input: impl Into<Vec<u8>>, cipher: &Cipher) -> Result<Self> {
         let mut bytes = input.into();
         let encrypted = cipher.encrypt_data(&mut bytes)?;
@@ -29,6 +30,7 @@ impl SensitiveBytes {
     }
 
     /// Helper to access a vector of sensitive bytes
+    // TODO: rename try_access_vec
     pub fn access_vec(
         sensitive_vec: Vec<SensitiveBytes>,
         cipher: &Cipher,
@@ -39,7 +41,15 @@ impl SensitiveBytes {
             .collect()
     }
 
+    pub fn try_from_vec(inputs: Vec<Vec<u8>>, cipher: &Cipher) -> Result<Vec<Self>> {
+        inputs
+            .into_iter()
+            .map(|i| SensitiveBytes::new(i, cipher))
+            .collect::<Result<_>>()
+    }
+
     /// Access the decrypted data, wrapped in a ZeroizeOnDrop container
+    // TODO: rename try_access
     pub fn access(&self, cipher: &Cipher) -> Result<Zeroizing<Vec<u8>>> {
         let decrypted_data = cipher.decrypt_data(&self.encrypted)?;
         Ok(Zeroizing::new(decrypted_data))
