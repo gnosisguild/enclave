@@ -48,7 +48,7 @@ pub struct ComputeRequested {
 pub struct ComputeRequestFailed {
     pub correlation_id: CorrelationId,
     pub request: ComputeRequest,
-    pub error: ComputeRequestError,
+    pub error: String,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

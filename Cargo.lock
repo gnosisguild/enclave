@@ -2947,6 +2947,7 @@ name = "e3-test-helpers"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "anyhow",
  "bincode",
  "clap",
  "e3-events",
@@ -2979,11 +2980,13 @@ dependencies = [
  "e3-fhe",
  "e3-keyshare",
  "e3-logger",
+ "e3-multithread",
  "e3-net",
  "e3-request",
  "e3-sdk",
  "e3-sortition",
  "e3-test-helpers",
+ "e3-trbfv",
  "fhe",
  "fhe-traits",
  "fhe-util",
@@ -3234,7 +3237,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
+source = "git+https://github.com/gnosisguild/fhe.rs#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -3259,7 +3262,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
+source = "git+https://github.com/gnosisguild/fhe.rs#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3281,7 +3284,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
+source = "git+https://github.com/gnosisguild/fhe.rs#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3289,7 +3292,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
+source = "git+https://github.com/gnosisguild/fhe.rs#aa90ff007c1ef7c68eeac951ebbf1988d0f1411c"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",

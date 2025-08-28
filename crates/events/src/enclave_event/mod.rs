@@ -257,6 +257,9 @@ impl_from_event!(
     CiphernodeSelected,
     CiphernodeAdded,
     CiphernodeRemoved,
+    ComputeRequested,
+    ComputeRequestSucceeded,
+    ComputeRequestFailed,
     EnclaveError,
     Shutdown,
     TestEvent

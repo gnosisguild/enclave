@@ -10,13 +10,16 @@ use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_events::{ComputeRequest, ComputeRequested, EnclaveEvent, EventBus, Subscribe};
+use e3_events::{
+    ComputeRequest, ComputeRequestFailed, ComputeRequestSucceeded, ComputeRequested,
+    ComputeResponse, EnclaveEvent, EventBus, Subscribe,
+};
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
-use e3_trbfv::{SharedRng, TrBFVRequest};
+use e3_trbfv::{SharedRng, TrBFVRequest, TrBFVResponse};
 
 /// Multithread actor
 pub struct Multithread {
@@ -67,8 +70,25 @@ impl Handler<ComputeRequested> for Multithread {
         let bus = self.bus.clone();
         let rng = self.rng.clone();
         Box::pin(async move {
-            let _ = handle_compute_request(rng, cipher, msg.request).await;
-            // bus.do_send(EnclaveEvent::/* Shutdown { id: () */, data: () });
+            let ComputeRequested {
+                correlation_id,
+                request,
+            } = msg;
+            let event: EnclaveEvent =
+                match handle_compute_request(rng, cipher, request.clone()).await {
+                    Ok(response) => ComputeRequestSucceeded {
+                        response,
+                        correlation_id,
+                    }
+                    .into(),
+                    Err(e) => ComputeRequestFailed {
+                        correlation_id,
+                        request,
+                        error: format!("{}", e),
+                    }
+                    .into(),
+                };
+            bus.do_send(event);
             Ok(())
         })
     }
@@ -78,24 +98,22 @@ async fn handle_compute_request(
     rng: SharedRng,
     cipher: Arc<Cipher>,
     request: ComputeRequest,
-) -> Result<()> {
-    match request {
+) -> Result<ComputeResponse> {
+    Ok(ComputeResponse::TrBFV(match request {
         ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => {
-            let _ = gen_pk_share_and_sk_sss(&rng, &cipher, req).await?;
+            TrBFVResponse::GenPkShareAndSkSss(gen_pk_share_and_sk_sss(&rng, &cipher, req).await?)
         }
         ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(req)) => {
-            let _ = gen_esi_sss(&cipher, req).await;
+            TrBFVResponse::GenEsiSss(gen_esi_sss(&cipher, req).await?)
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(req)) => {
-            let _ = calculate_decryption_key(&cipher, req).await;
+            TrBFVResponse::CalculateDecryptionKey(calculate_decryption_key(&cipher, req).await?)
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(req)) => {
-            let _ = calculate_decryption_share(&cipher, req).await;
+            TrBFVResponse::CalculateDecryptionShare(calculate_decryption_share(&cipher, req).await?)
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateThresholdDecryption(req)) => {
-            let _ = calculate_threshold_decryption(req).await;
+            TrBFVResponse::CalculateThresholdDecryption(calculate_threshold_decryption(req).await?)
         }
-        _ => (),
-    };
-    Ok(())
+    }))
 }
