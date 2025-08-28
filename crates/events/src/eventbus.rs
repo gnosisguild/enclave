@@ -294,6 +294,7 @@ where
 {
     tx: Option<oneshot::Sender<E>>,
     predicate: F,
+    bus: Addr<EventBus<E>>,
 }
 
 impl<E, F> EventWaiter<E, F>
@@ -301,16 +302,17 @@ where
     E: Event + Clone,
     F: 'static + Fn(&E) -> bool + Unpin,
 {
-    pub fn new(tx: oneshot::Sender<E>, predicate: F) -> Self {
+    pub fn new(bus: Addr<EventBus<E>>, tx: oneshot::Sender<E>, predicate: F) -> Self {
         Self {
             tx: Some(tx),
             predicate,
+            bus,
         }
     }
 
     pub fn wait(bus: &Addr<EventBus<E>>, predicate: F) -> oneshot::Receiver<E> {
         let (tx, rx) = oneshot::channel::<E>();
-        let addr = Self::new(tx, predicate).start();
+        let addr = Self::new(bus.clone(), tx, predicate).start();
         bus.do_send(Subscribe::new("*", addr.recipient()));
         rx
     }
@@ -335,13 +337,18 @@ where
         if (self.predicate)(&msg) {
             if let Some(tx) = self.tx.take() {
                 let _ = tx.send(msg.clone());
+                self.bus.do_send(Unsubscribe::new(
+                    msg.event_type(),
+                    ctx.address().recipient(),
+                ));
                 ctx.stop();
             }
         }
     }
 }
 
-/// Avoids the called constructing the event waiter
+/// Prepare a receiver to return the first event that passes the predicate function from the event
+/// bus. You must return the receiver first before triggering any events.
 pub fn wait_for_event<E, F>(bus: &Addr<EventBus<E>>, predicate: F) -> oneshot::Receiver<E>
 where
     E: Event + Clone,
