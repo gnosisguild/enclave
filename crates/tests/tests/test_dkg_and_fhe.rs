@@ -7,7 +7,7 @@
 use actix::prelude::*;
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_events::{ComputeRequest, ComputeRequested, CorrelationId, EnclaveEvent};
+use e3_events::{ComputeRequest, ComputeRequested, CorrelationId, EnclaveEvent, Subscribe};
 use e3_multithread::Multithread;
 use e3_test_helpers::get_common_setup;
 use e3_trbfv::{TrBFVConfig, TrBFVRequest};

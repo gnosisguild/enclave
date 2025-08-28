@@ -140,7 +140,23 @@ pub struct Subscribe<E: Event> {
     pub listener: Recipient<E>,
 }
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Unsubscribe<E: Event> {
+    pub event_type: String,
+    pub listener: Recipient<E>,
+}
+
 impl<E: Event> Subscribe<E> {
+    pub fn new(event_type: impl Into<String>, listener: Recipient<E>) -> Self {
+        Self {
+            event_type: event_type.into(),
+            listener,
+        }
+    }
+}
+
+impl<E: Event> Unsubscribe<E> {
     pub fn new(event_type: impl Into<String>, listener: Recipient<E>) -> Self {
         Self {
             event_type: event_type.into(),
@@ -157,6 +173,16 @@ impl<E: Event> Handler<Subscribe<E>> for EventBus<E> {
             .entry(msg.event_type)
             .or_default()
             .push(msg.listener);
+    }
+}
+
+impl<E: Event> Handler<Unsubscribe<E>> for EventBus<E> {
+    type Result = ();
+
+    fn handle(&mut self, msg: Unsubscribe<E>, _: &mut Context<Self>) {
+        if let Some(listeners) = self.listeners.get_mut(&msg.event_type) {
+            listeners.retain(|listener| listener != &msg.listener);
+        }
     }
 }
 
@@ -251,6 +277,28 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
         self.history.push(msg);
     }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// EventWaiter
+//////////////////////////////////////////////////////////////////////////////
+
+/// Actor to subscribe to EventBus to capture events
+pub struct EventWaiter;
+
+impl EventWaiter {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Actor for EventWaiter {
+    type Context = Context<Self>;
+}
+
+impl<E: Event> Handler<E> for EventWaiter {
+    type Result = E::Result;
+    fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {}
 }
 
 //////////////////////////////////////////////////////////////////////////////
