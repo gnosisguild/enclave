@@ -287,54 +287,57 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 //////////////////////////////////////////////////////////////////////////////
 
 /// Actor to wait on specific events in order to help with testing
-pub struct EventWaiter<E, F>
+pub struct EventWaiter<E>
 where
     E: Event + Clone,
-    F: 'static + Fn(&E) -> bool,
 {
     tx: Option<oneshot::Sender<E>>,
-    predicate: F,
+    matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
     bus: Addr<EventBus<E>>,
 }
 
-impl<E, F> EventWaiter<E, F>
+impl<E> EventWaiter<E>
 where
     E: Event + Clone,
-    F: 'static + Fn(&E) -> bool + Unpin,
 {
-    pub fn new(bus: Addr<EventBus<E>>, tx: oneshot::Sender<E>, predicate: F) -> Self {
+    pub fn new(
+        bus: Addr<EventBus<E>>,
+        tx: oneshot::Sender<E>,
+        matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+    ) -> Self {
         Self {
             tx: Some(tx),
-            predicate,
+            matcher,
             bus,
         }
     }
 
-    pub fn wait(bus: &Addr<EventBus<E>>, predicate: F) -> oneshot::Receiver<E> {
+    pub fn wait(
+        bus: &Addr<EventBus<E>>,
+        matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+    ) -> oneshot::Receiver<E> {
         let (tx, rx) = oneshot::channel::<E>();
-        let addr = Self::new(bus.clone(), tx, predicate).start();
+        let addr = Self::new(bus.clone(), tx, matcher).start();
         bus.do_send(Subscribe::new("*", addr.recipient()));
         rx
     }
 }
 
-impl<E, F> Actor for EventWaiter<E, F>
+impl<E> Actor for EventWaiter<E>
 where
     E: Event + Clone,
-    F: 'static + Fn(&E) -> bool + Unpin,
 {
     type Context = Context<Self>;
 }
 
-impl<E, F> Handler<E> for EventWaiter<E, F>
+impl<E> Handler<E> for EventWaiter<E>
 where
     E: Event + Clone,
-    F: 'static + Fn(&E) -> bool + Unpin,
 {
     type Result = ();
 
     fn handle(&mut self, msg: E, ctx: &mut Self::Context) -> Self::Result {
-        if (self.predicate)(&msg) {
+        if (self.matcher)(&msg) {
             if let Some(tx) = self.tx.take() {
                 let _ = tx.send(msg.clone());
                 self.bus.do_send(Unsubscribe::new(
@@ -347,14 +350,16 @@ where
     }
 }
 
-/// Prepare a receiver to return the first event that passes the predicate function from the event
+/// Prepare a receiver to return the first event that passes the matcher function from the event
 /// bus. You must return the receiver first before triggering any events.
-pub fn wait_for_event<E, F>(bus: &Addr<EventBus<E>>, predicate: F) -> oneshot::Receiver<E>
+pub fn wait_for_event<E>(
+    bus: &Addr<EventBus<E>>,
+    matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+) -> oneshot::Receiver<E>
 where
     E: Event + Clone,
-    F: 'static + Fn(&E) -> bool + Unpin,
 {
-    EventWaiter::wait(bus, predicate)
+    EventWaiter::wait(bus, matcher)
 }
 
 //////////////////////////////////////////////////////////////////////////////

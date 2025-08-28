@@ -38,15 +38,19 @@ async fn test_trbfv() -> Result<()> {
         )),
     });
 
-    let waiter = wait_for_event(&bus, move |event| match event {
-        EnclaveEvent::ComputeRequested {
-            data: ComputeRequested {
-                correlation_id: id, ..
-            },
-            ..
-        } => id == &correlation_id,
-        _ => false,
-    });
+    let waiter = wait_for_event(
+        &bus,
+        Box::new(move |event| match event {
+            EnclaveEvent::ComputeRequested {
+                data:
+                    ComputeRequested {
+                        correlation_id: id, ..
+                    },
+                ..
+            } => id == &correlation_id,
+            _ => false,
+        }),
+    );
     bus.do_send(gen_pk_share_and_sk_sss);
     waiter.await?;
 
