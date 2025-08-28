@@ -21,5 +21,6 @@ once_cell = { workspace = true }
 serde = { workspace = true }
 sha2 = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true }
 e3-crypto = { workspace = true }
 e3-trbfv = { workspace = true }

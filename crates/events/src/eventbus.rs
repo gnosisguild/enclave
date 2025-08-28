@@ -10,6 +10,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
+use tokio::sync::oneshot;
+
+use crate::EnclaveEvent;
 
 //////////////////////////////////////////////////////////////////////////////
 // Core Traits
@@ -283,22 +286,68 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
 // EventWaiter
 //////////////////////////////////////////////////////////////////////////////
 
-/// Actor to subscribe to EventBus to capture events
-pub struct EventWaiter;
+/// Actor to wait on specific events in order to help with testing
+pub struct EventWaiter<E, F>
+where
+    E: Event + Clone,
+    F: 'static + Fn(&E) -> bool,
+{
+    tx: Option<oneshot::Sender<E>>,
+    predicate: F,
+}
 
-impl EventWaiter {
-    pub fn new() -> Self {
-        Self {}
+impl<E, F> EventWaiter<E, F>
+where
+    E: Event + Clone,
+    F: 'static + Fn(&E) -> bool + Unpin,
+{
+    pub fn new(tx: oneshot::Sender<E>, predicate: F) -> Self {
+        Self {
+            tx: Some(tx),
+            predicate,
+        }
+    }
+
+    pub fn wait(bus: &Addr<EventBus<E>>, predicate: F) -> oneshot::Receiver<E> {
+        let (tx, rx) = oneshot::channel::<E>();
+        let addr = Self::new(tx, predicate).start();
+        bus.do_send(Subscribe::new("*", addr.recipient()));
+        rx
     }
 }
 
-impl Actor for EventWaiter {
+impl<E, F> Actor for EventWaiter<E, F>
+where
+    E: Event + Clone,
+    F: 'static + Fn(&E) -> bool + Unpin,
+{
     type Context = Context<Self>;
 }
 
-impl<E: Event> Handler<E> for EventWaiter {
-    type Result = E::Result;
-    fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {}
+impl<E, F> Handler<E> for EventWaiter<E, F>
+where
+    E: Event + Clone,
+    F: 'static + Fn(&E) -> bool + Unpin,
+{
+    type Result = ();
+
+    fn handle(&mut self, msg: E, ctx: &mut Self::Context) -> Self::Result {
+        if (self.predicate)(&msg) {
+            if let Some(tx) = self.tx.take() {
+                let _ = tx.send(msg.clone());
+                ctx.stop();
+            }
+        }
+    }
+}
+
+/// Avoids the called constructing the event waiter
+pub fn wait_for_event<E, F>(bus: &Addr<EventBus<E>>, predicate: F) -> oneshot::Receiver<E>
+where
+    E: Event + Clone,
+    F: 'static + Fn(&E) -> bool + Unpin,
+{
+    EventWaiter::wait(bus, predicate)
 }
 
 //////////////////////////////////////////////////////////////////////////////

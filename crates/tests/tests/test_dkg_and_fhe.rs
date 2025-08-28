@@ -7,7 +7,7 @@
 use actix::prelude::*;
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_events::{ComputeRequest, ComputeRequested, CorrelationId, EnclaveEvent, Subscribe};
+use e3_events::{wait_for_event, ComputeRequest, ComputeRequested, CorrelationId, EnclaveEvent};
 use e3_multithread::Multithread;
 use e3_test_helpers::get_common_setup;
 use e3_trbfv::{TrBFVConfig, TrBFVRequest};
@@ -25,11 +25,11 @@ async fn test_trbfv() -> Result<()> {
 
     // Setup multithread processor
     // TODO: Currently only testing logic not setup on multithread yet
-    let multi = Multithread::new(&bus, rng, cipher).start();
-
+    let _multi = Multithread::new(&bus, rng, cipher).start();
+    let correlation_id = CorrelationId::new();
     // Generate initial pk and sk sss
     let gen_pk_share_and_sk_sss = EnclaveEvent::from(ComputeRequested {
-        correlation_id: CorrelationId::new(),
+        correlation_id: correlation_id.clone(),
         request: ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(
             e3_trbfv::gen_pk_share_and_sk_sss::Request {
                 trbfv_config: TrBFVConfig::new(params_bytes, num_parties, threshold),
@@ -37,8 +37,18 @@ async fn test_trbfv() -> Result<()> {
             },
         )),
     });
-    bus.send(gen_pk_share_and_sk_sss).await?;
 
-    // assert!(false);
+    let waiter = wait_for_event(&bus, move |event| match event {
+        EnclaveEvent::ComputeRequested {
+            data: ComputeRequested {
+                correlation_id: id, ..
+            },
+            ..
+        } => id == &correlation_id,
+        _ => false,
+    });
+    bus.do_send(gen_pk_share_and_sk_sss);
+    waiter.await?;
+
     Ok(())
 }
