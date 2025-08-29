@@ -14,6 +14,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use e3_config::ProgramConfig;
 
+#[allow(dead_code)]
 pub struct ProgramSupportDev(pub ProgramConfig);
 
 #[async_trait]

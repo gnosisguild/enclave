@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{ArcBytes, SharedRng, TrBFVConfig};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe_rs::trbfv::{smudging::SmudgingNoiseGenerator, ShareManager};
 use num_bigint::BigUint;
@@ -34,18 +34,22 @@ pub async fn gen_esi_sss(rng: &SharedRng, cipher: &Cipher, req: Request) -> Resu
     let error_size = BigUint::from_bytes_be(&req.error_size);
     let esi_per_ct = req.esi_per_ct as usize;
     let esi_sss = (0..esi_per_ct)
-        .map(|_| {
+        .map(|_| -> Result<_> {
             let generator = SmudgingNoiseGenerator::new(params.clone(), error_size.clone());
-            let esi_coeffs = generator.generate_smudging_error().unwrap();
+            let esi_coeffs = {
+                generator
+                    .generate_smudging_error(&mut *rng.lock().unwrap())
+                    .context("Failed to generate smudging error")?
+            };
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
             {
                 share_manager
                     .generate_secret_shares_from_poly(esi_poly, &mut *rng.lock().unwrap())
-                    .unwrap()
+                    .context("Failed to generate secret shares from poly")
             }
         })
-        .collect::<Vec<Vec<_>>>();
+        .collect::<Result<Vec<Vec<_>>>>()?;
 
     let esi_sss_result = esi_sss
         .into_iter()

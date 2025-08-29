@@ -2315,7 +2315,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d162beedaa69905488a8da94f5ac3edb4dd4788b732fadb7bd120b2625c1976"
 dependencies = [
  "data-encoding",
- "syn 2.0.104",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -3153,7 +3153,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3240,7 +3240,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#135e484b7cbd4cc75f389e59d91f9b914144994f"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -3265,7 +3265,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#135e484b7cbd4cc75f389e59d91f9b914144994f"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3287,7 +3287,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#135e484b7cbd4cc75f389e59d91f9b914144994f"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3295,7 +3295,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#135e484b7cbd4cc75f389e59d91f9b914144994f"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -6217,7 +6217,7 @@ dependencies = [
  "once_cell",
  "socket2 0.5.10",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6679,7 +6679,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7344,7 +7344,7 @@ dependencies = [
  "getrandom 0.3.3",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
