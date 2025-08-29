@@ -52,7 +52,9 @@ pub fn create_crp_bytes_params(
     (crp_bytes, params)
 }
 
-pub fn get_common_setup() -> Result<(
+pub fn get_common_setup(
+    param_set: Option<(usize, u64, &[u64])>,
+) -> Result<(
     Addr<EventBus<EnclaveEvent>>,
     SharedRng,
     Seed,
@@ -69,8 +71,12 @@ pub fn get_common_setup() -> Result<(
 
     let rng = create_shared_rng_from_u64(42);
     let seed = create_seed_from_u64(123);
-    let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
-    let (crp_bytes, params) = create_crp_bytes_params(&moduli, degree, plaintext_modulus, &seed);
+    let (degree, plaintext_modulus, moduli) = param_set.unwrap_or((
+        SET_2048_1032193_1.0,
+        SET_2048_1032193_1.1,
+        &SET_2048_1032193_1.2,
+    ));
+    let (crp_bytes, params) = create_crp_bytes_params(moduli, degree, plaintext_modulus, &seed);
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
 
     Ok((bus, rng, seed, params, crpoly, errors, history))

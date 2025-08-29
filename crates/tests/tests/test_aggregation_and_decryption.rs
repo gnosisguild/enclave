@@ -13,20 +13,20 @@ use e3_data::RepositoriesFactory;
 use e3_data::{DataStore, InMemStore};
 use e3_events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
-    E3RequestComplete, E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig,
-    GetErrors, GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
+    E3RequestComplete, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig, GetErrors,
+    GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
     PublicKeyAggregated, ResetHistory, Seed, Shutdown, Subscribe,
 };
 use e3_fhe::ext::FheExtension;
-use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use e3_fhe::SharedRng;
 use e3_keyshare::ext::KeyshareExtension;
 use e3_logger::SimpleLogger;
 use e3_net::{events::NetEvent, NetEventTranslator};
 use e3_request::E3Router;
-use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
+use e3_sdk::bfv_helpers::encode_bfv_params;
 use e3_sortition::SortitionRepositoryFactory;
 use e3_sortition::{CiphernodeSelector, Sortition};
-use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, get_common_setup};
+use e3_test_helpers::{create_shared_rng_from_u64, get_common_setup};
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
@@ -249,7 +249,7 @@ fn to_decryptionshare_events(
 #[actix::test]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     // Setup
-    let (bus, rng, seed, params, crpoly, _, history_collector) = get_common_setup()?;
+    let (bus, rng, seed, params, crpoly, _, history_collector) = get_common_setup(None)?;
     let e3_id = E3id::new("1234", 1);
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
 
@@ -357,7 +357,8 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
 #[actix::test]
 async fn test_stopped_keyshares_retain_state() -> Result<()> {
-    let (bus, rng, seed, params, crpoly, error_collector, history_collector) = get_common_setup()?;
+    let (bus, rng, seed, params, crpoly, error_collector, history_collector) =
+        get_common_setup(None)?;
     let e3_id = E3id::new("1234", 1);
 
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
@@ -526,7 +527,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 #[actix::test]
 async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     // Setup
-    let (bus, rng, seed, params, crpoly, _, history_collector) = get_common_setup()?;
+    let (bus, rng, seed, params, crpoly, _, history_collector) = get_common_setup(None)?;
     let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
 
     // Setup actual ciphernodes and dispatch add events

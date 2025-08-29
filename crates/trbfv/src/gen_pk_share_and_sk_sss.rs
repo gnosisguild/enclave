@@ -46,6 +46,7 @@ pub async fn gen_pk_share_and_sk_sss(
 
     let sk_share = { SecretKey::random(&params, &mut *rng.lock().unwrap()) };
     let pk_share = { PublicKeyShare::new(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
+
     let mut share_manager =
         ShareManager::new(num_ciphernodes as usize, threshold as usize, params.clone());
 
@@ -54,10 +55,12 @@ pub async fn gen_pk_share_and_sk_sss(
     // has length of moduli
     // each entry holds num ciphernodes rows
     let sk_sss = share_manager.generate_secret_shares_from_poly(sk_poly)?;
+
     let sk_sss_result = sk_sss
         .into_iter()
         .map(|s| SensitiveBytes::new(bincode::serialize(&s)?, &cipher))
         .collect::<Result<_>>();
+
     Ok(Response {
         pk_share: Arc::new(pk_share.to_bytes()),
         sk_sss: sk_sss_result?,
