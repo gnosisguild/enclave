@@ -3,16 +3,18 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
 // import "./tasks/ciphernode";
 // import "./tasks/enclave";
-
+import hardhatIgnitionEthers from "@nomicfoundation/hardhat-ignition-ethers";
+import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
+import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
+import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
 import type { HardhatUserConfig } from "hardhat/config";
 import { configVariable } from "hardhat/config";
-import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
-import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
-import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
 import { ConfigurationVariable } from "hardhat/types/config";
+
+import { ciphernodeAdd } from "./tasks/ciphernode";
 
 const mnemonic = configVariable("MNEMONIC");
 const privateKey = configVariable("PRIVATE_KEY");
@@ -45,33 +47,44 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
       jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
   }
 
-  let accounts: [ConfigurationVariable] | {  count: number, mnemonic: ConfigurationVariable, path: string } ;
+  let accounts:
+    | [ConfigurationVariable]
+    | { count: number; mnemonic: ConfigurationVariable; path: string };
   if (privateKey) {
     accounts = [privateKey];
   } else {
-    accounts = { 
+    accounts = {
       count: 10,
-      mnemonic,
+      mnemonic: mnemonic,
       path: "m/44'/60'/0'/0",
-     };
+    };
   }
 
   return {
     accounts,
     chainId: chainIds[chain],
     url: jsonRpcUrl,
-    type: 'http' as const,
+    type: "http" as const,
     chainType: "l1" as const,
     blockExporers: {
       etherscan: {
-        apiUrl, 
+        apiUrl,
       },
     },
   };
 }
 
 const config: HardhatUserConfig = {
-  plugins: [hardhatToolboxMochaEthersPlugin, hardhatTypechainPlugin, hardhatNetworkHelpers],
+  plugins: [
+    hardhatToolboxMochaEthersPlugin,
+    hardhatTypechainPlugin,
+    hardhatNetworkHelpers,
+    hardhatIgnitionEthers,
+    hardhatEthersChaiMatchers,
+  ],
+  tasks: [
+    ciphernodeAdd,
+  ],
   networks: {
     hardhat: {
       accounts: {
@@ -88,51 +101,51 @@ const config: HardhatUserConfig = {
       url: "http://localhost:8545",
       type: "http",
     },
-    arbitrum: getChainConfig("arbitrum-mainnet", process.env.ARBISCAN_API_KEY || ""),
+    arbitrum: getChainConfig(
+      "arbitrum-mainnet",
+      process.env.ARBISCAN_API_KEY || "",
+    ),
     avalanche: getChainConfig("avalanche", process.env.SNOWTRACE_API_KEY || ""),
     bsc: getChainConfig("bsc", process.env.BSCSCAN_API_KEY || ""),
     mainnet: getChainConfig("mainnet", process.env.ETHERSCAN_API_KEY || ""),
-    optimism: getChainConfig("optimism-mainnet", process.env.OPTIMISM_API_KEY || ""),
-    "polygon-mainnet": getChainConfig("polygon-mainnet", process.env.POLYGONSCAN_API_KEY || ""),
-    "polygon-mumbai": getChainConfig("polygon-mumbai", process.env.POLYGONSCAN_API_KEY || ""),
+    optimism: getChainConfig(
+      "optimism-mainnet",
+      process.env.OPTIMISM_API_KEY || "",
+    ),
+    "polygon-mainnet": getChainConfig(
+      "polygon-mainnet",
+      process.env.POLYGONSCAN_API_KEY || "",
+    ),
+    "polygon-mumbai": getChainConfig(
+      "polygon-mumbai",
+      process.env.POLYGONSCAN_API_KEY || "",
+    ),
     sepolia: getChainConfig("sepolia", process.env.ETHERSCAN_API_KEY || ""),
     goerli: getChainConfig("goerli", process.env.ETHERSCAN_API_KEY || ""),
   },
   paths: {
     artifacts: "./artifacts",
     cache: "./cache",
-    sources: "./contracts",
+    sources: ["./contracts"],
     tests: "./test",
   },
   typechain: {
+    outDir: "./types",
     tsNocheck: false,
   },
   solidity: {
-    // version: "0.8.27",
+    npmFilesToBuild: ["poseidon-solidity/PoseidonT3.sol"],
     compilers: [
       {
         version: "0.8.27",
         settings: {
           optimizer: {
             enabled: true,
-            runs: 2 ** 32 - 1,
+            runs: 800,
           },
-          viaIR: true,
         },
-      }
+      },
     ],
-    
-    // overrides: {
-    //   "node_modules/poseidon-solidity/PoseidonT3.sol": {
-    //     version: "0.8.27",
-    //     settings: {
-    //       optimizer: {
-    //         enabled: true,
-    //         runs: 2 ** 32 - 1,
-    //       },
-    //     },
-    //   },
-    // },
   },
 };
 

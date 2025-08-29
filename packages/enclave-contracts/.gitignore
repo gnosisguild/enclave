@@ -21,6 +21,7 @@ dist
 node_modules
 types
 deployments/localhost
+ignition/deployments 
 
 # files
 *.env
