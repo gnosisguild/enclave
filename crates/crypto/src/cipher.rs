@@ -12,7 +12,6 @@ use aes_gcm::{
 };
 use anyhow::{anyhow, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
-use e3_config::AppConfig;
 use rand::{rngs::OsRng, RngCore};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -132,10 +131,6 @@ impl Cipher {
 
     pub async fn from_file(value: impl AsRef<Path>) -> Result<Self> {
         Ok(Self::new(FilePasswordManager::new(value)).await?)
-    }
-
-    pub async fn from_config(config: &AppConfig) -> Result<Self> {
-        Ok(Self::new(FilePasswordManager::new(config.key_file())).await?)
     }
 
     /// Encrypt the given data and zeroize the data after encryption

@@ -9,10 +9,12 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use serde::{Deserialize, Serialize};
+
 static NEXT_CORRELATION_ID: AtomicUsize = AtomicUsize::new(1);
 
 /// CorrelationId provides a way to correlate commands and the events they create.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CorrelationId {
     id: usize,
 }
