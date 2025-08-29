@@ -24,20 +24,19 @@ CRISP follows a modern Hardhat-based structure with clear separation of concerns
 
 ```
 CRISP/
-├── apps/                     # Application components
-│   ├── client/              # React frontend application
-│   ├── server/              # Rust coordination server
-│   ├── program/             # RISC Zero computation program
-│   └── wasm-crypto/         # WebAssembly crypto utilities
+|── client/                  # React frontend application
+|── server/                  # Rust coordination server
+|── program/                 # RISC Zero computation program
+|── wasm-crypto/             # WebAssembly crypto utilities
 ├── contracts/               # Smart contracts (Solidity)
 ├── circuits/                # Noir circuits for ZK proofs
 ├── scripts/                 # Development and utility scripts
-├── enclave.config.yaml     # Ciphernode configuration
+├── enclave.config.yaml      # Ciphernode configuration
 ```
 
 ---
 
-### **Client Application** (`/apps/client`)
+### **Client Application** (`/client`)
 
 The client is a React application built with TypeScript that provides a voting interface:
 
@@ -48,7 +47,7 @@ The client is a React application built with TypeScript that provides a voting i
 
 ---
 
-### **Coordination Server** (`/apps/server`)
+### **Coordination Server** (`/server`)
 
 The server is a Rust-based coordination service that manages the E3 lifecycle:
 
@@ -60,7 +59,7 @@ The server is a Rust-based coordination service that manages the E3 lifecycle:
 
 ---
 
-### **ZK Program** (`/apps/program`)
+### **ZK Program** (`/program`)
 
 The core computation logic written in Rust for zkVM:
 
@@ -70,7 +69,7 @@ The core computation logic written in Rust for zkVM:
 
 ---
 
-### **WebAssembly Crypto** (`/apps/wasm-crypto`)
+### **WebAssembly Crypto** (`/wasm-crypto`)
 
 High-performance cryptographic operations compiled to WebAssembly:
 

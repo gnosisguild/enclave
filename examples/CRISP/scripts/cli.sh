@@ -2,5 +2,4 @@
 
 set -e
 
-./scripts/tasks/dockerize.sh ./scripts/tasks/cli.sh "$@"
-
+(./target/debug/cli "$@")
