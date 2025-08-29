@@ -57,13 +57,24 @@ sol! {
     }
 
     #[derive(Debug)]
+    struct E3RequestParams {
+        address filter;
+        uint32[2] threshold;
+        uint256[2] startWindow;
+        uint256 duration;
+        address e3Program;
+        bytes e3ProgramParams;
+        bytes computeProviderParams;
+    }
+
+    #[derive(Debug)]
     #[sol(rpc)]
     contract Enclave {
         uint256 public nexte3Id = 0;
         mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
         mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
-        function request(address filter, uint32[2] calldata threshold, uint256[2] calldata startWindow, uint256 duration, address e3Program, bytes memory e3ProgramParams, bytes memory computeProviderParams) external payable returns (uint256 e3Id, E3 memory e3);
+        function request(E3RequestParams memory request) external payable returns (uint256 e3Id, E3 memory e3);
         function activate(uint256 e3Id,bytes memory publicKey) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
         function publishInput(uint256 e3Id, bytes memory data) external returns (bool success);
@@ -337,17 +348,19 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         let _guard = NONCE_LOCK.lock().await;
         let nonce = next_pending_nonce(&*self.provider).await?;
 
+        let e3_request = E3RequestParams {
+            filter,
+            threshold,
+            startWindow: start_window,
+            duration,
+            e3Program: e3_program,
+            e3ProgramParams: e3_params.clone(),
+            computeProviderParams: compute_provider_params.clone(),
+        };
+
         let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract
-            .request(
-                filter,
-                threshold,
-                start_window,
-                duration,
-                e3_program,
-                e3_params,
-                compute_provider_params,
-            )
+            .request(e3_request)
             .value(U256::from(1))
             .nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;

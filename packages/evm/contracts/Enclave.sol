@@ -128,40 +128,45 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function request(
-        address filter,
-        uint32[2] calldata threshold,
-        uint256[2] calldata startWindow,
-        uint256 duration,
-        IE3Program e3Program,
-        bytes memory e3ProgramParams,
-        bytes memory computeProviderParams
+        E3RequestParams memory requestParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
         // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
         require(msg.value > 0, PaymentRequired(msg.value));
         require(
-            threshold[1] >= threshold[0] && threshold[0] > 0,
-            InvalidThreshold(threshold)
+            requestParams.threshold[1] >= requestParams.threshold[0] &&
+                requestParams.threshold[0] > 0,
+            InvalidThreshold(requestParams.threshold)
         );
         require(
             // TODO: do we need a minimum start window to allow time for committee selection?
-            startWindow[1] >= startWindow[0] &&
-                startWindow[1] >= block.timestamp,
+            requestParams.startWindow[1] >= requestParams.startWindow[0] &&
+                requestParams.startWindow[1] >= block.timestamp,
             InvalidStartWindow()
         );
         require(
-            duration > 0 && duration <= maxDuration,
-            InvalidDuration(duration)
+            requestParams.duration > 0 && requestParams.duration <= maxDuration,
+            InvalidDuration(requestParams.duration)
         );
-        require(e3Programs[e3Program], E3ProgramNotAllowed(e3Program));
+        require(
+            e3Programs[requestParams.e3Program],
+            E3ProgramNotAllowed(requestParams.e3Program)
+        );
 
         // TODO: should IDs be incremental or produced deterministically?
         e3Id = nexte3Id;
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
-        (bytes32 encryptionSchemeId, IInputValidator inputValidator) = e3Program
-            .validate(e3Id, seed, e3ProgramParams, computeProviderParams);
+        (
+            bytes32 encryptionSchemeId,
+            IInputValidator inputValidator
+        ) = requestParams.e3Program.validate(
+                e3Id,
+                seed,
+                requestParams.e3ProgramParams,
+                requestParams.computeProviderParams
+            );
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
         ];
@@ -177,14 +182,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         e3 = E3({
             seed: seed,
-            threshold: threshold,
+            threshold: requestParams.threshold,
             requestBlock: block.number,
-            startWindow: startWindow,
-            duration: duration,
+            startWindow: requestParams.startWindow,
+            duration: requestParams.duration,
             expiration: 0,
             encryptionSchemeId: encryptionSchemeId,
-            e3Program: e3Program,
-            e3ProgramParams: e3ProgramParams,
+            e3Program: requestParams.e3Program,
+            e3ProgramParams: requestParams.e3ProgramParams,
             inputValidator: inputValidator,
             decryptionVerifier: decryptionVerifier,
             committeePublicKey: hex"",
@@ -194,11 +199,20 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3s[e3Id] = e3;
 
         require(
-            ciphernodeRegistry.requestCommittee(e3Id, filter, threshold),
+            ciphernodeRegistry.requestCommittee(
+                e3Id,
+                requestParams.filter,
+                requestParams.threshold
+            ),
             CommitteeSelectionFailed()
         );
 
-        emit E3Requested(e3Id, e3, filter, e3Program);
+        emit E3Requested(
+            e3Id,
+            e3,
+            requestParams.filter,
+            requestParams.e3Program
+        );
     }
 
     function activate(

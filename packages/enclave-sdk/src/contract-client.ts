@@ -107,7 +107,7 @@ export class ContractClient {
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
         functionName: "request",
-        args: [
+        args: [{
           filter,
           threshold,
           startWindow,
@@ -115,6 +115,7 @@ export class ContractClient {
           e3Program,
           e3ProgramParams,
           computeProviderParams,
+        }
         ],
         account,
         value: value || BigInt(0),
