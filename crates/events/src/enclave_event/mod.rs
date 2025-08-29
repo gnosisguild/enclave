@@ -30,6 +30,7 @@ pub use decryptionshare_created::*;
 pub use die::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
+use e3_trbfv::{TrBFVRequest, TrBFVResponse};
 pub use enclave_error::*;
 pub use keyshare_created::*;
 pub use plaintext_aggregated::*;
@@ -38,7 +39,7 @@ pub use publish_document::*;
 pub use shutdown::*;
 pub use test_event::*;
 
-use crate::{E3id, ErrorEvent, Event, EventId};
+use crate::{CorrelationId, E3id, ErrorEvent, Event, EventId};
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -155,6 +156,64 @@ impl EnclaveEvent {
             EnclaveEvent::E3RequestComplete { .. } => true,
             EnclaveEvent::Shutdown { .. } => true,
             _ => false,
+        }
+    }
+
+    // NOTE: I am not sure about the following helper methods existing on EnclaveEvent. On one hand
+    // they are explicit and exhaustive but it seems like a fair bit to maintain.
+    // We could put them behind traits potentially?
+    pub fn correlation_id(&self) -> Option<CorrelationId> {
+        match self {
+            EnclaveEvent::ComputeRequested {
+                data: ComputeRequested { correlation_id, .. },
+                ..
+            } => Some(correlation_id.clone()),
+            EnclaveEvent::ComputeRequestSucceeded {
+                data: ComputeRequestSucceeded { correlation_id, .. },
+                ..
+            } => Some(correlation_id.clone()),
+            EnclaveEvent::ComputeRequestFailed {
+                data: ComputeRequestFailed { correlation_id, .. },
+                ..
+            } => Some(correlation_id.clone()),
+
+            _ => None,
+        }
+    }
+
+    pub fn trbfv_request(&self) -> Option<&TrBFVRequest> {
+        match self {
+            EnclaveEvent::ComputeRequested {
+                data:
+                    ComputeRequested {
+                        payload: ComputeRequest::TrBFV(request),
+                        ..
+                    },
+                ..
+            } => Some(request),
+            EnclaveEvent::ComputeRequestFailed {
+                data:
+                    ComputeRequestFailed {
+                        payload: ComputeRequest::TrBFV(request),
+                        ..
+                    },
+                ..
+            } => Some(request),
+            _ => None,
+        }
+    }
+
+    pub fn trbfv_response(&self) -> Option<&TrBFVResponse> {
+        match self {
+            EnclaveEvent::ComputeRequestSucceeded {
+                data:
+                    ComputeRequestSucceeded {
+                        payload: ComputeResponse::TrBFV(response),
+                        ..
+                    },
+                ..
+            } => Some(response),
+            _ => None,
         }
     }
 }

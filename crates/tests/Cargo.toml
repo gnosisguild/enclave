@@ -33,6 +33,7 @@ e3-trbfv = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 fhe_rs = { workspace = true }
+num-bigint = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 tokio = { workspace = true }

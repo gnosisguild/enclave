@@ -72,18 +72,19 @@ impl Handler<ComputeRequested> for Multithread {
         Box::pin(async move {
             let ComputeRequested {
                 correlation_id,
-                request,
+                payload,
             } = msg;
+            println!("handle ComputeRequested... in Box::pin {}", correlation_id);
             let event: EnclaveEvent =
-                match handle_compute_request(rng, cipher, request.clone()).await {
-                    Ok(response) => ComputeRequestSucceeded {
-                        response,
+                match handle_compute_request(rng, cipher, payload.clone()).await {
+                    Ok(payload) => ComputeRequestSucceeded {
+                        payload,
                         correlation_id,
                     }
                     .into(),
                     Err(e) => ComputeRequestFailed {
                         correlation_id,
-                        request,
+                        payload,
                         error: format!("{}", e),
                     }
                     .into(),
@@ -99,6 +100,7 @@ async fn handle_compute_request(
     cipher: Arc<Cipher>,
     request: ComputeRequest,
 ) -> Result<ComputeResponse> {
+    println!("handle_compute_requested");
     Ok(ComputeResponse::TrBFV(match request {
         ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => {
             TrBFVResponse::GenPkShareAndSkSss(gen_pk_share_and_sk_sss(&rng, &cipher, req).await?)
