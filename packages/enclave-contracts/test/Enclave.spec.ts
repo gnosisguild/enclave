@@ -3,16 +3,10 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import "@nomicfoundation/hardhat-chai-matchers";
-// import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
-import {
-  loadFixture,
-  mine,
-  time,
-} from "@nomicfoundation/hardhat-network-helpers";
+
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { ZeroHash, AbiCoder, keccak256, toBigInt } from "ethers";
+import { AbiCoder, ZeroHash, keccak256, toBigInt } from "ethers";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
@@ -22,7 +16,6 @@ import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fix
 import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
 import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
 import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
-import { PoseidonT3Fixture } from "./fixtures/PoseidonT3.fixture";
 
 const abiCoder = AbiCoder.defaultAbiCoder();
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -51,14 +44,13 @@ const encodedE3ProgramParams = AbiCoder.defaultAbiCoder().encode(
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
-const { ethers } = await network.connect();
-
+const { ethers, networkHelpers } = await network.connect();
+const { loadFixture, mine, time } = networkHelpers;
 
 describe("Enclave", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
-    if (!owner) throw new Error("Bad getSigners() output");
-    if (!notTheOwner) throw new Error("Bad getSigners() output");
+
     const poseidon = await PoseidonT3Fixture();
     const registry = await deployCiphernodeRegistryFixture();
     const decryptionVerifier = await deployDecryptionVerifierFixture();
@@ -71,9 +63,9 @@ describe("Enclave", function () {
     );
 
     const enclave = await deployEnclaveFixture(
-      owner.address,
+      await owner.getAddress(),
       await registry.getAddress(),
-      await poseidon.getAddress(),
+      poseidon,
     );
 
     await enclave.setDecryptionVerifier(
@@ -118,7 +110,7 @@ describe("Enclave", function () {
   describe("constructor / initialize()", function () {
     it("correctly sets owner", async function () {
       const { owner, enclave } = await loadFixture(setup);
-      expect(await enclave.owner()).to.equal(owner.address);
+      expect(await enclave.owner()).to.equal(await owner.getAddress());
     });
 
     it("correctly sets ciphernodeRegistry address", async function () {

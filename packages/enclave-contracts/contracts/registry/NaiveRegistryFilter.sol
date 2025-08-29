@@ -11,6 +11,8 @@ import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
+import { console } from "hardhat/console.sol";
+
 contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
     struct Committee {
         address[] nodes;
@@ -101,6 +103,8 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
         committee.nodes = nodes;
         committee.publicKey = keccak256(publicKey);
+
+        console.log("registry", registry);
         ICiphernodeRegistry(registry).publishCommittee(
             e3Id,
             abi.encode(nodes),

@@ -14,9 +14,9 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {
     InternalLeanIMT,
-    LeanIMTData,
-    PoseidonT3
+    LeanIMTData
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
+import { PoseidonT3 } from "poseidon-solidity/PoseidonT3.sol";
 
 contract Enclave is IEnclave, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
@@ -102,6 +102,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             _maxDuration,
             _e3ProgramsParams
         );
+
     }
 
     /// @param _owner The owner of this contract

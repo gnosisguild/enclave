@@ -119,9 +119,36 @@ interface IEnclave {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                  Structs                               //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice This struct contains the parameters to submit a request to Enclave.
+    /// @param filter The address of the pool of nodes from which to select the committee.
+    /// @param threshold The M/N threshold for the committee.
+    /// @param startWindow The start window for the computation.
+    /// @param duration The duration of the computation in seconds.
+    /// @param e3Program The address of the E3 Program.
+    /// @param e3ProgramParams The ABI encoded computation parameters.
+    struct E3RequestParams {
+        address filter;
+        uint32[2] threshold;
+        uint256[2] startWindow;
+        uint256 duration;
+        IE3Program e3Program;
+        bytes e3ProgramParams;
+        bytes computeProviderParams;
+    }
+
     /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).
     /// @dev This function MUST emit the E3Requested event.
+<<<<<<< HEAD
     /// @param requestParams The parameters for the request.
+=======
+    /// @param requestParams The parameters for the E3 request.
+>>>>>>> c4593f5f (test: boostrap tests with hardhat3 ethers)
     /// @return e3Id ID of the E3.
     /// @return e3 The E3 struct.
     function request(

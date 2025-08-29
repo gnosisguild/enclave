@@ -5,14 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
 
-const { ethers } = await network.connect();
+import { MockComputeProvider__factory } from "../../types";
+import MockComputeProviderModule from "../../ignition/modules/mockComputeProvider";
 
-import { MockComputeProvider__factory } from "../../types/ethers-contracts";
+const { ignition } = await network.connect();
 
 export async function deployComputeProviderFixture() {
-  const deployment = await (
-    await ethers.getContractFactory("MockComputeProvider")
-  ).deploy();
+  const { mockComputeProvider } = await ignition.deploy(MockComputeProviderModule);
 
-  return MockComputeProvider__factory.connect(await deployment.getAddress());
+  return MockComputeProvider__factory.connect(await mockComputeProvider.getAddress());
 }

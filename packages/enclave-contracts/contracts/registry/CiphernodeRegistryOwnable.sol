@@ -15,6 +15,8 @@ import {
     LeanIMTData
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
+import { console } from "hardhat/console.sol";
+
 contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
 
@@ -90,6 +92,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         registryFilters[e3Id] = IRegistryFilter(filter);
         roots[e3Id] = root();
 
+
+
         IRegistryFilter(filter).requestCommittee(e3Id, threshold);
         emit CommitteeRequested(e3Id, filter, threshold);
         success = true;
@@ -97,11 +101,14 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function publishCommittee(
         uint256 e3Id,
-        bytes calldata,
+        bytes calldata nodes,
         bytes calldata publicKey
     ) external {
         // only to be published by the filter
+        console.log("msg.sender", msg.sender);
+        console.log("registryFilters[e3Id]", address(registryFilters[e3Id]));
         require(address(registryFilters[e3Id]) == msg.sender, OnlyFilter());
+        console.log("here in ciphernode registry");
 
         publicKeyHashes[e3Id] = keccak256(publicKey);
         emit CommitteePublished(e3Id, publicKey);

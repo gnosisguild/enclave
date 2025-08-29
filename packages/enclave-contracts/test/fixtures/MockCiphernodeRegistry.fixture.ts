@@ -5,18 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
 
-const { ethers } = await network.connect();
+import { MockCiphernodeRegistry__factory } from "../../types";
+import MockCiphernodeRegistryModule from "../../ignition/modules/mockCiphernodeRegistry";
 
-import { MockCiphernodeRegistry__factory } from "../../types/ethers-contracts";
+const { ethers, ignition } = await network.connect();
 
-export async function deployCiphernodeRegistryFixture(name?: string) {
+export async function deployCiphernodeRegistryFixture() {
   const [signer] = await ethers.getSigners();
-  const deployment = await (
-    await ethers.getContractFactory(name || "MockCiphernodeRegistry")
-  ).deploy();
+  const { mockCiphernodeRegistry } = await ignition.deploy(MockCiphernodeRegistryModule);
 
   return MockCiphernodeRegistry__factory.connect(
-    await deployment.getAddress(),
-    signer!.provider,
+    mockCiphernodeRegistry.target,
+    signer.provider,
   );
 }

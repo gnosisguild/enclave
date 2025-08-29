@@ -5,14 +5,14 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
 
-const { ethers } = await network.connect();
+import { Enclave__factory } from "../../types";
+import EnclaveModule from "../../ignition/modules/enclave";
 
-import { Enclave__factory } from "../../types/ethers-contracts";
+const { ethers, ignition } = await network.connect();
 
 export async function deployEnclaveFixture(
   owner: string,
   registry: string,
-  poseidonT3: string,
   maxDuration?: number,
 ) {
   const [signer] = await ethers.getSigners();
@@ -26,13 +26,16 @@ export async function deployEnclaveFixture(
     [polynomial_degree, plaintext_modulus, moduli],
   );
 
-  const deployment = await (
-    await ethers.getContractFactory("Enclave", {
-      libraries: {
-        PoseidonT3: poseidonT3,
+  const { enclave } = await ignition.deploy(EnclaveModule, {
+    parameters: {
+      Enclave: {
+        params: encoded,
+        owner: owner,
+        maxDuration: maxDuration || 60 * 60 * 24 * 30,
+        registry: registry,
       },
-    })
-  ).deploy(owner, registry, maxDuration || 60 * 60 * 24 * 30, [encoded]);
+    },
+  });
 
-  return Enclave__factory.connect(await deployment.getAddress(), signer);
+  return Enclave__factory.connect(await enclave.getAddress(), signer);
 }

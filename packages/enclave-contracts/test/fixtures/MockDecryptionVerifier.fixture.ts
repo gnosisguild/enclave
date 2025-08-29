@@ -5,13 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
 
-const { ethers } = await network.connect();
+import { MockDecryptionVerifier__factory } from "../../types";
+import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
 
-import { MockDecryptionVerifier__factory } from "../../types/ethers-contracts";
+const { ignition } = await network.connect();
 
 export async function deployDecryptionVerifierFixture() {
-  const deployment = await (
-    await ethers.getContractFactory("MockDecryptionVerifier")
-  ).deploy();
-  return MockDecryptionVerifier__factory.connect(await deployment.getAddress());
+  const { mockDecryptionVerifier } = await ignition.deploy(MockDecryptionVerifierModule);
+  return MockDecryptionVerifier__factory.connect(await mockDecryptionVerifier.getAddress());
 }

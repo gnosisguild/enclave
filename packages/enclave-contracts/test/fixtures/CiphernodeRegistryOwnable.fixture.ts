@@ -5,27 +5,27 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
 
-const { ethers } = await network.connect();
+import { CiphernodeRegistryOwnable__factory } from "../../types";
+import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
 
-import { CiphernodeRegistryOwnable__factory } from "../../types/ethers-contracts";
+const { ethers, ignition } = await network.connect();
 
 export async function deployCiphernodeRegistryOwnableFixture(
   owner: string,
   enclave: string,
-  poseidonT3: string,
-  name?: string,
 ) {
   const [signer] = await ethers.getSigners();
-  const deployment = await (
-    await ethers.getContractFactory(name || "CiphernodeRegistryOwnable", {
-      libraries: {
-        PoseidonT3: poseidonT3,
+  const { cipherNodeRegistry } = await ignition.deploy(CiphernodeRegistryModule, {
+    parameters: {
+      CiphernodeRegistry: {
+        enclaveAddress: enclave,
+        owner: owner,
       },
-    })
-  ).deploy(owner, enclave);
+    },
+  });
 
   return CiphernodeRegistryOwnable__factory.connect(
-    await deployment.getAddress(),
+    await cipherNodeRegistry.getAddress(),
     signer,
   );
 }

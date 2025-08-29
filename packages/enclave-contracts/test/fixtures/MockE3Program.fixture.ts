@@ -5,13 +5,18 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
 
-const { ethers } = await network.connect();
+import { MockE3Program__factory } from "../../types";
+import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
 
-import { MockE3Program__factory } from "../../types/ethers-contracts";
+const { ignition } = await network.connect();
 
 export async function deployE3ProgramFixture(inputValidator: string) {
-  const deployment = await (
-    await ethers.getContractFactory("MockE3Program")
-  ).deploy(inputValidator);
-  return MockE3Program__factory.connect(await deployment.getAddress());
+  const { mockE3Program } = await ignition.deploy(MockE3ProgramModule, {
+    parameters: {
+      MockE3Program: {
+        mockInputValidator: inputValidator,
+      },
+    },
+  });
+  return MockE3Program__factory.connect(await mockE3Program.getAddress());
 }
