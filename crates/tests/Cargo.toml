@@ -37,3 +37,4 @@ num-bigint = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 tokio = { workspace = true }
+zeroize = { workspace = true }

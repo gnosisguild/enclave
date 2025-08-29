@@ -2995,6 +2995,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]
@@ -3239,7 +3240,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
+source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -3264,7 +3265,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
+source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3286,7 +3287,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
+source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3294,7 +3295,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
+source = "git+https://github.com/gnosisguild/fhe.rs.git?branch=ry%2Fallow-for-deterministic-rng#7abd592fd213ddbb1d165f74790186db2f431183"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
