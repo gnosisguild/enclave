@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{ArcBytes, TrBFVConfig};
+use crate::{ArcBytes, SharedRng, TrBFVConfig};
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe_rs::trbfv::{smudging::SmudgingNoiseGenerator, ShareManager};
@@ -27,7 +27,7 @@ pub struct Response {
     pub esi_sss: Vec<SensitiveBytes>,
 }
 
-pub async fn gen_esi_sss(cipher: &Cipher, req: Request) -> Result<Response> {
+pub async fn gen_esi_sss(rng: &SharedRng, cipher: &Cipher, req: Request) -> Result<Response> {
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
@@ -39,9 +39,11 @@ pub async fn gen_esi_sss(cipher: &Cipher, req: Request) -> Result<Response> {
             let esi_coeffs = generator.generate_smudging_error().unwrap();
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
-            share_manager
-                .generate_secret_shares_from_poly(esi_poly)
-                .unwrap()
+            {
+                share_manager
+                    .generate_secret_shares_from_poly(esi_poly, &mut *rng.lock().unwrap())
+                    .unwrap()
+            }
         })
         .collect::<Vec<Vec<_>>>();
 

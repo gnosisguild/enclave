@@ -77,6 +77,7 @@ impl Fhe {
         let sk_share = { SecretKey::random(&self.params, &mut *self.rng.lock().unwrap()) };
         let pk_share =
             { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut *self.rng.lock().unwrap())? };
+
         Ok((
             SecretKeySerializer::to_bytes(sk_share)?,
             pk_share.to_bytes(),

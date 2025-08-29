@@ -50,7 +50,7 @@ async fn test_trbfv() -> Result<()> {
     let params_bytes = Arc::new(encode_bfv_params(&params));
     let crp_bytes = Arc::new(crpoly.to_bytes());
     let num_parties = 5;
-    let threshold = 3;
+    let threshold = 2; // must be <= (num_parties - 1)/2
 
     let error_size_bigint = calculate_error_size(params, num_parties as usize, 3)?;
     let error_size = Arc::new(BigUint::to_bytes_be(&error_size_bigint));
@@ -89,10 +89,13 @@ async fn test_trbfv() -> Result<()> {
     };
 
     let pk_share = response.pk_share.clone();
-    // let sk_sss = SensitiveBytes::access_vec(response.sk_sss.clone(), &cipher)?;
-    // let serialized_sk_sss = sk_sss[0].iter().map(|v| v).copied().collect::<Vec<_>>();
+    let sk_sss = SensitiveBytes::access_vec(response.sk_sss.clone(), &cipher)?;
+    let serialized_sk_sss = sk_sss
+        .iter()
+        .flat_map(|v| v.iter())
+        .copied()
+        .collect::<Vec<_>>();
 
-    // .iter().flat_map(|v| v.iter()).copied().collect();
     // NOTE: uncomment to save new snapshot. Note rng is deterministic so snapshots are possible
     // save_snapshot("fixtures/01_pk_share.bin", &pk_share[..]);
     // save_snapshot("fixtures/02_sk_sss.bin", &serialized_sk_sss);
@@ -102,7 +105,10 @@ async fn test_trbfv() -> Result<()> {
         pk_share,
         Arc::new(include_bytes!("fixtures/01_pk_share.bin").to_vec())
     );
-
+    assert_eq!(
+        serialized_sk_sss,
+        include_bytes!("fixtures/02_sk_sss.bin").to_vec()
+    );
     // TODO: verify encrypted sk_sss are correct
     // currently we dont do this as we need to decrypt the bytes
     // assert_eq!(response.sk_sss, Arc::new(expected.to_vec()));

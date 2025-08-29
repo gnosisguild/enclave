@@ -50,11 +50,17 @@ pub async fn gen_pk_share_and_sk_sss(
     let mut share_manager =
         ShareManager::new(num_ciphernodes as usize, threshold as usize, params.clone());
 
+    println!(
+        "share_amount = {}, threshold = {}, <=  {}",
+        share_manager.n,
+        share_manager.threshold,
+        (share_manager.n - 1) / 2,
+    );
+
     let sk_poly = share_manager.coeffs_to_poly_level0(sk_share.coeffs.clone().as_ref())?;
 
-    // has length of moduli
-    // each entry holds num ciphernodes rows
-    let sk_sss = share_manager.generate_secret_shares_from_poly(sk_poly)?;
+    let sk_sss =
+        { share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())? };
 
     let sk_sss_result = sk_sss
         .into_iter()

@@ -117,9 +117,9 @@ dialoguer = "=0.11.0"
 duct = "=1.0.0"
 eyre = { version = "=0.6.12" }
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs", branch = "ry/allow-for-deterministic-rng" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
-fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "ry/allow-for-deterministic-rng" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git", branch = "ry/allow-for-deterministic-rng" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "ry/allow-for-deterministic-rng" }
 figment = { version = "=0.10.19", features = ["yaml", "test"] }
 futures = "=0.3.31"
 futures-util = "=0.3.31"

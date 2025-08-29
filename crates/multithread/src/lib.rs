@@ -104,7 +104,7 @@ async fn handle_compute_request(
             TrBFVResponse::GenPkShareAndSkSss(gen_pk_share_and_sk_sss(&rng, &cipher, req).await?)
         }
         ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(req)) => {
-            TrBFVResponse::GenEsiSss(gen_esi_sss(&cipher, req).await?)
+            TrBFVResponse::GenEsiSss(gen_esi_sss(&rng, &cipher, req).await?)
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(req)) => {
             TrBFVResponse::CalculateDecryptionKey(calculate_decryption_key(&cipher, req).await?)
