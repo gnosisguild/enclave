@@ -69,9 +69,9 @@ importers:
       '@gnosis-guild/enclave':
         specifier: workspace:*
         version: link:../../packages/evm
-      '@semaphore-protocol/contracts':
-        specifier: github:hmzakhalid/semaphore-noir#dist-contracts
-        version: '@semaphore-protocol/contracts-noir@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/9cd8034957a6f66b787639e224e517d9b2a4c972'
+      '@hashcloak/semaphore-contracts-noir':
+        specifier: 1.0.1
+        version: 1.0.1
       '@zk-kit/lean-imt.sol':
         specifier: 2.0.0
         version: 2.0.0
@@ -172,6 +172,9 @@ importers:
       '@emotion/react':
         specifier: ^11.11.4
         version: 11.14.0(@types/react@18.3.23)(react@18.3.1)
+      '@hashcloak/semaphore-noir-proof':
+        specifier: 1.0.0
+        version: 1.0.0(@semaphore-protocol/group@4.12.1(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@semaphore-protocol/identity@4.12.1)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
       '@noir-lang/acvm_js':
         specifier: 1.0.0-beta.3
         version: 1.0.0-beta.3
@@ -184,12 +187,15 @@ importers:
       '@phosphor-icons/react':
         specifier: ^2.1.4
         version: 2.1.10(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@semaphore-protocol/core':
-        specifier: github:hmzakhalid/semaphore-noir#dist-core
-        version: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
       '@semaphore-protocol/data':
-        specifier: ^4.9.2
-        version: 4.11.1(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.67)
+        specifier: ^4.12.1
+        version: 4.12.1(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.67)
+      '@semaphore-protocol/group':
+        specifier: ^4.12.1
+        version: 4.12.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@semaphore-protocol/identity':
+        specifier: ^4.12.1
+        version: 4.12.1
       '@svgr/rollup':
         specifier: ^8.1.0
         version: 8.1.0(rollup@4.44.1)(typescript@5.8.3)
@@ -554,7 +560,7 @@ importers:
         version: 5.3.0
       '@risc0/ethereum':
         specifier: file:lib/risc0-ethereum
-        version: risc0-ethereum@file:templates/default/lib/risc0-ethereum
+        version: file:templates/default/lib/risc0-ethereum
       '@typechain/ethers-v6':
         specifier: ^0.5.0
         version: 0.5.1(ethers@6.14.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typechain@8.3.2(typescript@5.8.3))(typescript@5.8.3)
@@ -2074,6 +2080,19 @@ packages:
   '@hapi/topo@5.1.0':
     resolution: {integrity: sha512-foQZKJig7Ob0BMAYBfcJk8d77QtOe7Wo4ox7ff1lQYoNNAb6jwcY1ncdoy2e9wQZzvNy7ODZCYJkK8kzmcAnAg==}
 
+  '@hashcloak/semaphore-contracts-noir@1.0.1':
+    resolution: {integrity: sha512-ZPDAzlBXit/HLfP/KeuXfzOg0SP2Lc8t8cx/UZ7HF1M0RSDmp1nDn6Mq9s2lLwzeP1IQRb6IYqye+BrLTXXE/A==}
+
+  '@hashcloak/semaphore-noir-artifacts@1.0.0':
+    resolution: {integrity: sha512-etyUmus9UeXY30lJfU/7JPkx1vDff6MsWVhacE3qAQwYUCkGwl1yNt86QZ16Jd9LncWIIbzAwA5aVJjmD7Kldw==}
+    hasBin: true
+
+  '@hashcloak/semaphore-noir-proof@1.0.0':
+    resolution: {integrity: sha512-/G8aPTYX2OJZ6GnOXuCflqKriA3MrQGb0CP+MpewO16IpC0K1345sEpjVBI0/92ty5zdLdlXCwUyHqeJP+OFIw==}
+    peerDependencies:
+      '@semaphore-protocol/group': 4.9.1
+      '@semaphore-protocol/identity': 4.9.1
+
   '@headlessui/react@1.7.19':
     resolution: {integrity: sha512-Ll+8q3OlMJfJbAKM/+/Y2q6PPYbryqNTXDbryx7SXLIDamkF6iQFbriYHga0dY44PvDhvvBWCx1Xj4U5+G4hOw==}
     engines: {node: '>=10'}
@@ -2866,6 +2885,9 @@ packages:
   '@reown/appkit@1.7.8':
     resolution: {integrity: sha512-51kTleozhA618T1UvMghkhKfaPcc9JlKwLJ5uV+riHyvSoWPKPRIa5A6M1Wano5puNyW0s3fwywhyqTHSilkaA==}
 
+  '@risc0/ethereum@file:templates/default/lib/risc0-ethereum':
+    resolution: {directory: templates/default/lib/risc0-ethereum, type: directory}
+
   '@rolldown/pluginutils@1.0.0-beta.19':
     resolution: {integrity: sha512-3FL3mnMbPu0muGOCaKAhhFEYmqv9eTfPSJRJmANrCwtgK8VuxpsZDGK+m0LYAGoyO8+0j5uRe4PeyPDK1yA/hA==}
 
@@ -3052,37 +3074,20 @@ packages:
   '@scure/bip39@1.6.0':
     resolution: {integrity: sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A==}
 
-  '@semaphore-protocol/contracts-noir@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/9cd8034957a6f66b787639e224e517d9b2a4c972':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/9cd8034957a6f66b787639e224e517d9b2a4c972}
-    version: 1.0.0
-
   '@semaphore-protocol/contracts@4.11.1':
     resolution: {integrity: sha512-WYh598A6UE4+akDxxw+jU8DMKWqDgJBdV/iEUdzdXE+YGVJav4uOQJY8KetNKAakJf3z3/8rgkPab+dk3fJyuQ==}
 
-  '@semaphore-protocol/core@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43}
-    version: 4.9.1
+  '@semaphore-protocol/data@4.12.1':
+    resolution: {integrity: sha512-ecupOTH6h7yhf0AV7Xiwy3CuJwaHV7UT0OhoenPYqOroqjasejtv8nv0VpnUgnvj9lIJ7ez5aLItS64FN0GBLw==}
 
-  '@semaphore-protocol/data@4.11.1':
-    resolution: {integrity: sha512-vOwZ3ywD6wofUSR1s0tpS8wg1pL0H3rs1S8zHOEJ9zLnnBMFPGgjy6eUI68uoRC9kKDB6/hypDj0ncHyFq6nBA==}
+  '@semaphore-protocol/group@4.12.1':
+    resolution: {integrity: sha512-A9GIjMj+r7xyQmpQflYlra9dPl4qiDLvrs2zO0exhqS20qYJvmVvAym8v/POG3fYzjMYgGOoJM0hgjrKO1tAWg==}
 
-  '@semaphore-protocol/group@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8}
-    version: 4.9.1
+  '@semaphore-protocol/identity@4.12.1':
+    resolution: {integrity: sha512-p9FNt9n/36BLefgn7fJ1Y2lMNS9BNw89nAksu8l+QoMOWViHV2DxJfeaMnXc0udOsBpGFLlPD+9TGDYFQ1gm7A==}
 
-  '@semaphore-protocol/identity@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef}
-    version: 4.9.1
-
-  '@semaphore-protocol/proof@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/d8989c48201f05245965f992e4fc4f0bddb7725e':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/d8989c48201f05245965f992e4fc4f0bddb7725e}
-    version: 4.9.1
-    peerDependencies:
-      '@semaphore-protocol/group': 4.9.1
-      '@semaphore-protocol/identity': 4.9.1
-
-  '@semaphore-protocol/utils@4.11.1':
-    resolution: {integrity: sha512-lTzZo9RV1wUyFXVnDcnSV3cDYfoMfmG17Sl9M1I7L82JX19LBPNJ1olBQbloC6UvyzE6DaqQ783MJnTkWEoDjg==}
+  '@semaphore-protocol/utils@4.12.1':
+    resolution: {integrity: sha512-Fycb3QjOsHuc4o635N3SMxumG2h3c7xBxdSYGfOaJQBzZ1zOk+IoQUvGNeuyb7d6W5ko+LPZ5op5uJltcaSXJQ==}
 
   '@semaphore-protocol/utils@4.9.1':
     resolution: {integrity: sha512-fhiVW/CL+zU/DvKAibBh3thEg2GKTMvNEl2V+fcJYbiyjxjZPfwvVHS/tP2wxBibU8bvtfcuqAk3WFdJXYFG2A==}
@@ -3817,11 +3822,6 @@ packages:
   '@walletconnect/window-metadata@1.0.1':
     resolution: {integrity: sha512-9koTqyGrM2cqFRW517BPY/iEtUDx2r1+Pwwu5m7sJ7ka79wi3EyqhqcICk/yDmv6jAS1rjKgTKXlEhanYjijcA==}
 
-  '@zk-kit/artifacts@https://codeload.github.com/hmzakhalid/snark-artifacts/tar.gz/a8eb62a0e3f1d4917f7895bf4511ee1f7f221dc3':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/snark-artifacts/tar.gz/a8eb62a0e3f1d4917f7895bf4511ee1f7f221dc3}
-    version: 2.0.1
-    hasBin: true
-
   '@zk-kit/baby-jubjub@1.0.3':
     resolution: {integrity: sha512-Wl+QfV6XGOMk1yU2JTqHXeKWfJVXp83is0+dtqfj9wx4wsAPpb+qzYvwAxW5PBx5/Nu71Bh7jp/5vM+6QgHSwA==}
 
@@ -3837,11 +3837,17 @@ packages:
   '@zk-kit/lean-imt@2.2.3':
     resolution: {integrity: sha512-T6NXLzMuwFjp+hg6WJZqzJ2qyyTmbS9JmxiWW/lmp+VxxJLAO9byAvqd5p/7616AXdHyTbwku0tdX0JDq9Pkng==}
 
+  '@zk-kit/lean-imt@2.2.4':
+    resolution: {integrity: sha512-uoRl99DID9Z5EuhfecDuIGP0KLrGEndVH0+texwVQBmlXTvve+grkKT4w06C+VFzRmfYNVuRo9tXvqIzQ3dqPA==}
+
   '@zk-kit/utils@1.2.1':
     resolution: {integrity: sha512-H2nTsyWdicVOyvqC5AjgU7tsTgmR6PDrruFJNmlmdhKp7RxEia/E1B1swMZjaasYa2QMp4Zc6oB7cWchty7B2Q==}
 
   '@zk-kit/utils@1.3.0':
     resolution: {integrity: sha512-Gqsq5KLDf2WPuZSsNc2KZy25XeK5d5UV9hwLaPEM5wq+GD2qCi1ZBFzNs0OptiJ9GRGtP2J/xptrszWri+pRqQ==}
+
+  '@zk-kit/utils@1.4.1':
+    resolution: {integrity: sha512-IoXzy3ElfkvRfC/s6uk3eFQO8uxkCdAOVxKlJlaEjM7pgckX5AK46Q+7n5yMQD/v/o6OL0mMtet065o5EpUocA==}
 
   abbrev@1.0.9:
     resolution: {integrity: sha512-LEyx4aLEC3x6T0UguF6YILf+ntvmOaWsVfENmIW0E9H09vKlLDGelMjjSm0jkDHALj8A8quZ/HapKNigzwge+Q==}
@@ -5417,6 +5423,10 @@ packages:
 
   ethers@6.13.4:
     resolution: {integrity: sha512-21YtnZVg4/zKkCQPjrDj38B1r4nQvTZLopUGMLQ1ePU2zV/joCfDC3t3iKQjWRzjjjbzR+mdAIoikeBRNkdllA==}
+    engines: {node: '>=14.0.0'}
+
+  ethers@6.13.5:
+    resolution: {integrity: sha512-+knKNieu5EKRThQJWwqaJ10a6HE9sSehGeqWN65//wE7j47ZpFhKAnHB/JJFibwwg61I/koxaPsXbXpD/skNOQ==}
     engines: {node: '>=14.0.0'}
 
   ethers@6.14.4:
@@ -8114,9 +8124,6 @@ packages:
 
   ripemd160@2.0.2:
     resolution: {integrity: sha512-ii4iagi25WusVoiC4B4lq7pbXfAp3D9v5CwfkY33vffw2+pkDjY1D8GaN7spsxvCSx8dkPqOZCEZyfxcmJG2IA==}
-
-  risc0-ethereum@file:templates/default/lib/risc0-ethereum:
-    resolution: {directory: templates/default/lib/risc0-ethereum, type: directory}
 
   rlp@2.2.7:
     resolution: {integrity: sha512-d5gdPmgQ0Z+AklL2NVXr/IoSjNZFfTVvQWzL/AM2AOcSzYP2xjlb0AC8YyCLc41MSNf6P6QVtjgPdmVtzb+4lQ==}
@@ -11252,6 +11259,42 @@ snapshots:
     dependencies:
       '@hapi/hoek': 9.3.0
 
+  '@hashcloak/semaphore-contracts-noir@1.0.1':
+    dependencies:
+      '@zk-kit/lean-imt.sol': 2.0.0
+
+  '@hashcloak/semaphore-noir-artifacts@1.0.0(@types/snarkjs@0.7.9)(commander@13.1.0)':
+    dependencies:
+      '@commander-js/extra-typings': 12.1.0(commander@13.1.0)
+      '@inquirer/input': 2.3.0
+      '@inquirer/select': 2.5.0
+      '@noir-lang/noir_js': 1.0.0-beta.3
+      circomkit: 0.2.1(@types/snarkjs@0.7.9)(snarkjs@0.7.4)
+      ora: 5.4.1
+      snarkjs: 0.7.4
+    transitivePeerDependencies:
+      - '@types/snarkjs'
+      - commander
+
+  '@hashcloak/semaphore-noir-proof@1.0.0(@semaphore-protocol/group@4.12.1(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@semaphore-protocol/identity@4.12.1)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)':
+    dependencies:
+      '@aztec/bb.js': 0.82.2
+      '@noir-lang/noir_js': 1.0.0-beta.3
+      '@noir-lang/noir_wasm': 1.0.0-beta.3
+      '@semaphore-protocol/group': 4.12.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@semaphore-protocol/identity': 4.12.1
+      '@semaphore-protocol/utils': 4.9.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@zk-kit/artifacts': '@hashcloak/semaphore-noir-artifacts@1.0.0(@types/snarkjs@0.7.9)(commander@13.1.0)'
+      '@zk-kit/utils': 1.3.0
+      ethers: 6.13.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      snarkjs: 0.7.4
+    transitivePeerDependencies:
+      - '@types/snarkjs'
+      - bufferutil
+      - commander
+      - supports-color
+      - utf-8-validate
+
   '@headlessui/react@1.7.19(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@tanstack/react-virtual': 3.13.11(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -12446,6 +12489,8 @@ snapshots:
       - utf-8-validate
       - zod
 
+  '@risc0/ethereum@file:templates/default/lib/risc0-ethereum': {}
+
   '@rolldown/pluginutils@1.0.0-beta.19': {}
 
   '@rollup/plugin-inject@5.0.5(rollup@4.44.1)':
@@ -12653,29 +12698,13 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
 
-  '@semaphore-protocol/contracts-noir@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/9cd8034957a6f66b787639e224e517d9b2a4c972':
-    dependencies:
-      '@zk-kit/lean-imt.sol': 2.0.0
-
   '@semaphore-protocol/contracts@4.11.1':
     dependencies:
       '@zk-kit/lean-imt.sol': 2.0.1
 
-  '@semaphore-protocol/core@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)':
+  '@semaphore-protocol/data@4.12.1(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.67)':
     dependencies:
-      '@semaphore-protocol/group': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8
-      '@semaphore-protocol/identity': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef
-      '@semaphore-protocol/proof': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/d8989c48201f05245965f992e4fc4f0bddb7725e(@semaphore-protocol/group@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8)(@semaphore-protocol/identity@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - '@types/snarkjs'
-      - bufferutil
-      - commander
-      - supports-color
-      - utf-8-validate
-
-  '@semaphore-protocol/data@4.11.1(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.67)':
-    dependencies:
-      '@semaphore-protocol/utils': 4.11.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@semaphore-protocol/utils': 4.12.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@zk-kit/utils': 1.3.0
       axios: 1.6.6
       ethers: 6.13.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -12687,39 +12716,23 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@semaphore-protocol/group@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8':
+  '@semaphore-protocol/group@4.12.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:
-      '@zk-kit/lean-imt': 2.2.3
+      '@zk-kit/lean-imt': 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       '@zk-kit/utils': 1.3.0
       poseidon-lite: 0.3.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
-  '@semaphore-protocol/identity@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef':
+  '@semaphore-protocol/identity@4.12.1':
     dependencies:
       '@zk-kit/baby-jubjub': 1.0.3
       '@zk-kit/eddsa-poseidon': 1.0.4
       '@zk-kit/utils': 1.3.0
       poseidon-lite: 0.3.0
 
-  '@semaphore-protocol/proof@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/d8989c48201f05245965f992e4fc4f0bddb7725e(@semaphore-protocol/group@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8)(@semaphore-protocol/identity@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@aztec/bb.js': 0.82.2
-      '@noir-lang/noir_js': 1.0.0-beta.3
-      '@noir-lang/noir_wasm': 1.0.0-beta.3
-      '@semaphore-protocol/group': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8
-      '@semaphore-protocol/identity': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef
-      '@semaphore-protocol/utils': 4.9.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      '@zk-kit/artifacts': https://codeload.github.com/hmzakhalid/snark-artifacts/tar.gz/a8eb62a0e3f1d4917f7895bf4511ee1f7f221dc3(@types/snarkjs@0.7.9)(commander@13.1.0)
-      '@zk-kit/utils': 1.3.0
-      ethers: 6.13.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      snarkjs: 0.7.4
-    transitivePeerDependencies:
-      - '@types/snarkjs'
-      - bufferutil
-      - commander
-      - supports-color
-      - utf-8-validate
-
-  '@semaphore-protocol/utils@4.11.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
+  '@semaphore-protocol/utils@4.12.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:
       ethers: 6.14.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
@@ -14193,19 +14206,6 @@ snapshots:
       '@walletconnect/window-getters': 1.0.1
       tslib: 1.14.1
 
-  '@zk-kit/artifacts@https://codeload.github.com/hmzakhalid/snark-artifacts/tar.gz/a8eb62a0e3f1d4917f7895bf4511ee1f7f221dc3(@types/snarkjs@0.7.9)(commander@13.1.0)':
-    dependencies:
-      '@commander-js/extra-typings': 12.1.0(commander@13.1.0)
-      '@inquirer/input': 2.3.0
-      '@inquirer/select': 2.5.0
-      '@noir-lang/noir_js': 1.0.0-beta.3
-      circomkit: 0.2.1(@types/snarkjs@0.7.9)(snarkjs@0.7.4)
-      ora: 5.4.1
-      snarkjs: 0.7.4
-    transitivePeerDependencies:
-      - '@types/snarkjs'
-      - commander
-
   '@zk-kit/baby-jubjub@1.0.3':
     dependencies:
       '@zk-kit/utils': 1.2.1
@@ -14229,6 +14229,13 @@ snapshots:
     dependencies:
       '@zk-kit/utils': 1.3.0
 
+  '@zk-kit/lean-imt@2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
+    dependencies:
+      '@zk-kit/utils': 1.4.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@zk-kit/utils@1.2.1':
     dependencies:
       buffer: 6.0.3
@@ -14236,6 +14243,14 @@ snapshots:
   '@zk-kit/utils@1.3.0':
     dependencies:
       buffer: 6.0.3
+
+  '@zk-kit/utils@1.4.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
+    dependencies:
+      buffer: 6.0.3
+      ethers: 6.13.5(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   abbrev@1.0.9: {}
 
@@ -16099,6 +16114,19 @@ snapshots:
       - utf-8-validate
 
   ethers@6.13.4(bufferutil@4.0.9)(utf-8-validate@5.0.10):
+    dependencies:
+      '@adraffy/ens-normalize': 1.10.1
+      '@noble/curves': 1.2.0
+      '@noble/hashes': 1.3.2
+      '@types/node': 22.7.5
+      aes-js: 4.0.0-beta.5
+      tslib: 2.7.0
+      ws: 8.17.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  ethers@6.13.5(bufferutil@4.0.9)(utf-8-validate@5.0.10):
     dependencies:
       '@adraffy/ens-normalize': 1.10.1
       '@noble/curves': 1.2.0
@@ -19603,8 +19631,6 @@ snapshots:
     dependencies:
       hash-base: 3.1.0
       inherits: 2.0.4
-
-  risc0-ethereum@file:templates/default/lib/risc0-ethereum: {}
 
   rlp@2.2.7:
     dependencies:
