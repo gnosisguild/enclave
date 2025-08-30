@@ -2826,6 +2826,8 @@ dependencies = [
  "e3-events",
  "e3-fhe",
  "e3-request",
+ "e3-trbfv",
+ "fhe-traits",
  "serde",
  "tracing",
 ]

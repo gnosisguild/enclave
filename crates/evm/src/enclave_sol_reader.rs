@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::sync::Arc;
+
 use crate::event_reader::EvmEventReaderState;
 use crate::helpers::EthProvider;
 use crate::EvmEventReader;
@@ -27,8 +29,9 @@ struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 impl From<E3RequestedWithChainId> for e3_events::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
         e3_events::E3Requested {
-            params: value.0.e3.e3ProgramParams.to_vec(),
+            params: Arc::new(value.0.e3.e3ProgramParams.to_vec()),
             threshold_m: value.0.e3.threshold[0] as usize,
+            threshold_n: value.0.e3.threshold[1] as usize,
             seed: value.0.e3.seed.into(),
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
         }

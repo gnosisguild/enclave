@@ -336,6 +336,17 @@ where
         });
         rx
     }
+
+    pub async fn send_and_wait(
+        bus: &Addr<EventBus<E>>,
+        event: E,
+        matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+    ) -> Result<E> {
+        let waiter = Self::wait(bus, matcher);
+        bus.do_send(event);
+
+        waiter.await?
+    }
 }
 
 impl<E> Actor for EventWaiter<E>
