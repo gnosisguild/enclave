@@ -8,6 +8,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/test-helpers"
 
 [dependencies]
 actix = { workspace = true }
+anyhow = { workspace = true }
 e3-events = { workspace = true }
 e3-fhe = { workspace = true }
 bincode = { workspace = true }

@@ -5,11 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
+use anyhow::{anyhow, Result};
 use bloom::{BloomFilter, ASMS};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
+use tokio::sync::oneshot;
 
 //////////////////////////////////////////////////////////////////////////////
 // Core Traits
@@ -140,7 +142,23 @@ pub struct Subscribe<E: Event> {
     pub listener: Recipient<E>,
 }
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Unsubscribe<E: Event> {
+    pub event_type: String,
+    pub listener: Recipient<E>,
+}
+
 impl<E: Event> Subscribe<E> {
+    pub fn new(event_type: impl Into<String>, listener: Recipient<E>) -> Self {
+        Self {
+            event_type: event_type.into(),
+            listener,
+        }
+    }
+}
+
+impl<E: Event> Unsubscribe<E> {
     pub fn new(event_type: impl Into<String>, listener: Recipient<E>) -> Self {
         Self {
             event_type: event_type.into(),
@@ -157,6 +175,16 @@ impl<E: Event> Handler<Subscribe<E>> for EventBus<E> {
             .entry(msg.event_type)
             .or_default()
             .push(msg.listener);
+    }
+}
+
+impl<E: Event> Handler<Unsubscribe<E>> for EventBus<E> {
+    type Result = ();
+
+    fn handle(&mut self, msg: Unsubscribe<E>, _: &mut Context<Self>) {
+        if let Some(listeners) = self.listeners.get_mut(&msg.event_type) {
+            listeners.retain(|listener| listener != &msg.listener);
+        }
     }
 }
 
@@ -251,6 +279,127 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
         self.history.push(msg);
     }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// EventWaiter
+//////////////////////////////////////////////////////////////////////////////
+#[derive(Message)]
+#[rtype(result = "()")]
+struct TimeoutMessage;
+
+/// Actor to wait on specific events in order to help with testing
+pub struct EventWaiter<E>
+where
+    E: Event + Clone,
+{
+    tx: Option<oneshot::Sender<Result<E>>>,
+    matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+    bus: Addr<EventBus<E>>,
+}
+
+impl<E> EventWaiter<E>
+where
+    E: Event + Clone,
+{
+    pub fn new(
+        bus: Addr<EventBus<E>>,
+        tx: oneshot::Sender<Result<E>>,
+        matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+    ) -> Self {
+        Self {
+            tx: Some(tx),
+            matcher,
+            bus,
+        }
+    }
+
+    pub fn wait(
+        bus: &Addr<EventBus<E>>,
+        matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+    ) -> oneshot::Receiver<Result<E>> {
+        Self::wait_with_timeout(bus, matcher, 10000)
+    }
+
+    pub fn wait_with_timeout(
+        bus: &Addr<EventBus<E>>,
+        matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+        timeout: u64,
+    ) -> oneshot::Receiver<Result<E>> {
+        let (tx, rx) = oneshot::channel::<Result<E>>();
+        let addr = Self::new(bus.clone(), tx, matcher).start();
+        bus.do_send(Subscribe::new("*", addr.clone().recipient()));
+        // Add timeout
+        tokio::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(timeout)).await;
+            addr.do_send(TimeoutMessage);
+        });
+        rx
+    }
+
+    pub async fn send_and_wait(
+        bus: &Addr<EventBus<E>>,
+        event: E,
+        matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+    ) -> Result<E> {
+        let waiter = Self::wait(bus, matcher);
+        bus.do_send(event);
+
+        waiter.await?
+    }
+}
+
+impl<E> Actor for EventWaiter<E>
+where
+    E: Event + Clone,
+{
+    type Context = Context<Self>;
+}
+
+impl<E> Handler<E> for EventWaiter<E>
+where
+    E: Event + Clone,
+{
+    type Result = ();
+
+    fn handle(&mut self, msg: E, ctx: &mut Self::Context) -> Self::Result {
+        if (self.matcher)(&msg) {
+            if let Some(tx) = self.tx.take() {
+                let _ = tx.send(Ok(msg.clone()));
+                self.bus.do_send(Unsubscribe::new(
+                    msg.event_type(),
+                    ctx.address().recipient(),
+                ));
+                ctx.stop();
+            }
+        }
+    }
+}
+
+impl<E> Handler<TimeoutMessage> for EventWaiter<E>
+where
+    E: Event + Clone,
+{
+    type Result = ();
+
+    fn handle(&mut self, _msg: TimeoutMessage, ctx: &mut Self::Context) -> Self::Result {
+        if let Some(tx) = self.tx.take() {
+            let _ = tx.send(Err(anyhow!("Event timeout!")));
+            ctx.stop();
+        }
+    }
+}
+
+/// Prepare a receiver to return the first event that passes the matcher function from the event
+/// bus. You must return the receiver first before triggering any events.
+pub fn wait_for_event<E>(
+    bus: &Addr<EventBus<E>>,
+    matcher: Box<dyn Fn(&E) -> bool + Send + 'static>,
+) -> oneshot::Receiver<Result<E>>
+where
+    E: Event + Clone,
+{
+    EventWaiter::wait(bus, matcher)
 }
 
 //////////////////////////////////////////////////////////////////////////////
