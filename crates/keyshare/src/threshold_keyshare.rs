@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 
 use actix::prelude::*;
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
@@ -20,13 +20,17 @@ use fhe_traits::Serialize;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "Result<()>")]
+struct StartThresholdShareGeneration(CiphernodeSelected);
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[rtype(result = "Result<()>")]
 struct GenPkShareAndSkSss(CiphernodeSelected);
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "Result<()>")]
 struct GenEsiSss(CiphernodeSelected);
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingThresholdShareData {
     pk_share: Option<Arc<Vec<u8>>>,
     sk_sss: Option<Vec<SensitiveBytes>>,
@@ -42,6 +46,42 @@ pub enum KeyshareState {
     ReadyForDecryption,       // Awaiting decryption
     Decrypting,               // Decrypting something
     Completed,                // Finished
+}
+
+impl KeyshareState {
+    pub fn next(self: &KeyshareState, new_state: KeyshareState) -> Result<KeyshareState> {
+        use KeyshareState as K;
+        let valid = {
+            // If we are in the same branch the new state is valid
+            if mem::discriminant(self) == mem::discriminant(&new_state) {
+                true
+            } else {
+                match (self, &new_state) {
+                    (K::Init, K::GeneratingThresholdShare(_)) => true,
+                    (K::AggregatingDecryptionKey, K::ReadyForDecryption) => true,
+                    (K::ReadyForDecryption, K::Decrypting) => true,
+                    (K::Decrypting, K::Completed) => true,
+                    _ => false,
+                }
+            }
+        };
+
+        if valid {
+            Ok(new_state)
+        } else {
+            Err(anyhow!(
+                "Bad state transition {:?} -> {:?}",
+                self,
+                new_state
+            ))
+        }
+    }
+}
+
+impl Default for KeyshareState {
+    fn default() -> Self {
+        KeyshareState::Init
+    }
 }
 
 pub struct ThresholdKeyshare {
@@ -81,25 +121,25 @@ impl ThresholdKeyshare {
     ) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
-            let K::GeneratingThresholdShare(mut g) = s else {
-                bail!("bad state");
+            let K::GeneratingThresholdShare(mut g) = s.clone() else {
+                bail!("Cannot store pkshare and sk sss on state {:?}", s);
             };
 
             g.pk_share = Some(pk_share);
             g.sk_sss = Some(sk_sss);
-            Ok(K::GeneratingThresholdShare(g))
+            Ok(s.next(K::GeneratingThresholdShare(g))?)
         })
     }
 
     pub fn try_store_esi_sss(&mut self, value: Vec<Vec<SensitiveBytes>>) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
-            let K::GeneratingThresholdShare(mut g) = s else {
-                bail!("bad state");
+            let K::GeneratingThresholdShare(mut g) = s.clone() else {
+                bail!("Cannot store esi_sss on state {:?}", s);
             };
 
             g.esi_sss = Some(value);
-            Ok(K::GeneratingThresholdShare(g))
+            Ok(s.next(K::GeneratingThresholdShare(g))?)
         })
     }
 }
@@ -121,11 +161,30 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
 impl Handler<CiphernodeSelected> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: CiphernodeSelected, ctx: &mut Self::Context) -> Self::Result {
-        // Run both simultaneously
-        ctx.notify(GenPkShareAndSkSss(msg.clone()));
-        ctx.notify(GenEsiSss(msg));
+        ctx.notify(StartThresholdShareGeneration(msg));
     }
 }
+impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
+    type Result = Result<()>;
+    fn handle(
+        &mut self,
+        msg: StartThresholdShareGeneration,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        // Change state
+        self.state.try_mutate(|s| {
+            s.next(KeyshareState::GeneratingThresholdShare(
+                GeneratingThresholdShareData::default(),
+            ))
+        })?;
+
+        // Run both simultaneously
+        ctx.notify(GenPkShareAndSkSss(msg.0.clone()));
+        ctx.notify(GenEsiSss(msg.0));
+        Ok(())
+    }
+}
+
 impl Handler<GenEsiSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, Result<()>>;
     fn handle(&mut self, msg: GenEsiSss, ctx: &mut Self::Context) -> Self::Result {
