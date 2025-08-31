@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 use std::sync::Arc;
 
 use actix::prelude::*;
@@ -159,6 +165,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
         )
     }
 }
+
 impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, Result<()>>;
     fn handle(&mut self, msg: GenPkShareAndSkSss, ctx: &mut Self::Context) -> Self::Result {
