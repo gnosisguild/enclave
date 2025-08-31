@@ -7,7 +7,7 @@
 use actix::Actor;
 use anyhow::{bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
-use e3_events::{wait_for_event, EnclaveEvent, EventBus, EventBusConfig};
+use e3_events::{wait_for_event, EnclaveEvent, EventBus, EventBusConfig, EventWaiter};
 use e3_multithread::Multithread;
 use e3_sdk::bfv_helpers::encode_bfv_params;
 use e3_test_helpers::get_common_setup;
@@ -67,6 +67,14 @@ async fn generate_party_shares(
 ) -> Result<PartySharesResult> {
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
 
+    // 1. ThresholdKeyshare receives CiphernodeSelected event
+    // 1. EventBus emits EncryptionPubkeyCreated
+    // 1. Send other parties' EncryptionPubkeyCreated events to everyone else
+    // 1. Wait for GlobalEncryptionKeyAggregated
+    // 1. EventBus emits KeyshareCreated
+    // 1. EventBus emits THresholdShareCreated
+    //
+
     // Setup multithread processor
     // TODO: Currently only testing logic not setup on multithread yet
     let _multi = Multithread::attach(&bus, rng, cipher.clone());
@@ -75,28 +83,36 @@ async fn generate_party_shares(
     // 1. Generate initial pk and sk sss
     /////////////////////////////////////////////
 
-    let gen_pk_share_and_sk_sss: EnclaveEvent = e3_trbfv::gen_pk_share_and_sk_sss::Request {
+    let event: EnclaveEvent = e3_trbfv::gen_pk_share_and_sk_sss::Request {
         trbfv_config: TrBFVConfig::new(params.clone(), num_parties, threshold),
         crp,
     }
     .into();
 
-    let correlation_id = gen_pk_share_and_sk_sss.correlation_id().unwrap();
-    // Now lets setup a waiter to wait for the response
-    let wait_for_response = wait_for_event(
+    let correlation_id = event.correlation_id();
+
+    let pk_share_and_sk_sss_event = EventWaiter::send_and_wait(
         &bus,
-        Box::new(move |e| match e {
-            EnclaveEvent::ComputeRequestSucceeded { data, .. } => {
-                data.correlation_id == correlation_id
-            }
-            _ => false,
-        }),
-    );
+        event,
+        Box::new(move |e| e.correlation_id().is_some() && e.correlation_id() == correlation_id),
+    )
+    .await?;
+
+    // // Now lets setup a waiter to wait for the response
+    // let wait_for_response = wait_for_event(
+    //     &bus,
+    //     Box::new(move |e| match e {
+    //         EnclaveEvent::ComputeRequestSucceeded { data, .. } => {
+    //             data.correlation_id == correlation_id
+    //         }
+    //         _ => false,
+    //     }),
+    // );
 
     // Send the event
-    bus.do_send(gen_pk_share_and_sk_sss.clone());
+    // bus.do_send(gen_pk_share_and_sk_sss.clone());
 
-    let pk_share_and_sk_sss_event = wait_for_response.await??;
+    // let pk_share_and_sk_sss_event = wait_for_response.await??;
 
     /////////////////////////////////////////////
     // 2. Generate smudging noise

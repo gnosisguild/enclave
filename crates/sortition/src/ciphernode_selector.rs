@@ -89,6 +89,11 @@ impl Handler<E3Requested> for CiphernodeSelector {
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
                     e3_id: data.e3_id,
                     threshold_m: data.threshold_m,
+                    threshold_n: data.threshold_n,
+                    esi_per_ct: data.esi_per_ct,
+                    error_size: data.error_size,
+                    params: data.params.clone(),
+                    seed: data.seed.clone(),
                 }));
             }
         })

@@ -11,6 +11,7 @@ use e3_crypto::{Cipher, SensitiveBytes};
 use fhe_math::rq::Poly;
 use fhe_rs::bfv::BfvParameters;
 use fhe_traits::DeserializeWithContext;
+use ndarray::Array2;
 
 pub fn try_poly_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly> {
     Ok(Poly::from_bytes(bytes, params.ctx_at_level(0)?)?)

@@ -20,6 +20,7 @@ mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
 mod test_event;
+mod threshold_share_created;
 
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
@@ -30,7 +31,6 @@ pub use decryptionshare_created::*;
 pub use die::*;
 pub use e3_request_complete::*;
 pub use e3_requested::*;
-use e3_trbfv::{TrBFVRequest, TrBFVResponse};
 pub use enclave_error::*;
 pub use keyshare_created::*;
 pub use plaintext_aggregated::*;
@@ -38,8 +38,9 @@ pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
 pub use test_event::*;
+pub use threshold_share_created::*;
 
-use crate::{CorrelationId, E3id, ErrorEvent, Event, EventId};
+use crate::{E3id, ErrorEvent, Event, EventId};
 use actix::Message;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -114,17 +115,9 @@ pub enum EnclaveEvent {
         id: EventId,
         data: Shutdown,
     },
-    ComputeRequested {
+    ThresholdShareCreated {
         id: EventId,
-        data: ComputeRequested,
-    },
-    ComputeRequestFailed {
-        id: EventId,
-        data: ComputeRequestFailed,
-    },
-    ComputeRequestSucceeded {
-        id: EventId,
-        data: ComputeRequestSucceeded,
+        data: ThresholdShareCreated,
     },
     /// This is a test event to use in testing
     TestEvent {
@@ -156,64 +149,6 @@ impl EnclaveEvent {
             EnclaveEvent::E3RequestComplete { .. } => true,
             EnclaveEvent::Shutdown { .. } => true,
             _ => false,
-        }
-    }
-
-    // NOTE: I am not sure about the following helper methods existing on EnclaveEvent. On one hand
-    // they are explicit and exhaustive but it seems like a fair bit to maintain.
-    // We could put them behind traits potentially?
-    pub fn correlation_id(&self) -> Option<CorrelationId> {
-        match self {
-            EnclaveEvent::ComputeRequested {
-                data: ComputeRequested { correlation_id, .. },
-                ..
-            } => Some(correlation_id.clone()),
-            EnclaveEvent::ComputeRequestSucceeded {
-                data: ComputeRequestSucceeded { correlation_id, .. },
-                ..
-            } => Some(correlation_id.clone()),
-            EnclaveEvent::ComputeRequestFailed {
-                data: ComputeRequestFailed { correlation_id, .. },
-                ..
-            } => Some(correlation_id.clone()),
-
-            _ => None,
-        }
-    }
-
-    pub fn trbfv_request(&self) -> Option<&TrBFVRequest> {
-        match self {
-            EnclaveEvent::ComputeRequested {
-                data:
-                    ComputeRequested {
-                        payload: ComputeRequest::TrBFV(request),
-                        ..
-                    },
-                ..
-            } => Some(request),
-            EnclaveEvent::ComputeRequestFailed {
-                data:
-                    ComputeRequestFailed {
-                        payload: ComputeRequest::TrBFV(request),
-                        ..
-                    },
-                ..
-            } => Some(request),
-            _ => None,
-        }
-    }
-
-    pub fn trbfv_response(&self) -> Option<&TrBFVResponse> {
-        match self {
-            EnclaveEvent::ComputeRequestSucceeded {
-                data:
-                    ComputeRequestSucceeded {
-                        payload: ComputeResponse::TrBFV(response),
-                        ..
-                    },
-                ..
-            } => Some(response),
-            _ => None,
         }
     }
 }
@@ -261,10 +196,8 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::EnclaveError { id, .. } => id,
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
-            EnclaveEvent::ComputeRequested { id, .. } => id,
-            EnclaveEvent::ComputeRequestSucceeded { id, .. } => id,
-            EnclaveEvent::ComputeRequestFailed { id, .. } => id,
             EnclaveEvent::TestEvent { id, .. } => id,
+            EnclaveEvent::ThresholdShareCreated { id, .. } => id,
         }
     }
 }
@@ -279,6 +212,7 @@ impl EnclaveEvent {
             EnclaveEvent::DecryptionshareCreated { data, .. } => Some(data.e3_id),
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
+            EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.e3_id),
             _ => None,
         }
     }
@@ -296,9 +230,7 @@ impl EnclaveEvent {
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
-            EnclaveEvent::ComputeRequested { data, .. } => format!("{:?}", data),
-            EnclaveEvent::ComputeRequestSucceeded { data, .. } => format!("{:?}", data),
-            EnclaveEvent::ComputeRequestFailed { data, .. } => format!("{:?}", data),
+            EnclaveEvent::ThresholdShareCreated { data, .. } => format!("{:?}", data),
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
@@ -316,9 +248,6 @@ impl_from_event!(
     CiphernodeSelected,
     CiphernodeAdded,
     CiphernodeRemoved,
-    ComputeRequested,
-    ComputeRequestSucceeded,
-    ComputeRequestFailed,
     EnclaveError,
     Shutdown,
     TestEvent

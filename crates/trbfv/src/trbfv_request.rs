@@ -37,5 +37,9 @@ pub enum TrBFVResponse {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVError {
-    // TODO: Add errors here as required
+    GenEsiSss,
+    GenPkShareAndSkSss,
+    CalculateDecryptionKey,
+    CalculateDecryptionShare,
+    CalculateThresholdDecryption,
 }

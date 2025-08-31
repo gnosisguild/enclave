@@ -42,7 +42,7 @@ impl TryFrom<Request> for InnerRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Response {
     /// The smudging noise shares
-    pub esi_sss: Vec<SensitiveBytes>,
+    pub esi_sss: Vec<Vec<SensitiveBytes>>,
 }
 
 impl TryFrom<(InnerResponse, &Cipher)> for Response {
@@ -54,7 +54,7 @@ impl TryFrom<(InnerResponse, &Cipher)> for Response {
             esi_sss: value
                 .esi_sss
                 .into_iter()
-                .map(|s| SensitiveBytes::new(bincode::serialize(&s)?, cipher))
+                .map(|s| SensitiveBytes::try_from_unserialized_vec(s, cipher))
                 .collect::<Result<_>>()?,
         })
     }

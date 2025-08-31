@@ -58,12 +58,7 @@ impl TryFrom<(InnerResponse, &Cipher)> for Response {
         (value, cipher): (InnerResponse, &Cipher),
     ) -> std::result::Result<Self, Self::Error> {
         let pk_share = Arc::new(value.pk_share.to_bytes());
-        let sk_sss = value
-            .sk_sss
-            .into_iter()
-            .map(|s| SensitiveBytes::new(bincode::serialize(&s)?, cipher))
-            .collect::<Result<_>>()?;
-
+        let sk_sss = SensitiveBytes::try_from_unserialized_vec(value.sk_sss, cipher)?;
         Ok(Response { pk_share, sk_sss })
     }
 }

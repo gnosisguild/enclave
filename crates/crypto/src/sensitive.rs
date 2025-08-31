@@ -48,6 +48,19 @@ impl SensitiveBytes {
             .collect::<Result<_>>()
     }
 
+    pub fn try_from_unserialized_vec<T: Sized>(
+        value: Vec<T>,
+        cipher: &Cipher,
+    ) -> Result<Vec<SensitiveBytes>>
+    where
+        T: ?Sized + serde::Serialize,
+    {
+        value
+            .into_iter()
+            .map(|s| SensitiveBytes::new(bincode::serialize(&s)?, cipher))
+            .collect::<Result<_>>()
+    }
+
     /// Access the decrypted data, wrapped in a ZeroizeOnDrop container
     // TODO: rename try_access
     pub fn access(&self, cipher: &Cipher) -> Result<Zeroizing<Vec<u8>>> {
