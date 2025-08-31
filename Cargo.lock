@@ -2833,6 +2833,7 @@ dependencies = [
  "fhe-traits",
  "serde",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]

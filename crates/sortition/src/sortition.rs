@@ -7,18 +7,19 @@
 use crate::DistanceSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
     Subscribe,
 };
+use num::BigInt;
 use std::collections::{HashMap, HashSet};
 use tracing::{info, instrument, trace};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "bool")]
-pub struct GetHasNode {
+#[rtype(result = "Option<u64>")]
+pub struct GetNodeIndex {
     pub seed: Seed,
     pub address: String,
     pub size: usize,
@@ -27,6 +28,7 @@ pub struct GetHasNode {
 
 pub trait SortitionList<T> {
     fn contains(&self, seed: Seed, size: usize, address: T) -> Result<bool>;
+    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>>;
     fn add(&mut self, address: T);
     fn remove(&mut self, address: T);
 }
@@ -60,23 +62,28 @@ impl SortitionList<String> for SortitionModule {
             return Err(anyhow!("No nodes registered!"));
         }
 
-        let registered_nodes: Vec<Address> = self
-            .nodes
-            .clone()
-            .into_iter()
-            // TODO: error handling
-            .map(|b| b.parse().unwrap())
-            .collect();
-
-        let Ok(committee) =
-            DistanceSortition::new(seed.into(), registered_nodes, size).get_committee()
-        else {
-            return Err(anyhow!("Could not get committee!"));
-        };
+        let committee = get_committee(seed, size, self.nodes.clone())?;
 
         Ok(committee
             .iter()
             .any(|(_, addr)| addr.to_string() == address))
+    }
+
+    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>> {
+        if self.nodes.len() == 0 {
+            return Err(anyhow!("No nodes registered!"));
+        }
+
+        let committee = get_committee(seed, size, self.nodes.clone())?;
+
+        let maybe_index = committee.iter().enumerate().find_map(|(index, (_, addr))| {
+            if addr.to_string() == address {
+                return Some(index as u64);
+            }
+            None
+        });
+
+        Ok(maybe_index)
     }
 
     fn add(&mut self, address: String) {
@@ -86,6 +93,21 @@ impl SortitionList<String> for SortitionModule {
     fn remove(&mut self, address: String) {
         self.nodes.remove(&address);
     }
+}
+
+fn get_committee(
+    seed: Seed,
+    size: usize,
+    nodes: HashSet<String>,
+) -> Result<Vec<(BigInt, Address)>> {
+    let registered_nodes: Vec<Address> = nodes
+        .into_iter()
+        .map(|b| b.parse().context(format!("Error parsing address {}", b)))
+        .collect::<Result<_>>()?;
+
+    DistanceSortition::new(seed.into(), registered_nodes, size)
+        .get_committee()
+        .context("Could not get committee!")
 }
 
 #[derive(Message)]
@@ -195,22 +217,22 @@ impl Handler<CiphernodeRemoved> for Sortition {
     }
 }
 
-impl Handler<GetHasNode> for Sortition {
-    type Result = bool;
+impl Handler<GetNodeIndex> for Sortition {
+    type Result = Option<u64>;
 
     #[instrument(name = "sortition", skip_all)]
-    fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
         self.list
             .try_with(|list_map| {
                 if let Some(entry) = list_map.get(&msg.chain_id) {
-                    return entry.contains(msg.seed, msg.size, msg.address);
+                    return entry.get_index(msg.seed, msg.size, msg.address);
                 }
 
-                Ok(false)
+                Ok(None)
             })
             .unwrap_or_else(|err| {
                 self.bus.err(EnclaveErrorType::Sortition, err);
-                false
+                None
             })
     }
 }

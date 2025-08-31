@@ -7,14 +7,24 @@
 use crate::E3id;
 use actix::Message;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display};
+use std::{
+    fmt::{self, Display},
+    sync::Arc,
+};
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ThresholdShare {
+    pub party_id: u64,
+    pub pk_share: Arc<Vec<u8>>,
+    pub sk_sss: Vec<Vec<u8>>,
+    pub esi_sss: Vec<Vec<Vec<u8>>>,
+}
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ThresholdShareCreated {
     pub e3_id: E3id,
-    pub share: Vec<u8>,
-    pub party_id: u64,
+    pub share: ThresholdShare,
 }
 
 impl Display for ThresholdShareCreated {

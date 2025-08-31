@@ -11,12 +11,14 @@ use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    CiphernodeSelected, ComputeRequest, EnclaveEvent, EventBus, ThresholdShareCreated,
+    CiphernodeSelected, ComputeRequest, ComputeResponse, E3id, EnclaveEvent, EventBus,
+    ThresholdShare, ThresholdShareCreated,
 };
 use e3_fhe::set_up_crp;
 use e3_multithread::Multithread;
 use e3_trbfv::{gen_pk_share_and_sk_sss, SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse};
 use fhe_traits::Serialize;
+use zeroize::Zeroizing;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "Result<()>")]
@@ -30,6 +32,10 @@ struct GenPkShareAndSkSss(CiphernodeSelected);
 #[rtype(result = "Result<()>")]
 struct GenEsiSss(CiphernodeSelected);
 
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[rtype(result = "Result<()>")]
+struct SharesGenerated;
+
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingThresholdShareData {
     pk_share: Option<Arc<Vec<u8>>>,
@@ -40,12 +46,25 @@ pub struct GeneratingThresholdShareData {
 // TODO: Add GeneratingPvwKey state
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum KeyshareState {
-    Init,                                                   // Before anything
-    GeneratingThresholdShare(GeneratingThresholdShareData), // Generating TrBFV share material
-    AggregatingDecryptionKey, // Collecting remaining TrBFV shares to aggregate decryption key
-    ReadyForDecryption,       // Awaiting decryption
-    Decrypting,               // Decrypting something
-    Completed,                // Finished
+    // Before anything
+    Init,
+    // Generating TrBFV share material
+    GeneratingThresholdShare {
+        party_id: u64,
+        pk_share: Option<Arc<Vec<u8>>>,
+        sk_sss: Option<Vec<SensitiveBytes>>,
+        esi_sss: Option<Vec<Vec<SensitiveBytes>>>,
+    },
+    // Collecting remaining TrBFV shares to aggregate decryption key
+    AggregatingDecryptionKey {
+        party_id: u64,
+        pk_share: Arc<Vec<u8>>,
+        sk_sss: Vec<SensitiveBytes>,
+        esi_sss: Vec<Vec<SensitiveBytes>>,
+    },
+    ReadyForDecryption, // Awaiting decryption
+    Decrypting,         // Decrypting something
+    Completed,          // Finished
 }
 
 impl KeyshareState {
@@ -57,8 +76,8 @@ impl KeyshareState {
                 true
             } else {
                 match (self, &new_state) {
-                    (K::Init, K::GeneratingThresholdShare(_)) => true,
-                    (K::AggregatingDecryptionKey, K::ReadyForDecryption) => true,
+                    (K::Init, K::GeneratingThresholdShare { .. }) => true,
+                    (K::AggregatingDecryptionKey { .. }, K::ReadyForDecryption) => true,
                     (K::ReadyForDecryption, K::Decrypting) => true,
                     (K::Decrypting, K::Completed) => true,
                     _ => false,
@@ -85,6 +104,7 @@ impl Default for KeyshareState {
 }
 
 pub struct ThresholdKeyshare {
+    e3_id: E3id,
     bus: Addr<EventBus<EnclaveEvent>>,
     multithread: Addr<Multithread>,
     cipher: Arc<Cipher>,
@@ -121,25 +141,57 @@ impl ThresholdKeyshare {
     ) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
-            let K::GeneratingThresholdShare(mut g) = s.clone() else {
+            let K::GeneratingThresholdShare {
+                party_id, esi_sss, ..
+            } = s.clone()
+            else {
                 bail!("Cannot store pkshare and sk sss on state {:?}", s);
             };
 
-            g.pk_share = Some(pk_share);
-            g.sk_sss = Some(sk_sss);
-            Ok(s.next(K::GeneratingThresholdShare(g))?)
+            match esi_sss {
+                Some(esi_sss) => Ok(s.next(K::AggregatingDecryptionKey {
+                    party_id,
+                    esi_sss,
+                    pk_share,
+                    sk_sss,
+                })?),
+                None => Ok(s.next(K::GeneratingThresholdShare {
+                    party_id,
+                    esi_sss,
+                    pk_share: Some(pk_share),
+                    sk_sss: Some(sk_sss),
+                })?),
+            }
         })
     }
 
-    pub fn try_store_esi_sss(&mut self, value: Vec<Vec<SensitiveBytes>>) -> Result<()> {
+    pub fn try_store_esi_sss(&mut self, esi_sss: Vec<Vec<SensitiveBytes>>) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
-            let K::GeneratingThresholdShare(mut g) = s.clone() else {
+            let K::GeneratingThresholdShare {
+                sk_sss,
+                pk_share,
+                party_id,
+                ..
+            } = s.clone()
+            else {
                 bail!("Cannot store esi_sss on state {:?}", s);
             };
-
-            g.esi_sss = Some(value);
-            Ok(s.next(K::GeneratingThresholdShare(g))?)
+            match (sk_sss, pk_share) {
+                (Some(sk_sss), Some(pk_share)) => Ok(s.next(K::AggregatingDecryptionKey {
+                    party_id,
+                    esi_sss,
+                    pk_share,
+                    sk_sss,
+                })?),
+                (None, None) => Ok(s.next(K::GeneratingThresholdShare {
+                    party_id,
+                    sk_sss: None,
+                    pk_share: None,
+                    esi_sss: Some(esi_sss),
+                })?),
+                _ => bail!("Inconsistent state!"),
+            }
         })
     }
 }
@@ -164,6 +216,7 @@ impl Handler<CiphernodeSelected> for ThresholdKeyshare {
         ctx.notify(StartThresholdShareGeneration(msg));
     }
 }
+
 impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
     type Result = Result<()>;
     fn handle(
@@ -171,11 +224,16 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
         msg: StartThresholdShareGeneration,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        // Change state
+        let party_id = msg.0.party_id;
+
+        // Initialize State
         self.state.try_mutate(|s| {
-            s.next(KeyshareState::GeneratingThresholdShare(
-                GeneratingThresholdShareData::default(),
-            ))
+            Ok(s.next(KeyshareState::GeneratingThresholdShare {
+                party_id,
+                sk_sss: None,
+                pk_share: None,
+                esi_sss: None,
+            })?)
         })?;
 
         // Run both simultaneously
@@ -211,14 +269,15 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
             self.multithread
                 .send(event)
                 .into_actor(self)
-                .map(move |res, act, _ctx| {
-                    let Ok(e3_events::ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(output))) =
-                        res?
-                    else {
+                .map(move |res, act, ctx| {
+                    let Ok(ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(output))) = res? else {
                         bail!("Error extracting data from compute process")
                     };
 
                     act.try_store_esi_sss(output.esi_sss)?;
+                    if let Some(KeyshareState::AggregatingDecryptionKey { .. }) = act.state.get() {
+                        ctx.notify(SharesGenerated)
+                    }
                     Ok(())
                 }),
         )
@@ -245,7 +304,7 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
             self.multithread
                 .send(event)
                 .into_actor(self)
-                .map(move |res, act, _ctx| {
+                .map(move |res, act, ctx| {
                     let Ok(e3_events::ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(
                         output,
                     ))) = res?
@@ -254,9 +313,49 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
                     };
 
                     act.try_store_pk_share_and_sk_sss(output.pk_share, output.sk_sss)?;
+                    if let Some(KeyshareState::AggregatingDecryptionKey { .. }) = act.state.get() {
+                        ctx.notify(SharesGenerated);
+                    }
                     Ok(())
                 }),
         )
+    }
+}
+
+impl Handler<SharesGenerated> for ThresholdKeyshare {
+    type Result = Result<()>;
+    fn handle(&mut self, msg: SharesGenerated, ctx: &mut Self::Context) -> Self::Result {
+        let Some(KeyshareState::AggregatingDecryptionKey {
+            party_id,
+            pk_share,
+            sk_sss,
+            esi_sss,
+        }) = self.state.get()
+        else {
+            bail!("Invalid state!");
+        };
+
+        let sk_sss = SensitiveBytes::access_vec(sk_sss, &self.cipher)?;
+        let esi_sss = esi_sss
+            .into_iter()
+            .map(|s| SensitiveBytes::access_vec(s, &self.cipher))
+            .collect::<Result<Vec<_>>>()?;
+
+        // TODO: pvw encrypt all data
+        let (pk_share, sk_sss, esi_sss) =
+            _dangerously_remove_zeroizing_to_simulate_pvw_encryption((pk_share, sk_sss, esi_sss));
+
+        self.bus.do_send(EnclaveEvent::from(ThresholdShareCreated {
+            e3_id: self.e3_id.clone(),
+            share: ThresholdShare {
+                party_id,
+                esi_sss,
+                pk_share,
+                sk_sss,
+            },
+        }));
+
+        Ok(())
     }
 }
 
@@ -278,4 +377,24 @@ impl Actor for DecryptionKeyCollector {
 impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
     type Result = ();
     fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {}
+}
+
+// Function to prepare tuple to put on an event
+fn _dangerously_remove_zeroizing_to_simulate_pvw_encryption(
+    input: (
+        Arc<Vec<u8>>,
+        Vec<Zeroizing<Vec<u8>>>,
+        Vec<Vec<Zeroizing<Vec<u8>>>>,
+    ),
+) -> (Arc<Vec<u8>>, Vec<Vec<u8>>, Vec<Vec<Vec<u8>>>) {
+    let (first, second, third) = input;
+
+    (
+        first,                                            // Arc<Vec<u8>> stays the same
+        second.into_iter().map(|z| z.to_vec()).collect(), // Vec<Zeroizing<Vec<u8>>> -> Vec<Vec<u8>>
+        third
+            .into_iter()
+            .map(|outer_vec| outer_vec.into_iter().map(|z| z.to_vec()).collect())
+            .collect(), // Vec<Vec<Zeroizing<Vec<u8>>>> -> Vec<Vec<Vec<u8>>>
+    )
 }

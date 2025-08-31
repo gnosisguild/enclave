@@ -250,7 +250,8 @@ impl_from_event!(
     CiphernodeRemoved,
     EnclaveError,
     Shutdown,
-    TestEvent
+    TestEvent,
+    ThresholdShareCreated
 );
 
 impl FromError for EnclaveEvent {

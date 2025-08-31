@@ -21,3 +21,4 @@ e3-trbfv = { workspace = true }
 fhe-traits = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+zeroize = { workspace = true }

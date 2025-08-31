@@ -22,6 +22,7 @@ pub struct CiphernodeSelected {
     pub error_size: Arc<Vec<u8>>,
     pub esi_per_ct: usize,
     pub params: Arc<Vec<u8>>,
+    pub party_id: u64,
 }
 
 impl Display for CiphernodeSelected {

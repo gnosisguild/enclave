@@ -11,7 +11,7 @@ use e3_events::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
-use e3_sortition::{GetHasNode, GetNodes, Sortition};
+use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
 use std::sync::Arc;
 use tracing::error;
 
@@ -162,7 +162,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
         Box::pin(
             self.sortition
-                .send(GetHasNode {
+                .send(GetNodeIndex {
                     chain_id,
                     address,
                     size,
@@ -172,11 +172,11 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
                 .map(move |res, act, ctx| {
                     // NOTE: Returning Ok(()) on errors as we probably dont need a result type here since
                     // we will not be doing a send
-                    let has_node = res?;
-                    if !has_node {
+                    let maybe_found_index = res?;
+                    let Some(_) = maybe_found_index else {
                         error!("Node not found in committee");
                         return Ok(());
-                    }
+                    };
 
                     if e3_id != act.e3_id {
                         error!("Wrong e3_id sent to aggregator. This should not happen.");

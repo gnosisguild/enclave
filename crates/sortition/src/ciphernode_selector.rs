@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{GetHasNode, Sortition};
+use crate::{GetNodeIndex, Sortition};
 /// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
 /// forwards a CiphernodeSelected event to the event bus
 use actix::prelude::*;
@@ -72,8 +72,8 @@ impl Handler<E3Requested> for CiphernodeSelector {
             let seed = data.seed;
             let size = data.threshold_m;
 
-            if let Ok(is_selected) = sortition
-                .send(GetHasNode {
+            if let Ok(found_index) = sortition
+                .send(GetNodeIndex {
                     chain_id,
                     seed,
                     address: address.clone(),
@@ -81,12 +81,13 @@ impl Handler<E3Requested> for CiphernodeSelector {
                 })
                 .await
             {
-                if !is_selected {
+                let Some(party_id) = found_index else {
                     info!(node = address, "Ciphernode was not selected");
                     return;
-                }
+                };
 
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+                    party_id,
                     e3_id: data.e3_id,
                     threshold_m: data.threshold_m,
                     threshold_n: data.threshold_n,
