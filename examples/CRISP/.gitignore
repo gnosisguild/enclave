@@ -42,7 +42,9 @@ dist
 node_modules
 types
 deployments
-.enclave
 test-results/
 playwright-report/
 .cache-synpress/
+.enclave/data/ 
+.enclave/config/ 
+cache_hardhat/

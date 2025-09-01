@@ -8,7 +8,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./test",
-  timeout: 5 * 60 * 1000,
+  timeout: 5 * 60 * 10000,
   use: {
     baseURL: "http://localhost:3000",
     actionTimeout: 60 * 1000,

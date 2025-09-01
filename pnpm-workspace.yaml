@@ -2,7 +2,7 @@ packages:
   - crates/wasm
   - docs
   - examples/CRISP
-  - examples/CRISP/apps/client
+  - examples/CRISP/client
   - packages/enclave-config
   - packages/enclave-react
   - packages/enclave-sdk
