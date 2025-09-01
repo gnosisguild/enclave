@@ -48,8 +48,6 @@ jobs:
         run: |
           rustup target add ${{ matrix.target }}
 
-
-
       - name: Build enclave
         run: cargo build --locked --release --target ${{ matrix.target }} --bin enclave
 

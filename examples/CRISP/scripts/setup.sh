@@ -15,5 +15,10 @@ echo "crisp-wasm-crypto"
 echo "client"
 (cd ./client && if [[ ! -f .env ]]; then cp .env.example .env; fi)
 echo "ciphernode"
-(cd ../../ && cargo build --locked -p e3-cli && cargo install --locked --path crates/cli)
+if [[ ! -f ~/.cargo/bin/enclave ]]; then
+  echo "Building and installing enclave CLI..."
+  (cd ../../ && cargo build --locked -p e3-cli && cargo install --locked --path crates/cli)
+else
+  echo "enclave CLI already installed, skipping build"
+fi
 echo "Skipping circuit compilation - using pre-compiled circuits"
