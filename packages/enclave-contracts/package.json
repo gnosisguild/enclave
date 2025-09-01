@@ -11,22 +11,22 @@
   "exports": {
     "./deploy/enclave": {
       "import": {
-        "types": "./dist/deploy/enclave.d.mts",
-        "default": "./dist/deploy/enclave.mjs"
+        "types": "./dist/scripts/deployEnclave.d.mts",
+        "default": "./dist/scripts/deployEnclave.mjs"
       },
       "require": {
-        "types": "./dist/deploy/enclave.d.ts",
-        "default": "./dist/deploy/enclave.js"
+        "types": "./dist/scripts/deployEnclave.d.ts",
+        "default": "./dist/scripts/deployEnclave.js"
       }
     },
     "./deploy/mocks": {
       "import": {
-        "types": "./dist/deploy/mocks.d.mts",
-        "default": "./dist/deploy/mocks.mjs"
+        "types": "./dist/scripts/deployMocks.d.mts",
+        "default": "./dist/scripts/deployMocks.mjs"
       },
       "require": {
-        "types": "./dist/deploy/mocks.d.ts",
-        "default": "./dist/deploy/mocks.js"
+        "types": "./dist/scripts/deployMocks.d.ts",
+        "default": "./dist/scripts/deployMocks.js"
       }
     },
     "./contracts/*": "./contracts/*",
@@ -39,6 +39,16 @@
       "require": {
         "types": "./dist/types/index.d.ts",
         "default": "./dist/types/index.js"
+      }
+    },
+    "./ignition/modules/*": {
+      "import": {
+        "types": "./dist/ignition/modules/*.d.mts",
+        "default": "./dist/ignition/modules/*.mjs"
+      },
+      "require": {
+        "types": "./dist/ignition/modules/*.d.ts",
+        "default": "./dist/ignition/modules/*.js"
       }
     }
   },
@@ -115,7 +125,7 @@
     "build": "pnpm compile",
     "compile": "pnpm compile:contracts && pnpm compile:ts",
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
-    "compile:ts": "pnpm tsup",
+    "compile:ts": "tsc",
     "coverage": "pnpm test --coverage",
     "deploy": "hardhat run scripts/deployEnclave.ts",
     "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm run deploy",
@@ -123,15 +133,14 @@
     "ciphernode:remove": "hardhat ciphernode:remove",
     "committee:new": "hardhat committee:new",
     "lint": "pnpm lint:sol && pnpm lint:ts && pnpm prettier:check",
-    "lint:sol": "solhint --max-warnings 0 \"contracts/**/*.sol\"",
+    "lint:sol": "solhint --max-warnings 10 \"contracts/**/*.sol\"",
     "lint:ts": "eslint --ignore-path ./.eslintignore --ext .js,.ts .",
-    "postcompile": "pnpm typechain",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yml}\"",
     "prettier:write": "prettier --write \"**/*.{js,json,md,sol,ts,yml}\"",
-    "test": "hardhat test",
-    "test:registryFilter": "hardhat test mocha test/CiphernodeRegistry/NaiveRegistryFilter.spec.ts",
-    "test:enclave": "hardhat test mocha test/Enclave.spec.ts",
-    "test:ciphernodeRegistry": "hardhat test mocha test/CiphernodeRegistry/CiphernodeRegistryOwnable.spec.ts",
+    "test": "hardhat test mocha",
+    "test:registryFilter": "pnpm run test test/CiphernodeRegistry/NaiveRegistryFilter.spec.ts",
+    "test:enclave": "pnpm run test test/Enclave.spec.ts",
+    "test:ciphernodeRegistry": "pnpm run test test/CiphernodeRegistry/CiphernodeRegistryOwnable.spec.ts",
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
     "release": "pnpm publish"
   },

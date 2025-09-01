@@ -92,7 +92,7 @@ export const deployEnclave = async () => {
     const encryptionSchemeId = ethers.keccak256(
       ethers.toUtf8Bytes("fhe.rs:BFV"),
     );
-  
+
     const tx = await enclaveContract.setDecryptionVerifier(
       encryptionSchemeId,
       decryptionVerifierAddress,

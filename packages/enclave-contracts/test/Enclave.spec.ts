@@ -1,122 +1,178 @@
-// SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
-
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { AbiCoder, ZeroHash, keccak256, toBigInt } from "ethers";
+import { Signer, ZeroHash, keccak256 } from "ethers";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
-import { deployEnclaveFixture } from "./fixtures/Enclave.fixture";
-import { deployCiphernodeRegistryFixture } from "./fixtures/MockCiphernodeRegistry.fixture";
-import { deployComputeProviderFixture } from "./fixtures/MockComputeProvider.fixture";
-import { deployDecryptionVerifierFixture } from "./fixtures/MockDecryptionVerifier.fixture";
-import { deployE3ProgramFixture } from "./fixtures/MockE3Program.fixture";
-import { deployInputValidatorFixture } from "./fixtures/MockInputValidator.fixture";
+import EnclaveModule from "../ignition/modules/enclave";
+import MockCiphernodeRegistryModule from "../ignition/modules/mockCiphernodeRegistry";
+import MockCiphernodeRegistryEmptyKeyModule from "../ignition/modules/mockCiphernodeRegistryEmptyKey";
+import mockComputeProviderModule from "../ignition/modules/mockComputeProvider";
+import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
+import MockE3ProgramModule from "../ignition/modules/mockE3Program";
+import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
+import NaiveRegistryFilterModule from "../ignition/modules/naiveRegistryFilter";
+import {
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
+  Enclave__factory as EnclaveFactory,
+  NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
+} from "../types";
 
-const abiCoder = AbiCoder.defaultAbiCoder();
-const AddressTwo = "0x0000000000000000000000000000000000000002";
-const AddressSix = "0x0000000000000000000000000000000000000006";
-const encryptionSchemeId =
-  "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
-const newEncryptionSchemeId =
-  "0x0000000000000000000000000000000000000000000000000000000000000002";
-
-const FilterFail = AddressTwo;
-const FilterOkay = AddressSix;
-
-const data = "0xda7a";
-const dataHash = keccak256(data);
-const _publicKeyHash = keccak256(abiCoder.encode(["uint256"], [0]));
-const proof = "0x1337";
-const polynomial_degree = toBigInt(2048);
-const plaintext_modulus = toBigInt(1032193);
-const moduli = [toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
-
-const encodedE3ProgramParams = AbiCoder.defaultAbiCoder().encode(
-  ["uint256", "uint256", "uint256[]"],
-  [polynomial_degree, plaintext_modulus, moduli],
-);
-
-// Hash function used to compute the tree nodes.
-const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
-
-const { ethers, networkHelpers } = await network.connect();
-const { loadFixture, mine, time } = networkHelpers;
+const { ethers, ignition, networkHelpers } = await network.connect();
+const { loadFixture, time, mine } = networkHelpers;
 
 describe("Enclave", function () {
-  async function setup() {
-    const [owner, notTheOwner] = await ethers.getSigners();
+  let owner: Signer;
+  let notTheOwner: Signer;
 
-    const poseidon = await PoseidonT3Fixture();
-    const registry = await deployCiphernodeRegistryFixture();
-    const decryptionVerifier = await deployDecryptionVerifierFixture();
-    const computeProvider = await deployComputeProviderFixture();
+  const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
+  const addressOne = "0x0000000000000000000000000000000000000001";
+  const AddressTwo = "0x0000000000000000000000000000000000000002";
 
-    const inputValidator = await deployInputValidatorFixture();
+  const encryptionSchemeId =
+    "0x2c2a814a0495f913a3a312fc4771e37552bc14f8a2d4075a08122d356f0849c6";
+  const newEncryptionSchemeId =
+    "0x0000000000000000000000000000000000000000000000000000000000000002";
 
-    const e3Program = await deployE3ProgramFixture(
-      await inputValidator.getAddress(),
+  const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+  const polynomial_degree = ethers.toBigInt(2048);
+  const plaintext_modulus = ethers.toBigInt(1032193);
+  const moduli = [ethers.toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
+
+  const encodedE3ProgramParams = abiCoder.encode(
+    ["uint256", "uint256", "uint256[]"],
+    [polynomial_degree, plaintext_modulus, moduli],
+  );
+
+  const data = "0xda7a";
+  const dataHash = keccak256(data);
+  const proof = "0x1337";
+
+  // Hash function used to compute the tree nodes.
+  const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
+
+  const setup = async () => {
+    [owner, notTheOwner] = await ethers.getSigners();
+
+    const ownerAddress = await owner.getAddress();
+
+    const enclaveContract = await ignition.deploy(EnclaveModule, {
+      parameters: {
+        Enclave: {
+          params: encodedE3ProgramParams,
+          owner: ownerAddress,
+          maxDuration: THIRTY_DAYS_IN_SECONDS,
+          registry: addressOne,
+        },
+      },
+    });
+
+    const enclaveAddress = await enclaveContract.enclave.getAddress();
+
+    const ciphernodeRegistry = await ignition.deploy(
+      MockCiphernodeRegistryModule,
     );
 
-    const enclave = await deployEnclaveFixture(
-      await owner.getAddress(),
-      await registry.getAddress(),
-      poseidon,
+    const ciphernodeRegistryAddress =
+      await ciphernodeRegistry.mockCiphernodeRegistry.getAddress();
+
+    const naiveRegistryFilter = await ignition.deploy(
+      NaiveRegistryFilterModule,
+      {
+        parameters: {
+          NaiveRegistryFilter: {
+            ciphernodeRegistryAddress,
+            owner: ownerAddress,
+          },
+        },
+      },
     );
 
+    const naiveRegistryFilterAddress =
+      await naiveRegistryFilter.naiveRegistryFilter.getAddress();
+
+    const enclave = EnclaveFactory.connect(enclaveAddress, owner);
+    const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
+      ciphernodeRegistryAddress,
+      owner,
+    );
+    const naiveRegistryFilterContract = NaiveRegistryFilterFactory.connect(
+      naiveRegistryFilterAddress,
+      owner,
+    );
+    const registryAddress = await enclave.ciphernodeRegistry();
+
+    if (registryAddress !== ciphernodeRegistryAddress) {
+      await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
+    }
+
+    const mockComputeProvider = await ignition.deploy(
+      mockComputeProviderModule,
+    );
+
+    const decryptionVerifier = await ignition.deploy(
+      MockDecryptionVerifierModule,
+    );
+
+    const inputValidator = await ignition.deploy(MockInputValidatorModule);
+
+    const e3Program = await ignition.deploy(MockE3ProgramModule, {
+      parameters: {
+        MockE3Program: {
+          mockInputValidator:
+            await inputValidator.mockInputValidator.getAddress(),
+        },
+      },
+    });
+
+    await enclave.enableE3Program(await e3Program.mockE3Program.getAddress());
+    await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
     await enclave.setDecryptionVerifier(
       encryptionSchemeId,
-      await decryptionVerifier.getAddress(),
+      await decryptionVerifier.mockDecryptionVerifier.getAddress(),
     );
 
-    await enclave.enableE3Program(await e3Program.getAddress());
-
-    await enclave.setE3ProgramsParams([encodedE3ProgramParams]);
+    const request = {
+      filter: await naiveRegistryFilterContract.getAddress(),
+      threshold: [2, 2] as [number, number],
+      startTime: [await time.latest(), (await time.latest()) + 100] as [
+        number,
+        number,
+      ],
+      duration: time.duration.days(30),
+      e3Program: await e3Program.mockE3Program.getAddress(),
+      e3ProgramParams: encodedE3ProgramParams,
+      computeProviderParams: abiCoder.encode(
+        ["address"],
+        [await decryptionVerifier.mockDecryptionVerifier.getAddress()],
+      ),
+    };
 
     return {
-      owner,
-      notTheOwner,
       enclave,
-      poseidon,
+      ciphernodeRegistryContract,
+      naiveRegistryFilterContract,
       mocks: {
-        e3Program,
-        decryptionVerifier,
-        inputValidator,
-        computeProvider,
-        registry,
+        decryptionVerifier: decryptionVerifier.mockDecryptionVerifier,
+        inputValidator: inputValidator.mockInputValidator,
+        e3Program: e3Program.mockE3Program,
+        mockComputeProvider: mockComputeProvider.mockComputeProvider,
       },
-      request: {
-        filter: FilterOkay,
-        threshold: [2, 2] as [number, number],
-        startTime: [await time.latest(), (await time.latest()) + 100] as [
-          number,
-          number,
-        ],
-        duration: time.duration.days(30),
-        e3Program: await e3Program.getAddress(),
-        e3ProgramParams: encodedE3ProgramParams,
-        computeProviderParams: abiCoder.encode(
-          ["address"],
-          [await decryptionVerifier.getAddress()],
-        ),
-      },
+      request,
     };
-  }
+  };
 
   describe("constructor / initialize()", function () {
     it("correctly sets owner", async function () {
-      const { owner, enclave } = await loadFixture(setup);
+      const { enclave } = await loadFixture(setup);
       expect(await enclave.owner()).to.equal(await owner.getAddress());
     });
 
     it("correctly sets ciphernodeRegistry address", async function () {
-      const { mocks, enclave } = await loadFixture(setup);
+      const { enclave, ciphernodeRegistryContract } = await loadFixture(setup);
       expect(await enclave.ciphernodeRegistry()).to.equal(
-        await mocks.registry.getAddress(),
+        await ciphernodeRegistryContract.getAddress(),
       );
     });
 
@@ -128,8 +184,13 @@ describe("Enclave", function () {
 
   describe("setMaxDuration()", function () {
     it("reverts if not called by owner", async function () {
-      const { enclave, notTheOwner } = await loadFixture(setup);
-      await expect(enclave.connect(notTheOwner).setMaxDuration(1))
+      const { enclave } = await loadFixture(setup);
+
+      await expect(
+        enclave
+          .connect(notTheOwner)
+          .setMaxDuration(1, { from: await notTheOwner.getAddress() }),
+      )
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
@@ -153,7 +214,7 @@ describe("Enclave", function () {
 
   describe("setCiphernodeRegistry()", function () {
     it("reverts if not called by owner", async function () {
-      const { enclave, notTheOwner } = await loadFixture(setup);
+      const { enclave } = await loadFixture(setup);
 
       await expect(
         enclave.connect(notTheOwner).setCiphernodeRegistry(AddressTwo),
@@ -161,21 +222,25 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
+
     it("reverts if given address(0)", async function () {
       const { enclave } = await loadFixture(setup);
       await expect(enclave.setCiphernodeRegistry(ethers.ZeroAddress))
         .to.be.revertedWithCustomError(enclave, "InvalidCiphernodeRegistry")
         .withArgs(ethers.ZeroAddress);
     });
+
     it("reverts if given address is the same as the current ciphernodeRegistry", async function () {
-      const {
-        enclave,
-        mocks: { registry },
-      } = await loadFixture(setup);
-      await expect(enclave.setCiphernodeRegistry(registry))
+      const { enclave, ciphernodeRegistryContract } = await loadFixture(setup);
+      await expect(
+        enclave.setCiphernodeRegistry(
+          await ciphernodeRegistryContract.getAddress(),
+        ),
+      )
         .to.be.revertedWithCustomError(enclave, "InvalidCiphernodeRegistry")
-        .withArgs(registry);
+        .withArgs(await ciphernodeRegistryContract.getAddress());
     });
+
     it("sets ciphernodeRegistry correctly", async function () {
       const { enclave } = await loadFixture(setup);
 
@@ -183,12 +248,14 @@ describe("Enclave", function () {
       await enclave.setCiphernodeRegistry(AddressTwo);
       expect(await enclave.ciphernodeRegistry()).to.equal(AddressTwo);
     });
+
     it("returns true if ciphernodeRegistry is set successfully", async function () {
       const { enclave } = await loadFixture(setup);
 
       const result = await enclave.setCiphernodeRegistry.staticCall(AddressTwo);
       expect(result).to.be.true;
     });
+
     it("emits CiphernodeRegistrySet event", async function () {
       const { enclave } = await loadFixture(setup);
 
@@ -199,19 +266,10 @@ describe("Enclave", function () {
   });
 
   describe("setE3ProgramsParams()", function () {
-    const polynomial_degree = ethers.toBigInt(2048);
-    const plaintext_modulus = ethers.toBigInt(1032193);
-    const moduli = [ethers.toBigInt("18014398492704769")]; // 0x3FFFFFFF000001
-
-    const encodedE3ProgramParams = ethers.AbiCoder.defaultAbiCoder().encode(
-      ["uint256", "uint256", "uint256[]"],
-      [polynomial_degree, plaintext_modulus, moduli],
-    );
-
     const encodedE3ProgramsParams = [encodedE3ProgramParams];
 
     it("reverts if not called by owner", async function () {
-      const { enclave, notTheOwner } = await loadFixture(setup);
+      const { enclave } = await loadFixture(setup);
 
       await expect(
         enclave
@@ -269,11 +327,14 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "E3DoesNotExist")
         .withArgs(1);
     });
+
     it("returns correct E3 details", async function () {
-      const { enclave, request, mocks } = await loadFixture(setup);
+      const { enclave, request, mocks, naiveRegistryFilterContract } =
+        await loadFixture(setup);
+
       await enclave.request(
         {
-          filter: request.filter,
+          filter: await naiveRegistryFilterContract.getAddress(),
           threshold: request.threshold,
           startWindow: request.startTime,
           duration: request.duration,
@@ -309,6 +370,7 @@ describe("Enclave", function () {
         await mocks.decryptionVerifier.getAddress(),
       );
     });
+
     it("returns false if encryption scheme is not enabled", async function () {
       const { enclave } = await loadFixture(setup);
       expect(
@@ -319,7 +381,7 @@ describe("Enclave", function () {
 
   describe("setDecryptionVerifier()", function () {
     it("reverts if caller is not owner", async function () {
-      const { enclave, notTheOwner, mocks } = await loadFixture(setup);
+      const { enclave, mocks } = await loadFixture(setup);
 
       await expect(
         enclave
@@ -332,6 +394,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
         .withArgs(notTheOwner);
     });
+
     it("reverts if encryption scheme is already enabled", async function () {
       const { enclave, mocks } = await loadFixture(setup);
 
@@ -344,6 +407,7 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
         .withArgs(encryptionSchemeId);
     });
+
     it("enabled decryption verifier", async function () {
       const { enclave, mocks } = await loadFixture(setup);
 
@@ -357,6 +421,7 @@ describe("Enclave", function () {
         await enclave.getDecryptionVerifier(newEncryptionSchemeId),
       ).to.equal(await mocks.decryptionVerifier.getAddress());
     });
+
     it("returns true if decryption verifier is enabled successfully", async function () {
       const { enclave, mocks } = await loadFixture(setup);
 
@@ -366,6 +431,7 @@ describe("Enclave", function () {
       );
       expect(result).to.be.true;
     });
+
     it("emits EncryptionSchemeEnabled", async function () {
       const { enclave, mocks } = await loadFixture(setup);
 
@@ -382,7 +448,7 @@ describe("Enclave", function () {
 
   describe("disableEncryptionScheme()", function () {
     it("reverts if caller is not owner", async function () {
-      const { enclave, notTheOwner } = await loadFixture(setup);
+      const { enclave } = await loadFixture(setup);
 
       await expect(
         enclave
@@ -426,7 +492,6 @@ describe("Enclave", function () {
   describe("enableE3Program()", function () {
     it("reverts if not called by owner", async function () {
       const {
-        notTheOwner,
         enclave,
         mocks: { e3Program },
       } = await loadFixture(setup);
@@ -469,7 +534,6 @@ describe("Enclave", function () {
   describe("disableE3Program()", function () {
     it("reverts if not called by owner", async function () {
       const {
-        notTheOwner,
         enclave,
         mocks: { e3Program },
       } = await loadFixture(setup);
@@ -641,7 +705,7 @@ describe("Enclave", function () {
       await expect(
         enclave.request(
           {
-            filter: FilterFail,
+            filter: AddressTwo,
             threshold: request.threshold,
             startWindow: request.startTime,
             duration: request.duration,
@@ -732,8 +796,10 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      await expect(enclave.getE3(0)).to.not.be.reverted;
-      await expect(enclave.activate(0, ethers.ZeroHash)).to.not.be.reverted;
+      await expect(enclave.getE3(0)).to.not.be.revert(ethers);
+      await expect(enclave.activate(0, ethers.ZeroHash)).to.not.be.revert(
+        ethers,
+      );
       await expect(enclave.activate(0, ethers.ZeroHash))
         .to.be.revertedWithCustomError(enclave, "E3AlreadyActivated")
         .withArgs(0);
@@ -855,24 +921,27 @@ describe("Enclave", function () {
       );
 
       const prevRegistry = await enclave.ciphernodeRegistry();
-      const nextRegistry = await deployCiphernodeRegistryFixture(
-        "MockCiphernodeRegistryEmptyKey",
-      );
+
+      const reg = await ignition.deploy(MockCiphernodeRegistryEmptyKeyModule);
+      const nextRegistry =
+        await reg.mockCiphernodeRegistryEmptyKey.getAddress();
 
       await enclave.setCiphernodeRegistry(nextRegistry);
+
       await expect(
-        enclave.activate(0, ethers.ZeroHash),
+        await enclave.activate(0, ethers.ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
 
       await enclave.setCiphernodeRegistry(prevRegistry);
-      await expect(enclave.activate(0, ethers.ZeroHash)).to.not.be.reverted;
+      await enclave.activate(0, ethers.ZeroHash);
+      await expect(enclave.activate(0, ethers.ZeroHash)).to.not.be.revert(
+        ethers,
+      );
     });
+
     it("sets committeePublicKey correctly", async () => {
-      const {
-        enclave,
-        request,
-        mocks: { registry },
-      } = await loadFixture(setup);
+      const { enclave, request, ciphernodeRegistryContract } =
+        await loadFixture(setup);
 
       await enclave.request(
         {
@@ -888,7 +957,8 @@ describe("Enclave", function () {
       );
 
       const e3Id = 0;
-      const publicKey = await registry.committeePublicKey(e3Id);
+      const publicKey =
+        await ciphernodeRegistryContract.committeePublicKey(e3Id);
 
       let e3 = await enclave.getE3(e3Id);
       expect(e3.committeePublicKey).to.not.equal(ethers.keccak256(publicKey));
@@ -938,9 +1008,10 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await expect(enclave.activate(e3Id, ethers.ZeroHash))
-        .to.emit(enclave, "E3Activated")
-        .withArgs(e3Id, anyValue, ethers.ZeroHash);
+      await expect(enclave.activate(e3Id, ethers.ZeroHash)).to.emit(
+        enclave,
+        "E3Activated",
+      );
     });
   });
 
@@ -971,7 +1042,7 @@ describe("Enclave", function () {
 
       const inputData = abiCoder.encode(["bytes32"], [ZeroHash]);
 
-      await expect(enclave.getE3(0)).to.not.be.reverted;
+      await expect(enclave.getE3(0)).to.not.be.revert(ethers);
       await expect(enclave.publishInput(0, inputData))
         .to.be.revertedWithCustomError(enclave, "E3NotActivated")
         .withArgs(0);

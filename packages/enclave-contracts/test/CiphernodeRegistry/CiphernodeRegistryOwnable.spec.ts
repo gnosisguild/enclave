@@ -8,14 +8,18 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
-import { deployCiphernodeRegistryOwnableFixture } from "../fixtures/CiphernodeRegistryOwnable.fixture";
-import { naiveRegistryFilterFixture } from "../fixtures/NaiveRegistryFilter.fixture";
+import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
+import NaiveRegistryFilterModule from "../../ignition/modules/naiveRegistryFilter";
+import {
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
+  NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
+} from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressThree = "0x0000000000000000000000000000000000000003";
 
-const { ethers, networkHelpers } = await network.connect();
+const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
@@ -27,17 +31,33 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 describe("CiphernodeRegistryOwnable", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
-    if (!owner) throw new Error("getSigners() did not return expected output");
-    if (!notTheOwner)
-      throw new Error("getSigners() did not return expected output");
 
-    const registry = await deployCiphernodeRegistryOwnableFixture(
-      await owner.getAddress(),
-      await owner.getAddress(),
+    const registryContract = await ignition.deploy(CiphernodeRegistryModule, {
+      parameters: {
+        CiphernodeRegistry: {
+          enclaveAddress: await owner.getAddress(),
+          owner: await owner.getAddress(),
+        },
+      },
+    });
+
+    const filterContract = await ignition.deploy(NaiveRegistryFilterModule, {
+      parameters: {
+        NaiveRegistryFilter: {
+          owner: await owner.getAddress(),
+          ciphernodeRegistryAddress:
+            await registryContract.cipherNodeRegistry.getAddress(),
+        },
+      },
+    });
+
+    const registry = CiphernodeRegistryFactory.connect(
+      await registryContract.cipherNodeRegistry.getAddress(),
+      owner,
     );
-    const filter = await naiveRegistryFilterFixture(
-      await owner.getAddress(),
-      await registry.getAddress(),
+    const filter = NaiveRegistryFilterFactory.connect(
+      await filterContract.naiveRegistryFilter.getAddress(),
+      owner,
     );
 
     const tree = new LeanIMT(hash);
@@ -83,24 +103,21 @@ describe("CiphernodeRegistryOwnable", function () {
     });
   });
 
-  describe.only("requestCommittee()", function () {
-    it.only("reverts if committee has already been requested for given e3Id", async function () {
+  describe("requestCommittee()", function () {
+    it("reverts if committee has already been requested for given e3Id", async function () {
       const { registry, request } = await loadFixture(setup);
-
-      // console.log("filter from contract === ", await filter.registry() === await registry.getAddress())
-
       await registry.requestCommittee(
         request.e3Id,
         request.filter,
         request.threshold,
       );
-    //   await expect(
-    //     registry.requestCommittee(
-    //       request.e3Id,
-    //       request.filter,
-    //       request.threshold,
-    //     ),
-    //   ).to.be.revertedWithCustomError(registry, "CommitteeAlreadyRequested");
+      await expect(
+        registry.requestCommittee(
+          request.e3Id,
+          request.filter,
+          request.threshold,
+        ),
+      ).to.be.revertedWithCustomError(registry, "CommitteeAlreadyRequested");
     });
     it("stores the registry filter for the given e3Id", async function () {
       const { registry, request } = await loadFixture(setup);
