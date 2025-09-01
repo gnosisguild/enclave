@@ -3,8 +3,10 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   ...baseConfig,
-  entry: ["deploy/enclave.ts", "deploy/mocks.ts", "types/index.ts"],
-  include: ["./deploy/**/*.ts", "./types/**/*.ts"],
-  external: [/^mocha/, /^ts-node/],
-  format: ["esm", "cjs"],
+  entry: ["types/index.ts", "scripts/deployEnclave.ts", "scripts/deployMocks.ts"],
+  include: ["hardhat.config.ts", "scripts/**/*.ts"],
+  // include: ["./scripts/**/*.ts", "./types/**/*.ts", "./tasks/**/*.ts", "./ignition/modules/*.ts"],
+  // entry: ["scripts/deployEnclave.ts", "scripts/deployMocks.ts", "types/index.ts"],
+  // lib: ["es2023"],
+  // module: "node16"
 });

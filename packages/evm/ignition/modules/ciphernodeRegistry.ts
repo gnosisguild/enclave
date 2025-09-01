@@ -5,7 +5,7 @@ export default buildModule("CiphernodeRegistry", (m) => {
   const owner = m.getParameter("owner");
 
   const poseidonT3 = m.library("PoseidonT3");
-  
+
   const cipherNodeRegistry = m.contract(
     "CiphernodeRegistryOwnable",
     [owner, enclaveAddress],

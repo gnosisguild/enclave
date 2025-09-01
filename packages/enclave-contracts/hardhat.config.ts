@@ -3,18 +3,28 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-// import "./tasks/ciphernode";
-// import "./tasks/enclave";
+import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
 import hardhatIgnitionEthers from "@nomicfoundation/hardhat-ignition-ethers";
 import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
-import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
 import type { HardhatUserConfig } from "hardhat/config";
 import { configVariable } from "hardhat/config";
 import { ConfigurationVariable } from "hardhat/types/config";
 
-import { ciphernodeAdd } from "./tasks/ciphernode";
+import {
+  ciphernodeAdd,
+  ciphernodeRemove,
+  ciphernodeSiblings,
+} from "./tasks/ciphernode";
+import {
+  enableE3,
+  publishCiphertext,
+  publishCommittee,
+  publishInput,
+  publishPlaintext,
+  requestCommittee,
+} from "./tasks/enclave";
 
 const mnemonic = configVariable("MNEMONIC");
 const privateKey = configVariable("PRIVATE_KEY");
@@ -84,14 +94,20 @@ const config: HardhatUserConfig = {
   ],
   tasks: [
     ciphernodeAdd,
+    ciphernodeRemove,
+    ciphernodeSiblings,
+    enableE3,
+    publishPlaintext,
+    publishCiphertext,
+    publishInput,
+    requestCommittee,
+    publishCommittee,
   ],
   networks: {
     hardhat: {
-      accounts: {
-        mnemonic,
-      },
       chainId: chainIds.hardhat,
       type: "edr-simulated",
+      chainType: "l1",
     },
     ganache: {
       accounts: {

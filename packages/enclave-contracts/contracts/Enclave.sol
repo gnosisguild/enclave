@@ -102,7 +102,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             _maxDuration,
             _e3ProgramsParams
         );
-
     }
 
     /// @param _owner The owner of this contract

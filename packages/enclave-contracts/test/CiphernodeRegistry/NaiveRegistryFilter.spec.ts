@@ -8,14 +8,18 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
-import { deployCiphernodeRegistryOwnableFixture } from "../fixtures/CiphernodeRegistryOwnable.fixture";
-import { naiveRegistryFilterFixture } from "../fixtures/NaiveRegistryFilter.fixture";
+import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
+import NaiveRegistryFilterModule from "../../ignition/modules/naiveRegistryFilter";
+import {
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
+  NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
+} from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressThree = "0x0000000000000000000000000000000000000003";
 
-const { ethers, networkHelpers } = await network.connect({network: "localhost"});
+const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture } = networkHelpers;
 
 // Hash function used to compute the tree nodes.
@@ -25,21 +29,35 @@ describe("NaiveRegistryFilter", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
 
-    if (!owner) throw new Error("Bad getSigners output");
-    if (!notTheOwner) throw new Error("Bad getSigners output");
-    const registry = await deployCiphernodeRegistryOwnableFixture(
-      await owner.getAddress(),
-      await owner.getAddress(),
-    );
+    const registryContract = await ignition.deploy(CiphernodeRegistryModule, {
+      parameters: {
+        CiphernodeRegistry: {
+          enclaveAddress: await owner.getAddress(),
+          owner: await owner.getAddress(),
+        },
+      },
+    });
 
-    console.log("registry", await registry.getAddress());
-    const filter = await naiveRegistryFilterFixture(
-      await owner.getAddress(),
-      await registry.getAddress(),
+    const filterContract = await ignition.deploy(NaiveRegistryFilterModule, {
+      parameters: {
+        NaiveRegistryFilter: {
+          owner: await owner.getAddress(),
+          ciphernodeRegistryAddress:
+            await registryContract.cipherNodeRegistry.getAddress(),
+        },
+      },
+    });
+
+    const registry = CiphernodeRegistryFactory.connect(
+      await registryContract.cipherNodeRegistry.getAddress(),
+      owner,
+    );
+    const filter = NaiveRegistryFilterFactory.connect(
+      await filterContract.naiveRegistryFilter.getAddress(),
+      owner,
     );
 
     const tree = new LeanIMT(hash);
-
     await registry.addCiphernode(AddressOne);
     tree.insert(BigInt(AddressOne));
     await registry.addCiphernode(AddressTwo);
@@ -61,25 +79,24 @@ describe("NaiveRegistryFilter", function () {
 
   describe("constructor / initialize()", function () {
     it("should set the owner", async function () {
-      const { owner, filter } = await setup();
+      const { owner, filter } = await loadFixture(setup);
       expect(await filter.owner()).to.equal(await owner.getAddress());
     });
     it("should set the registry", async function () {
-      const { registry, filter } = await setup();
+      const { registry, filter } = await loadFixture(setup);
       expect(await filter.registry()).to.equal(await registry.getAddress());
     });
   });
 
   describe("requestCommittee()", function () {
     it("should revert if the caller is not the registry", async function () {
-      const { filter, request } = await setup();
+      const { filter, request } = await loadFixture(setup);
       await expect(
-        filter
-          .requestCommittee(request.e3Id, request.threshold),
+        filter.requestCommittee(request.e3Id, request.threshold),
       ).to.be.revertedWithCustomError(filter, "OnlyRegistry");
     });
     it("should revert if a committee has already been requested for the given e3Id", async function () {
-      const { filter, request, owner } = await setup();
+      const { filter, request, owner } = await loadFixture(setup);
       await filter.setRegistry(await owner.getAddress());
       await filter.requestCommittee(request.e3Id, request.threshold);
       await expect(
@@ -87,14 +104,14 @@ describe("NaiveRegistryFilter", function () {
       ).to.be.revertedWithCustomError(filter, "CommitteeAlreadyExists");
     });
     it("should set the threshold for the requested committee", async function () {
-      const { filter, owner, request } = await setup();
+      const { filter, owner, request } = await loadFixture(setup);
       await filter.setRegistry(await owner.getAddress());
       await filter.requestCommittee(request.e3Id, request.threshold);
       const committee = await filter.getCommittee(request.e3Id);
       expect(committee.threshold).to.deep.equal(request.threshold);
     });
     it("should return true when a committee is requested", async function () {
-      const { filter, owner, request } = await setup();
+      const { filter, owner, request } = await loadFixture(setup);
       await filter.setRegistry(await owner.getAddress());
       const result = await filter.requestCommittee.staticCall(
         request.e3Id,
@@ -104,11 +121,12 @@ describe("NaiveRegistryFilter", function () {
     });
   });
 
-  describe.only("publishCommittee()", function () {
+  describe("publishCommittee()", function () {
     it("should revert if the caller is not owner", async function () {
-      const { filter, notTheOwner, request } = await setup();
+      const { filter, notTheOwner, request } = await loadFixture(setup);
       await expect(
         filter
+          .connect(notTheOwner)
           .publishCommittee(
             request.e3Id,
             [AddressOne, AddressTwo],
@@ -117,7 +135,7 @@ describe("NaiveRegistryFilter", function () {
       ).to.be.revertedWithCustomError(filter, "OwnableUnauthorizedAccount");
     });
     it("should revert if committee already published", async function () {
-      const { filter, registry, request } = await setup();
+      const { filter, registry, request } = await loadFixture(setup);
       expect(
         await registry.requestCommittee(
           request.e3Id,
@@ -139,7 +157,7 @@ describe("NaiveRegistryFilter", function () {
       ).to.be.revertedWithCustomError(filter, "CommitteeAlreadyPublished");
     });
     it("should store the node addresses of the committee", async function () {
-      const { filter, registry, request } = await setup();
+      const { filter, registry, request } = await loadFixture(setup);
       expect(
         await registry.requestCommittee(
           request.e3Id,
@@ -156,7 +174,7 @@ describe("NaiveRegistryFilter", function () {
       expect(committee.nodes).to.deep.equal([AddressOne, AddressTwo]);
     });
     it("should store the public key of the committee", async function () {
-      const { filter, registry, request } = await setup();
+      const { filter, registry, request } = await loadFixture(setup);
       expect(
         await registry.requestCommittee(
           request.e3Id,
@@ -173,7 +191,7 @@ describe("NaiveRegistryFilter", function () {
       expect(committee.publicKey).to.equal(ethers.keccak256(AddressThree));
     });
     it("should publish the correct node addresses of the committee for the given e3Id", async function () {
-      const { filter, registry, request } = await setup();
+      const { filter, registry, request } = await loadFixture(setup);
       expect(
         await registry.requestCommittee(
           request.e3Id,
@@ -190,7 +208,7 @@ describe("NaiveRegistryFilter", function () {
       expect(committee.nodes).to.deep.equal([AddressOne, AddressTwo]);
     });
     it("should publish the public key of the committee for the given e3Id", async function () {
-      const { filter, registry, request } = await setup();
+      const { filter, registry, request } = await loadFixture(setup);
       expect(
         await registry.requestCommittee(
           request.e3Id,
@@ -210,13 +228,15 @@ describe("NaiveRegistryFilter", function () {
 
   describe("setRegistry()", function () {
     it("should revert if the caller is not the owner", async function () {
-      const { filter, notTheOwner } = await setup();
-      await expect(filter.connect(notTheOwner).setRegistry(await notTheOwner.getAddress()))
+      const { filter, notTheOwner } = await loadFixture(setup);
+      await expect(
+        filter.connect(notTheOwner).setRegistry(await notTheOwner.getAddress()),
+      )
         .to.be.revertedWithCustomError(filter, "OwnableUnauthorizedAccount")
         .withArgs(await notTheOwner.getAddress());
     });
     it("should set the registry", async function () {
-      const { filter, owner } = await setup();
+      const { filter, owner } = await loadFixture(setup);
       await filter.setRegistry(await owner.getAddress());
       expect(await filter.registry()).to.equal(await owner.getAddress());
     });
@@ -224,7 +244,7 @@ describe("NaiveRegistryFilter", function () {
 
   describe("getCommittee()", function () {
     it("should return the committee for the given e3Id", async function () {
-      const { filter, registry, request } = await setup();
+      const { filter, registry, request } = await loadFixture(setup);
       expect(
         await registry.requestCommittee(
           request.e3Id,

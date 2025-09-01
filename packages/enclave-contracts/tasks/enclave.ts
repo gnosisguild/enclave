@@ -3,343 +3,465 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+import { ZeroAddress } from "ethers";
 import fs from "fs";
-import { task, types } from "hardhat/config";
-import type { TaskArguments } from "hardhat/types";
+import { task } from "hardhat/config";
+import { ArgumentType } from "hardhat/types/arguments";
 
-task(
+import EnclaveModule from "../ignition/modules/enclave";
+import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
+import MockE3ProgramModule from "../ignition/modules/mockE3Program";
+import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
+import NaiveRegistryFilterModule from "../ignition/modules/naiveRegistryFilter";
+
+export const requestCommittee = task(
   "committee:new",
   "Request a new ciphernode committee, will use E3 mock contracts by default",
 )
-  .addOptionalParam(
-    "filter",
-    "address of filter contract to use",
-    undefined,
-    types.string,
-  )
-  .addOptionalParam(
-    "thresholdQuorum",
-    "threshold quorum for committee",
-    2,
-    types.int,
-  )
-  .addOptionalParam(
-    "thresholdTotal",
-    "threshold total for committee",
-    2,
-    types.int,
-  )
-  .addOptionalParam(
-    "windowStart",
-    "timestamp start of window for the E3 (default: now)",
-    Math.floor(Date.now() / 1000),
-    types.int,
-  )
-  .addOptionalParam(
-    "windowEnd",
-    "timestamp end of window for the E3 (default: now + 1 day)",
-    Math.floor(Date.now() / 1000) + 86400,
-    types.int,
-  )
-  .addOptionalParam(
-    "duration",
-    "duration in seconds of the E3 (default: 1 day)",
-    86400,
-    types.int,
-  )
-  .addOptionalParam(
-    "e3Address",
-    "address of the E3 program",
-    undefined,
-    types.string,
-  )
-  .addOptionalParam(
-    "e3Params",
-    "parameters for the E3 program",
-    undefined,
-    types.string,
-  )
-  .addOptionalParam(
-    "computeParams",
-    "parameters for the compute provider",
-    undefined,
-    types.string,
-  )
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const enclave = await hre.deployments.get("Enclave");
-
-    const enclaveContract = await hre.ethers.getContractAt(
-      "Enclave",
-      enclave.address,
-    );
-
-    let e3Address = taskArguments.e3Address;
-    if (!e3Address) {
-      const mockE3Program = await hre.deployments.get("MockE3Program");
-      if (!mockE3Program) {
-        throw new Error("MockE3Program not deployed");
-      }
-      e3Address = mockE3Program.address;
-    }
-
-    let filterAddress = taskArguments.filter;
-    if (!filterAddress) {
-      const naiveRegistryFilter = await hre.deployments.get(
-        "NaiveRegistryFilter",
-      );
-      if (!naiveRegistryFilter) {
-        throw new Error("NaiveRegistryFilter not deployed");
-      }
-      filterAddress = naiveRegistryFilter.address;
-    }
-
-    let e3Params = taskArguments.e3Params;
-    if (!e3Params) {
-      const MockInputValidatorChecker = await hre.deployments.get(
-        "MockInputValidatorChecker",
-      );
-      if (!MockInputValidatorChecker) {
-        throw new Error("MockInputValidatorChecker not deployed");
-      }
-      e3Params = hre.ethers.zeroPadValue(MockInputValidatorChecker.address, 32);
-    }
-
-    let computeParams = taskArguments.computeParams;
-    if (!computeParams) {
-      // no compute params provided, use mock
-      const MockDecryptionVerifier = await hre.deployments.get(
-        "MockDecryptionVerifier",
-      );
-      if (!MockDecryptionVerifier) {
-        throw new Error("MockDecryptionVerifier not deployed");
-      }
-      computeParams = hre.ethers.zeroPadValue(
-        MockDecryptionVerifier.address,
-        32,
-      );
-    }
-
-    try {
-      const enableE3Tx = await enclaveContract.enableE3Program(e3Address);
-      await enableE3Tx.wait();
-    } catch (e) {
-      console.log("E3 program enabling failed, probably already enabled: ", e);
-    }
-
-    const tx = await enclaveContract.request(
+  .addOption({
+    name: "filter",
+    description: "address of filter contract to use",
+    defaultValue: ZeroAddress,
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "thresholdQuorum",
+    description: "threshold quorum for committee",
+    defaultValue: 2,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "thresholdTotal",
+    description: "threshold total for committee",
+    defaultValue: 2,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "windowStart",
+    description: "timestamp start of window for the E3 (default: now)",
+    defaultValue: Math.floor(Date.now() / 1000),
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "windowEnd",
+    description: "timestamp end of window for the E3 (default: now + 1 day)",
+    defaultValue: Math.floor(Date.now() / 1000) + 86400,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "duration",
+    description: "duration in seconds of the E3 (default: 1 day)",
+    defaultValue: 86400,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "e3Address",
+    description: "address of the E3 program",
+    defaultValue: ZeroAddress,
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "e3Params",
+    description: "parameters for the E3 program",
+    defaultValue: ZeroAddress,
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "computeParams",
+    description: "parameters for the compute provider",
+    defaultValue: ZeroAddress,
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async function (
       {
-        filter: filterAddress,
-        threshold: [
-          taskArguments.thresholdQuorum,
-          taskArguments.thresholdTotal,
-        ],
-        startWindow: [taskArguments.windowStart, taskArguments.windowEnd],
-        duration: taskArguments.duration,
-        e3Program: e3Address,
-        e3ProgramParams: e3Params,
-        computeProviderParams: computeParams,
+        filter,
+        thresholdQuorum,
+        thresholdTotal,
+        windowStart,
+        windowEnd,
+        duration,
+        e3Address,
+        e3Params,
+        computeParams,
       },
-      // 1 ETH
-      { value: "1000000000000000000" },
-    );
+      hre,
+    ) {
+      const { ignition } = await hre.network.connect();
 
-    console.log("Requesting committee... ", tx.hash);
-    await tx.wait();
+      const { enclave } = await ignition.deploy(EnclaveModule);
 
-    console.log(`Committee requested`);
-  });
+      let actualE3Address = e3Address;
 
-task("enclave:enableE3", "Enable an E3 program")
-  .addParam("e3Address", "address of the E3 program")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const enclave = await hre.deployments.get("Enclave");
+      if (!e3Address) {
+        const mockE3Program = await ignition.deploy(MockE3ProgramModule);
+        if (!mockE3Program) {
+          throw new Error("MockE3Program not deployed");
+        }
+        actualE3Address = await mockE3Program.mockE3Program.getAddress();
+      }
 
-    const enclaveContract = await hre.ethers.getContractAt(
-      "Enclave",
-      enclave.address,
-    );
-
-    const tx = await enclaveContract.enableE3Program(taskArguments.e3Address);
-
-    console.log("Enabling E3 program... ", tx.hash);
-    await tx.wait();
-
-    console.log(`E3 program enabled`);
-  });
-
-task("committee:publish", "Publish the publickey of the committee")
-  .addOptionalParam(
-    "filter",
-    "address of filter contract to use (defaults to NaiveRegistryFilter)",
-  )
-  .addParam("e3Id", "Id of the E3 program", undefined, types.int)
-  .addParam(
-    "nodes",
-    "list of node address in the committee, comma separated",
-    undefined,
-    types.string,
-  )
-  .addParam("publicKey", "public key of the committee", undefined, types.string)
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    let filterAddress = taskArguments.filter;
-    if (!taskArguments.filter) {
-      filterAddress = (await hre.deployments.get("NaiveRegistryFilter"))
-        .address;
-
+      let filterAddress = filter;
       if (!filterAddress) {
+        const naiveRegistryFilter = await ignition.deploy(
+          NaiveRegistryFilterModule,
+        );
+        if (!naiveRegistryFilter) {
+          throw new Error("NaiveRegistryFilter not deployed");
+        }
+        filterAddress =
+          await naiveRegistryFilter.naiveRegistryFilter.getAddress();
+      }
+
+      let e3ParamsToSend = e3Params;
+      if (!e3Params) {
+        const mockInputValidator = await ignition.deploy(
+          MockInputValidatorModule,
+        );
+
+        e3ParamsToSend =
+          await mockInputValidator.mockInputValidator.getAddress();
+      }
+
+      let computeParamsToSend = computeParams;
+      if (!computeParams) {
+        // no compute params provided, use mock
+        const MockDecryptionVerifier = await ignition.deploy(
+          MockDecryptionVerifierModule,
+        );
+        if (!MockDecryptionVerifier) {
+          throw new Error("MockDecryptionVerifier not deployed");
+        }
+        computeParamsToSend =
+          await MockDecryptionVerifier.mockDecryptionVerifier.getAddress();
+      }
+
+      try {
+        const enableE3Tx = await enclave.enableE3Program(e3Address);
+        await enableE3Tx.wait();
+      } catch (e) {
+        console.log(
+          "E3 program enabling failed, probably already enabled: ",
+          e,
+        );
+      }
+
+      const tx = await enclave.request(
+        filterAddress,
+        [thresholdQuorum, thresholdTotal],
+        [windowStart, windowEnd],
+        duration,
+        actualE3Address,
+        e3ParamsToSend,
+        computeParamsToSend,
+        // 1 ETH
+        { value: "1000000000000000000" },
+      );
+
+      console.log("Reequesting committee... ", tx.hash);
+      await tx.wait();
+
+      console.log(`Committee requested`);
+    },
+  }))
+  .build();
+
+export const enableE3 = task("enclave:enableE3", "Enable an E3 program")
+  .addOption({
+    name: "e3Address",
+    description: "address of the E3 program",
+    defaultValue: ZeroAddress,
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async function ({ e3Address }, hre) {
+      const { ignition } = await hre.network.connect();
+
+      const enclave = await ignition.deploy(EnclaveModule);
+
+      const tx = await enclave.enclave.enableE3Program(e3Address);
+
+      console.log("Enabling E3 program... ", tx.hash);
+      await tx.wait();
+
+      console.log(`E3 program enabled`);
+    },
+  }))
+  .build();
+
+export const publishCommittee = task(
+  "committee:publish",
+  "Publish the publickey of the committee",
+)
+  .addOption({
+    name: "filter",
+    description:
+      "address of filter contract to use (defaults to NaiveRegistryFilter)",
+    defaultValue: ZeroAddress,
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "nodes",
+    description: "list of node address in the committee, comma separated",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "publicKey",
+    description: "public key of the committee",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async function ({ filter, e3Id, nodes, publicKey }, hre) {
+      const { ignition } = await hre.network.connect();
+
+      let filterAddress = filter;
+      if (!filterAddress) {
+        const naiveRegistryFilter = await ignition.deploy(
+          NaiveRegistryFilterModule,
+        );
+        if (!naiveRegistryFilter) {
+          throw new Error("NaiveRegistryFilter not deployed");
+        }
+        filterAddress =
+          await naiveRegistryFilter.naiveRegistryFilter.getAddress();
+      }
+
+      const nodesToSend = nodes.split(",");
+
+      const filterContract = await ignition.deploy(NaiveRegistryFilterModule);
+      if (!filterContract) {
         throw new Error("NaiveRegistryFilter not deployed");
       }
-    }
 
-    const filterContract = await hre.ethers.getContractAt(
-      "NaiveRegistryFilter",
-      filterAddress,
-    );
-
-    const nodes = taskArguments.nodes.split(",");
-
-    if (!Array.isArray(nodes)) {
-      throw new Error(
-        "Could not parse nodes: Nodes must be input as comma separated list",
+      const tx = await filterContract.naiveRegistryFilter.publishCommittee(
+        e3Id,
+        nodesToSend,
+        publicKey,
       );
-    }
 
-    const tx = await filterContract.publishCommittee(
-      taskArguments.e3Id,
-      nodes,
-      taskArguments.publicKey,
-    );
+      console.log("Publishing committee... ", tx.hash);
+      await tx.wait();
+      console.log(`Committee public key published`);
+    },
+  }))
+  .build();
 
-    console.log("Publishing committee... ", tx.hash);
-    await tx.wait();
-    console.log(`Committee public key published`);
-  });
+export const activateE3 = task("e3:activate", "Activate an E3 program")
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "publicKey",
+    description: "public key of the committee",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async function ({ e3Id, publicKey }, hre) {
+      const { ignition } = await hre.network.connect();
 
-task("e3:activate", "Activate an E3 program")
-  .addParam("e3Id", "Id of the E3 program")
-  .addParam("publicKey", "public key of the committee")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const enclave = await hre.deployments.get("Enclave");
+      const { enclave } = await ignition.deploy(EnclaveModule);
 
-    const enclaveContract = await hre.ethers.getContractAt(
-      "Enclave",
-      enclave.address,
-    );
+      const tx = await enclave.activate(e3Id, publicKey);
 
-    const tx = await enclaveContract.activate(
-      taskArguments.e3Id,
-      taskArguments.publicKey,
-    );
+      console.log("Activating E3 program... ", tx.hash);
+      await tx.wait();
 
-    console.log("Activating E3 program... ", tx.hash);
-    await tx.wait();
+      console.log(`E3 program activated`);
+    },
+  }))
+  .build();
 
-    console.log(`E3 program activated`);
-  });
+export const publishInput = task(
+  "e3:publishInput",
+  "Publish input for an E3 program",
+)
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "data",
+    description: "data to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "dataFile",
+    description: "file containing data to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async function ({ e3Id, data, dataFile }, hre) {
+      const { ignition } = await hre.network.connect();
 
-task("e3:publishInput", "Publish input for an E3 program")
-  .addParam("e3Id", "Id of the E3 program")
-  .addOptionalParam("data", "data to publish")
-  .addOptionalParam("dataFile", "file containing data to publish")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const enclave = await hre.deployments.get("Enclave");
+      const enclave = await ignition.deploy(EnclaveModule);
 
-    const enclaveContract = await hre.ethers.getContractAt(
-      "Enclave",
-      enclave.address,
-    );
+      let dataToSend = data;
 
-    let data = taskArguments.data;
+      if (dataFile) {
+        const file = fs.readFileSync(dataFile);
+        dataToSend = file.toString();
+      }
 
-    if (taskArguments.dataFile) {
-      const file = fs.readFileSync(taskArguments.dataFile);
-      data = file.toString();
-    }
+      const tx = await enclave.enclave.publishInput(e3Id, dataToSend);
 
-    const tx = await enclaveContract.publishInput(taskArguments.e3Id, data);
+      console.log("Publishing input... ", tx.hash);
+      await tx.wait();
 
-    console.log("Publishing input... ", tx.hash);
-    await tx.wait();
+      console.log(`Input published`);
+    },
+  }))
+  .build();
 
-    console.log(`Input published`);
-  });
+export const publishCiphertext = task(
+  "e3:publishCiphertext",
+  "Publish ciphertext output for an E3 program",
+)
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "data",
+    description: "data to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "dataFile",
+    description: "file containing data to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "proof",
+    description: "proof to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "proofFile",
+    description: "file containing proof to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async function ({ e3Id, data, dataFile, proof, proofFile }, hre) {
+      const { ignition } = await hre.network.connect();
 
-task("e3:publishCiphertext", "Publish ciphertext output for an E3 program")
-  .addParam("e3Id", "Id of the E3 program")
-  .addOptionalParam("data", "data to publish")
-  .addOptionalParam("dataFile", "file containing data to publish")
-  .addOptionalParam("proof", "proof to publish")
-  .addOptionalParam("proofFile", "file containing proof to publish")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const enclave = await hre.deployments.get("Enclave");
+      const enclave = await ignition.deploy(EnclaveModule);
 
-    const enclaveContract = await hre.ethers.getContractAt(
-      "Enclave",
-      enclave.address,
-    );
+      const enclaveContract = await enclave.enclave;
 
-    let data = taskArguments.data;
+      let dataToSend = data;
 
-    if (taskArguments.dataFile) {
-      const file = fs.readFileSync(taskArguments.dataFile);
-      data = "0x" + file.toString("hex");
-    }
+      if (dataFile) {
+        const file = fs.readFileSync(dataFile);
+        dataToSend = "0x" + file.toString("hex");
+      }
 
-    let proof = taskArguments.proof;
+      let proofToSend = proof;
 
-    if (taskArguments.proofFile) {
-      const file = fs.readFileSync(taskArguments.proofFile);
-      proof = file.toString();
-    }
+      if (proofFile) {
+        const file = fs.readFileSync(proofFile);
+        proofToSend = file.toString();
+      }
 
-    const tx = await enclaveContract.publishCiphertextOutput(
-      taskArguments.e3Id,
-      data,
-      proof,
-    );
+      const tx = await enclaveContract.publishCiphertextOutput(
+        e3Id,
+        dataToSend,
+        proofToSend,
+      );
 
-    console.log("Publishing ciphertext... ", tx.hash);
-    await tx.wait();
+      console.log("Publishing ciphertext... ", tx.hash);
+      await tx.wait();
 
-    console.log(`Ciphertext published`);
-  });
+      console.log(`Ciphertext published`);
+    },
+  }))
+  .build();
 
-task("e3:publishPlaintext", "Publish plaintext output for an E3 program")
-  .addParam("e3Id", "Id of the E3 program")
-  .addOptionalParam("data", "data to publish")
-  .addOptionalParam("dataFile", "file containing data to publish")
-  .addOptionalParam("proof", "proof to publish")
-  .addOptionalParam("proofFile", "file containing proof to publish")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const enclave = await hre.deployments.get("Enclave");
+export const publishPlaintext = task(
+  "e3:publishPlaintext",
+  "Publish plaintext output for an E3 program",
+)
+  .addOption({
+    name: "e3Id",
+    description: "Id of the E3 program",
+    defaultValue: 0,
+    type: ArgumentType.INT,
+  })
+  .addOption({
+    name: "data",
+    description: "data to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "dataFile",
+    description: "file containing data to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "proof",
+    description: "proof to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .addOption({
+    name: "proofFile",
+    description: "file containing proof to publish",
+    defaultValue: "",
+    type: ArgumentType.STRING,
+  })
+  .setAction(async () => ({
+    default: async function ({ e3Id, data, dataFile, proof, proofFile }, hre) {
+      const { ignition } = await hre.network.connect();
 
-    const enclaveContract = await hre.ethers.getContractAt(
-      "Enclave",
-      enclave.address,
-    );
+      const enclave = await ignition.deploy(EnclaveModule);
 
-    let data = taskArguments.data;
+      let dataToSend = data;
 
-    if (taskArguments.dataFile) {
-      const file = fs.readFileSync(taskArguments.dataFile);
-      data = file.toString();
-    }
+      if (dataFile) {
+        const file = fs.readFileSync(dataFile);
+        dataToSend = file.toString();
+      }
 
-    let proof = taskArguments.proof;
+      let proofToSend = proof;
 
-    if (taskArguments.proofFile) {
-      const file = fs.readFileSync(taskArguments.proofFile);
-      proof = file.toString();
-    }
+      if (proofFile) {
+        const file = fs.readFileSync(proofFile);
+        proofToSend = file.toString();
+      }
 
-    const tx = await enclaveContract.publishPlaintextOutput(
-      taskArguments.e3Id,
-      data,
-      proof,
-    );
+      const tx = await enclave.enclave.publishPlaintextOutput(
+        e3Id,
+        dataToSend,
+        proofToSend,
+      );
 
-    console.log("Publishing ciphertext... ", tx.hash);
-    await tx.wait();
+      console.log("Publishing ciphertext... ", tx.hash);
+      await tx.wait();
 
-    console.log(`Ciphertext published`);
-  });
+      console.log(`Ciphertext published`);
+    },
+  }))
+  .build();
