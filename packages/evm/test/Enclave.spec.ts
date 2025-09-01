@@ -277,13 +277,15 @@ describe("Enclave", function () {
     it("returns correct E3 details", async function () {
       const { enclave, request, mocks } = await loadFixture(setup);
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -520,28 +522,30 @@ describe("Enclave", function () {
     it("reverts if msg.value is 0", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
-        enclave.request(
-          request.filter,
-          request.threshold,
-          request.startTime,
-          request.duration,
-          request.e3Program,
-          request.e3ProgramParams,
-          request.computeProviderParams,
-        ),
+        enclave.request({
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        }),
       ).to.be.revertedWithCustomError(enclave, "PaymentRequired");
     });
     it("reverts if threshold is 0", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.filter,
-          [0, 2],
-          request.startTime,
-          request.duration,
-          request.e3Program,
-          request.e3ProgramParams,
-          request.computeProviderParams,
+          {
+            filter: request.filter,
+            threshold: [0, 2],
+            startWindow: request.startTime,
+            duration: request.duration,
+            e3Program: request.e3Program,
+            e3ProgramParams: request.e3ProgramParams,
+            computeProviderParams: request.computeProviderParams,
+          },
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
@@ -550,13 +554,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.filter,
-          [3, 2],
-          request.startTime,
-          request.duration,
-          request.e3Program,
-          request.e3ProgramParams,
-          request.computeProviderParams,
+          {
+            filter: request.filter,
+            threshold: [3, 2],
+            startWindow: request.startTime,
+            duration: request.duration,
+            e3Program: request.e3Program,
+            e3ProgramParams: request.e3ProgramParams,
+            computeProviderParams: request.computeProviderParams,
+          },
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
@@ -565,13 +571,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.filter,
-          request.threshold,
-          request.startTime,
-          0,
-          request.e3Program,
-          request.e3ProgramParams,
-          request.computeProviderParams,
+          {
+            filter: request.filter,
+            threshold: request.threshold,
+            startWindow: request.startTime,
+            duration: 0,
+            e3Program: request.e3Program,
+            e3ProgramParams: request.e3ProgramParams,
+            computeProviderParams: request.computeProviderParams,
+          },
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
@@ -580,13 +588,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.filter,
-          request.threshold,
-          request.startTime,
-          time.duration.days(31),
-          request.e3Program,
-          request.e3ProgramParams,
-          request.computeProviderParams,
+          {
+            filter: request.filter,
+            threshold: request.threshold,
+            startWindow: request.startTime,
+            duration: time.duration.days(31),
+            e3Program: request.e3Program,
+            e3ProgramParams: request.e3ProgramParams,
+            computeProviderParams: request.computeProviderParams,
+          },
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
@@ -595,13 +605,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          request.filter,
-          request.threshold,
-          request.startTime,
-          request.duration,
-          ethers.ZeroAddress,
-          request.e3ProgramParams,
-          request.computeProviderParams,
+          {
+            filter: request.filter,
+            threshold: request.threshold,
+            startWindow: request.startTime,
+            duration: request.duration,
+            e3Program: ethers.ZeroAddress,
+            e3ProgramParams: request.e3ProgramParams,
+            computeProviderParams: request.computeProviderParams,
+          },
           { value: 10 },
         ),
       )
@@ -613,18 +625,15 @@ describe("Enclave", function () {
       await enclave.disableEncryptionScheme(encryptionSchemeId);
       await expect(
         enclave.request(
-          request.filter,
-          request.threshold,
-          request.startTime,
-          request.duration,
-          request.e3Program,
-          ethers.keccak256(
-            abiCoder.encode(
-              ["bytes", "address"],
-              [ZeroHash, ethers.ZeroAddress],
-            ),
-          ),
-          request.computeProviderParams,
+          {
+            filter: request.filter,
+            threshold: request.threshold,
+            startWindow: request.startTime,
+            duration: request.duration,
+            e3Program: request.e3Program,
+            e3ProgramParams: request.e3ProgramParams,
+            computeProviderParams: request.computeProviderParams,
+          },
           { value: 10 },
         ),
       )
@@ -636,13 +645,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request(
-          FilterFail,
-          request.threshold,
-          request.startTime,
-          request.duration,
-          request.e3Program,
-          request.e3ProgramParams,
-          request.computeProviderParams,
+          {
+            filter: FilterFail,
+            threshold: request.threshold,
+            startWindow: request.startTime,
+            duration: request.duration,
+            e3Program: request.e3Program,
+            e3ProgramParams: request.e3ProgramParams,
+            computeProviderParams: request.computeProviderParams,
+          },
           { value: 10 },
         ),
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
@@ -651,13 +662,15 @@ describe("Enclave", function () {
       const { enclave, request, mocks } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -681,13 +694,15 @@ describe("Enclave", function () {
     it("emits E3Requested event", async function () {
       const { enclave, request } = await loadFixture(setup);
       const tx = await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       const e3 = await enclave.getE3(0);
@@ -710,13 +725,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -734,13 +751,15 @@ describe("Enclave", function () {
       ] as [number, number];
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -756,13 +775,15 @@ describe("Enclave", function () {
       ] as [number, number];
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -780,13 +801,15 @@ describe("Enclave", function () {
       ] as [number, number];
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -802,13 +825,15 @@ describe("Enclave", function () {
       ];
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -822,13 +847,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -853,13 +880,15 @@ describe("Enclave", function () {
       } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -878,13 +907,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -898,13 +929,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -929,13 +962,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -953,13 +988,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -973,13 +1010,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -999,13 +1038,15 @@ describe("Enclave", function () {
       const inputData = "0x12345678";
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -1014,13 +1055,15 @@ describe("Enclave", function () {
 
       // Make a new request, activate and call
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(
@@ -1034,13 +1077,15 @@ describe("Enclave", function () {
       const inputData = "0x12345678";
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -1059,13 +1104,15 @@ describe("Enclave", function () {
       const tree = new LeanIMT(hash);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -1087,13 +1134,15 @@ describe("Enclave", function () {
       const { enclave, request } = await loadFixture(setup);
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
 
@@ -1122,13 +1171,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        request.startTime,
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: request.startTime,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await expect(enclave.publishCiphertextOutput(e3Id, "0x", "0x"))
@@ -1138,13 +1189,15 @@ describe("Enclave", function () {
     it("reverts if input deadline has not passed", async function () {
       const { enclave, request } = await loadFixture(setup);
       const tx = await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       const block = await tx.getBlock();
@@ -1163,13 +1216,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1187,13 +1242,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1207,13 +1264,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1227,13 +1286,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1247,13 +1308,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1278,13 +1341,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await expect(enclave.publishPlaintextOutput(e3Id, data, "0x"))
@@ -1296,13 +1361,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1315,13 +1382,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1340,13 +1409,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1361,13 +1432,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1383,13 +1456,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);
@@ -1404,13 +1479,15 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await enclave.request(
-        request.filter,
-        request.threshold,
-        [await time.latest(), (await time.latest()) + 100],
-        request.duration,
-        request.e3Program,
-        request.e3ProgramParams,
-        request.computeProviderParams,
+        {
+          filter: request.filter,
+          threshold: request.threshold,
+          startWindow: [await time.latest(), (await time.latest()) + 100],
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        },
         { value: 10 },
       );
       await enclave.activate(e3Id, ethers.ZeroHash);

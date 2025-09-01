@@ -127,18 +127,23 @@ task(
     }
 
     const tx = await enclaveContract.request(
-      filterAddress,
-      [taskArguments.thresholdQuorum, taskArguments.thresholdTotal],
-      [taskArguments.windowStart, taskArguments.windowEnd],
-      taskArguments.duration,
-      e3Address,
-      e3Params,
-      computeParams,
+      {
+        filter: filterAddress,
+        threshold: [
+          taskArguments.thresholdQuorum,
+          taskArguments.thresholdTotal,
+        ],
+        startWindow: [taskArguments.windowStart, taskArguments.windowEnd],
+        duration: taskArguments.duration,
+        e3Program: e3Address,
+        e3ProgramParams: e3Params,
+        computeProviderParams: computeParams,
+      },
       // 1 ETH
       { value: "1000000000000000000" },
     );
 
-    console.log("Reequesting committee... ", tx.hash);
+    console.log("Requesting committee... ", tx.hash);
     await tx.wait();
 
     console.log(`Committee requested`);
