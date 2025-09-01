@@ -199,6 +199,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.86.0
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: v1.0.0-beta.11
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -328,6 +332,40 @@ jobs:
           name: enclave-binary
           path: ~/.cargo/bin/enclave
           retention-days: 1
+
+  test_enclave_circuits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: v1.0.0-beta.11
+
+      - name: Check formatting
+        working-directory: ./packages/circuits
+        run: nargo fmt --check
+
+      - name: Compile Noir circuits
+        working-directory: ./packages/circuits
+        run: |
+          nargo compile --workspace
+
+      - name: Test Noir circuits
+        working-directory: ./packages/circuits
+        run: |
+          nargo test --workspace
+
+      - name: Upload circuit artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: circuit-artifacts
+          path: packages/circuits/target/
+          retention-days: 1
+          if-no-files-found: warn
 
   build_e3_support_dev:
     runs-on: ubuntu-latest
