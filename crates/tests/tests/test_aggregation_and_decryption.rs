@@ -36,8 +36,9 @@ use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::{sync::Arc, time::Duration};
+use tokio::sync::mpsc;
 use tokio::sync::{broadcast, Mutex};
-use tokio::{sync::mpsc, time::sleep};
+use tokio::time::sleep;
 
 // Simulating a local node
 type LocalCiphernodeTuple = (
@@ -211,6 +212,7 @@ async fn create_local_ciphernodes(
     let eth_addrs = create_random_eth_addrs(count);
     let mut result = vec![];
     for addr in &eth_addrs {
+        println!("Setting up eth addr: {}", addr);
         let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None, cipher).await?;
         result.push(tuple);
     }
@@ -348,7 +350,13 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     // Setup actual ciphernodes and dispatch add events
     let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
-    let eth_addrs = ciphernodes.iter().map(|tup| tup.0.to_owned()).collect();
+    let eth_addrs = ciphernodes
+        .iter()
+        .map(|tup| tup.0.to_owned())
+        .collect::<Vec<_>>();
+
+    add_ciphernodes(&bus, &eth_addrs, 1).await?;
+
     let e3_request_event = EnclaveEvent::from(E3Requested {
         e3_id: e3_id.clone(),
         params: Arc::new(encode_bfv_params(&params)),
@@ -468,6 +476,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         // SEND SHUTDOWN!
         bus.send(EnclaveEvent::from(Shutdown)).await?;
 
+        // This is probably overkill but required to ensure that all the data is written
         sleep(Duration::from_secs(1)).await;
 
         let cn1_dump = cn1.1.send(GetDump).await??;
@@ -610,11 +619,9 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     bus.do_send(evt_2.clone());
     bus.do_send(local_evt_3.clone()); // This is a local event which should not be broadcast to the network
 
-    sleep(Duration::from_millis(1)).await; // need to push to next tick
-
     // check the history of the event bus
     let history = history_collector
-        .send(GetHistory::<EnclaveEvent>::new())
+        .send(TakeHistory::<EnclaveEvent>::new(3))
         .await?;
 
     assert_eq!(
@@ -655,9 +662,6 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     }))
     .await?;
 
-    // Wait for events to flush through
-    sleep(Duration::from_millis(2000)).await;
-
     // Generate the test shares and pubkey
     let rng_test = create_shared_rng_from_u64(42);
     let test_pubkey = aggregate_public_key(&generate_pk_shares(
@@ -666,7 +670,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
 
     let history_collector = ciphernodes.last().unwrap().6.clone();
     let history = history_collector
-        .send(GetHistory::<EnclaveEvent>::new())
+        .send(TakeHistory::<EnclaveEvent>::new(12))
         .await?;
 
     assert_eq!(
@@ -677,7 +681,6 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
             nodes: OrderedSet::from(eth_addrs.clone()),
         })
     );
-    history_collector.send(ResetHistory).await?;
 
     // Send the computation requested event
     bus.send(EnclaveEvent::from(E3Requested {
@@ -689,14 +692,12 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     }))
     .await?;
 
-    sleep(Duration::from_millis(2000)).await;
-
     let test_pubkey = aggregate_public_key(&generate_pk_shares(
         &params, &crpoly, &rng_test, &eth_addrs,
     )?)?;
 
     let history = history_collector
-        .send(GetHistory::<EnclaveEvent>::new())
+        .send(TakeHistory::<EnclaveEvent>::new(6))
         .await?;
 
     assert_eq!(
@@ -736,11 +737,9 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     // lets send an event from the network
     let _ = event_tx.send(NetEvent::GossipData(event.to_bytes()?));
 
-    sleep(Duration::from_millis(1)).await; // need to push to next tick
-
     // check the history of the event bus
     let history = history_collector
-        .send(GetHistory::<EnclaveEvent>::new())
+        .send(TakeHistory::<EnclaveEvent>::new(1))
         .await?;
 
     assert_eq!(history, vec![event]);
