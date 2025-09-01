@@ -232,7 +232,7 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                 .into_actor(self)
                 .map(move |res, act, _| {
                     let nodes = res?;
-
+                    println!("sending PublicKeyAggregated!");
                     let event = EnclaveEvent::from(PublicKeyAggregated {
                         pubkey: msg.pubkey.clone(),
                         e3_id: msg.e3_id.clone(),
