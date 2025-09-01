@@ -2,4 +2,6 @@
 
 set -e
 
-./scripts/tasks/dockerize.sh ./scripts/tasks/build.sh
+(cargo build --locked)
+(cd ../../packages/evm && pnpm compile)
+(cd ./client && pnpm build)

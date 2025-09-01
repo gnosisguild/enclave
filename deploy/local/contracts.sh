@@ -24,4 +24,4 @@ pnpm ciphernode:add --ciphernode-address "$CN3" --network "localhost"
 
 
 # Delete local DB
-(rm -rf ./examples/CRISP/apps/server/database)
+(rm -rf ./examples/CRISP/server/database)

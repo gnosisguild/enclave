@@ -7,16 +7,16 @@ on:
       - release
       - main
     paths:
-      - "examples/CRISP/apps/server/**"
+      - "examples/CRISP/server/**"
   pull_request:
     branches:
       - release
       - main
     paths:
-      - "examples/CRISP/apps/server/**"
+      - "examples/CRISP/server/**"
 
 env:
-  DOCKERFILE_PATH: examples/CRISP/apps/server/Dockerfile
+  DOCKERFILE_PATH: examples/CRISP/server/Dockerfile
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/crisp-server
 
 permissions:
@@ -48,7 +48,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare .dockerignore
-        run: cp examples/CRISP/apps/server/.dockerignore .dockerignore
+        run: cp examples/CRISP/server/.dockerignore .dockerignore
 
       - name: Build image
         uses: docker/build-push-action@v5

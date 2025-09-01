@@ -12,9 +12,9 @@
   "rust-analyzer.linkedProjects": [
     "crates/evm/Cargo.toml",
     "crates/evm-helpers/Cargo.toml",
-    "examples/CRISP/apps/program/Cargo.toml",
-    "examples/CRISP/apps/server/Cargo.toml",
-    "examples/CRISP/apps/wasm-crypto/Cargo.toml"
+    "examples/CRISP/program/Cargo.toml",
+    "examples/CRISP/server/Cargo.toml",
+    "examples/CRISP/wasm-crypto/Cargo.toml"
   ],
   "[solidity]": {
     "editor.defaultFormatter": "NomicFoundation.hardhat-solidity"

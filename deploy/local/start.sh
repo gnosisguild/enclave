@@ -89,7 +89,7 @@ deploy_contracts() {
     
     # Clean up local database
     echo "   Cleaning up local database..."
-    rm -rf ./examples/CRISP/apps/server/database
+    rm -rf ./examples/CRISP/server/database
     
     echo "✅ Contracts deployed successfully!"
 }
@@ -116,7 +116,7 @@ sleep 3
 
 # Install CRISP dependencies
 echo "📦 Installing CRISP dependencies..."
-(cd examples/CRISP/apps/client && pnpm install)
+(cd examples/CRISP/client && pnpm install)
 
 echo "🎯 Starting CRISP applications..."
 
@@ -124,9 +124,9 @@ echo "🎯 Starting CRISP applications..."
 concurrently \
   --names "CLIENT,SERVER,PROGRAM" \
   --prefix-colors "green,yellow,magenta" \
-  "cd examples/CRISP/apps/client && pnpm dev" \
-  "cd examples/CRISP/apps/server && cargo run --bin server" \
-  "cd examples/CRISP/apps/program && cargo run"
+  "cd examples/CRISP/client && pnpm dev" \
+  "cd examples/CRISP/server && cargo run --bin server" \
+  "cd examples/CRISP/program && cargo run"
 
 # This will run until interrupted
 echo "🚨 CRISP development environment stopped" 
