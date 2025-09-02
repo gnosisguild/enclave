@@ -8,6 +8,10 @@ pragma solidity >=0.8.27;
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
+import { IRegistryFilter } from "./interfaces/IRegistryFilter.sol";
+import { IServiceManager } from "./interfaces/IServiceManager.sol";
+import { IERC20 } from "@oz/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@oz/token/ERC20/utils/SafeERC20.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -20,6 +24,7 @@ import {
 
 contract Enclave is IEnclave, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
+    using SafeERC20 for IERC20;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -28,6 +33,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     ICiphernodeRegistry public ciphernodeRegistry; // address of the Ciphernode registry.
+    IServiceManager public serviceManager; // address of the ServiceManager for reward distribution.
+    IERC20 public enclToken; // address of the ENCL token.
     uint256 public maxDuration; // maximum duration of a computation in seconds.
     uint256 public nexte3Id; // ID of the next E3.
     uint256 public requests; // total number of requests made to Enclave.
@@ -51,6 +58,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// Mapping that stores the valid E3 program ABI encoded parameter sets (e.g., BFV).
     mapping(bytes e3ProgramParams => bool allowed) public e3ProgramsParams;
 
+    /// Mapping of E3 payments.
+    mapping(uint256 e3Id => uint256 payment) public e3Payments;
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //
@@ -71,6 +81,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
     error InvalidComputationRequest(IInputValidator inputValidator);
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
+    error InvalidServiceManager(IServiceManager serviceManager);
+    error InvalidEnclToken(IERC20 enclToken);
     error InvalidDuration(uint256 duration);
     error InvalidOutput(bytes output);
     error InvalidInput();
@@ -93,12 +105,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     constructor(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
+        IServiceManager _serviceManager,
+        IERC20 _enclToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
     ) {
         initialize(
             _owner,
             _ciphernodeRegistry,
+            _serviceManager,
+            _enclToken,
             _maxDuration,
             _e3ProgramsParams
         );
@@ -111,12 +127,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function initialize(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
+        IServiceManager _serviceManager,
+        IERC20 _enclToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
+        setServiceManager(_serviceManager);
+        setEnclToken(_enclToken);
         setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
@@ -138,7 +158,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ) external payable returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
         // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
+        // Leaving this be for now, will remove after team discussion.
         require(msg.value > 0, PaymentRequired(msg.value));
+
         require(
             threshold[1] >= threshold[0] && threshold[0] > 0,
             InvalidThreshold(threshold)
@@ -197,6 +219,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             ciphernodeRegistry.requestCommittee(e3Id, filter, threshold),
             CommitteeSelectionFailed()
         );
+
+        // Need to perfome fee caculation here. get e3Quote?
+        // Transfer ENCL tokens, hardcoded for now to 10 ENCL tokens.
+        enclToken.safeTransferFrom(msg.sender, address(this), 10 * 10 ** 18);
+        e3Payments[e3Id] = 10 * 10 ** 18;
 
         emit E3Requested(e3Id, e3, filter, e3Program);
     }
@@ -302,6 +329,25 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         require(success, InvalidOutput(plaintextOutput));
         e3s[e3Id].plaintextOutput = plaintextOutput;
 
+        // Get the the committee
+        IRegistryFilter.Committee memory committee = ciphernodeRegistry
+            .getCommittee(e3Id);
+
+        // Call ServiceManager and Distribute rewards to the committee
+        uint256[] memory amounts = new uint256[](committee.nodes.length);
+        uint256 amount = e3Payments[e3Id] / committee.nodes.length;
+        for (uint256 i = 0; i < committee.nodes.length; i++) {
+            amounts[i] = amount;
+        }
+        // Approve the ServiceManager to spend the ENCL tokens
+        enclToken.approve(address(serviceManager), e3Payments[e3Id]);
+        // Distribute rewards to the committee
+        serviceManager.distributeRewards(committee.nodes, amounts);
+        // Zero out the payment
+        e3Payments[e3Id] = 0;
+        // Where does dust go? treasury maybe?
+        enclToken.approve(address(serviceManager), 0);
+
         emit PlaintextOutputPublished(e3Id, plaintextOutput);
     }
 
@@ -330,6 +376,30 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         ciphernodeRegistry = _ciphernodeRegistry;
         success = true;
         emit CiphernodeRegistrySet(address(_ciphernodeRegistry));
+    }
+
+    function setServiceManager(
+        IServiceManager _serviceManager
+    ) public onlyOwner returns (bool success) {
+        require(
+            address(_serviceManager) != address(0),
+            InvalidServiceManager(_serviceManager)
+        );
+        serviceManager = _serviceManager;
+        success = true;
+        emit ServiceManagerSet(address(_serviceManager));
+    }
+
+    function setEnclToken(
+        IERC20 _enclToken
+    ) public onlyOwner returns (bool success) {
+        require(
+            address(_enclToken) != address(0),
+            InvalidEnclToken(_enclToken)
+        );
+        enclToken = _enclToken;
+        success = true;
+        emit EnclTokenSet(address(_enclToken));
     }
 
     function enableE3Program(

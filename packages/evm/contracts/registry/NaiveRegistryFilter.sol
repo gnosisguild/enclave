@@ -12,12 +12,6 @@ import {
 } from "@oz-upgradeable/access/OwnableUpgradeable.sol";
 
 contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
-    struct Committee {
-        address[] nodes;
-        uint32[2] threshold;
-        bytes32 publicKey;
-    }
-
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //
@@ -26,7 +20,8 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     address public registry;
 
-    mapping(uint256 e3 => Committee committee) public committees;
+    mapping(uint256 e3 => IRegistryFilter.Committee committee)
+        public committees;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -97,7 +92,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         address[] memory nodes,
         bytes memory publicKey
     ) external onlyOwner {
-        Committee storage committee = committees[e3Id];
+        IRegistryFilter.Committee storage committee = committees[e3Id];
         require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
         committee.nodes = nodes;
         committee.publicKey = keccak256(publicKey);
@@ -126,7 +121,9 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     function getCommittee(
         uint256 e3Id
-    ) external view returns (Committee memory) {
-        return committees[e3Id];
+    ) external view returns (IRegistryFilter.Committee memory) {
+        IRegistryFilter.Committee memory committee = committees[e3Id];
+        require(committee.publicKey != bytes32(0), CommitteeNotPublished());
+        return committee;
     }
 }

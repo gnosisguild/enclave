@@ -1,37 +1,58 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
 import {
     IStrategy
 } from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {
+    IStrategyManager
+} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {
+    IAVSRegistrar
+} from "eigenlayer-contracts/src/contracts/interfaces/IAVSRegistrar.sol";
 
+/**
+ * @title IServiceManager
+ * @notice Interface for managing operator registration, rewards, and slashing
+ */
 interface IServiceManager {
-    /// @notice Custom errors
+    // Custom errors
     error ZeroAddress();
-    error StrategyNotAllowed();
-    error InsufficientCollateral();
     error OperatorNotRegistered();
-    error NotAuthorizedSlasher();
-    error InvalidMinCollateral();
-    error StrategyAlreadyAllowed();
-    error StrategyNotFound();
-    error InvalidSlashingPercentage();
-    error InsufficientMagnitudeAllocation();
-    error InsufficientLicenseStake();
-    error InsufficientTicketBalance();
-    error InvalidTicketAmount();
-    error TicketPurchaseFailed();
-    error AlreadyLicensed();
     error NotLicensed();
+    error InsufficientCollateral();
+    error InvalidMinCollateral();
+    error PriceFeedError();
+    error InvalidOperatorSet();
+    error WrongOperatorSet();
+    error InsufficientAllocatedMagnitude();
+    error OnlyAllocationManager();
+    error StrategyNotFound();
+    error StrategyAlreadyAllowed();
+    error CannotRemoveCoreStrategies();
+    error InvalidOperatorSetId();
+    error AlreadySetToThisId();
+    error NoStrategiesConfigured();
+    error OperatorNoStake();
+    error InvalidWadSlashing();
+    error NotAuthorizedSlasher();
+    error SlashingFailed(string reason);
+    error OnlyRewardDistributor();
+    error ArrayLengthMismatch();
+    error InvalidPriceOrStale();
+    error MustDeregisterCiphernodeFirst();
 
-    /// @notice Events
-    event MinCollateralUpdated(uint256 newMinCollateralUsd);
-    event CiphernodeRegistered(address indexed operator, uint256 collateralUsd);
-    event CiphernodeDeregistered(address indexed operator);
+    // Events
+    event StrategyAdded(address indexed strategy, address priceFeed);
+    event StrategyRemoved(address indexed strategy);
+    event StrategyUpdated(address indexed strategy, address newPriceFeed);
+    event MinCollateralUpdated(uint256 newMinCollateral);
+    event OperatorSetIdUpdated(uint32 previousId, uint32 newId);
+    event AVSRegistrarSet(address indexed registrar);
+    event OperatorRegisteredToAVS(address indexed operator);
+    event OperatorDeregisteredFromAVS(address indexed operator);
+    event OperatorBonded(address indexed operator, uint256 collateralUsd);
+    event OperatorDebonded(address indexed operator);
     event OperatorSlashed(
         address indexed operator,
         uint256 wadToSlash,
@@ -39,116 +60,113 @@ interface IServiceManager {
         IStrategy[] strategies,
         uint256[] slashedShares
     );
-    event OperatorSetIdUpdated(
-        uint32 indexed previousOperatorSetId,
-        uint32 indexed newOperatorSetId
-    );
-    event OperatorRegisteredToAVS(address indexed operator);
-    event OperatorDeregisteredFromAVS(address indexed operator);
-    event AVSRegistrarSet(address indexed registrar);
     event SlasherAdded(address indexed slasher);
     event SlasherRemoved(address indexed slasher);
-    event StrategyAdded(address indexed strategy, address indexed priceFeed);
-    event StrategyRemoved(address indexed strategy);
-    event StrategyUpdated(
-        address indexed strategy,
-        address indexed newPriceFeed
-    );
+    event BondingManagerSet(address indexed bondingManager);
 
-    event LicenseAcquired(address indexed operator, uint256 enclAmount);
-    event LicenseRevoked(address indexed operator);
-    event TicketsPurchased(
-        address indexed operator,
-        uint256 usdcAmount,
-        uint256 ticketCount
-    );
-    event TicketsUsed(address indexed operator, uint256 ticketCount);
-    event LicenseStakeUpdated(uint256 newLicenseStake);
-    event TicketPriceUpdated(uint256 newTicketPrice);
-
-    /// @notice Strategy configuration
+    // Structs
     struct StrategyConfig {
         bool isAllowed;
         address priceFeed;
         uint8 decimals;
     }
 
-    /// @notice Operator license and ticket information
     struct OperatorInfo {
-        bool isLicensed; // Has operator acquired license with ENCL stake?
-        uint256 licenseStake; // Amount of ENCL staked for license
-        uint256 ticketBalance; // Number of selection tickets owned
-        uint256 registeredAt; // Timestamp when license was acquired
+        bool isActive;
+        uint256 registeredAt;
+        uint256 collateralUsd;
     }
 
     /**
-     * @notice Add a supported strategy for collateral
-     * @param strategy The EigenLayer strategy contract
-     * @param priceFeed Chainlink price feed for USD conversion (address(0) for stablecoins)
+     * @notice Add strategy to allowed strategies list
+     * @param strategy Strategy contract address
+     * @param priceFeed Chainlink price feed address (0x0 for stablecoins)
      */
     function addStrategy(IStrategy strategy, address priceFeed) external;
 
     /**
-     * @notice Remove a supported strategy
-     * @param strategy The strategy to remove
+     * @notice Remove strategy from allowed strategies list
+     * @param strategy Strategy contract address
      */
     function removeStrategy(IStrategy strategy) external;
 
     /**
-     * @notice Update strategy parameters
-     * @param strategy The strategy to update
+     * @notice Update strategy price feed
+     * @param strategy Strategy contract address
      * @param newPriceFeed New price feed address
      */
     function updateStrategy(IStrategy strategy, address newPriceFeed) external;
 
     /**
-     * @notice Set minimum collateral requirement in USD
-     * @param minCollateralUsd New minimum collateral in USD (18 decimals)
+     * @notice Set minimum collateral USD requirement
+     * @param _minCollateralUsd New minimum collateral in USD
      */
-    function setMinCollateralUsd(uint256 minCollateralUsd) external;
+    function setMinCollateralUsd(uint256 _minCollateralUsd) external;
 
     /**
-     * @notice Set minimum ENCL stake required for license
-     * @param licenseStake Amount of ENCL required for license
+     * @notice Set operator set ID for this AVS
+     * @param _operatorSetId New operator set ID
      */
-    function setLicenseStake(uint256 licenseStake) external;
+    function setOperatorSetId(uint32 _operatorSetId) external;
 
     /**
-     * @notice Set price per selection ticket in USDC
-     * @param ticketPrice Price per ticket in USDC (6 decimals)
+     * @notice Set AVS registrar in AllocationManager
+     * @param registrar New registrar contract
      */
-    function setTicketPrice(uint256 ticketPrice) external;
+    function setAVSRegistrar(IAVSRegistrar registrar) external;
 
     /**
-     * @notice Acquire license to become a ciphernode by staking ENCL
-     * @dev Operator must first stake ENCL tokens to get license
+     * @notice Set reward distributor address
+     * @param _rewardDistributor New reward distributor address
      */
-    function acquireLicense() external;
+    function setRewardDistributor(address _rewardDistributor) external;
 
     /**
-     * @notice Purchase selection tickets with USDC
-     * @param ticketCount Number of tickets to purchase
+     * @notice Set bonding manager address
+     * @param _bondingManager New bonding manager address
      */
-    function purchaseTickets(uint256 ticketCount) external;
+    function setBondingManager(address _bondingManager) external;
 
     /**
-     * @notice Register as a ciphernode (requires license)
-     * @dev Operator must have license and meet collateral requirements
+     * @notice Publish AVS metadata URI via AllocationManager
+     * @param uri Metadata URI for the AVS
      */
-    function registerCiphernode() external;
+    function publishAVSMetadata(string calldata uri) external;
 
     /**
-     * @notice Deregister from being a ciphernode
-     * @param siblingNodes Array of sibling node indices for registry removal
+     * @notice Create operator set with strategies via AllocationManager
+     * @param id Operator set ID
+     * @param strategies Array of strategy addresses
      */
-    function deregisterCiphernode(uint256[] calldata siblingNodes) external;
+    function createOperatorSet(
+        uint32 id,
+        IStrategy[] calldata strategies
+    ) external;
 
     /**
-     * @notice Slash an operator's collateral for misbehavior
+     * @notice Add strategies to existing operator set via AllocationManager
+     * @param id Operator set ID
+     * @param strategies Array of strategy addresses to add
+     */
+    function addStrategies(uint32 id, IStrategy[] calldata strategies) external;
+
+    /**
+     * @notice Add authorized slasher
+     * @param slasher Address to authorize for slashing
+     */
+    function addSlasher(address slasher) external;
+
+    /**
+     * @notice Remove authorized slasher
+     * @param slasher Address to remove from slashing authorization
+     */
+    function removeSlasher(address slasher) external;
+
+    /**
+     * @notice Slash operator across all strategies
      * @param operator Address of the operator to slash
-     * @param wadToSlash Amount to slash in WAD format (18 decimals, 1e18 = 100%)
-     * @param description Description of the slashing event
-     * @dev Only authorized slashers can call this
+     * @param wadToSlash Proportion to slash (in WAD format, 1e18 = 100%)
+     * @param description Description of the slashing reason
      */
     function slashOperator(
         address operator,
@@ -157,39 +175,39 @@ interface IServiceManager {
     ) external;
 
     /**
-     * @notice Deregister operator from operator sets
-     * @param operator The operator to deregister
-     * @param operatorSetIds Array of operator set IDs to deregister from
+     * @notice Distribute rewards to operators
+     * @param recipients Array of operator addresses
+     * @param amounts Array of reward amounts
      */
-    function deregisterOperatorFromOperatorSets(
-        address operator,
-        uint32[] memory operatorSetIds
+    function distributeRewards(
+        address[] calldata recipients,
+        uint256[] calldata amounts
     ) external;
 
     /**
-     * @notice Check if an operator meets collateral requirements
+     * @notice Check if operator meets collateral requirements
      * @param operator Address of the operator
-     * @return isEligible Whether the operator meets requirements
-     * @return collateralUsd Total collateral value in USD (18 decimals)
+     * @return isEligible True if operator meets requirements
+     * @return collateralUsd USD value of operator's collateral
      */
     function checkOperatorEligibility(
         address operator
     ) external view returns (bool isEligible, uint256 collateralUsd);
 
     /**
-     * @notice Get total collateral value for an operator across all strategies
+     * @notice Get operator's collateral value in USD
      * @param operator Address of the operator
-     * @return totalUsdValue Total USD value of operator's restaked collateral (18 decimals)
+     * @return totalUsdValue Total USD value of operator's collateral
      */
     function getOperatorCollateralValue(
         address operator
     ) external view returns (uint256 totalUsdValue);
 
     /**
-     * @notice Get operator's shares in a specific strategy
+     * @notice Get operator's shares in a strategy
      * @param operator Address of the operator
-     * @param strategy The strategy contract
-     * @return shares Amount of shares the operator has in the strategy
+     * @param strategy Strategy contract address
+     * @return shares Number of shares
      */
     function getOperatorShares(
         address operator,
@@ -197,63 +215,74 @@ interface IServiceManager {
     ) external view returns (uint256 shares);
 
     /**
-     * @notice Check if a strategy is allowed for collateral
-     * @param strategy The strategy to check
-     * @return isAllowed Whether the strategy is allowed
+     * @notice Get operator's allocated magnitude for a strategy
+     * @param operator Address of the operator
+     * @param strategy Strategy contract address
+     * @return Allocated magnitude
      */
-    function isStrategyAllowed(
+    function getAllocatedMagnitude(
+        address operator,
         IStrategy strategy
-    ) external view returns (bool isAllowed);
+    ) external view returns (uint256);
+
+    /**
+     * @notice Get operator's total magnitude for a strategy
+     * @param operator Address of the operator
+     * @param strategy Strategy contract address
+     * @return Total magnitude (allocated + allocatable)
+     */
+    function getTotalMagnitude(
+        address operator,
+        IStrategy strategy
+    ) external view returns (uint256);
+
+    /**
+     * @notice Check if strategy is allowed
+     * @param strategy Strategy contract address
+     * @return True if strategy is allowed
+     */
+    function isStrategyAllowed(IStrategy strategy) external view returns (bool);
 
     /**
      * @notice Get all allowed strategies
-     * @return strategies Array of allowed strategy contracts
+     * @return Array of allowed strategy addresses
      */
-    function getAllowedStrategies()
-        external
-        view
-        returns (IStrategy[] memory strategies);
+    function getAllowedStrategies() external view returns (IStrategy[] memory);
 
     /**
      * @notice Get strategy configuration
-     * @param strategy The strategy contract
-     * @return priceFeed Price feed address for USD conversion
+     * @param strategy Strategy contract address
+     * @return Price feed address
      */
     function getStrategyConfig(
         IStrategy strategy
-    ) external view returns (address priceFeed);
+    ) external view returns (address);
 
     /**
-     * @notice Get minimum collateral requirement
-     * @return minCollateralUsd Minimum collateral in USD (18 decimals)
+     * @notice Get minimum collateral USD requirement
+     * @return Minimum collateral in USD
      */
-    function getMinCollateralUsd()
-        external
-        view
-        returns (uint256 minCollateralUsd);
+    function getMinCollateralUsd() external view returns (uint256);
 
     /**
-     * @notice Get operator information (license and tickets)
+     * @notice Get the strategy manager contract
+     * @return The IStrategyManager instance
+     */
+    function strategyManager() external view returns (IStrategyManager);
+
+    /**
+     * @notice Get operator set information
+     * @return operatorSetId The operator set ID
+     * @return avs The AVS address
+     */
+    function getOperatorSetInfo() external view returns (uint32, address);
+
+    /**
+     * @notice Get operator information
      * @param operator Address of the operator
-     * @return info OperatorInfo struct with license and ticket data
+     * @return OperatorInfo struct
      */
     function getOperatorInfo(
         address operator
-    ) external view returns (OperatorInfo memory info);
-
-    /**
-     * @notice Get current license stake requirement
-     * @return licenseStake Amount of ENCL required for license
-     */
-    function getLicenseStake() external view returns (uint256 licenseStake);
-
-    /**
-     * @notice Get current ticket price
-     * @return ticketPrice Price per ticket in USDC
-     */
-    function getTicketPrice() external view returns (uint256 ticketPrice);
-
-    function getAvailableTicketBudget(
-        address operator
-    ) external view returns (uint256);
+    ) external view returns (OperatorInfo memory);
 }

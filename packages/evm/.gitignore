@@ -13,8 +13,12 @@ dist
 node_modules
 types
 deployments/localhost
+deployments/deployment-31337.json
+deployments/core
 out/
 cache_forge/
+cache_hardhat/
+broadcast/
 
 # files
 *.env

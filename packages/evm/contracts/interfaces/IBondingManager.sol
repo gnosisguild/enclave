@@ -1,106 +1,197 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
+import {
+    IStrategy
+} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+
+/**
+ * @title IBondingManager
+ * @notice Interface for managing operator licenses, tickets, and ciphernode registration
+ */
 interface IBondingManager {
-    /// @notice Custom errors
+    // Custom errors
     error ZeroAddress();
     error OperatorNotRegistered();
-    error AlreadyRequested();
-    error DecommissionNotRequested();
-    error DecommissionDelayNotPassed();
-    error NotAuthorizedSlasher();
+    error AlreadyLicensed();
+    error NotLicensed();
+    error InsufficientLicenseStake();
+    error InsufficientTicketBalance();
+    error InvalidTicketAmount();
+    error CostOverflow();
+    error InsufficientTicketBudget();
+    error InvalidMinTicketBalance();
+    error OnlyRegistry();
     error OnlyServiceManager();
 
-    /// @notice Operator information struct
+    error InsufficientAllocatedMagnitude();
+    error AlreadyRegistered();
+
+    // Events
+    event LicenseAcquired(address indexed operator, uint256 stake);
+    event LicenseRevoked(address indexed operator);
+    event TicketsPurchased(
+        address indexed operator,
+        uint256 cost,
+        uint256 count
+    );
+    event TicketsUsed(address indexed operator, uint256 count);
+    event TicketsSlashed(address indexed operator, uint256 count);
+    event MinTicketBalanceUpdated(uint256 newBalance);
+    event CiphernodeRegistered(address indexed operator, uint256 collateralUsd);
+    event CiphernodeDeregistered(address indexed operator);
+    event CiphernodeActivated(address indexed operator);
+    event CiphernodeDeactivated(address indexed operator);
+
+    event LicenseStakeUpdated(uint256 newStake);
+    event TicketPriceUpdated(uint256 newPrice);
+
+    // Structs
     struct OperatorInfo {
-        bool isActive;
+        bool isLicensed;
+        uint256 licenseStake;
+        uint256 ticketBalance;
         uint256 registeredAt;
-        uint256 decommissionRequestedAt;
+        bool isActive;
         uint256 collateralUsd;
     }
 
-    /// @notice Events
-    event OperatorRegistered(address indexed operator, uint256 collateralUsd);
-    event OperatorDeregistered(address indexed operator);
-    event DecommissionRequested(address indexed operator, uint256 requestTime);
-    event DecommissionCompleted(address indexed operator);
-    event DecommissionDelayUpdated(uint256 newDelay);
-    event SlasherAdded(address indexed slasher);
-    event SlasherRemoved(address indexed slasher);
-
     /**
-     * @notice Register an operator after they've registered with ServiceManager
-     * @param operator Address of the operator to register
-     * @param collateralUsd USD value of their collateral
+     * @notice Acquire license to operate as ciphernode - this requires allocated magnitude and collateral
      */
-    function registerOperator(address operator, uint256 collateralUsd) external;
+    function acquireLicense() external;
 
     /**
-     * @notice Deregister an operator
-     * @param operator Address of the operator to deregister
+     * @notice Purchase tickets for computation budget
+     * @param ticketCount Number of tickets to purchase
      */
-    function deregisterOperator(address operator) external;
+    function purchaseTickets(uint256 ticketCount) external;
 
     /**
-     * @notice Request decommission from being a ciphernode
-     * @dev Starts the decommission delay period
+     * @notice Register as ciphernode in the registry
      */
-    function requestDecommission() external;
+    function registerCiphernode() external;
 
     /**
-     * @notice Complete decommission after delay period
-     * @param siblingNodes Array of sibling node indices for registry removal
+     * @notice Deregister from ciphernode registry
+     * @param siblingNodes Array of sibling node IDs for registry update
      */
-    function completeDecommission(uint256[] calldata siblingNodes) external;
+    function deregisterCiphernode(uint256[] calldata siblingNodes) external;
 
     /**
-     * @notice Update operator's collateral value
+     * @notice Use tickets for computation (callable by registry)
      * @param operator Address of the operator
-     * @param newCollateralUsd New collateral value in USD
+     * @param ticketCount Number of tickets to use
      */
-    function updateOperatorCollateral(
-        address operator,
-        uint256 newCollateralUsd
-    ) external;
+    function useTickets(address operator, uint256 ticketCount) external;
 
     /**
-     * @notice Set decommission delay
-     * @param newDelay New delay in seconds
-     */
-    function setDecommissionDelay(uint256 newDelay) external;
-
-    /**
-     * @notice Check if an operator is bonded and active
+     * @notice Slash operator tickets proportionally (callable by ServiceManager)
      * @param operator Address of the operator
-     * @return isBonded Whether the operator is bonded
+     * @param wadToSlash Proportion to slash (in WAD format)
      */
-    function isBonded(address operator) external view returns (bool isBonded);
+    function slashTickets(address operator, uint256 wadToSlash) external;
+
+    /**
+     * @notice Update license status after slashing (callable by ServiceManager)
+     * @param operator Address of the operator
+     */
+    function updateLicenseStatus(address operator) external;
+
+    /**
+     * @notice Sync ticket health based on allocation changes (called by ServiceManager)
+     * @param operator Address of the operator
+     */
+    function syncTicketHealth(address operator) external;
+
+    /**
+     * @notice Set minimum ticket balance for activation
+     * @param _minTicketBalance New minimum ticket balance
+     */
+    function setMinTicketBalance(uint256 _minTicketBalance) external;
+
+    /**
+     * @notice Set license stake requirement
+     * @param _licenseStake New license stake amount
+     */
+    function setLicenseStake(uint256 _licenseStake) external;
+
+    /**
+     * @notice Set ticket price
+     * @param _ticketPrice New ticket price
+     */
+    function setTicketPrice(uint256 _ticketPrice) external;
 
     /**
      * @notice Get operator information
      * @param operator Address of the operator
-     * @return info Operator information struct
+     * @return OperatorInfo struct
      */
     function getOperatorInfo(
         address operator
-    ) external view returns (OperatorInfo memory info);
+    ) external view returns (OperatorInfo memory);
 
     /**
-     * @notice Check if an operator can complete decommission
+     * @notice Get available ticket budget for operator
      * @param operator Address of the operator
-     * @return canDecommission Whether decommission can be completed
+     * @return Available budget in USDC
      */
-    function canCompleteDecommission(
+    function getAvailableTicketBudget(
         address operator
-    ) external view returns (bool canDecommission);
+    ) external view returns (uint256);
 
     /**
-     * @notice Get decommission delay
-     * @return delay Decommission delay in seconds
+     * @notice Get license stake requirement
+     * @return License stake amount
      */
-    function getDecommissionDelay() external view returns (uint256 delay);
+    function getLicenseStake() external view returns (uint256);
+
+    /**
+     * @notice Get ticket price
+     * @return Ticket price
+     */
+    function getTicketPrice() external view returns (uint256);
+
+    /**
+     * @notice Check if operator is registered in ciphernode registry
+     * @param operator Address of the operator
+     * @return True if registered
+     */
+    function isRegisteredOperator(
+        address operator
+    ) external view returns (bool);
+
+    /**
+     * @notice Check if operator is active (registered and has enough tickets)
+     * @param operator Address of the operator
+     * @return True if active
+     */
+    function isActive(address operator) external view returns (bool);
+
+    /**
+     * @notice Get total USDC value spent on tickets by operator
+     * @param operator Address of the operator
+     * @return Total USDC spent on tickets
+     */
+    function ticketBudgetSpent(
+        address operator
+    ) external view returns (uint256);
+
+    /**
+     * @notice Ciphernode state enum for lifecycle management
+     */
+    enum CiphernodeState {
+        REMOVED,
+        REGISTERED_INACTIVE,
+        ACTIVE
+    }
+
+    /**
+     * @notice Get the current state of a ciphernode
+     * @param operator Address of the operator
+     * @return Current state of the ciphernode
+     */
+    function getCiphernodeState(
+        address operator
+    ) external view returns (CiphernodeState);
 }

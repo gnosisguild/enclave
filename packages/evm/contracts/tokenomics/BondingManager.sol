@@ -1,122 +1,273 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-//
-// This file is provided WITHOUT ANY WARRANTY;
-// without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
+import { ReentrancyGuard } from "@oz/utils/ReentrancyGuard.sol";
+import { IERC20Metadata } from "@oz/token/ERC20/extensions/IERC20Metadata.sol";
+import { SafeERC20 } from "@oz/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "@oz/access/Ownable.sol";
-
-import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
+import { Math } from "@oz/utils/math/Math.sol";
+import {
+    IStrategy
+} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {
+    IDelegationManager
+} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {
+    IAllocationManager
+} from "eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
+import {
+    IStrategyManager
+} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {
+    OperatorSet
+} from "eigenlayer-contracts/src/contracts/libraries/OperatorSetLib.sol";
 import { IBondingManager } from "../interfaces/IBondingManager.sol";
+import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
+import { IServiceManager } from "../interfaces/IServiceManager.sol";
 
-contract BondingManager is Ownable, IBondingManager {
-    /// @notice Decommission delay in seconds
-    uint256 public decommissionDelay;
+contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
+    using SafeERC20 for IERC20Metadata;
 
-    /// @notice Mapping of operator address to their information
-    mapping(address operator => OperatorInfo info) public operators;
+    uint256 public minTicketBalance;
+    IStrategy public enclStrategy;
+    IStrategy public usdcStrategy;
+    uint256 public licenseStake;
+    uint256 public ticketPrice;
+    uint32 public operatorSetId;
 
-    /// @notice ServiceManager contract
+    mapping(address => OperatorInfo) public operators;
+    mapping(address => bool) public registeredOperators;
+    mapping(address => uint256) public ticketBudgetSpent;
+
+    ICiphernodeRegistry public ciphernodeRegistry;
+    IDelegationManager public delegationManager;
+    IAllocationManager public allocationManager;
     address public serviceManager;
 
-    /// @notice CiphernodeRegistry contract
-    ICiphernodeRegistry public ciphernodeRegistry;
-
-    /// @notice Modifier to restrict access to ServiceManager
     modifier onlyServiceManager() {
-        require(msg.sender == serviceManager, OnlyServiceManager());
+        if (msg.sender != serviceManager) revert OnlyServiceManager();
         _;
     }
 
     constructor(
-        address _serviceManager,
-        address _ciphernodeRegistry,
         address _owner,
-        uint256 _decommissionDelay
+        address _serviceManager,
+        IDelegationManager _delegationManager,
+        IAllocationManager _allocationManager,
+        address _ciphernodeRegistry,
+        IStrategy _enclStrategy,
+        IStrategy _usdcStrategy,
+        uint256 _licenseStake,
+        uint256 _ticketPrice,
+        uint32 _operatorSetId
     ) Ownable(_owner) {
-        require(_serviceManager != address(0), ZeroAddress());
-        require(_ciphernodeRegistry != address(0), ZeroAddress());
+        if (_serviceManager == address(0)) revert ZeroAddress();
+        if (_ciphernodeRegistry == address(0)) revert ZeroAddress();
+        if (address(_delegationManager) == address(0)) revert ZeroAddress();
+        if (address(_allocationManager) == address(0)) revert ZeroAddress();
+        if (address(_enclStrategy) == address(0)) revert ZeroAddress();
+        if (address(_usdcStrategy) == address(0)) revert ZeroAddress();
+        if (_licenseStake == 0) revert InsufficientLicenseStake();
+        if (_ticketPrice == 0) revert InvalidTicketAmount();
 
         serviceManager = _serviceManager;
+        delegationManager = _delegationManager;
+        allocationManager = _allocationManager;
         ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
-        decommissionDelay = _decommissionDelay;
+        enclStrategy = _enclStrategy;
+        usdcStrategy = _usdcStrategy;
+        licenseStake = _licenseStake;
+        ticketPrice = _ticketPrice;
+        operatorSetId = _operatorSetId;
+        minTicketBalance = 5;
     }
 
-    // ============ ServiceManager Interface ============
+    function acquireLicense() external nonReentrant {
+        if (!delegationManager.isOperator(msg.sender))
+            revert OperatorNotRegistered();
+        if (operators[msg.sender].isLicensed) revert AlreadyLicensed();
 
-    function registerOperator(
-        address operator,
-        uint256 collateralUsd
-    ) external onlyServiceManager {
-        require(!operators[operator].isActive, "Already registered");
+        uint256 enclShares = _getOperatorShares(msg.sender, enclStrategy);
+        uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
+        if (enclAmount < licenseStake) revert InsufficientLicenseStake();
 
-        operators[operator] = OperatorInfo({
-            isActive: true,
+        _requireAllocatedAtLeastUnderlying(
+            msg.sender,
+            enclStrategy,
+            licenseStake
+        );
+
+        operators[msg.sender] = OperatorInfo({
+            isLicensed: true,
+            licenseStake: enclAmount,
+            ticketBalance: 0,
             registeredAt: block.timestamp,
-            decommissionRequestedAt: 0,
-            collateralUsd: collateralUsd
+            isActive: false,
+            collateralUsd: 0
         });
 
-        emit OperatorRegistered(operator, collateralUsd);
+        emit LicenseAcquired(msg.sender, enclAmount);
     }
 
-    function deregisterOperator(address operator) external onlyServiceManager {
-        require(operators[operator].isActive, OperatorNotRegistered());
+    function purchaseTickets(uint256 ticketCount) external nonReentrant {
+        if (ticketCount == 0) revert InvalidTicketAmount();
+        if (!operators[msg.sender].isLicensed) revert NotLicensed();
 
-        operators[operator].isActive = false;
-        operators[operator].decommissionRequestedAt = 0;
+        uint256 totalCost = ticketCount * ticketPrice;
+        if (totalCost / ticketPrice != ticketCount) revert CostOverflow();
 
-        emit OperatorDeregistered(operator);
-    }
-
-    function updateOperatorCollateral(
-        address operator,
-        uint256 newCollateralUsd
-    ) external onlyServiceManager {
-        require(operators[operator].isActive, OperatorNotRegistered());
-
-        operators[operator].collateralUsd = newCollateralUsd;
-    }
-
-    // ============ Operator Interface ============
-
-    function requestDecommission() external {
-        OperatorInfo storage operatorInfo = operators[msg.sender];
-        require(operatorInfo.isActive, OperatorNotRegistered());
-        require(operatorInfo.decommissionRequestedAt == 0, AlreadyRequested());
-
-        operatorInfo.decommissionRequestedAt = block.timestamp;
-        emit DecommissionRequested(msg.sender, block.timestamp);
-    }
-
-    function completeDecommission(uint256[] calldata siblingNodes) external {
-        OperatorInfo storage operatorInfo = operators[msg.sender];
-        require(operatorInfo.isActive, OperatorNotRegistered());
-        require(
-            operatorInfo.decommissionRequestedAt > 0,
-            DecommissionNotRequested()
+        uint256 allocatedUsdc = _allocatedUnderlyingToAVS(
+            msg.sender,
+            usdcStrategy
         );
-        require(
-            block.timestamp >=
-                operatorInfo.decommissionRequestedAt + decommissionDelay,
-            DecommissionDelayNotPassed()
-        );
+        uint256 alreadySpent = ticketBudgetSpent[msg.sender];
+        if (allocatedUsdc < alreadySpent + totalCost)
+            revert InsufficientTicketBudget();
 
-        operatorInfo.isActive = false;
-        operatorInfo.decommissionRequestedAt = 0;
+        ticketBudgetSpent[msg.sender] = alreadySpent + totalCost;
+        operators[msg.sender].ticketBalance += ticketCount;
 
-        if (ciphernodeRegistry.isEnabled(msg.sender)) {
-            ciphernodeRegistry.removeCiphernode(msg.sender, siblingNodes);
+        if (
+            registeredOperators[msg.sender] &&
+            !operators[msg.sender].isActive &&
+            operators[msg.sender].ticketBalance >= minTicketBalance
+        ) {
+            operators[msg.sender].isActive = true;
+            emit CiphernodeActivated(msg.sender);
         }
 
-        emit DecommissionCompleted(msg.sender);
+        emit TicketsPurchased(msg.sender, totalCost, ticketCount);
     }
 
-    // ============ View Functions ============
+    function registerCiphernode() external nonReentrant {
+        if (registeredOperators[msg.sender]) revert AlreadyRegistered();
+        if (!operators[msg.sender].isLicensed) revert NotLicensed();
+        if (!delegationManager.isOperator(msg.sender))
+            revert OperatorNotRegistered();
 
-    function isBonded(address operator) external view returns (bool) {
-        return operators[operator].isActive;
+        uint256 encl = enclStrategy.sharesToUnderlyingView(
+            _getOperatorShares(msg.sender, enclStrategy)
+        );
+        if (encl < licenseStake) revert InsufficientLicenseStake();
+        _requireAllocatedAtLeastUnderlying(
+            msg.sender,
+            enclStrategy,
+            licenseStake
+        );
+        _requireAllocatedAtLeastUnderlying(
+            msg.sender,
+            usdcStrategy,
+            ticketBudgetSpent[msg.sender]
+        );
+
+        registeredOperators[msg.sender] = true;
+        ciphernodeRegistry.addCiphernode(msg.sender);
+
+        bool activeNow = (operators[msg.sender].ticketBalance >=
+            minTicketBalance);
+        operators[msg.sender].isActive = activeNow;
+        if (activeNow) emit CiphernodeActivated(msg.sender);
+
+        emit CiphernodeRegistered(msg.sender, 0);
+    }
+
+    function deregisterCiphernode(
+        uint256[] calldata siblingNodes
+    ) external nonReentrant {
+        if (!registeredOperators[msg.sender]) revert OperatorNotRegistered();
+
+        if (operators[msg.sender].isActive) {
+            operators[msg.sender].isActive = false;
+            emit CiphernodeDeactivated(msg.sender);
+        }
+
+        registeredOperators[msg.sender] = false;
+        ciphernodeRegistry.removeCiphernode(msg.sender, siblingNodes);
+        emit CiphernodeDeregistered(msg.sender);
+    }
+
+    function useTickets(address operator, uint256 ticketCount) external {
+        if (msg.sender != address(ciphernodeRegistry)) revert OnlyRegistry();
+        if (operators[operator].ticketBalance < ticketCount)
+            revert InsufficientTicketBalance();
+
+        operators[operator].ticketBalance -= ticketCount;
+        emit TicketsUsed(operator, ticketCount);
+    }
+
+    function slashTickets(
+        address operator,
+        uint256 wadToSlash
+    ) external onlyServiceManager {
+        uint256 oldTickets = operators[operator].ticketBalance;
+        uint256 ticketsLost = (oldTickets * wadToSlash) / 1e18;
+        if (ticketsLost > 0 && ticketsLost <= oldTickets) {
+            operators[operator].ticketBalance -= ticketsLost;
+            emit TicketsSlashed(operator, ticketsLost);
+        }
+
+        if (
+            registeredOperators[operator] &&
+            operators[operator].isActive &&
+            operators[operator].ticketBalance < minTicketBalance
+        ) {
+            operators[operator].isActive = false;
+            emit CiphernodeDeactivated(operator);
+        }
+    }
+
+    function updateLicenseStatus(address operator) external onlyServiceManager {
+        if (!operators[operator].isLicensed) return;
+
+        uint256 enclShares = _getOperatorShares(operator, enclStrategy);
+        uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
+
+        bool belowAbsolute = (enclAmount < licenseStake) ||
+            (enclAmount < (operators[operator].licenseStake / 2));
+        bool belowAllocated = _allocatedUnderlyingToAVS(
+            operator,
+            enclStrategy
+        ) < licenseStake;
+
+        if (belowAbsolute || belowAllocated) {
+            operators[operator].isLicensed = false;
+            if (registeredOperators[operator]) {
+                registeredOperators[operator] = false;
+                emit CiphernodeDeregistered(operator);
+            }
+            emit LicenseRevoked(operator);
+        }
+    }
+
+    function syncTicketHealth(address operator) external onlyServiceManager {
+        uint256 allocatedUsdc = _allocatedUnderlyingToAVS(
+            operator,
+            usdcStrategy
+        );
+        if (allocatedUsdc < ticketBudgetSpent[operator]) {
+            if (registeredOperators[operator] && operators[operator].isActive) {
+                operators[operator].isActive = false;
+                emit CiphernodeDeactivated(operator);
+            }
+        }
+    }
+
+    function setMinTicketBalance(uint256 _minTicketBalance) external onlyOwner {
+        if (_minTicketBalance == 0) revert InvalidMinTicketBalance();
+        minTicketBalance = _minTicketBalance;
+        emit MinTicketBalanceUpdated(_minTicketBalance);
+    }
+
+    function setLicenseStake(uint256 _licenseStake) external onlyOwner {
+        if (_licenseStake == 0) revert InsufficientLicenseStake();
+        licenseStake = _licenseStake;
+        emit LicenseStakeUpdated(_licenseStake);
+    }
+
+    function setTicketPrice(uint256 _ticketPrice) external onlyOwner {
+        if (_ticketPrice == 0) revert InvalidTicketAmount();
+        ticketPrice = _ticketPrice;
+        emit TicketPriceUpdated(_ticketPrice);
     }
 
     function getOperatorInfo(
@@ -125,42 +276,106 @@ contract BondingManager is Ownable, IBondingManager {
         return operators[operator];
     }
 
-    function canCompleteDecommission(
+    function getAvailableTicketBudget(
+        address operator
+    ) external view returns (uint256) {
+        uint256 allocatedUsdc = _allocatedUnderlyingToAVS(
+            operator,
+            usdcStrategy
+        );
+        uint256 alreadySpent = ticketBudgetSpent[operator];
+        return allocatedUsdc > alreadySpent ? allocatedUsdc - alreadySpent : 0;
+    }
+
+    function getLicenseStake() external view returns (uint256) {
+        return licenseStake;
+    }
+
+    function getTicketPrice() external view returns (uint256) {
+        return ticketPrice;
+    }
+
+    function isRegisteredOperator(
         address operator
     ) external view returns (bool) {
-        OperatorInfo memory operatorInfo = operators[operator];
+        return registeredOperators[operator];
+    }
 
-        if (
-            !operatorInfo.isActive || operatorInfo.decommissionRequestedAt == 0
-        ) {
-            return false;
-        }
+    function isActive(address operator) external view returns (bool) {
+        return operators[operator].isActive;
+    }
 
+    function _getOperatorShares(
+        address operator,
+        IStrategy strategy
+    ) internal view returns (uint256 shares) {
+        IServiceManager sm = IServiceManager(serviceManager);
+        IStrategyManager strategyManager = sm.strategyManager();
+        return strategyManager.stakerDepositShares(operator, strategy);
+    }
+
+    function _getTotalMagnitude(
+        IStrategy strategy,
+        address operator
+    ) internal view returns (uint256) {
         return
-            block.timestamp >=
-            operatorInfo.decommissionRequestedAt + decommissionDelay;
+            uint256(
+                allocationManager.getEncumberedMagnitude(operator, strategy)
+            ) +
+            uint256(
+                allocationManager.getAllocatableMagnitude(operator, strategy)
+            );
     }
 
-    function getDecommissionDelay() external view returns (uint256) {
-        return decommissionDelay;
+    function _getCurrentMagnitudeForAVS(
+        IStrategy strategy,
+        address operator
+    ) internal view returns (uint256) {
+        OperatorSet memory set_ = OperatorSet({
+            avs: serviceManager,
+            id: operatorSetId
+        });
+        return
+            uint256(
+                allocationManager
+                    .getAllocation(operator, set_, strategy)
+                    .currentMagnitude
+            );
     }
 
-    // ============ Administrative Functions ============
+    function _allocatedUnderlyingToAVS(
+        address operator,
+        IStrategy strategy
+    ) internal view returns (uint256) {
+        uint256 curMag = _getCurrentMagnitudeForAVS(strategy, operator);
+        if (curMag == 0) return 0;
 
-    function setDecommissionDelay(uint256 newDelay) external onlyOwner {
-        decommissionDelay = newDelay;
-        emit DecommissionDelayUpdated(newDelay);
+        uint256 totalShares = _getOperatorShares(operator, strategy);
+        uint256 allocatedShares = Math.mulDiv(totalShares, curMag, 1e9);
+        return strategy.sharesToUnderlyingView(allocatedShares);
     }
 
-    function setServiceManager(address _serviceManager) external onlyOwner {
-        require(_serviceManager != address(0), ZeroAddress());
-        serviceManager = _serviceManager;
+    function _requireAllocatedAtLeastUnderlying(
+        address operator,
+        IStrategy strategy,
+        uint256 requiredUnderlying
+    ) internal view {
+        uint256 allocatedUnderlying = _allocatedUnderlyingToAVS(
+            operator,
+            strategy
+        );
+        if (allocatedUnderlying < requiredUnderlying)
+            revert InsufficientAllocatedMagnitude();
     }
 
-    function setCiphernodeRegistry(
-        address _ciphernodeRegistry
-    ) external onlyOwner {
-        require(_ciphernodeRegistry != address(0), ZeroAddress());
-        ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
+    function getCiphernodeState(
+        address operator
+    ) external view returns (IBondingManager.CiphernodeState) {
+        if (!registeredOperators[operator])
+            return IBondingManager.CiphernodeState.REMOVED;
+        return
+            operators[operator].isActive
+                ? IBondingManager.CiphernodeState.ACTIVE
+                : IBondingManager.CiphernodeState.REGISTERED_INACTIVE;
     }
 }

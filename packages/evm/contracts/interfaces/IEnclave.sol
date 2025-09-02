@@ -70,6 +70,26 @@ interface IEnclave {
     /// @param ciphernodeRegistry The address of the CiphernodeRegistry contract.
     event CiphernodeRegistrySet(address ciphernodeRegistry);
 
+    /// @notice This event MUST be emitted when the ServiceManager is set.
+    /// @param serviceManager The address of the ServiceManager contract.
+    event ServiceManagerSet(address serviceManager);
+
+    /// @notice This event MUST be emitted when the ENCL token is set.
+    /// @param enclToken The address of the ENCL token contract.
+    event EnclTokenSet(address enclToken);
+
+    /// @notice This event MUST be emitted when rewards are distributed to committee.
+    /// @param e3Id ID of the E3.
+    /// @param totalReward Total reward amount distributed.
+    /// @param recipients Array of recipient addresses.
+    /// @param amounts Array of reward amounts per recipient.
+    event RewardsDistributed(
+        uint256 indexed e3Id,
+        uint256 totalReward,
+        address[] recipients,
+        uint256[] amounts
+    );
+
     /// @notice The event MUST be emitted any time an encryption scheme is enabled.
     /// @param encryptionSchemeId The ID of the encryption scheme that was enabled.
     event EncryptionSchemeEnabled(bytes32 encryptionSchemeId);

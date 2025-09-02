@@ -1,6 +1,10 @@
 import "./tasks/accounts";
 import "./tasks/ciphernode";
 import "./tasks/enclave";
+import "./tasks/operator-status";
+import "./tasks/publish-ciphertext";
+import "./tasks/publish-plaintext";
+import "./tasks/request-e3";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomicfoundation/hardhat-foundry";
 import "@nomicfoundation/hardhat-toolbox";
@@ -115,6 +119,7 @@ const config: HardhatUserConfig = {
     cache: "./cache",
     sources: "./contracts",
     tests: "./test",
+    deploy: "./deploy/hardhat",
   },
   solidity: {
     version: "0.8.27",

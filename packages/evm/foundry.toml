@@ -2,12 +2,13 @@
 src = 'contracts'
 out = 'out'
 libs = ['lib', 'node_modules']
-# Exclude EigenLayer subdirectories from automatic compilation to prevent conflicts
-excluded_paths = ['lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test']
 solc = "0.8.27"
 optimizer = true
 via_ir = true
-cache_path = 'cache_forge'
+verify = false
+chain_id = 31337
+fs_permissions = [{ access = "read-write", path = "./" }]
+
 
 remappings = [
   # --- EigenLayer OZ v4.9 mappings ---
@@ -25,5 +26,4 @@ remappings = [
   "forge-std/=lib/forge-std/src/",
 ]
 
-# Avoid noisy warnings from their repo
 ignored_warnings_from = ["lib/eigenlayer-middleware"]

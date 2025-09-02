@@ -5,6 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
+import { IRegistryFilter } from "./IRegistryFilter.sol";
+
 interface ICiphernodeRegistry {
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
@@ -98,4 +100,18 @@ interface ICiphernodeRegistry {
     function committeePublicKey(
         uint256 e3Id
     ) external view returns (bytes32 publicKeyHash);
+
+    /// @notice This function should be called by the Enclave contract to get the filter for a given E3.
+    /// @dev This function MUST revert if no filter has been requested for the given E3.
+    /// @param e3Id ID of the E3 for which to get the filter.
+    /// @return filter The filter for the given E3.
+    function getFilter(uint256 e3Id) external view returns (address filter);
+
+    /// @notice This function should be called by the Enclave contract to get the committee for a given E3.
+    /// @dev This function MUST revert if no committee has been requested for the given E3.
+    /// @param e3Id ID of the E3 for which to get the committee.
+    /// @return committee The committee for the given E3.
+    function getCommittee(
+        uint256 e3Id
+    ) external view returns (IRegistryFilter.Committee memory committee);
 }
