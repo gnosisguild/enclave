@@ -1,0 +1,18 @@
+{
+  "mode": "exit",
+  "tag": "test",
+  "initialVersions": {
+    "@enclave-e3/wasm": "0.0.6-test",
+    "enclave-docs": "1.0.0",
+    "crisp": "0.0.0",
+    "crisp-client": "1.0.0",
+    "@enclave-e3/config": "0.0.6-test",
+    "@enclave-e3/contracts": "0.0.6-test",
+    "@enclave-e3/react": "0.0.6-test",
+    "@enclave-e3/sdk": "0.0.6-test",
+    "enclave-client": "1.0.0"
+  },
+  "changesets": [
+    "lazy-llamas-arrive"
+  ]
+}

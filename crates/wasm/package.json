@@ -1,7 +1,7 @@
 {
   "name": "@enclave-e3/wasm",
   "private": false,
-  "version": "0.0.6-test",
+  "version": "0.0.7-test",
   "description": "Wasm modules for enclave.",
   "main": "dist/nodejs/e3_wasm.js",
   "module": "dist/web/e3_wasm.js",
