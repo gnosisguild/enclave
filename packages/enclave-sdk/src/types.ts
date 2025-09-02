@@ -6,11 +6,12 @@
 
 import type { Log, PublicClient, WalletClient } from "viem";
 import type { ProofData } from "@aztec/bb.js";
-import type {
-  CiphernodeRegistryOwnable,
-  Enclave,
-  MockCiphernodeRegistry,
-} from "@gnosis-guild/enclave/types";
+
+import {
+  type CiphernodeRegistryOwnable,
+  type Enclave,
+  type MockCiphernodeRegistry,
+} from "@enclave-e3/contracts/types";
 
 /**
  * SDK configuration

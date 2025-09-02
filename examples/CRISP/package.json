@@ -22,15 +22,15 @@
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
-    "@gnosis-guild/enclave": "workspace:*",
     "@hashcloak/semaphore-contracts-noir": "1.0.1",
-    "@gnosis-guild/enclave-sdk": "workspace:*",
+    "@enclave-e3/sdk": "workspace:*",
+    "@enclave-e3/contracts": "workspace:*",
     "@zk-kit/lean-imt.sol": "2.0.0",
     "poseidon-solidity": "^0.0.5",
     "solady": "^0.1.13"
   },
   "devDependencies": {
-    "@gnosis-guild/enclave-config": "workspace:*",
+    "@enclave-e3/config": "workspace:*",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-foundry": "^1.1.2",

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { defineConfig } from "tsup";
-import { baseConfig } from "@gnosis-guild/enclave-config/tsup";
+import { baseConfig } from "@enclave-e3/config/tsup";
 
 export default defineConfig([
   {

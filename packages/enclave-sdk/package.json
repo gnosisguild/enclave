@@ -1,5 +1,5 @@
 {
-  "name": "@gnosis-guild/enclave-sdk",
+  "name": "@enclave-e3/sdk",
   "private": false,
   "version": "0.0.6-test",
   "type": "module",
@@ -18,7 +18,7 @@
     "dist"
   ],
   "scripts": {
-    "prebuild": "cd ../evm && pnpm compile:ts && cd ../../crates/wasm && pnpm build",
+    "prebuild": "cd ../enclave-contracts && pnpm compile:ts && cd ../../crates/wasm && pnpm build",
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
@@ -27,7 +27,7 @@
     "release": "pnpm publish --access=public"
   },
   "devDependencies": {
-    "@gnosis-guild/enclave-config": "workspace:*",
+    "@enclave-e3/config": "workspace:*",
     "concurrently": "^9.1.2",
     "tsup": "^8.5.0",
     "typescript": "5.8.3",
@@ -37,8 +37,8 @@
   "dependencies": {
     "@aztec/bb.js": "^0.82.2",
     "@noir-lang/noir_js": "1.0.0-beta.3",
-    "@gnosis-guild/e3-wasm": "workspace:*",
-    "@gnosis-guild/enclave": "workspace:*",
+    "@enclave-e3/wasm": "workspace:*",
+    "@enclave-e3/contracts": "workspace:*",
     "comlink": "^4.4.2",
     "viem": "2.30.6",
     "vite-plugin-top-level-await": "^1.5.0",

@@ -1,5 +1,5 @@
 {
-  "name": "@gnosis-guild/e3-wasm",
+  "name": "@enclave-e3/wasm",
   "private": false,
   "version": "0.0.6-test",
   "description": "Wasm modules for enclave.",

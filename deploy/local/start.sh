@@ -68,7 +68,7 @@ deploy_contracts() {
     
     # Deploy Enclave contracts
     echo "   Deploying Enclave contracts..."
-    (cd packages/evm && rm -rf deployments/localhost && pnpm deploy:mocks --network localhost)
+    (cd packages/enclave-contracts && rm -rf deployments/localhost && pnpm deploy:mocks --network localhost)
     
     # Deploy CRISP contracts
     echo "   Deploying CRISP contracts..."

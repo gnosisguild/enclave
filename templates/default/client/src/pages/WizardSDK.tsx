@@ -15,7 +15,7 @@ import EnvironmentError from './components/EnvironmentError'
 import Spinner from './components/Spinner'
 
 // SDK and utilities
-import { useEnclaveSDK } from '@gnosis-guild/enclave-react'
+import { useEnclaveSDK } from '@enclave-e3/react'
 import {
   encodeBfvParams,
   encodeComputeProviderParams,
@@ -23,8 +23,13 @@ import {
   decodePlaintextOutput,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
+<<<<<<< HEAD
   bfvVerifiableEncryptNumber,
 } from '@gnosis-guild/enclave-sdk'
+=======
+  encryptNumber,
+} from '@enclave-e3/sdk'
+>>>>>>> 8b1b4d9a (feat: update to enclave specific org)
 import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS, getContractAddresses } from '@/utils/env-config'
 import { formatContractError } from '@/utils/error-formatting'
 

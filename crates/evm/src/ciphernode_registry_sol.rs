@@ -21,7 +21,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug)]
     ICiphernodeRegistry,
-    "../../packages/evm/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json"
+    "../../packages/enclave-contracts/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json"
 );
 
 struct CiphernodeAddedWithChainId(pub ICiphernodeRegistry::CiphernodeAdded, pub u64);

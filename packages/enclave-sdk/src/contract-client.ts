@@ -15,7 +15,7 @@ import {
 import {
   CiphernodeRegistryOwnable__factory,
   Enclave__factory,
-} from "@gnosis-guild/enclave/types";
+} from "@enclave-e3/contracts/types";
 import { type E3 } from "./types";
 import { SDKError, isValidAddress } from "./utils";
 

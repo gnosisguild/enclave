@@ -7,7 +7,7 @@ on:
     paths:
       - "Cargo.*"
       - "crates/**"
-      - "packages/evm/contracts/**"
+      - "packages/enclave-contracts/contracts/**"
   pull_request:
     branches:
       - release
@@ -15,7 +15,7 @@ on:
     paths:
       - "Cargo.*"
       - "crates/**"
-      - "packages/evm/contracts/**"
+      - "packages/enclave-contracts/contracts/**"
 
 env:
   DOCKERFILE_PATH: crates/Dockerfile

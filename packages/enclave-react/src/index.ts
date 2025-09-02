@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 /**
- * @gnosis-guild/enclave-react
+ * @enclave-e3/react
  *
  * React hooks and utilities for Enclave SDK
  */
@@ -27,6 +27,6 @@ export type {
   CiphernodeRemovedData,
   CommitteeRequestedData,
   CommitteePublishedData,
-} from "@gnosis-guild/enclave-sdk";
+} from "@enclave-e3/sdk";
 
-export { EnclaveEventType, RegistryEventType } from "@gnosis-guild/enclave-sdk";
+export { EnclaveEventType, RegistryEventType } from "@enclave-e3/sdk";

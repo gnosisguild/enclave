@@ -16,8 +16,7 @@ import {
   encodeBfvParams,
   encodeComputeProviderParams,
   RegistryEventType,
-  FheProtocol,
-} from "@gnosis-guild/enclave-sdk";
+} from "@enclave-e3/sdk";
 import { hexToBytes } from "viem";
 import assert from "assert";
 

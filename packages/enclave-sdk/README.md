@@ -19,7 +19,7 @@ methods, and comprehensive error handling.
 ## Installation
 
 ```bash
-pnpm add @gnosis-guild/enclave-sdk
+pnpm add @enclave-e3/sdk
 ```
 
 ## Quick Start
@@ -29,7 +29,7 @@ import {
   EnclaveSDK,
   EnclaveEventType,
   RegistryEventType,
-} from "@gnosis-guild/enclave-sdk";
+} from "@enclave-e3/sdk";
 import { createPublicClient, createWalletClient, http, custom } from "viem";
 
 // Initialize clients
@@ -83,7 +83,7 @@ Usage within a typescript project should work out of the box, however in order t
 - Use `vite`
 - Use the `vite-plugin-top-level-await` plugin
 - Use the `vite-plugin-wasm` plugin
-- Exclude the `@gnosis-guild/e3-wasm` package from bundling optimization.
+- Exclude the `@enclave-e3/wasm` package from bundling optimization.
 
 This will enable `vite` to correctly bundle and serve the wasm bundle we use effectively.
 
@@ -95,7 +95,7 @@ import topLevelAwait from 'vite-plugin-top-level-await'
 export default defineConfig({
   // other config ...
   optimizeDeps: {
-    exclude: ['@gnosis-guild/e3-wasm'],
+    exclude: ['@enclave-e3/wasm'],
   },
   plugins: [wasm(), topLevelAwait()],
 })
@@ -160,7 +160,7 @@ interface EnclaveEvent<T extends AllEventTypes> {
 The SDK includes a React hook for easy integration:
 
 ```typescript
-import { useEnclaveSDK } from '@gnosis-guild/enclave/sdk';
+import { useEnclaveSDK } from '@enclave-e3/contracts/sdk';
 
 function MyComponent() {
   const {
@@ -285,7 +285,7 @@ interface SDKConfig {
 The SDK includes comprehensive error handling:
 
 ```typescript
-import { SDKError } from "@gnosis-guild/enclave-sdk";
+import { SDKError } from "@enclave-e3/sdk";
 
 try {
   await sdk.requestE3(params);
@@ -303,7 +303,7 @@ try {
 ### Building the SDK
 
 ```bash
-cd packages/evm
+cd packages/enclave-contracts
 pnpm compile
 ```
 
@@ -321,7 +321,7 @@ contract interactions.
 ### Testing
 
 ```bash
-cd packages/evm
+cd packages/enclave-contracts
 pnpm test
 ```
 

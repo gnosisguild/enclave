@@ -1,5 +1,5 @@
 {
-  "name": "@gnosis-guild/enclave",
+  "name": "@enclave-e3/contracts",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
   "version": "0.0.6-test",
   "license": "LGPL-3.0-only",
@@ -42,7 +42,7 @@
     }
   },
   "devDependencies": {
-    "@gnosis-guild/enclave-config": "workspace:*",
+    "@enclave-e3/config": "workspace:*",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
@@ -133,7 +133,7 @@
   },
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
-    "@gnosis-guild/enclave-sdk": "workspace:*",
+    "@enclave-e3/sdk": "workspace:*",
     "solady": "^0.1.13"
   },
   "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808"

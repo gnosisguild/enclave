@@ -6,9 +6,9 @@
 pragma solidity >=0.8.27;
 
 import {IRiscZeroVerifier} from "@risc0/ethereum/contracts/src/IRiscZeroVerifier.sol";
-import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
-import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
-import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
+import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
+import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
+import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MyProgram is IE3Program, Ownable {

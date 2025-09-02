@@ -53,7 +53,7 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
     let evm_version = spinner
         .run("Getting workspace version of enclave...", || async {
             package_json::get_version_from_package_json(
-                &PathBuf::from(TEMP_DIR).join("packages/evm/package.json"),
+                &PathBuf::from(TEMP_DIR).join("packages/enclave-contracts/package.json"),
             )
             .await
         })
@@ -87,18 +87,18 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
                 &vec![
                     Filter::new(
                         "**/package.json",
-                        r#""@gnosis-guild/enclave":\s*"[^"]*""#,
-                        &format!(r#""@gnosis-guild/enclave": "{}""#, evm_version),
+                        r#""@enclave-e3/contracts":\s*"[^"]*""#,
+                        &format!(r#""@enclave-e3/contracts": "{}""#, evm_version),
                     ),
                     Filter::new(
                         "**/package.json",
-                        r#""@gnosis-guild/enclave-react":\s*"[^"]*""#,
-                        &format!(r#""@gnosis-guild/enclave-react": "{}""#, react_version),
+                        r#""@enclave-e3/react":\s*"[^"]*""#,
+                        &format!(r#""@enclave-e3/react": "{}""#, react_version),
                     ),
                     Filter::new(
                         "**/package.json",
-                        r#""@gnosis-guild/enclave-sdk":\s*"[^"]*""#,
-                        &format!(r#""@gnosis-guild/enclave-sdk": "{}""#, sdk_version),
+                        r#""@enclave-e3/sdk":\s*"[^"]*""#,
+                        &format!(r#""@enclave-e3/sdk": "{}""#, sdk_version),
                     ),
                 ],
             )
