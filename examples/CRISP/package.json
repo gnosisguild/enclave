@@ -17,7 +17,7 @@
     "dev:down": "bash ./scripts/clean.sh",
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "test": "pnpm test:e2e",
-    "test:contracts": "hardhat test test/crisp.contracts.test.ts --network localhost",
+    "test:contracts": "hardhat test tests/crisp.contracts.test.ts --network localhost",
     "report": "playwright show-report"
   },
   "dependencies": {

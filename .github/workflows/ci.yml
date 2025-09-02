@@ -373,6 +373,9 @@ jobs:
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
 
+      - name: Install wasm-pack
+        uses: ./.github/actions/install-wasm-pack
+
       - name: Install yq
         run: |
           sudo wget -qO- https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz | sudo tar xz -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
@@ -393,7 +396,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: .
-        run: pnpm --version && pnpm install --frozen-lockfile
+        run: |
+          pnpm --version && pnpm install --frozen-lockfile && pnpm build:ts
 
       - name: Install Playwright browsers
         working-directory: ./examples/CRISP
@@ -404,6 +408,7 @@ jobs:
         with:
           name: enclave-binary
           path: ~/.cargo/bin/
+
       - name: Make binaries executable
         run: |
           chmod +x ~/.cargo/bin/enclave
