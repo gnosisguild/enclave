@@ -115,12 +115,21 @@ importers:
       '@nomicfoundation/ignition-core':
         specifier: ^0.15.5
         version: 0.15.13(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      '@playwright/test':
+        specifier: 1.52.0
+        version: 1.52.0
       '@semaphore-protocol/core':
         specifier: github:hmzakhalid/semaphore-noir#dist-core
         version: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
       '@semaphore-protocol/data':
         specifier: ^4.9.2
         version: 4.13.0(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+      '@synthetixio/synpress':
+        specifier: ^4.1.0
+        version: 4.1.1(@depay/solana-web3.js@1.98.3)(@depay/web3-blockchains@9.8.6)(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+      '@synthetixio/synpress-cache':
+        specifier: ^0.0.12
+        version: 0.0.12(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)
       '@typechain/ethers-v6':
         specifier: ^0.5.0
         version: 0.5.1(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typechain@8.3.2(typescript@5.8.3))(typescript@5.8.3)
@@ -154,6 +163,9 @@ importers:
       hardhat-gas-reporter:
         specifier: ^1.0.8
         version: 1.0.10(bufferutil@4.0.9)(hardhat@2.26.3(bufferutil@4.0.9)(ts-node@10.9.2(@swc/core@1.13.5)(@swc/wasm@1.13.5)(@types/node@22.7.5)(typescript@5.8.3))(typescript@5.8.3)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)
+      playwright:
+        specifier: 1.52.0
+        version: 1.52.0
       solidity-coverage:
         specifier: ^0.8.1
         version: 0.8.16(hardhat@2.26.3(bufferutil@4.0.9)(ts-node@10.9.2(@swc/core@1.13.5)(@swc/wasm@1.13.5)(@types/node@22.7.5)(typescript@5.8.3))(typescript@5.8.3)(utf-8-validate@5.0.10))
@@ -257,15 +269,6 @@ importers:
         specifier: ^2.14.16
         version: 2.16.8(@tanstack/query-core@5.85.5)(@tanstack/react-query@5.85.5(react@18.3.1))(@types/react@18.3.24)(bufferutil@4.0.9)(immer@10.0.2)(react@18.3.1)(typescript@5.8.3)(utf-8-validate@5.0.10)(viem@2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76))(zod@3.25.76)
     devDependencies:
-      '@playwright/test':
-        specifier: 1.52.0
-        version: 1.52.0
-      '@synthetixio/synpress':
-        specifier: ^4.1.0
-        version: 4.1.1(@depay/solana-web3.js@1.98.3)(@depay/web3-blockchains@9.8.6)(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
-      '@synthetixio/synpress-cache':
-        specifier: ^0.0.12
-        version: 0.0.12(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)
       '@tailwindcss/typography':
         specifier: ^0.5.12
         version: 0.5.16(tailwindcss@3.4.17(ts-node@10.9.2(@swc/core@1.13.5)(@swc/wasm@1.13.5)(@types/node@22.7.5)(typescript@5.8.3)))
@@ -305,9 +308,6 @@ importers:
       gh-pages:
         specifier: ^6.1.1
         version: 6.3.0
-      playwright:
-        specifier: 1.52.0
-        version: 1.52.0
       prettier:
         specifier: ^3.2.5
         version: 3.6.2

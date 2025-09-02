@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "description": "CRISP - Coercion-Resistant Impartial Selection Protocol",
   "repository": "https://github.com/gnosisguild/enclave",
+  "type": "module",
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
@@ -41,11 +42,15 @@
     "@nomicfoundation/ignition-core": "^0.15.5",
     "@semaphore-protocol/core": "github:hmzakhalid/semaphore-noir#dist-core",
     "@semaphore-protocol/data": "^4.9.2",
+    "@synthetixio/synpress": "^4.1.0",
+    "@synthetixio/synpress-cache": "^0.0.12",
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",
     "@types/chai": "^4.2.0",
     "@types/mocha": ">=9.1.0",
     "@types/node": "22.7.5",
+    "@playwright/test": "1.52.0",
+    "playwright": "1.52.0",
     "concurrently": "^9.1.2",
     "dotenv": "^16.4.5",
     "ethers": "^6.15.0",

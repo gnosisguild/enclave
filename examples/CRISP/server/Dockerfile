@@ -25,7 +25,6 @@ COPY examples/CRISP/server/Cargo.toml examples/CRISP/server/
 COPY examples/CRISP/program/Cargo.toml examples/CRISP/program/
 COPY examples/CRISP/program/client/Cargo.toml examples/CRISP/program/client/
 COPY examples/CRISP/program/core/Cargo.toml examples/CRISP/program/core/
-COPY examples/CRISP/wasm-crypto/Cargo.toml examples/CRISP/wasm-crypto/
 COPY examples/CRISP/Cargo.toml examples/CRISP/
 
 COPY crates/sdk/Cargo.toml crates/sdk/
@@ -112,7 +111,6 @@ WORKDIR /app
 COPY examples/CRISP/.enclave/   examples/CRISP/.enclave/
 COPY examples/CRISP/server/    examples/CRISP/server/
 COPY examples/CRISP/program/   examples/CRISP/program/
-COPY examples/CRISP/wasm-crypto/   examples/CRISP/wasm-crypto/
 COPY examples/CRISP/Cargo.*    examples/CRISP/
 COPY Cargo.*                        ./
 COPY crates/           crates/
