@@ -2954,6 +2954,7 @@ name = "e3-test-helpers"
 version = "0.1.0"
 dependencies = [
  "actix",
+ "alloy",
  "anyhow",
  "bincode",
  "clap",

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use super::set_up_crp;
+use super::create_crp;
 use anyhow::*;
 use async_trait::async_trait;
 use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
@@ -50,7 +50,7 @@ impl Fhe {
 
     pub fn from_encoded(bytes: &[u8], seed: Seed, rng: SharedRng) -> Result<Self> {
         let params = decode_bfv_params_arc(bytes);
-        let crp = set_up_crp(
+        let crp = create_crp(
             params.clone(),
             Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
         );

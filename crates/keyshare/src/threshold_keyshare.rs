@@ -14,7 +14,7 @@ use e3_events::{
     CiphernodeSelected, ComputeRequest, ComputeResponse, E3id, EnclaveEvent, EventBus,
     ThresholdShare, ThresholdShareCreated,
 };
-use e3_fhe::set_up_crp;
+use e3_fhe::create_crp;
 use e3_multithread::Multithread;
 use e3_trbfv::{gen_pk_share_and_sk_sss, SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse};
 use fhe_traits::Serialize;
@@ -295,7 +295,7 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
         } = msg.0;
 
         let trbfv_config = TrBFVConfig::new(params.clone(), threshold_n as u64, threshold_m as u64);
-        let crp = Arc::new(set_up_crp(trbfv_config.params(), self.rng.clone()).to_bytes());
+        let crp = Arc::new(create_crp(trbfv_config.params(), self.rng.clone()).to_bytes());
         let event = ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(
             gen_pk_share_and_sk_sss::Request { trbfv_config, crp }.into(),
         ));

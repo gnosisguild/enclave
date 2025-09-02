@@ -26,7 +26,7 @@ pub fn setup_crp_params(
     rng: SharedRng,
 ) -> ParamsWithCrp {
     let params = build_bfv_params_arc(degree, plaintext_modulus, moduli);
-    let crp = set_up_crp(params.clone(), rng);
+    let crp = create_crp(params.clone(), rng);
     ParamsWithCrp {
         moduli: moduli.to_vec(),
         degree,
@@ -36,6 +36,6 @@ pub fn setup_crp_params(
     }
 }
 
-pub fn set_up_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
+pub fn create_crp(params: Arc<BfvParameters>, rng: SharedRng) -> CommonRandomPoly {
     CommonRandomPoly::new(&params, &mut *rng.lock().unwrap()).unwrap()
 }

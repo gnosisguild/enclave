@@ -8,9 +8,8 @@ mod plaintext_writer;
 mod public_key_writer;
 mod utils;
 
-use std::sync::Arc;
-
 use actix::prelude::*;
+use alloy::primitives::Address;
 use anyhow::*;
 use e3_events::{
     EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector, Seed, Subscribe,
@@ -21,8 +20,10 @@ use fhe_rs::bfv::BfvParameters;
 use fhe_rs::mbfv::CommonRandomPoly;
 pub use plaintext_writer::*;
 pub use public_key_writer::*;
+use rand::Rng;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use std::sync::Arc;
 pub use utils::*;
 
 pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rng>> {
@@ -31,6 +32,10 @@ pub fn create_shared_rng_from_u64(value: u64) -> Arc<std::sync::Mutex<ChaCha20Rn
 
 pub fn create_seed_from_u64(value: u64) -> Seed {
     Seed(ChaCha20Rng::seed_from_u64(value).get_seed())
+}
+
+pub fn create_rng_from_seed(seed: Seed) -> SharedRng {
+    Arc::new(std::sync::Mutex::new(ChaCha20Rng::from_seed(seed.into())))
 }
 
 pub fn create_crp_bytes_params(
@@ -80,4 +85,58 @@ pub fn get_common_setup(
     let crpoly = CommonRandomPoly::deserialize(&crp_bytes.clone(), &params)?;
 
     Ok((bus, rng, seed, params, crpoly, errors, history))
+}
+
+/// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and forward remaining events back to the event bus
+/// deduplication will remove previously seen events.
+/// This sets up a set of cyphernodes without libp2p.
+/// The way it works is that it feeds back all events from
+/// all nodes filteres by whether they are broadcastible or not
+/// ```txt
+///
+///                    ┌─────┐
+///                    │ BUS │
+///                    └─────┘
+///                       │
+///          ┌────────────┼────────────┐
+///          │            │            │
+///          ▼            ▼            ▼
+///       ┌────┐       ┌────┐       ┌────┐               
+///       │ B1 │       │ B2 │       │ B3 │◀──┐
+///       └────┘       └────┘       └────┘   │
+///          │            │            │     │
+///          │            │            │     │
+///          └────────────┼────────────┘     │
+///                       │                  │
+///                       ▼                  │
+///                    ┌─────┐               │               
+///                    │ FIL │───────────────┘                 
+///                    └─────┘
+/// ```
+pub fn simulate_libp2p_net(local_buses: Vec<&Addr<EventBus<EnclaveEvent>>>) {
+    for (i, source) in local_buses.iter().enumerate() {
+        for dest in local_buses.iter() {
+            EventBus::pipe_filter(
+                source,
+                move |e| {
+                    println!(
+                        "{}:filter:{} - allowed={}",
+                        i,
+                        e.event_type(),
+                        !e.is_local_only()
+                    );
+                    !e.is_local_only()
+                },
+                dest,
+            )
+        }
+    }
+}
+
+/// Creates test eth addresses
+/// NOTE: THESE ARE NOT ACTUAL ADDRESSES JUST RANDOM DATA
+pub fn create_random_eth_addrs(how_many: u32) -> Vec<String> {
+    (0..how_many)
+        .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()).to_string())
+        .collect()
 }

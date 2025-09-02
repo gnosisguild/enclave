@@ -14,8 +14,8 @@ use e3_data::{GetDump, RepositoriesFactory};
 use e3_events::{
     CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, DecryptionshareCreated,
     E3Requested, E3id, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, GetErrors,
-    GetHistory, HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated,
-    PublicKeyAggregated, ResetHistory, Seed, Shutdown, Subscribe, TakeHistory,
+    HistoryCollector, KeyshareCreated, OrderedSet, PlaintextAggregated, PublicKeyAggregated, Seed,
+    Shutdown, Subscribe, TakeHistory,
 };
 use e3_fhe::ext::FheExtension;
 use e3_fhe::SharedRng;
@@ -26,7 +26,9 @@ use e3_request::E3Router;
 use e3_sdk::bfv_helpers::encode_bfv_params;
 use e3_sortition::SortitionRepositoryFactory;
 use e3_sortition::{CiphernodeSelector, Sortition};
-use e3_test_helpers::{create_shared_rng_from_u64, get_common_setup};
+use e3_test_helpers::{
+    create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
+};
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
@@ -95,29 +97,6 @@ async fn setup_local_ciphernode(
     ))
 }
 
-/// Simulate libp2p by taking output events on each local bus and filter for !is_local_only() and
-/// forward remaining events back to the event bus
-/// deduplication will remove previously seen events
-fn simulate_libp2p_net(local_buses: Vec<&Addr<EventBus<EnclaveEvent>>>) {
-    for (i, source) in local_buses.iter().enumerate() {
-        for dest in local_buses.iter() {
-            EventBus::pipe_filter(
-                source,
-                move |e| {
-                    println!(
-                        "{}:filter:{} - allowed={}",
-                        i,
-                        e.event_type(),
-                        !e.is_local_only()
-                    );
-                    !e.is_local_only()
-                },
-                dest,
-            )
-        }
-    }
-}
-
 fn generate_pk_share(
     params: &Arc<BfvParameters>,
     crp: &CommonRandomPoly,
@@ -140,12 +119,6 @@ fn generate_pk_shares(
         result.push(generate_pk_share(params, crp, rng, addr)?);
     }
     Ok(result)
-}
-
-fn create_random_eth_addrs(how_many: u32) -> Vec<String> {
-    (0..how_many)
-        .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()).to_string())
-        .collect()
 }
 
 /// Test helper to add addresses to the committee by creating events on the event bus
@@ -179,30 +152,6 @@ impl AddToCommittee {
     }
 }
 
-/// This sets up a set of cyphernodes without libp2p.
-/// The way it works is that it feeds back all events from
-/// all nodes filteres by whether they are broadcastible or not
-/// ```txt
-///
-///                    ┌─────┐
-///                    │ BUS │
-///                    └─────┘
-///                       │
-///          ┌────────────┼────────────┐
-///          │            │            │
-///          ▼            ▼            ▼
-///       ┌────┐       ┌────┐       ┌────┐               
-///       │ B1 │       │ B2 │       │ B3 │◀──┐
-///       └────┘       └────┘       └────┘   │
-///          │            │            │     │
-///          │            │            │     │
-///          └────────────┼────────────┘     │
-///                       │                  │
-///                       ▼                  │
-///                    ┌─────┐               │               
-///                    │ FIL │───────────────┘                 
-///                    └─────┘
-/// ```
 async fn create_local_ciphernodes(
     bus: &Addr<EventBus<EnclaveEvent>>,
     rng: &SharedRng,
