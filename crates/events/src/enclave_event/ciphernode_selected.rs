@@ -25,6 +25,21 @@ pub struct CiphernodeSelected {
     pub party_id: u64,
 }
 
+impl Default for CiphernodeSelected {
+    fn default() -> Self {
+        CiphernodeSelected {
+            e3_id: E3id::new("99", 0),
+            error_size: Arc::new(vec![]),
+            esi_per_ct: 0,
+            params: Arc::new(vec![]),
+            party_id: 0,
+            seed: Seed([0u8; 32]),
+            threshold_m: 0,
+            threshold_n: 0,
+        }
+    }
+}
+
 impl Display for CiphernodeSelected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

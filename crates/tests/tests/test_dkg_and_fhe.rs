@@ -10,14 +10,18 @@ use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtens
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_data::{DataStore, InMemStore};
-use e3_events::{E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig, HistoryCollector};
+use e3_events::{E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig};
 use e3_fhe::{create_crp, ext::FheExtension};
 use e3_keyshare::ext::KeyshareExtension;
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
 use e3_sortition::SortitionRepositoryFactory;
 use e3_sortition::{CiphernodeSelector, Sortition};
-use e3_test_helpers::{create_rng_from_seed, create_seed_from_u64, create_shared_rng_from_u64};
+use e3_test_helpers::ciphernode_system::CiphernodeSimulated;
+use e3_test_helpers::{
+    create_random_eth_addrs, create_rng_from_seed, create_seed_from_u64,
+    create_shared_rng_from_u64, simulate_libp2p_net,
+};
 use e3_trbfv::SharedRng;
 use fhe_rs::{
     bfv,
@@ -25,22 +29,22 @@ use fhe_rs::{
 };
 use num_bigint::BigUint;
 use std::{fs, sync::Arc};
-use zeroize::Zeroizing;
+// use zeroize::Zeroizing;
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
     fs::write(format!("tests/{file_name}"), bytes).unwrap();
 }
 
-fn serialize_z_vec_of_bytes(data: &Vec<Zeroizing<Vec<u8>>>) -> Vec<u8> {
-    bincode::serialize(
-        &data
-            .iter()
-            .map(|z| -> &Vec<u8> { z.as_ref() })
-            .collect::<Vec<_>>(),
-    )
-    .unwrap()
-}
+// fn serialize_z_vec_of_bytes(data: &Vec<Zeroizing<Vec<u8>>>) -> Vec<u8> {
+//     bincode::serialize(
+//         &data
+//             .iter()
+//             .map(|z| -> &Vec<u8> { z.as_ref() })
+//             .collect::<Vec<_>>(),
+//     )
+//     .unwrap()
+// }
 
 pub fn calculate_error_size(
     params: Arc<bfv::BfvParameters>,
@@ -205,13 +209,6 @@ pub fn calculate_error_size(
 //     Ok(())
 // }
 
-struct SimulatedCiphernode {
-    address: String,
-    store: Addr<InMemStore>,
-    bus: Addr<EventBus<EnclaveEvent>>,
-    history: Addr<HistoryCollector<EnclaveEvent>>,
-}
-
 async fn setup_local_ciphernode(
     bus: &Addr<EventBus<EnclaveEvent>>,
     rng: &SharedRng,
@@ -219,13 +216,13 @@ async fn setup_local_ciphernode(
     addr: &str,
     data: Option<Addr<InMemStore>>,
     cipher: &Arc<Cipher>,
-) -> Result<SimulatedCiphernode> {
+) -> Result<CiphernodeSimulated> {
     // create data actor for saving data
     let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
     // Pipe all source events to the local bus
     let history = EventBus::<EnclaveEvent>::history(&local_bus);
     // Might not need this yet
-    // let _error = EventBus::<EnclaveEvent>::error(&local_bus);
+    let errors = EventBus::<EnclaveEvent>::error(&local_bus);
     EventBus::pipe(bus, &local_bus);
     let data_actor = data.unwrap_or_else(|| InMemStore::new(logging).start());
     let store = DataStore::from(&data_actor);
@@ -243,12 +240,27 @@ async fn setup_local_ciphernode(
         .build()
         .await?;
 
-    Ok(SimulatedCiphernode {
+    Ok(CiphernodeSimulated {
         store: data_actor.clone(),
         address: addr.to_owned(),
         bus: local_bus,
         history,
+        errors,
     })
+}
+
+async fn create_ciphernods_system(
+    bus: &Addr<EventBus<EnclaveEvent>>,
+    rng: &SharedRng,
+    count: u32,
+    cipher: &Arc<Cipher>,
+) -> Result<Vec<CiphernodeSimulated>> {
+    let mut nodes = Vec::new();
+    for addr in create_random_eth_addrs(count) {
+        nodes.push(setup_local_ciphernode(&bus, &rng, false, &addr, None, cipher).await?);
+    }
+    simulate_libp2p_net(&nodes);
+    Ok(nodes)
 }
 
 /// Test trbfv

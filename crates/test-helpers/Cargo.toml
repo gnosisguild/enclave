@@ -10,6 +10,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/test-helpers"
 actix = { workspace = true }
 anyhow = { workspace = true }
 e3-events = { workspace = true }
+e3-data = { workspace = true }
 e3-fhe = { workspace = true }
 bincode = { workspace = true }
 clap = { workspace = true }

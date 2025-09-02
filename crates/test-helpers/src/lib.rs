@@ -4,13 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod ciphernode_system;
 mod plaintext_writer;
 mod public_key_writer;
 mod utils;
-
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::*;
+use ciphernode_system::CiphernodeSimulated;
 use e3_events::{
     EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector, Seed, Subscribe,
 };
@@ -113,12 +114,14 @@ pub fn get_common_setup(
 ///                    │ FIL │───────────────┘                 
 ///                    └─────┘
 /// ```
-pub fn simulate_libp2p_net(local_buses: Vec<&Addr<EventBus<EnclaveEvent>>>) {
-    for (i, source) in local_buses.iter().enumerate() {
-        for dest in local_buses.iter() {
+pub fn simulate_libp2p_net(nodes: &[CiphernodeSimulated]) {
+    for (i, node) in nodes.iter().enumerate() {
+        let source = &node.bus;
+        for node in nodes.iter() {
+            let dest = &node.bus;
             EventBus::pipe_filter(
                 source,
-                move |e| {
+                move |e: &EnclaveEvent| {
                     println!(
                         "{}:filter:{} - allowed={}",
                         i,
