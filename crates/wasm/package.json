@@ -1,12 +1,14 @@
 {
   "name": "@enclave-e3/wasm",
-  "version": "0.0.8-test",
+  "version": "0.0.9-test",
   "description": "Wasm modules for enclave.",
   "main": "dist/nodejs/e3_wasm.js",
   "module": "dist/web/e3_wasm.js",
   "types": "dist/web/e3_wasm.d.ts",
   "files": [
     "dist/",
+    "dist/nodejs/**",
+    "dist/web/**",
     "init_node.js",
     "init_node.cjs",
     "init_web.js",

@@ -18,7 +18,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
-    "@enclave-e3/sdk": "^0.0.8-test",
+    "@enclave-e3/sdk": "^0.0.9-test",
     "@aztec/bb.js": "^0.82.2",
     "@emotion/babel-plugin": "^11.11.0",
     "@emotion/react": "^11.11.4",
