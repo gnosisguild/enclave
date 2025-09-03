@@ -13,7 +13,8 @@ use alloy::primitives::Address;
 use anyhow::*;
 use ciphernode_system::CiphernodeSimulated;
 use e3_events::{
-    EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector, Seed, Subscribe,
+    CiphernodeAdded, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector,
+    Seed, Subscribe,
 };
 use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
@@ -142,4 +143,43 @@ pub fn create_random_eth_addrs(how_many: u32) -> Vec<String> {
     (0..how_many)
         .map(|_| Address::from_slice(&rand::thread_rng().gen::<[u8; 20]>()).to_string())
         .collect()
+}
+
+pub fn rand_eth_addr(rng: &SharedRng) -> String {
+    {
+        let rnum = &mut rng.lock().unwrap().gen::<[u8; 20]>();
+        Address::from_slice(rnum).to_string()
+    }
+}
+
+/// Test helper to add addresses to the committee by creating events on the event bus
+#[derive(Clone, Debug)]
+pub struct AddToCommittee {
+    bus: Addr<EventBus<EnclaveEvent>>,
+    count: usize,
+    chain_id: u64,
+}
+
+impl AddToCommittee {
+    pub fn new(bus: &Addr<EventBus<EnclaveEvent>>, chain_id: u64) -> Self {
+        Self {
+            bus: bus.clone(),
+            chain_id,
+            count: 0,
+        }
+    }
+    pub async fn add(&mut self, address: &str) -> Result<EnclaveEvent> {
+        let evt = EnclaveEvent::from(CiphernodeAdded {
+            chain_id: self.chain_id,
+            address: address.to_owned(),
+            index: self.count,
+            num_nodes: self.count + 1,
+        });
+
+        self.count += 1;
+
+        self.bus.send(evt.clone()).await?;
+
+        Ok(evt)
+    }
 }

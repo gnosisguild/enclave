@@ -63,7 +63,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, data: E3Requested, _ctx: &mut Self::Context) -> Self::Result {
-        println!(">>>>>>> E#Requested!!!");
+        println!(">>>>>>> E3Requested!!!");
         let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
@@ -72,7 +72,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
         Box::pin(async move {
             let seed = data.seed;
             let size = data.threshold_m;
-
+            println!("SEED BEFORE SELECTION: {}", seed);
             if let Ok(found_index) = sortition
                 .send(GetNodeIndex {
                     chain_id,

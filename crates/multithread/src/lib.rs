@@ -31,8 +31,8 @@ impl Multithread {
         Self { rng, cipher }
     }
 
-    pub fn attach(rng: SharedRng, cipher: Arc<Cipher>) -> Addr<Self> {
-        let addr = Self::new(rng, cipher).start();
+    pub fn attach(rng: &SharedRng, cipher: &Arc<Cipher>) -> Addr<Self> {
+        let addr = Self::new(rng.clone(), cipher.clone()).start();
         addr
     }
 }
@@ -55,6 +55,7 @@ async fn handle_compute_request(
     cipher: Arc<Cipher>,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
+    println!("Handling multithread request");
     match request {
         ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => {
             match gen_pk_share_and_sk_sss(&rng, &cipher, req).await {

@@ -341,7 +341,8 @@ impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
 
     fn handle(&mut self, _: ResetHistory, _: &mut Context<Self>) {
         println!("History clearn'");
-        self.history.clear()
+        self.history.clear();
+        self.pending_takes.clear();
     }
 }
 

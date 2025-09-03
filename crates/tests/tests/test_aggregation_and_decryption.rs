@@ -27,6 +27,7 @@ use e3_sortition::{CiphernodeSelector, Sortition};
 use e3_test_helpers::ciphernode_system::CiphernodeSimulated;
 use e3_test_helpers::{
     create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
+    AddToCommittee,
 };
 use fhe_rs::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
@@ -112,37 +113,6 @@ fn generate_pk_shares(
         result.push(generate_pk_share(params, crp, rng, addr)?);
     }
     Ok(result)
-}
-
-/// Test helper to add addresses to the committee by creating events on the event bus
-struct AddToCommittee {
-    bus: Addr<EventBus<EnclaveEvent>>,
-    count: usize,
-    chain_id: u64,
-}
-
-impl AddToCommittee {
-    fn new(bus: &Addr<EventBus<EnclaveEvent>>, chain_id: u64) -> Self {
-        Self {
-            bus: bus.clone(),
-            chain_id,
-            count: 0,
-        }
-    }
-    async fn add(&mut self, address: &str) -> Result<EnclaveEvent> {
-        let evt = EnclaveEvent::from(CiphernodeAdded {
-            chain_id: self.chain_id,
-            address: address.to_owned(),
-            index: self.count,
-            num_nodes: self.count + 1,
-        });
-
-        self.count += 1;
-
-        self.bus.send(evt.clone()).await?;
-
-        Ok(evt)
-    }
 }
 
 async fn create_local_ciphernodes(

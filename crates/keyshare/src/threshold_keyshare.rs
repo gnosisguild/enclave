@@ -103,14 +103,38 @@ impl Default for KeyshareState {
     }
 }
 
+pub struct ThresholdKeyshareParams {
+    pub bus: Addr<EventBus<EnclaveEvent>>,
+    pub cipher: Arc<Cipher>,
+    pub e3_id: E3id, // should this be on the persistable?
+    pub multithread: Addr<Multithread>,
+    pub rng: SharedRng,
+    pub state: Persistable<KeyshareState>,
+}
+
 pub struct ThresholdKeyshare {
-    e3_id: E3id,
     bus: Addr<EventBus<EnclaveEvent>>,
-    multithread: Addr<Multithread>,
     cipher: Arc<Cipher>,
-    state: Persistable<KeyshareState>,
     decryption_key_collector: Option<Addr<DecryptionKeyCollector>>,
+    e3_id: E3id,
+    multithread: Addr<Multithread>,
     rng: SharedRng,
+    state: Persistable<KeyshareState>,
+}
+
+impl ThresholdKeyshare {
+    pub fn new(params: ThresholdKeyshareParams) -> Self {
+        println!("Created ThresholdKeyshare!");
+        Self {
+            bus: params.bus,
+            cipher: params.cipher,
+            decryption_key_collector: None,
+            e3_id: params.e3_id,
+            multithread: params.multithread,
+            rng: params.rng,
+            state: params.state,
+        }
+    }
 }
 
 impl Actor for ThresholdKeyshare {
@@ -224,10 +248,12 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
         msg: StartThresholdShareGeneration,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        println!("Starting keyshare generation party={} ...", msg.0.party_id);
         let party_id = msg.0.party_id;
 
         // Initialize State
         self.state.try_mutate(|s| {
+            println!("Attempting to mutate....");
             Ok(s.next(KeyshareState::GeneratingThresholdShare {
                 party_id,
                 sk_sss: None,
@@ -235,7 +261,7 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
                 esi_sss: None,
             })?)
         })?;
-
+        println!("Trying to run processes...");
         // Run both simultaneously
         ctx.notify(GenPkShareAndSkSss(msg.0.clone()));
         ctx.notify(GenEsiSss(msg.0));
@@ -245,7 +271,8 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
 
 impl Handler<GenEsiSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, Result<()>>;
-    fn handle(&mut self, msg: GenEsiSss, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GenEsiSss, _: &mut Self::Context) -> Self::Result {
+        println!("GenEsiSss on ThresholdKeyshare");
         let CiphernodeSelected {
             params,
             threshold_n,
@@ -287,6 +314,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
 impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, Result<()>>;
     fn handle(&mut self, msg: GenPkShareAndSkSss, ctx: &mut Self::Context) -> Self::Result {
+        println!("GenPkShareAndSkSss on ThresholdKeyshare");
         let CiphernodeSelected {
             params,
             threshold_n,

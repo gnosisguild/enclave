@@ -20,4 +20,5 @@ fhe-traits = { workspace = true }
 rand_chacha = { workspace = true }
 rand = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true }
 e3-sdk = { workspace = true }

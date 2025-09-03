@@ -4,29 +4,55 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::Addr;
+use actix::{Addr, MailboxError};
 use anyhow::*;
 use e3_data::InMemStore;
-use e3_events::{EnclaveEvent, ErrorCollector, EventBus, HistoryCollector};
-use std::{future::Future, pin::Pin};
+use e3_events::{
+    EnclaveEvent, ErrorCollector, EventBus, GetHistory, HistoryCollector, ResetHistory, TakeHistory,
+};
+use tokio::time::{sleep, timeout};
+
+use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 
 use crate::simulate_libp2p_net;
 
+// This type allows us to store various dynamic async callbacks
 type SetupFn<'a> =
     Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<CiphernodeSimulated>> + 'a>> + 'a>;
+type ThenFn<'a> =
+    Box<dyn Fn(CiphernodeSimulated) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> + 'a>;
 
 /// This builds a ciphernode system using the actor model only. This helps us simulate the network
 /// in tests that we can run in the /crates/tests crate
+/// ```ignore
+/// let nodes = CiphernodeSystemBuilder::new()
+///     .add_group(6, || async {
+///         setup_local_ciphernode(bus, rng, true, rand_eth_addr(), None, cipher).await
+///     })
+///     .add_group(1, || async {
+///         setup_aggregator_ciphernode(bus, rng, true, rand_eth_addr(), None, cipher).await
+///     })
+///     .build()
+///     .await?;
+/// ```
 pub struct CiphernodeSystemBuilder<'a> {
     // Various groups with different setup functions
     groups: Vec<(u32, SetupFn<'a>)>,
+    thens: Vec<ThenFn<'a>>,
+    simulate: bool,
 }
 
 impl<'a> CiphernodeSystemBuilder<'a> {
     pub fn new() -> Self {
-        Self { groups: Vec::new() }
+        Self {
+            groups: Vec::new(),
+            thens: Vec::new(),
+            simulate: false,
+        }
     }
 
+    /// Add a group of nodes with a specific configuration to the ciphernode system.
+    /// We can add multiple groups of nodes each with a different configuration and count.
     pub fn add_group<F, Fut>(mut self, count: u32, setup_fn: F) -> Self
     where
         F: Fn() -> Fut + 'a,
@@ -41,7 +67,15 @@ impl<'a> CiphernodeSystemBuilder<'a> {
         self
     }
 
-    pub async fn build(self) -> Result<Vec<CiphernodeSimulated>> {
+    /// Add gossip simulation. This takes all event bus events on local ciphernode busses that have been set for
+    /// broadcast and broadcasts them to all other nodes.
+    pub fn simulate_libp2p(mut self) -> Self {
+        self.simulate = true;
+        self
+    }
+
+    /// Build the system returning a list of all nodes
+    pub async fn build(self) -> Result<CiphernodeSystem> {
         let mut nodes = Vec::new();
 
         for (count, setup_fn) in self.groups {
@@ -50,17 +84,109 @@ impl<'a> CiphernodeSystemBuilder<'a> {
             }
         }
 
-        simulate_libp2p_net(&nodes);
-        Ok(nodes)
+        if self.simulate {
+            simulate_libp2p_net(&nodes);
+        }
+
+        // for node in nodes.clone().iter() {
+        for then_fn in self.thens {
+            for node in nodes.clone() {
+                then_fn(node).await?;
+            }
+        }
+        // }
+
+        Ok(CiphernodeSystem(nodes))
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct CiphernodeSimulated {
     pub address: String,
     pub store: Addr<InMemStore>,
     pub bus: Addr<EventBus<EnclaveEvent>>,
     pub history: Addr<HistoryCollector<EnclaveEvent>>,
     pub errors: Addr<ErrorCollector<EnclaveEvent>>,
+}
+
+pub struct CiphernodeSystem(Vec<CiphernodeSimulated>);
+
+impl CiphernodeSystem {
+    pub async fn get_history(&self, index: usize) -> Result<CiphernodeHistory> {
+        let Some(node) = self.0.get(index) else {
+            return Ok(CiphernodeHistory(vec![]));
+        };
+
+        Ok(CiphernodeHistory(
+            node.history.send(GetHistory::new()).await?,
+        ))
+    }
+
+    pub async fn take_history(&self, index: usize, count: usize) -> Result<CiphernodeHistory> {
+        let Some(node) = self.0.get(index) else {
+            bail!("No node found");
+        };
+
+        let history = timeout(
+            Duration::from_secs(4),
+            node.history.send(TakeHistory::new(count)),
+        )
+        .await
+        .context(format!(
+            "Could not take {} events from node {}",
+            count, index
+        ))??;
+
+        Ok(CiphernodeHistory(history))
+    }
+
+    pub async fn flush_all_history(&self, millis: u64) -> Result<()> {
+        let nodes = self.0.clone();
+        for node in nodes.iter() {
+            loop {
+                let nhs = node.history.send(TakeHistory::new(1));
+                let tr = timeout(Duration::from_millis(millis), nhs).await;
+                if !tr.is_ok() {
+                    break;
+                }
+            }
+            node.history.send(ResetHistory).await?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Deref for CiphernodeSystem {
+    type Target = Vec<CiphernodeSimulated>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub struct CiphernodeHistory(Vec<EnclaveEvent>);
+
+impl CiphernodeHistory {
+    pub fn filter_by_event_type(&self, event_type: String) -> Vec<EnclaveEvent> {
+        self.0
+            .iter()
+            .filter(|e| e.event_type() == event_type)
+            .cloned()
+            .collect()
+    }
+
+    pub fn event_types(&self) -> Vec<String> {
+        self.0.iter().map(|e| e.event_type()).collect()
+    }
+}
+
+impl Deref for CiphernodeHistory {
+    type Target = Vec<EnclaveEvent>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[cfg(test)]
