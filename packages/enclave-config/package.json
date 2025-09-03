@@ -1,8 +1,11 @@
 {
   "name": "@enclave-e3/config",
-  "private": false,
   "version": "0.0.7-test",
-  "description": "",
+  "publishConfig": {
+    "access": "public",
+    "git-checks": false
+  },
+  "description": "Common configuration for Enclave",
   "module": true,
   "main": "index.js",
   "type": "module",

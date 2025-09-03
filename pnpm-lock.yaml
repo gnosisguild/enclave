@@ -64,11 +64,11 @@ importers:
   examples/CRISP:
     dependencies:
       '@enclave-e3/contracts':
-        specifier: workspace:*
-        version: link:../../packages/enclave-contracts
+        specifier: ^0.0.7-test
+        version: 0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
       '@enclave-e3/sdk':
-        specifier: workspace:*
-        version: link:../../packages/enclave-sdk
+        specifier: ^0.0.7-test
+        version: 0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
       '@excubiae/contracts':
         specifier: ^0.4.0
         version: 0.4.0
@@ -86,8 +86,8 @@ importers:
         version: 0.1.26
     devDependencies:
       '@enclave-e3/config':
-        specifier: workspace:*
-        version: link:../../packages/enclave-config
+        specifier: ^0.0.7-test
+        version: 0.0.7-test(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))
       '@nomicfoundation/hardhat-chai-matchers':
         specifier: ^2.0.0
         version: 2.1.0(@nomicfoundation/hardhat-ethers@3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@2.26.3(bufferutil@4.0.9)(ts-node@10.9.2(@swc/core@1.13.5)(@swc/wasm@1.13.5)(@types/node@22.7.5)(typescript@5.8.3))(typescript@5.8.3)(utf-8-validate@5.0.10)))(chai@5.3.3)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@2.26.3(bufferutil@4.0.9)(ts-node@10.9.2(@swc/core@1.13.5)(@swc/wasm@1.13.5)(@types/node@22.7.5)(typescript@5.8.3))(typescript@5.8.3)(utf-8-validate@5.0.10))
@@ -118,18 +118,12 @@ importers:
       '@playwright/test':
         specifier: 1.52.0
         version: 1.52.0
-      '@semaphore-protocol/core':
-        specifier: github:hmzakhalid/semaphore-noir#dist-core
-        version: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
-      '@semaphore-protocol/data':
-        specifier: ^4.9.2
-        version: 4.13.0(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       '@synthetixio/synpress':
         specifier: ^4.1.0
-        version: 4.1.1(@depay/solana-web3.js@1.98.3)(@depay/web3-blockchains@9.8.6)(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+        version: 4.1.1(@depay/solana-web3.js@1.98.3)(@depay/web3-blockchains@9.8.6)(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(yaml@2.8.1)(zod@3.25.76)
       '@synthetixio/synpress-cache':
         specifier: ^0.0.12
-        version: 0.0.12(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)
+        version: 0.0.12(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)
       '@typechain/ethers-v6':
         specifier: ^0.5.0
         version: 0.5.1(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typechain@8.3.2(typescript@5.8.3))(typescript@5.8.3)
@@ -197,8 +191,8 @@ importers:
         specifier: ^11.11.4
         version: 11.14.0(@types/react@18.3.24)(react@18.3.1)
       '@enclave-e3/sdk':
-        specifier: workspace:*
-        version: link:../../../packages/enclave-sdk
+        specifier: ^0.0.7-test
+        version: 0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)
       '@hashcloak/semaphore-noir-proof':
         specifier: 1.0.0
         version: 1.0.0(@semaphore-protocol/group@4.13.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@semaphore-protocol/identity@4.13.0)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
@@ -1541,6 +1535,20 @@ packages:
 
   '@emotion/weak-memoize@0.4.0':
     resolution: {integrity: sha512-snKqtPW01tN0ui7yu9rGv69aJXr/a/Ywvl11sUjNtEcRc+ng/mQriFL0wLXMef74iHa/EkftbDzU9F8iFbH+zg==}
+
+  '@enclave-e3/config@0.0.7-test':
+    resolution: {integrity: sha512-iL+NzEz0Dt/1tYD5vhJIrKZEhmn4x8hyHV0eY6UBBCY4szlLa36vo6I1TwLdzPkh/ULkUcz04ewOso1wYzbC0Q==}
+    peerDependencies:
+      tsup: 8.5.0
+
+  '@enclave-e3/contracts@0.0.7-test':
+    resolution: {integrity: sha512-F+XWjdMhx96AOuTNzWoHrStKeZ6pI2Ae7SZyJN6j/Ncwv6qjsRyVEG0ZY3lYwe0MgMiCXpQKSPFMziN7C79n8w==}
+
+  '@enclave-e3/sdk@0.0.7-test':
+    resolution: {integrity: sha512-JD+KLugwyZLq3NGxiGs3b209pi837OSrenwRFGlJ6sMMqsD+CtNPzlbasJHjV4V8fmtj567i5NqfWFLwAueYag==}
+
+  '@enclave-e3/wasm@0.0.7-test':
+    resolution: {integrity: sha512-U6C86gCw9XoTu9Vnficktch7rKGsMsddctPCQetHSyN2aOS365Cx4gll+9+M/bJqe98Uohs9FTuoH4cMZuPLFw==}
 
   '@esbuild/aix-ppc64@0.20.0':
     resolution: {integrity: sha512-fGFDEctNh0CcSwsiRPxiaqX0P5rq+AqE0SRhYGZ4PX46Lg1FNR6oCxJghf8YgY0WQEgQuh3lErUFE4KxLeRmmw==}
@@ -3161,33 +3169,14 @@ packages:
   '@semaphore-protocol/contracts@4.13.0':
     resolution: {integrity: sha512-MZeD3CJIgHn8WnEcUvWkQjncIcfdqPwzeb6tPX3Zf0n5VhRiigxBLSuQYY5QzFNd/mzgScLO6duwOq3T1Oup+A==}
 
-  '@semaphore-protocol/core@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43}
-    version: 4.9.1
-
   '@semaphore-protocol/data@4.13.0':
     resolution: {integrity: sha512-91dgssYuh4lbcelmNe/Mbq6riXr+zFIUQnUNCq8mxbCrDeX6RnUOQFfQ5XzGF1RNJQN4+wiESzipM7SrB4mhsQ==}
 
   '@semaphore-protocol/group@4.13.0':
     resolution: {integrity: sha512-wj2g6lAa1l2eg6U9wu9PvjtgsynWLaXnRU5GGzOBwOZkOW66VdfyIE6a7tLxrvVVyZVRylIZ0Juhlo6NJVfwAA==}
 
-  '@semaphore-protocol/group@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8}
-    version: 4.9.1
-
   '@semaphore-protocol/identity@4.13.0':
     resolution: {integrity: sha512-lszEOQFMMI12HmDL1rzPz6OQvlW1e2QVZsbKI5K4CnPYsnIh+yZ3i5PQKnCu7slT0mmObNlPQU2cpBbe4Vo9DQ==}
-
-  '@semaphore-protocol/identity@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef}
-    version: 4.9.1
-
-  '@semaphore-protocol/proof@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/d8989c48201f05245965f992e4fc4f0bddb7725e':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/d8989c48201f05245965f992e4fc4f0bddb7725e}
-    version: 4.9.1
-    peerDependencies:
-      '@semaphore-protocol/group': 4.9.1
-      '@semaphore-protocol/identity': 4.9.1
 
   '@semaphore-protocol/utils@4.13.0':
     resolution: {integrity: sha512-5F05Hfbs+zuXgIMaefgnURCSQ5GW6Q0R8Ew1L+f9eFrHOrolPE9Oz3RV1dLw0zmA6s9PlUESo2g6S73XHhkLYg==}
@@ -3941,11 +3930,6 @@ packages:
   '@walletconnect/window-metadata@1.0.1':
     resolution: {integrity: sha512-9koTqyGrM2cqFRW517BPY/iEtUDx2r1+Pwwu5m7sJ7ka79wi3EyqhqcICk/yDmv6jAS1rjKgTKXlEhanYjijcA==}
 
-  '@zk-kit/artifacts@https://codeload.github.com/hmzakhalid/snark-artifacts/tar.gz/a8eb62a0e3f1d4917f7895bf4511ee1f7f221dc3':
-    resolution: {tarball: https://codeload.github.com/hmzakhalid/snark-artifacts/tar.gz/a8eb62a0e3f1d4917f7895bf4511ee1f7f221dc3}
-    version: 2.0.1
-    hasBin: true
-
   '@zk-kit/baby-jubjub@1.0.3':
     resolution: {integrity: sha512-Wl+QfV6XGOMk1yU2JTqHXeKWfJVXp83is0+dtqfj9wx4wsAPpb+qzYvwAxW5PBx5/Nu71Bh7jp/5vM+6QgHSwA==}
 
@@ -3957,9 +3941,6 @@ packages:
 
   '@zk-kit/lean-imt.sol@2.0.1':
     resolution: {integrity: sha512-2dy/wfzch2vy5QtDCFmQwN7E4GZP0xBcucTb2mfZoJP5V69cjPRdy6KcbS0YOcBMH/Lb7BgXLsekRYjh9JNKEw==}
-
-  '@zk-kit/lean-imt@2.2.3':
-    resolution: {integrity: sha512-T6NXLzMuwFjp+hg6WJZqzJ2qyyTmbS9JmxiWW/lmp+VxxJLAO9byAvqd5p/7616AXdHyTbwku0tdX0JDq9Pkng==}
 
   '@zk-kit/lean-imt@2.2.4':
     resolution: {integrity: sha512-uoRl99DID9Z5EuhfecDuIGP0KLrGEndVH0+texwVQBmlXTvve+grkKT4w06C+VFzRmfYNVuRo9tXvqIzQ3dqPA==}
@@ -10993,6 +10974,138 @@ snapshots:
 
   '@emotion/weak-memoize@0.4.0': {}
 
+  '@enclave-e3/config@0.0.7-test(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))':
+    dependencies:
+      tsup: 8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)
+
+  '@enclave-e3/contracts@0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)':
+    dependencies:
+      '@enclave-e3/sdk': 0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)
+      '@excubiae/contracts': 0.4.0
+      solady: 0.1.26
+    transitivePeerDependencies:
+      - '@edge-runtime/vm'
+      - '@swc/helpers'
+      - '@types/node'
+      - '@vitest/browser'
+      - '@vitest/ui'
+      - bufferutil
+      - happy-dom
+      - jsdom
+      - less
+      - lightningcss
+      - rollup
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+      - typescript
+      - utf-8-validate
+      - vite
+      - zod
+
+  '@enclave-e3/contracts@0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)':
+    dependencies:
+      '@enclave-e3/sdk': 0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
+      '@excubiae/contracts': 0.4.0
+      solady: 0.1.26
+    transitivePeerDependencies:
+      - '@edge-runtime/vm'
+      - '@swc/helpers'
+      - '@types/node'
+      - '@vitest/browser'
+      - '@vitest/ui'
+      - bufferutil
+      - happy-dom
+      - jsdom
+      - less
+      - lightningcss
+      - rollup
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+      - typescript
+      - utf-8-validate
+      - vite
+      - zod
+
+  '@enclave-e3/sdk@0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)':
+    dependencies:
+      '@aztec/bb.js': 0.82.3
+      '@enclave-e3/contracts': 0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)
+      '@enclave-e3/wasm': 0.0.7-test
+      '@noir-lang/noir_js': 1.0.0-beta.3
+      comlink: 4.4.2
+      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+      vite-plugin-top-level-await: 1.6.0(rollup@4.49.0)(vite@5.4.19(@types/node@22.7.5))
+      vite-plugin-wasm: 3.5.0(vite@5.4.19(@types/node@22.7.5))
+      vitest: 1.6.1(@types/node@22.7.5)
+      web-worker: 1.5.0
+    transitivePeerDependencies:
+      - '@edge-runtime/vm'
+      - '@swc/helpers'
+      - '@types/node'
+      - '@vitest/browser'
+      - '@vitest/ui'
+      - bufferutil
+      - happy-dom
+      - jsdom
+      - less
+      - lightningcss
+      - rollup
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+      - typescript
+      - utf-8-validate
+      - vite
+      - zod
+
+  '@enclave-e3/sdk@0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)':
+    dependencies:
+      '@aztec/bb.js': 0.82.3
+      '@enclave-e3/contracts': 0.0.7-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
+      '@enclave-e3/wasm': 0.0.7-test
+      '@noir-lang/noir_js': 1.0.0-beta.3
+      comlink: 4.4.2
+      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+      vite-plugin-top-level-await: 1.6.0(rollup@4.49.0)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))
+      vite-plugin-wasm: 3.5.0(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))
+      vitest: 1.6.1(@types/node@22.7.5)
+      web-worker: 1.5.0
+    transitivePeerDependencies:
+      - '@edge-runtime/vm'
+      - '@swc/helpers'
+      - '@types/node'
+      - '@vitest/browser'
+      - '@vitest/ui'
+      - bufferutil
+      - happy-dom
+      - jsdom
+      - less
+      - lightningcss
+      - rollup
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+      - typescript
+      - utf-8-validate
+      - vite
+      - zod
+
+  '@enclave-e3/wasm@0.0.7-test': {}
+
   '@esbuild/aix-ppc64@0.20.0':
     optional: true
 
@@ -12947,18 +13060,6 @@ snapshots:
     dependencies:
       '@zk-kit/lean-imt.sol': 2.0.1
 
-  '@semaphore-protocol/core@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/caad5529009ebdeb1613c552c4e188a54b681a43(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@semaphore-protocol/group': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8
-      '@semaphore-protocol/identity': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef
-      '@semaphore-protocol/proof': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/d8989c48201f05245965f992e4fc4f0bddb7725e(@semaphore-protocol/group@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8)(@semaphore-protocol/identity@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - '@types/snarkjs'
-      - bufferutil
-      - commander
-      - supports-color
-      - utf-8-validate
-
   '@semaphore-protocol/data@4.13.0(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)':
     dependencies:
       '@semaphore-protocol/utils': 4.13.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -12982,44 +13083,12 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@semaphore-protocol/group@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8':
-    dependencies:
-      '@zk-kit/lean-imt': 2.2.3
-      '@zk-kit/utils': 1.3.0
-      poseidon-lite: 0.3.0
-
   '@semaphore-protocol/identity@4.13.0':
     dependencies:
       '@zk-kit/baby-jubjub': 1.0.3
       '@zk-kit/eddsa-poseidon': 1.0.4
       '@zk-kit/utils': 1.3.0
       poseidon-lite: 0.3.0
-
-  '@semaphore-protocol/identity@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef':
-    dependencies:
-      '@zk-kit/baby-jubjub': 1.0.3
-      '@zk-kit/eddsa-poseidon': 1.0.4
-      '@zk-kit/utils': 1.3.0
-      poseidon-lite: 0.3.0
-
-  '@semaphore-protocol/proof@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/d8989c48201f05245965f992e4fc4f0bddb7725e(@semaphore-protocol/group@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8)(@semaphore-protocol/identity@https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@aztec/bb.js': 0.82.2
-      '@noir-lang/noir_js': 1.0.0-beta.3
-      '@noir-lang/noir_wasm': 1.0.0-beta.3
-      '@semaphore-protocol/group': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/8c41614a00c121ec96e07d73145dc542739eefa8
-      '@semaphore-protocol/identity': https://codeload.github.com/hmzakhalid/semaphore-noir/tar.gz/4137e5d6cf645af3fc8eb720b6c8ee33a125d0ef
-      '@semaphore-protocol/utils': 4.9.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      '@zk-kit/artifacts': https://codeload.github.com/hmzakhalid/snark-artifacts/tar.gz/a8eb62a0e3f1d4917f7895bf4511ee1f7f221dc3(@types/snarkjs@0.7.9)(commander@13.1.0)
-      '@zk-kit/utils': 1.3.0
-      ethers: 6.13.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
-      snarkjs: 0.7.4
-    transitivePeerDependencies:
-      - '@types/snarkjs'
-      - bufferutil
-      - commander
-      - supports-color
-      - utf-8-validate
 
   '@semaphore-protocol/utils@4.13.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:
@@ -13275,7 +13344,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@synthetixio/synpress-cache@0.0.12(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)':
+  '@synthetixio/synpress-cache@0.0.12(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)':
     dependencies:
       axios: 1.6.7
       chalk: 5.3.0
@@ -13301,7 +13370,7 @@ snapshots:
       - typescript
       - yaml
 
-  '@synthetixio/synpress-cache@0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)':
+  '@synthetixio/synpress-cache@0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)':
     dependencies:
       axios: 1.6.7
       chalk: 5.3.0
@@ -13331,10 +13400,10 @@ snapshots:
     dependencies:
       '@playwright/test': 1.52.0
 
-  '@synthetixio/synpress-metamask@0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)(utf-8-validate@5.0.10)':
+  '@synthetixio/synpress-metamask@0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(yaml@2.8.1)':
     dependencies:
       '@playwright/test': 1.52.0
-      '@synthetixio/synpress-cache': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)
+      '@synthetixio/synpress-cache': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)
       '@synthetixio/synpress-core': 0.0.13(@playwright/test@1.52.0)
       '@viem/anvil': 0.0.7(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       fs-extra: 11.2.0
@@ -13353,10 +13422,10 @@ snapshots:
       - utf-8-validate
       - yaml
 
-  '@synthetixio/synpress-phantom@0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)(utf-8-validate@5.0.10)':
+  '@synthetixio/synpress-phantom@0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(yaml@2.8.1)':
     dependencies:
       '@playwright/test': 1.52.0
-      '@synthetixio/synpress-cache': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)
+      '@synthetixio/synpress-cache': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)
       '@synthetixio/synpress-core': 0.0.13(@playwright/test@1.52.0)
       '@viem/anvil': 0.0.7(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       fs-extra: 11.2.0
@@ -13375,14 +13444,14 @@ snapshots:
       - utf-8-validate
       - yaml
 
-  '@synthetixio/synpress@4.1.1(@depay/solana-web3.js@1.98.3)(@depay/web3-blockchains@9.8.6)(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)':
+  '@synthetixio/synpress@4.1.1(@depay/solana-web3.js@1.98.3)(@depay/web3-blockchains@9.8.6)(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(yaml@2.8.1)(zod@3.25.76)':
     dependencies:
       '@playwright/test': 1.52.0
       '@synthetixio/ethereum-wallet-mock': 0.0.13(@depay/solana-web3.js@1.98.3)(@depay/web3-blockchains@9.8.6)(@playwright/test@1.52.0)(bufferutil@4.0.9)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
-      '@synthetixio/synpress-cache': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)
+      '@synthetixio/synpress-cache': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)
       '@synthetixio/synpress-core': 0.0.13(@playwright/test@1.52.0)
-      '@synthetixio/synpress-metamask': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)(utf-8-validate@5.0.10)
-      '@synthetixio/synpress-phantom': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(playwright-core@1.52.0)(postcss@8.5.6)(typescript@5.8.3)(utf-8-validate@5.0.10)
+      '@synthetixio/synpress-metamask': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(yaml@2.8.1)
+      '@synthetixio/synpress-phantom': 0.0.13(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@playwright/test@1.52.0)(@swc/core@1.13.5)(bufferutil@4.0.9)(jiti@1.21.7)(playwright-core@1.52.0)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(utf-8-validate@5.0.10)(yaml@2.8.1)
     transitivePeerDependencies:
       - '@depay/solana-web3.js'
       - '@depay/web3-blockchains'
@@ -14481,19 +14550,6 @@ snapshots:
       '@walletconnect/window-getters': 1.0.1
       tslib: 1.14.1
 
-  '@zk-kit/artifacts@https://codeload.github.com/hmzakhalid/snark-artifacts/tar.gz/a8eb62a0e3f1d4917f7895bf4511ee1f7f221dc3(@types/snarkjs@0.7.9)(commander@13.1.0)':
-    dependencies:
-      '@commander-js/extra-typings': 12.1.0(commander@13.1.0)
-      '@inquirer/input': 2.3.0
-      '@inquirer/select': 2.5.0
-      '@noir-lang/noir_js': 1.0.0-beta.3
-      circomkit: 0.2.1(@types/snarkjs@0.7.9)(snarkjs@0.7.4)
-      ora: 5.4.1
-      snarkjs: 0.7.4
-    transitivePeerDependencies:
-      - '@types/snarkjs'
-      - commander
-
   '@zk-kit/baby-jubjub@1.0.3':
     dependencies:
       '@zk-kit/utils': 1.2.1
@@ -14512,10 +14568,6 @@ snapshots:
   '@zk-kit/lean-imt.sol@2.0.1':
     dependencies:
       poseidon-solidity: 0.0.5
-
-  '@zk-kit/lean-imt@2.2.3':
-    dependencies:
-      '@zk-kit/utils': 1.3.0
 
   '@zk-kit/lean-imt@2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:

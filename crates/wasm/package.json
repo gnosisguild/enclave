@@ -1,6 +1,5 @@
 {
   "name": "@enclave-e3/wasm",
-  "private": false,
   "version": "0.0.7-test",
   "description": "Wasm modules for enclave.",
   "main": "dist/nodejs/e3_wasm.js",
@@ -10,6 +9,10 @@
     "dist/",
     "dist/**/*"
   ],
+  "publishConfig": {
+    "access": "public",
+    "git-checks": false
+  },
   "scripts": {
     "build": "./scripts/build.sh",
     "prerelease": "pnpm build",

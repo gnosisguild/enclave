@@ -1,6 +1,5 @@
 {
   "name": "@enclave-e3/sdk",
-  "private": false,
   "version": "0.0.7-test",
   "type": "module",
   "exports": {
@@ -17,6 +16,10 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public",
+    "git-checks": false
+  },
   "scripts": {
     "prebuild": "cd ../enclave-contracts && pnpm compile:ts && cd ../../crates/wasm && pnpm build",
     "build": "tsup",
