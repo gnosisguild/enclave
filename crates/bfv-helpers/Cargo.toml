@@ -13,6 +13,10 @@ fhe-traits.workspace = true
 fhe_rs.workspace = true
 rand.workspace = true
 anyhow.workspace = true
+num-bigint.workspace = true
+num-traits.workspace = true
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
+greco = { package = "e3-greco-generator", git = "https://github.com/gnosisguild/greco", version = "0.1.0"} 
 
 [dev-dependencies]
 hex.workspace = true

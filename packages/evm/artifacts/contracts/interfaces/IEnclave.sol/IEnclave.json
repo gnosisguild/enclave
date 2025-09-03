@@ -585,7 +585,7 @@
               "type": "bytes"
             }
           ],
-          "internalType": "struct IEnclave.RequestParams",
+          "internalType": "struct IEnclave.E3RequestParams",
           "name": "requestParams",
           "type": "tuple"
         }

@@ -3,7 +3,7 @@
 set -e
 
 if [ "$1" == "--ui" ]; then
-  PLAYWRIGHT_CMD="pnpm synpress && pnpm playwright test --ui"
+  PLAYWRIGHT_CMD="pnpm synpress && pnpm playwright test"
 else
   PLAYWRIGHT_CMD="pnpm synpress --headless && xvfb-run pnpm playwright test"
 fi

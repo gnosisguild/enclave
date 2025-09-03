@@ -6,7 +6,7 @@ export CARGO_INCREMENTAL=1
 
 cleanup() {
   echo "Cleaning up processes..."
-  enclave nodes down
+  pkill -9 -f "enclave start"
   sleep 1
 
   pkill -9 -f "anvil" 2>/dev/null || true

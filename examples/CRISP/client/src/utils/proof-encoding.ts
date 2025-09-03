@@ -27,3 +27,23 @@ export function encodeSemaphoreProof(
 
     return hexToBytes(hex);
 }
+
+const crispAbi = parseAbiParameters(
+    '(bytes, bytes, bytes32[], bytes)'
+);
+
+export const encodeCrispInputs = (
+    semaphoreProof: Uint8Array,
+    noirProof: Uint8Array,
+    noirPublicInputs: string[],
+    encryptedVote: Uint8Array
+): string => {
+    return encodeAbiParameters(crispAbi, [
+        [
+            bytesToHex(semaphoreProof),
+            bytesToHex(noirProof),
+            noirPublicInputs.map(input => input as `0x${string}`),
+            bytesToHex(encryptedVote)
+        ]
+    ])
+}
