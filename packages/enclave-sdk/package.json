@@ -1,6 +1,6 @@
 {
   "name": "@enclave-e3/sdk",
-  "version": "0.0.7-test",
+  "version": "0.0.8-test",
   "type": "module",
   "exports": {
     ".": {
