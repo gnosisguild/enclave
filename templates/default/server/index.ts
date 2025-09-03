@@ -10,6 +10,7 @@ import {
   EnclaveEventType,
   type E3ActivatedData,
   type InputPublishedData,
+  FheProtocol,
 } from "@enclave-e3/sdk";
 import { handleTestInteraction } from "./testHandler";
 import { getCheckedEnvVars } from "./utils";

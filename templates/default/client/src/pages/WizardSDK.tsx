@@ -23,13 +23,8 @@ import {
   decodePlaintextOutput,
   DEFAULT_COMPUTE_PROVIDER_PARAMS,
   DEFAULT_E3_CONFIG,
-<<<<<<< HEAD
-  bfvVerifiableEncryptNumber,
-} from '@gnosis-guild/enclave-sdk'
-=======
-  encryptNumber,
+  FheProtocol,
 } from '@enclave-e3/sdk'
->>>>>>> 8b1b4d9a (feat: update to enclave specific org)
 import { HAS_MISSING_ENV_VARS, MISSING_ENV_VARS, getContractAddresses } from '@/utils/env-config'
 import { formatContractError } from '@/utils/error-formatting'
 
@@ -563,6 +558,7 @@ const WizardSDK: React.FC = () => {
         enclave: contracts.enclave,
         ciphernodeRegistry: contracts.ciphernodeRegistry,
       },
+      protocol: FheProtocol.BFV,
     }),
     [contracts.enclave, contracts.ciphernodeRegistry],
   )
@@ -577,6 +573,7 @@ const WizardSDK: React.FC = () => {
     off,
     EnclaveEventType,
     RegistryEventType,
+    sdk,
   } = useEnclaveSDK(sdkConfig)
 
   // Component state
@@ -791,20 +788,20 @@ const WizardSDK: React.FC = () => {
       const publicKeyBytes = hexToBytes(e3State.publicKey)
 
       // Encrypt both inputs
-      const encryptedInput1 = await bfvVerifiableEncryptNumber(num1, publicKeyBytes)
-      const encryptedInput2 = await bfvVerifiableEncryptNumber(num2, publicKeyBytes)
+      const encryptedInput1 = await sdk?.encryptNumber(num1, publicKeyBytes)
+      const encryptedInput2 = await sdk?.encryptNumber(num2, publicKeyBytes)
 
       if (!encryptedInput1 || !encryptedInput2) {
         throw new Error('Failed to encrypt inputs')
       }
 
       // Publish first input
-      await publishInput(e3State.id, `0x${Array.from(encryptedInput1.encryptedVote, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
+      await publishInput(e3State.id, `0x${Array.from(encryptedInput1, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`)
 
       // Publish second input
       const hash2 = await publishInput(
         e3State.id,
-        `0x${Array.from(encryptedInput2.encryptedVote, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
+        `0x${Array.from(encryptedInput2, (b) => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`,
       )
 
       setLastTransactionHash(hash2)

@@ -16,6 +16,7 @@ import {
   encodeBfvParams,
   encodeComputeProviderParams,
   RegistryEventType,
+  FheProtocol,
 } from "@enclave-e3/sdk";
 import { hexToBytes } from "viem";
 import assert from "assert";
