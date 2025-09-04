@@ -1,0 +1,29 @@
+[profile.default]
+src = 'contracts'
+out = 'out'
+libs = ['lib', 'node_modules']
+solc = "0.8.27"
+optimizer = true
+via_ir = true
+verify = false
+chain_id = 31337
+fs_permissions = [{ access = "read-write", path = "./" }]
+
+
+remappings = [
+  # --- EigenLayer OZ v4.9 mappings ---
+  "@openzeppelin/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
+  "@openzeppelin-upgrades/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/",
+  
+  # --- Enclave OZ v5 to avoid conflicts with EigenLayer OZ v4.9 ---
+  "@oz/=node_modules/@openzeppelin/contracts/",
+  "@oz-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+
+  # --- EigenLayer imports  ---
+  "eigenlayer-contracts/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/",
+  "@eigenlayer-scripts/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/script/",
+  "@eigenlayer-middleware/=lib/eigenlayer-middleware/",
+  "forge-std/=lib/forge-std/src/",
+]
+
+ignored_warnings_from = ["lib/eigenlayer-middleware"]

@@ -11,6 +11,7 @@ export async function deployCiphernodeRegistryOwnableFixture(
   owner: string,
   enclave: string,
   poseidonT3: string,
+  serviceManager: string,
   name?: string,
 ) {
   const [signer] = await ethers.getSigners();
@@ -20,7 +21,7 @@ export async function deployCiphernodeRegistryOwnableFixture(
         PoseidonT3: poseidonT3,
       },
     })
-  ).deploy(owner, enclave);
+  ).deploy(owner, enclave, serviceManager);
 
   return CiphernodeRegistryOwnable__factory.connect(
     await deployment.getAddress(),

@@ -1,0 +1,17 @@
+{
+  "../../examples/CRISP/lib/risc0-ethereum": {
+    "rev": "c09ee29b386d2b1486724509868d1115db36929f"
+  },
+  "lib/eigenlayer-middleware": {
+    "rev": "a43dc4b20ea1cbcd237717512902f8a6e80fdf2d"
+  },
+  "../../templates/default/lib/risc0-ethereum": {
+    "rev": "ef94105fbfbc2775d7a7f0c4773190e04cb67a04"
+  },
+  "lib/forge-std": {
+    "tag": {
+      "name": "v1.10.0",
+      "rev": "8bbcf6e3f8f62f419e5429a0bd89331c85c37824"
+    }
+  }
+}
