@@ -11,8 +11,8 @@ use crate::helpers::{try_poly_from_sensitive_bytes, try_polys_from_sensitive_byt
 use crate::{ArcBytes, TrBFVConfig};
 use anyhow::*;
 use e3_crypto::{Cipher, SensitiveBytes};
+use fhe::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_math::rq::Poly;
-use fhe_rs::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_traits::DeserializeParametrized;
 use fhe_traits::Serialize;
 

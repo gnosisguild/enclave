@@ -9,7 +9,7 @@
 use crate::{ArcBytes, SharedRng, TrBFVConfig};
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
-use fhe_rs::{
+use fhe::{
     bfv::SecretKey,
     mbfv::{CommonRandomPoly, PublicKeyShare},
     trbfv::ShareManager,

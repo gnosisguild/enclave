@@ -7,7 +7,7 @@
 use crate::{ArcBytes, SharedRng, TrBFVConfig};
 use anyhow::{Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
-use fhe_rs::trbfv::{smudging::SmudgingNoiseGenerator, ShareManager};
+use fhe::trbfv::{smudging::SmudgingNoiseGenerator, ShareManager};
 use ndarray::Array2;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};

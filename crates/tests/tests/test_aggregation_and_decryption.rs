@@ -29,7 +29,7 @@ use e3_test_helpers::{
     create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
     AddToCommittee,
 };
-use fhe_rs::{
+use fhe::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
 };

@@ -9,7 +9,7 @@ use anyhow::Result;
 /// This module defines event payloads that will generate the decryption key material to create a decryption share
 use anyhow::*;
 use e3_crypto::{Cipher, SensitiveBytes};
-use fhe_rs::trbfv::ShareManager;
+use fhe::trbfv::ShareManager;
 use fhe_traits::Serialize;
 use ndarray::Array2;
 use zeroize::Zeroizing;

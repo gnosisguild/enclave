@@ -18,8 +18,8 @@ use e3_events::{
 };
 use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
-use fhe_rs::bfv::BfvParameters;
-use fhe_rs::mbfv::CommonRandomPoly;
+use fhe::bfv::BfvParameters;
+use fhe::mbfv::CommonRandomPoly;
 pub use plaintext_writer::*;
 pub use public_key_writer::*;
 use rand::Rng;

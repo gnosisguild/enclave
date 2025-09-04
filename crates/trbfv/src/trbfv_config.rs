@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use fhe_rs::bfv::BfvParameters;
+use fhe::bfv::BfvParameters;
 use serde::{Deserialize, Serialize};
 
 use crate::ArcBytes;

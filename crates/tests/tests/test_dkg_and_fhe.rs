@@ -25,7 +25,7 @@ use e3_test_helpers::{
     create_shared_rng_from_u64, rand_eth_addr, simulate_libp2p_net, AddToCommittee,
 };
 use e3_trbfv::SharedRng;
-use fhe_rs::{
+use fhe::{
     bfv,
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
 };

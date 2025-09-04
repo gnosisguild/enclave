@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
+use fhe::bfv::BfvParameters;
 use fhe_math::rq::Poly;
-use fhe_rs::bfv::BfvParameters;
 use fhe_traits::DeserializeWithContext;
 use ndarray::Array2;
 

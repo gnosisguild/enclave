@@ -16,7 +16,7 @@ e3-data = { workspace = true }
 e3-events = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
-fhe_rs = { workspace = true }
+fhe = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 e3-request = { workspace = true }
