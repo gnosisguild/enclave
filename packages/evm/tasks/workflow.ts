@@ -99,7 +99,10 @@ function getOrCreateE3Data(
 }
 
 // --- Helpers -----------------------------------------------------
-function resolveE3Id(maybeId: any, state: { latestE3Id: number }) {
+function resolveE3Id(
+  maybeId: number | undefined,
+  state: { latestE3Id: number },
+) {
   if (maybeId !== undefined && maybeId !== null) return Number(maybeId);
   const v = state.latestE3Id;
   if (v === undefined || v === null || Number.isNaN(v)) {
@@ -806,6 +809,7 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
     const MAG_100 = 1_000_000_000n;
     const operatorSet = { avs: serviceManagerAddr, id: operatorSetId };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows: any[] = [];
     for (const operator of operatorsToCheck) {
       try {
@@ -854,7 +858,9 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
             operator,
             operatorSet,
           );
-        } catch {}
+        } catch (e) {
+          console.log("Error getting allocation:", e);
+        }
 
         let isLicensed = false,
           isRegistered = false,
@@ -874,12 +880,16 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
           state = ["REMOVED", "REGISTERED_INACTIVE", "ACTIVE"][
             Number(cipherState)
           ];
-        } catch {}
+        } catch (e) {
+          console.log("Error getting bonding manager status:", e);
+        }
 
         let inRegistry = false;
         try {
           inRegistry = await registry.isEnabled(operator);
-        } catch {}
+        } catch (e) {
+          console.log("Error getting registry status:", e);
+        }
 
         rows.push({
           operator,
@@ -897,8 +907,8 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
           state,
           inRegistry,
         });
-      } catch (e: any) {
-        rows.push({ operator, error: e?.message ?? String(e) });
+      } catch (e) {
+        rows.push({ operator, error: e });
       }
     }
 
