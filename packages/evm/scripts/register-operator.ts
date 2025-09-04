@@ -1,9 +1,40 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { Signer } from "ethers";
 import * as fs from "fs";
 import { ethers } from "hardhat";
 import * as path from "path";
 
+// --- Types --------------------------------------------------------
+type Address = string;
+
+interface Deployment {
+  contracts: {
+    enclToken?: Address;
+    enclaveToken?: Address;
+    usdcToken: Address;
+    serviceManager: Address;
+    bondingManager: Address;
+    enclStrategy: Address;
+    usdcStrategy: Address;
+  };
+  eigenLayer: {
+    strategyManager: Address;
+    delegationManager: Address;
+    allocationManager: Address;
+  };
+  config: {
+    tokenomics: {
+      operatorSetId: number;
+    };
+  };
+}
+
 // --- Config -------------------------------------------------------
-const OPERATORS = [
+const OPERATORS: Address[] = [
   "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E",
   "0xdD2FD4581271e230360230F9337D5c0430Bf44C0",
   "0x2546BcD3c84621e976D8185a91A922aE77ECEc30",
@@ -39,7 +70,7 @@ const ALLOCATION_MANAGER_ABI = [
 ];
 
 // --- Helpers ------------------------------------------------------
-function loadDeploymentAddresses(chainId: string) {
+function loadDeploymentAddresses(chainId: string): Deployment {
   const deploymentPath = path.join(
     __dirname,
     "../deployments",
@@ -50,15 +81,18 @@ function loadDeploymentAddresses(chainId: string) {
     contracts: deployment.contracts,
     eigenLayer: deployment.eigenLayer,
     config: deployment.config,
-  };
+  } as Deployment;
 }
 
-async function mineBlocks(n: number) {
+async function mineBlocks(n: number): Promise<void> {
   const hex = "0x" + n.toString(16);
   await ethers.provider.send("hardhat_mine", [hex]);
 }
 
-async function fundOperatorWithETH(operatorAddress: string, admin: any) {
+async function fundOperatorWithETH(
+  operatorAddress: Address,
+  admin: Signer,
+): Promise<void> {
   await admin.sendTransaction({
     to: operatorAddress,
     value: ethers.parseEther("10"),
@@ -66,22 +100,24 @@ async function fundOperatorWithETH(operatorAddress: string, admin: any) {
 }
 
 async function mintAndApproveTokens(
-  admin: any,
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
+  admin: Signer,
+  operatorSigner: Signer,
+  operatorAddress: Address,
+  deployment: Deployment,
   isLiveNetwork: boolean,
-) {
+): Promise<void> {
   const enclTokenAddr =
-    deployment.contracts.enclToken ?? deployment.contracts.enclaveToken;
+    deployment.contracts.enclToken ?? deployment.contracts.enclaveToken!;
   const usdcTokenAddr = deployment.contracts.usdcToken;
   const strategyManagerAddr = deployment.eigenLayer.strategyManager;
 
   const enclToken = await ethers.getContractAt("EnclaveToken", enclTokenAddr);
   const MINTER_ROLE = await enclToken.MINTER_ROLE();
-  const adminIsMinter = await enclToken.hasRole(MINTER_ROLE, admin.address);
+  const adminAddr = await admin.getAddress();
+  const adminIsMinter = await enclToken.hasRole(MINTER_ROLE, adminAddr);
   if (!adminIsMinter)
     throw new Error("Admin does not have MINTER_ROLE on enclToken.");
+
   await (
     await enclToken
       .connect(admin)
@@ -98,6 +134,7 @@ async function mintAndApproveTokens(
       .connect(operatorSigner)
       .approve(strategyManagerAddr, ENCL_AMOUNT)
   ).wait();
+
   const usdcForApprove = await ethers.getContractAt(ERC20_ABI, usdcTokenAddr);
   await (
     await usdcForApprove
@@ -112,13 +149,13 @@ async function mintAndApproveTokens(
 }
 
 async function depositIntoStrategies(
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
-) {
+  operatorSigner: Signer,
+  _operatorAddress: Address,
+  deployment: Deployment,
+): Promise<void> {
   const strategyManagerAddr = deployment.eigenLayer.strategyManager;
   const enclTokenAddr =
-    deployment.contracts.enclToken ?? deployment.contracts.enclaveToken;
+    deployment.contracts.enclToken ?? deployment.contracts.enclaveToken!;
   const usdcTokenAddr = deployment.contracts.usdcToken;
   const enclStrategyAddr = deployment.contracts.enclStrategy;
   const usdcStrategyAddr = deployment.contracts.usdcStrategy;
@@ -144,10 +181,10 @@ async function depositIntoStrategies(
 }
 
 async function registerAsEigenLayerOperator(
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
-) {
+  operatorSigner: Signer,
+  operatorAddress: Address,
+  deployment: Deployment,
+): Promise<boolean> {
   const delegationManagerAddr = deployment.eigenLayer.delegationManager;
   const delegationManager = await ethers.getContractAt(
     DELEGATION_MANAGER_ABI,
@@ -168,10 +205,10 @@ async function registerAsEigenLayerOperator(
 }
 
 async function setAllocationDelayAndMine(
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
-) {
+  operatorSigner: Signer,
+  operatorAddress: Address,
+  deployment: Deployment,
+): Promise<boolean> {
   const allocationManagerAddr = deployment.eigenLayer.allocationManager;
   const allocationManager = await ethers.getContractAt(
     ALLOCATION_MANAGER_ABI,
@@ -196,17 +233,18 @@ async function setAllocationDelayAndMine(
       await allocationManager.getAllocationDelay(operatorAddress);
     console.log(`Allocation delay verified: isSet=${isSet}, delay=${delay}`);
     return true;
-  } catch (e: any) {
-    console.log("setAllocationDelay failed:", e.message ?? e);
+  } catch (e: unknown) {
+    const msg = (e as Error)?.message ?? String(e);
+    console.log("setAllocationDelay failed:", msg);
     return false;
   }
 }
 
 async function allocateMagnitudes(
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
-) {
+  operatorSigner: Signer,
+  operatorAddress: Address,
+  deployment: Deployment,
+): Promise<void> {
   const allocationManagerAddr = deployment.eigenLayer.allocationManager;
   const serviceManagerAddr = deployment.contracts.serviceManager;
   const enclStrategyAddr = deployment.contracts.enclStrategy;
@@ -230,15 +268,15 @@ async function allocateMagnitudes(
       usdcStrategyAddr,
     );
     if (
-      enclAllocation.currentMagnitude == MAG_100 &&
-      usdcAllocation.currentMagnitude == MAG_100
+      enclAllocation.currentMagnitude === MAG_100 &&
+      usdcAllocation.currentMagnitude === MAG_100
     ) {
       console.log(
         "Already allocated ENCL+USDC magnitude (100% each) to AVS operator set",
       );
       return;
     }
-  } catch {
+  } catch (_e: unknown) {
     console.log("First-time allocation (no existing allocation found)");
   }
 
@@ -262,10 +300,10 @@ async function allocateMagnitudes(
 }
 
 async function acquireLicense(
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
-) {
+  operatorSigner: Signer,
+  operatorAddress: Address,
+  deployment: Deployment,
+): Promise<void> {
   const bondingManagerAddr = deployment.contracts.bondingManager;
   const bondingManager = await ethers.getContractAt(
     "BondingManager",
@@ -277,16 +315,19 @@ async function acquireLicense(
       console.log("License already acquired (operator is active)");
       return;
     }
-  } catch {}
+  } catch (e: unknown) {
+    // query may revert if not yet set up; intentionally ignore
+    void e;
+  }
   await (await bondingManager.connect(operatorSigner).acquireLicense()).wait();
   console.log("License acquired");
 }
 
 async function purchaseTickets(
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
-) {
+  operatorSigner: Signer,
+  operatorAddress: Address,
+  deployment: Deployment,
+): Promise<void> {
   const bondingManagerAddr = deployment.contracts.bondingManager;
   const bondingManager = await ethers.getContractAt(
     "BondingManager",
@@ -302,7 +343,8 @@ async function purchaseTickets(
       );
       return;
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const _msg = (e as Error)?.message ?? String(e);
     console.log("~ Checking ticket status failed, proceeding with purchase");
   }
   await (
@@ -312,10 +354,10 @@ async function purchaseTickets(
 }
 
 async function registerToOperatorSet(
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
-) {
+  operatorSigner: Signer,
+  operatorAddress: Address,
+  deployment: Deployment,
+): Promise<void> {
   const allocationManagerAddr = deployment.eigenLayer.allocationManager;
   const allocationManager = await ethers.getContractAt(
     ALLOCATION_MANAGER_ABI,
@@ -333,7 +375,8 @@ async function registerToOperatorSet(
       console.log("Already registered to AVS operator set");
       return;
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const _msg = (e as Error)?.message ?? String(e);
     console.log(
       "~ Checking operator set registration status failed, proceeding with registration",
     );
@@ -352,10 +395,10 @@ async function registerToOperatorSet(
 }
 
 async function registerCiphernode(
-  operatorSigner: any,
-  operatorAddress: string,
-  deployment: any,
-) {
+  operatorSigner: Signer,
+  operatorAddress: Address,
+  deployment: Deployment,
+): Promise<void> {
   const bondingManagerAddr = deployment.contracts.bondingManager;
   const bondingManager = await ethers.getContractAt(
     "BondingManager",
@@ -368,7 +411,8 @@ async function registerCiphernode(
       console.log("Ciphernode already registered");
       return;
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const _msg = (e as Error)?.message ?? String(e);
     console.log(
       "~ Checking ciphernode registration status failed, proceeding with registration",
     );
@@ -381,14 +425,14 @@ async function registerCiphernode(
 }
 
 // --- Main ---------------------------------------------------------
-async function main() {
+async function main(): Promise<void> {
   const [admin] = await ethers.getSigners();
   const chainId = (await ethers.provider.getNetwork()).chainId.toString();
   const deployment = loadDeploymentAddresses(chainId);
 
   console.log("EIGENLAYER OPERATOR REGISTRATION");
   console.log("=".repeat(65));
-  console.log("Admin:", admin.address);
+  console.log("Admin:", await admin.getAddress());
   console.log("ServiceManager:", deployment.contracts.serviceManager);
   console.log("BondingManager:", deployment.contracts.bondingManager);
 
@@ -401,8 +445,9 @@ async function main() {
       await serviceManager.connect(admin).publishAVSMetadata(AVS_METADATA_URI)
     ).wait();
     console.log("✓ AVS metadata published");
-  } catch (e: any) {
-    console.log("~ publishAVSMetadata skipped:", e.message ?? e);
+  } catch (e: unknown) {
+    const msg = (e as Error)?.message ?? String(e);
+    console.log("~ publishAVSMetadata skipped:", msg);
   }
 
   const operatorSetId = deployment.config.tokenomics.operatorSetId;
@@ -416,10 +461,9 @@ async function main() {
         ])
     ).wait();
     console.log(`Operator set ${operatorSetId} created (runtime)`);
-  } catch (e: any) {
-    console.log(
-      `~ createOperatorSet skipped (likely exists): ${e.message ?? e}`,
-    );
+  } catch (e: unknown) {
+    const msg = (e as Error)?.message ?? String(e);
+    console.log(`~ createOperatorSet skipped (likely exists): ${msg}`);
   }
   console.log(
     `Using operator set ${operatorSetId} (configured at deploy-time)`,
@@ -470,15 +514,16 @@ async function main() {
       await ethers.provider.send("hardhat_stopImpersonatingAccount", [
         operatorAddress,
       ]);
-    } catch (error: any) {
-      console.error(
-        `Operator ${operatorAddress} failed: ${error?.message ?? error}`,
-      );
+    } catch (error: unknown) {
+      const msg = (error as Error)?.message ?? String(error);
+      console.error(`Operator ${operatorAddress} failed: ${msg}`);
       try {
         await ethers.provider.send("hardhat_stopImpersonatingAccount", [
           operatorAddress,
         ]);
-      } catch {}
+      } catch (e: unknown) {
+        void e; // best-effort cleanup
+      }
       console.log("Continuing with next operator...");
     }
   }
@@ -494,7 +539,8 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
+main().catch((error: unknown) => {
+  const msg = (error as Error)?.message ?? String(error);
+  console.error(msg);
   process.exitCode = 1;
 });

@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 import "@nomicfoundation/hardhat-ethers";
 import "hardhat-deploy";
 import { DeployFunction } from "hardhat-deploy/types";
@@ -25,7 +29,7 @@ const func: DeployFunction = async (hre) => {
   const sm = await hre.deployments.getOrNull("ServiceManager");
   const bm = await hre.deployments.getOrNull("BondingManager");
   const enclTokenDep = await hre.deployments.getOrNull("EnclaveToken");
-  // Not really needed here but incase I dont forget about it.
+  // Not really needed here but incase I forget about it.
   const vestingEscrowDep = await hre.deployments.getOrNull("VestingEscrow");
 
   const enclTokenAddr = enclTokenDep?.address ?? process.env.ENCL_TOKEN;
@@ -129,10 +133,7 @@ const func: DeployFunction = async (hre) => {
     (await hre.deployments.getOrNull("UsdcToken"))?.address ??
     process.env.USDC_TOKEN;
 
-  let eigen;
-  try {
-    eigen = loadEigenLayerDeployment(parseInt(await hre.getChainId()));
-  } catch {}
+  const eigen = loadEigenLayerDeployment(parseInt(await hre.getChainId()));
   await saveDeploymentMetadata(hre, addresses, eigen);
 };
 export default func;

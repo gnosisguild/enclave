@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 import { ethers } from "ethers";
 import fs from "fs";
 import type { HardhatRuntimeEnvironment } from "hardhat/types";
@@ -22,6 +26,41 @@ export const CONFIG = {
   },
 } as const;
 
+export interface EigenLayerAddresses {
+  strategyManager: string;
+  delegationManager: string;
+  allocationManager: string;
+  avsDirectory?: string;
+  rewardsCoordinator?: string;
+  slashingRegistryCoordinator?: string;
+  stakeRegistry?: string;
+  permissionController?: string;
+  [key: string]: string | undefined;
+}
+
+type DeploymentOut = {
+  network: string;
+  chainId: string;
+  timestamp: string;
+  contracts: Record<string, string | undefined>;
+  eigenLayer?: EigenLayerAddresses; // optional
+  config: {
+    enclave: {
+      maxComputeDuration: number;
+      polynomialDegree: string;
+      plaintextModulus: string;
+      moduli: string[];
+    };
+    tokenomics: {
+      licenseStake: string;
+      ticketPrice: string;
+      minCollateralUsd: string;
+      operatorSetId: number;
+    };
+    addresses: typeof CONFIG.addresses;
+  };
+};
+
 export function loadEigenLayerDeployment(chainId: number) {
   const p = path.join(
     __dirname,
@@ -35,21 +74,21 @@ export function loadEigenLayerDeployment(chainId: number) {
       `EigenLayer core deployment not found at ${p}. Deploy it first.`,
     );
   }
-  return JSON.parse(fs.readFileSync(p, "utf8")).addresses;
+  return JSON.parse(fs.readFileSync(p, "utf8"))
+    .addresses as EigenLayerAddresses;
 }
 
 export async function saveDeploymentMetadata(
   hre: HardhatRuntimeEnvironment,
   addresses: Record<string, string | undefined>,
-  eigen?: any,
+  eigen?: EigenLayerAddresses,
 ) {
   const chainId = await hre.getChainId();
-  const out = {
+  const out: DeploymentOut = {
     network: hre.network.name,
     chainId,
     timestamp: new Date().toISOString(),
     contracts: addresses,
-    ...(eigen && { eigenLayer: eigen }),
     config: {
       enclave: {
         maxComputeDuration: CONFIG.enclave.maxComputeDuration,
@@ -66,6 +105,11 @@ export async function saveDeploymentMetadata(
       addresses: CONFIG.addresses,
     },
   };
+
+  if (eigen) {
+    out.eigenLayer = eigen;
+  }
+
   const outPath = path.join(
     __dirname,
     "../..",

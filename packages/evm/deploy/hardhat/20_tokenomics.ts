@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 import "@nomicfoundation/hardhat-ethers";
 import { ethers } from "ethers";
 import "hardhat-deploy";
@@ -132,7 +136,8 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   ]);
 
   const smProxy = await deploy("ServiceManager_Proxy", {
-    contract: "TransparentUpgradeableProxy",
+    contract:
+      "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy",
     from: deployer,
     args: [impl.address, eigen.proxyAdmin, initData],
     log: true,

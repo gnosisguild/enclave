@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
 pragma solidity >=0.8.27;
 
 import {
@@ -40,9 +46,12 @@ import {
 import {
     AggregatorV3Interface
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+// Need this for deployment of service manager proxy
+/* solhint-disable no-unused-import */
 import {
     TransparentUpgradeableProxy
 } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+/* solhint-enable no-unused-import */
 import { ReentrancyGuard } from "@oz/utils/ReentrancyGuard.sol";
 import { IERC20Metadata } from "@oz/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeERC20 } from "@oz/token/ERC20/utils/SafeERC20.sol";
