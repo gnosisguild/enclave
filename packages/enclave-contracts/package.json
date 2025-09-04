@@ -103,8 +103,7 @@
     "typechain"
   ],
   "publishConfig": {
-    "access": "public",
-    "git-checks": false
+    "access": "public"
   },
   "scripts": {
     "clean": "rimraf ./artifacts ./cache ./coverage ./types ./dist ./coverage.json && pnpm typechain",

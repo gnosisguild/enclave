@@ -15,8 +15,7 @@
     "init.d.ts"
   ],
   "publishConfig": {
-    "access": "public",
-    "git-checks": false
+    "access": "public"
   },
   "scripts": {
     "build": "./scripts/build.sh",

@@ -17,8 +17,7 @@
     "dist"
   ],
   "publishConfig": {
-    "access": "public",
-    "git-checks": false
+    "access": "public"
   },
   "scripts": {
     "prebuild": "cd ../enclave-contracts && pnpm compile:ts && cd ../../crates/wasm && pnpm build",

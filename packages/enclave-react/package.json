@@ -39,8 +39,7 @@
     "wagmi": "^2.14.16"
   },
   "publishConfig": {
-    "access": "public",
-    "git-checks": false
+    "access": "public"
   },
   "dependencies": {
     "@enclave-e3/sdk": "workspace:*",
