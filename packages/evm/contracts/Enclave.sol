@@ -92,6 +92,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error CiphertextOutputNotPublished(uint256 e3Id);
     error PaymentRequired(uint256 value);
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
+    error InsufficientBalance();
+    error InsufficientAllowance();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -156,11 +158,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes memory e3ProgramParams,
         bytes memory computeProviderParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
-        // TODO: allow for other payment methods or only native tokens?
-        // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
-        // Leaving this be for now, will remove after team discussion.
-        require(msg.value > 0, PaymentRequired(msg.value));
-
         require(
             threshold[1] >= threshold[0] && threshold[0] > 0,
             InvalidThreshold(threshold)
@@ -215,15 +212,23 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         });
         e3s[e3Id] = e3;
 
+        // TODO: replace with dynamic getE3Quote(...), hardcoding it for now
+        uint256 fee = 10 * 1e18;
+        // sanity checks
+        require(enclToken.balanceOf(msg.sender) >= fee, InsufficientBalance());
+        require(
+            enclToken.allowance(msg.sender, address(this)) >= fee,
+            InsufficientAllowance()
+        );
+
+        // move payment
+        enclToken.safeTransferFrom(msg.sender, address(this), fee);
+        e3Payments[e3Id] = fee;
+
         require(
             ciphernodeRegistry.requestCommittee(e3Id, filter, threshold),
             CommitteeSelectionFailed()
         );
-
-        // Need to perfome fee caculation here. get e3Quote?
-        // Transfer ENCL tokens, hardcoded for now to 10 ENCL tokens.
-        enclToken.safeTransferFrom(msg.sender, address(this), 10 * 10 ** 18);
-        e3Payments[e3Id] = 10 * 10 ** 18;
 
         emit E3Requested(e3Id, e3, filter, e3Program);
     }

@@ -20,7 +20,7 @@ contract EnclaveToken is
     Ownable,
     AccessControl
 {
-    // Custom errors to reduce deployment cost and provide descriptive reverts.
+    // Custom errors
     error ZeroAddress();
     error ZeroAmount();
     error ExceedsTotalSupply();
