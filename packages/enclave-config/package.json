@@ -1,6 +1,6 @@
 {
   "name": "@enclave-e3/config",
-  "version": "0.0.9-test",
+  "version": "0.0.10-test",
   "publishConfig": {
     "access": "public",
     "git-checks": false

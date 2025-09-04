@@ -25,11 +25,6 @@ export default defineConfig({
     esbuildOptions: { target: "esnext" },
     exclude: ['@rollup/browser', '@noir-lang/noirc_abi', '@noir-lang/acvm_js', '@enclave-e3/wasm'],
   },
-  build: {
-    rollupOptions: {
-      external: ['@enclave-e3/wasm', '@enclave-e3/wasm/init'],
-    },
-  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -38,9 +33,6 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
-    rollupOptions: {
-      external: ['@enclave-e3/wasm', '@enclave-e3/wasm/init'],
-    },
   },
   plugins: [
     // here is the main update

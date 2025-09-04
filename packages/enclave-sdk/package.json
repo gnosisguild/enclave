@@ -1,6 +1,6 @@
 {
   "name": "@enclave-e3/sdk",
-  "version": "0.0.9-test",
+  "version": "0.0.10-test",
   "type": "module",
   "exports": {
     ".": {
@@ -40,7 +40,7 @@
   "dependencies": {
     "@aztec/bb.js": "^0.82.2",
     "@noir-lang/noir_js": "1.0.0-beta.3",
-    "@enclave-e3/wasm": "workspace:*",
+    "@enclave-e3/wasm": "^0.0.10-test",
     "@enclave-e3/contracts": "workspace:*",
     "comlink": "^4.4.2",
     "viem": "2.30.6",
