@@ -7,7 +7,7 @@ export CARGO_INCREMENTAL=1
 echo "pnpm install"
 (cd ../../ && pnpm install --frozen-lockfile)
 echo "evm"
-(cd ../../packages/evm && pnpm compile)
+(cd ../../packages/enclave-contracts && pnpm compile)
 echo "server"
 (cd ./server && [[ ! -f .env ]] && cp .env.example .env; [[ ! -f ../.env ]] && cp .env.example ../.env; cargo build --locked --bin cli && cargo build --locked --bin server)
 echo "client"

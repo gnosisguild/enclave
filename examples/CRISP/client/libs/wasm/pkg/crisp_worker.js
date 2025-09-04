@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { EnclaveSDK, FheProtocol } from '@gnosis-guild/enclave-sdk';
+import { EnclaveSDK, FheProtocol } from '@enclave-e3/sdk';
 import circuit from "../../noir/crisp_circuit.json";
 
 self.onmessage = async function (event) {

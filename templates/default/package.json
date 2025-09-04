@@ -1,5 +1,7 @@
 {
   "name": "enclave-example",
+  "version": "0.0.0",
+  "private": true,
   "scripts": {
     "ciphernode:add": "hardhat run scripts/ciphernode-add.ts -- ",
     "compile": "hardhat compile",
@@ -16,8 +18,8 @@
     "test:integration": "./scripts/test_integration.sh"
   },
   "dependencies": {
-    "@gnosis-guild/enclave": "workspace:*",
-    "@gnosis-guild/enclave-sdk": "workspace:*",
+    "@enclave-e3/contracts": "workspace:*",
+    "@enclave-e3/sdk": "workspace:*",
     "@types/yargs": "^17.0.33",
     "viem": "2.30.6",
     "yargs": "^18.0.0"

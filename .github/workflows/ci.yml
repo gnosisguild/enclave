@@ -282,7 +282,7 @@ jobs:
           ls -la target/debug/fake_encrypt || echo "fake_encrypt not found"
           ls -la target/debug/pack_e3_params || echo "pack_e3_params not found"
           ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
-          ls -la packages/evm/dist || echo "SDK dist not found"
+          ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
       - name: "Set executable permissions"
         run: |
@@ -545,10 +545,10 @@ jobs:
           name: sdk-artifacts
           path: |
             packages/enclave-sdk/dist
-            packages/evm/dist
-            packages/evm/artifacts
-            packages/evm/cache
-            packages/evm/typechain-types
+            packages/enclave-contracts/dist
+            packages/enclave-contracts/artifacts
+            packages/enclave-contracts/cache
+            packages/enclave-contracts/typechain-types
             crates/wasm/dist
           retention-days: 1
           if-no-files-found: warn
@@ -596,7 +596,7 @@ jobs:
           echo "Checking downloaded artifacts:"
           ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
           ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
-          ls -la packages/evm/dist || echo "SDK dist not found"
+          ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
           echo "Support scripts permissions:"
           ls -la templates/default/target/debug/e3-support-scripts-dev

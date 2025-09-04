@@ -1,4 +1,4 @@
-import { baseConfig } from "@gnosis-guild/enclave-config/tsup";
+import { baseConfig } from "@enclave-e3/config/tsup";
 import { defineConfig } from "tsup";
 
 export default defineConfig({

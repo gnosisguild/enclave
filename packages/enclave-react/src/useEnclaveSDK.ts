@@ -16,7 +16,7 @@ import {
   EnclaveEventType,
   RegistryEventType,
   SDKError,
-} from "@gnosis-guild/enclave-sdk";
+} from "@enclave-e3/sdk";
 
 export interface UseEnclaveSDKConfig {
   contracts?: {
@@ -59,7 +59,7 @@ export interface UseEnclaveSDKReturn {
  *
  * @example
  * ```tsx
- * import { useEnclaveSDK } from '@gnosis-guild/enclave-react';
+ * import { useEnclaveSDK } from '@enclave-e3/react';
  *
  * function MyComponent() {
  *   const {

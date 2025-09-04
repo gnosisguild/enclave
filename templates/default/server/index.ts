@@ -11,7 +11,7 @@ import {
   type E3ActivatedData,
   type InputPublishedData,
   FheProtocol,
-} from "@gnosis-guild/enclave-sdk";
+} from "@enclave-e3/sdk";
 import { handleTestInteraction } from "./testHandler";
 import { getCheckedEnvVars } from "./utils";
 import { callFheRunner } from "./runner";

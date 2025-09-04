@@ -22,7 +22,7 @@ use tracing::info;
 sol!(
     #[sol(rpc)]
     NaiveRegistryFilter,
-    "../../packages/evm/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json"
+    "../../packages/enclave-contracts/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json"
 );
 
 pub struct RegistryFilterSolWriter<P> {

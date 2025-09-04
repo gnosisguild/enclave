@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
+import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
 
 contract InputValidator is IInputValidator {
     error EmptyInputData();

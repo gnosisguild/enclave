@@ -122,7 +122,7 @@ Keep Anvil running in the terminal, and open a new terminal for the next steps.
 2. Navigate to the `evm` directory:
 
    ```sh
-   cd enclave/packages/evm
+   cd enclave/packages/enclave-contracts
    ```
 
 3. Install dependencies:

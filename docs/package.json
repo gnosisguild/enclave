@@ -1,6 +1,7 @@
 {
   "name": "enclave-docs",
   "version": "1.0.0",
+  "private": true,
   "description": "the official documentation for Enclave.",
   "main": "index.js",
   "scripts": {

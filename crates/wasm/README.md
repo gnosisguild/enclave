@@ -12,15 +12,15 @@ This is because in modern node there is no need for preloading however in the br
 
 ```ts
 // Bad! Because this uses the raw loader which doesn't exist in node contexts
-import init, { bfvEncryptNumber } from "@gnosis-guild/e3-wasm";
+import init, { bfvEncryptNumber } from "@enclave-e3/wasm";
 ```
 
 ##### ✅ DO USE THE EXPORTED SUBMODULE
 
 ```ts
 // Good! Use the universal loader
-import init from "@gnosis-guild/e3-wasm/init";
-import { bfvEncryptNumber } from "@gnosis-guild/e3-wasm";
+import init from "@enclave-e3/wasm/init";
+import { bfvEncryptNumber } from "@enclave-e3/wasm";
 
 export async function bfvEncryptNumber(
   data: bigint,

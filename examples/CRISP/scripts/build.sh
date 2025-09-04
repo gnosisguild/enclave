@@ -3,5 +3,5 @@
 set -e
 
 (cargo build --locked)
-(cd ../../packages/evm && pnpm compile)
+(cd ../../packages/enclave-contracts && pnpm compile)
 (cd ./client && pnpm build)

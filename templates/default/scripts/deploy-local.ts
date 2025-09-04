@@ -9,7 +9,7 @@ import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 // Import the deployment logic from your published package
 // This assumes your package exports the deployment function
-import deployEnclave from "@gnosis-guild/enclave/deploy/enclave";
+import deployEnclave from "@enclave-e3/contracts/deploy/enclave";
 
 async function main() {
   console.log("🚀 Deploying Enclave protocol locally...");

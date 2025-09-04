@@ -1,15 +1,15 @@
-# @gnosis-guild/enclave-react
+# @enclave-e3/react
 
 React hooks and utilities for Enclave SDK.
 
 ## Installation
 
 ```bash
-npm install @gnosis-guild/enclave-react @gnosis-guild/enclave
+npm install @enclave-e3/react @enclave-e3/contracts
 # or
-yarn add @gnosis-guild/enclave-react @gnosis-guild/enclave
+yarn add @enclave-e3/react @enclave-e3/contracts
 # or
-pnpm add @gnosis-guild/enclave-react @gnosis-guild/enclave
+pnpm add @enclave-e3/react @enclave-e3/contracts
 ```
 
 ## Usage
@@ -19,7 +19,7 @@ pnpm add @gnosis-guild/enclave-react @gnosis-guild/enclave
 A React hook for interacting with the Enclave SDK. This hook provides a clean interface for managing SDK state, handling contract interactions, and listening to events.
 
 ```tsx
-import { useEnclaveSDK } from '@gnosis-guild/enclave-react';
+import { useEnclaveSDK } from '@enclave-e3/react';
 
 function MyComponent() {
   const {
