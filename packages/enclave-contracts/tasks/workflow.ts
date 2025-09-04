@@ -210,16 +210,15 @@ task("e3t:new", "Request a new ciphernode committee").setAction(async function (
     }
 
     console.log("Requesting committee...");
-    const tx = await enclave.request(
-      filterAddress,
-      [thresholdQuorum, thresholdTotal],
-      [windowStart, windowEnd],
+    const tx = await enclave.request({
+      filter: filterAddress,
+      threshold: [thresholdQuorum, thresholdTotal],
+      startWindow: [windowStart, windowEnd],
       duration,
-      e3Address,
-      e3Params,
-      computeParams,
-      { value: ethers.parseEther("1") },
-    );
+      e3Program: e3Address,
+      e3ProgramParams: e3Params,
+      computeProviderParams: computeParams,
+    });
     const receipt = await tx.wait();
     if (!receipt) throw new Error("Transaction failed");
     console.log(`Transaction hash: ${receipt.hash}`);

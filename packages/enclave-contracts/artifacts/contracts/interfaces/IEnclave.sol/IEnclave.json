@@ -207,6 +207,19 @@
       "inputs": [
         {
           "indexed": false,
+          "internalType": "address",
+          "name": "enclToken",
+          "type": "address"
+        }
+      ],
+      "name": "EnclTokenSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
           "internalType": "bytes32",
           "name": "encryptionSchemeId",
           "type": "bytes32"
@@ -289,6 +302,50 @@
         }
       ],
       "name": "PlaintextOutputPublished",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalReward",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address[]",
+          "name": "recipients",
+          "type": "address[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256[]",
+          "name": "amounts",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "RewardsDistributed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "serviceManager",
+          "type": "address"
+        }
+      ],
+      "name": "ServiceManagerSet",
       "type": "event"
     },
     {
