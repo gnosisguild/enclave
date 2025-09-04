@@ -12,7 +12,7 @@ use e3_events::{
     Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};
-use e3_sortition::{GetHasNode, Sortition};
+use e3_sortition::{GetNodeIndex, Sortition};
 use std::sync::Arc;
 use tracing::error;
 
@@ -153,7 +153,7 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
 
         Box::pin(
             self.sortition
-                .send(GetHasNode {
+                .send(GetNodeIndex {
                     chain_id,
                     address,
                     size,
@@ -161,11 +161,11 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                 })
                 .into_actor(self)
                 .map(move |res, act, ctx| {
-                    let has_node = res?;
-                    if !has_node {
+                    let maybe_found_index = res?;
+                    let Some(_) = maybe_found_index else {
                         error!("Node not found in committee");
                         return Ok(());
-                    }
+                    };
 
                     if e3_id != act.e3_id {
                         error!("Wrong e3_id sent to aggregator. This should not happen.");
