@@ -2,8 +2,6 @@
 pragma solidity >=0.8.27;
 
 import { ReentrancyGuard } from "@oz/utils/ReentrancyGuard.sol";
-import { IERC20Metadata } from "@oz/token/ERC20/extensions/IERC20Metadata.sol";
-import { SafeERC20 } from "@oz/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "@oz/access/Ownable.sol";
 import { Math } from "@oz/utils/math/Math.sol";
 import {
@@ -26,8 +24,6 @@ import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IServiceManager } from "../interfaces/IServiceManager.sol";
 
 contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
-    using SafeERC20 for IERC20Metadata;
-
     uint256 public minTicketBalance;
     IStrategy public enclStrategy;
     IStrategy public usdcStrategy;
@@ -35,9 +31,10 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     uint256 public ticketPrice;
     uint32 public operatorSetId;
 
-    mapping(address => OperatorInfo) public operators;
-    mapping(address => bool) public registeredOperators;
-    mapping(address => uint256) public ticketBudgetSpent;
+    mapping(address node => OperatorInfo operator) public operators;
+    mapping(address node => bool registeredOperators)
+        public registeredOperators;
+    mapping(address node => uint256 ticketBudgetSpent) public ticketBudgetSpent;
 
     ICiphernodeRegistry public ciphernodeRegistry;
     IDelegationManager public delegationManager;
@@ -45,7 +42,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     address public serviceManager;
 
     modifier onlyServiceManager() {
-        if (msg.sender != serviceManager) revert OnlyServiceManager();
+        require(msg.sender == serviceManager, OnlyServiceManager());
         _;
     }
 
@@ -61,14 +58,14 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         uint256 _ticketPrice,
         uint32 _operatorSetId
     ) Ownable(_owner) {
-        if (_serviceManager == address(0)) revert ZeroAddress();
-        if (_ciphernodeRegistry == address(0)) revert ZeroAddress();
-        if (address(_delegationManager) == address(0)) revert ZeroAddress();
-        if (address(_allocationManager) == address(0)) revert ZeroAddress();
-        if (address(_enclStrategy) == address(0)) revert ZeroAddress();
-        if (address(_usdcStrategy) == address(0)) revert ZeroAddress();
-        if (_licenseStake == 0) revert InsufficientLicenseStake();
-        if (_ticketPrice == 0) revert InvalidTicketAmount();
+        require(_serviceManager != address(0), ZeroAddress());
+        require(_ciphernodeRegistry != address(0), ZeroAddress());
+        require(address(_delegationManager) != address(0), ZeroAddress());
+        require(address(_allocationManager) != address(0), ZeroAddress());
+        require(address(_enclStrategy) != address(0), ZeroAddress());
+        require(address(_usdcStrategy) != address(0), ZeroAddress());
+        require(_licenseStake != 0, InsufficientLicenseStake());
+        require(_ticketPrice != 0, InvalidTicketAmount());
 
         serviceManager = _serviceManager;
         delegationManager = _delegationManager;
@@ -83,13 +80,15 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     }
 
     function acquireLicense() external nonReentrant {
-        if (!delegationManager.isOperator(msg.sender))
-            revert OperatorNotRegistered();
-        if (operators[msg.sender].isLicensed) revert AlreadyLicensed();
+        require(
+            delegationManager.isOperator(msg.sender),
+            OperatorNotRegistered()
+        );
+        require(!operators[msg.sender].isLicensed, AlreadyLicensed());
 
         uint256 enclShares = _getOperatorShares(msg.sender, enclStrategy);
         uint256 enclAmount = enclStrategy.sharesToUnderlyingView(enclShares);
-        if (enclAmount < licenseStake) revert InsufficientLicenseStake();
+        require(enclAmount >= licenseStake, InsufficientLicenseStake());
 
         _requireAllocatedAtLeastUnderlying(
             msg.sender,
@@ -110,19 +109,20 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     }
 
     function purchaseTickets(uint256 ticketCount) external nonReentrant {
-        if (ticketCount == 0) revert InvalidTicketAmount();
-        if (!operators[msg.sender].isLicensed) revert NotLicensed();
+        require(ticketCount != 0, InvalidTicketAmount());
+        require(operators[msg.sender].isLicensed, NotLicensed());
 
         uint256 totalCost = ticketCount * ticketPrice;
-        if (totalCost / ticketPrice != ticketCount) revert CostOverflow();
 
         uint256 allocatedUsdc = _allocatedUnderlyingToAVS(
             msg.sender,
             usdcStrategy
         );
         uint256 alreadySpent = ticketBudgetSpent[msg.sender];
-        if (allocatedUsdc < alreadySpent + totalCost)
-            revert InsufficientTicketBudget();
+        require(
+            allocatedUsdc >= alreadySpent + totalCost,
+            InsufficientTicketBudget()
+        );
 
         ticketBudgetSpent[msg.sender] = alreadySpent + totalCost;
         operators[msg.sender].ticketBalance += ticketCount;
@@ -140,15 +140,17 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     }
 
     function registerCiphernode() external nonReentrant {
-        if (registeredOperators[msg.sender]) revert AlreadyRegistered();
-        if (!operators[msg.sender].isLicensed) revert NotLicensed();
-        if (!delegationManager.isOperator(msg.sender))
-            revert OperatorNotRegistered();
+        require(!registeredOperators[msg.sender], AlreadyRegistered());
+        require(operators[msg.sender].isLicensed, NotLicensed());
+        require(
+            delegationManager.isOperator(msg.sender),
+            OperatorNotRegistered()
+        );
 
         uint256 encl = enclStrategy.sharesToUnderlyingView(
             _getOperatorShares(msg.sender, enclStrategy)
         );
-        if (encl < licenseStake) revert InsufficientLicenseStake();
+        require(encl >= licenseStake, InsufficientLicenseStake());
         _requireAllocatedAtLeastUnderlying(
             msg.sender,
             enclStrategy,
@@ -174,7 +176,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     function deregisterCiphernode(
         uint256[] calldata siblingNodes
     ) external nonReentrant {
-        if (!registeredOperators[msg.sender]) revert OperatorNotRegistered();
+        require(registeredOperators[msg.sender], OperatorNotRegistered());
 
         if (operators[msg.sender].isActive) {
             operators[msg.sender].isActive = false;
@@ -187,9 +189,11 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     }
 
     function useTickets(address operator, uint256 ticketCount) external {
-        if (msg.sender != address(ciphernodeRegistry)) revert OnlyRegistry();
-        if (operators[operator].ticketBalance < ticketCount)
-            revert InsufficientTicketBalance();
+        require(msg.sender == address(ciphernodeRegistry), OnlyRegistry());
+        require(
+            operators[operator].ticketBalance >= ticketCount,
+            InsufficientTicketBalance()
+        );
 
         operators[operator].ticketBalance -= ticketCount;
         emit TicketsUsed(operator, ticketCount);
@@ -200,7 +204,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         uint256 wadToSlash
     ) external onlyServiceManager {
         uint256 oldTickets = operators[operator].ticketBalance;
-        uint256 ticketsLost = (oldTickets * wadToSlash) / 1e18;
+        uint256 ticketsLost = Math.mulDiv(oldTickets, wadToSlash, 1e18);
         if (ticketsLost > 0 && ticketsLost <= oldTickets) {
             operators[operator].ticketBalance -= ticketsLost;
             emit TicketsSlashed(operator, ticketsLost);
@@ -253,19 +257,19 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     }
 
     function setMinTicketBalance(uint256 _minTicketBalance) external onlyOwner {
-        if (_minTicketBalance == 0) revert InvalidMinTicketBalance();
+        require(_minTicketBalance != 0, InvalidMinTicketBalance());
         minTicketBalance = _minTicketBalance;
         emit MinTicketBalanceUpdated(_minTicketBalance);
     }
 
     function setLicenseStake(uint256 _licenseStake) external onlyOwner {
-        if (_licenseStake == 0) revert InsufficientLicenseStake();
+        require(_licenseStake != 0, InsufficientLicenseStake());
         licenseStake = _licenseStake;
         emit LicenseStakeUpdated(_licenseStake);
     }
 
     function setTicketPrice(uint256 _ticketPrice) external onlyOwner {
-        if (_ticketPrice == 0) revert InvalidTicketAmount();
+        require(_ticketPrice != 0, InvalidTicketAmount());
         ticketPrice = _ticketPrice;
         emit TicketPriceUpdated(_ticketPrice);
     }
@@ -364,8 +368,10 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
             operator,
             strategy
         );
-        if (allocatedUnderlying < requiredUnderlying)
-            revert InsufficientAllocatedMagnitude();
+        require(
+            allocatedUnderlying >= requiredUnderlying,
+            InsufficientAllocatedMagnitude()
+        );
     }
 
     function getCiphernodeState(

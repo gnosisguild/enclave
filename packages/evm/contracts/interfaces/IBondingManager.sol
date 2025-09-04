@@ -6,22 +6,42 @@ pragma solidity >=0.8.27;
  * @notice Interface for managing operator licenses, tickets, and ciphernode registration
  */
 interface IBondingManager {
-    // Custom errors
+    // ======================
+    // General validation
+    // ======================
     error ZeroAddress();
+
+    // ======================
+    // Operator-related
+    // ======================
     error OperatorNotRegistered();
+    error AlreadyRegistered();
+
+    // ======================
+    // Licensing-related
+    // ======================
     error AlreadyLicensed();
     error NotLicensed();
     error InsufficientLicenseStake();
+
+    // ======================
+    // Ticket-related
+    // ======================
     error InsufficientTicketBalance();
     error InvalidTicketAmount();
-    error CostOverflow();
     error InsufficientTicketBudget();
     error InvalidMinTicketBalance();
+
+    // ======================
+    // Magnitude / resources
+    // ======================
+    error InsufficientAllocatedMagnitude();
+
+    // ======================
+    // Role/authorization
+    // ======================
     error OnlyRegistry();
     error OnlyServiceManager();
-
-    error InsufficientAllocatedMagnitude();
-    error AlreadyRegistered();
 
     // Events
     event LicenseAcquired(address indexed operator, uint256 stake);

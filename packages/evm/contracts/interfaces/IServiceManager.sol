@@ -16,31 +16,54 @@ import {
  * @notice Interface for managing operator registration, rewards, and slashing
  */
 interface IServiceManager {
-    // Custom errors
+    // ======================
+    // General validation
+    // ======================
     error ZeroAddress();
-    error OperatorNotRegistered();
-    error NotLicensed();
-    error InsufficientCollateral();
-    error InvalidMinCollateral();
-    error PriceFeedError();
-    error InvalidOperatorSet();
-    error WrongOperatorSet();
-    error InsufficientAllocatedMagnitude();
-    error OnlyAllocationManager();
-    error StrategyNotFound();
-    error StrategyAlreadyAllowed();
-    error CannotRemoveCoreStrategies();
-    error InvalidOperatorSetId();
-    error AlreadySetToThisId();
-    error NoStrategiesConfigured();
-    error OperatorNoStake();
-    error InvalidWadSlashing();
-    error NotAuthorizedSlasher();
-    error SlashingFailed(string reason);
-    error OnlyRewardDistributor();
     error ArrayLengthMismatch();
     error InvalidPriceOrStale();
+    error PriceFeedError();
+
+    // ======================
+    // Operator-related
+    // ======================
+    error OperatorNotRegistered();
+    error OperatorNoStake();
+    error InvalidOperatorSet();
+    error InvalidOperatorSetId();
+    error WrongOperatorSet();
+    error AlreadySetToThisId();
+    error NotLicensed();
     error MustDeregisterCiphernodeFirst();
+
+    // ======================
+    // Collateral & magnitude
+    // ======================
+    error InsufficientCollateral();
+    error InvalidMinCollateral();
+    error InsufficientAllocatedMagnitude();
+
+    // ======================
+    // Strategy-related
+    // ======================
+    error StrategyNotFound();
+    error StrategyAlreadyAllowed();
+    error NoStrategiesConfigured();
+    error CannotRemoveCoreStrategies();
+
+    // ======================
+    // Slashing-related
+    // ======================
+    error InvalidWadSlashing();
+    error InvalidAVS();
+    error NotAuthorizedSlasher();
+    error SlashingFailed(string reason);
+
+    // ======================
+    // Role/authorization
+    // ======================
+    error OnlyAllocationManager();
+    error OnlyRewardDistributor();
 
     // Events
     event StrategyAdded(address indexed strategy, address priceFeed);

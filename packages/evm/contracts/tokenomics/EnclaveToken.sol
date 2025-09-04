@@ -37,7 +37,7 @@ contract EnclaveToken is
     uint256 public totalMinted;
 
     /// @dev Mapping of addresses allowed to transfer when restrictions are active.
-    mapping(address => bool) public transferWhitelisted;
+    mapping(address account => bool allowed) public transferWhitelisted;
 
     /// @dev Whether transfers are currently restricted.
     bool public transfersRestricted;

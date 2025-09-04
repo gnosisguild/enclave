@@ -35,13 +35,14 @@ import {
     IStrategyManager
 } from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {
-    OperatorSetLib,
     OperatorSet
 } from "eigenlayer-contracts/src/contracts/libraries/OperatorSetLib.sol";
 import {
     AggregatorV3Interface
 } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    TransparentUpgradeableProxy
+} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ReentrancyGuard } from "@oz/utils/ReentrancyGuard.sol";
 import { IERC20Metadata } from "@oz/token/ERC20/extensions/IERC20Metadata.sol";
 import { SafeERC20 } from "@oz/token/ERC20/utils/SafeERC20.sol";
@@ -63,9 +64,9 @@ contract ServiceManager is
     IStrategy public enclStrategy;
     IStrategy public usdcStrategy;
 
-    mapping(IStrategy => StrategyConfig) public strategyConfigs;
-    mapping(IStrategy => uint256) private strategyToIndex;
-    mapping(address => bool) public slashers;
+    mapping(IStrategy strategy => StrategyConfig config) public strategyConfigs;
+    mapping(IStrategy strategy => uint256 index) private strategyToIndex;
+    mapping(address slasher => bool isSlasher) public slashers;
 
     IStrategy[] public allowedStrategies;
     IStrategyManager public strategyManager;
@@ -74,8 +75,10 @@ contract ServiceManager is
     address public rewardDistributor;
 
     modifier onlyAllocationManager() {
-        if (msg.sender != address(_allocationManager))
-            revert OnlyAllocationManager();
+        require(
+            msg.sender == address(_allocationManager),
+            OnlyAllocationManager()
+        );
         _;
     }
 
@@ -110,12 +113,12 @@ contract ServiceManager is
         uint256 _minCollateralUsd,
         uint32 _operatorSetId
     ) external reinitializer(1) {
-        if (address(_strategyManager) == address(0)) revert ZeroAddress();
-        if (address(_delegationManager) == address(0)) revert ZeroAddress();
-        if (address(_enclStrategy) == address(0)) revert ZeroAddress();
-        if (address(_usdcStrategy) == address(0)) revert ZeroAddress();
-        if (_minCollateralUsd == 0) revert InvalidMinCollateral();
-        if (_operatorSetId == 0) revert InvalidOperatorSetId();
+        require(address(_strategyManager) != address(0), ZeroAddress());
+        require(address(_delegationManager) != address(0), ZeroAddress());
+        require(address(_enclStrategy) != address(0), ZeroAddress());
+        require(address(_usdcStrategy) != address(0), ZeroAddress());
+        require(_minCollateralUsd != 0, InvalidMinCollateral());
+        require(_operatorSetId != 0, InvalidOperatorSetId());
 
         __ServiceManagerBase_init(_owner, _rewardsInitiator);
         strategyManager = _strategyManager;
@@ -141,16 +144,11 @@ contract ServiceManager is
         IStrategy strategy,
         address priceFeed
     ) internal {
-        if (address(strategy) == address(0)) revert ZeroAddress();
-        if (strategyConfigs[strategy].isAllowed)
-            revert StrategyAlreadyAllowed();
+        require(address(strategy) != address(0), ZeroAddress());
+        require(!strategyConfigs[strategy].isAllowed, StrategyAlreadyAllowed());
 
-        uint8 decimals = 18;
-        try
-            IERC20Metadata(address(strategy.underlyingToken())).decimals()
-        returns (uint8 d) {
-            decimals = d;
-        } catch {}
+        uint8 decimals = IERC20Metadata(address(strategy.underlyingToken()))
+            .decimals();
 
         strategyConfigs[strategy] = StrategyConfig({
             isAllowed: true,
@@ -163,9 +161,11 @@ contract ServiceManager is
     }
 
     function removeStrategy(IStrategy strategy) external onlyOwner {
-        if (!strategyConfigs[strategy].isAllowed) revert StrategyNotFound();
-        if (strategy == enclStrategy || strategy == usdcStrategy)
-            revert CannotRemoveCoreStrategies();
+        require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
+        require(
+            strategy != enclStrategy && strategy != usdcStrategy,
+            CannotRemoveCoreStrategies()
+        );
 
         uint256 index = strategyToIndex[strategy];
         uint256 lastIndex = allowedStrategies.length - 1;
@@ -186,21 +186,23 @@ contract ServiceManager is
         IStrategy strategy,
         address newPriceFeed
     ) external onlyOwner {
-        if (!strategyConfigs[strategy].isAllowed) revert StrategyNotFound();
+        require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
         strategyConfigs[strategy].priceFeed = newPriceFeed;
         emit StrategyUpdated(address(strategy), newPriceFeed);
     }
 
     function setMinCollateralUsd(uint256 _minCollateralUsd) external onlyOwner {
-        if (_minCollateralUsd == 0) revert InvalidMinCollateral();
+        require(_minCollateralUsd != 0, InvalidMinCollateral());
         minCollateralUsd = _minCollateralUsd;
         emit MinCollateralUpdated(_minCollateralUsd);
     }
 
     function setOperatorSetId(uint32 _operatorSetId) external onlyOwner {
-        if (_operatorSetId == 0) revert InvalidOperatorSetId();
-        if (operatorSetId != 0 && operatorSetId == _operatorSetId)
-            revert AlreadySetToThisId();
+        require(_operatorSetId != 0, InvalidOperatorSetId());
+        require(
+            operatorSetId == 0 || operatorSetId != _operatorSetId,
+            AlreadySetToThisId()
+        );
         uint32 previousId = operatorSetId;
         operatorSetId = _operatorSetId;
         emit OperatorSetIdUpdated(previousId, _operatorSetId);
@@ -214,12 +216,12 @@ contract ServiceManager is
     function setRewardDistributor(
         address _rewardDistributor
     ) external onlyOwner {
-        if (_rewardDistributor == address(0)) revert ZeroAddress();
+        require(_rewardDistributor != address(0), ZeroAddress());
         rewardDistributor = _rewardDistributor;
     }
 
     function setBondingManager(address _bondingManager) external onlyOwner {
-        if (_bondingManager == address(0)) revert ZeroAddress();
+        require(_bondingManager != address(0), ZeroAddress());
         bondingManager = IBondingManager(_bondingManager);
         emit BondingManagerSet(_bondingManager);
     }
@@ -258,7 +260,7 @@ contract ServiceManager is
         uint32[] calldata operatorSetIds,
         bytes calldata
     ) external override onlyAllocationManager {
-        if (avs != address(this)) revert InvalidOperatorSet();
+        require(avs == address(this), InvalidOperatorSet());
 
         bool ours;
         for (uint256 i = 0; i < operatorSetIds.length; ++i) {
@@ -267,9 +269,11 @@ contract ServiceManager is
                 break;
             }
         }
-        if (!ours) revert WrongOperatorSet();
-        if (!delegationManager.isOperator(operator))
-            revert OperatorNotRegistered();
+        require(ours, WrongOperatorSet());
+        require(
+            delegationManager.isOperator(operator),
+            OperatorNotRegistered()
+        );
 
         IBondingManager.OperatorInfo memory bondingInfo = bondingManager
             .getOperatorInfo(operator);
@@ -282,7 +286,7 @@ contract ServiceManager is
         if (spent > 0) _requireAllocatedAtLeast(operator, usdcStrategy, spent);
 
         (bool ok, uint256 usd) = checkOperatorEligibility(operator);
-        if (!ok) revert InsufficientCollateral();
+        require(ok, InsufficientCollateral());
 
         emit OperatorRegisteredToAVS(operator);
         emit OperatorBonded(operator, usd);
@@ -293,7 +297,7 @@ contract ServiceManager is
         address avs,
         uint32[] calldata operatorSetIds
     ) external override onlyAllocationManager {
-        if (avs != address(this)) return;
+        require(avs == address(this), InvalidAVS());
 
         bool ours;
         for (uint256 i = 0; i < operatorSetIds.length; ++i) {
@@ -304,8 +308,10 @@ contract ServiceManager is
         }
         if (!ours) return;
 
-        if (bondingManager.isRegisteredOperator(operator))
-            revert MustDeregisterCiphernodeFirst();
+        require(
+            !bondingManager.isRegisteredOperator(operator),
+            MustDeregisterCiphernodeFirst()
+        );
 
         emit OperatorDeregisteredFromAVS(operator);
         emit OperatorDebonded(operator);
@@ -316,7 +322,7 @@ contract ServiceManager is
     }
 
     function addSlasher(address slasher) external onlyOwner {
-        if (slasher == address(0)) revert ZeroAddress();
+        require(slasher != address(0), ZeroAddress());
         slashers[slasher] = true;
         emit SlasherAdded(slasher);
     }
@@ -331,11 +337,13 @@ contract ServiceManager is
         uint256 wadToSlash,
         string calldata description
     ) external nonReentrant {
-        if (!slashers[msg.sender]) revert NotAuthorizedSlasher();
-        if (!bondingManager.isRegisteredOperator(operator))
-            revert OperatorNotRegistered();
-        if (wadToSlash > 1e18 || wadToSlash == 0) revert InvalidWadSlashing();
-        if (allowedStrategies.length == 0) revert NoStrategiesConfigured();
+        require(slashers[msg.sender], NotAuthorizedSlasher());
+        require(
+            bondingManager.isRegisteredOperator(operator),
+            OperatorNotRegistered()
+        );
+        require(wadToSlash <= 1e18 && wadToSlash != 0, InvalidWadSlashing());
+        require(allowedStrategies.length != 0, NoStrategiesConfigured());
 
         IStrategy[] memory tmp = new IStrategy[](allowedStrategies.length);
         uint256 n;
@@ -343,7 +351,7 @@ contract ServiceManager is
             if (getOperatorShares(operator, allowedStrategies[i]) > 0)
                 tmp[n++] = allowedStrategies[i];
         }
-        if (n == 0) revert OperatorNoStake();
+        require(n != 0, OperatorNoStake());
 
         IStrategy[] memory strategies = new IStrategy[](n);
         uint256[] memory wads = new uint256[](n);
@@ -386,8 +394,8 @@ contract ServiceManager is
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external {
-        if (msg.sender != rewardDistributor) revert OnlyRewardDistributor();
-        if (recipients.length != amounts.length) revert ArrayLengthMismatch();
+        require(msg.sender == rewardDistributor, OnlyRewardDistributor());
+        require(recipients.length == amounts.length, ArrayLengthMismatch());
 
         IERC20Metadata enclToken = IERC20Metadata(
             address(enclStrategy.underlyingToken())
@@ -495,10 +503,7 @@ contract ServiceManager is
     function getOperatorInfo(
         address operator
     ) external view returns (OperatorInfo memory) {
-        bool active = false;
-        try bondingManager.isActive(operator) returns (bool result) {
-            active = result;
-        } catch {}
+        bool active = bondingManager.isActive(operator);
         return
             OperatorInfo({
                 isActive: active,
@@ -515,7 +520,7 @@ contract ServiceManager is
         uint64 usdcAlloc = _allocationManager
             .getAllocation(operator, set_, usdcStrategy)
             .currentMagnitude;
-        if (usdcAlloc == 0) revert InsufficientAllocatedMagnitude();
+        require(usdcAlloc != 0, InsufficientAllocatedMagnitude());
     }
 
     function _requireAllocatedAtLeast(
@@ -534,7 +539,7 @@ contract ServiceManager is
             uint256(
                 _allocationManager.getAllocatableMagnitude(operator, strategy)
             );
-        if (totalMag == 0) revert InsufficientAllocatedMagnitude();
+        require(totalMag != 0, InsufficientAllocatedMagnitude());
 
         uint256 curMag = uint256(
             _allocationManager
@@ -547,8 +552,10 @@ contract ServiceManager is
             allocatedShares
         );
 
-        if (allocatedUnderlying < requiredUnderlying)
-            revert InsufficientAllocatedMagnitude();
+        require(
+            allocatedUnderlying >= requiredUnderlying,
+            InsufficientAllocatedMagnitude()
+        );
     }
 
     function _convertSharesToUsd(
@@ -586,10 +593,11 @@ contract ServiceManager is
             uint256 updatedAt,
             uint80
         ) {
-            if (
-                answer <= 0 ||
-                block.timestamp - updatedAt > PRICE_STALENESS_THRESHOLD
-            ) revert InvalidPriceOrStale();
+            require(
+                answer > 0 &&
+                    block.timestamp - updatedAt <= PRICE_STALENESS_THRESHOLD,
+                InvalidPriceOrStale()
+            );
 
             uint8 feedDecimals = feed.decimals();
             uint256 rawPrice = uint256(answer);
