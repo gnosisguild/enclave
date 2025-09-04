@@ -65,6 +65,7 @@ struct InnerResponse {
 }
 
 pub async fn gen_esi_sss(rng: &SharedRng, cipher: &Cipher, req: Request) -> Result<Response> {
+    println!("gen_esi_sss");
     let req = InnerRequest::try_from(req)?;
 
     let params = req.trbfv_config.params();
@@ -74,7 +75,9 @@ pub async fn gen_esi_sss(rng: &SharedRng, cipher: &Cipher, req: Request) -> Resu
     let esi_per_ct = req.esi_per_ct as usize;
     let esi_sss = (0..esi_per_ct)
         .map(|_| -> Result<_> {
+            println!("gen_esi_sss:mapping...");
             let generator = SmudgingNoiseGenerator::new(params.clone(), error_size.clone());
+            println!("gen_esi_sss:generate_smudging_error...");
             let esi_coeffs = {
                 generator
                     .generate_smudging_error(&mut *rng.lock().unwrap())
@@ -82,6 +85,7 @@ pub async fn gen_esi_sss(rng: &SharedRng, cipher: &Cipher, req: Request) -> Resu
             };
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
+            println!("gen_esi_sss:generate_secret_shares_from_poly...");
             {
                 share_manager
                     .generate_secret_shares_from_poly(esi_poly, &mut *rng.lock().unwrap())
@@ -90,5 +94,6 @@ pub async fn gen_esi_sss(rng: &SharedRng, cipher: &Cipher, req: Request) -> Resu
         })
         .collect::<Result<Vec<Vec<_>>>>()?;
 
+    println!("gen_esi_sss:returning...");
     Ok(Response::try_from((InnerResponse { esi_sss }, cipher))?)
 }

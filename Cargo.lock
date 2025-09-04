@@ -2726,6 +2726,7 @@ dependencies = [
  "bloom",
  "bs58",
  "chrono",
+ "derivative",
  "e3-crypto",
  "e3-trbfv",
  "futures-util",

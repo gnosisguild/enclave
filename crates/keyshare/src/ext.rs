@@ -156,7 +156,7 @@ impl E3Extension for ThresholdKeyshareExtension {
 
         let e3_id = data.clone().e3_id;
         let repo = ctx.repositories().threshold_keyshare(&e3_id);
-        let container = repo.send(None); // New container with None
+        let container = repo.send(Some(KeyshareState::Init)); // New container with None
         println!("got container");
         ctx.set_event_recipient(
             "threshold_keyshare",

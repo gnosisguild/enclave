@@ -6,12 +6,15 @@
 
 use crate::E3id;
 use actix::Message;
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Derivative, Message, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct DecryptionshareCreated {
+    #[derivative(Debug(format_with = "crate::hexf"))]
     pub decryption_share: Vec<u8>,
     pub e3_id: E3id,
     pub node: String,

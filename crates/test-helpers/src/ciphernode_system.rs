@@ -14,7 +14,7 @@ use tokio::time::{sleep, timeout};
 
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 
-use crate::simulate_libp2p_net;
+use crate::{d, simulate_libp2p_net};
 
 // This type allows us to store various dynamic async callbacks
 type SetupFn<'a> =
@@ -123,23 +123,29 @@ impl CiphernodeSystem {
     }
 
     pub async fn take_history(&self, index: usize, count: usize) -> Result<CiphernodeHistory> {
+        self.take_history_with_timeout(index, count, Duration::from_millis(4000))
+            .await
+    }
+
+    pub async fn take_history_with_timeout(
+        &self,
+        index: usize,
+        count: usize,
+        tout: Duration,
+    ) -> Result<CiphernodeHistory> {
         let Some(node) = self.0.get(index) else {
             bail!("No node found");
         };
 
-        let history = timeout(
-            Duration::from_secs(4),
-            node.history.send(TakeHistory::new(count)),
-        )
-        .await
-        .context(format!(
-            "Could not take {} events from node {}",
-            count, index
-        ))??;
+        let history = timeout(tout, node.history.send(TakeHistory::new(count)))
+            .await
+            .context(format!(
+                "Could not take {} events from node {}",
+                count, index
+            ))??;
 
         Ok(CiphernodeHistory(history))
     }
-
     pub async fn flush_all_history(&self, millis: u64) -> Result<()> {
         let nodes = self.0.clone();
         for node in nodes.iter() {

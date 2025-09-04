@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::{mem, sync::Arc};
+use std::{mem, sync::Arc, time::Duration};
 
 use actix::prelude::*;
 use anyhow::{anyhow, bail, Result};
@@ -25,11 +25,11 @@ use zeroize::Zeroizing;
 struct StartThresholdShareGeneration(CiphernodeSelected);
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[rtype(result = "Result<()>")]
+#[rtype(result = "()")]
 struct GenPkShareAndSkSss(CiphernodeSelected);
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[rtype(result = "Result<()>")]
+#[rtype(result = "()")]
 struct GenEsiSss(CiphernodeSelected);
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -77,6 +77,9 @@ impl KeyshareState {
             } else {
                 match (self, &new_state) {
                     (K::Init, K::GeneratingThresholdShare { .. }) => true,
+                    (K::GeneratingThresholdShare { .. }, K::AggregatingDecryptionKey { .. }) => {
+                        true
+                    }
                     (K::AggregatingDecryptionKey { .. }, K::ReadyForDecryption) => true,
                     (K::ReadyForDecryption, K::Decrypting) => true,
                     (K::Decrypting, K::Completed) => true,
@@ -90,9 +93,19 @@ impl KeyshareState {
         } else {
             Err(anyhow!(
                 "Bad state transition {:?} -> {:?}",
-                self,
-                new_state
+                self.variant_name(),
+                new_state.variant_name()
             ))
+        }
+    }
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            Self::Init => "Init",
+            Self::GeneratingThresholdShare { .. } => "GeneratingThresholdShare",
+            Self::AggregatingDecryptionKey { .. } => "AggregatingDecryptionKey",
+            Self::ReadyForDecryption => "ReadyForDecryption",
+            Self::Decrypting => "Decrypting",
+            Self::Completed => "Completed",
         }
     }
 }
@@ -165,11 +178,13 @@ impl ThresholdKeyshare {
     ) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
+            println!("TRY STORE PK");
+
             let K::GeneratingThresholdShare {
                 party_id, esi_sss, ..
             } = s.clone()
             else {
-                bail!("Cannot store pkshare and sk sss on state {:?}", s);
+                bail!("Cannot store pkshare and sk sss on state");
             };
 
             match esi_sss {
@@ -192,6 +207,7 @@ impl ThresholdKeyshare {
     pub fn try_store_esi_sss(&mut self, esi_sss: Vec<Vec<SensitiveBytes>>) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
+            println!("TRY STORE ESI");
             let K::GeneratingThresholdShare {
                 sk_sss,
                 pk_share,
@@ -199,7 +215,7 @@ impl ThresholdKeyshare {
                 ..
             } = s.clone()
             else {
-                bail!("Cannot store esi_sss on state {:?}", s);
+                bail!("Cannot store esi_sss on state");
             };
             match (sk_sss, pk_share) {
                 (Some(sk_sss), Some(pk_share)) => Ok(s.next(K::AggregatingDecryptionKey {
@@ -261,16 +277,17 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
                 esi_sss: None,
             })?)
         })?;
+
         println!("Trying to run processes...");
         // Run both simultaneously
         ctx.notify(GenPkShareAndSkSss(msg.0.clone()));
-        ctx.notify(GenEsiSss(msg.0));
+        ctx.notify_later(GenEsiSss(msg.0), Duration::from_millis(1));
         Ok(())
     }
 }
 
 impl Handler<GenEsiSss> for ThresholdKeyshare {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenEsiSss, _: &mut Self::Context) -> Self::Result {
         println!("GenEsiSss on ThresholdKeyshare");
         let CiphernodeSelected {
@@ -297,22 +314,36 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
                 .send(event)
                 .into_actor(self)
                 .map(move |res, act, ctx| {
-                    let Ok(ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(output))) = res? else {
-                        bail!("Error extracting data from compute process")
+                    let c = || {
+                        println!("\nRECEIVED GEN ESI SSS");
+                        let Ok(ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(output))) = res?
+                        else {
+                            bail!("Error extracting data from compute process")
+                        };
+
+                        println!("\nSTORING GEN ESI SSS...");
+                        act.try_store_esi_sss(output.esi_sss)?;
+
+                        if let Some(KeyshareState::AggregatingDecryptionKey { .. }) =
+                            act.state.get()
+                        {
+                            ctx.notify(SharesGenerated)
+                        }
+
+                        Ok(())
                     };
 
-                    act.try_store_esi_sss(output.esi_sss)?;
-                    if let Some(KeyshareState::AggregatingDecryptionKey { .. }) = act.state.get() {
-                        ctx.notify(SharesGenerated)
-                    }
-                    Ok(())
+                    match c() {
+                        Ok(_) => (),
+                        Err(e) => println!("There was an error: GenEsiSss, {}", e),
+                    };
                 }),
         )
     }
 }
 
 impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
-    type Result = ResponseActFuture<Self, Result<()>>;
+    type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenPkShareAndSkSss, ctx: &mut Self::Context) -> Self::Result {
         println!("GenPkShareAndSkSss on ThresholdKeyshare");
         let CiphernodeSelected {
@@ -333,18 +364,29 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
                 .send(event)
                 .into_actor(self)
                 .map(move |res, act, ctx| {
-                    let Ok(e3_events::ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(
-                        output,
-                    ))) = res?
-                    else {
-                        bail!("Error extracting data from compute process")
+                    let c = || {
+                        println!("\nRECEIVED GEN PK SHARE AND SK SSS");
+                        let Ok(e3_events::ComputeResponse::TrBFV(
+                            TrBFVResponse::GenPkShareAndSkSss(output),
+                        )) = res?
+                        else {
+                            bail!("Error extracting data from compute process")
+                        };
+
+                        println!("\nSTORING GEN PK SHARE AND SK SSS...");
+                        act.try_store_pk_share_and_sk_sss(output.pk_share, output.sk_sss)?;
+                        if let Some(KeyshareState::AggregatingDecryptionKey { .. }) =
+                            act.state.get()
+                        {
+                            ctx.notify(SharesGenerated);
+                        }
+                        Ok(())
                     };
 
-                    act.try_store_pk_share_and_sk_sss(output.pk_share, output.sk_sss)?;
-                    if let Some(KeyshareState::AggregatingDecryptionKey { .. }) = act.state.get() {
-                        ctx.notify(SharesGenerated);
-                    }
-                    Ok(())
+                    match c() {
+                        Ok(_) => (),
+                        Err(e) => println!("There was an error: GenPkShareAndSkSss"),
+                    };
                 }),
         )
     }

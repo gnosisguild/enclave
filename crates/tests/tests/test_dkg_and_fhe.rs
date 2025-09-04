@@ -5,9 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr};
-use anyhow::{bail, Result};
-use async_std::task::sleep;
-use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
+use anyhow::Result;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_data::{DataStore, InMemStore};
@@ -30,25 +28,14 @@ use fhe::{
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
 };
 use num_bigint::BigUint;
+use std::ops::Deref;
 use std::time::Duration;
 use std::{fs, sync::Arc};
-use tokio::sync::RwLock;
-// use zeroize::Zeroizing;
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
     fs::write(format!("tests/{file_name}"), bytes).unwrap();
 }
-
-// fn serialize_z_vec_of_bytes(data: &Vec<Zeroizing<Vec<u8>>>) -> Vec<u8> {
-//     bincode::serialize(
-//         &data
-//             .iter()
-//             .map(|z| -> &Vec<u8> { z.as_ref() })
-//             .collect::<Vec<_>>(),
-//     )
-//     .unwrap()
-// }
 
 pub fn calculate_error_size(
     params: Arc<bfv::BfvParameters>,
@@ -59,159 +46,6 @@ pub fn calculate_error_size(
     let calculator = SmudgingBoundCalculator::new(config);
     Ok(calculator.calculate_sm_bound()?)
 }
-
-// Act like a single party in multithread
-// #[derive(Clone)]
-// struct PartySharesResult {
-//     pk_share_and_sk_sss_event: EnclaveEvent,
-//     esi_sss_event: EnclaveEvent,
-// }
-// async fn generate_party_shares(
-//     rng: Arc<Mutex<ChaCha20Rng>>,
-//     params: Arc<Vec<u8>>,
-//     cipher: Arc<Cipher>,
-//     crp: Arc<Vec<u8>>,
-//     error_size: Arc<Vec<u8>>,
-//     num_parties: u64,
-//     threshold: u64,
-// ) -> Result<PartySharesResult> {
-//
-//     // 1. Setup test environment
-//     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-//     //
-//     //
-//     //
-//     //
-//     // 1. ThresholdKeyshare receives CiphernodeSelected event
-//     // 1. EventBus emits EncryptionPubkeyCreated
-//     // 1. Send other parties' EncryptionPubkeyCreated events to everyone else
-//     // 1. Wait for GlobalEncryptionKeyAggregated
-//     // 1. EventBus emits KeyshareCreated
-//     // 1. EventBus emits THresholdShareCreated
-//     //
-//
-//     // Setup multithread processor
-//     // TODO: Currently only testing logic not setup on multithread yet
-//     let _multi = Multithread::attach(&bus, rng, cipher.clone());
-//
-//     /////////////////////////////////////////////
-//     // 1. Generate initial pk and sk sss
-//     /////////////////////////////////////////////
-//
-//     let event: EnclaveEvent = e3_trbfv::gen_pk_share_and_sk_sss::Request {
-//         trbfv_config: TrBFVConfig::new(params.clone(), num_parties, threshold),
-//         crp,
-//     }
-//     .into();
-//
-//     let correlation_id = event.correlation_id();
-//
-//     let pk_share_and_sk_sss_event = EventWaiter::send_and_wait(
-//         &bus,
-//         event,
-//         Box::new(move |e| e.correlation_id().is_some() && e.correlation_id() == correlation_id),
-//     )
-//     .await?;
-//
-//     // // Now lets setup a waiter to wait for the response
-//     // let wait_for_response = wait_for_event(
-//     //     &bus,
-//     //     Box::new(move |e| match e {
-//     //         EnclaveEvent::ComputeRequestSucceeded { data, .. } => {
-//     //             data.correlation_id == correlation_id
-//     //         }
-//     //         _ => false,
-//     //     }),
-//     // );
-//
-//     // Send the event
-//     // bus.do_send(gen_pk_share_and_sk_sss.clone());
-//
-//     // let pk_share_and_sk_sss_event = wait_for_response.await??;
-//
-//     /////////////////////////////////////////////
-//     // 2. Generate smudging noise
-//     /////////////////////////////////////////////
-//
-//     let gen_esi_sss: EnclaveEvent = e3_trbfv::gen_esi_sss::Request {
-//         trbfv_config: TrBFVConfig::new(params.clone(), num_parties, threshold),
-//         error_size,
-//         esi_per_ct: 1,
-//     }
-//     .into();
-//
-//     let correlation_id = gen_esi_sss.correlation_id().unwrap();
-//
-//     // Now lets setup a waiter to wait for the response
-//     let wait_for_response = wait_for_event(
-//         &bus,
-//         Box::new(move |e| match e {
-//             EnclaveEvent::ComputeRequestSucceeded { data, .. } => {
-//                 data.correlation_id == correlation_id
-//             }
-//             _ => false,
-//         }),
-//     );
-//
-//     bus.do_send(gen_esi_sss.clone());
-//
-//     let esi_sss_event = wait_for_response.await??;
-//     Ok(PartySharesResult {
-//         pk_share_and_sk_sss_event,
-//         esi_sss_event,
-//     })
-// }
-
-// async fn snapshot_test_events(party: PartySharesResult, cipher: &Cipher) -> Result<()> {
-//     let Some(TrBFVResponse::GenPkShareAndSkSss(res)) =
-//         party.pk_share_and_sk_sss_event.trbfv_response()
-//     else {
-//         bail!("bad response from GenPkShareAndSkSss");
-//     };
-//
-//     // Ensure pk_share is correct
-//     let pk_share = res.pk_share.clone();
-//
-//     // NOTE: uncomment the following to save new snapshot.
-//     // save_snapshot("fixtures/01_pk_share.bin", &pk_share[..]);
-//
-//     // Check against snapshot
-//     assert_eq!(
-//         pk_share,
-//         Arc::new(include_bytes!("fixtures/01_pk_share.bin").to_vec())
-//     );
-//
-//     // Ensure sk_sss is correct
-//     let sk_sss = SensitiveBytes::access_vec(res.sk_sss.clone(), &cipher)?;
-//
-//     let serialized_sk_sss = serialize_z_vec_of_bytes(&sk_sss);
-//
-//     // NOTE: uncomment the following to save new snapshot.
-//     // save_snapshot("fixtures/02_sk_sss.bin", &serialized_sk_sss);
-//
-//     // Check against snapshot
-//     assert_eq!(
-//         serialized_sk_sss,
-//         include_bytes!("fixtures/02_sk_sss.bin").to_vec()
-//     );
-//
-//     let Some(TrBFVResponse::GenEsiSss(res)) = party.esi_sss_event.trbfv_response() else {
-//         bail!("bad response from GenEsiSss");
-//     };
-//
-//     let esi_sss = SensitiveBytes::access_vec(res.esi_sss.clone(), &cipher)?;
-//
-//     let serialized_esi_sss = serialize_z_vec_of_bytes(&esi_sss);
-//     // NOTE: uncomment the following to save new snapshot.
-//     // save_snapshot("fixtures/03_esi_sss.bin", &serialized_esi_sss);
-//
-//     assert_eq!(
-//         serialized_esi_sss,
-//         include_bytes!("fixtures/03_esi_sss.bin").to_vec()
-//     );
-//
-//     Ok(())
-// }
 
 /// Function to setup a specific ciphernode actor configuration
 async fn setup_local_ciphernode(
@@ -267,23 +101,6 @@ async fn setup_local_ciphernode(
         history,
         errors,
     })
-}
-
-async fn create_ciphernods_system(
-    bus: &Addr<EventBus<EnclaveEvent>>,
-    rng: &SharedRng,
-    count: u32,
-    cipher: &Arc<Cipher>,
-) -> Result<Vec<CiphernodeSimulated>> {
-    let mut nodes = Vec::new();
-    for addr in create_random_eth_addrs(count) {
-        nodes.push(
-            setup_local_ciphernode(bus.clone(), rng.clone(), false, addr, None, cipher.clone())
-                .await?,
-        );
-    }
-    simulate_libp2p_net(&nodes);
-    Ok(nodes)
 }
 
 /// Test trbfv
@@ -393,9 +210,19 @@ async fn test_trbfv() -> Result<()> {
     bus.do_send(event);
 
     // node #1 is selected so lets grab all events
-    let h = nodes.take_history(1, 4).await?;
+    let h = nodes
+        .take_history_with_timeout(1, 4, Duration::from_secs(300))
+        .await?;
 
-    assert_eq!(h.event_types(), vec!["E3Requested", "CiphernodeSelected"]);
+    assert_eq!(
+        h.event_types(),
+        vec![
+            "E3Requested",
+            "CiphernodeSelected",
+            "ThresholdKeyshareCreated",
+            "ThresholdKeyshareCreated"
+        ]
+    );
 
     Ok(())
 }

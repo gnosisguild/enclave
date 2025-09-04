@@ -6,21 +6,25 @@
 
 use crate::{E3id, Seed};
 use actix::Message;
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
     sync::Arc,
 };
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Derivative, Message, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
 #[rtype(result = "()")]
 pub struct CiphernodeSelected {
     pub e3_id: E3id,
     pub threshold_m: usize,
     pub threshold_n: usize,
     pub seed: Seed,
+    #[derivative(Debug(format_with = "crate::hexf"))]
     pub error_size: Arc<Vec<u8>>,
     pub esi_per_ct: usize,
+    #[derivative(Debug(format_with = "crate::hexf"))]
     pub params: Arc<Vec<u8>>,
     pub party_id: u64,
 }

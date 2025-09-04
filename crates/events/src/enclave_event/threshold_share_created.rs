@@ -6,17 +6,22 @@
 
 use crate::E3id;
 use actix::Message;
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
     sync::Arc,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
 pub struct ThresholdShare {
     pub party_id: u64,
+    #[derivative(Debug(format_with = "crate::hexf"))]
     pub pk_share: Arc<Vec<u8>>,
+    #[derivative(Debug(format_with = "crate::hexf_bytes_slice"))]
     pub sk_sss: Vec<Vec<u8>>,
+    #[derivative(Debug(format_with = "crate::hexf_3d_bytes"))]
     pub esi_sss: Vec<Vec<Vec<u8>>>,
 }
 

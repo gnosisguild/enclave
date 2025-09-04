@@ -46,7 +46,11 @@ impl Handler<ComputeRequest> for Multithread {
     fn handle(&mut self, msg: ComputeRequest, ctx: &mut Self::Context) -> Self::Result {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
-        Box::pin(async move { handle_compute_request(rng, cipher, msg).await })
+        Box::pin(async move {
+            let res = handle_compute_request(rng, cipher, msg).await;
+            println!("returned from compute request!");
+            res
+        })
     }
 }
 
@@ -55,7 +59,6 @@ async fn handle_compute_request(
     cipher: Arc<Cipher>,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
-    println!("Handling multithread request");
     match request {
         ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => {
             match gen_pk_share_and_sk_sss(&rng, &cipher, req).await {

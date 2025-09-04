@@ -16,6 +16,7 @@ bincode = { workspace = true }
 bloom = { workspace = true }
 bs58 = { workspace = true }
 chrono = { workspace = true }
+derivative = { workspace = true }
 futures-util = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }

@@ -75,6 +75,7 @@ pub async fn gen_pk_share_and_sk_sss(
     cipher: &Cipher,
     req: Request,
 ) -> Result<Response> {
+    println!("gen_pk_share_and_sk_sss");
     let req = InnerRequest::try_from(req)?;
 
     let params = req.trbfv_config.params();
@@ -90,9 +91,11 @@ pub async fn gen_pk_share_and_sk_sss(
 
     let sk_poly = share_manager.coeffs_to_poly_level0(sk_share.coeffs.clone().as_ref())?;
 
+    println!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
     let sk_sss =
         { share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())? };
 
+    println!("gen_pk_share_and_sk_sss:returning...");
     Ok(Response::try_from((
         InnerResponse { pk_share, sk_sss },
         cipher,

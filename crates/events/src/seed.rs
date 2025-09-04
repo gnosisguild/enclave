@@ -6,11 +6,13 @@
 
 use alloy::hex;
 use alloy_primitives::Uint;
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Seed(pub [u8; 32]);
+#[derive(Derivative, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
+pub struct Seed(#[derivative(Debug(format_with = "crate::hexf"))] pub [u8; 32]);
 impl From<Seed> for u64 {
     fn from(value: Seed) -> Self {
         u64::from_le_bytes(value.0[..8].try_into().unwrap())
