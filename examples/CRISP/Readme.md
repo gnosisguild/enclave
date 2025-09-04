@@ -7,16 +7,13 @@ Welcome to the CRISP project! This document provides a comprehensive guide to se
 ```
 CRISP
 ├── Dockerfile - Dockerfile for a local development environment
-├── apps
-│   ├── client
-│   ├── program
-│   ├── server
-│   └── wasm-crypto
+├── client
+├── server
+├── wasm-crypto
 ├── contracts - Contracts for the CRISP protocol
-├── deploy - Deployment scripts
 ├── docker-compose.yaml
 └── scripts 
-    └── tasks - Scripts for tasks to be run inside the docker container
+    └── tasks - Scripts for tasks to be run inside the docker container 
 ```
 
 ## Docker Development
@@ -87,7 +84,7 @@ To set up the CRISP dApp in your local environment, follow these steps:
 1. Navigate to the `client` directory:
 
    ```sh
-   cd CRISP/apps/client
+   cd examples/CRISP/client
    ```
 
 2. Install dependencies:
@@ -125,7 +122,7 @@ Keep Anvil running in the terminal, and open a new terminal for the next steps.
 2. Navigate to the `evm` directory:
 
    ```sh
-   cd enclave/packages/evm
+   cd enclave/packages/enclave-contracts
    ```
 
 3. Install dependencies:

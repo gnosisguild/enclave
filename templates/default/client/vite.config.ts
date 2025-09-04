@@ -17,7 +17,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
-    exclude: ['@rollup/browser', '@gnosis-guild/e3-wasm'],
+    exclude: ['@rollup/browser', '@enclave-e3/wasm'],
   },
   build: {
     commonjsOptions: {

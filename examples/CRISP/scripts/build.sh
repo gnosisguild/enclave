@@ -2,4 +2,6 @@
 
 set -e
 
-./scripts/tasks/dockerize.sh ./scripts/tasks/build.sh
+(cargo build --locked)
+(cd ../../packages/enclave-contracts && pnpm compile)
+(cd ./client && pnpm build)

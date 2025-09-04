@@ -7,11 +7,11 @@ pragma solidity >=0.8.27;
 
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IE3Program} from "@gnosis-guild/enclave/contracts/interfaces/IE3Program.sol";
+import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
-import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
-import {IEnclave} from "@gnosis-guild/enclave/contracts/interfaces/IEnclave.sol";
-import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphoreNoir.sol";
+import {ISemaphore} from "@hashcloak/semaphore-contracts-noir/interfaces/ISemaphoreNoir.sol";
+import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
+import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";

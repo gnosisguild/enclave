@@ -29,9 +29,9 @@ members = [
   "crates/wasm",
 ]
 exclude = [
-  "examples/CRISP/apps/server",
-  "examples/CRISP/apps/program",
-  "examples/CRISP/apps/wasm-crypto",
+  "examples/CRISP/server",
+  "examples/CRISP/program",
+  "examples/CRISP/wasm-crypto",
   "examples/default/client/wasm",
   "examples/default",
   # client needs to be able to build crates/support independently
@@ -106,6 +106,7 @@ bloom = "=0.3.2"
 bs58 = "=0.5.1"
 base64 = "=0.22.1"
 clap = { version = "=4.5.41", features = ["derive"] }
+chrono = { version = "=0.4.41", features = ["serde"] }
 compile-time = "=0.2.0"
 dirs = "=5.0.1"
 dialoguer = "=0.11.0"

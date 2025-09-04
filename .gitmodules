@@ -4,9 +4,3 @@
 [submodule "templates/default/lib/risc0-ethereum"]
 	path = templates/default/lib/risc0-ethereum
   	url = https://github.com/gnosisguild/risc0-ethereum
-[submodule "packages/evm/lib/eigenlayer-middleware"]
-	path = packages/evm/lib/eigenlayer-middleware
-	url = https://github.com/Layr-Labs/eigenlayer-middleware.git
-[submodule "packages/evm/lib/forge-std"]
-	path = packages/evm/lib/forge-std
-	url = https://github.com/foundry-rs/forge-std

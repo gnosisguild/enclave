@@ -6,7 +6,7 @@
 
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-deploy";
-import "@gnosis-guild/enclave/deploy/enclave";
+import "@enclave-e3/contracts/deploy/enclave";
 import { task } from "hardhat/config";
 import type { TaskArguments } from "hardhat/types";
 import type { HardhatUserConfig } from "hardhat/config";
@@ -51,7 +51,7 @@ const config: HardhatUserConfig = {
   external: {
     contracts: [
       {
-        artifacts: "node_modules/@gnosis-guild/enclave/artifacts",
+        artifacts: "node_modules/@enclave-e3/contracts/artifacts",
       },
     ],
   },

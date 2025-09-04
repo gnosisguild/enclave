@@ -1,0 +1,220 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "ICiphernodeRegistry",
+  "sourceName": "contracts/interfaces/ICiphernodeRegistry.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "numNodes",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "size",
+          "type": "uint256"
+        }
+      ],
+      "name": "CiphernodeAdded",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "numNodes",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "size",
+          "type": "uint256"
+        }
+      ],
+      "name": "CiphernodeRemoved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "publicKey",
+          "type": "bytes"
+        }
+      ],
+      "name": "CommitteePublished",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "filter",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32[2]",
+          "name": "threshold",
+          "type": "uint32[2]"
+        }
+      ],
+      "name": "CommitteeRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "enclave",
+          "type": "address"
+        }
+      ],
+      "name": "EnclaveSet",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "committeePublicKey",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "publicKeyHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "ciphernode",
+          "type": "address"
+        }
+      ],
+      "name": "isCiphernodeEligible",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "proof",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "publicKey",
+          "type": "bytes"
+        }
+      ],
+      "name": "publishCommittee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "filter",
+          "type": "address"
+        },
+        {
+          "internalType": "uint32[2]",
+          "name": "threshold",
+          "type": "uint32[2]"
+        }
+      ],
+      "name": "requestCommittee",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -199,6 +199,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.86.0
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: v1.0.0-beta.11
       - name: Cache node modules
         uses: actions/cache@v4
         with:
@@ -278,7 +282,7 @@ jobs:
           ls -la target/debug/fake_encrypt || echo "fake_encrypt not found"
           ls -la target/debug/pack_e3_params || echo "pack_e3_params not found"
           ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
-          ls -la packages/evm/dist || echo "SDK dist not found"
+          ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
       - name: "Set executable permissions"
         run: |
@@ -328,6 +332,135 @@ jobs:
           name: enclave-binary
           path: ~/.cargo/bin/enclave
           retention-days: 1
+
+  crisp_e2e: 
+    runs-on: ubuntu-latest
+    needs: [build_enclave_cli]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Prepare test environment
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/test-results
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/test-results
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/playwright-report
+          mkdir -p $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          sudo chown -R $USER_UID:$USER_GID $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+          sudo chmod -R 777 $GITHUB_WORKSPACE/examples/CRISP/.cache-synpress
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.7.1
+          run_install: false
+
+      # We must install foundry in order to be able to test anvil
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
+
+      - name: Install wasm-pack
+        uses: ./.github/actions/install-wasm-pack
+
+      - name: Install yq
+        run: |
+          sudo wget -qO- https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz | sudo tar xz -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        working-directory: .
+        run: |
+          pnpm --version && pnpm install --frozen-lockfile && pnpm build:ts
+
+      - name: Install Playwright browsers
+        working-directory: ./examples/CRISP
+        run: pnpm exec playwright install chromium
+
+      - name: Download enclave binary
+        uses: actions/download-artifact@v4
+        with:
+          name: enclave-binary
+          path: ~/.cargo/bin/
+
+      - name: Make binaries executable
+        run: |
+          chmod +x ~/.cargo/bin/enclave
+
+      - name: Run Playwright tests
+        working-directory: ./examples/CRISP
+        env:
+          PLAYWRIGHT_WORKERS: 4
+          METAMASK_VERSION: 11.8.2
+        run: pnpm test:e2e
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: ./examples/CRISP/playwright-report/
+          retention-days: 30
+
+  test_enclave_circuits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: v1.0.0-beta.11
+
+      - name: Check formatting
+        working-directory: ./packages/circuits
+        run: nargo fmt --check
+
+      - name: Compile Noir circuits
+        working-directory: ./packages/circuits
+        run: |
+          nargo compile --workspace
+
+      - name: Test Noir circuits
+        working-directory: ./packages/circuits
+        run: |
+          nargo test --workspace
+
+      - name: Upload circuit artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: circuit-artifacts
+          path: packages/circuits/target/
+          retention-days: 1
+          if-no-files-found: warn
 
   build_e3_support_dev:
     runs-on: ubuntu-latest
@@ -412,10 +545,10 @@ jobs:
           name: sdk-artifacts
           path: |
             packages/enclave-sdk/dist
-            packages/evm/dist
-            packages/evm/artifacts
-            packages/evm/cache
-            packages/evm/typechain-types
+            packages/enclave-contracts/dist
+            packages/enclave-contracts/artifacts
+            packages/enclave-contracts/cache
+            packages/enclave-contracts/typechain-types
             crates/wasm/dist
           retention-days: 1
           if-no-files-found: warn
@@ -463,7 +596,7 @@ jobs:
           echo "Checking downloaded artifacts:"
           ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
           ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
-          ls -la packages/evm/dist || echo "SDK dist not found"
+          ls -la packages/enclave-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
           echo "Support scripts permissions:"
           ls -la templates/default/target/debug/e3-support-scripts-dev
@@ -514,7 +647,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Populate Contributors List
     # Only run on main branch to avoid branch conflicts
-    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, 'contrib-readme-action')
+    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, 'contrib-readme-action')
     concurrency:
       group: contrib-readme-${{ github.ref }}
       cancel-in-progress: true
@@ -536,7 +669,7 @@ jobs:
           use_username: false
           columns_per_row: 6
           collaborators: direct
-          commit_message: "docs(contributor): contrib-readme-action has updated readme [skip ci]"
+          commit_message: "docs(contributor): contrib-readme-action has updated readme"
           committer_username: "github-actions[bot]"
           committer_email: "github-actions[bot]@users.noreply.github.com"
           auto_detect_branch_protection: true

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
-import {IInputValidator} from "@gnosis-guild/enclave/contracts/interfaces/IInputValidator.sol";
+import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
 import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
 import {Clone} from "@excubiae/contracts/proxy/Clone.sol";
 import {IVerifier} from "./CRISPVerifier.sol";

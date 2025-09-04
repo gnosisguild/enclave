@@ -11,10 +11,12 @@ import {
   type SDKConfig,
   type AllEventTypes,
   type EventCallback,
+  type FheProtocol,
+  type ProtocolParams,
   EnclaveEventType,
   RegistryEventType,
   SDKError,
-} from "@gnosis-guild/enclave-sdk";
+} from "@enclave-e3/sdk";
 
 export interface UseEnclaveSDKConfig {
   contracts?: {
@@ -23,6 +25,8 @@ export interface UseEnclaveSDKConfig {
   };
   chainId?: number;
   autoConnect?: boolean;
+  protocol: FheProtocol;
+  protocolParams?: ProtocolParams;
 }
 
 export interface UseEnclaveSDKReturn {
@@ -55,7 +59,7 @@ export interface UseEnclaveSDKReturn {
  *
  * @example
  * ```tsx
- * import { useEnclaveSDK } from '@gnosis-guild/enclave-react';
+ * import { useEnclaveSDK } from '@enclave-e3/react';
  *
  * function MyComponent() {
  *   const {
@@ -69,7 +73,13 @@ export interface UseEnclaveSDKReturn {
  *     contracts: {
  *       enclave: '0x...',
  *       ciphernodeRegistry: '0x...'
- *     }
+ *     },
+ *     protocol: EFheProtocol.BFV,
+ *     protocolParams: {
+ *       degree: 2048,
+ *       plaintextModulus: 1032193n,
+ *       moduli: 0x3FFFFFFF000001n,
+ *     },
  *   });
  *
  *   // Use the SDK...
@@ -107,6 +117,8 @@ export const useEnclaveSDK = (
           ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
         },
         chainId: config.chainId,
+        protocol: config.protocol,
+        protocolParams: config.protocolParams,
       };
 
       const newSdk = new EnclaveSDK(sdkConfig);

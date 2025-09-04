@@ -1,0 +1,22 @@
+{
+<<<<<<< HEAD:packages/evm/tsconfig.json
+  "extends": "@gnosis-guild/enclave-config/tsconfig.json",
+  "include": [
+    "tasks/**/*",
+    "test/**/*",
+    "deploy/**/*",
+    "types/**/*",
+    "scripts/**/*"
+  ],
+=======
+  "extends": "@enclave-e3/config/tsconfig.json",
+  "include": ["tasks/**/*", "test/**/*", "deploy/**/*", "types/**/*"],
+>>>>>>> main:packages/enclave-contracts/tsconfig.json
+  "exclude": ["node_modules", "dist"],
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  }
+}

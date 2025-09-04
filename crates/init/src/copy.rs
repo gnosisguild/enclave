@@ -50,6 +50,7 @@ where
             &filter.glob_pattern
         );
         info!("Running filter: {:?}", filter);
+
         let file_paths = fs.find_files(&dest_path, &prefixed_glob_pattern).await?;
         info!("pattern:{} found {:?}", filter.glob_pattern, file_paths);
 

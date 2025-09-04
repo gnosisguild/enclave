@@ -1,0 +1,11 @@
+[package]
+name = "greco"
+version = "0.1.0"
+type = "lib"
+authors = ["Gnosis Guild"]
+license = "MIT"
+
+[dependencies]
+poseidon = { tag = "v0.1.1", git = "https://github.com/noir-lang/poseidon" }
+polynomial = { path = "../polynomial" }
+safe = { path = "../safe" }

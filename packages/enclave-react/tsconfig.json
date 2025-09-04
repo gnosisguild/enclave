@@ -1,5 +1,5 @@
 {
-  "extends": "@gnosis-guild/enclave-config/dom.tsconfig.json",
+  "extends": "@enclave-e3/config/dom.tsconfig.json",
   "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist"],
   "compilerOptions": {

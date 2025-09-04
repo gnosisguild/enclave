@@ -4,7 +4,7 @@
 cargo install --locked --path ./crates/cli --bin enclave -f
 
 # Deploy Contacts
-(cd packages/evm && rm -rf deployments/localhost && pnpm deploy:mocks --network localhost)
+(cd packages/enclave-contracts && rm -rf deployments/localhost && pnpm deploy:mocks --network localhost)
 
 # Deploy CRISP Contracts
 (cd examples/CRISP && ETH_WALLET_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 FOUNDRY_PROFILE=local forge script --rpc-url http://localhost:8545 --broadcast deploy/Deploy.s.sol)
@@ -24,4 +24,4 @@ pnpm ciphernode:add --ciphernode-address "$CN3" --network "localhost"
 
 
 # Delete local DB
-(rm -rf ./examples/CRISP/apps/server/database)
+(rm -rf ./examples/CRISP/server/database)

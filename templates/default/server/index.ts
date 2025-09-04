@@ -10,7 +10,8 @@ import {
   EnclaveEventType,
   type E3ActivatedData,
   type InputPublishedData,
-} from "@gnosis-guild/enclave-sdk";
+  FheProtocol,
+} from "@enclave-e3/sdk";
 import { handleTestInteraction } from "./testHandler";
 import { getCheckedEnvVars } from "./utils";
 import { callFheRunner } from "./runner";
@@ -49,6 +50,7 @@ async function createPrivateSDK() {
       ciphernodeRegistry: CIPHERNODE_REGISTRY_CONTRACT as `0x${string}`,
     },
     chainId: CHAIN_ID,
+    protocol: FheProtocol.BFV,
   });
 
   await sdk.initialize();

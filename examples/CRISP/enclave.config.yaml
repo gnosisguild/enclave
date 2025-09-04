@@ -6,6 +6,13 @@ chains:
       ciphernode_registry: "0x36b58F5C1969B7b6591D752ea6F5486D069010AB"
       filter_registry: "0x8198f5d8F8CfFE8f9C413d98a0A55aEB8ab9FbB7"
 
+program:
+  dev: true
+  # risc0:
+  #   risc0_dev_mode: 1
+  #   bonsai_api_key: xxxxxxxxxxxxxxxx
+  #   bonsai_api_url: xxxxxxxxxxxxxxxx
+
 nodes:
   cn1:
     address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"

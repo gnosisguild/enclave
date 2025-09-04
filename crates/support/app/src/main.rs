@@ -28,7 +28,6 @@ async fn call_webhook(
         proof,
     };
     println!("callback_url: {}", callback_url);
-    println!("payload: {:?}", payload);
     reqwest::Client::new()
         .post(callback_url)
         .json(&payload)
