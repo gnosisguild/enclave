@@ -2,48 +2,33 @@ import * as fs from "fs";
 import { ethers } from "hardhat";
 import * as path from "path";
 
-// Configuration
+// --- Config -------------------------------------------------------
 const OPERATORS = [
   "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E",
   "0xdD2FD4581271e230360230F9337D5c0430Bf44C0",
   "0x2546BcD3c84621e976D8185a91A922aE77ECEc30",
 ];
-
-// Load deployment addresses
-function loadDeploymentAddresses() {
-  const deploymentPath = path.join(
-    __dirname,
-    "../deployments/deployment-31337.json",
-  );
-  const deployment = JSON.parse(fs.readFileSync(deploymentPath, "utf8"));
-  return {
-    contracts: deployment.contracts,
-    eigenLayer: deployment.eigenLayer,
-    config: deployment.config,
-  };
-}
-
 const ENCL_AMOUNT = ethers.parseEther("1000");
 const USDC_AMOUNT = ethers.parseUnits("10000", 6);
 const TICKET_COUNT = 100;
 const AVS_METADATA_URI = "https://example.com/avs.json";
-const MAG_100 = 1_000_000_000n; // 100% in PPB (Parts Per Billion) - EigenLayer uint64 magnitudes
+const MAG_100 = 1_000_000_000n;
 
-// Minimal ABIs
+// --- Minimal ABIs -------------------------------------------------
 const ERC20_ABI = [
   "function approve(address,uint256) external returns (bool)",
-  "function mint(address,uint256) external",
+  "function allowance(address,address) view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+  "function decimals() view returns (uint8)",
 ];
-
+const MOCK_USDC_ABI = [...ERC20_ABI, "function mint(address,uint256) external"];
 const STRATEGY_MANAGER_ABI = [
-  "function depositIntoStrategy(address,address,uint256) external returns (uint256)",
+  "function depositIntoStrategy(address strategy,address token,uint256 amount) external returns (uint256)",
 ];
-
 const DELEGATION_MANAGER_ABI = [
   "function isOperator(address) view returns (bool)",
   "function registerAsOperator(address,uint32,string) external",
 ];
-
 const ALLOCATION_MANAGER_ABI = [
   "function setAllocationDelay(address operator, uint32 delay) external",
   "function modifyAllocations(address operator, tuple(tuple(address avs,uint32 id) operatorSet, address[] strategies, uint64[] newMagnitudes)[] calldata params) external",
@@ -53,49 +38,76 @@ const ALLOCATION_MANAGER_ABI = [
   "function isOperatorSlashable(address operator, tuple(address avs, uint32 id) operatorSet) external view returns (bool)",
 ];
 
+// --- Helpers ------------------------------------------------------
+function loadDeploymentAddresses(chainId: string) {
+  const deploymentPath = path.join(
+    __dirname,
+    "../deployments",
+    `deployment-${chainId}.json`,
+  );
+  const deployment = JSON.parse(fs.readFileSync(deploymentPath, "utf8"));
+  return {
+    contracts: deployment.contracts,
+    eigenLayer: deployment.eigenLayer,
+    config: deployment.config,
+  };
+}
+
 async function mineBlocks(n: number) {
   const hex = "0x" + n.toString(16);
   await ethers.provider.send("hardhat_mine", [hex]);
 }
 
 async function fundOperatorWithETH(operatorAddress: string, admin: any) {
-  // Send ETH to operator for gas fees
   await admin.sendTransaction({
     to: operatorAddress,
-    value: ethers.parseEther("10"), // 10 ETH for gas
+    value: ethers.parseEther("10"),
   });
 }
 
 async function mintAndApproveTokens(
+  admin: any,
   operatorSigner: any,
   operatorAddress: string,
   deployment: any,
+  isLiveNetwork: boolean,
 ) {
-  // Get contract addresses from deployment
-  const enclTokenAddr = deployment.contracts.enclToken;
+  const enclTokenAddr =
+    deployment.contracts.enclToken ?? deployment.contracts.enclaveToken;
   const usdcTokenAddr = deployment.contracts.usdcToken;
   const strategyManagerAddr = deployment.eigenLayer.strategyManager;
 
-  // Mint and approve ENCL
-  const enclToken = await ethers.getContractAt(ERC20_ABI, enclTokenAddr);
-  await (await enclToken.mint(operatorAddress, ENCL_AMOUNT)).wait();
+  const enclToken = await ethers.getContractAt("EnclaveToken", enclTokenAddr);
+  const MINTER_ROLE = await enclToken.MINTER_ROLE();
+  const adminIsMinter = await enclToken.hasRole(MINTER_ROLE, admin.address);
+  if (!adminIsMinter)
+    throw new Error("Admin does not have MINTER_ROLE on enclToken.");
+  await (
+    await enclToken
+      .connect(admin)
+      .mintAllocation(operatorAddress, ENCL_AMOUNT, "operator bootstrap")
+  ).wait();
+
+  if (!isLiveNetwork) {
+    const usdc = await ethers.getContractAt(MOCK_USDC_ABI, usdcTokenAddr);
+    await (await usdc.connect(admin).mint(operatorAddress, USDC_AMOUNT)).wait();
+  }
+
   await (
     await enclToken
       .connect(operatorSigner)
       .approve(strategyManagerAddr, ENCL_AMOUNT)
   ).wait();
-
-  // Mint and approve USDC
-  const usdcToken = await ethers.getContractAt(ERC20_ABI, usdcTokenAddr);
-  await (await usdcToken.mint(operatorAddress, USDC_AMOUNT)).wait();
+  const usdcForApprove = await ethers.getContractAt(ERC20_ABI, usdcTokenAddr);
   await (
-    await usdcToken
+    await usdcForApprove
       .connect(operatorSigner)
       .approve(strategyManagerAddr, USDC_AMOUNT)
   ).wait();
 
   console.log(
-    `Tokens minted and approved -> ENCL: ${ethers.formatEther(ENCL_AMOUNT)}, USDC: ${ethers.formatUnits(USDC_AMOUNT, 6)}`,
+    `Tokens prepared -> ENCL minted ${ethers.formatEther(ENCL_AMOUNT)}; ` +
+      `${isLiveNetwork ? "USDC: assumed pre-funded" : `USDC minted ${ethers.formatUnits(USDC_AMOUNT, 6)}`}`,
   );
 }
 
@@ -105,7 +117,8 @@ async function depositIntoStrategies(
   deployment: any,
 ) {
   const strategyManagerAddr = deployment.eigenLayer.strategyManager;
-  const enclTokenAddr = deployment.contracts.enclToken;
+  const enclTokenAddr =
+    deployment.contracts.enclToken ?? deployment.contracts.enclaveToken;
   const usdcTokenAddr = deployment.contracts.usdcToken;
   const enclStrategyAddr = deployment.contracts.enclStrategy;
   const usdcStrategyAddr = deployment.contracts.usdcStrategy;
@@ -114,17 +127,13 @@ async function depositIntoStrategies(
     STRATEGY_MANAGER_ABI,
     strategyManagerAddr,
   );
-
   console.log("Depositing into EigenLayer strategies...");
 
-  // Deposit ENCL
   await (
     await strategyManager
       .connect(operatorSigner)
       .depositIntoStrategy(enclStrategyAddr, enclTokenAddr, ENCL_AMOUNT)
   ).wait();
-
-  // Deposit USDC
   await (
     await strategyManager
       .connect(operatorSigner)
@@ -144,13 +153,11 @@ async function registerAsEigenLayerOperator(
     DELEGATION_MANAGER_ABI,
     delegationManagerAddr,
   );
-
   const isOperator = await delegationManager.isOperator(operatorAddress);
   if (isOperator) {
     console.log("Already EigenLayer operator");
     return true;
   }
-
   await (
     await delegationManager
       .connect(operatorSigner)
@@ -172,28 +179,19 @@ async function setAllocationDelayAndMine(
   );
 
   try {
-    // Phase 1: Schedule the delay (creates pending state)
     await (
       await allocationManager
         .connect(operatorSigner)
         .setAllocationDelay(operatorAddress, 0)
     ).wait();
-    console.log(
-      "Phase 1: Allocation delay scheduled; mining blocks for it to take effect...",
-    );
-
-    // Wait for effectBlock to pass (with config=0, +1 block is enough, but mine 2 to be safe)
+    console.log("Phase 1: Allocation delay scheduled; mining blocks...");
     await mineBlocks(2);
-
-    // Phase 2: Commit the pending delay (sets isSet=true)
     await (
       await allocationManager
         .connect(operatorSigner)
         .setAllocationDelay(operatorAddress, 0)
     ).wait();
-    console.log("Phase 2: Allocation delay committed (isSet=true)");
-
-    // Optional: Verify the delay is properly set
+    console.log("Phase 2: Allocation delay committed");
     const [isSet, delay] =
       await allocationManager.getAllocationDelay(operatorAddress);
     console.log(`Allocation delay verified: isSet=${isSet}, delay=${delay}`);
@@ -220,7 +218,6 @@ async function allocateMagnitudes(
     allocationManagerAddr,
   );
 
-  // Check existing allocations first to avoid SameMagnitude error
   try {
     const enclAllocation = await allocationManager.getAllocation(
       operatorAddress,
@@ -232,8 +229,6 @@ async function allocateMagnitudes(
       { avs: serviceManagerAddr, id: operatorSetId },
       usdcStrategyAddr,
     );
-
-    // If both strategies already have 100% allocation, skip
     if (
       enclAllocation.currentMagnitude == MAG_100 &&
       usdcAllocation.currentMagnitude == MAG_100
@@ -243,13 +238,11 @@ async function allocateMagnitudes(
       );
       return;
     }
-  } catch (e: any) {
-    // If getAllocation fails, proceed with allocation (probably first time)
+  } catch {
     console.log("First-time allocation (no existing allocation found)");
   }
 
-  // Allocate 100% magnitude for BOTH strategies to operator set (make everything slashable)
-  const allocParams = [
+  const params = [
     {
       operatorSet: { avs: serviceManagerAddr, id: operatorSetId },
       strategies: [enclStrategyAddr, usdcStrategyAddr],
@@ -258,13 +251,12 @@ async function allocateMagnitudes(
   ];
 
   console.log(
-    `Attempting to allocate magnitudes: [${allocParams[0].newMagnitudes.join(", ")}] to strategies: [${allocParams[0].strategies.join(", ")}]`,
+    `Allocating magnitudes 100/100 to strategies ${enclStrategyAddr}, ${usdcStrategyAddr}`,
   );
-
   await (
     await allocationManager
       .connect(operatorSigner)
-      .modifyAllocations(operatorAddress, allocParams)
+      .modifyAllocations(operatorAddress, params)
   ).wait();
   console.log("Allocated ENCL+USDC magnitude (100% each) to AVS operator set");
 }
@@ -279,19 +271,13 @@ async function acquireLicense(
     "BondingManager",
     bondingManagerAddr,
   );
-
-  // Check if operator is already active (has license and tickets)
   try {
     const isActive = await bondingManager.isActive(operatorAddress);
     if (isActive) {
       console.log("License already acquired (operator is active)");
       return;
     }
-  } catch (e: any) {
-    // If isActive fails, try to acquire license
-    console.log("Checking license status failed, proceeding with acquisition");
-  }
-
+  } catch {}
   await (await bondingManager.connect(operatorSigner).acquireLicense()).wait();
   console.log("License acquired");
 }
@@ -306,23 +292,19 @@ async function purchaseTickets(
     "BondingManager",
     bondingManagerAddr,
   );
-
-  // Check if operator already has sufficient tickets
   try {
-    const ticketSpent = await bondingManager.ticketBudgetSpent(operatorAddress);
-    const ticketPrice = await bondingManager.getTicketPrice();
-    const expectedSpent = BigInt(TICKET_COUNT) * ticketPrice;
-
-    if (ticketSpent >= expectedSpent) {
+    const spent = await bondingManager.ticketBudgetSpent(operatorAddress);
+    const price = await bondingManager.getTicketPrice();
+    const expected = BigInt(TICKET_COUNT) * price;
+    if (spent >= expected) {
       console.log(
-        `Already purchased ${TICKET_COUNT}+ tickets (spent: ${ethers.formatUnits(ticketSpent, 6)} USDC)`,
+        `Already purchased ${TICKET_COUNT}+ tickets (spent: ${ethers.formatUnits(spent, 6)} USDC)`,
       );
       return;
     }
   } catch (e: any) {
     console.log("~ Checking ticket status failed, proceeding with purchase");
   }
-
   await (
     await bondingManager.connect(operatorSigner).purchaseTickets(TICKET_COUNT)
   ).wait();
@@ -342,7 +324,6 @@ async function registerToOperatorSet(
   const serviceManagerAddr = deployment.contracts.serviceManager;
   const operatorSetId = deployment.config.tokenomics.operatorSetId;
 
-  // Check if operator is already registered to this operator set
   try {
     const isSlashable = await allocationManager.isOperatorSlashable(
       operatorAddress,
@@ -380,8 +361,6 @@ async function registerCiphernode(
     "BondingManager",
     bondingManagerAddr,
   );
-
-  // Check if ciphernode is already registered
   try {
     const isRegistered =
       await bondingManager.isRegisteredOperator(operatorAddress);
@@ -401,11 +380,11 @@ async function registerCiphernode(
   console.log("Ciphernode registered");
 }
 
+// --- Main ---------------------------------------------------------
 async function main() {
   const [admin] = await ethers.getSigners();
-
-  // Load deployment addresses
-  const deployment = loadDeploymentAddresses();
+  const chainId = (await ethers.provider.getNetwork()).chainId.toString();
+  const deployment = loadDeploymentAddresses(chainId);
 
   console.log("EIGENLAYER OPERATOR REGISTRATION");
   console.log("=".repeat(65));
@@ -413,12 +392,10 @@ async function main() {
   console.log("ServiceManager:", deployment.contracts.serviceManager);
   console.log("BondingManager:", deployment.contracts.bondingManager);
 
-  // AVS-level setup (admin operations)
   const serviceManager = await ethers.getContractAt(
     "ServiceManager",
     deployment.contracts.serviceManager,
   );
-
   try {
     await (
       await serviceManager.connect(admin).publishAVSMetadata(AVS_METADATA_URI)
@@ -428,47 +405,48 @@ async function main() {
     console.log("~ publishAVSMetadata skipped:", e.message ?? e);
   }
 
-  // Ensure operator set exists (safety net in case deployment didn't create it)
+  const operatorSetId = deployment.config.tokenomics.operatorSetId;
   try {
     await (
       await serviceManager
         .connect(admin)
-        .createOperatorSet(deployment.config.operatorSetId, [
+        .createOperatorSet(operatorSetId, [
           deployment.contracts.enclStrategy,
           deployment.contracts.usdcStrategy,
         ])
     ).wait();
-    console.log(
-      `Operator set ${deployment.config.operatorSetId} created (runtime)`,
-    );
+    console.log(`Operator set ${operatorSetId} created (runtime)`);
   } catch (e: any) {
     console.log(
       `~ createOperatorSet skipped (likely exists): ${e.message ?? e}`,
     );
   }
-
   console.log(
-    `Using operator set ${deployment.config.operatorSetId} (configured at deploy-time)`,
+    `Using operator set ${operatorSetId} (configured at deploy-time)`,
   );
 
-  // Register each operator
+  const isLiveNetwork = chainId !== "31337";
+
   let successCount = 0;
   for (const operatorAddress of OPERATORS) {
     console.log(`\nRegistering Operator: ${operatorAddress}`);
     console.log("=".repeat(64));
 
     try {
-      // Fund operator with ETH for gas
       await fundOperatorWithETH(operatorAddress, admin);
 
-      // Impersonate operator
       await ethers.provider.send("hardhat_impersonateAccount", [
         operatorAddress,
       ]);
       const operatorSigner = await ethers.getSigner(operatorAddress);
 
-      // Complete registration flow
-      await mintAndApproveTokens(operatorSigner, operatorAddress, deployment);
+      await mintAndApproveTokens(
+        admin,
+        operatorSigner,
+        operatorAddress,
+        deployment,
+        isLiveNetwork,
+      );
       await depositIntoStrategies(operatorSigner, operatorAddress, deployment);
       await registerAsEigenLayerOperator(
         operatorSigner,
@@ -489,7 +467,6 @@ async function main() {
       console.log(`Operator ${operatorAddress} registered successfully!`);
       successCount++;
 
-      // Stop impersonation
       await ethers.provider.send("hardhat_stopImpersonatingAccount", [
         operatorAddress,
       ]);
@@ -497,17 +474,6 @@ async function main() {
       console.error(
         `Operator ${operatorAddress} failed: ${error?.message ?? error}`,
       );
-
-      // Try to extract error signature for debugging
-      if (error.receipt && error.receipt.blockNumber) {
-        console.log(
-          `Block: ${error.receipt.blockNumber}, Gas: ${error.receipt.gasUsed}, To: ${error.receipt.to}`,
-        );
-      }
-      if (error.data) {
-        console.log(`Error data: ${error.data}`);
-      }
-
       try {
         await ethers.provider.send("hardhat_stopImpersonatingAccount", [
           operatorAddress,
@@ -517,14 +483,13 @@ async function main() {
     }
   }
 
-  // Final summary
   console.log("\n" + "=".repeat(65));
   console.log("REGISTRATION SUMMARY");
   console.log("=".repeat(65));
   console.log(`Successful registrations: ${successCount}/${OPERATORS.length}`);
   if (successCount < OPERATORS.length) {
     console.log(
-      `\ ${OPERATORS.length - successCount} operators failed registration`,
+      `\\ ${OPERATORS.length - successCount} operators failed registration`,
     );
   }
 }
