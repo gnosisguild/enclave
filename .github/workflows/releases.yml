@@ -48,6 +48,7 @@ jobs:
           git rm --cached --ignore-unmatch "packages/enclave-contracts/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json" || true
           git rm --cached --ignore-unmatch "packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json" || true
           git rm --cached --ignore-unmatch "packages/enclave-contracts/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json" || true
+          git rm --cached --ignore-unmatch "examples/CRISP/contracts/ImageID.sol" || true
 
           # Ensure we're on the main branch and up to date
           git checkout main
