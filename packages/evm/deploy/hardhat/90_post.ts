@@ -99,6 +99,7 @@ const func: DeployFunction = async (hre) => {
     // AVS init
     await (await smc.setAVSRegistrar(sm.address)).wait();
     await (await smc.publishAVSMetadata(AVS_METADATA_URL)).wait();
+    await (await smc.setRewardDistributor(enclave.address)).wait();
 
     const enclStrategy = (await hre.deployments.getOrNull("EnclStrategy"))
       ?.address;

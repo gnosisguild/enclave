@@ -1,6 +1,7 @@
 import "./tasks/accounts";
 import "./tasks/ciphernode";
 import "./tasks/enclave";
+import "./tasks/workflow";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomicfoundation/hardhat-foundry";
 import "@nomicfoundation/hardhat-toolbox";
