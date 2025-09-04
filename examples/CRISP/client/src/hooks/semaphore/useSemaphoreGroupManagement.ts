@@ -17,7 +17,7 @@ import {
     E3_PROGRAM_ABI,
 } from '@/config/Enclave.abi';
 import { SemaphoreEthers } from '@semaphore-protocol/data';
-import type { Identity } from '@semaphore-protocol/core/identity';
+import type { Identity } from '@semaphore-protocol/identity';
 import { useCallback, useEffect, useRef } from 'react';
 
 interface SemaphoreGroupManagement {

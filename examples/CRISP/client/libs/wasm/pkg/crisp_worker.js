@@ -4,18 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import * as WasmInstance from './crisp_wasm_crypto';
-
-let wasmInstance = null;
-let encryptInstance = null;
-
-async function initWasm() {
-    if (!wasmInstance) {
-        wasmInstance = await WasmInstance.default();
-        encryptInstance = new WasmInstance.Encrypt();
-    }
-}
-initWasm();
+import { EnclaveSDK, FheProtocol } from '@gnosis-guild/enclave-sdk';
+import circuit from "../../noir/crisp_circuit.json";
 
 self.onmessage = async function (event) {
     const { type, data } = event.data;
@@ -23,18 +13,34 @@ self.onmessage = async function (event) {
         case 'encrypt_vote':
             try {
                 const { voteId, publicKey } = data;
-                if (!wasmInstance || !encryptInstance) {
-                    await initWasm();
-                }
-                const result = encryptInstance.encrypt_vote(voteId, publicKey);
-                const circuitInputs = JSON.parse(result.circuit_inputs);
+                // use default params for now as they do not matter for what we are doing here, 
+                // which is just encrypting the vote and generating a proof
+                const sdk = EnclaveSDK.create({
+                    chainId: 31337,
+                    contracts: {
+                      enclave: "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+                      ciphernodeRegistry: "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+                    },
+                    // local node 
+                    rpcUrl: "http://localhost:8545",
+                    // default Anvil private key 
+                    privateKey:
+                      "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+                    protocol: FheProtocol.BFV,
+                  });
 
+                const result = await sdk.encryptNumberAndGenProof(
+                    voteId,
+                    publicKey,
+                    circuit
+                );
+                
                 self.postMessage({
                     type: 'encrypt_vote',
                     success: true,
                     encryptedVote: {
-                        vote: result.encrypted_vote,
-                        circuitInputs,
+                        vote: result.encryptedVote,
+                        proofData: result.proof,
                     },
                 });
             } catch (error) {

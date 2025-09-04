@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "server",
-  "wasm-crypto",
   ".enclave/support/dev",
   "program",
 ]

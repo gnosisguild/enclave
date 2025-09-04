@@ -9,7 +9,7 @@ import { VoteManagementContextType, VoteManagementProviderProps } from '@/contex
 import { useWebAssemblyHook } from '@/hooks/wasm/useWebAssembly'
 import { useEffect, useState } from 'react'
 import { useAccount } from 'wagmi'
-import { Identity } from '@semaphore-protocol/core/identity'
+import { Identity } from '@semaphore-protocol/identity'
 import { VoteStateLite, VotingRound } from '@/model/vote.model'
 import { useEnclaveServer } from '@/hooks/enclave/useEnclaveServer'
 import { convertPollData, convertTimestampToDate } from '@/utils/methods'

@@ -9,6 +9,7 @@
   },
   "homepage": "https://github.com/gnosisguild/CRISP",
   "scripts": {
+    "cli": "pnpm sh ./scripts/cli.sh",
     "dev": "vite --no-open --host",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -17,6 +18,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@gnosis-guild/enclave-sdk": "workspace:*",
     "@aztec/bb.js": "^0.82.2",
     "@emotion/babel-plugin": "^11.11.0",
     "@emotion/react": "^11.11.4",
@@ -24,8 +26,10 @@
     "@noir-lang/noir_js": "1.0.0-beta.3",
     "@noir-lang/noirc_abi": "1.0.0-beta.3",
     "@phosphor-icons/react": "^2.1.4",
-    "@semaphore-protocol/core": "github:hmzakhalid/semaphore-noir#dist-core",
-    "@semaphore-protocol/data": "^4.9.2",
+    "@semaphore-protocol/identity": "^4.12.1",
+    "@semaphore-protocol/data": "^4.12.1",
+    "@semaphore-protocol/group": "^4.12.1",
+    "@hashcloak/semaphore-noir-proof": "1.0.0",
     "@svgr/rollup": "^8.1.0",
     "@tanstack/react-query": "^5.74.3",
     "axios": "^1.6.8",

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { hexToBytes, encodeAbiParameters, parseAbiParameters, bytesToHex } from 'viem';
-import { type SemaphoreNoirProof } from '@semaphore-protocol/core';
+import { type SemaphoreNoirProof } from '@hashcloak/semaphore-noir-proof';
 
 const abi = parseAbiParameters(
     '(uint256,uint256,uint256,uint256,uint256,bytes)'
@@ -26,4 +26,24 @@ export function encodeSemaphoreProof(
     ]);
 
     return hexToBytes(hex);
+}
+
+const crispAbi = parseAbiParameters(
+    '(bytes, bytes, bytes32[], bytes)'
+);
+
+export const encodeCrispInputs = (
+    semaphoreProof: Uint8Array,
+    noirProof: Uint8Array,
+    noirPublicInputs: string[],
+    encryptedVote: Uint8Array
+): string => {
+    return encodeAbiParameters(crispAbi, [
+        [
+            bytesToHex(semaphoreProof),
+            bytesToHex(noirProof),
+            noirPublicInputs.map(input => input as `0x${string}`),
+            bytesToHex(encryptedVote)
+        ]
+    ])
 }
