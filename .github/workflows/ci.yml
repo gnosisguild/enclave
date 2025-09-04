@@ -61,9 +61,6 @@ jobs:
       - name: "Install the dependencies"
         run: "pnpm install"
 
-      - name: "Compile the contracts and generate the TypeChain bindings"
-        run: "pnpm typechain"
-
       - name: Checking code format ciphernode
         run: pnpm ciphernode:lint
 
@@ -155,9 +152,6 @@ jobs:
           echo "## Lint results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
 
-      - name: "Compile the contracts and generate the TypeChain bindings"
-        run: "pnpm typechain"
-
       - name: "Test the contracts and generate the coverage report"
         run: "pnpm coverage"
 
@@ -216,8 +210,7 @@ jobs:
         run: |
           echo "## Lint results" >> $GITHUB_STEP_SUMMARY
           echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
-      - name: "Compile the contracts and generate the TypeChain bindings"
-        run: "pnpm typechain"
+
       - name: "Run prebuild"
         run: "pnpm test:integration prebuild"
       - name: "Verify build artifacts exist"

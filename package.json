@@ -33,7 +33,6 @@
     "evm:node": "cd packages/enclave-contracts && pnpm hardhat node",
     "evm:build": "cd packages/enclave-contracts && pnpm compile",
     "evm:lint": "cd packages/enclave-contracts && pnpm lint",
-    "evm:typechain": "cd packages/enclave-contracts && pnpm typechain",
     "evm:test": "cd packages/enclave-contracts && pnpm test",
     "evm:coverage": "cd packages/enclave-contracts && pnpm coverage",
     "evm:release": "cd packages/enclave-contracts && pnpm release",
