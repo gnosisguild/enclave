@@ -29,22 +29,9 @@ echo ""
 echo "2. Deploying Complete Enclave System"  
 echo "===================================="
 
-DEPLOY_TOKENOMICS=true npx hardhat deploy --network localhost --tags enclave
+npx hardhat deploy --network localhost --tags enclave,tokenomics,post,mocks
 
 if [ $? -ne 0 ]; then
     echo "Enclave system deployment failed"
-    exit 1
-fi
-
-echo "Enclave & EigenLayer contracts deployed"
-echo ""
-
-echo "3. Deploying Mock Deployments"
-echo "============================"
-
-npx hardhat deploy --network localhost --tags mocks
-
-if [ $? -ne 0 ]; then
-    echo "Mock deployments failed"
     exit 1
 fi
