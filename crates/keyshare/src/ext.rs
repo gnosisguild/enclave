@@ -6,7 +6,7 @@
 
 use crate::{
     Keyshare, KeyshareParams, KeyshareRepositoryFactory, KeyshareState, ThresholdKeyshare,
-    ThresholdKeyshareParams, ThresholdKeyshareRepositoryFactory,
+    ThresholdKeyshareParams, ThresholdKeyshareRepositoryFactory, ThresholdKeyshareState,
 };
 use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
@@ -16,7 +16,7 @@ use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use e3_fhe::{ext::FHE_KEY, SharedRng};
 use e3_multithread::Multithread;
-use e3_request::{E3Context, E3ContextSnapshot, E3Extension};
+use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;
 
 pub struct KeyshareExtension {
@@ -122,7 +122,6 @@ impl E3Extension for KeyshareExtension {
 
 pub struct ThresholdKeyshareExtension {
     bus: Addr<EventBus<EnclaveEvent>>,
-    address: String,
     cipher: Arc<Cipher>,
     rng: SharedRng,
     multithread: Addr<Multithread>,
@@ -131,14 +130,12 @@ pub struct ThresholdKeyshareExtension {
 impl ThresholdKeyshareExtension {
     pub fn create(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        address: &str,
         cipher: &Arc<Cipher>,
         multithread: &Addr<Multithread>,
         rng: &SharedRng,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
-            address: address.to_owned(),
             cipher: cipher.to_owned(),
             multithread: multithread.clone(),
             rng: rng.clone(),
@@ -155,8 +152,22 @@ impl E3Extension for ThresholdKeyshareExtension {
         };
 
         let e3_id = data.clone().e3_id;
+        let party_id = data.clone().party_id;
+        let Some(meta) = ctx.get_dependency(META_KEY) else {
+            self.bus.err(
+                EnclaveErrorType::KeyGeneration,
+                anyhow!(ERROR_KEYSHARE_FHE_MISSING),
+            );
+            return;
+        };
         let repo = ctx.repositories().threshold_keyshare(&e3_id);
-        let container = repo.send(Some(KeyshareState::Init)); // New container with None
+        let container = repo.send(Some(ThresholdKeyshareState::new(
+            KeyshareState::Init,
+            meta.threshold_m as u64,
+            party_id,
+        )));
+
+        // New container with None
         println!("got container");
         ctx.set_event_recipient(
             "threshold_keyshare",

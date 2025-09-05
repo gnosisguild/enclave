@@ -8,7 +8,7 @@ use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
 use e3_events::E3id;
 
-use crate::KeyshareState;
+use crate::ThresholdKeyshareState;
 
 pub trait KeyshareRepositoryFactory {
     fn keyshare(&self, e3_id: &E3id) -> Repository<Vec<u8>>;
@@ -21,11 +21,11 @@ impl KeyshareRepositoryFactory for Repositories {
 }
 
 pub trait ThresholdKeyshareRepositoryFactory {
-    fn threshold_keyshare(&self, e3_id: &E3id) -> Repository<KeyshareState>;
+    fn threshold_keyshare(&self, e3_id: &E3id) -> Repository<ThresholdKeyshareState>;
 }
 
 impl ThresholdKeyshareRepositoryFactory for Repositories {
-    fn threshold_keyshare(&self, e3_id: &E3id) -> Repository<KeyshareState> {
+    fn threshold_keyshare(&self, e3_id: &E3id) -> Repository<ThresholdKeyshareState> {
         Repository::new(self.store.scope(StoreKeys::threshold_keyshare(e3_id)))
     }
 }

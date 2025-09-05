@@ -171,6 +171,7 @@ impl Deref for CiphernodeSystem {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CiphernodeHistory(Vec<EnclaveEvent>);
 
 impl CiphernodeHistory {

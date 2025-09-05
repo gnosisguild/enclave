@@ -86,7 +86,6 @@ async fn setup_local_ciphernode(
     E3Router::builder(&local_bus, store)
         .with(ThresholdKeyshareExtension::create(
             &local_bus,
-            &addr,
             &cipher,
             &multithread,
             &rng,
@@ -211,16 +210,18 @@ async fn test_trbfv() -> Result<()> {
 
     // node #1 is selected so lets grab all events
     let h = nodes
-        .take_history_with_timeout(1, 4, Duration::from_secs(300))
+        .take_history_with_timeout(1, 5, Duration::from_secs(300))
         .await?;
+
+    println!("{:?}", h);
 
     assert_eq!(
         h.event_types(),
         vec![
             "E3Requested",
             "CiphernodeSelected",
-            "ThresholdKeyshareCreated",
-            "ThresholdKeyshareCreated"
+            "ThresholdShareCreated",
+            "ThresholdShareCreated"
         ]
     );
 

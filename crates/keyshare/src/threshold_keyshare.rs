@@ -4,14 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::{mem, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    mem,
+    sync::Arc,
+    time::Duration,
+};
 
 use actix::prelude::*;
 use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    CiphernodeSelected, ComputeRequest, ComputeResponse, E3id, EnclaveEvent, EventBus,
+    CiphernodeSelected, ComputeRequest, ComputeResponse, E3id, EnclaveEvent, EventBus, PartyId,
     ThresholdShare, ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
@@ -35,6 +40,12 @@ struct GenEsiSss(CiphernodeSelected);
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "Result<()>")]
 struct SharesGenerated;
+
+#[derive(Message, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[rtype(result = "()")]
+struct AllThresholdSharesCollected {
+    shares: HashMap<PartyId, ThresholdShare>,
+}
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingThresholdShareData {
@@ -110,19 +121,30 @@ impl KeyshareState {
     }
 }
 
-impl Default for KeyshareState {
-    fn default() -> Self {
-        KeyshareState::Init
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ThresholdKeyshareState {
+    pub state: KeyshareState,
+    pub total: u64,
+    pub party_id: PartyId,
+}
+
+impl ThresholdKeyshareState {
+    pub fn new(state: KeyshareState, total: u64, party_id: PartyId) -> Self {
+        Self {
+            state,
+            total,
+            party_id,
+        }
     }
 }
 
 pub struct ThresholdKeyshareParams {
     pub bus: Addr<EventBus<EnclaveEvent>>,
     pub cipher: Arc<Cipher>,
-    pub e3_id: E3id, // should this be on the persistable?
+    pub e3_id: E3id,
     pub multithread: Addr<Multithread>,
     pub rng: SharedRng,
-    pub state: Persistable<KeyshareState>,
+    pub state: Persistable<ThresholdKeyshareState>,
 }
 
 pub struct ThresholdKeyshare {
@@ -132,7 +154,7 @@ pub struct ThresholdKeyshare {
     e3_id: E3id,
     multithread: Addr<Multithread>,
     rng: SharedRng,
-    state: Persistable<KeyshareState>,
+    state: Persistable<ThresholdKeyshareState>,
 }
 
 impl ThresholdKeyshare {
@@ -155,20 +177,29 @@ impl Actor for ThresholdKeyshare {
 }
 
 impl ThresholdKeyshare {
-    pub fn ensure_collector(&mut self, self_addr: Addr<Self>) -> Addr<DecryptionKeyCollector> {
+    pub fn ensure_collector(
+        &mut self,
+        self_addr: Addr<Self>,
+    ) -> Result<Addr<DecryptionKeyCollector>> {
+        let Some(state) = self.state.get() else {
+            bail!("State not found on threshold keyshare. This should not happen.");
+        };
         let addr = self
             .decryption_key_collector
-            .get_or_insert_with(|| DecryptionKeyCollector { parent: self_addr }.start());
-        addr.clone()
+            .get_or_insert_with(|| DecryptionKeyCollector::setup(self_addr, state.total));
+        Ok(addr.clone())
     }
 
     pub fn send_to_decryption_key_collector(
         &mut self,
         msg: ThresholdShareCreated,
         self_addr: Addr<Self>,
-    ) {
-        let collector = self.ensure_collector(self_addr);
+    ) -> Result<()> {
+        println!("Sending ThresholdShareCreated to collector!");
+        let collector = self.ensure_collector(self_addr)?;
+        println!("got collector address!");
         collector.do_send(msg);
+        Ok(())
     }
 
     pub fn try_store_pk_share_and_sk_sss(
@@ -182,24 +213,30 @@ impl ThresholdKeyshare {
 
             let K::GeneratingThresholdShare {
                 party_id, esi_sss, ..
-            } = s.clone()
+            } = s.state.clone()
             else {
                 bail!("Cannot store pkshare and sk sss on state");
             };
 
             match esi_sss {
-                Some(esi_sss) => Ok(s.next(K::AggregatingDecryptionKey {
-                    party_id,
-                    esi_sss,
-                    pk_share,
-                    sk_sss,
-                })?),
-                None => Ok(s.next(K::GeneratingThresholdShare {
-                    party_id,
-                    esi_sss,
-                    pk_share: Some(pk_share),
-                    sk_sss: Some(sk_sss),
-                })?),
+                Some(esi_sss) => Ok(ThresholdKeyshareState {
+                    state: s.state.next(K::AggregatingDecryptionKey {
+                        esi_sss,
+                        party_id,
+                        pk_share,
+                        sk_sss,
+                    })?,
+                    ..s
+                }),
+                None => Ok(ThresholdKeyshareState {
+                    state: s.state.next(K::GeneratingThresholdShare {
+                        esi_sss,
+                        party_id,
+                        pk_share: Some(pk_share),
+                        sk_sss: Some(sk_sss),
+                    })?,
+                    ..s
+                }),
             }
         })
     }
@@ -213,23 +250,29 @@ impl ThresholdKeyshare {
                 pk_share,
                 party_id,
                 ..
-            } = s.clone()
+            } = s.state.clone()
             else {
                 bail!("Cannot store esi_sss on state");
             };
             match (sk_sss, pk_share) {
-                (Some(sk_sss), Some(pk_share)) => Ok(s.next(K::AggregatingDecryptionKey {
-                    party_id,
-                    esi_sss,
-                    pk_share,
-                    sk_sss,
-                })?),
-                (None, None) => Ok(s.next(K::GeneratingThresholdShare {
-                    party_id,
-                    sk_sss: None,
-                    pk_share: None,
-                    esi_sss: Some(esi_sss),
-                })?),
+                (Some(sk_sss), Some(pk_share)) => Ok(ThresholdKeyshareState {
+                    state: s.state.next(K::AggregatingDecryptionKey {
+                        esi_sss,
+                        party_id,
+                        pk_share,
+                        sk_sss,
+                    })?,
+                    ..s
+                }),
+                (None, None) => Ok(ThresholdKeyshareState {
+                    state: s.state.next(K::GeneratingThresholdShare {
+                        esi_sss: Some(esi_sss),
+                        party_id,
+                        pk_share: None,
+                        sk_sss: None,
+                    })?,
+                    ..s
+                }),
                 _ => bail!("Inconsistent state!"),
             }
         })
@@ -243,7 +286,7 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
         match msg {
             EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
             EnclaveEvent::ThresholdShareCreated { data, .. } => {
-                self.send_to_decryption_key_collector(data, ctx.address())
+                let _ = self.send_to_decryption_key_collector(data, ctx.address());
             }
             _ => (),
         }
@@ -253,6 +296,7 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
 impl Handler<CiphernodeSelected> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: CiphernodeSelected, ctx: &mut Self::Context) -> Self::Result {
+        let _ = self.ensure_collector(ctx.address());
         ctx.notify(StartThresholdShareGeneration(msg));
     }
 }
@@ -270,12 +314,15 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
         // Initialize State
         self.state.try_mutate(|s| {
             println!("Attempting to mutate....");
-            Ok(s.next(KeyshareState::GeneratingThresholdShare {
-                party_id,
-                sk_sss: None,
-                pk_share: None,
-                esi_sss: None,
-            })?)
+            Ok(ThresholdKeyshareState {
+                state: s.state.next(KeyshareState::GeneratingThresholdShare {
+                    party_id,
+                    sk_sss: None,
+                    pk_share: None,
+                    esi_sss: None,
+                })?,
+                ..s
+            })
         })?;
 
         println!("Trying to run processes...");
@@ -324,8 +371,10 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
                         println!("\nSTORING GEN ESI SSS...");
                         act.try_store_esi_sss(output.esi_sss)?;
 
-                        if let Some(KeyshareState::AggregatingDecryptionKey { .. }) =
-                            act.state.get()
+                        if let Some(ThresholdKeyshareState {
+                            state: KeyshareState::AggregatingDecryptionKey { .. },
+                            ..
+                        }) = act.state.get()
                         {
                             ctx.notify(SharesGenerated)
                         }
@@ -375,8 +424,10 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
 
                         println!("\nSTORING GEN PK SHARE AND SK SSS...");
                         act.try_store_pk_share_and_sk_sss(output.pk_share, output.sk_sss)?;
-                        if let Some(KeyshareState::AggregatingDecryptionKey { .. }) =
-                            act.state.get()
+                        if let Some(ThresholdKeyshareState {
+                            state: KeyshareState::AggregatingDecryptionKey { .. },
+                            ..
+                        }) = act.state.get()
                         {
                             ctx.notify(SharesGenerated);
                         }
@@ -391,15 +442,28 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
         )
     }
 }
-
+impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(
+        &mut self,
+        msg: AllThresholdSharesCollected,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        println!("AllThresholdSharesCollected");
+    }
+}
 impl Handler<SharesGenerated> for ThresholdKeyshare {
     type Result = Result<()>;
     fn handle(&mut self, msg: SharesGenerated, ctx: &mut Self::Context) -> Self::Result {
-        let Some(KeyshareState::AggregatingDecryptionKey {
-            party_id,
-            pk_share,
-            sk_sss,
-            esi_sss,
+        let Some(ThresholdKeyshareState {
+            state:
+                KeyshareState::AggregatingDecryptionKey {
+                    party_id,
+                    pk_share,
+                    sk_sss,
+                    esi_sss,
+                },
+            ..
         }) = self.state.get()
         else {
             bail!("Invalid state!");
@@ -429,13 +493,27 @@ impl Handler<SharesGenerated> for ThresholdKeyshare {
     }
 }
 
+pub enum CollectorState {
+    Collecting { total: u64 },
+    Finished,
+}
+
 pub struct DecryptionKeyCollector {
+    todo: HashSet<PartyId>,
     parent: Addr<ThresholdKeyshare>,
+    state: CollectorState,
+    shares: HashMap<PartyId, ThresholdShare>,
 }
 
 impl DecryptionKeyCollector {
-    pub fn setup(parent: Addr<ThresholdKeyshare>) -> Addr<Self> {
-        let addr = Self { parent }.start();
+    pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64) -> Addr<Self> {
+        let addr = Self {
+            todo: (0..total).collect(),
+            parent,
+            state: CollectorState::Collecting { total },
+            shares: HashMap::new(),
+        }
+        .start();
         addr
     }
 }
@@ -446,7 +524,32 @@ impl Actor for DecryptionKeyCollector {
 
 impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
     type Result = ();
-    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {}
+    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
+        println!("DecryptionKeyyCollector received event");
+        if let CollectorState::Finished = self.state {
+            println!("DecryptionKeyCollector is finished so ignoring!");
+            return;
+        };
+
+        let pid = msg.share.party_id;
+        println!("DecryptionKeyCollector party id: {}", pid);
+        let Some(_) = self.todo.take(&pid) else {
+            println!(
+                "Error: {} was not in decryption key collectors ID list",
+                pid
+            );
+            return;
+        };
+        println!("Inserting...");
+        self.shares.insert(pid, msg.share);
+        if self.todo.len() == 0 {
+            println!("We have recieved all the things");
+            self.state = CollectorState::Finished;
+            self.parent.do_send(AllThresholdSharesCollected {
+                shares: self.shares.clone(),
+            })
+        }
+    }
 }
 
 // Function to prepare tuple to put on an event
