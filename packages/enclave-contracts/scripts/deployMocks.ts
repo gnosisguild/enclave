@@ -3,12 +3,10 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { network } from "hardhat";
-
-import MockComputeProviderModule from "../ignition/modules/mockComputeProvider";
-import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
-import MockE3ProgramModule from "../ignition/modules/mockE3Program";
-import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
+import { deployAndSaveMockComputeProvider } from "./deployAndSave/mockComputeProvider";
+import { deployAndSaveMockDecryptionVerifier } from "./deployAndSave/mockDecryptionVerifier";
+import { deployAndSaveMockInputValidator } from "./deployAndSave/mockInputValidator";
+import { deployAndSaveMockProgram } from "./deployAndSave/mockProgram";
 
 export interface MockDeployments {
   computeProviderAddress: string;
@@ -23,30 +21,22 @@ export interface MockDeployments {
  * @returns The addresses of the mock contracts.
  */
 export const deployMocks = async (): Promise<MockDeployments> => {
-  const { ignition } = await network.connect();
+  const { computeProvider } = await deployAndSaveMockComputeProvider();
 
-  const computeProvider = await ignition.deploy(MockComputeProviderModule);
-  const computeProviderAddress =
-    await computeProvider.mockComputeProvider.getAddress();
+  const computeProviderAddress = await computeProvider.getAddress();
 
-  const decryptionVerifier = await ignition.deploy(
-    MockDecryptionVerifierModule,
-  );
-  const decryptionVerifierAddress =
-    await decryptionVerifier.mockDecryptionVerifier.getAddress();
+  const { decryptionVerifier } = await deployAndSaveMockDecryptionVerifier();
 
-  const inputValidator = await ignition.deploy(MockInputValidatorModule);
-  const inputValidatorAddress =
-    await inputValidator.mockInputValidator.getAddress();
+  const decryptionVerifierAddress = await decryptionVerifier.getAddress();
 
-  const e3Program = await ignition.deploy(MockE3ProgramModule, {
-    parameters: {
-      MockE3Program: {
-        mockInputValidator: inputValidatorAddress,
-      },
-    },
+  const { inputValidator } = await deployAndSaveMockInputValidator();
+  const inputValidatorAddress = await inputValidator.getAddress();
+
+  const { e3Program } = await deployAndSaveMockProgram({
+    mockInputValidator: inputValidatorAddress,
   });
-  const e3ProgramAddress = await e3Program.mockE3Program.getAddress();
+
+  const e3ProgramAddress = await e3Program.getAddress();
 
   console.log(`
         MockDeployments:

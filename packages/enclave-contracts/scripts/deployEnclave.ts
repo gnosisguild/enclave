@@ -5,17 +5,16 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { network } from "hardhat";
 
-import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
-import EnclaveModule from "../ignition/modules/enclave";
-import NaiveRegistryFilterModule from "../ignition/modules/naiveRegistryFilter";
-import { Enclave__factory as EnclaveFactory } from "../types";
+import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
+import { deployAndSaveEnclave } from "./deployAndSave/enclave";
+import { deployAndSaveNaiveRegistryFilter } from "./deployAndSave/naiveRegistryFilter";
 import { deployMocks } from "./deployMocks";
 
 /**
  * Deploys the Enclave contracts
  */
 export const deployEnclave = async () => {
-  const { ignition, ethers } = await network.connect();
+  const { ethers } = await network.connect();
 
   const [owner] = await ethers.getSigners();
 
@@ -33,61 +32,44 @@ export const deployEnclave = async () => {
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
-  const enclave = await ignition.deploy(EnclaveModule, {
-    parameters: {
-      Enclave: {
-        params: encoded,
-        owner: ownerAddress,
-        maxDuration: THIRTY_DAYS_IN_SECONDS,
-        registry: addressOne,
-      },
-    },
+  const { enclave } = await deployAndSaveEnclave({
+    params: encoded,
+    owner: ownerAddress,
+    maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
+    registry: addressOne,
   });
 
-  const enclaveAddress = await enclave.enclave.getAddress();
+  const enclaveAddress = await enclave.getAddress();
 
   console.log("Enclave deployed to: ", enclaveAddress);
 
-  const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
-    parameters: {
-      CiphernodeRegistry: {
-        enclaveAddress: enclaveAddress,
-        owner: ownerAddress,
-      },
-    },
+  const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
+    enclaveAddress: enclaveAddress,
+    owner: ownerAddress,
   });
 
-  const ciphernodeRegistryAddress =
-    await ciphernodeRegistry.cipherNodeRegistry.getAddress();
+  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
 
   console.log("CiphernodeRegistry deployed to: ", ciphernodeRegistryAddress);
 
-  const naiveRegistryFilter = await ignition.deploy(NaiveRegistryFilterModule, {
-    parameters: {
-      NaiveRegistryFilter: {
-        ciphernodeRegistryAddress,
-        owner: ownerAddress,
-      },
-    },
+  const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
+    ciphernodeRegistryAddress: ciphernodeRegistryAddress,
+    owner: ownerAddress,
   });
 
-  const naiveRegistryFilterAddress =
-    await naiveRegistryFilter.naiveRegistryFilter.getAddress();
+  const naiveRegistryFilterAddress = await naiveRegistryFilter.getAddress();
 
   console.log("NaiveRegistryFilter deployed to: ", naiveRegistryFilterAddress);
 
-  const enclaveContract = EnclaveFactory.connect(enclaveAddress, owner);
-
-  const registryAddress = await enclaveContract.ciphernodeRegistry();
+  const registryAddress = await enclave.ciphernodeRegistry();
 
   if (registryAddress === ciphernodeRegistryAddress) {
     console.log(`Enclave contract already has registry`);
-    return;
+  } else {
+    await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
+
+    console.log(`Enclave contract updated with registry`);
   }
-
-  await enclaveContract.setCiphernodeRegistry(ciphernodeRegistryAddress);
-
-  console.log(`Enclave contract updated with registry`);
 
   // Deploy mocks only if specified
   const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true";
@@ -98,12 +80,20 @@ export const deployEnclave = async () => {
       ethers.toUtf8Bytes("fhe.rs:BFV"),
     );
 
-    const tx = await enclaveContract.setDecryptionVerifier(
-      encryptionSchemeId,
-      decryptionVerifierAddress,
-    );
-    await tx.wait();
-    console.log(`Successfully set MockDecryptionVerifier in Enclave contract`);
+    const deployedDecryptionVerifier =
+      await enclave.decryptionVerifiers(encryptionSchemeId);
+    if (deployedDecryptionVerifier === decryptionVerifierAddress) {
+      console.log(`DecryptionVerifier already set in Enclave contract`);
+    } else {
+      const tx = await enclave.setDecryptionVerifier(
+        encryptionSchemeId,
+        decryptionVerifierAddress,
+      );
+      await tx.wait();
+      console.log(
+        `Successfully set MockDecryptionVerifier in Enclave contract`,
+      );
+    }
   }
 };
 

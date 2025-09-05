@@ -1,0 +1,75 @@
+import { network } from "hardhat";
+
+import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
+import {
+  CiphernodeRegistryOwnable,
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
+} from "../../types";
+import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+
+/**
+ * The arguments for the deployAndSaveCiphernodeRegistryOwnable function
+ */
+export interface CiphernodeRegistryOwnableArgs {
+  enclaveAddress: string;
+  owner: string;
+}
+
+/**
+ * Deploys the CiphernodeRegistryOwnable contract and saves the deployment arguments
+ * @param param0 - The deployment arguments
+ * @returns The deployed CiphernodeRegistryOwnable contract
+ */
+export const deployAndSaveCiphernodeRegistryOwnable = async ({
+  enclaveAddress,
+  owner,
+}: CiphernodeRegistryOwnableArgs): Promise<{
+  ciphernodeRegistry: CiphernodeRegistryOwnable;
+}> => {
+  const { ignition, ethers } = await network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+
+  const preDeployedArgs = readDeploymentArgs("CiphernodeRegistry", chain);
+
+  if (
+    preDeployedArgs?.constructorArgs?.enclaveAddress === enclaveAddress &&
+    preDeployedArgs?.constructorArgs?.owner === owner
+  ) {
+    const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
+      preDeployedArgs.address,
+      signer,
+    );
+    return { ciphernodeRegistry: ciphernodeRegistryContract };
+  }
+
+  const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
+    parameters: {
+      CiphernodeRegistry: {
+        enclaveAddress,
+        owner,
+      },
+    },
+  });
+
+  const blockNumber = await signer.provider?.getBlockNumber();
+
+  const ciphernodeRegistryAddress =
+    await ciphernodeRegistry.cipherNodeRegistry.getAddress();
+
+  storeDeploymentArgs(
+    {
+      constructorArgs: { enclaveAddress: enclaveAddress, owner },
+      blockNumber,
+      address: ciphernodeRegistryAddress,
+    },
+    "CiphernodeRegistry",
+    chain,
+  );
+
+  const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
+    ciphernodeRegistryAddress,
+  );
+
+  return { ciphernodeRegistry: ciphernodeRegistryContract };
+};
