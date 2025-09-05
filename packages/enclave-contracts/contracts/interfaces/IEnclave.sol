@@ -121,7 +121,7 @@ interface IEnclave {
 
     /// @notice This function should be called to request a computation within an Encrypted Execution Environment (E3).
     /// @dev This function MUST emit the E3Requested event.
-    /// @param requestParams The parameters for the request.
+    /// @param requestParams The parameters for the E3 request.
     /// @return e3Id ID of the E3.
     /// @return e3 The E3 struct.
     function request(

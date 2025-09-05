@@ -101,6 +101,7 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
         committee.nodes = nodes;
         committee.publicKey = keccak256(publicKey);
+
         ICiphernodeRegistry(registry).publishCommittee(
             e3Id,
             abi.encode(nodes),

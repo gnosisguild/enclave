@@ -115,8 +115,7 @@ export class ContractClient {
           e3Program,
           e3ProgramParams,
           computeProviderParams,
-        }
-        ],
+        }],
         account,
         value: value || BigInt(0),
         gas: gasLimit,
