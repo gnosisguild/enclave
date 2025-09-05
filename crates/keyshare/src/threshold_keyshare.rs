@@ -61,14 +61,12 @@ pub enum KeyshareState {
     Init,
     // Generating TrBFV share material
     GeneratingThresholdShare {
-        party_id: u64,
         pk_share: Option<Arc<Vec<u8>>>,
         sk_sss: Option<Vec<SensitiveBytes>>,
         esi_sss: Option<Vec<Vec<SensitiveBytes>>>,
     },
     // Collecting remaining TrBFV shares to aggregate decryption key
     AggregatingDecryptionKey {
-        party_id: u64,
         pk_share: Arc<Vec<u8>>,
         sk_sss: Vec<SensitiveBytes>,
         esi_sss: Vec<Vec<SensitiveBytes>>,
@@ -81,6 +79,7 @@ pub enum KeyshareState {
 impl KeyshareState {
     pub fn next(self: &KeyshareState, new_state: KeyshareState) -> Result<KeyshareState> {
         use KeyshareState as K;
+        // The following can be used to check that we are transitioning to a valid state
         let valid = {
             // If we are in the same branch the new state is valid
             if mem::discriminant(self) == mem::discriminant(&new_state) {
@@ -135,6 +134,14 @@ impl ThresholdKeyshareState {
             total,
             party_id,
         }
+    }
+
+    /// Return a valid Self based on a new state struct.
+    pub fn new_state(self, new_state: KeyshareState) -> Result<Self> {
+        Ok(ThresholdKeyshareState {
+            state: self.state.next(new_state)?,
+            ..self
+        })
     }
 }
 
@@ -211,70 +218,59 @@ impl ThresholdKeyshare {
         self.state.try_mutate(|s| {
             println!("TRY STORE PK");
 
-            let K::GeneratingThresholdShare {
-                party_id, esi_sss, ..
-            } = s.state.clone()
-            else {
-                bail!("Cannot store pkshare and sk sss on state");
+            let next = match s.state.clone() {
+                // If the esi shares are here then transition to aggregation
+                K::GeneratingThresholdShare {
+                    esi_sss: Some(esi_sss),
+                    ..
+                } => K::AggregatingDecryptionKey {
+                    esi_sss,
+                    pk_share,
+                    sk_sss,
+                },
+                // If esi shares are not here yet then don't transition
+                K::GeneratingThresholdShare { esi_sss: None, .. } => K::GeneratingThresholdShare {
+                    esi_sss: None,
+                    pk_share: Some(pk_share),
+                    sk_sss: Some(sk_sss),
+                },
+                _ => bail!("Inconsistent state!"),
             };
-
-            match esi_sss {
-                Some(esi_sss) => Ok(ThresholdKeyshareState {
-                    state: s.state.next(K::AggregatingDecryptionKey {
-                        esi_sss,
-                        party_id,
-                        pk_share,
-                        sk_sss,
-                    })?,
-                    ..s
-                }),
-                None => Ok(ThresholdKeyshareState {
-                    state: s.state.next(K::GeneratingThresholdShare {
-                        esi_sss,
-                        party_id,
-                        pk_share: Some(pk_share),
-                        sk_sss: Some(sk_sss),
-                    })?,
-                    ..s
-                }),
-            }
+            s.new_state(next)
         })
     }
 
     pub fn try_store_esi_sss(&mut self, esi_sss: Vec<Vec<SensitiveBytes>>) -> Result<()> {
-        use KeyshareState as K;
         self.state.try_mutate(|s| {
+            use KeyshareState as K;
+
             println!("TRY STORE ESI");
-            let K::GeneratingThresholdShare {
-                sk_sss,
-                pk_share,
-                party_id,
-                ..
-            } = s.state.clone()
-            else {
-                bail!("Cannot store esi_sss on state");
-            };
-            match (sk_sss, pk_share) {
-                (Some(sk_sss), Some(pk_share)) => Ok(ThresholdKeyshareState {
-                    state: s.state.next(K::AggregatingDecryptionKey {
-                        esi_sss,
-                        party_id,
-                        pk_share,
-                        sk_sss,
-                    })?,
-                    ..s
-                }),
-                (None, None) => Ok(ThresholdKeyshareState {
-                    state: s.state.next(K::GeneratingThresholdShare {
-                        esi_sss: Some(esi_sss),
-                        party_id,
-                        pk_share: None,
-                        sk_sss: None,
-                    })?,
-                    ..s
-                }),
+
+            let next = match s.state.clone() {
+                // If the other shares are here then transition to aggregation
+                K::GeneratingThresholdShare {
+                    sk_sss: Some(sk_sss),
+                    pk_share: Some(pk_share),
+                    ..
+                } => K::AggregatingDecryptionKey {
+                    esi_sss,
+                    pk_share,
+                    sk_sss,
+                },
+                // If the other shares are not here yet then dont transition
+                K::GeneratingThresholdShare {
+                    sk_sss: None,
+                    pk_share: None,
+                    ..
+                } => K::GeneratingThresholdShare {
+                    esi_sss: Some(esi_sss),
+                    pk_share: None,
+                    sk_sss: None,
+                },
                 _ => bail!("Inconsistent state!"),
-            }
+            };
+
+            s.new_state(next)
         })
     }
 }
@@ -308,24 +304,15 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
         msg: StartThresholdShareGeneration,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        println!("Starting keyshare generation party={} ...", msg.0.party_id);
-        let party_id = msg.0.party_id;
-
         // Initialize State
         self.state.try_mutate(|s| {
-            println!("Attempting to mutate....");
-            Ok(ThresholdKeyshareState {
-                state: s.state.next(KeyshareState::GeneratingThresholdShare {
-                    party_id,
-                    sk_sss: None,
-                    pk_share: None,
-                    esi_sss: None,
-                })?,
-                ..s
+            s.new_state(KeyshareState::GeneratingThresholdShare {
+                sk_sss: None,
+                pk_share: None,
+                esi_sss: None,
             })
         })?;
 
-        println!("Trying to run processes...");
         // Run both simultaneously
         ctx.notify(GenPkShareAndSkSss(msg.0.clone()));
         ctx.notify_later(GenEsiSss(msg.0), Duration::from_millis(1));
@@ -458,11 +445,11 @@ impl Handler<SharesGenerated> for ThresholdKeyshare {
         let Some(ThresholdKeyshareState {
             state:
                 KeyshareState::AggregatingDecryptionKey {
-                    party_id,
                     pk_share,
                     sk_sss,
                     esi_sss,
                 },
+            party_id,
             ..
         }) = self.state.get()
         else {
