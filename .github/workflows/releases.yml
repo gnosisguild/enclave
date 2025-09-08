@@ -39,17 +39,6 @@ jobs:
           echo "Git status before cleaning:"
           git status --porcelain || true
 
-          echo "Checking for problematic files:"
-          ls -la packages/enclave-contracts/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ 2>/dev/null || echo "ICiphernodeRegistry.sol directory not found"
-          ls -la packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/ 2>/dev/null || echo "IEnclave.sol directory not found"
-          ls -la packages/enclave-contracts/artifacts/contracts/registry/NaiveRegistryFilter.sol/ 2>/dev/null || echo "NaiveRegistryFilter.sol directory not found"
-
-          # Remove the specific problematic files from git tracking if they exist
-          git rm --cached --ignore-unmatch "packages/enclave-contracts/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json" || true
-          git rm --cached --ignore-unmatch "packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json" || true
-          git rm --cached --ignore-unmatch "packages/enclave-contracts/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json" || true
-          git rm --cached --ignore-unmatch "examples/CRISP/contracts/ImageID.sol" || true
-
           # Ensure we're on the main branch and up to date
           git checkout main
           git pull origin main
