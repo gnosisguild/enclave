@@ -48,7 +48,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd packages/enclave-contracts
-          pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run release-plz
         id: release-plz
