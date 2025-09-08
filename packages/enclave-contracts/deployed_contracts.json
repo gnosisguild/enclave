@@ -1,1 +1,49 @@
-{}
+{
+  "localhost": {
+    "Enclave": {
+      "constructorArgs": {
+        "params": "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001",
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "maxDuration": "2592000",
+        "registry": "0x0000000000000000000000000000000000000001"
+      },
+      "blockNumber": 61,
+      "address": "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154"
+    },
+    "CiphernodeRegistry": {
+      "constructorArgs": {
+        "enclaveAddress": "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154",
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      },
+      "blockNumber": 61,
+      "address": "0xCD8a1C3ba11CF5ECfa6267617243239504a98d90"
+    },
+    "NaiveRegistryFilter": {
+      "constructorArgs": {
+        "ciphernodeRegistryAddress": "0xCD8a1C3ba11CF5ECfa6267617243239504a98d90",
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      },
+      "blockNumber": 61,
+      "address": "0x82e01223d51Eb87e16A03E24687EDF0F294da6f1"
+    },
+    "MockComputeProvider": {
+      "blockNumber": 61,
+      "address": "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0"
+    },
+    "MockDecryptionVerifier": {
+      "blockNumber": 61,
+      "address": "0x7bc06c482DEAd17c0e297aFbC32f6e63d3846650"
+    },
+    "MockInputValidator": {
+      "blockNumber": 61,
+      "address": "0xc351628EB244ec633d5f21fBD6621e1a683B1181"
+    },
+    "MockE3Program": {
+      "constructorArgs": {
+        "mockInputValidator": "0xc351628EB244ec633d5f21fBD6621e1a683B1181"
+      },
+      "blockNumber": 61,
+      "address": "0xFD471836031dc5108809D173A067e8486B9047A3"
+    }
+  }
+}

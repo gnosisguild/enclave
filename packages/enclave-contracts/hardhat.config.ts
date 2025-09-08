@@ -92,17 +92,17 @@ const config: HardhatUserConfig = {
     hardhatIgnitionEthers,
     hardhatEthersChaiMatchers,
   ],
-  tasks: [
-    ciphernodeAdd,
-    ciphernodeRemove,
-    ciphernodeSiblings,
-    enableE3,
-    publishPlaintext,
-    publishCiphertext,
-    publishInput,
-    requestCommittee,
-    publishCommittee,
-  ],
+  // tasks: [
+  //   ciphernodeAdd,
+  //   ciphernodeRemove,
+  //   ciphernodeSiblings,
+  //   enableE3,
+  //   publishPlaintext,
+  //   publishCiphertext,
+  //   publishInput,
+  //   requestCommittee,
+  //   publishCommittee,
+  // ],
   networks: {
     hardhat: {
       chainId: chainIds.hardhat,

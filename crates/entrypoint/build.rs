@@ -22,8 +22,7 @@ fn main() -> std::io::Result<()> {
         .join("..")
         .join("packages")
         .join("enclave-contracts")
-        .join("deployments")
-        .join("sepolia");
+        .join("deployed_contracts.json");
 
     // Create output string for contract info
     let mut contract_info = String::from(
@@ -34,15 +33,19 @@ fn main() -> std::io::Result<()> {
     );
 
     // Process each JSON file in the deployments directory
-    for entry in fs::read_dir(deployments_path)? {
-        let entry = entry?;
-        let path = entry.path();
+    // for entry in fs::read_dir(deployments_path)? {
+    //     let entry = entry?;
+    //     let path = entry.path();
 
-        if path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let contract_name = path.file_stem().and_then(|s| s.to_str()).unwrap();
+    //     if path.extension().and_then(|s| s.to_str()) == Some("json") {
+    //         let contract_name = path.file_stem().and_then(|s| s.to_str()).unwrap();
 
-            let file = File::open(&path)?;
+            let file = File::open(&deployments_path)?;
             let json: Value = from_reader(file)?;
+
+            let contract_name = "test";
+
+            info!("Processing json: {}", json);
 
             // Extract address and block number
             if let (Some(address), Some(deploy_block)) = (
@@ -54,8 +57,8 @@ fn main() -> std::io::Result<()> {
                     contract_name, address, deploy_block
                 ));
             }
-        }
-    }
+    //     }
+    // }
 
     contract_info.push_str("};\n");
 
@@ -63,7 +66,7 @@ fn main() -> std::io::Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("contract_deployments.rs");
     fs::write(dest_path, contract_info)?;
-    println!("cargo:rerun-if-changed=../../packages/enclave-contracts/deployments/sepolia");
+    println!("cargo:rerun-if-changed=../../packages/enclave-contracts/deployed_contracts.json");
 
     Ok(())
 }
