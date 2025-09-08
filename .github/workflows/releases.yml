@@ -15,12 +15,6 @@ on:
       - ".github/workflows/releases.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "Cargo.toml"
-      - "package.json"
-      - "crates/**"
-      - "packages/**"
-      - ".github/workflows/releases.yml"
 
 jobs:
   release-rust:
