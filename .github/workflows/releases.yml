@@ -59,6 +59,7 @@ jobs:
           RUST_LOG: debug
         with:
           version: "0.3.83"
+          verbose: true
           command: ${{ github.event_name == 'pull_request' && 'release-pr --dry-run' || 'release-pr' }}
 
       - uses: fregante/setup-git-user@v2.0.1
