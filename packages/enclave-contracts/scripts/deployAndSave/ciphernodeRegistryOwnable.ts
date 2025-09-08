@@ -11,8 +11,8 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  * The arguments for the deployAndSaveCiphernodeRegistryOwnable function
  */
 export interface CiphernodeRegistryOwnableArgs {
-  enclaveAddress: string;
-  owner: string;
+  enclaveAddress?: string;
+  owner?: string;
 }
 
 /**
@@ -33,11 +33,13 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   const preDeployedArgs = readDeploymentArgs("CiphernodeRegistry", chain);
 
   if (
-    preDeployedArgs?.constructorArgs?.enclaveAddress === enclaveAddress &&
-    preDeployedArgs?.constructorArgs?.owner === owner
+    !enclaveAddress ||
+    !owner ||
+    (preDeployedArgs?.constructorArgs?.enclaveAddress === enclaveAddress &&
+      preDeployedArgs?.constructorArgs?.owner === owner)
   ) {
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
-      preDeployedArgs.address,
+      preDeployedArgs!.address,
       signer,
     );
     return { ciphernodeRegistry: ciphernodeRegistryContract };

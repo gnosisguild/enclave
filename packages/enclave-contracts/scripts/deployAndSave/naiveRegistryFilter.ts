@@ -5,11 +5,11 @@ import {
   NaiveRegistryFilter,
   NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
 } from "../../types";
-import { storeDeploymentArgs } from "../utils";
+import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
 export interface NaiveRegistryFilterArgs {
-  ciphernodeRegistryAddress: string;
-  owner: string;
+  ciphernodeRegistryAddress?: string;
+  owner?: string;
 }
 
 export const deployAndSaveNaiveRegistryFilter = async ({
@@ -19,6 +19,24 @@ export const deployAndSaveNaiveRegistryFilter = async ({
   naiveRegistryFilter: NaiveRegistryFilter;
 }> => {
   const { ignition, ethers } = await network.connect();
+  const [signer] = await ethers.getSigners();
+  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+
+  const preDeployedArgs = readDeploymentArgs("NaiveRegistryFilter", chain);
+  if (
+    !ciphernodeRegistryAddress ||
+    !owner ||
+    (preDeployedArgs?.constructorArgs?.ciphernodeRegistryAddress ===
+      ciphernodeRegistryAddress &&
+      preDeployedArgs?.constructorArgs?.owner === owner)
+  ) {
+    const naiveRegistryFilterContract = NaiveRegistryFilterFactory.connect(
+      preDeployedArgs!.address,
+      signer,
+    );
+    return { naiveRegistryFilter: naiveRegistryFilterContract };
+  }
+
   const naiveRegistryFilter = await ignition.deploy(NaiveRegistryFilterModule, {
     parameters: {
       NaiveRegistryFilter: {
@@ -31,8 +49,6 @@ export const deployAndSaveNaiveRegistryFilter = async ({
   const naiveRegistryFilterAddress =
     await naiveRegistryFilter.naiveRegistryFilter.getAddress();
 
-  const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name;
   const blockNumber = await signer.provider?.getBlockNumber();
 
   storeDeploymentArgs(

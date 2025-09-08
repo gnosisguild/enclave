@@ -8,10 +8,10 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  * The arguments for the deployAndSaveEnclave function
  */
 export interface EnclaveArgs {
-  params: string;
-  owner: string;
-  maxDuration: string;
-  registry: string;
+  params?: string;
+  owner?: string;
+  maxDuration?: string;
+  registry?: string;
 }
 
 /**
@@ -34,13 +34,17 @@ export const deployAndSaveEnclave = async ({
   const preDeployedArgs = readDeploymentArgs("Enclave", chain);
 
   if (
-    preDeployedArgs?.constructorArgs?.params === params &&
-    preDeployedArgs?.constructorArgs?.owner === owner &&
-    preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
-    preDeployedArgs?.constructorArgs?.registry === registry
+    !params ||
+    !owner ||
+    !maxDuration ||
+    !registry ||
+    (preDeployedArgs?.constructorArgs?.params === params &&
+      preDeployedArgs?.constructorArgs?.owner === owner &&
+      preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
+      preDeployedArgs?.constructorArgs?.registry === registry)
   ) {
     const enclaveContract = EnclaveFactory.connect(
-      preDeployedArgs.address,
+      preDeployedArgs!.address,
       signer,
     );
     return { enclave: enclaveContract };

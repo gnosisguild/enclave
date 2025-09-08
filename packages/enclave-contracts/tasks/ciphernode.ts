@@ -8,7 +8,7 @@ import { ZeroAddress } from "ethers";
 import { task } from "hardhat/config";
 import { poseidon2 } from "poseidon-lite";
 
-import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
+import { deployAndSaveCiphernodeRegistryOwnable } from "../scripts/deployAndSave/ciphernodeRegistryOwnable";
 
 export const ciphernodeAdd = task(
   "ciphernode:add",
@@ -20,12 +20,11 @@ export const ciphernodeAdd = task(
     defaultValue: ZeroAddress,
   })
   .setAction(async () => ({
-    default: async ({ ciphernodeAddress }, hre) => {
-      const { ignition } = await hre.network.connect();
-      const registry = await ignition.deploy(CiphernodeRegistryModule);
+    default: async ({ ciphernodeAddress }, _) => {
+      const { ciphernodeRegistry } =
+        await deployAndSaveCiphernodeRegistryOwnable({});
 
-      const tx =
-        await registry.cipherNodeRegistry.addCiphernode(ciphernodeAddress);
+      const tx = await ciphernodeRegistry.addCiphernode(ciphernodeAddress);
       await tx.wait();
       console.log(`Ciphernode ${ciphernodeAddress} registered`);
     },
@@ -47,13 +46,13 @@ export const ciphernodeRemove = task(
     defaultValue: ZeroAddress,
   })
   .setAction(async () => ({
-    default: async function ({ ciphernodeAddress, siblings }, hre) {
-      const { ignition } = await hre.network.connect();
-      const registry = await ignition.deploy(CiphernodeRegistryModule);
+    default: async ({ ciphernodeAddress, siblings }, _) => {
+      const { ciphernodeRegistry } =
+        await deployAndSaveCiphernodeRegistryOwnable({});
 
       const siblingsArray = siblings.split(",").map((s: string) => BigInt(s));
 
-      const tx = await registry.cipherNodeRegistry.removeCiphernode(
+      const tx = await ciphernodeRegistry.removeCiphernode(
         ciphernodeAddress,
         siblingsArray,
       );
@@ -80,7 +79,7 @@ export const ciphernodeSiblings = task(
     defaultValue: ZeroAddress,
   })
   .setAction(async () => ({
-    default: async function ({ ciphernodeAddress, ciphernodeAddresses }) {
+    default: async ({ ciphernodeAddress, ciphernodeAddresses }, _) => {
       const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
       const tree = new LeanIMT(hash);
 

@@ -8,11 +8,8 @@ import fs from "fs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 
-import EnclaveModule from "../ignition/modules/enclave";
-import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
-import MockE3ProgramModule from "../ignition/modules/mockE3Program";
-import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
-import NaiveRegistryFilterModule from "../ignition/modules/naiveRegistryFilter";
+import { deployAndSaveEnclave } from "../scripts/deployAndSave/enclave";
+import { deployAndSaveNaiveRegistryFilter } from "../scripts/deployAndSave/naiveRegistryFilter";
 
 export const requestCommittee = task(
   "committee:new",
@@ -73,7 +70,7 @@ export const requestCommittee = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async function (
+    default: async (
       {
         filter,
         thresholdQuorum,
@@ -85,76 +82,20 @@ export const requestCommittee = task(
         e3Params,
         computeParams,
       },
-      hre,
-    ) {
-      const { ignition } = await hre.network.connect();
-
-      const { enclave } = await ignition.deploy(EnclaveModule);
-
-      let actualE3Address = e3Address;
-
-      if (!e3Address) {
-        const mockE3Program = await ignition.deploy(MockE3ProgramModule);
-        if (!mockE3Program) {
-          throw new Error("MockE3Program not deployed");
-        }
-        actualE3Address = await mockE3Program.mockE3Program.getAddress();
-      }
-
-      let filterAddress = filter;
-      if (!filterAddress) {
-        const naiveRegistryFilter = await ignition.deploy(
-          NaiveRegistryFilterModule,
-        );
-        if (!naiveRegistryFilter) {
-          throw new Error("NaiveRegistryFilter not deployed");
-        }
-        filterAddress =
-          await naiveRegistryFilter.naiveRegistryFilter.getAddress();
-      }
-
-      let e3ParamsToSend = e3Params;
-      if (!e3Params) {
-        const mockInputValidator = await ignition.deploy(
-          MockInputValidatorModule,
-        );
-
-        e3ParamsToSend =
-          await mockInputValidator.mockInputValidator.getAddress();
-      }
-
-      let computeParamsToSend = computeParams;
-      if (!computeParams) {
-        // no compute params provided, use mock
-        const MockDecryptionVerifier = await ignition.deploy(
-          MockDecryptionVerifierModule,
-        );
-        if (!MockDecryptionVerifier) {
-          throw new Error("MockDecryptionVerifier not deployed");
-        }
-        computeParamsToSend =
-          await MockDecryptionVerifier.mockDecryptionVerifier.getAddress();
-      }
-
-      try {
-        const enableE3Tx = await enclave.enableE3Program(e3Address);
-        await enableE3Tx.wait();
-      } catch (e) {
-        console.log(
-          "E3 program enabling failed, probably already enabled: ",
-          e,
-        );
-      }
+      _,
+    ) => {
+      const { enclave } = await deployAndSaveEnclave({});
 
       const tx = await enclave.request(
-        filterAddress,
-        [thresholdQuorum, thresholdTotal],
-        [windowStart, windowEnd],
-        duration,
-        actualE3Address,
-        e3ParamsToSend,
-        computeParamsToSend,
-        // 1 ETH
+        {
+          filter,
+          threshold: [thresholdQuorum, thresholdTotal],
+          startWindow: [windowStart, windowEnd],
+          duration,
+          e3Program: e3Address,
+          e3ProgramParams: e3Params,
+          computeProviderParams: computeParams,
+        },
         { value: "1000000000000000000" },
       );
 
@@ -174,12 +115,10 @@ export const enableE3 = task("enclave:enableE3", "Enable an E3 program")
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async function ({ e3Address }, hre) {
-      const { ignition } = await hre.network.connect();
+    default: async ({ e3Address }, _) => {
+      const { enclave } = await deployAndSaveEnclave({});
 
-      const enclave = await ignition.deploy(EnclaveModule);
-
-      const tx = await enclave.enclave.enableE3Program(e3Address);
+      const tx = await enclave.enableE3Program(e3Address);
 
       console.log("Enabling E3 program... ", tx.hash);
       await tx.wait();
@@ -193,13 +132,6 @@ export const publishCommittee = task(
   "committee:publish",
   "Publish the publickey of the committee",
 )
-  .addOption({
-    name: "filter",
-    description:
-      "address of filter contract to use (defaults to NaiveRegistryFilter)",
-    defaultValue: ZeroAddress,
-    type: ArgumentType.STRING,
-  })
   .addOption({
     name: "e3Id",
     description: "Id of the E3 program",
@@ -219,29 +151,14 @@ export const publishCommittee = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async function ({ filter, e3Id, nodes, publicKey }, hre) {
-      const { ignition } = await hre.network.connect();
-
-      let filterAddress = filter;
-      if (!filterAddress) {
-        const naiveRegistryFilter = await ignition.deploy(
-          NaiveRegistryFilterModule,
-        );
-        if (!naiveRegistryFilter) {
-          throw new Error("NaiveRegistryFilter not deployed");
-        }
-        filterAddress =
-          await naiveRegistryFilter.naiveRegistryFilter.getAddress();
-      }
+    default: async ({ e3Id, nodes, publicKey }, _) => {
+      const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter(
+        {},
+      );
 
       const nodesToSend = nodes.split(",");
 
-      const filterContract = await ignition.deploy(NaiveRegistryFilterModule);
-      if (!filterContract) {
-        throw new Error("NaiveRegistryFilter not deployed");
-      }
-
-      const tx = await filterContract.naiveRegistryFilter.publishCommittee(
+      const tx = await naiveRegistryFilter.publishCommittee(
         e3Id,
         nodesToSend,
         publicKey,
@@ -268,10 +185,8 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async function ({ e3Id, publicKey }, hre) {
-      const { ignition } = await hre.network.connect();
-
-      const { enclave } = await ignition.deploy(EnclaveModule);
+    default: async ({ e3Id, publicKey }, _) => {
+      const { enclave } = await deployAndSaveEnclave({});
 
       const tx = await enclave.activate(e3Id, publicKey);
 
@@ -306,10 +221,8 @@ export const publishInput = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async function ({ e3Id, data, dataFile }, hre) {
-      const { ignition } = await hre.network.connect();
-
-      const enclave = await ignition.deploy(EnclaveModule);
+    default: async ({ e3Id, data, dataFile }, _) => {
+      const { enclave } = await deployAndSaveEnclave({});
 
       let dataToSend = data;
 
@@ -318,7 +231,7 @@ export const publishInput = task(
         dataToSend = file.toString();
       }
 
-      const tx = await enclave.enclave.publishInput(e3Id, dataToSend);
+      const tx = await enclave.publishInput(e3Id, dataToSend);
 
       console.log("Publishing input... ", tx.hash);
       await tx.wait();
@@ -363,12 +276,8 @@ export const publishCiphertext = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async function ({ e3Id, data, dataFile, proof, proofFile }, hre) {
-      const { ignition } = await hre.network.connect();
-
-      const enclave = await ignition.deploy(EnclaveModule);
-
-      const enclaveContract = await enclave.enclave;
+    default: async ({ e3Id, data, dataFile, proof, proofFile }, _) => {
+      const { enclave } = await deployAndSaveEnclave({});
 
       let dataToSend = data;
 
@@ -384,7 +293,7 @@ export const publishCiphertext = task(
         proofToSend = file.toString();
       }
 
-      const tx = await enclaveContract.publishCiphertextOutput(
+      const tx = await enclave.publishCiphertextOutput(
         e3Id,
         dataToSend,
         proofToSend,
@@ -433,10 +342,8 @@ export const publishPlaintext = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async function ({ e3Id, data, dataFile, proof, proofFile }, hre) {
-      const { ignition } = await hre.network.connect();
-
-      const enclave = await ignition.deploy(EnclaveModule);
+    default: async ({ e3Id, data, dataFile, proof, proofFile }, _) => {
+      const { enclave } = await deployAndSaveEnclave({});
 
       let dataToSend = data;
 
@@ -452,7 +359,7 @@ export const publishPlaintext = task(
         proofToSend = file.toString();
       }
 
-      const tx = await enclave.enclave.publishPlaintextOutput(
+      const tx = await enclave.publishPlaintextOutput(
         e3Id,
         dataToSend,
         proofToSend,
