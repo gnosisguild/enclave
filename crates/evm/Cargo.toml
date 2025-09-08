@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 description = "E3 - Enclave Ciphernode EVM Connectors"
 repository = "https://github.com/gnosisguild/enclave/crates/evm"
+publish = false
 
 [dependencies]
 actix = { workspace = true }
