@@ -48,22 +48,19 @@ jobs:
           cd packages/enclave-contracts
           pnpm install --frozen-lockfile
 
-      - name: Ensure clean working directory
+      - name: Verify clean working directory
         run: |
           # Show current git status for debugging
-          echo "Git status before cleaning:"
+          echo "Git status:"
           git status --porcelain || true
 
-          # Ensure we're on the main branch and up to date
-          git checkout main
-          git pull origin main
-
-          # Clean up any untracked files
-          git clean -fd
-
-          # Verify working directory is clean
-          echo "Git status after cleaning:"
-          git status --porcelain
+          # Check if there are any uncommitted changes
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Warning: Working directory has uncommitted changes"
+            git status
+          else
+            echo "Working directory is clean"
+          fi
 
       - name: Run release-plz
         id: release-plz
