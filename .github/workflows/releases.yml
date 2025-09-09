@@ -35,21 +35,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 10.7.1
-
-      - name: Install dependencies
-        run: |
-          cd packages/enclave-contracts
-          pnpm install --frozen-lockfile --ignore-scripts
-
       - name: Run release-plz
         id: release-plz
         uses: MarcoIeni/release-plz-action@v0.5.64
@@ -58,7 +43,6 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         with:
           version: "0.3.83"
-          verbose: true
           command: ${{ github.event_name == 'pull_request' && 'release-pr --dry-run' || 'release-pr' }}
 
       - uses: fregante/setup-git-user@v2.0.1
