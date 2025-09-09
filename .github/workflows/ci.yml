@@ -27,7 +27,7 @@ jobs:
   rust_unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust 1.86.0
         uses: dtolnay/rust-toolchain@stable
@@ -75,7 +75,7 @@ jobs:
     outputs:
       image_tag: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Generate version tag
         id: version
         run: |
@@ -119,7 +119,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - name: "Check out the repo"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5"
 
       - name: Install Rust 1.86.0
         uses: dtolnay/rust-toolchain@stable
@@ -170,7 +170,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - name: "Check out the repo"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5"
       - name: "Setup node"
         uses: actions/setup-node@v4
         with:
@@ -188,7 +188,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - name: "Check out the repo"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5"
       - name: "Setup node"
         uses: actions/setup-node@v4
         with:
@@ -243,7 +243,7 @@ jobs:
       fail-fast: false
     steps:
       - name: "Check out the repo"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5"
       - name: "Setup node"
         uses: actions/setup-node@v4
         with:
@@ -299,7 +299,7 @@ jobs:
   build_enclave_cli:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Cache Rust dependencies
@@ -338,7 +338,7 @@ jobs:
     needs: [build_enclave_cli]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -431,7 +431,7 @@ jobs:
   test_enclave_circuits:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -465,7 +465,7 @@ jobs:
   build_e3_support_dev:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Cache Rust dependencies
@@ -498,7 +498,7 @@ jobs:
   build_sdk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Cache Node dependencies
@@ -557,7 +557,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_e3_support_dev, build_sdk]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Setup Node.js
@@ -656,7 +656,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
