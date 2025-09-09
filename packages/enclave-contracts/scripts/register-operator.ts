@@ -19,7 +19,6 @@ interface Deployment {
     serviceManager: Address;
     bondingManager: Address;
     enclStrategy: Address;
-    usdcStrategy: Address;
   };
   eigenLayer: {
     strategyManager: Address;
@@ -41,7 +40,7 @@ const OPERATORS: Address[] = [
 ];
 const ENCL_AMOUNT = ethers.parseEther("1000");
 const USDC_AMOUNT = ethers.parseUnits("10000", 6);
-const TICKET_COUNT = 100;
+const TICKET_COUNT = 10;
 const AVS_METADATA_URI = "https://example.com/avs.json";
 const MAG_100 = 1_000_000_000n;
 
@@ -135,13 +134,6 @@ async function mintAndApproveTokens(
       .approve(strategyManagerAddr, ENCL_AMOUNT)
   ).wait();
 
-  const usdcForApprove = await ethers.getContractAt(ERC20_ABI, usdcTokenAddr);
-  await (
-    await usdcForApprove
-      .connect(operatorSigner)
-      .approve(strategyManagerAddr, USDC_AMOUNT)
-  ).wait();
-
   console.log(
     `Tokens prepared -> ENCL minted ${ethers.formatEther(ENCL_AMOUNT)}; ` +
       `${isLiveNetwork ? "USDC: assumed pre-funded" : `USDC minted ${ethers.formatUnits(USDC_AMOUNT, 6)}`}`,
@@ -156,28 +148,21 @@ async function depositIntoStrategies(
   const strategyManagerAddr = deployment.eigenLayer.strategyManager;
   const enclTokenAddr =
     deployment.contracts.enclToken ?? deployment.contracts.enclaveToken!;
-  const usdcTokenAddr = deployment.contracts.usdcToken;
   const enclStrategyAddr = deployment.contracts.enclStrategy;
-  const usdcStrategyAddr = deployment.contracts.usdcStrategy;
 
   const strategyManager = await ethers.getContractAt(
     STRATEGY_MANAGER_ABI,
     strategyManagerAddr,
   );
-  console.log("Depositing into EigenLayer strategies...");
+  console.log("Depositing ENCL into EigenLayer strategy...");
 
   await (
     await strategyManager
       .connect(operatorSigner)
       .depositIntoStrategy(enclStrategyAddr, enclTokenAddr, ENCL_AMOUNT)
   ).wait();
-  await (
-    await strategyManager
-      .connect(operatorSigner)
-      .depositIntoStrategy(usdcStrategyAddr, usdcTokenAddr, USDC_AMOUNT)
-  ).wait();
 
-  console.log("Strategy deposits completed");
+  console.log("ENCL strategy deposit completed");
 }
 
 async function registerAsEigenLayerOperator(
@@ -248,7 +233,6 @@ async function allocateMagnitudes(
   const allocationManagerAddr = deployment.eigenLayer.allocationManager;
   const serviceManagerAddr = deployment.contracts.serviceManager;
   const enclStrategyAddr = deployment.contracts.enclStrategy;
-  const usdcStrategyAddr = deployment.contracts.usdcStrategy;
   const operatorSetId = deployment.config.tokenomics.operatorSetId;
 
   const allocationManager = await ethers.getContractAt(
@@ -262,17 +246,9 @@ async function allocateMagnitudes(
       { avs: serviceManagerAddr, id: operatorSetId },
       enclStrategyAddr,
     );
-    const usdcAllocation = await allocationManager.getAllocation(
-      operatorAddress,
-      { avs: serviceManagerAddr, id: operatorSetId },
-      usdcStrategyAddr,
-    );
-    if (
-      enclAllocation.currentMagnitude === MAG_100 &&
-      usdcAllocation.currentMagnitude === MAG_100
-    ) {
+    if (enclAllocation.currentMagnitude === MAG_100) {
       console.log(
-        "Already allocated ENCL+USDC magnitude (100% each) to AVS operator set",
+        "Already allocated ENCL magnitude (100%) to AVS operator set",
       );
       return;
     }
@@ -283,20 +259,29 @@ async function allocateMagnitudes(
   const params = [
     {
       operatorSet: { avs: serviceManagerAddr, id: operatorSetId },
-      strategies: [enclStrategyAddr, usdcStrategyAddr],
-      newMagnitudes: [MAG_100, MAG_100],
+      strategies: [enclStrategyAddr],
+      newMagnitudes: [MAG_100],
     },
   ];
 
-  console.log(
-    `Allocating magnitudes 100/100 to strategies ${enclStrategyAddr}, ${usdcStrategyAddr}`,
-  );
+  console.log(`Allocating magnitude 100% to ENCL strategy ${enclStrategyAddr}`);
+
   await (
     await allocationManager
       .connect(operatorSigner)
       .modifyAllocations(operatorAddress, params)
   ).wait();
-  console.log("Allocated ENCL+USDC magnitude (100% each) to AVS operator set");
+
+  const { effectBlock } = await allocationManager.getAllocation(
+    operatorAddress,
+    { avs: serviceManagerAddr, id: operatorSetId },
+    enclStrategyAddr,
+  );
+  const current = await ethers.provider.getBlockNumber();
+  if (effectBlock > current) {
+    await mineBlocks(Number(effectBlock - current + 1));
+  }
+  console.log("Allocated ENCL magnitude (100%) to AVS operator set");
 }
 
 async function acquireLicense(
@@ -316,9 +301,16 @@ async function acquireLicense(
       return;
     }
   } catch (e: unknown) {
-    // query may revert if not yet set up; intentionally ignore
+    console.log(
+      "~ Checking license status failed, proceeding with acquisition",
+    );
     void e;
   }
+  console.log("~ Checking license stake...");
+  const licenseStake = await bondingManager.getLicenseStake();
+  console.log(`~ License stake: ${licenseStake}`);
+
+  console.log("~ Acquiring license...");
   await (await bondingManager.connect(operatorSigner).acquireLicense()).wait();
   console.log("License acquired");
 }
@@ -329,17 +321,22 @@ async function purchaseTickets(
   deployment: Deployment,
 ): Promise<void> {
   const bondingManagerAddr = deployment.contracts.bondingManager;
+  const usdcTokenAddr = deployment.contracts.usdcToken;
   const bondingManager = await ethers.getContractAt(
     "BondingManager",
     bondingManagerAddr,
   );
+  const usdcToken = await ethers.getContractAt(ERC20_ABI, usdcTokenAddr);
+
+  const ticketPrice = await bondingManager.getTicketPrice();
+  const totalCost = BigInt(TICKET_COUNT) * ticketPrice;
+
   try {
-    const spent = await bondingManager.ticketBudgetSpent(operatorAddress);
-    const price = await bondingManager.getTicketPrice();
-    const expected = BigInt(TICKET_COUNT) * price;
-    if (spent >= expected) {
+    const availableTickets =
+      await bondingManager.getAvailableTicketCount(operatorAddress);
+    if (availableTickets >= TICKET_COUNT) {
       console.log(
-        `Already purchased ${TICKET_COUNT}+ tickets (spent: ${ethers.formatUnits(spent, 6)} USDC)`,
+        `Already has sufficient tickets: ${availableTickets} available`,
       );
       return;
     }
@@ -347,10 +344,36 @@ async function purchaseTickets(
     const _msg = (e as Error)?.message ?? String(e);
     console.log("~ Checking ticket status failed, proceeding with purchase");
   }
+
+  const usdcBalance = await usdcToken.balanceOf(operatorAddress);
+  if (usdcBalance < totalCost) {
+    throw new Error(
+      `Insufficient USDC balance: ${ethers.formatUnits(usdcBalance, 6)} < ${ethers.formatUnits(totalCost, 6)}`,
+    );
+  }
+
+  const allowance = await usdcToken.allowance(
+    operatorAddress,
+    bondingManagerAddr,
+  );
+  if (allowance < totalCost) {
+    console.log("Approving USDC for ticket purchase...");
+    await (
+      await usdcToken
+        .connect(operatorSigner)
+        .approve(bondingManagerAddr, totalCost)
+    ).wait();
+  }
+
+  console.log(
+    `Purchasing ${TICKET_COUNT} tickets (${ethers.formatUnits(ticketPrice, 6)} USDC each, total: ${ethers.formatUnits(totalCost, 6)} USDC)...`,
+  );
   await (
     await bondingManager.connect(operatorSigner).purchaseTickets(TICKET_COUNT)
   ).wait();
-  console.log(`✓ Purchased ${TICKET_COUNT} tickets`);
+  console.log(
+    `✓ Purchased ${TICKET_COUNT} tickets for ${ethers.formatUnits(totalCost, 6)} USDC`,
+  );
 }
 
 async function registerToOperatorSet(
@@ -367,6 +390,7 @@ async function registerToOperatorSet(
   const operatorSetId = deployment.config.tokenomics.operatorSetId;
 
   try {
+    console.log("Checking operator set registration status...");
     const isSlashable = await allocationManager.isOperatorSlashable(
       operatorAddress,
       { avs: serviceManagerAddr, id: operatorSetId },
@@ -455,10 +479,7 @@ async function main(): Promise<void> {
     await (
       await serviceManager
         .connect(admin)
-        .createOperatorSet(operatorSetId, [
-          deployment.contracts.enclStrategy,
-          deployment.contracts.usdcStrategy,
-        ])
+        .createOperatorSet(operatorSetId, [deployment.contracts.enclStrategy])
     ).wait();
     console.log(`Operator set ${operatorSetId} created (runtime)`);
   } catch (e: unknown) {
@@ -502,9 +523,9 @@ async function main(): Promise<void> {
         operatorAddress,
         deployment,
       );
-      await registerToOperatorSet(operatorSigner, operatorAddress, deployment);
       await allocateMagnitudes(operatorSigner, operatorAddress, deployment);
       await acquireLicense(operatorSigner, operatorAddress, deployment);
+      await registerToOperatorSet(operatorSigner, operatorAddress, deployment);
       await purchaseTickets(operatorSigner, operatorAddress, deployment);
       await registerCiphernode(operatorSigner, operatorAddress, deployment);
 
@@ -522,7 +543,7 @@ async function main(): Promise<void> {
           operatorAddress,
         ]);
       } catch (e: unknown) {
-        void e; // best-effort cleanup
+        void e;
       }
       console.log("Continuing with next operator...");
     }

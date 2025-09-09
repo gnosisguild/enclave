@@ -10,15 +10,15 @@ import path from "path";
 
 export const CONFIG = {
   enclave: {
-    maxComputeDuration: 60 * 60 * 24 * 30, // 30 days
+    maxComputeDuration: 60 * 60 * 24 * 30,
     polynomialDegree: 2048n,
     plaintextModulus: 1032193n,
     moduli: [18014398492704769n],
   },
   tokenomics: {
     licenseStake: ethers.parseEther("100"),
+    minTicketBalance: 1n,
     ticketPrice: ethers.parseUnits("10", 6),
-    minCollateralUsd: ethers.parseEther("1000"),
     operatorSetId: 1,
   },
   addresses: {
@@ -43,7 +43,7 @@ type DeploymentOut = {
   chainId: string;
   timestamp: string;
   contracts: Record<string, string | undefined>;
-  eigenLayer?: EigenLayerAddresses; // optional
+  eigenLayer?: EigenLayerAddresses;
   config: {
     enclave: {
       maxComputeDuration: number;
@@ -53,8 +53,7 @@ type DeploymentOut = {
     };
     tokenomics: {
       licenseStake: string;
-      ticketPrice: string;
-      minCollateralUsd: string;
+      minTicketBalance: string;
       operatorSetId: number;
     };
     addresses: typeof CONFIG.addresses;
@@ -98,8 +97,8 @@ export async function saveDeploymentMetadata(
       },
       tokenomics: {
         licenseStake: CONFIG.tokenomics.licenseStake.toString(),
+        minTicketBalance: CONFIG.tokenomics.minTicketBalance.toString(),
         ticketPrice: CONFIG.tokenomics.ticketPrice.toString(),
-        minCollateralUsd: CONFIG.tokenomics.minCollateralUsd.toString(),
         operatorSetId: CONFIG.tokenomics.operatorSetId,
       },
       addresses: CONFIG.addresses,

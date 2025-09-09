@@ -9,6 +9,8 @@ pragma solidity >=0.8.27;
 import { ReentrancyGuard } from "@oz/utils/ReentrancyGuard.sol";
 import { Ownable } from "@oz/access/Ownable.sol";
 import { Math } from "@oz/utils/math/Math.sol";
+import { IERC20 } from "@oz/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@oz/token/ERC20/utils/SafeERC20.sol";
 import {
     IStrategy
 } from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
@@ -29,17 +31,24 @@ import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IServiceManager } from "../interfaces/IServiceManager.sol";
 
 contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
+    using SafeERC20 for IERC20;
+
+    uint256 private constant BPS_DENOM = 10_000;
+    uint256 private constant INACTIVE_AT_BPS = 9_500; // 95%
+
     uint256 public minTicketBalance;
-    IStrategy public enclStrategy;
-    IStrategy public usdcStrategy;
-    uint256 public licenseStake;
     uint256 public ticketPrice;
+    IStrategy public enclStrategy;
+    IERC20 public usdcToken;
+    uint256 public licenseStake;
     uint32 public operatorSetId;
 
-    mapping(address node => OperatorInfo operator) public operators;
-    mapping(address node => bool registeredOperators)
-        public registeredOperators;
-    mapping(address node => uint256 ticketBudgetSpent) public ticketBudgetSpent;
+    uint32 private nextTicketId = 1;
+    mapping(uint32 ticketId => Ticket ticket) public tickets;
+    mapping(address operator => uint32[] ticketIds) public operatorTickets;
+    mapping(address operator => OperatorInfo info) public operators;
+    mapping(address operator => bool registered) public registeredOperators;
+    mapping(address => uint256) public availableTicketCount;
 
     ICiphernodeRegistry public ciphernodeRegistry;
     IDelegationManager public delegationManager;
@@ -58,7 +67,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         IAllocationManager _allocationManager,
         address _ciphernodeRegistry,
         IStrategy _enclStrategy,
-        IStrategy _usdcStrategy,
+        IERC20 _usdcToken,
         uint256 _licenseStake,
         uint256 _ticketPrice,
         uint32 _operatorSetId
@@ -68,20 +77,20 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         require(address(_delegationManager) != address(0), ZeroAddress());
         require(address(_allocationManager) != address(0), ZeroAddress());
         require(address(_enclStrategy) != address(0), ZeroAddress());
-        require(address(_usdcStrategy) != address(0), ZeroAddress());
+        require(address(_usdcToken) != address(0), ZeroAddress());
         require(_licenseStake != 0, InsufficientLicenseStake());
-        require(_ticketPrice != 0, InvalidTicketAmount());
+        require(_ticketPrice != 0, InvalidTicketPrice());
 
         serviceManager = _serviceManager;
         delegationManager = _delegationManager;
         allocationManager = _allocationManager;
         ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
         enclStrategy = _enclStrategy;
-        usdcStrategy = _usdcStrategy;
+        usdcToken = _usdcToken;
         licenseStake = _licenseStake;
         ticketPrice = _ticketPrice;
         operatorSetId = _operatorSetId;
-        minTicketBalance = 5;
+        minTicketBalance = 1;
     }
 
     function acquireLicense() external nonReentrant {
@@ -104,10 +113,8 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         operators[msg.sender] = OperatorInfo({
             isLicensed: true,
             licenseStake: enclAmount,
-            ticketBalance: 0,
             registeredAt: block.timestamp,
-            isActive: false,
-            collateralUsd: 0
+            isActive: false
         });
 
         emit LicenseAcquired(msg.sender, enclAmount);
@@ -118,30 +125,84 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         require(operators[msg.sender].isLicensed, NotLicensed());
 
         uint256 totalCost = ticketCount * ticketPrice;
+        require(ticketPrice <= type(uint96).max, InvalidTicketPrice());
 
-        uint256 allocatedUsdc = _allocatedUnderlyingToAVS(
-            msg.sender,
-            usdcStrategy
-        );
-        uint256 alreadySpent = ticketBudgetSpent[msg.sender];
-        require(
-            allocatedUsdc >= alreadySpent + totalCost,
-            InsufficientTicketBudget()
-        );
+        usdcToken.safeTransferFrom(msg.sender, address(this), totalCost);
 
-        ticketBudgetSpent[msg.sender] = alreadySpent + totalCost;
-        operators[msg.sender].ticketBalance += ticketCount;
+        for (uint256 i = 0; i < ticketCount; i++) {
+            uint32 ticketId = nextTicketId++;
+            tickets[ticketId] = Ticket({
+                createdAt: uint64(block.timestamp),
+                originalValue: uint96(ticketPrice),
+                slashedAmount: 0,
+                operator: msg.sender,
+                id: ticketId,
+                isUsed: false,
+                status: TicketStatus.Active
+            });
+            operatorTickets[msg.sender].push(ticketId);
+        }
+
+        availableTicketCount[msg.sender] += ticketCount;
+
+        uint32 firstTicketId = nextTicketId - uint32(ticketCount);
 
         if (
             registeredOperators[msg.sender] &&
             !operators[msg.sender].isActive &&
-            operators[msg.sender].ticketBalance >= minTicketBalance
+            availableTicketCount[msg.sender] >= minTicketBalance
         ) {
             operators[msg.sender].isActive = true;
             emit CiphernodeActivated(msg.sender);
         }
 
-        emit TicketsPurchased(msg.sender, totalCost, ticketCount);
+        emit TicketsPurchased(
+            msg.sender,
+            firstTicketId,
+            ticketCount,
+            totalCost
+        );
+    }
+
+    function topUpTicket(
+        uint32 ticketId,
+        uint256 usdcAmount
+    ) external nonReentrant {
+        require(usdcAmount != 0, InvalidTicketAmount());
+        Ticket storage t = tickets[ticketId];
+        require(t.operator == msg.sender, TicketNotFound());
+        require(t.status != TicketStatus.Burned, TicketAlreadyInactive());
+        require(!t.isUsed, InvalidTicketAmount());
+
+        usdcToken.safeTransferFrom(msg.sender, address(this), usdcAmount);
+
+        require(usdcAmount <= type(uint96).max, InvalidTicketAmount());
+        t.originalValue += uint96(usdcAmount);
+
+        if (t.status == TicketStatus.Inactive) {
+            if (
+                uint256(t.slashedAmount) * BPS_DENOM <
+                uint256(t.originalValue) * INACTIVE_AT_BPS
+            ) {
+                t.status = TicketStatus.Active;
+                availableTicketCount[msg.sender]++;
+                if (
+                    registeredOperators[msg.sender] &&
+                    !operators[msg.sender].isActive &&
+                    availableTicketCount[msg.sender] >= 1
+                ) {
+                    operators[msg.sender].isActive = true;
+                    emit CiphernodeActivated(msg.sender);
+                }
+                emit TicketStatusChanged(
+                    msg.sender,
+                    ticketId,
+                    TicketStatus.Active
+                );
+            }
+        }
+
+        emit TicketToppedUp(msg.sender, ticketId, usdcAmount);
     }
 
     function registerCiphernode() external nonReentrant {
@@ -161,21 +222,15 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
             enclStrategy,
             licenseStake
         );
-        _requireAllocatedAtLeastUnderlying(
-            msg.sender,
-            usdcStrategy,
-            ticketBudgetSpent[msg.sender]
-        );
 
         registeredOperators[msg.sender] = true;
         ciphernodeRegistry.addCiphernode(msg.sender);
 
-        bool activeNow = (operators[msg.sender].ticketBalance >=
-            minTicketBalance);
+        bool activeNow = availableTicketCount[msg.sender] >= 1;
         operators[msg.sender].isActive = activeNow;
         if (activeNow) emit CiphernodeActivated(msg.sender);
 
-        emit CiphernodeRegistered(msg.sender, 0);
+        emit CiphernodeRegistered(msg.sender);
     }
 
     function deregisterCiphernode(
@@ -193,32 +248,135 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         emit CiphernodeDeregistered(msg.sender);
     }
 
-    function useTickets(address operator, uint256 ticketCount) external {
+    function useTicket(address operator, uint32 ticketId) external {
         require(msg.sender == address(ciphernodeRegistry), OnlyRegistry());
+        require(tickets[ticketId].operator == operator, TicketNotFound());
         require(
-            operators[operator].ticketBalance >= ticketCount,
-            InsufficientTicketBalance()
+            tickets[ticketId].status == TicketStatus.Active,
+            TicketAlreadyInactive()
         );
+        require(!tickets[ticketId].isUsed, InvalidTicketAmount());
 
-        operators[operator].ticketBalance -= ticketCount;
-        emit TicketsUsed(operator, ticketCount);
+        tickets[ticketId].isUsed = true;
+        tickets[ticketId].status = TicketStatus.Burned;
+        availableTicketCount[operator]--;
+
+        emit TicketUsed(operator, ticketId);
+        emit TicketStatusChanged(operator, ticketId, TicketStatus.Burned);
+
+        if (availableTicketCount[operator] == 0) {
+            operators[operator].isActive = false;
+            emit CiphernodeDeactivated(operator);
+        }
     }
 
-    function slashTickets(
+    function slashTicket(
         address operator,
+        uint32 ticketId,
         uint256 wadToSlash
     ) external onlyServiceManager {
-        uint256 oldTickets = operators[operator].ticketBalance;
-        uint256 ticketsLost = Math.mulDiv(oldTickets, wadToSlash, 1e18);
-        if (ticketsLost > 0 && ticketsLost <= oldTickets) {
-            operators[operator].ticketBalance -= ticketsLost;
-            emit TicketsSlashed(operator, ticketsLost);
+        require(wadToSlash <= 1e18 && wadToSlash > 0, InvalidTicketAmount());
+        Ticket storage t = tickets[ticketId];
+        require(t.operator == operator, TicketNotFound());
+        require(t.status == TicketStatus.Active, TicketAlreadyInactive());
+
+        uint256 slashAmount = Math.mulDiv(t.originalValue, wadToSlash, 1e18);
+        if (slashAmount == 0) return;
+
+        uint256 remaining = t.originalValue - t.slashedAmount;
+        if (slashAmount > remaining) slashAmount = remaining;
+
+        t.slashedAmount += uint96(slashAmount);
+        emit TicketSlashed(operator, ticketId, slashAmount);
+
+        if (t.slashedAmount == t.originalValue) {
+            t.isUsed = true;
+            t.status = TicketStatus.Burned;
+            availableTicketCount[operator]--;
+            emit TicketStatusChanged(operator, ticketId, TicketStatus.Burned);
+        } else if (
+            uint256(t.slashedAmount) * BPS_DENOM >=
+            uint256(t.originalValue) * INACTIVE_AT_BPS
+        ) {
+            t.status = TicketStatus.Inactive;
+            availableTicketCount[operator]--;
+            emit TicketStatusChanged(operator, ticketId, TicketStatus.Inactive);
         }
 
         if (
             registeredOperators[operator] &&
             operators[operator].isActive &&
-            operators[operator].ticketBalance < minTicketBalance
+            availableTicketCount[operator] == 0
+        ) {
+            operators[operator].isActive = false;
+            emit CiphernodeDeactivated(operator);
+        }
+    }
+
+    // Legacy function for ServiceManager compatibility - slashes all active tickets
+    function slashTickets(
+        address operator,
+        uint256 wadToSlash
+    ) external onlyServiceManager {
+        require(wadToSlash <= 1e18 && wadToSlash > 0, InvalidTicketAmount());
+
+        uint32[] memory ticketIds = operatorTickets[operator];
+
+        for (uint256 i = 0; i < ticketIds.length; i++) {
+            uint32 ticketId = ticketIds[i];
+            Ticket storage ticket = tickets[ticketId];
+
+            if (ticket.status != TicketStatus.Active || ticket.isUsed) continue;
+
+            uint256 slashAmount = Math.mulDiv(
+                ticket.originalValue,
+                wadToSlash,
+                1e18
+            );
+            uint256 remaining = ticket.originalValue - ticket.slashedAmount;
+            if (slashAmount > remaining) slashAmount = remaining;
+            ticket.slashedAmount += uint96(slashAmount);
+            emit TicketSlashed(operator, ticketId, slashAmount);
+
+            if (ticket.slashedAmount == ticket.originalValue) {
+                ticket.isUsed = true;
+                ticket.status = TicketStatus.Burned;
+                emit TicketStatusChanged(
+                    operator,
+                    ticketId,
+                    TicketStatus.Burned
+                );
+            } else if (
+                uint256(ticket.slashedAmount) * BPS_DENOM >=
+                uint256(ticket.originalValue) * INACTIVE_AT_BPS
+            ) {
+                ticket.status = TicketStatus.Inactive;
+                emit TicketStatusChanged(
+                    operator,
+                    ticketId,
+                    TicketStatus.Inactive
+                );
+            }
+        }
+
+        uint256 newCount = 0;
+        for (uint256 i = 0; i < ticketIds.length; i++) {
+            Ticket storage ticket = tickets[ticketIds[i]];
+            if (
+                ticket.status == TicketStatus.Active &&
+                !ticket.isUsed &&
+                uint256(ticket.slashedAmount) * BPS_DENOM <
+                uint256(ticket.originalValue) * INACTIVE_AT_BPS
+            ) {
+                newCount++;
+            }
+        }
+        availableTicketCount[operator] = newCount;
+
+        if (
+            registeredOperators[operator] &&
+            operators[operator].isActive &&
+            availableTicketCount[operator] == 0
         ) {
             operators[operator].isActive = false;
             emit CiphernodeDeactivated(operator);
@@ -248,19 +406,6 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         }
     }
 
-    function syncTicketHealth(address operator) external onlyServiceManager {
-        uint256 allocatedUsdc = _allocatedUnderlyingToAVS(
-            operator,
-            usdcStrategy
-        );
-        if (allocatedUsdc < ticketBudgetSpent[operator]) {
-            if (registeredOperators[operator] && operators[operator].isActive) {
-                operators[operator].isActive = false;
-                emit CiphernodeDeactivated(operator);
-            }
-        }
-    }
-
     function setMinTicketBalance(uint256 _minTicketBalance) external onlyOwner {
         require(_minTicketBalance != 0, InvalidMinTicketBalance());
         minTicketBalance = _minTicketBalance;
@@ -274,9 +419,15 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     }
 
     function setTicketPrice(uint256 _ticketPrice) external onlyOwner {
-        require(_ticketPrice != 0, InvalidTicketAmount());
+        require(_ticketPrice != 0, InvalidTicketPrice());
         ticketPrice = _ticketPrice;
         emit TicketPriceUpdated(_ticketPrice);
+    }
+
+    function withdrawUSDC(address to, uint256 amount) external onlyOwner {
+        require(to != address(0), ZeroAddress());
+        usdcToken.safeTransfer(to, amount);
+        emit USDCWithdrawn(to, amount);
     }
 
     function getOperatorInfo(
@@ -285,15 +436,54 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         return operators[operator];
     }
 
-    function getAvailableTicketBudget(
+    function getTotalActiveTicketBalance(
         address operator
-    ) external view returns (uint256) {
-        uint256 allocatedUsdc = _allocatedUnderlyingToAVS(
-            operator,
-            usdcStrategy
-        );
-        uint256 alreadySpent = ticketBudgetSpent[operator];
-        return allocatedUsdc > alreadySpent ? allocatedUsdc - alreadySpent : 0;
+    ) public view returns (uint256) {
+        return availableTicketCount[operator];
+    }
+
+    function getAvailableTicketCount(
+        address operator
+    ) public view returns (uint256) {
+        return availableTicketCount[operator];
+    }
+
+    function getAvailableTickets(
+        address operator
+    ) external view returns (uint32[] memory) {
+        uint32[] memory ticketIds = operatorTickets[operator];
+        uint32[] memory tempAvailable = new uint32[](ticketIds.length);
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < ticketIds.length; i++) {
+            Ticket memory ticket = tickets[ticketIds[i]];
+            if (
+                ticket.status == TicketStatus.Active &&
+                !ticket.isUsed &&
+                uint256(ticket.slashedAmount) * BPS_DENOM <
+                uint256(ticket.originalValue) * INACTIVE_AT_BPS
+            ) {
+                tempAvailable[count] = ticketIds[i];
+                count++;
+            }
+        }
+
+        uint32[] memory availableTickets = new uint32[](count);
+        for (uint256 i = 0; i < count; i++) {
+            availableTickets[i] = tempAvailable[i];
+        }
+
+        return availableTickets;
+    }
+
+    function getTicket(uint32 ticketId) external view returns (Ticket memory) {
+        return tickets[ticketId];
+    }
+
+    function getOperatorTickets(
+        address operator
+    ) external view returns (uint32[] memory) {
+        return operatorTickets[operator];
     }
 
     function getLicenseStake() external view returns (uint256) {
@@ -318,9 +508,13 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         address operator,
         IStrategy strategy
     ) internal view returns (uint256 shares) {
-        IServiceManager sm = IServiceManager(serviceManager);
-        IStrategyManager strategyManager = sm.strategyManager();
-        return strategyManager.stakerDepositShares(operator, strategy);
+        IStrategy[] memory arr = new IStrategy[](1);
+        arr[0] = strategy;
+        uint256[] memory ops = delegationManager.getOperatorShares(
+            operator,
+            arr
+        );
+        return ops[0];
     }
 
     function _getTotalMagnitude(

@@ -42,10 +42,8 @@ interface IServiceManager {
     error MustDeregisterCiphernodeFirst();
 
     // ======================
-    // Collateral & magnitude
+    // Magnitude
     // ======================
-    error InsufficientCollateral();
-    error InvalidMinCollateral();
     error InsufficientAllocatedMagnitude();
 
     // ======================
@@ -124,12 +122,6 @@ interface IServiceManager {
      * @param newPriceFeed New price feed address
      */
     function updateStrategy(IStrategy strategy, address newPriceFeed) external;
-
-    /**
-     * @notice Set minimum collateral USD requirement
-     * @param _minCollateralUsd New minimum collateral in USD
-     */
-    function setMinCollateralUsd(uint256 _minCollateralUsd) external;
 
     /**
      * @notice Set operator set ID for this AVS
@@ -213,25 +205,6 @@ interface IServiceManager {
     ) external;
 
     /**
-     * @notice Check if operator meets collateral requirements
-     * @param operator Address of the operator
-     * @return isEligible True if operator meets requirements
-     * @return collateralUsd USD value of operator's collateral
-     */
-    function checkOperatorEligibility(
-        address operator
-    ) external view returns (bool isEligible, uint256 collateralUsd);
-
-    /**
-     * @notice Get operator's collateral value in USD
-     * @param operator Address of the operator
-     * @return totalUsdValue Total USD value of operator's collateral
-     */
-    function getOperatorCollateralValue(
-        address operator
-    ) external view returns (uint256 totalUsdValue);
-
-    /**
      * @notice Get operator's shares in a strategy
      * @param operator Address of the operator
      * @param strategy Strategy contract address
@@ -285,12 +258,6 @@ interface IServiceManager {
     function getStrategyConfig(
         IStrategy strategy
     ) external view returns (address);
-
-    /**
-     * @notice Get minimum collateral USD requirement
-     * @return Minimum collateral in USD
-     */
-    function getMinCollateralUsd() external view returns (uint256);
 
     /**
      * @notice Get the strategy manager contract

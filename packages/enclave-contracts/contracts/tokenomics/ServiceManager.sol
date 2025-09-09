@@ -68,10 +68,8 @@ contract ServiceManager is
     using SafeERC20 for IERC20Metadata;
 
     uint256 public constant PRICE_STALENESS_THRESHOLD = 86400;
-    uint256 public minCollateralUsd;
     uint32 public operatorSetId;
     IStrategy public enclStrategy;
-    IStrategy public usdcStrategy;
 
     mapping(IStrategy strategy => StrategyConfig config) public strategyConfigs;
     mapping(IStrategy strategy => uint256 index) private strategyToIndex;
@@ -118,15 +116,11 @@ contract ServiceManager is
         IDelegationManager _delegationManager,
         address _bondingManager,
         IStrategy _enclStrategy,
-        IStrategy _usdcStrategy,
-        uint256 _minCollateralUsd,
         uint32 _operatorSetId
     ) external reinitializer(1) {
         require(address(_strategyManager) != address(0), ZeroAddress());
         require(address(_delegationManager) != address(0), ZeroAddress());
         require(address(_enclStrategy) != address(0), ZeroAddress());
-        require(address(_usdcStrategy) != address(0), ZeroAddress());
-        require(_minCollateralUsd != 0, InvalidMinCollateral());
         require(_operatorSetId != 0, InvalidOperatorSetId());
 
         __ServiceManagerBase_init(_owner, _rewardsInitiator);
@@ -134,12 +128,9 @@ contract ServiceManager is
         delegationManager = _delegationManager;
         bondingManager = IBondingManager(_bondingManager);
         enclStrategy = _enclStrategy;
-        usdcStrategy = _usdcStrategy;
-        minCollateralUsd = _minCollateralUsd;
         operatorSetId = _operatorSetId;
 
         _addStrategyInternal(_enclStrategy, address(0));
-        _addStrategyInternal(_usdcStrategy, address(0));
     }
 
     function addStrategy(
@@ -171,10 +162,7 @@ contract ServiceManager is
 
     function removeStrategy(IStrategy strategy) external onlyOwner {
         require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
-        require(
-            strategy != enclStrategy && strategy != usdcStrategy,
-            CannotRemoveCoreStrategies()
-        );
+        require(strategy != enclStrategy, CannotRemoveCoreStrategies());
 
         uint256 index = strategyToIndex[strategy];
         uint256 lastIndex = allowedStrategies.length - 1;
@@ -198,12 +186,6 @@ contract ServiceManager is
         require(strategyConfigs[strategy].isAllowed, StrategyNotFound());
         strategyConfigs[strategy].priceFeed = newPriceFeed;
         emit StrategyUpdated(address(strategy), newPriceFeed);
-    }
-
-    function setMinCollateralUsd(uint256 _minCollateralUsd) external onlyOwner {
-        require(_minCollateralUsd != 0, InvalidMinCollateral());
-        minCollateralUsd = _minCollateralUsd;
-        emit MinCollateralUpdated(_minCollateralUsd);
     }
 
     function setOperatorSetId(uint32 _operatorSetId) external onlyOwner {
@@ -286,19 +268,9 @@ contract ServiceManager is
 
         IBondingManager.OperatorInfo memory bondingInfo = bondingManager
             .getOperatorInfo(operator);
-        if (bondingInfo.isLicensed) {
-            uint256 requiredLicense = bondingManager.getLicenseStake();
-            _requireAllocatedAtLeast(operator, enclStrategy, requiredLicense);
-        }
-
-        uint256 spent = bondingManager.ticketBudgetSpent(operator);
-        if (spent > 0) _requireAllocatedAtLeast(operator, usdcStrategy, spent);
-
-        (bool ok, uint256 usd) = checkOperatorEligibility(operator);
-        require(ok, InsufficientCollateral());
+        require(bondingInfo.isLicensed, NotLicensed());
 
         emit OperatorRegisteredToAVS(operator);
-        emit OperatorBonded(operator, usd);
     }
 
     function deregisterOperator(
@@ -323,7 +295,6 @@ contract ServiceManager is
         );
 
         emit OperatorDeregisteredFromAVS(operator);
-        emit OperatorDebonded(operator);
     }
 
     function supportsAVS(address avs) external view returns (bool) {
@@ -341,6 +312,15 @@ contract ServiceManager is
         emit SlasherRemoved(slasher);
     }
 
+    function slashTicket(
+        address operator,
+        uint32 ticketId,
+        uint256 wadToSlash
+    ) external nonReentrant {
+        require(slashers[msg.sender], NotAuthorizedSlasher());
+        bondingManager.slashTicket(operator, ticketId, wadToSlash);
+    }
+
     function slashOperator(
         address operator,
         uint256 wadToSlash,
@@ -354,20 +334,10 @@ contract ServiceManager is
         require(wadToSlash <= 1e18 && wadToSlash != 0, InvalidWadSlashing());
         require(allowedStrategies.length != 0, NoStrategiesConfigured());
 
-        IStrategy[] memory tmp = new IStrategy[](allowedStrategies.length);
-        uint256 n;
-        for (uint256 i = 0; i < allowedStrategies.length; i++) {
-            if (getOperatorShares(operator, allowedStrategies[i]) > 0)
-                tmp[n++] = allowedStrategies[i];
-        }
-        require(n != 0, OperatorNoStake());
-
-        IStrategy[] memory strategies = new IStrategy[](n);
-        uint256[] memory wads = new uint256[](n);
-        for (uint256 i = 0; i < n; i++) {
-            strategies[i] = tmp[i];
-            wads[i] = wadToSlash;
-        }
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = enclStrategy;
+        uint256[] memory wads = new uint256[](1);
+        wads[0] = wadToSlash;
 
         IAllocationManagerTypes.SlashingParams
             memory params = IAllocationManagerTypes.SlashingParams({
@@ -382,7 +352,6 @@ contract ServiceManager is
             uint256,
             uint256[] memory slashedShares
         ) {
-            bondingManager.slashTickets(operator, wadToSlash);
             emit OperatorSlashed(
                 operator,
                 wadToSlash,
@@ -391,7 +360,6 @@ contract ServiceManager is
                 slashedShares
             );
             bondingManager.updateLicenseStatus(operator);
-            bondingManager.syncTicketHealth(operator);
         } catch Error(string memory errorMsg) {
             revert SlashingFailed(errorMsg);
         }
@@ -420,26 +388,6 @@ contract ServiceManager is
                     amounts[i]
                 );
             }
-        }
-    }
-
-    function checkOperatorEligibility(
-        address operator
-    ) public view returns (bool isEligible, uint256 collateralUsd) {
-        collateralUsd = getOperatorCollateralValue(operator);
-        isEligible = collateralUsd >= minCollateralUsd;
-    }
-
-    function getOperatorCollateralValue(
-        address operator
-    ) public view returns (uint256 totalUsdValue) {
-        for (uint256 i = 0; i < allowedStrategies.length; i++) {
-            IStrategy strategy = allowedStrategies[i];
-            if (strategy == enclStrategy) continue;
-
-            uint256 shares = getOperatorShares(operator, strategy);
-            if (shares > 0)
-                totalUsdValue += _convertSharesToUsd(strategy, shares);
         }
     }
 
@@ -501,10 +449,6 @@ contract ServiceManager is
         return strategyConfigs[strategy].priceFeed;
     }
 
-    function getMinCollateralUsd() external view returns (uint256) {
-        return minCollateralUsd;
-    }
-
     function getOperatorSetInfo() external view returns (uint32, address) {
         return (operatorSetId, address(this));
     }
@@ -517,19 +461,8 @@ contract ServiceManager is
             OperatorInfo({
                 isActive: active,
                 registeredAt: 0,
-                collateralUsd: getOperatorCollateralValue(operator)
+                collateralUsd: 0
             });
-    }
-
-    function _requireMinAllocation(address operator) internal view {
-        OperatorSet memory set_ = OperatorSet({
-            avs: address(this),
-            id: operatorSetId
-        });
-        uint64 usdcAlloc = _allocationManager
-            .getAllocation(operator, set_, usdcStrategy)
-            .currentMagnitude;
-        require(usdcAlloc != 0, InsufficientAllocatedMagnitude());
     }
 
     function _requireAllocatedAtLeast(

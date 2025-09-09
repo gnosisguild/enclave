@@ -103,9 +103,7 @@ const func: DeployFunction = async (hre) => {
 
     const enclStrategy = (await hre.deployments.getOrNull("EnclStrategy"))
       ?.address;
-    const usdcStrategy = (await hre.deployments.getOrNull("UsdcStrategy"))
-      ?.address;
-    const strategies = [enclStrategy, usdcStrategy].filter(Boolean) as string[];
+    const strategies = [enclStrategy].filter(Boolean) as string[];
 
     try {
       await (
@@ -122,8 +120,18 @@ const func: DeployFunction = async (hre) => {
       }
     }
 
+    const bmc = await hre.ethers.getContractAt("BondingManager", bm.address);
+    const currentMinBalance = await bmc.minTicketBalance();
+    if (
+      currentMinBalance.toString() !==
+      CONFIG.tokenomics.minTicketBalance.toString()
+    ) {
+      await (
+        await bmc.setMinTicketBalance(CONFIG.tokenomics.minTicketBalance)
+      ).wait();
+    }
+
     addresses.enclStrategy = enclStrategy;
-    addresses.usdcStrategy = usdcStrategy;
   } else {
     console.log(
       "No ServiceManager/BondingManager found; skipping wiring & AVS init.",

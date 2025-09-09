@@ -770,7 +770,6 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
       deployment.contracts.enclToken ?? deployment.contracts.enclaveToken;
     const usdcTokenAddr = deployment.contracts.usdcToken;
     const enclStrategyAddr = deployment.contracts.enclStrategy;
-    const usdcStrategyAddr = deployment.contracts.usdcStrategy;
     const serviceManagerAddr = deployment.contracts.serviceManager;
     const bondingManagerAddr = deployment.contracts.bondingManager;
     const registryAddr = deployment.contracts.registry;
@@ -781,10 +780,6 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
     const enclStrategy = await ethers.getContractAt(
       "IStrategy",
       enclStrategyAddr,
-    );
-    const usdcStrategy = await ethers.getContractAt(
-      "IStrategy",
-      usdcStrategyAddr,
     );
     const strategyManager = await ethers.getContractAt(
       "IStrategyManager",
@@ -821,42 +816,26 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
           usdcToken.balanceOf(operator),
         ]);
 
-        const [enclShares, usdcShares] = await Promise.all([
-          strategyManager.stakerDepositShares(operator, enclStrategyAddr),
-          strategyManager.stakerDepositShares(operator, usdcStrategyAddr),
-        ]);
-
-        const [enclUnderlying, usdcUnderlying] = await Promise.all([
-          enclStrategy.sharesToUnderlyingView(enclShares),
-          usdcStrategy.sharesToUnderlyingView(usdcShares),
-        ]);
+        const enclShares = await strategyManager.stakerDepositShares(
+          operator,
+          enclStrategyAddr,
+        );
+        const enclUnderlying =
+          await enclStrategy.sharesToUnderlyingView(enclShares);
 
         let enclAllocated = "0",
-          usdcAllocated = "0",
           isSlashable = false;
         try {
-          const [enclAlloc, usdcAlloc] = await Promise.all([
-            allocationManager.getAllocation(
-              operator,
-              operatorSet,
-              enclStrategyAddr,
-            ),
-            allocationManager.getAllocation(
-              operator,
-              operatorSet,
-              usdcStrategyAddr,
-            ),
-          ]);
+          const enclAlloc = await allocationManager.getAllocation(
+            operator,
+            operatorSet,
+            enclStrategyAddr,
+          );
           const enclAllocShares =
             (BigInt(enclShares) * BigInt(enclAlloc.currentMagnitude)) / MAG_100;
-          const usdcAllocShares =
-            (BigInt(usdcShares) * BigInt(usdcAlloc.currentMagnitude)) / MAG_100;
-          const [enclAllocUnderlying, usdcAllocUnderlying] = await Promise.all([
-            enclStrategy.sharesToUnderlyingView(enclAllocShares),
-            usdcStrategy.sharesToUnderlyingView(usdcAllocShares),
-          ]);
+          const enclAllocUnderlying =
+            await enclStrategy.sharesToUnderlyingView(enclAllocShares);
           enclAllocated = ethers.formatEther(enclAllocUnderlying);
-          usdcAllocated = ethers.formatUnits(usdcAllocUnderlying, 6);
           isSlashable = await allocationManager.isOperatorSlashable(
             operator,
             operatorSet,
@@ -868,17 +847,19 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
         let isLicensed = false,
           isRegistered = false,
           isActive = false,
-          ticketBalance = 0,
+          availableTickets = 0,
           state = "REMOVED";
         try {
-          const [info, registered, cipherState] = await Promise.all([
-            bondingManager.getOperatorInfo(operator),
-            bondingManager.isRegisteredOperator(operator),
-            bondingManager.getCiphernodeState(operator),
-          ]);
+          const [info, registered, cipherState, ticketCount] =
+            await Promise.all([
+              bondingManager.getOperatorInfo(operator),
+              bondingManager.isRegisteredOperator(operator),
+              bondingManager.getCiphernodeState(operator),
+              bondingManager.getAvailableTicketCount(operator),
+            ]);
           isLicensed = info.isLicensed;
           isActive = info.isActive;
-          ticketBalance = Number(info.ticketBalance);
+          availableTickets = Number(ticketCount);
           isRegistered = registered;
           state = ["REMOVED", "REGISTERED_INACTIVE", "ACTIVE"][
             Number(cipherState)
@@ -899,14 +880,12 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
           enclBal: ethers.formatEther(enclBal),
           usdcBal: ethers.formatUnits(usdcBal, 6),
           enclStaked: ethers.formatEther(enclUnderlying),
-          usdcStaked: ethers.formatUnits(usdcUnderlying, 6),
           enclAllocated,
-          usdcAllocated,
           isSlashable,
           isLicensed,
           isRegistered,
           isActive,
-          ticketBalance,
+          availableTickets,
           state,
           inRegistry,
         });
@@ -917,10 +896,10 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
 
     console.log("");
     console.log("OPERATOR STATUS");
-    console.log("=".repeat(145));
-    const header = `${"Operator".padEnd(10)} | ${"ENCL Bal".padEnd(10)} | ${"USDC Bal".padEnd(10)} | ${"ENCL Stake".padEnd(12)} | ${"USDC Stake".padEnd(12)} | ${"ENCL Alloc".padEnd(12)} | ${"USDC Alloc".padEnd(12)} | ${"Slash".padEnd(5)} | ${"Lic".padEnd(3)} | ${"Act".padEnd(3)} | ${"Tickets".padEnd(7)} | ${"State".padEnd(7)} | ${"Reg".padEnd(3)}`;
+    console.log("=".repeat(120));
+    const header = `${"Operator".padEnd(10)} | ${"ENCL Bal".padEnd(10)} | ${"USDC Bal".padEnd(10)} | ${"ENCL Stake".padEnd(12)} | ${"ENCL Alloc".padEnd(12)} | ${"Slash".padEnd(5)} | ${"Lic".padEnd(3)} | ${"Act".padEnd(3)} | ${"Tickets".padEnd(7)} | ${"State".padEnd(18)} | ${"Reg".padEnd(3)}`;
     console.log(header);
-    console.log("-".repeat(145));
+    console.log("-".repeat(120));
     for (const r of rows) {
       if (r.error) {
         console.log(
@@ -933,19 +912,17 @@ task("e3t:operatorStatus", "Display comprehensive operator status")
         Number(r.enclBal).toFixed(2).padEnd(10),
         Number(r.usdcBal).toFixed(2).padEnd(10),
         Number(r.enclStaked).toFixed(2).padEnd(12),
-        Number(r.usdcStaked).toFixed(2).padEnd(12),
         Number(r.enclAllocated).toFixed(2).padEnd(12),
-        Number(r.usdcAllocated).toFixed(2).padEnd(12),
         (r.isSlashable ? "Yes" : "No").padEnd(5),
         (r.isLicensed ? "Yes" : "No").padEnd(3),
         (r.isActive ? "Yes" : "No").padEnd(3),
-        String(r.ticketBalance).padEnd(7),
-        r.state.padEnd(7),
+        String(r.availableTickets).padEnd(7),
+        r.state.padEnd(18),
         (r.inRegistry ? "Yes" : "No").padEnd(3),
       ].join(" | ");
       console.log(row);
     }
     console.log("");
-    console.log("=".repeat(145));
+    console.log("=".repeat(120));
     console.log("Status check complete!");
   });

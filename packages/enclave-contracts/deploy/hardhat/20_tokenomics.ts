@@ -15,7 +15,6 @@ const ENV = {
   ENCL_TOKEN: process.env.ENCL_TOKEN,
   USDC_TOKEN: process.env.USDC_TOKEN,
   ENCL_STRATEGY: process.env.ENCL_STRATEGY,
-  USDC_STRATEGY: process.env.USDC_STRATEGY,
 };
 
 const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
@@ -60,15 +59,12 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
     );
   }
 
-  // 2) Strategies
+  // 2) Strategies (only ENCL needed now)
   let enclStrategy =
     ENV.ENCL_STRATEGY ??
     (await hre.deployments.getOrNull("EnclStrategy"))?.address;
-  let usdcStrategy =
-    ENV.USDC_STRATEGY ??
-    (await hre.deployments.getOrNull("UsdcStrategy"))?.address;
 
-  if (!enclStrategy || !usdcStrategy) {
+  if (!enclStrategy) {
     const strategyFactory = await hre.ethers.getContractAt(
       [
         "function deployNewStrategy(address token) external returns (address)",
@@ -90,15 +86,10 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       return s;
     };
 
-    if (!enclStrategy) enclStrategy = await ensureStrategy(enclToken);
-    if (!usdcStrategy) usdcStrategy = await ensureStrategy(usdcToken);
+    enclStrategy = await ensureStrategy(enclToken);
 
     await hre.deployments.save("EnclStrategy", {
       address: enclStrategy!,
-      abi: [],
-    });
-    await hre.deployments.save("UsdcStrategy", {
-      address: usdcStrategy!,
       abi: [],
     });
   }
@@ -130,8 +121,6 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
     eigen.delegationManager,
     CONFIG.addresses.addressOne, // BondingManager needs to be updated
     enclStrategy,
-    usdcStrategy,
-    CONFIG.tokenomics.minCollateralUsd,
     CONFIG.tokenomics.operatorSetId,
   ]);
 
@@ -153,7 +142,7 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       eigen.allocationManager,
       registryAddr,
       enclStrategy,
-      usdcStrategy,
+      usdcToken,
       CONFIG.tokenomics.licenseStake,
       CONFIG.tokenomics.ticketPrice,
       CONFIG.tokenomics.operatorSetId,
@@ -194,7 +183,6 @@ const func: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
     serviceManager: smProxy.address,
     bondingManager: bonding.address,
     enclStrategy,
-    usdcStrategy,
     enclToken,
     usdcToken,
   });

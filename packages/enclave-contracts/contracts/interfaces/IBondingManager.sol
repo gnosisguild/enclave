@@ -34,8 +34,12 @@ interface IBondingManager {
     // ======================
     error InsufficientTicketBalance();
     error InvalidTicketAmount();
-    error InsufficientTicketBudget();
     error InvalidMinTicketBalance();
+    error InvalidTicketPrice();
+    error TicketNotFound();
+    error TicketAlreadyInactive();
+    error InsufficientUSDCBalance();
+    error InsufficientUSDCAllowance();
 
     // ======================
     // Magnitude / resources
@@ -53,28 +57,59 @@ interface IBondingManager {
     event LicenseRevoked(address indexed operator);
     event TicketsPurchased(
         address indexed operator,
-        uint256 cost,
-        uint256 count
+        uint32 ticketId,
+        uint256 ticketCount,
+        uint256 totalCost
     );
-    event TicketsUsed(address indexed operator, uint256 count);
-    event TicketsSlashed(address indexed operator, uint256 count);
+    event TicketUsed(address indexed operator, uint256 indexed ticketId);
+    event TicketSlashed(
+        address indexed operator,
+        uint256 indexed ticketId,
+        uint256 slashAmount
+    );
+    event TicketToppedUp(
+        address indexed operator,
+        uint32 ticketId,
+        uint256 amount
+    );
+    event TicketStatusChanged(
+        address indexed operator,
+        uint32 ticketId,
+        TicketStatus newStatus
+    );
     event MinTicketBalanceUpdated(uint256 newBalance);
-    event CiphernodeRegistered(address indexed operator, uint256 collateralUsd);
+    event CiphernodeRegistered(address indexed operator);
     event CiphernodeDeregistered(address indexed operator);
     event CiphernodeActivated(address indexed operator);
     event CiphernodeDeactivated(address indexed operator);
 
     event LicenseStakeUpdated(uint256 newStake);
     event TicketPriceUpdated(uint256 newPrice);
+    event USDCWithdrawn(address indexed to, uint256 amount);
+
+    // Enums
+    enum TicketStatus {
+        Active,
+        Inactive,
+        Burned
+    }
 
     // Structs
+    struct Ticket {
+        uint64 createdAt;
+        uint96 originalValue;
+        uint96 slashedAmount;
+        address operator;
+        uint32 id;
+        bool isUsed;
+        TicketStatus status;
+    }
+
     struct OperatorInfo {
         bool isLicensed;
         uint256 licenseStake;
-        uint256 ticketBalance;
         uint256 registeredAt;
         bool isActive;
-        uint256 collateralUsd;
     }
 
     /**
@@ -100,14 +135,33 @@ interface IBondingManager {
     function deregisterCiphernode(uint256[] calldata siblingNodes) external;
 
     /**
-     * @notice Use tickets for computation (callable by registry)
-     * @param operator Address of the operator
-     * @param ticketCount Number of tickets to use
+     * @notice Top up an existing ticket with more USDC
+     * @param ticketId ID of the ticket to top up
+     * @param usdcAmount Amount of USDC to add
      */
-    function useTickets(address operator, uint256 ticketCount) external;
+    function topUpTicket(uint32 ticketId, uint256 usdcAmount) external;
 
     /**
-     * @notice Slash operator tickets proportionally (callable by ServiceManager)
+     * @notice Use a specific ticket for computation (callable by registry)
+     * @param operator Address of the operator
+     * @param ticketId ID of the ticket to use
+     */
+    function useTicket(address operator, uint32 ticketId) external;
+
+    /**
+     * @notice Slash a specific ticket (callable by ServiceManager)
+     * @param operator Address of the operator
+     * @param ticketId ID of the ticket to slash
+     * @param wadToSlash Proportion to slash (in WAD format)
+     */
+    function slashTicket(
+        address operator,
+        uint32 ticketId,
+        uint256 wadToSlash
+    ) external;
+
+    /**
+     * @notice Slash all active tickets for an operator (callable by ServiceManager)
      * @param operator Address of the operator
      * @param wadToSlash Proportion to slash (in WAD format)
      */
@@ -120,14 +174,8 @@ interface IBondingManager {
     function updateLicenseStatus(address operator) external;
 
     /**
-     * @notice Sync ticket health based on allocation changes (called by ServiceManager)
-     * @param operator Address of the operator
-     */
-    function syncTicketHealth(address operator) external;
-
-    /**
-     * @notice Set minimum ticket balance for activation
-     * @param _minTicketBalance New minimum ticket balance
+     * @notice Set minimum USDC balance across all tickets for activation
+     * @param _minTicketBalance New minimum ticket balance in USDC
      */
     function setMinTicketBalance(uint256 _minTicketBalance) external;
 
@@ -138,8 +186,8 @@ interface IBondingManager {
     function setLicenseStake(uint256 _licenseStake) external;
 
     /**
-     * @notice Set ticket price
-     * @param _ticketPrice New ticket price
+     * @notice Set ticket price (cost per ticket)
+     * @param _ticketPrice New ticket price in USDC
      */
     function setTicketPrice(uint256 _ticketPrice) external;
 
@@ -153,13 +201,38 @@ interface IBondingManager {
     ) external view returns (OperatorInfo memory);
 
     /**
-     * @notice Get available ticket budget for operator
+     * @notice Get total active ticket balance for operator
      * @param operator Address of the operator
-     * @return Available budget in USDC
+     * @return Total USDC balance in active tickets
      */
-    function getAvailableTicketBudget(
+    function getTotalActiveTicketBalance(
         address operator
     ) external view returns (uint256);
+
+    /**
+     * @notice Get specific ticket information
+     * @param ticketId ID of the ticket
+     * @return Ticket struct
+     */
+    function getTicket(uint32 ticketId) external view returns (Ticket memory);
+
+    /**
+     * @notice Get all ticket IDs for an operator
+     * @param operator Address of the operator
+     * @return Array of ticket IDs
+     */
+    function getOperatorTickets(
+        address operator
+    ) external view returns (uint32[] memory);
+
+    /**
+     * @notice Get available (unused and not too slashed) tickets for an operator
+     * @param operator Address of the operator
+     * @return Array of available ticket IDs
+     */
+    function getAvailableTickets(
+        address operator
+    ) external view returns (uint32[] memory);
 
     /**
      * @notice Get license stake requirement
@@ -168,8 +241,8 @@ interface IBondingManager {
     function getLicenseStake() external view returns (uint256);
 
     /**
-     * @notice Get ticket price
-     * @return Ticket price
+     * @notice Get current ticket price
+     * @return Ticket price in USDC
      */
     function getTicketPrice() external view returns (uint256);
 
@@ -188,15 +261,6 @@ interface IBondingManager {
      * @return True if active
      */
     function isActive(address operator) external view returns (bool);
-
-    /**
-     * @notice Get total USDC value spent on tickets by operator
-     * @param operator Address of the operator
-     * @return Total USDC spent on tickets
-     */
-    function ticketBudgetSpent(
-        address operator
-    ) external view returns (uint256);
 
     /**
      * @notice Ciphernode state enum for lifecycle management
