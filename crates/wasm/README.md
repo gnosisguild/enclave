@@ -1,6 +1,6 @@
 # Wasm bundle for enclave
 
-Here we export wasm funcionality for consumption in typescript to enable use to share code between Rust and Typescript.
+Here we export wasm functionality for consumption in typescript to enable use to share code between Rust and Typescript.
 
 ## Usage
 
