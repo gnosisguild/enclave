@@ -28,7 +28,7 @@ jobs:
       releases_created: ${{ steps.release-plz.outputs.releases_created }}
       version: ${{ steps.release-plz.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -84,7 +84,7 @@ jobs:
     needs: release-rust
     if: github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -119,7 +119,7 @@ jobs:
     needs: [release-rust, release-npm]
     if: github.event_name == 'push' && needs.release-rust.outputs.releases_created == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Trigger binary release workflow
         uses: peter-evans/repository-dispatch@v3
