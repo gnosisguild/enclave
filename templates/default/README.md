@@ -105,7 +105,7 @@ Launch the complete development stack with a single command:
 pnpm dev:all
 ```
 
-or, if have `tmux` installed:
+or, if you have `tmux` installed:
 
 ```bash
 pnpm dev:all --tmux
