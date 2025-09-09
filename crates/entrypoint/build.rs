@@ -32,33 +32,29 @@ fn main() -> std::io::Result<()> {
         "pub static CONTRACT_DEPLOYMENTS: phf::Map<&'static str, ContractInfo> = phf::phf_map! {\n",
     );
 
-    // Process each JSON file in the deployments directory
-    // for entry in fs::read_dir(deployments_path)? {
-    //     let entry = entry?;
-    //     let path = entry.path();
+    // Read the single JSON file
+    let file = File::open(&deployments_path)?;
+    let json: Value = from_reader(file)?;
 
-    //     if path.extension().and_then(|s| s.to_str()) == Some("json") {
-    //         let contract_name = path.file_stem().and_then(|s| s.to_str()).unwrap();
-
-            let file = File::open(&deployments_path)?;
-            let json: Value = from_reader(file)?;
-
-            let contract_name = "test";
-
-            info!("Processing json: {}", json);
-
-            // Extract address and block number
-            if let (Some(address), Some(deploy_block)) = (
-                json["address"].as_str(),
-                json["receipt"]["blockNumber"].as_u64(),
-            ) {
-                contract_info.push_str(&format!(
-                    "    \"{}\" => ContractInfo {{\n        address: \"{}\",\n        deploy_block: {},\n    }},\n",
-                    contract_name, address, deploy_block
-                ));
+    // Process each network in the JSON
+    if let Some(networks) = json.as_object() {
+        for (_, network_data) in networks {
+            if let Some(contracts) = network_data.as_object() {
+                for (contract_name, contract_data) in contracts {
+                    // Extract address and block number from the contract data
+                    if let (Some(address), Some(deploy_block)) = (
+                        contract_data["address"].as_str(),
+                        contract_data["blockNumber"].as_u64(),
+                    ) {
+                        contract_info.push_str(&format!(
+                            "    \"{}\" => ContractInfo {{\n        address: \"{}\",\n        deploy_block: {},\n    }},\n",
+                            contract_name, address, deploy_block
+                        ));
+                    }
+                }
             }
-    //     }
-    // }
+        }
+    }
 
     contract_info.push_str("};\n");
 

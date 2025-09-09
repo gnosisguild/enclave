@@ -1,4 +1,9 @@
-import { network } from "hardhat";
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import EnclaveModule from "../../ignition/modules/enclave";
 import { Enclave, Enclave__factory as EnclaveFactory } from "../../types";
@@ -12,6 +17,7 @@ export interface EnclaveArgs {
   owner?: string;
   maxDuration?: string;
   registry?: string;
+  hre: HardhatRuntimeEnvironment;
 }
 
 /**
@@ -24,12 +30,13 @@ export const deployAndSaveEnclave = async ({
   owner,
   maxDuration,
   registry,
+  hre,
 }: EnclaveArgs): Promise<{ enclave: Enclave }> => {
-  const { ignition, ethers } = await network.connect();
+  const { ignition, ethers } = await hre.network.connect();
 
   const [signer] = await ethers.getSigners();
 
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = hre.globalOptions.network;
 
   const preDeployedArgs = readDeploymentArgs("Enclave", chain);
 

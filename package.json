@@ -26,7 +26,7 @@
     "preciphernode:build": "pnpm evm:build",
     "committee:new": "cd packages/enclave-contracts && pnpm committee:new",
     "committee:publish": "cd packages/enclave-contracts && pnpm hardhat committee:publish",
-    "e3:activate": "cd packages/enclave-contracts && pnpm -s hardhat e3:activate",
+    "e3:activate": "cd packages/enclave-contracts && pnpm e3:activate",
     "e3:publishInput": "cd packages/enclave-contracts && pnpm hardhat e3:publishInput",
     "e3:publishCiphertext": "cd packages/enclave-contracts && pnpm hardhat e3:publishCiphertext",
     "evm:install": "cd packages/enclave-contracts && pnpm install",

@@ -82,9 +82,9 @@ export const requestCommittee = task(
         e3Params,
         computeParams,
       },
-      _,
+      hre,
     ) => {
-      const { enclave } = await deployAndSaveEnclave({});
+      const { enclave } = await deployAndSaveEnclave({ hre });
 
       const tx = await enclave.request(
         {
@@ -115,8 +115,8 @@ export const enableE3 = task("enclave:enableE3", "Enable an E3 program")
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async ({ e3Address }, _) => {
-      const { enclave } = await deployAndSaveEnclave({});
+    default: async ({ e3Address }, hre) => {
+      const { enclave } = await deployAndSaveEnclave({ hre });
 
       const tx = await enclave.enableE3Program(e3Address);
 
@@ -151,10 +151,10 @@ export const publishCommittee = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async ({ e3Id, nodes, publicKey }, _) => {
-      const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter(
-        {},
-      );
+    default: async ({ e3Id, nodes, publicKey }, hre) => {
+      const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
+        hre,
+      });
 
       const nodesToSend = nodes.split(",");
 
@@ -185,8 +185,8 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async ({ e3Id, publicKey }, _) => {
-      const { enclave } = await deployAndSaveEnclave({});
+    default: async ({ e3Id, publicKey }, hre) => {
+      const { enclave } = await deployAndSaveEnclave({ hre });
 
       const tx = await enclave.activate(e3Id, publicKey);
 
@@ -221,8 +221,8 @@ export const publishInput = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async ({ e3Id, data, dataFile }, _) => {
-      const { enclave } = await deployAndSaveEnclave({});
+    default: async ({ e3Id, data, dataFile }, hre) => {
+      const { enclave } = await deployAndSaveEnclave({ hre });
 
       let dataToSend = data;
 
@@ -276,8 +276,8 @@ export const publishCiphertext = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async ({ e3Id, data, dataFile, proof, proofFile }, _) => {
-      const { enclave } = await deployAndSaveEnclave({});
+    default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
+      const { enclave } = await deployAndSaveEnclave({ hre });
 
       let dataToSend = data;
 
@@ -342,8 +342,8 @@ export const publishPlaintext = task(
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
-    default: async ({ e3Id, data, dataFile, proof, proofFile }, _) => {
-      const { enclave } = await deployAndSaveEnclave({});
+    default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
+      const { enclave } = await deployAndSaveEnclave({ hre });
 
       let dataToSend = data;
 

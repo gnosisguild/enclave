@@ -1,4 +1,9 @@
-import { network } from "hardhat";
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
 import {
@@ -9,14 +14,16 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
 interface MockProgramArgs {
   mockInputValidator: string;
+  hre: HardhatRuntimeEnvironment;
 }
 
 export const deployAndSaveMockProgram = async ({
   mockInputValidator,
+  hre,
 }: MockProgramArgs): Promise<{
   e3Program: MockE3Program;
 }> => {
-  const { ignition, ethers } = await network.connect();
+  const { ignition, ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 

@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 import fs from "fs";
 import path from "path";
 
@@ -20,11 +25,17 @@ export interface Deployments {
   [chainName: string]: ChainDeployments;
 }
 
+/**
+ * Store the deployment arguments for a given contract and chain
+ * @param args - The deployment arguments to store
+ * @param contractName - The name of the contract to store the deployments for
+ * @param chain - The chain to store the deployments for
+ */
 export const storeDeploymentArgs = (
   args: DeploymentArgs,
   contractName: string,
   chain: string,
-) => {
+): void => {
   let deployments: Deployments = {};
 
   // Read existing deployments if file exists
@@ -50,6 +61,12 @@ export const storeDeploymentArgs = (
   fs.writeFileSync(deploymentsFile, JSON.stringify(deployments, null, 2));
 };
 
+/**
+ * Read the deployment arguments for a given contract and chain
+ * @param contractName - The name of the contract to read the deployments from
+ * @param chain - The chain to read the deployments from
+ * @returns The deployment arguments for the given contract and chain
+ */
 export const readDeploymentArgs = (
   contractName: string,
   chain: string,
@@ -60,6 +77,10 @@ export const readDeploymentArgs = (
   return deployments[chain]?.[contractName];
 };
 
+/**
+ * Read all the deployments from the deployments file
+ * @returns All the deployments from the deployments file
+ */
 export const readAllDeployments = (): Deployments => {
   if (!fs.existsSync(deploymentsFile)) {
     return {};
@@ -71,4 +92,20 @@ export const readAllDeployments = (): Deployments => {
     console.warn("Failed to parse deployments file");
     return {};
   }
+};
+
+/**
+ * Clean the deployments for a given network
+ * @param network
+ */
+export const cleanDeployments = (network: string): void => {
+  if (!fs.existsSync(deploymentsFile)) {
+    return;
+  }
+
+  const deployments = readAllDeployments();
+  if (deployments[network]) {
+    delete deployments[network];
+  }
+  fs.writeFileSync(deploymentsFile, JSON.stringify(deployments, null, 2));
 };

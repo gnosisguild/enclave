@@ -7,43 +7,43 @@
         "maxDuration": "2592000",
         "registry": "0x0000000000000000000000000000000000000001"
       },
-      "blockNumber": 61,
-      "address": "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154"
+      "blockNumber": 2,
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
     },
     "CiphernodeRegistry": {
       "constructorArgs": {
-        "enclaveAddress": "0x5f3f1dBD7B74C6B46e8c44f98792A1dAf8d69154",
+        "enclaveAddress": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 61,
-      "address": "0xCD8a1C3ba11CF5ECfa6267617243239504a98d90"
+      "blockNumber": 4,
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
     },
     "NaiveRegistryFilter": {
       "constructorArgs": {
-        "ciphernodeRegistryAddress": "0xCD8a1C3ba11CF5ECfa6267617243239504a98d90",
+        "ciphernodeRegistryAddress": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 61,
-      "address": "0x82e01223d51Eb87e16A03E24687EDF0F294da6f1"
+      "blockNumber": 5,
+      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
     },
     "MockComputeProvider": {
-      "blockNumber": 61,
-      "address": "0x7969c5eD335650692Bc04293B07F5BF2e7A673C0"
+      "blockNumber": 7,
+      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 61,
-      "address": "0x7bc06c482DEAd17c0e297aFbC32f6e63d3846650"
+      "blockNumber": 8,
+      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
     },
     "MockInputValidator": {
-      "blockNumber": 61,
-      "address": "0xc351628EB244ec633d5f21fBD6621e1a683B1181"
+      "blockNumber": 9,
+      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
     },
     "MockE3Program": {
       "constructorArgs": {
-        "mockInputValidator": "0xc351628EB244ec633d5f21fBD6621e1a683B1181"
+        "mockInputValidator": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
       },
-      "blockNumber": 61,
-      "address": "0xFD471836031dc5108809D173A067e8486B9047A3"
+      "blockNumber": 10,
+      "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     }
   }
 }

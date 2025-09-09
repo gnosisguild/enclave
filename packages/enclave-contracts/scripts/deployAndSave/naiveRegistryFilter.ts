@@ -1,4 +1,9 @@
-import { network } from "hardhat";
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import NaiveRegistryFilterModule from "../../ignition/modules/naiveRegistryFilter";
 import {
@@ -10,17 +15,19 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 export interface NaiveRegistryFilterArgs {
   ciphernodeRegistryAddress?: string;
   owner?: string;
+  hre: HardhatRuntimeEnvironment;
 }
 
 export const deployAndSaveNaiveRegistryFilter = async ({
   ciphernodeRegistryAddress,
   owner,
+  hre,
 }: NaiveRegistryFilterArgs): Promise<{
   naiveRegistryFilter: NaiveRegistryFilter;
 }> => {
-  const { ignition, ethers } = await network.connect();
+  const { ignition, ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = hre.globalOptions.network;
 
   const preDeployedArgs = readDeploymentArgs("NaiveRegistryFilter", chain);
   if (
@@ -61,7 +68,7 @@ export const deployAndSaveNaiveRegistryFilter = async ({
       address: naiveRegistryFilterAddress,
     },
     "NaiveRegistryFilter",
-    chain ?? "localhost",
+    chain,
   );
 
   const naiveRegistryFilterContract = NaiveRegistryFilterFactory.connect(

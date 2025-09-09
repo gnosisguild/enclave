@@ -1,4 +1,9 @@
-import { network } from "hardhat";
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import MockComputeProviderModule from "../../ignition/modules/mockComputeProvider";
 import {
@@ -7,10 +12,12 @@ import {
 } from "../../types";
 import { storeDeploymentArgs } from "../utils";
 
-export const deployAndSaveMockComputeProvider = async (): Promise<{
+export const deployAndSaveMockComputeProvider = async (
+  hre: HardhatRuntimeEnvironment,
+): Promise<{
   computeProvider: MockComputeProvider;
 }> => {
-  const { ignition, ethers } = await network.connect();
+  const { ignition, ethers } = await hre.network.connect();
 
   const computeProvider = await ignition.deploy(MockComputeProviderModule);
 

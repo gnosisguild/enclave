@@ -18,6 +18,7 @@ import {
   ciphernodeSiblings,
 } from "./tasks/ciphernode";
 import {
+  activateE3,
   enableE3,
   publishCiphertext,
   publishCommittee,
@@ -25,6 +26,7 @@ import {
   publishPlaintext,
   requestCommittee,
 } from "./tasks/enclave";
+import { cleanDeploymentsTask } from "./tasks/utils";
 
 const mnemonic = configVariable("MNEMONIC");
 const privateKey = configVariable("PRIVATE_KEY");
@@ -92,17 +94,19 @@ const config: HardhatUserConfig = {
     hardhatIgnitionEthers,
     hardhatEthersChaiMatchers,
   ],
-  // tasks: [
-  //   ciphernodeAdd,
-  //   ciphernodeRemove,
-  //   ciphernodeSiblings,
-  //   enableE3,
-  //   publishPlaintext,
-  //   publishCiphertext,
-  //   publishInput,
-  //   requestCommittee,
-  //   publishCommittee,
-  // ],
+  tasks: [
+    ciphernodeAdd,
+    ciphernodeRemove,
+    ciphernodeSiblings,
+    requestCommittee,
+    publishPlaintext,
+    publishCiphertext,
+    publishInput,
+    activateE3,
+    publishCommittee,
+    enableE3,
+    cleanDeploymentsTask,
+  ],
   networks: {
     hardhat: {
       chainId: chainIds.hardhat,

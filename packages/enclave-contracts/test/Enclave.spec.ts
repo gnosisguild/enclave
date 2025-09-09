@@ -910,7 +910,8 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "E3Expired");
     });
     it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, naiveRegistryFilterContract } =
+        await loadFixture(setup);
 
       await enclave.request(
         {
@@ -932,14 +933,14 @@ describe("Enclave", function () {
         await reg.mockCiphernodeRegistryEmptyKey.getAddress();
 
       await enclave.setCiphernodeRegistry(nextRegistry);
+      await naiveRegistryFilterContract.setRegistry(nextRegistry);
 
       await expect(
-        await enclave.activate(0, ethers.ZeroHash),
+        enclave.activate(0, ethers.ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
 
       await enclave.setCiphernodeRegistry(prevRegistry);
-      await enclave.activate(0, ethers.ZeroHash);
-      await expect(enclave.activate(0, ethers.ZeroHash)).to.not.be.revert(
+      await expect(enclave.activate(0, ethers.ZeroHash)).not.to.be.revert(
         ethers,
       );
     });

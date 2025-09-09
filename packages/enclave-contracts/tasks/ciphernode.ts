@@ -20,9 +20,9 @@ export const ciphernodeAdd = task(
     defaultValue: ZeroAddress,
   })
   .setAction(async () => ({
-    default: async ({ ciphernodeAddress }, _) => {
+    default: async ({ ciphernodeAddress }, hre) => {
       const { ciphernodeRegistry } =
-        await deployAndSaveCiphernodeRegistryOwnable({});
+        await deployAndSaveCiphernodeRegistryOwnable({ hre });
 
       const tx = await ciphernodeRegistry.addCiphernode(ciphernodeAddress);
       await tx.wait();
@@ -46,9 +46,9 @@ export const ciphernodeRemove = task(
     defaultValue: ZeroAddress,
   })
   .setAction(async () => ({
-    default: async ({ ciphernodeAddress, siblings }, _) => {
+    default: async ({ ciphernodeAddress, siblings }, hre) => {
       const { ciphernodeRegistry } =
-        await deployAndSaveCiphernodeRegistryOwnable({});
+        await deployAndSaveCiphernodeRegistryOwnable({ hre });
 
       const siblingsArray = siblings.split(",").map((s: string) => BigInt(s));
 

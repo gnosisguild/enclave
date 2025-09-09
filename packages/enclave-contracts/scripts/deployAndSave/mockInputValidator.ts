@@ -1,4 +1,9 @@
-import { network } from "hardhat";
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import MockInputValidatorModule from "../../ignition/modules/mockInputValidator";
 import {
@@ -7,10 +12,12 @@ import {
 } from "../../types";
 import { storeDeploymentArgs } from "../utils";
 
-export const deployAndSaveMockInputValidator = async (): Promise<{
+export const deployAndSaveMockInputValidator = async (
+  hre: HardhatRuntimeEnvironment,
+): Promise<{
   inputValidator: MockInputValidator;
 }> => {
-  const { ignition, ethers } = await network.connect();
+  const { ignition, ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const inputValidator = await ignition.deploy(MockInputValidatorModule);
   const inputValidatorAddress =

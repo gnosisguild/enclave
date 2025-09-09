@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { network } from "hardhat";
+import hre from "hardhat";
 
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
@@ -14,7 +14,7 @@ import { deployMocks } from "./deployMocks";
  * Deploys the Enclave contracts
  */
 export const deployEnclave = async () => {
-  const { ethers } = await network.connect();
+  const { ethers } = await hre.network.connect();
 
   const [owner] = await ethers.getSigners();
 
@@ -37,6 +37,7 @@ export const deployEnclave = async () => {
     owner: ownerAddress,
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: addressOne,
+    hre,
   });
 
   const enclaveAddress = await enclave.getAddress();
@@ -46,6 +47,7 @@ export const deployEnclave = async () => {
   const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
     enclaveAddress: enclaveAddress,
     owner: ownerAddress,
+    hre,
   });
 
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
@@ -55,6 +57,7 @@ export const deployEnclave = async () => {
   const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
     ciphernodeRegistryAddress: ciphernodeRegistryAddress,
     owner: ownerAddress,
+    hre,
   });
 
   const naiveRegistryFilterAddress = await naiveRegistryFilter.getAddress();
