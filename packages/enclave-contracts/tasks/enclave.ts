@@ -8,9 +8,6 @@ import fs from "fs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 
-import { deployAndSaveEnclave } from "../scripts/deployAndSave/enclave";
-import { deployAndSaveNaiveRegistryFilter } from "../scripts/deployAndSave/naiveRegistryFilter";
-
 export const requestCommittee = task(
   "committee:new",
   "Request a new ciphernode committee, will use E3 mock contracts by default",
@@ -84,6 +81,10 @@ export const requestCommittee = task(
       },
       hre,
     ) => {
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
+
       const { enclave } = await deployAndSaveEnclave({ hre });
 
       const tx = await enclave.request(
@@ -116,6 +117,10 @@ export const enableE3 = task("enclave:enableE3", "Enable an E3 program")
   })
   .setAction(async () => ({
     default: async ({ e3Address }, hre) => {
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
+
       const { enclave } = await deployAndSaveEnclave({ hre });
 
       const tx = await enclave.enableE3Program(e3Address);
@@ -152,6 +157,10 @@ export const publishCommittee = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, nodes, publicKey }, hre) => {
+      const { deployAndSaveNaiveRegistryFilter } = await import(
+        "../scripts/deployAndSave/naiveRegistryFilter"
+      );
+
       const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
         hre,
       });
@@ -186,6 +195,10 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
   })
   .setAction(async () => ({
     default: async ({ e3Id, publicKey }, hre) => {
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
+
       const { enclave } = await deployAndSaveEnclave({ hre });
 
       const tx = await enclave.activate(e3Id, publicKey);
@@ -222,6 +235,10 @@ export const publishInput = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, data, dataFile }, hre) => {
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
+
       const { enclave } = await deployAndSaveEnclave({ hre });
 
       let dataToSend = data;
@@ -277,6 +294,10 @@ export const publishCiphertext = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
+
       const { enclave } = await deployAndSaveEnclave({ hre });
 
       let dataToSend = data;
@@ -343,6 +364,10 @@ export const publishPlaintext = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, data, dataFile, proof, proofFile }, hre) => {
+      const { deployAndSaveEnclave } = await import(
+        "../scripts/deployAndSave/enclave"
+      );
+
       const { enclave } = await deployAndSaveEnclave({ hre });
 
       let dataToSend = data;

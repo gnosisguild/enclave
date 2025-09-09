@@ -348,7 +348,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -541,7 +541,7 @@ jobs:
             packages/enclave-contracts/dist
             packages/enclave-contracts/artifacts
             packages/enclave-contracts/cache
-            packages/enclave-contracts/typechain-types
+            packages/enclave-contracts/types
             crates/wasm/dist
           retention-days: 1
           if-no-files-found: warn

@@ -11,8 +11,8 @@
   "exports": {
     "./deploy/enclave": {
       "import": {
-        "types": "./dist/scripts/deployEnclave.d.mts",
-        "default": "./dist/scripts/deployEnclave.mjs"
+        "types": "./dist/scripts/deployEnclave.d.ts",
+        "default": "./dist/scripts/deployEnclave.js"
       },
       "require": {
         "types": "./dist/scripts/deployEnclave.d.ts",
@@ -21,20 +21,22 @@
     },
     "./deploy/mocks": {
       "import": {
-        "types": "./dist/scripts/deployMocks.d.mts",
-        "default": "./dist/scripts/deployMocks.mjs"
+        "types": "./dist/scripts/deployMocks.d.ts",
+        "default": "./dist/scripts/deployMocks.js"
       },
       "require": {
         "types": "./dist/scripts/deployMocks.d.ts",
         "default": "./dist/scripts/deployMocks.js"
       }
     },
+    "./tasks/*": "./tasks/*",
+    "./scripts/*": "./scripts/*",
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",
     "./types": {
       "import": {
-        "types": "./dist/types/index.d.mts",
-        "default": "./dist/types/index.mjs"
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/types/index.js"
       },
       "require": {
         "types": "./dist/types/index.d.ts",
@@ -43,8 +45,8 @@
     },
     "./ignition/modules/*": {
       "import": {
-        "types": "./dist/ignition/modules/*.d.mts",
-        "default": "./dist/ignition/modules/*.mjs"
+        "types": "./dist/ignition/modules/*.d.ts",
+        "default": "./dist/ignition/modules/*.js"
       },
       "require": {
         "types": "./dist/ignition/modules/*.d.ts",

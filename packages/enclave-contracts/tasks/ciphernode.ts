@@ -8,8 +8,6 @@ import { ZeroAddress } from "ethers";
 import { task } from "hardhat/config";
 import { poseidon2 } from "poseidon-lite";
 
-import { deployAndSaveCiphernodeRegistryOwnable } from "../scripts/deployAndSave/ciphernodeRegistryOwnable";
-
 export const ciphernodeAdd = task(
   "ciphernode:add",
   "Register a ciphernode to the registry",
@@ -21,6 +19,9 @@ export const ciphernodeAdd = task(
   })
   .setAction(async () => ({
     default: async ({ ciphernodeAddress }, hre) => {
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
+      );
       const { ciphernodeRegistry } =
         await deployAndSaveCiphernodeRegistryOwnable({ hre });
 
@@ -47,6 +48,9 @@ export const ciphernodeRemove = task(
   })
   .setAction(async () => ({
     default: async ({ ciphernodeAddress, siblings }, hre) => {
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
+      );
       const { ciphernodeRegistry } =
         await deployAndSaveCiphernodeRegistryOwnable({ hre });
 
