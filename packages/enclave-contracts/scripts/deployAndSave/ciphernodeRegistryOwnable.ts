@@ -61,6 +61,8 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
     },
   });
 
+  await ciphernodeRegistry.cipherNodeRegistry.waitForDeployment();
+
   const blockNumber = await signer.provider?.getBlockNumber();
 
   const ciphernodeRegistryAddress =

@@ -20,6 +20,7 @@ export const deployAndSaveMockInputValidator = async (
   const { ignition, ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const inputValidator = await ignition.deploy(MockInputValidatorModule);
+  await inputValidator.mockInputValidator.waitForDeployment();
   const inputValidatorAddress =
     await inputValidator.mockInputValidator.getAddress();
 

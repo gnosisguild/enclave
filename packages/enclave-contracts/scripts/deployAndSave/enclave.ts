@@ -67,6 +67,8 @@ export const deployAndSaveEnclave = async ({
     },
   });
 
+  await enclave.enclave.waitForDeployment();
+
   const enclaveAddress = await enclave.enclave.getAddress();
   const blockNumber = await signer.provider?.getBlockNumber();
 

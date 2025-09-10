@@ -13,7 +13,7 @@ import { deployMocks } from "./deployMocks";
 /**
  * Deploys the Enclave contracts
  */
-export const deployEnclave = async () => {
+export const deployEnclave = async (withMocks?: boolean) => {
   const { ethers } = await hre.network.connect();
 
   const [owner] = await ethers.getSigners();
@@ -69,20 +69,23 @@ export const deployEnclave = async () => {
   if (registryAddress === ciphernodeRegistryAddress) {
     console.log(`Enclave contract already has registry`);
   } else {
-    await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
+    const tx = await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
+    await tx.wait();
 
     console.log(`Enclave contract updated with registry`);
   }
 
   // Deploy mocks only if specified
-  const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true";
+  const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
 
   if (shouldDeployMocks) {
-    const { decryptionVerifierAddress } = await deployMocks();
+    const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
 
     const encryptionSchemeId = ethers.keccak256(
       ethers.toUtf8Bytes("fhe.rs:BFV"),
     );
+
+    console.log("encryptionSchemeId", encryptionSchemeId);
 
     const deployedDecryptionVerifier =
       await enclave.decryptionVerifiers(encryptionSchemeId);
@@ -98,7 +101,9 @@ export const deployEnclave = async () => {
         `Successfully set MockDecryptionVerifier in Enclave contract`,
       );
     }
+
+    const tx = await enclave.enableE3Program(e3ProgramAddress);
+    await tx.wait();
+    console.log(`Successfully enabled E3 Program in Enclave contract`);
   }
 };
-
-deployEnclave().catch((error) => console.error(error));

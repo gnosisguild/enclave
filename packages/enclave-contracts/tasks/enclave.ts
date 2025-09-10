@@ -3,10 +3,12 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { ZeroAddress } from "ethers";
+import { ZeroAddress, zeroPadValue } from "ethers";
 import fs from "fs";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
+
+import { readDeploymentArgs } from "../scripts/utils";
 
 export const requestCommittee = task(
   "committee:new",
@@ -87,15 +89,88 @@ export const requestCommittee = task(
 
       const { enclave } = await deployAndSaveEnclave({ hre });
 
+      const enclaveArgs = readDeploymentArgs(
+        "Enclave",
+        hre.globalOptions.network,
+      );
+
+      if (!enclaveArgs) {
+        throw new Error("Enclave deployment arguments not found");
+      }
+
+      const registryArgs = readDeploymentArgs(
+        "CiphernodeRegistry",
+        hre.globalOptions.network,
+      );
+
+      if (!registryArgs) {
+        throw new Error("CiphernodeRegistry deployment arguments not found");
+      }
+
+      const filterArgs = readDeploymentArgs(
+        "NaiveRegistryFilter",
+        hre.globalOptions.network,
+      );
+
+      if (!filterArgs) {
+        throw new Error("NaiveRegistryFilter deployment arguments not found");
+      }
+
+      const mockE3ProgramArgs = readDeploymentArgs(
+        "MockE3Program",
+        hre.globalOptions.network,
+      );
+
+      let e3ProgramParams = e3Params;
+
+      const mockInputValidatorArgs = readDeploymentArgs(
+        "MockInputValidator",
+        hre.globalOptions.network,
+      );
+      if (e3ProgramParams === ZeroAddress) {
+        if (!mockInputValidatorArgs) {
+          throw new Error("MockInputValidator deployment arguments not found");
+        }
+        e3ProgramParams = zeroPadValue(mockInputValidatorArgs.address, 32);
+      }
+
+      let computeProviderParams = computeParams;
+      const mockDecryptionVerifierArgs = readDeploymentArgs(
+        "MockDecryptionVerifier",
+        hre.globalOptions.network,
+      );
+      if (computeProviderParams === ZeroAddress) {
+        if (!mockDecryptionVerifierArgs) {
+          throw new Error(
+            "MockDecryptionVerifier deployment arguments not found",
+          );
+        }
+        computeProviderParams = zeroPadValue(
+          mockDecryptionVerifierArgs.address,
+          32,
+        );
+      }
+
+      console.log({
+        filter: filter === ZeroAddress ? filterArgs.address : filter,
+        threshold: [thresholdQuorum, thresholdTotal],
+        startWindow: [windowStart, windowEnd],
+        duration: duration,
+        e3Program:
+          e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
+        e3ProgramParams,
+        computeProviderParams,
+      });
       const tx = await enclave.request(
         {
-          filter,
+          filter: filter === ZeroAddress ? filterArgs.address : filter,
           threshold: [thresholdQuorum, thresholdTotal],
           startWindow: [windowStart, windowEnd],
-          duration,
-          e3Program: e3Address,
-          e3ProgramParams: e3Params,
-          computeProviderParams: computeParams,
+          duration: duration,
+          e3Program:
+            e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
+          e3ProgramParams,
+          computeProviderParams,
         },
         { value: "1000000000000000000" },
       );

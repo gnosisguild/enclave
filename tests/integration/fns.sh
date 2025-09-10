@@ -52,6 +52,8 @@ echo "Enclave binary: $ENCLAVE_BIN"
 cleanup() {
     echo "Cleaning up processes..."
     jobs -p | xargs -r kill -9 2>/dev/null || true
+    pkill -9 -f "target/debug/enclave" || true
+    pkill -9 -f "hardhat" || true
     exit ${1:-1}
 }
 
@@ -172,7 +174,9 @@ kill_proc() {
 }
 
 kill_em_all() {
+  echo "Killing enclave"
   pkill -9 -f "target/debug/enclave" || true
+  pkill -9 -f "enclave start" || true
   pkill -9 -f "hardhat" || true
 }
 

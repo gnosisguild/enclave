@@ -24,6 +24,8 @@ export const deployAndSaveMockDecryptionVerifier = async (
   const decryptionVerifier = await ignition.deploy(
     MockDecryptionVerifierModule,
   );
+
+  await decryptionVerifier.mockDecryptionVerifier.waitForDeployment();
   const decryptionVerifierAddress =
     await decryptionVerifier.mockDecryptionVerifier.getAddress();
 

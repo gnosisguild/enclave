@@ -21,6 +21,8 @@ export const deployAndSaveMockComputeProvider = async (
 
   const computeProvider = await ignition.deploy(MockComputeProviderModule);
 
+  await computeProvider.mockComputeProvider.waitForDeployment();
+
   const computeProviderAddress =
     await computeProvider.mockComputeProvider.getAddress();
 

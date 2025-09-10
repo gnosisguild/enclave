@@ -160,7 +160,7 @@
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
     "compile:ts": "tsc",
     "coverage": "pnpm test --coverage",
-    "deploy": "hardhat run scripts/deployEnclave.ts",
+    "deploy": "hardhat run scripts/run.ts",
     "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm clean:deployments && pnpm run deploy",
     "e3:activate": "hardhat e3:activate",
     "e3:enable": "hardhat e3:enable",

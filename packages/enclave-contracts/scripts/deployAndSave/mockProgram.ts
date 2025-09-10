@@ -47,6 +47,8 @@ export const deployAndSaveMockProgram = async ({
     },
   });
 
+  await e3Program.mockE3Program.waitForDeployment();
+
   const e3ProgramAddress = await e3Program.mockE3Program.getAddress();
   const blockNumber = await signer.provider?.getBlockNumber();
 

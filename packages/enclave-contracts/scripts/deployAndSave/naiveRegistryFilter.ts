@@ -53,6 +53,8 @@ export const deployAndSaveNaiveRegistryFilter = async ({
     },
   });
 
+  await naiveRegistryFilter.naiveRegistryFilter.waitForDeployment();
+
   const naiveRegistryFilterAddress =
     await naiveRegistryFilter.naiveRegistryFilter.getAddress();
 

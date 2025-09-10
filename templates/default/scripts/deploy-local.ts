@@ -25,13 +25,9 @@ async function main() {
     ),
   );
 
-  try {
-    // Execute the deployment
-    await deployEnclave();
-    await deployTemplate();
-  } catch (error) {
-    console.error("❌ Deployment failed:", error);
-  }
+  // Execute the deployment
+  await deployEnclave(true);
+  await deployTemplate();
 }
 
 // Execute the deployment

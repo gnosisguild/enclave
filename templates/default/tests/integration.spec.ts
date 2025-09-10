@@ -189,7 +189,6 @@ async function main() {
   // REQUEST phase
   await waitForEvent(EnclaveEventType.E3_REQUESTED, async () => {
     console.log("Requested E3...");
-    console.log("Contracts:", contracts);
     await sdk.requestE3({
       filter: contracts.filterRegistry,
       threshold,
@@ -203,7 +202,6 @@ async function main() {
   });
 
   state = store.get(0n);
-  console.log("State:", state);
   assert(state);
   assert.strictEqual(state.e3Id, 0n);
   assert.strictEqual(state.filter, contracts.filterRegistry);

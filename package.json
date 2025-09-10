@@ -34,6 +34,8 @@
     "evm:build": "cd packages/enclave-contracts && pnpm compile",
     "evm:lint": "cd packages/enclave-contracts && pnpm lint",
     "evm:test": "cd packages/enclave-contracts && pnpm test",
+    "evm:deploy": "cd packages/enclave-contracts && pnpm run deploy:mocks",
+    "evm:clean": "cd packages/enclave-contracts && pnpm clean:deployments",
     "evm:coverage": "cd packages/enclave-contracts && pnpm coverage",
     "evm:release": "cd packages/enclave-contracts && pnpm release",
     "react:build": "cd packages/enclave-react && pnpm build",
