@@ -80,7 +80,7 @@ async fn setup_local_ciphernode(
     // Ciphernode Selector
     CiphernodeSelector::attach(&local_bus, &sortition, &addr);
 
-    // E3 specific chain
+    // E3 specific setup
     E3Router::builder(&local_bus, store)
         .with(ThresholdKeyshareExtension::create(
             &local_bus,
@@ -196,8 +196,8 @@ async fn test_trbfv() -> Result<()> {
 
     let e3_requested = E3Requested {
         e3_id: E3id::new("0", 1),
-        threshold_m: 1, //tmp
-        threshold_n: 3, //tmp
+        threshold_m: 1,
+        threshold_n: 3,
         // threshold_m: 2,
         // threshold_n: 5, // Committee size is 5 from 7 total nodes
         seed: seed.clone(),
@@ -215,7 +215,13 @@ async fn test_trbfv() -> Result<()> {
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
+        // "ThresholdShareCreated",
+        // "ThresholdShareCreated",
         "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        // "KeyshareCreated",
+        // "KeyshareCreated",
     ];
 
     // node #1 is selected so lets grab all events
