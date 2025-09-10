@@ -77,7 +77,7 @@ e3-evm-helpers = { version = "0.0.1-test", path = "./crates/evm-helpers" }
 e3-fhe = { version = "0.0.1-test", path = "./crates/fhe" }
 e3-fs = { version = "0.0.1-test", path = "./crates/fs" }
 e3-indexer = { version = "0.0.1-test", path = "./crates/indexer" }
-e3-multithread = { version = "0.1.0", path = "./crates/multithread" }
+e3-multithread = { version = "0.0.1-test", path = "./crates/multithread" }
 e3-keyshare = { version = "0.0.1-test", path = "./crates/keyshare" }
 e3-logger = { version = "0.0.1-test", path = "./crates/logger" }
 e3-net = { version = "0.0.1-test", path = "./crates/net" }
