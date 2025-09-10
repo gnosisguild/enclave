@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { deployEnclave } from "@enclave-e3/contracts/deploy/enclave";
+import { deployTemplate } from "../deploy/default";
 
 async function main() {
   console.log("🚀 Deploying Enclave protocol locally...");
@@ -27,6 +28,7 @@ async function main() {
   try {
     // Execute the deployment
     await deployEnclave();
+    await deployTemplate();
   } catch (error) {
     console.error("❌ Deployment failed:", error);
   }

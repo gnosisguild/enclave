@@ -37,7 +37,6 @@ export const deployAndSaveEnclave = async ({
   const [signer] = await ethers.getSigners();
 
   const chain = hre.globalOptions.network;
-
   const preDeployedArgs = readDeploymentArgs("Enclave", chain);
 
   if (

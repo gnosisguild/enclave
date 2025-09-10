@@ -32,6 +32,7 @@ export const deployMocks = async (): Promise<MockDeployments> => {
   const decryptionVerifierAddress = await decryptionVerifier.getAddress();
 
   const { inputValidator } = await deployAndSaveMockInputValidator(hre);
+
   const inputValidatorAddress = await inputValidator.getAddress();
 
   const { e3Program } = await deployAndSaveMockProgram({

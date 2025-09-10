@@ -49,6 +49,16 @@
         "default": "./dist/tasks/enclave.js"
       }
     },
+    "./tasks/utils": {
+      "import": {
+        "types": "./dist/tasks/utils.d.ts",
+        "default": "./dist/tasks/utils.js"
+      },
+      "require": {
+        "types": "./dist/tasks/utils.d.ts",
+        "default": "./dist/tasks/utils.js"
+      }
+    },
     "./scripts/*": "./scripts/*",
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",

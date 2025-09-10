@@ -79,6 +79,7 @@ export const deployEnclave = async () => {
 
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress } = await deployMocks();
+
     const encryptionSchemeId = ethers.keccak256(
       ethers.toUtf8Bytes("fhe.rs:BFV"),
     );

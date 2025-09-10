@@ -6,7 +6,9 @@
   "scripts": {
     "ciphernode:add": "hardhat run scripts/ciphernode-add.ts -- ",
     "compile": "hardhat compile",
-    "deploy": "hardhat run scripts/deploy-local.ts --network localhost",
+    "clean:ignition:deployments": "rm -rf ./ignition/deployments/chain-31337",
+    "clean:deployments": "hardhat utils:clean-deployments && pnpm clean:ignition:deployments",
+    "deploy": "pnpm clean:deployments && hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
     "dev:all": "./scripts/dev_all.sh",
     "dev:ciphernodes": "./scripts/dev_ciphernodes.sh",
