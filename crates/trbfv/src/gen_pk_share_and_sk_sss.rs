@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Request {
+pub struct GenPkShareAndSkSssRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// Crp
@@ -32,10 +32,10 @@ struct InnerRequest {
     pub crp: CommonRandomPoly,
 }
 
-impl TryFrom<Request> for InnerRequest {
+impl TryFrom<GenPkShareAndSkSssRequest> for InnerRequest {
     type Error = anyhow::Error;
 
-    fn try_from(value: Request) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: GenPkShareAndSkSssRequest) -> std::result::Result<Self, Self::Error> {
         let crp = CommonRandomPoly::deserialize(&value.crp, &value.trbfv_config.params())?;
         Ok(InnerRequest {
             trbfv_config: value.trbfv_config,
@@ -45,21 +45,21 @@ impl TryFrom<Request> for InnerRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Response {
+pub struct GenPkShareAndSkSssResponse {
     /// PublicKey share for this node
     pub pk_share: ArcBytes,
     /// SecretKey Shamir Shares for other parties
     pub sk_sss: Vec<SensitiveBytes>,
 }
 
-impl TryFrom<(InnerResponse, &Cipher)> for Response {
+impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
     type Error = anyhow::Error;
     fn try_from(
         (value, cipher): (InnerResponse, &Cipher),
     ) -> std::result::Result<Self, Self::Error> {
         let pk_share = Arc::new(value.pk_share.to_bytes());
         let sk_sss = SensitiveBytes::try_from_unserialized_vec(value.sk_sss, cipher)?;
-        Ok(Response { pk_share, sk_sss })
+        Ok(GenPkShareAndSkSssResponse { pk_share, sk_sss })
     }
 }
 
@@ -73,8 +73,8 @@ struct InnerResponse {
 pub async fn gen_pk_share_and_sk_sss(
     rng: &SharedRng,
     cipher: &Cipher,
-    req: Request,
-) -> Result<Response> {
+    req: GenPkShareAndSkSssRequest,
+) -> Result<GenPkShareAndSkSssResponse> {
     println!("gen_pk_share_and_sk_sss");
     let req = InnerRequest::try_from(req)?;
 
@@ -96,7 +96,7 @@ pub async fn gen_pk_share_and_sk_sss(
         { share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())? };
 
     println!("gen_pk_share_and_sk_sss:returning...");
-    Ok(Response::try_from((
+    Ok(GenPkShareAndSkSssResponse::try_from((
         InnerResponse { pk_share, sk_sss },
         cipher,
     ))?)

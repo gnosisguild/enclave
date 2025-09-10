@@ -15,7 +15,7 @@ use fhe_traits::DeserializeParametrized;
 use fhe_traits::FheDecoder;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Request {
+pub struct CalculateThresholdDecryptionRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// All decryption shares from a threshold quorum of nodes polys.
@@ -25,12 +25,14 @@ pub struct Request {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Response {
+pub struct CalculateThresholdDecryptionResponse {
     /// The resultant plaintext
     pub plaintext: Vec<ArcBytes>,
 }
 
-pub async fn calculate_threshold_decryption(req: Request) -> Result<Response> {
+pub async fn calculate_threshold_decryption(
+    req: CalculateThresholdDecryptionRequest,
+) -> Result<CalculateThresholdDecryptionResponse> {
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
@@ -64,7 +66,7 @@ pub async fn calculate_threshold_decryption(req: Request) -> Result<Response> {
         })
         .collect::<Result<Vec<_>>>()?;
 
-    Ok(Response {
+    Ok(CalculateThresholdDecryptionResponse {
         plaintext: open_results
             .into_iter()
             .map(|open_result| -> Result<_> {

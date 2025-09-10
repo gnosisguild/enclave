@@ -17,7 +17,7 @@ use fhe_traits::DeserializeParametrized;
 use fhe_traits::Serialize;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Request {
+pub struct CalculateDecryptionShareRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// One or more Ciphertexts to decrypt
@@ -29,12 +29,15 @@ pub struct Request {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Response {
+pub struct CalculateDecryptionShareResponse {
     /// The decryption share for the given ciphertext
     pub d_share_poly: Vec<ArcBytes>,
 }
 
-pub async fn calculate_decryption_share(cipher: &Cipher, req: Request) -> Result<Response> {
+pub async fn calculate_decryption_share(
+    cipher: &Cipher,
+    req: CalculateDecryptionShareRequest,
+) -> Result<CalculateDecryptionShareResponse> {
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
@@ -63,7 +66,7 @@ pub async fn calculate_decryption_share(cipher: &Cipher, req: Request) -> Result
         })
         .collect::<Result<Vec<Poly>>>()?;
 
-    Ok(Response {
+    Ok(CalculateDecryptionShareResponse {
         d_share_poly: d_share_poly
             .into_iter()
             .map(|p| Arc::new(p.to_bytes()))

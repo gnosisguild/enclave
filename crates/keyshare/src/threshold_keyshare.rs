@@ -21,7 +21,12 @@ use e3_events::{
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
-use e3_trbfv::{gen_pk_share_and_sk_sss, SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse};
+use e3_trbfv::{
+    calculate_decryption_key::CalculateDecryptionKeyRequest,
+    gen_esi_sss::GenEsiSssRequest,
+    gen_pk_share_and_sk_sss::{self, GenPkShareAndSkSssRequest},
+    SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse,
+};
 use fhe_traits::Serialize;
 use zeroize::Zeroizing;
 
@@ -247,7 +252,7 @@ impl ThresholdKeyshare {
     pub fn try_generate_compute_decryption_key_request(
         &self,
         msg: AllThresholdSharesCollected,
-    ) -> Result<e3_trbfv::calculate_decryption_key::Request> {
+    ) -> Result<CalculateDecryptionKeyRequest> {
         let cipher = self.cipher.clone();
         let Some(state) = self.state.get() else {
             bail!("No state found");
@@ -270,7 +275,7 @@ impl ThresholdKeyshare {
             )?);
         }
 
-        Ok(e3_trbfv::calculate_decryption_key::Request {
+        Ok(CalculateDecryptionKeyRequest {
             trbfv_config,
             esi_sss_collected,
             sk_sss_collected,
@@ -473,7 +478,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
         let trbfv_config = state.into();
 
         let event = ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(
-            e3_trbfv::gen_esi_sss::Request {
+            GenEsiSssRequest {
                 trbfv_config,
                 error_size,
                 esi_per_ct: esi_per_ct as u64,
@@ -529,7 +534,7 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
 
         let crp = Arc::new(create_crp(trbfv_config.params(), self.rng.clone()).to_bytes());
         let event = ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(
-            gen_pk_share_and_sk_sss::Request { trbfv_config, crp }.into(),
+            GenPkShareAndSkSssRequest { trbfv_config, crp }.into(),
         ));
 
         Box::pin(
@@ -539,9 +544,8 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
                 .map(move |res, act, ctx| {
                     let c = || {
                         println!("\nRECEIVED GEN PK SHARE AND SK SSS");
-                        let Ok(e3_events::ComputeResponse::TrBFV(
-                            TrBFVResponse::GenPkShareAndSkSss(output),
-                        )) = res?
+                        let Ok(ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(output))) =
+                            res?
                         else {
                             bail!("Error extracting data from compute process")
                         };
@@ -586,9 +590,9 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
                 .into_actor(self)
                 .map(move |res, act, ctx| {
                     let c = || {
-                        let Ok(e3_events::ComputeResponse::TrBFV(
-                            TrBFVResponse::CalculateDecryptionKey(output),
-                        )) = res?
+                        let Ok(ComputeResponse::TrBFV(TrBFVResponse::CalculateDecryptionKey(
+                            output,
+                        ))) = res?
                         else {
                             bail!("Error extracting data from compute process")
                         };

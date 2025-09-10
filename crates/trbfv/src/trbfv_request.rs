@@ -4,12 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    calculate_decryption_key, calculate_decryption_share, calculate_threshold_decryption,
-    gen_esi_sss, gen_pk_share_and_sk_sss,
+    calculate_decryption_key::{CalculateDecryptionKeyRequest, CalculateDecryptionKeyResponse},
+    calculate_decryption_share::{
+        CalculateDecryptionShareRequest, CalculateDecryptionShareResponse,
+    },
+    calculate_threshold_decryption::{
+        CalculateThresholdDecryptionRequest, CalculateThresholdDecryptionResponse,
+    },
+    gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
+    gen_pk_share_and_sk_sss::{GenPkShareAndSkSssRequest, GenPkShareAndSkSssResponse},
 };
 
 // NOTE: All size values use u64 instead of usize to maintain a stable
@@ -19,21 +25,21 @@ use crate::{
 /// Input format for TrBFVRequest
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVRequest {
-    GenEsiSss(gen_esi_sss::Request),
-    GenPkShareAndSkSss(gen_pk_share_and_sk_sss::Request),
-    CalculateDecryptionKey(calculate_decryption_key::Request),
-    CalculateDecryptionShare(calculate_decryption_share::Request),
-    CalculateThresholdDecryption(calculate_threshold_decryption::Request),
+    GenEsiSss(GenEsiSssRequest),
+    GenPkShareAndSkSss(GenPkShareAndSkSssRequest),
+    CalculateDecryptionKey(CalculateDecryptionKeyRequest),
+    CalculateDecryptionShare(CalculateDecryptionShareRequest),
+    CalculateThresholdDecryption(CalculateThresholdDecryptionRequest),
 }
 
 /// Result format for TrBFVResponse
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVResponse {
-    GenEsiSss(gen_esi_sss::Response),
-    GenPkShareAndSkSss(gen_pk_share_and_sk_sss::Response),
-    CalculateDecryptionKey(calculate_decryption_key::Response),
-    CalculateDecryptionShare(calculate_decryption_share::Response),
-    CalculateThresholdDecryption(calculate_threshold_decryption::Response),
+    GenEsiSss(GenEsiSssResponse),
+    GenPkShareAndSkSss(GenPkShareAndSkSssResponse),
+    CalculateDecryptionKey(CalculateDecryptionKeyResponse),
+    CalculateDecryptionShare(CalculateDecryptionShareResponse),
+    CalculateThresholdDecryption(CalculateThresholdDecryptionResponse),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

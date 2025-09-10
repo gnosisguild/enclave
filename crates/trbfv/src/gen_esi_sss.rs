@@ -13,7 +13,7 @@ use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Request {
+pub struct GenEsiSssRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// Error Size extracted from the E3 Program Parameters
@@ -28,9 +28,9 @@ struct InnerRequest {
     pub esi_per_ct: u64,
 }
 
-impl TryFrom<Request> for InnerRequest {
+impl TryFrom<GenEsiSssRequest> for InnerRequest {
     type Error = anyhow::Error;
-    fn try_from(value: Request) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: GenEsiSssRequest) -> std::result::Result<Self, Self::Error> {
         Ok(InnerRequest {
             trbfv_config: value.trbfv_config,
             error_size: BigUint::from_bytes_be(&value.error_size),
@@ -40,17 +40,17 @@ impl TryFrom<Request> for InnerRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Response {
+pub struct GenEsiSssResponse {
     /// The smudging noise shares
     pub esi_sss: Vec<Vec<SensitiveBytes>>,
 }
 
-impl TryFrom<(InnerResponse, &Cipher)> for Response {
+impl TryFrom<(InnerResponse, &Cipher)> for GenEsiSssResponse {
     type Error = anyhow::Error;
     fn try_from(
         (value, cipher): (InnerResponse, &Cipher),
     ) -> std::result::Result<Self, Self::Error> {
-        Ok(Response {
+        Ok(GenEsiSssResponse {
             esi_sss: value
                 .esi_sss
                 .into_iter()
@@ -64,7 +64,11 @@ struct InnerResponse {
     pub esi_sss: Vec<Vec<Array2<u64>>>,
 }
 
-pub async fn gen_esi_sss(rng: &SharedRng, cipher: &Cipher, req: Request) -> Result<Response> {
+pub async fn gen_esi_sss(
+    rng: &SharedRng,
+    cipher: &Cipher,
+    req: GenEsiSssRequest,
+) -> Result<GenEsiSssResponse> {
     println!("gen_esi_sss");
     let req = InnerRequest::try_from(req)?;
 
@@ -95,5 +99,8 @@ pub async fn gen_esi_sss(rng: &SharedRng, cipher: &Cipher, req: Request) -> Resu
         .collect::<Result<Vec<Vec<_>>>>()?;
 
     println!("gen_esi_sss:returning...");
-    Ok(Response::try_from((InnerResponse { esi_sss }, cipher))?)
+    Ok(GenEsiSssResponse::try_from((
+        InnerResponse { esi_sss },
+        cipher,
+    ))?)
 }

@@ -16,7 +16,7 @@ use ndarray::Array2;
 use zeroize::Zeroizing;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Request {
+pub struct CalculateDecryptionKeyRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// All collected secret key shamir shares where SensitiveBytes is Vec<Array2<u64>>
@@ -31,9 +31,11 @@ struct InnerRequest {
     pub esi_sss_collected: Vec<Vec<Array2<u64>>>,
 }
 
-impl TryFrom<(&Cipher, Request)> for InnerRequest {
+impl TryFrom<(&Cipher, CalculateDecryptionKeyRequest)> for InnerRequest {
     type Error = anyhow::Error;
-    fn try_from(value: (&Cipher, Request)) -> std::result::Result<Self, Self::Error> {
+    fn try_from(
+        value: (&Cipher, CalculateDecryptionKeyRequest),
+    ) -> std::result::Result<Self, Self::Error> {
         let cipher = value.0;
         let req = value.1;
         println!("Converting sk_sss to collected...");
@@ -65,7 +67,7 @@ impl TryFrom<(&Cipher, Request)> for InnerRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Response {
+pub struct CalculateDecryptionKeyResponse {
     /// A single summed polynomial for this nodes secret key.
     pub sk_poly_sum: SensitiveBytes,
     /// A single summed polynomial for this partys smudging noise
@@ -77,7 +79,7 @@ struct InnerResponse {
     pub es_poly_sum: Vec<Poly>,
 }
 
-impl TryFrom<(&Cipher, InnerResponse)> for Response {
+impl TryFrom<(&Cipher, InnerResponse)> for CalculateDecryptionKeyResponse {
     type Error = anyhow::Error;
     fn try_from(value: (&Cipher, InnerResponse)) -> std::result::Result<Self, Self::Error> {
         let InnerResponse {
@@ -87,7 +89,7 @@ impl TryFrom<(&Cipher, InnerResponse)> for Response {
 
         let cipher = value.0;
 
-        Ok(Response {
+        Ok(CalculateDecryptionKeyResponse {
             es_poly_sum: SensitiveBytes::try_from_vec(
                 es_poly_sum
                     .into_iter()
@@ -108,7 +110,10 @@ pub fn serialize_from_array2(value: Array2<u64>) -> Result<Vec<u8>> {
     bincode::serialize(&value).context("Error serializing ndarray")
 }
 
-pub async fn calculate_decryption_key(cipher: &Cipher, req: Request) -> Result<Response> {
+pub async fn calculate_decryption_key(
+    cipher: &Cipher,
+    req: CalculateDecryptionKeyRequest,
+) -> Result<CalculateDecryptionKeyResponse> {
     println!("Calculating decryption key...");
 
     let req = InnerRequest::try_from((cipher, req))?;
@@ -135,7 +140,7 @@ pub async fn calculate_decryption_key(cipher: &Cipher, req: Request) -> Result<R
 
     println!("Returning successful result! Encrypting for transit...");
 
-    Ok(Response::try_from((
+    Ok(CalculateDecryptionKeyResponse::try_from((
         cipher,
         InnerResponse {
             sk_poly_sum,
