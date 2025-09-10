@@ -2947,7 +2947,7 @@ dependencies = [
 
 [[package]]
 name = "e3-multithread"
-version = "0.1.0"
+version = "0.0.1-test"
 dependencies = [
  "actix",
  "anyhow",
@@ -3108,7 +3108,7 @@ dependencies = [
 
 [[package]]
 name = "e3-trbfv"
-version = "0.1.0"
+version = "0.0.1-test"
 dependencies = [
  "anyhow",
  "bincode",
