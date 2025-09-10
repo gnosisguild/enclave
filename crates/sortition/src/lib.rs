@@ -5,13 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 mod ciphernode_selector;
-mod distance;
-mod index;
+mod merkle_committee;
 mod repo;
 mod sortition;
+mod ticket;
+mod ticket_sortition;
 
 pub use ciphernode_selector::*;
-pub use distance::*;
-pub use index::*;
 pub use repo::*;
 pub use sortition::*;
