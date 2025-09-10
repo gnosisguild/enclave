@@ -5,7 +5,7 @@
 To install, run
 
 ```
-pnpm add @gnosis-guild/enclave
+pnpm add @enclave-e3/contracts
 ```
 
 If writing a new E3 program, you can import the necessary interfaces by writing

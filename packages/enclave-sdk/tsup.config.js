@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { defineConfig } from "tsup";
-import { baseConfig } from "@gnosis-guild/enclave-config/tsup";
+import { baseConfig } from "@enclave-e3/config/tsup";
 
 export default defineConfig([
   {
@@ -17,7 +17,7 @@ export default defineConfig([
     }),
     esbuildOptions: (options) => {
       options.alias = {
-        "@gnosis-guild/e3-wasm/init": "../../../crates/wasm/init_node.js",
+        "@enclave-e3/wasm/init": "../../../crates/wasm/init_node.js",
       };
     },
   },
@@ -30,7 +30,7 @@ export default defineConfig([
     }),
     esbuildOptions: (options) => {
       options.alias = {
-        "@gnosis-guild/e3-wasm/init": "../../../crates/wasm/init_node.cjs",
+        "@enclave-e3/wasm/init": "../../../crates/wasm/init_node.cjs",
       };
     },
   },

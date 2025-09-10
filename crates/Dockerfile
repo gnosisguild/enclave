@@ -5,7 +5,7 @@ COPY crates/wasm/package.json ./crates/wasm/package.json
 COPY packages/enclave-react ./packages/enclave-react
 COPY packages/enclave-sdk ./packages/enclave-sdk
 COPY packages/enclave-config ./packages/enclave-config
-COPY packages/evm ./packages/evm
+COPY packages/enclave-contracts ./packages/enclave-contracts
 COPY pnpm-workspace.yaml .
 COPY pnpm-lock.yaml .
 
@@ -13,7 +13,7 @@ RUN npm install -g corepack
 RUN corepack enable
 
 # We just need the contracts to be compiled here
-RUN cd packages/evm && pnpm install && pnpm compile:contracts
+RUN cd packages/enclave-contracts && pnpm install && pnpm compile:contracts
 
 # Build stage
 FROM rust:1.86 AS ciphernode-builder
@@ -31,8 +31,8 @@ COPY Cargo.toml ./Cargo.toml
 COPY ./rust-toolchain.toml .
 
 WORKDIR /build/crates
-COPY --from=evm-builder /build/packages/evm/artifacts ../packages/evm/artifacts
-COPY --from=evm-builder /build/packages/evm/deployments ../packages/evm/deployments
+COPY --from=evm-builder /build/packages/enclave-contracts/artifacts ../packages/enclave-contracts/artifacts
+COPY --from=evm-builder /build/packages/enclave-contracts/deployments ../packages/enclave-contracts/deployments
 
 
 # find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'

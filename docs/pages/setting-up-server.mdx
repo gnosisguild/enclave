@@ -32,13 +32,13 @@ The Enclave SDK handles much of this complexity for you, providing:
 For TypeScript/JavaScript applications:
 
 ```bash
-pnpm add @gnosis-guild/enclave
+pnpm add @enclave-e3/contracts
 ```
 
 For React applications:
 
 ```bash
-pnpm add @gnosis-guild/enclave @gnosis-guild/enclave-react
+pnpm add @enclave-e3/contracts @enclave-e3/react
 ```
 
 ### Basic TypeScript Client
@@ -46,7 +46,7 @@ pnpm add @gnosis-guild/enclave @gnosis-guild/enclave-react
 Create a type-safe client that can interact with Enclave contracts:
 
 ```typescript
-import { EnclaveSDK, EnclaveEventType } from '@gnosis-guild/enclave-sdk'
+import { EnclaveSDK, EnclaveEventType } from '@enclave-e3/sdk'
 import { createPublicClient, createWalletClient, http, custom } from 'viem'
 
 // Initialize clients
@@ -92,7 +92,7 @@ For React applications, use the `useEnclaveSDK` hook for seamless integration:
 
 ```typescript
 import React, { useEffect, useState } from 'react';
-import { useEnclaveSDK } from '@gnosis-guild/enclave-react';
+import { useEnclaveSDK } from '@enclave-e3/react';
 
 function E3Dashboard() {
   const [e3Data, setE3Data] = useState(null);
@@ -208,7 +208,7 @@ sdk.onEnclaveEvent(EnclaveEventType.CIPHERTEXT_OUTPUT_PUBLISHED, (event) => {
 ### Registry Events
 
 ```typescript
-import { RegistryEventType } from '@gnosis-guild/enclave/sdk'
+import { RegistryEventType } from '@enclave-e3/sdk'
 
 // Monitor ciphernode network changes
 sdk.onEnclaveEvent(RegistryEventType.CIPHERNODE_ADDED, (event) => {
@@ -225,7 +225,7 @@ sdk.onEnclaveEvent(RegistryEventType.COMMITTEE_PUBLISHED, (event) => {
 For server-side applications, you can create automated coordination services:
 
 ```typescript
-import { EnclaveSDK } from '@gnosis-guild/enclave-sdk'
+import { EnclaveSDK } from '@enclave-e3/sdk'
 import { createPublicClient, createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
@@ -299,7 +299,7 @@ server.start()
 The SDK includes comprehensive error handling:
 
 ```typescript
-import { SDKError } from '@gnosis-guild/enclave-sdk'
+import { SDKError } from '@enclave-e3/sdk'
 
 try {
   await sdk.requestE3(params)

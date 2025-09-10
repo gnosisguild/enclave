@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import deployEnclave from "@gnosis-guild/enclave/deploy/enclave";
-import deployMocks from "@gnosis-guild/enclave/deploy/mocks";
+import deployEnclave from "@enclave-e3/contracts/deploy/enclave";
+import deployMocks from "@enclave-e3/contracts/deploy/mocks";
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 

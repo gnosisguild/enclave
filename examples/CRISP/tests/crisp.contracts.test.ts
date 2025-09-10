@@ -3,8 +3,8 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { EnclaveSDK, FheProtocol } from "@gnosis-guild/enclave-sdk"
-import { Enclave, Enclave__factory as EnclaveFactory } from "@gnosis-guild/enclave/types"
+import { EnclaveSDK, FheProtocol } from "@enclave-e3/sdk"
+import { Enclave, Enclave__factory as EnclaveFactory } from "@enclave-e3/contracts/types"
 import { expect } from "chai"
 import fs from "fs"
 import path from "path"

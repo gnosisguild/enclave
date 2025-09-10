@@ -1,10 +1,11 @@
 [package]
 name = "e3-evm"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "E3 - Enclave Ciphernode EVM Connectors"
 repository = "https://github.com/gnosisguild/enclave/crates/evm"
+publish = false
 
 [dependencies]
 actix = { workspace = true }

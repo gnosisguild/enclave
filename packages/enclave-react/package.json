@@ -1,6 +1,6 @@
 {
-  "name": "@gnosis-guild/enclave-react",
-  "version": "0.0.6-test",
+  "name": "@enclave-e3/react",
+  "version": "0.0.10-test",
   "description": "React hooks and utilities for Enclave SDK",
   "type": "module",
   "private": false,
@@ -39,15 +39,14 @@
     "wagmi": "^2.14.16"
   },
   "publishConfig": {
-    "access": "public",
-    "git-checks": false
+    "access": "public"
   },
   "dependencies": {
-    "@gnosis-guild/enclave-sdk": "workspace:*",
+    "@enclave-e3/sdk": "workspace:*",
     "viem": "2.30.6"
   },
   "devDependencies": {
-    "@gnosis-guild/enclave-config": "workspace:*",
+    "@enclave-e3/config": "workspace:*",
     "@types/react": "^18.2.0",
     "tsup": "^8.5.0",
     "typescript": "5.8.3"

@@ -6,6 +6,6 @@ packages:
   - packages/enclave-config
   - packages/enclave-react
   - packages/enclave-sdk
-  - packages/evm
+  - packages/enclave-contracts
   - templates/default
   - templates/default/client

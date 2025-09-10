@@ -22,7 +22,7 @@ use tracing::{error, info, trace};
 sol!(
     #[sol(rpc)]
     IEnclave,
-    "../../packages/evm/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
+    "../../packages/enclave-contracts/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json"
 );
 
 struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);

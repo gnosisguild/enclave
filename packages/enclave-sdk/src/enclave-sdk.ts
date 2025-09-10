@@ -16,12 +16,12 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { hardhat, mainnet, monadTestnet, sepolia } from "viem/chains";
-import initializeWasm from "@gnosis-guild/e3-wasm/init";
+import initializeWasm from "@enclave-e3/wasm/init";
 
 import {
   CiphernodeRegistryOwnable__factory,
   Enclave__factory,
-} from "@gnosis-guild/enclave/types";
+} from "@enclave-e3/contracts/types";
 import { ContractClient } from "./contract-client";
 import { EventListener } from "./event-listener";
 import { FheProtocol, EnclaveEventType, BfvProtocolParams } from "./types";
@@ -35,8 +35,8 @@ import type {
   ProtocolParams,
   VerifiableEncryptionResult,
 } from "./types";
-import { bfv_encrypt_number, bfv_verifiable_encrypt_number } from "@gnosis-guild/e3-wasm";
-import { CircuitInputs, defaultParams, generateProof } from "./greco";
+import { bfv_encrypt_number, bfv_verifiable_encrypt_number } from "@enclave-e3/wasm";
+import { CircuitInputs, generateProof } from "./greco";
 import { CompiledCircuit } from "@noir-lang/noir_js";
 
 export class EnclaveSDK {
