@@ -24,21 +24,28 @@ use rayon::{self, ThreadPool};
 pub struct Multithread {
     rng: SharedRng,
     cipher: Arc<Cipher>,
-    thread_pool: Arc<ThreadPool>,
+    thread_pool: Option<Arc<ThreadPool>>,
 }
 
 impl Multithread {
     pub fn new(rng: SharedRng, cipher: Arc<Cipher>, threads: usize) -> Self {
-        let thread_pool = Arc::new(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(threads)
-                .build()
-                .expect("Failed to create Rayon thread pool"),
-        );
-        println!(
-            "$$$$$$$$  Created threadpool with {} threads.",
-            thread_pool.current_num_threads()
-        );
+        let thread_pool = if threads == 1 {
+            None
+        } else {
+            let thread_pool = Arc::new(
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(threads)
+                    .build()
+                    .expect("Failed to create Rayon thread pool"),
+            );
+            println!(
+                "$$$$$$$$  Created threadpool with {} threads.",
+                thread_pool.current_num_threads()
+            );
+
+            Some(thread_pool)
+        };
+
         Self {
             rng,
             cipher,
@@ -62,16 +69,18 @@ impl Handler<ComputeRequest> for Multithread {
         let rng = self.rng.clone();
         let thread_pool = self.thread_pool.clone();
         Box::pin(async move {
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            thread_pool.spawn(move || {
-                let res = handle_compute_request(rng, cipher, msg);
-                let _ = tx.send(res);
-            });
+            let res = if let Some(pool) = thread_pool {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                pool.spawn(move || {
+                    let res = handle_compute_request(rng, cipher, msg);
+                    let _ = tx.send(res);
+                });
+                rx.await.unwrap()
+            } else {
+                handle_compute_request(rng, cipher, msg)
+            };
 
-            println!("returned from compute request!");
-            let res = rx.await.unwrap()?;
-
-            Ok(res)
+            res
         })
     }
 }

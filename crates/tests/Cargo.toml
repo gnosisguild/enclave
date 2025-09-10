@@ -36,5 +36,6 @@ fhe = { workspace = true }
 num-bigint = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
+serial_test = { workspace = true }
 tokio = { workspace = true }
 zeroize = { workspace = true }

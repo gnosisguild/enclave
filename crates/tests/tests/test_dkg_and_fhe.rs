@@ -49,6 +49,7 @@ pub fn calculate_error_size(
 
 /// Test trbfv
 #[actix::test]
+#[serial_test::serial]
 async fn test_trbfv() -> Result<()> {
     // NOTE: Here we are trying to make it as clear as possible as to what is going on so attempting to
     // avoid over abstracting test helpers and favouring straight forward single descriptive

@@ -355,7 +355,10 @@ impl ThresholdKeyshare {
             };
 
             s.new_state(next)
-        })
+        })?;
+
+        println!("ESI STORED");
+        Ok(())
     }
 
     pub fn try_store_decryption_key(
