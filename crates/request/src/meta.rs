@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::sync::Arc;
+
 use crate::{E3Context, E3ContextSnapshot, E3Extension, MetaRepositoryFactory, TypedKey};
 use anyhow::*;
 use async_trait::async_trait;
@@ -17,6 +19,7 @@ pub struct E3Meta {
     pub threshold_m: usize,
     pub threshold_n: usize,
     pub seed: Seed,
+    pub params: Arc<Vec<u8>>,
 }
 
 pub struct E3MetaExtension;
@@ -38,6 +41,7 @@ impl E3Extension for E3MetaExtension {
             threshold_n,
             seed,
             e3_id,
+            params,
             ..
         } = data.clone();
 
@@ -46,6 +50,7 @@ impl E3Extension for E3MetaExtension {
             threshold_m,
             threshold_n,
             seed,
+            params,
         };
         ctx.repositories().meta(&e3_id).write(&meta);
         let _ = ctx.set_dependency(META_KEY, meta);

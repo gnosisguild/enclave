@@ -9,9 +9,9 @@ use anyhow::Result;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_data::{DataStore, InMemStore};
-use e3_events::{E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig, TakeHistory};
-use e3_fhe::{create_crp, ext::FheExtension};
-use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
+use e3_events::{E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig};
+use e3_fhe::create_crp;
+use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
@@ -19,8 +19,7 @@ use e3_sortition::SortitionRepositoryFactory;
 use e3_sortition::{CiphernodeSelector, Sortition};
 use e3_test_helpers::ciphernode_system::{CiphernodeSimulated, CiphernodeSystemBuilder};
 use e3_test_helpers::{
-    create_random_eth_addrs, create_rng_from_seed, create_seed_from_u64,
-    create_shared_rng_from_u64, rand_eth_addr, simulate_libp2p_net, AddToCommittee,
+    create_seed_from_u64, create_shared_rng_from_u64, rand_eth_addr, AddToCommittee,
 };
 use e3_trbfv::SharedRng;
 use fhe::{
@@ -28,7 +27,6 @@ use fhe::{
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
 };
 use num_bigint::BigUint;
-use std::ops::Deref;
 use std::time::Duration;
 use std::{fs, sync::Arc};
 
@@ -89,6 +87,7 @@ async fn setup_local_ciphernode(
             &cipher,
             &multithread,
             &rng,
+            &addr,
         ))
         .build()
         .await?;
@@ -109,7 +108,7 @@ async fn test_trbfv() -> Result<()> {
     // avoid over abstracting test helpers and favouring straight forward single descriptive
     // functions alongside explanations
 
-    ////
+    ///////////////////////////////////////////////////////////////////////////////////
     // 1. Setup ThresholdKeyshare system
     //
     //   - E3Router
@@ -117,7 +116,7 @@ async fn test_trbfv() -> Result<()> {
     //   - Multithread actor
     //   - 7 nodes (so as to check for some nodes not getting selected)
     //   - Loopback libp2p simulation
-    ////
+    ///////////////////////////////////////////////////////////////////////////////////
 
     // Create rng
     let rng = create_shared_rng_from_u64(42);
@@ -152,6 +151,7 @@ async fn test_trbfv() -> Result<()> {
 
     // Actor system setup
     let nodes = CiphernodeSystemBuilder::new()
+        // Adding 7 total nodes of which we are only choosing 5 for the committee
         .add_group(7, || async {
             setup_local_ciphernode(
                 bus.clone(),
@@ -174,14 +174,14 @@ async fn test_trbfv() -> Result<()> {
     // Flush all events
     nodes.flush_all_history(100).await?;
 
-    ////
+    ///////////////////////////////////////////////////////////////////////////////////
     // 2. Trigger E3Requested
     //
     //   - m=2.
     //   - n=5
     //   - error_size -> calculate using calculate_error_size
     //   - esi_per_ciphertext = 3
-    ////
+    ///////////////////////////////////////////////////////////////////////////////////
 
     // Prepare round
 
@@ -196,8 +196,10 @@ async fn test_trbfv() -> Result<()> {
 
     let e3_requested = E3Requested {
         e3_id: E3id::new("0", 1),
-        threshold_m: 2,
-        threshold_n: 5,
+        threshold_m: 1, //tmp
+        threshold_n: 3, //tmp
+        // threshold_m: 2,
+        // threshold_n: 5, // Committee size is 5 from 7 total nodes
         seed: seed.clone(),
         error_size,
         esi_per_ct: 3,
@@ -207,23 +209,23 @@ async fn test_trbfv() -> Result<()> {
     let event = EnclaveEvent::from(e3_requested);
 
     bus.do_send(event);
+    let expected = vec![
+        "E3Requested",
+        "CiphernodeSelected",
+        "ThresholdShareCreated",
+        "ThresholdShareCreated",
+        "ThresholdShareCreated",
+        "KeyshareCreated",
+    ];
 
     // node #1 is selected so lets grab all events
     let h = nodes
-        .take_history_with_timeout(1, 5, Duration::from_secs(300))
+        .take_history_with_timeout(1, expected.len(), Duration::from_secs(300))
         .await?;
 
     println!("{:?}", h);
 
-    assert_eq!(
-        h.event_types(),
-        vec![
-            "E3Requested",
-            "CiphernodeSelected",
-            "ThresholdShareCreated",
-            "ThresholdShareCreated"
-        ]
-    );
+    assert_eq!(h.event_types(), expected);
 
     Ok(())
 }

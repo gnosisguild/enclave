@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use anyhow::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::{

@@ -77,9 +77,12 @@ async fn handle_compute_request(
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateDecryptionKey(o),
                 )),
-                Err(_) => Err(ComputeRequestError::TrBFV(
-                    TrBFVError::CalculateDecryptionKey,
-                )),
+                Err(e) => {
+                    println!("Error calculating decryption key: {}", e);
+                    Err(ComputeRequestError::TrBFV(
+                        TrBFVError::CalculateDecryptionKey,
+                    ))
+                }
             }
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(req)) => {

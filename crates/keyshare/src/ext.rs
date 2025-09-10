@@ -123,6 +123,7 @@ impl E3Extension for KeyshareExtension {
 pub struct ThresholdKeyshareExtension {
     bus: Addr<EventBus<EnclaveEvent>>,
     cipher: Arc<Cipher>,
+    address: String,
     rng: SharedRng,
     multithread: Addr<Multithread>,
 }
@@ -133,12 +134,14 @@ impl ThresholdKeyshareExtension {
         cipher: &Arc<Cipher>,
         multithread: &Addr<Multithread>,
         rng: &SharedRng,
+        address: &str,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             cipher: cipher.to_owned(),
             multithread: multithread.clone(),
             rng: rng.clone(),
+            address: address.to_owned(),
         })
     }
 }
@@ -162,9 +165,13 @@ impl E3Extension for ThresholdKeyshareExtension {
         };
         let repo = ctx.repositories().threshold_keyshare(&e3_id);
         let container = repo.send(Some(ThresholdKeyshareState::new(
+            e3_id.clone(),
+            party_id,
             KeyshareState::Init,
             meta.threshold_m as u64,
-            party_id,
+            meta.threshold_n as u64,
+            meta.params.clone(),
+            self.address.clone(),
         )));
 
         // New container with None
@@ -175,7 +182,6 @@ impl E3Extension for ThresholdKeyshareExtension {
                 ThresholdKeyshare::new(ThresholdKeyshareParams {
                     bus: self.bus.clone(),
                     cipher: self.cipher.clone(),
-                    e3_id,
                     multithread: self.multithread.clone(),
                     rng: self.rng.clone(),
                     state: container,
@@ -207,7 +213,6 @@ impl E3Extension for ThresholdKeyshareExtension {
         let value = ThresholdKeyshare::new(ThresholdKeyshareParams {
             bus: self.bus.clone(),
             cipher: self.cipher.clone(),
-            e3_id: snapshot.e3_id.clone(),
             multithread: self.multithread.clone(),
             rng: self.rng.clone(),
             state,

@@ -13,16 +13,24 @@ use std::{
     sync::Arc,
 };
 
+/// Type Representing Pvw encrypted bytes
+pub type PvwBytes = Vec<u8>;
+
+/// PVW encrypted shares list for a party in the DKG
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct ThresholdShare {
+    /// The publishers party_id
     pub party_id: u64,
+    /// The publishers public key share
     #[derivative(Debug(format_with = "crate::hexf"))]
     pub pk_share: Arc<Vec<u8>>,
+    /// PVW encrypted sk_sss list with index determining party_id
     #[derivative(Debug(format_with = "crate::hexf_bytes_slice"))]
-    pub sk_sss: Vec<Vec<u8>>,
+    pub sk_sss: Vec<PvwBytes>,
+    /// PVW encrypted esi_sss list with index determining party_id
     #[derivative(Debug(format_with = "crate::hexf_3d_bytes"))]
-    pub esi_sss: Vec<Vec<Vec<u8>>>,
+    pub esi_sss: Vec<Vec<PvwBytes>>,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

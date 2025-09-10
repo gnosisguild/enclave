@@ -71,7 +71,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
 
         Box::pin(async move {
             let seed = data.seed;
-            let size = data.threshold_m;
+            let size = data.threshold_n;
             println!("SEED BEFORE SELECTION: {}", seed);
             if let Ok(found_index) = sortition
                 .send(GetNodeIndex {

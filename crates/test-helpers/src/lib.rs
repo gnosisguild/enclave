@@ -123,12 +123,12 @@ pub fn simulate_libp2p_net(nodes: &[CiphernodeSimulated]) {
             EventBus::pipe_filter(
                 source,
                 move |e: &EnclaveEvent| {
-                    println!(
-                        "{}:filter:{} - allowed={}",
-                        i,
-                        e.event_type(),
-                        !e.is_local_only()
-                    );
+                    // println!(
+                    //     "{}:filter:{} - allowed={}",
+                    //     i,
+                    //     e.event_type(),
+                    //     !e.is_local_only()
+                    // );
                     !e.is_local_only()
                 },
                 dest,

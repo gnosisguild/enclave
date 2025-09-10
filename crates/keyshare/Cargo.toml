@@ -10,6 +10,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/keyshare"
 actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bincode = { workspace = true }
 e3-config = { workspace = true }
 e3-data = { workspace = true }
 e3-crypto = { workspace = true }
@@ -21,4 +22,5 @@ e3-trbfv = { workspace = true }
 fhe-traits = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+ndarray = { workspace = true }
 zeroize = { workspace = true }

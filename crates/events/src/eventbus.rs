@@ -133,12 +133,6 @@ impl<E: Event> Handler<E> for EventBus<E> {
 
     fn handle(&mut self, event: E, _: &mut Context<Self>) {
         if self.is_duplicate(&event) {
-            println!(
-                "IS DUPLICATE: {}:{}:{}",
-                event.event_type(),
-                event.event_id(),
-                event
-            );
             return;
         }
 
