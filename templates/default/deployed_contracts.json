@@ -9,6 +9,59 @@
       },
       "blockNumber": 2,
       "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    },
+    "CiphernodeRegistry": {
+      "constructorArgs": {
+        "enclaveAddress": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      },
+      "blockNumber": 4,
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+    },
+    "NaiveRegistryFilter": {
+      "constructorArgs": {
+        "ciphernodeRegistryAddress": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      },
+      "blockNumber": 5,
+      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+    },
+    "MockComputeProvider": {
+      "blockNumber": 7,
+      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
+    },
+    "MockDecryptionVerifier": {
+      "blockNumber": 8,
+      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+    },
+    "MockInputValidator": {
+      "blockNumber": 9,
+      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+    },
+    "MockE3Program": {
+      "constructorArgs": {
+        "mockInputValidator": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+      },
+      "blockNumber": 10,
+      "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+    },
+    "MockRISC0Verifier": {
+      "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
+    },
+    "ImageID": {
+      "address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
+    },
+    "InputValidator": {
+      "address": "0x9A676e781A523b5d0C0e43731313A708CB607508"
+    },
+    "MyProgram": {
+      "address": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+      "constructorArgs": {
+        "enclave": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "verifier": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "programId": "0xaf928ebf39fec4696c3f41f473a1a9473b67d723c6373149c6ab99ba4c1a76ef",
+        "inputValidator": "0x9A676e781A523b5d0C0e43731313A708CB607508"
+      }
     }
   }
 }

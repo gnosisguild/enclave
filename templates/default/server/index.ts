@@ -149,7 +149,7 @@ async function handleE3ActivatedEvent(event: any) {
     console.log("📡 Fetching E3 data from contract...");
 
     const e3 = await sdk.getE3(e3Id);
-    console.log("✅ Reveived E3 data from contract.");
+    console.log("✅ Received E3 data from contract.");
 
     e3Sessions.set(sessionKey, {
       e3Id,
