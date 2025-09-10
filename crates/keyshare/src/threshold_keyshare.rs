@@ -12,18 +12,17 @@ use std::{
 };
 
 use actix::prelude::*;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
     CiphernodeSelected, ComputeRequest, ComputeResponse, E3id, EnclaveEvent, EventBus,
-    KeyshareCreated, PartyId, PvwBytes, ThresholdShare, ThresholdShareCreated,
+    KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
 use e3_trbfv::{gen_pk_share_and_sk_sss, SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse};
 use fhe_traits::Serialize;
-use ndarray::Array2;
 use zeroize::Zeroizing;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -249,8 +248,6 @@ impl ThresholdKeyshare {
         &self,
         msg: AllThresholdSharesCollected,
     ) -> Result<e3_trbfv::calculate_decryption_key::Request> {
-        let mut sk_sss_collected = vec![];
-        let mut esi_sss_collected = vec![];
         let cipher = self.cipher.clone();
         let Some(state) = self.state.get() else {
             bail!("No state found");
@@ -260,6 +257,8 @@ impl ThresholdKeyshare {
         let trbfv_config = state.into();
 
         // Shares are in order of party_id
+        let mut sk_sss_collected = vec![];
+        let mut esi_sss_collected = vec![];
         for share in msg.shares {
             sk_sss_collected.push(SensitiveBytes::new(
                 share.sk_sss[party_id].clone(),
@@ -640,28 +639,6 @@ impl Handler<SharesGenerated> for ThresholdKeyshare {
         // Currently this removes zeroizing to create bytes
         let (pk_share, sk_sss, esi_sss) =
             _dangerously_remove_zeroizing_to_simulate_pvw_encryption((pk_share, sk_sss, esi_sss));
-        // let sk_sss_res: Result<Vec<Array2<u64>>> = sk_sss
-        //     .iter()
-        //     .map(|a| bincode::deserialize(&a).context("sk_sss failed deserialization"))
-        //     .collect::<Result<Vec<Array2<u64>>>>();
-        //
-        // let es_sss_res: Result<Vec<Vec<Array2<u64>>>> = esi_sss
-        //     .iter()
-        //     .map(|a| {
-        //         a.iter()
-        //             .map(|aa| bincode::deserialize(&aa).context(""))
-        //             .collect()
-        //     })
-        //     .collect::<Result<Vec<Vec<Array2<u64>>>>>();
-        //
-        // match sk_sss_res {
-        //     Ok(_) => println!("YAY SKSSS!!!!"),
-        //     Err(e) => println!("BOOOOO SKSSS"),
-        // };
-        // match es_sss_res {
-        //     Ok(_) => println!("YAY ES SSS!!!!"),
-        //     Err(e) => println!("BOOOOO ES SSS"),
-        // };
 
         self.bus.do_send(EnclaveEvent::from(ThresholdShareCreated {
             e3_id,
