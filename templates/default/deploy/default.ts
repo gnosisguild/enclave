@@ -4,60 +4,25 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { DeployFunction } from "hardhat-deploy/types";
-import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { deployAndSaveEnclave } from "@enclave-e3/contracts/scripts/deployAndSave/enclave.js";
+import { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployer } = await hre.getNamedAccounts();
-  const { deploy } = hre.deployments;
+export const deployTemplate = async (hre: HardhatRuntimeEnvironment) => {
+  // const { ethers  } = await hre.network.connect();
+ 
+  // const { enclave } = await deployAndSaveEnclave({ hre });
 
-  const [deployerAccount] = await hre.ethers.getSigners();
-  const enclave = await hre.deployments.get("Enclave");
+  // const verifier = await ethers.deployContract("MockRISC0Verifier");
 
-  const verifier = await deploy("MockRISC0Verifier", {
-    from: deployer,
-    args: [],
-    log: true,
-  });
+  // const imageId = await ethers.deployContract("ImageID");
 
-  const imageId = await deploy("ImageID", {
-    from: deployer,
-    args: [],
-    log: true,
-  });
-  const imageIdContract = await hre.ethers.getContractAt(
-    "ImageID",
-    imageId.address,
-  );
-  const programId = await imageIdContract.PROGRAM_ID();
+  // const programId = await imageId.PROGRAM_ID();
 
-  const inputValidator = await deploy("InputValidator", {
-    from: deployer,
-    args: [],
-    log: true,
-  });
+  // const inputValidator = await ethers.deployContract("InputValidator");
 
-  const e3Program = await deploy("MyProgram", {
-    from: deployer,
-    args: [enclave.address, verifier.address, programId, inputValidator.address],
-    log: true,
-  });
+  // const e3Program = await ethers.deployContract("MyProgram", [await enclave.getAddress(), await verifier.getAddress(), programId, await inputValidator.getAddress()]);
 
-  const enclaveContract = new hre.ethers.Contract(
-    enclave.address,
-    enclave.abi,
-    deployerAccount,
-  );
-  const result = enclaveContract.interface.encodeFunctionData(
-    "enableE3Program",
-    [e3Program.address],
-  );
-  const tx = await deployerAccount.sendTransaction({
-    to: enclave.address,
-    data: result,
-  });
-  await tx.wait();
+  // const tx = await enclave.enableE3Program(await e3Program.getAddress());
+
+  // await tx.wait();
 };
-export default func;
-func.tags = ["default"];
-func.dependencies = ["enclave"];

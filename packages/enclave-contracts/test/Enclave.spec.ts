@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { Signer, ZeroHash, keccak256 } from "ethers";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
@@ -27,9 +26,6 @@ const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
 
 describe("Enclave", function () {
-  let owner: Signer;
-  let notTheOwner: Signer;
-
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const addressOne = "0x0000000000000000000000000000000000000001";
   const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -51,14 +47,14 @@ describe("Enclave", function () {
   );
 
   const data = "0xda7a";
-  const dataHash = keccak256(data);
+  const dataHash = ethers.keccak256(data);
   const proof = "0x1337";
 
   // Hash function used to compute the tree nodes.
   const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
   const setup = async () => {
-    [owner, notTheOwner] = await ethers.getSigners();
+    const [owner, notTheOwner] = await ethers.getSigners();
 
     const ownerAddress = await owner.getAddress();
 
@@ -165,12 +161,14 @@ describe("Enclave", function () {
         mockComputeProvider: mockComputeProvider.mockComputeProvider,
       },
       request,
+      owner,
+      notTheOwner,
     };
   };
 
   describe("constructor / initialize()", function () {
     it("correctly sets owner", async function () {
-      const { enclave } = await loadFixture(setup);
+      const { enclave, owner } = await loadFixture(setup);
       expect(await enclave.owner()).to.equal(await owner.getAddress());
     });
 
@@ -189,7 +187,7 @@ describe("Enclave", function () {
 
   describe("setMaxDuration()", function () {
     it("reverts if not called by owner", async function () {
-      const { enclave } = await loadFixture(setup);
+      const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
         enclave
@@ -219,7 +217,7 @@ describe("Enclave", function () {
 
   describe("setCiphernodeRegistry()", function () {
     it("reverts if not called by owner", async function () {
-      const { enclave } = await loadFixture(setup);
+      const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
         enclave.connect(notTheOwner).setCiphernodeRegistry(AddressTwo),
@@ -274,7 +272,7 @@ describe("Enclave", function () {
     const encodedE3ProgramsParams = [encodedE3ProgramParams];
 
     it("reverts if not called by owner", async function () {
-      const { enclave } = await loadFixture(setup);
+      const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
         enclave
@@ -386,7 +384,7 @@ describe("Enclave", function () {
 
   describe("setDecryptionVerifier()", function () {
     it("reverts if caller is not owner", async function () {
-      const { enclave, mocks } = await loadFixture(setup);
+      const { enclave, mocks, notTheOwner } = await loadFixture(setup);
 
       await expect(
         enclave
@@ -453,7 +451,7 @@ describe("Enclave", function () {
 
   describe("disableEncryptionScheme()", function () {
     it("reverts if caller is not owner", async function () {
-      const { enclave } = await loadFixture(setup);
+      const { enclave, notTheOwner } = await loadFixture(setup);
 
       await expect(
         enclave
@@ -499,6 +497,7 @@ describe("Enclave", function () {
       const {
         enclave,
         mocks: { e3Program },
+        notTheOwner,
       } = await loadFixture(setup);
 
       await expect(enclave.connect(notTheOwner).enableE3Program(e3Program))
@@ -541,6 +540,7 @@ describe("Enclave", function () {
       const {
         enclave,
         mocks: { e3Program },
+        notTheOwner,
       } = await loadFixture(setup);
       await expect(enclave.connect(notTheOwner).disableE3Program(e3Program))
         .to.be.revertedWithCustomError(enclave, "OwnableUnauthorizedAccount")
@@ -1046,7 +1046,7 @@ describe("Enclave", function () {
         { value: 10 },
       );
 
-      const inputData = abiCoder.encode(["bytes32"], [ZeroHash]);
+      const inputData = abiCoder.encode(["bytes32"], [ethers.ZeroHash]);
 
       await expect(enclave.getE3(0)).to.not.be.revert(ethers);
       await expect(enclave.publishInput(0, inputData))
@@ -1099,7 +1099,7 @@ describe("Enclave", function () {
       await mine(2, { interval: request.duration });
 
       await expect(
-        enclave.publishInput(0, ZeroHash),
+        enclave.publishInput(0, ethers.ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "InputDeadlinePassed");
     });
 

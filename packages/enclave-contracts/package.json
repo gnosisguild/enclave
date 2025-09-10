@@ -29,7 +29,26 @@
         "default": "./dist/scripts/deployMocks.js"
       }
     },
-    "./tasks/*": "./tasks/*",
+    "./tasks/ciphernode": {
+      "import": {
+        "types": "./dist/tasks/ciphernode.d.ts",
+        "default": "./dist/tasks/ciphernode.js"
+      },
+      "require": {
+        "types": "./dist/tasks/ciphernode.d.ts",
+        "default": "./dist/tasks/ciphernode.js"
+      }
+    },
+    "./tasks/enclave": {
+      "import": {
+        "types": "./dist/tasks/enclave.d.ts",
+        "default": "./dist/tasks/enclave.js"
+      },
+      "require": {
+        "types": "./dist/tasks/enclave.d.ts",
+        "default": "./dist/tasks/enclave.js"
+      }
+    },
     "./scripts/*": "./scripts/*",
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",

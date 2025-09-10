@@ -4,61 +4,61 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import "@nomicfoundation/hardhat-toolbox";
-import "hardhat-deploy";
-import "@enclave-e3/contracts/deploy/enclave";
-import { task } from "hardhat/config";
-import type { TaskArguments } from "hardhat/types";
+import { ciphernodeAdd } from "@enclave-e3/contracts/tasks/ciphernode";
+
+import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
+import hardhatIgnitionEthers from "@nomicfoundation/hardhat-ignition-ethers";
+import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
+import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
+
 import type { HardhatUserConfig } from "hardhat/config";
 
-task("ciphernode:add", "Register a ciphernode to the registry")
-  .addParam("ciphernodeAddress", "address of ciphernode to register")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
-    const [deployer] = await hre.ethers.getSigners();
-    const registryContract = new hre.ethers.Contract(
-      registry.address,
-      registry.abi,
-      deployer,
-    );
-    const result = registryContract.interface.encodeFunctionData(
-      "addCiphernode",
-      [taskArguments.ciphernodeAddress.replace(/"/g, "")],
-    );
-    const tx = await deployer.sendTransaction({
-      to: registryContract.target,
-      data: result,
-    });
-    await tx.wait();
-    console.log(`Ciphernode ${taskArguments.ciphernodeAddress} registered`);
-  });
-
 const config: HardhatUserConfig = {
+  tasks: [
+    ciphernodeAdd,
+  ],
+  plugins: [
+    hardhatTypechainPlugin,
+    hardhatEthersChaiMatchers,
+    hardhatIgnitionEthers,
+    hardhatNetworkHelpers,
+    hardhatToolboxMochaEthersPlugin,
+  ],
+  typechain: {
+    outDir: "./types",
+    tsNocheck: false,
+  },
+  networks: {
+    hardhat: {
+      type: "edr-simulated",
+      chainType: "l1",
+    },
+  },
   solidity: {
-    version: "0.8.27",
-    overrides: {
-      "node_modules/poseidon-solidity/PoseidonT3.sol": {
-        version: "0.7.0",
+    npmFilesToBuild: [
+      "poseidon-solidity/PoseidonT3.sol", 
+      "@enclave-e3/contracts/contracts/Enclave.sol",
+      "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
+      "@enclave-e3/contracts/contracts/registry/NaiveRegistryFilter.sol",
+      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
+      "@enclave-e3/contracts/contracts/test/MockCiphernodeRegistry.sol",
+      "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
+      "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
+      "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
+      "@enclave-e3/contracts/contracts/test/MockRegistryFilter.sol",
+    ],
+    compilers: [
+      {
+        version: "0.8.27",
         settings: {
           optimizer: {
             enabled: true,
-            runs: 2 ** 32 - 1,
+            runs: 800,
           },
         },
       },
-    },
-  },
-  external: {
-    contracts: [
-      {
-        artifacts: "node_modules/@enclave-e3/contracts/artifacts",
-      },
     ],
-  },
-  namedAccounts: {
-    deployer: {
-      default: 0, // Use the first account as deployer
-    },
   },
 };
 
