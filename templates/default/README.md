@@ -105,6 +105,12 @@ Launch the complete development stack with a single command:
 pnpm dev:all
 ```
 
+or, if you have `tmux` installed:
+
+```bash
+pnpm dev:all --tmux
+```
+
 ### What Happens Next
 
 The command will start multiple processes simultaneously:
