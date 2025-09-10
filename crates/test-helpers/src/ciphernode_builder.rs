@@ -1,4 +1,8 @@
-use std::sync::Arc;
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.;
 
 use actix::{Actor, Addr};
 use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
@@ -10,6 +14,7 @@ use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sortition::{CiphernodeSelector, Sortition, SortitionRepositoryFactory};
+use std::sync::Arc;
 
 use crate::{ciphernode_system::CiphernodeSimulated, rand_eth_addr};
 
