@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use actix::prelude::*;
 use actix::{Actor, Handler};
@@ -34,7 +35,10 @@ impl Multithread {
                 .build()
                 .expect("Failed to create Rayon thread pool"),
         );
-
+        println!(
+            "$$$$$$$$  Created threadpool with {} threads.",
+            thread_pool.current_num_threads()
+        );
         Self {
             rng,
             cipher,
@@ -72,26 +76,42 @@ impl Handler<ComputeRequest> for Multithread {
     }
 }
 
+// TODO: implement tracing for this
+// This enabled us to get insight into the timing of our long running functions
+fn timefunc<F>(name: &str, func: F) -> Result<ComputeResponse, ComputeRequestError>
+where
+    F: FnOnce() -> Result<ComputeResponse, ComputeRequestError>,
+{
+    println!("\n$$$$$$$$$ STARTING `{}`\n", name);
+    let start = Instant::now();
+    let out = func();
+    let dur = start.elapsed();
+    println!("\n$$$$$$$$$ FINISHED `{}` in {:?}\n", name, dur);
+    out
+}
+
 fn handle_compute_request(
     rng: SharedRng,
     cipher: Arc<Cipher>,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     match request {
-        ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => {
-            match gen_pk_share_and_sk_sss(&rng, &cipher, req) {
+        ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => timefunc(
+            "gen_pk_share_and_sk_sss",
+            || match gen_pk_share_and_sk_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(o))),
                 Err(_) => Err(ComputeRequestError::TrBFV(TrBFVError::GenPkShareAndSkSss)),
-            }
-        }
+            },
+        ),
         ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(req)) => {
-            match gen_esi_sss(&rng, &cipher, req) {
+            timefunc("gen_esi_sss", || match gen_esi_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(o))),
                 Err(_) => Err(ComputeRequestError::TrBFV(TrBFVError::GenEsiSss)),
-            }
+            })
         }
-        ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(req)) => {
-            match calculate_decryption_key(&cipher, req) {
+        ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(req)) => timefunc(
+            "calculate_decryption_key",
+            || match calculate_decryption_key(&cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateDecryptionKey(o),
                 )),
@@ -101,27 +121,29 @@ fn handle_compute_request(
                         TrBFVError::CalculateDecryptionKey,
                     ))
                 }
-            }
-        }
-        ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(req)) => {
-            match calculate_decryption_share(&cipher, req) {
+            },
+        ),
+        ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(req)) => timefunc(
+            "calculate_decryption_share",
+            || match calculate_decryption_share(&cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateDecryptionShare(o),
                 )),
                 Err(_) => Err(ComputeRequestError::TrBFV(
                     TrBFVError::CalculateDecryptionShare,
                 )),
-            }
-        }
-        ComputeRequest::TrBFV(TrBFVRequest::CalculateThresholdDecryption(req)) => {
-            match calculate_threshold_decryption(req) {
+            },
+        ),
+        ComputeRequest::TrBFV(TrBFVRequest::CalculateThresholdDecryption(req)) => timefunc(
+            "calculate_threshold_decryption",
+            || match calculate_threshold_decryption(req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateThresholdDecryption(o),
                 )),
                 Err(_) => Err(ComputeRequestError::TrBFV(
                     TrBFVError::CalculateThresholdDecryption,
                 )),
-            }
-        }
+            },
+        ),
     }
 }

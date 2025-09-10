@@ -145,11 +145,7 @@ impl CiphernodeBuilder {
             let multithread = self
                 .injected_multithread
                 .clone()
-                .unwrap_or(Multithread::attach(
-                    self.rng.clone(),
-                    self.cipher.clone(),
-                    1,
-                ));
+                .unwrap_or_else(|| Multithread::attach(self.rng.clone(), self.cipher.clone(), 1));
 
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &local_bus,

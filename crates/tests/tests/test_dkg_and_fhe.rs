@@ -99,10 +99,9 @@ async fn test_trbfv() -> Result<()> {
     let total_threads = thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(1);
-    let threads_to_use = std::cmp::max(1, total_threads.saturating_sub(3));
+    let threads_to_use = std::cmp::max(1, total_threads.saturating_sub(1));
     println!("Total threads available: {}", total_threads);
-    println!("Using {} threads for sync actors", threads_to_use);
-
+    println!("Using {} threads for rayon pool", threads_to_use);
     let multithread = Multithread::attach(rng.clone(), cipher.clone(), threads_to_use);
 
     let nodes = CiphernodeSystemBuilder::new()
