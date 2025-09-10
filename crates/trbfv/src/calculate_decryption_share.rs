@@ -34,7 +34,7 @@ pub struct CalculateDecryptionShareResponse {
     pub d_share_poly: Vec<ArcBytes>,
 }
 
-pub async fn calculate_decryption_share(
+pub fn calculate_decryption_share(
     cipher: &Cipher,
     req: CalculateDecryptionShareRequest,
 ) -> Result<CalculateDecryptionShareResponse> {

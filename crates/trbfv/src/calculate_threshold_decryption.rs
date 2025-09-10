@@ -30,7 +30,7 @@ pub struct CalculateThresholdDecryptionResponse {
     pub plaintext: Vec<ArcBytes>,
 }
 
-pub async fn calculate_threshold_decryption(
+pub fn calculate_threshold_decryption(
     req: CalculateThresholdDecryptionRequest,
 ) -> Result<CalculateThresholdDecryptionResponse> {
     let params = req.trbfv_config.params();

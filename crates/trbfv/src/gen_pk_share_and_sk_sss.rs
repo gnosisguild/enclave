@@ -70,7 +70,7 @@ struct InnerResponse {
     pub sk_sss: Vec<Array2<u64>>,
 }
 
-pub async fn gen_pk_share_and_sk_sss(
+pub fn gen_pk_share_and_sk_sss(
     rng: &SharedRng,
     cipher: &Cipher,
     req: GenPkShareAndSkSssRequest,

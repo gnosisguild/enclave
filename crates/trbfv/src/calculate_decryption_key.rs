@@ -110,7 +110,7 @@ pub fn serialize_from_array2(value: Array2<u64>) -> Result<Vec<u8>> {
     bincode::serialize(&value).context("Error serializing ndarray")
 }
 
-pub async fn calculate_decryption_key(
+pub fn calculate_decryption_key(
     cipher: &Cipher,
     req: CalculateDecryptionKeyRequest,
 ) -> Result<CalculateDecryptionKeyResponse> {

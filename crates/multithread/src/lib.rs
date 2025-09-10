@@ -10,30 +10,40 @@ use actix::prelude::*;
 use actix::{Actor, Handler};
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_events::{
-    ComputeRequest, ComputeRequestError, ComputeResponse, EnclaveEvent, EventBus, Subscribe,
-};
+use e3_events::{ComputeRequest, ComputeRequestError, ComputeResponse};
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{SharedRng, TrBFVError, TrBFVRequest, TrBFVResponse};
+use rayon::{self, ThreadPool};
 
 /// Multithread actor
 pub struct Multithread {
     rng: SharedRng,
     cipher: Arc<Cipher>,
+    thread_pool: Arc<ThreadPool>,
 }
 
 impl Multithread {
-    pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
-        Self { rng, cipher }
+    pub fn new(rng: SharedRng, cipher: Arc<Cipher>, threads: usize) -> Self {
+        let thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .expect("Failed to create Rayon thread pool"),
+        );
+
+        Self {
+            rng,
+            cipher,
+            thread_pool,
+        }
     }
 
-    pub fn attach(rng: &SharedRng, cipher: &Arc<Cipher>) -> Addr<Self> {
-        let addr = Self::new(rng.clone(), cipher.clone()).start();
-        addr
+    pub fn attach(rng: SharedRng, cipher: Arc<Cipher>, threads: usize) -> Addr<Self> {
+        Self::new(rng.clone(), cipher.clone(), threads).start()
     }
 }
 
@@ -46,34 +56,42 @@ impl Handler<ComputeRequest> for Multithread {
     fn handle(&mut self, msg: ComputeRequest, ctx: &mut Self::Context) -> Self::Result {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
+        let thread_pool = self.thread_pool.clone();
         Box::pin(async move {
-            let res = handle_compute_request(rng, cipher, msg).await;
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            thread_pool.spawn(move || {
+                let res = handle_compute_request(rng, cipher, msg);
+                let _ = tx.send(res);
+            });
+
             println!("returned from compute request!");
-            res
+            let res = rx.await.unwrap()?;
+
+            Ok(res)
         })
     }
 }
 
-async fn handle_compute_request(
+fn handle_compute_request(
     rng: SharedRng,
     cipher: Arc<Cipher>,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
     match request {
         ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => {
-            match gen_pk_share_and_sk_sss(&rng, &cipher, req).await {
+            match gen_pk_share_and_sk_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(o))),
                 Err(_) => Err(ComputeRequestError::TrBFV(TrBFVError::GenPkShareAndSkSss)),
             }
         }
         ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(req)) => {
-            match gen_esi_sss(&rng, &cipher, req).await {
+            match gen_esi_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(o))),
                 Err(_) => Err(ComputeRequestError::TrBFV(TrBFVError::GenEsiSss)),
             }
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(req)) => {
-            match calculate_decryption_key(&cipher, req).await {
+            match calculate_decryption_key(&cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateDecryptionKey(o),
                 )),
@@ -86,7 +104,7 @@ async fn handle_compute_request(
             }
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(req)) => {
-            match calculate_decryption_share(&cipher, req).await {
+            match calculate_decryption_share(&cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateDecryptionShare(o),
                 )),
@@ -96,7 +114,7 @@ async fn handle_compute_request(
             }
         }
         ComputeRequest::TrBFV(TrBFVRequest::CalculateThresholdDecryption(req)) => {
-            match calculate_threshold_decryption(req).await {
+            match calculate_threshold_decryption(req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateThresholdDecryption(o),
                 )),

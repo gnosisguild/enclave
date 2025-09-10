@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Addr};
+use actix::{Actor, Addr, SyncArbiter};
 use anyhow::Result;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
@@ -17,6 +17,7 @@ use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
 use e3_sortition::SortitionRepositoryFactory;
 use e3_sortition::{CiphernodeSelector, Sortition};
+use e3_test_helpers::ciphernode_builder::CiphernodeBuilder;
 use e3_test_helpers::ciphernode_system::{CiphernodeSimulated, CiphernodeSystemBuilder};
 use e3_test_helpers::{
     create_seed_from_u64, create_shared_rng_from_u64, rand_eth_addr, AddToCommittee,
@@ -27,6 +28,7 @@ use fhe::{
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
 };
 use num_bigint::BigUint;
+use std::thread;
 use std::time::Duration;
 use std::{fs, sync::Arc};
 
@@ -43,62 +45,6 @@ pub fn calculate_error_size(
     let config = SmudgingBoundCalculatorConfig::new(params, n, num_ciphertexts);
     let calculator = SmudgingBoundCalculator::new(config);
     Ok(calculator.calculate_sm_bound()?)
-}
-
-/// Function to setup a specific ciphernode actor configuration
-async fn setup_local_ciphernode(
-    bus: Addr<EventBus<EnclaveEvent>>,
-    rng: SharedRng,
-    logging: bool,
-    addr: String,
-    data: Option<Addr<InMemStore>>,
-    cipher: Arc<Cipher>,
-) -> Result<CiphernodeSimulated> {
-    // Local bus for ciphernode events
-    let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-
-    // History collector for taking historical events for analysis
-    let history = EventBus::<EnclaveEvent>::history(&local_bus);
-
-    // Error collector for taking historical events for analysis
-    let errors = EventBus::<EnclaveEvent>::error(&local_bus);
-
-    // Pipe all source events to the local bus
-    EventBus::pipe(&bus, &local_bus);
-
-    // create data actor for saving data
-    let data_actor = data.unwrap_or_else(|| InMemStore::new(logging).start());
-    let store = DataStore::from(&data_actor);
-    let repositories = store.repositories();
-
-    // create ciphernode actor for managing ciphernode flow
-    let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
-
-    // Multithread actor
-    let multithread = Multithread::attach(&rng, &cipher);
-
-    // Ciphernode Selector
-    CiphernodeSelector::attach(&local_bus, &sortition, &addr);
-
-    // E3 specific setup
-    E3Router::builder(&local_bus, store)
-        .with(ThresholdKeyshareExtension::create(
-            &local_bus,
-            &cipher,
-            &multithread,
-            &rng,
-            &addr,
-        ))
-        .build()
-        .await?;
-
-    Ok(CiphernodeSimulated {
-        store: data_actor.clone(),
-        address: addr.to_owned(),
-        bus: local_bus,
-        history,
-        errors,
-    })
 }
 
 /// Test trbfv
@@ -150,25 +96,34 @@ async fn test_trbfv() -> Result<()> {
     let mut adder = AddToCommittee::new(&bus, 1);
 
     // Actor system setup
+    let total_threads = thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+    let threads_to_use = std::cmp::max(1, total_threads.saturating_sub(3));
+    println!("Total threads available: {}", total_threads);
+    println!("Using {} threads for sync actors", threads_to_use);
+
+    let multithread = Multithread::attach(rng.clone(), cipher.clone(), threads_to_use);
+
     let nodes = CiphernodeSystemBuilder::new()
         // Adding 7 total nodes of which we are only choosing 5 for the committee
         .add_group(7, || async {
-            setup_local_ciphernode(
-                bus.clone(),
-                rng.clone(),
-                true,
-                rand_eth_addr(&rng),
-                None,
-                cipher.clone(),
-            )
-            .await
+            CiphernodeBuilder::new(rng.clone(), cipher.clone())
+                .with_address(&rand_eth_addr(&rng))
+                .with_injected_multithread(multithread.clone())
+                .with_history()
+                .with_trbfv()
+                .with_source_bus(&bus)
+                .with_logging()
+                .build()
+                .await
         })
         .simulate_libp2p()
         .build()
         .await?;
 
     for node in nodes.iter() {
-        adder.add(&node.address).await?;
+        adder.add(&node.address()).await?;
     }
 
     // Flush all events

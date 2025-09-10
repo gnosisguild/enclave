@@ -64,7 +64,7 @@ struct InnerResponse {
     pub esi_sss: Vec<Vec<Array2<u64>>>,
 }
 
-pub async fn gen_esi_sss(
+pub fn gen_esi_sss(
     rng: &SharedRng,
     cipher: &Cipher,
     req: GenEsiSssRequest,

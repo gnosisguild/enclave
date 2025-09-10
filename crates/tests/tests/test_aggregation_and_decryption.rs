@@ -6,24 +6,18 @@
 
 use actix::prelude::*;
 use anyhow::*;
-use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
 use e3_crypto::Cipher;
-use e3_data::{DataStore, InMemStore};
-use e3_data::{GetDump, RepositoriesFactory};
+use e3_data::GetDump;
+use e3_data::InMemStore;
 use e3_events::{
-    CiphernodeAdded, CiphernodeSelected, CiphertextOutputPublished, E3Requested, E3id,
-    EnclaveEvent, EventBus, EventBusConfig, GetErrors, HistoryCollector, OrderedSet,
-    PlaintextAggregated, PublicKeyAggregated, Seed, Shutdown, Subscribe, TakeHistory,
+    CiphernodeSelected, CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus,
+    EventBusConfig, GetErrors, HistoryCollector, OrderedSet, PlaintextAggregated,
+    PublicKeyAggregated, Seed, Shutdown, Subscribe, TakeHistory,
 };
-use e3_fhe::ext::FheExtension;
 use e3_fhe::SharedRng;
-use e3_keyshare::ext::KeyshareExtension;
-use e3_logger::SimpleLogger;
 use e3_net::{events::NetEvent, NetEventTranslator};
-use e3_request::E3Router;
 use e3_sdk::bfv_helpers::encode_bfv_params;
-use e3_sortition::SortitionRepositoryFactory;
-use e3_sortition::{CiphernodeSelector, Sortition};
+use e3_test_helpers::ciphernode_builder::CiphernodeBuilder;
 use e3_test_helpers::ciphernode_system::CiphernodeSimulated;
 use e3_test_helpers::{
     create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
@@ -49,46 +43,65 @@ async fn setup_local_ciphernode(
     data: Option<Addr<InMemStore>>,
     cipher: &Arc<Cipher>,
 ) -> Result<CiphernodeSimulated> {
-    // create data actor for saving data
-    let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-    // Pipe all source events to the local bus
-    let history = EventBus::<EnclaveEvent>::history(&local_bus);
-    let errors = EventBus::<EnclaveEvent>::error(&local_bus);
-    EventBus::pipe(bus, &local_bus);
-    let data_actor = data.unwrap_or_else(|| InMemStore::new(logging).start());
-    let store = DataStore::from(&data_actor);
-    let repositories = store.repositories();
+    let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
+        .with_address(addr)
+        .with_source_bus(bus)
+        .with_history()
+        .with_errors()
+        .with_pubkey_aggregation()
+        .with_plaintext_aggregation();
 
-    // create ciphernode actor for managing ciphernode flow
-    let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
-    CiphernodeSelector::attach(&local_bus, &sortition, addr);
+    if let Some(data) = data {
+        builder = builder.with_data(data);
+    }
 
-    E3Router::builder(&local_bus, store)
-        .with(FheExtension::create(&local_bus, &rng))
-        .with(PublicKeyAggregatorExtension::create(&local_bus, &sortition))
-        .with(PlaintextAggregatorExtension::create(&local_bus, &sortition))
-        .with(KeyshareExtension::create(&local_bus, addr, &cipher))
-        .build()
-        .await?;
+    if logging {
+        builder = builder.with_logging()
+    }
 
-    SimpleLogger::<EnclaveEvent>::attach(addr, local_bus.clone());
-    // Ok((
-    //     addr.to_owned(),
-    //     data_actor.clone(),
-    //     sortition,
-    //     router,
-    //     logger,
-    //     local_bus,
+    let node = builder.build().await?;
+
+    Ok(node)
+    // // create data actor for saving data
+    // let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+    // // Pipe all source events to the local bus
+    // let history = EventBus::<EnclaveEvent>::history(&local_bus);
+    // let errors = EventBus::<EnclaveEvent>::error(&local_bus);
+    // EventBus::pipe(bus, &local_bus);
+    // let data_actor = data.unwrap_or_else(|| InMemStore::new(logging).start());
+    // let store = DataStore::from(&data_actor);
+    // let repositories = store.repositories();
+    //
+    // // create ciphernode actor for managing ciphernode flow
+    // let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
+    // CiphernodeSelector::attach(&local_bus, &sortition, addr);
+    //
+    // E3Router::builder(&local_bus, store)
+    //     .with(FheExtension::create(&local_bus, &rng))
+    //     .with(PublicKeyAggregatorExtension::create(&local_bus, &sortition))
+    //     .with(PlaintextAggregatorExtension::create(&local_bus, &sortition))
+    //     .with(KeyshareExtension::create(&local_bus, addr, &cipher))
+    //     .build()
+    //     .await?;
+    //
+    // SimpleLogger::<EnclaveEvent>::attach(addr, local_bus.clone());
+    // // Ok((
+    // //     addr.to_owned(),
+    // //     data_actor.clone(),
+    // //     sortition,
+    // //     router,
+    // //     logger,
+    // //     local_bus,
+    // //     history,
+    // //     error,
+    // // ))
+    // Ok(CiphernodeSimulated {
+    //     bus: local_bus,
     //     history,
-    //     error,
-    // ))
-    Ok(CiphernodeSimulated {
-        bus: local_bus,
-        history,
-        store: data_actor.clone(),
-        address: addr.to_owned(),
-        errors,
-    })
+    //     store: data_actor.clone(),
+    //     address: addr.to_owned(),
+    //     errors,
+    // })
 }
 
 fn generate_pk_share(
@@ -238,7 +251,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
     let eth_addrs = ciphernodes
         .iter()
-        .map(|tup| tup.address.to_owned())
+        .map(|tup| tup.address().to_owned())
         .collect::<Vec<_>>();
 
     add_ciphernodes(&bus, &eth_addrs, 1).await?;
@@ -268,7 +281,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         nodes: OrderedSet::from(eth_addrs.clone()),
     };
 
-    let history_collector = ciphernodes.first().unwrap().history.clone();
+    let history_collector = ciphernodes.first().unwrap().history().unwrap();
 
     let history = history_collector
         .send(TakeHistory::<EnclaveEvent>::new(9))
@@ -328,10 +341,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         let (bus, rng, seed, params, crpoly, ..) = get_common_setup(None)?;
         let cipher = Arc::new(Cipher::from_password("Don't tell anyone my secret").await?);
         let ciphernodes = create_local_ciphernodes(&bus, &rng, 2, &cipher).await?;
-        let eth_addrs = ciphernodes
-            .iter()
-            .map(|n| n.address.clone())
-            .collect::<Vec<_>>();
+        let eth_addrs = ciphernodes.iter().map(|n| n.address()).collect::<Vec<_>>();
 
         add_ciphernodes(&bus, &eth_addrs, 1).await?;
 
@@ -351,8 +361,8 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             .clone(),
         )
         .await?;
-        let history_collector = cn1.history.clone();
-        let error_collector = cn1.errors.clone();
+        let history_collector = cn1.history().unwrap();
+        let error_collector = cn1.errors().unwrap();
         let history = history_collector
             .send(TakeHistory::<EnclaveEvent>::new(7))
             .await?;
@@ -368,14 +378,14 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         // This is probably overkill but required to ensure that all the data is written
         sleep(Duration::from_secs(1)).await;
 
-        let cn1_dump = cn1.store.send(GetDump).await??;
-        let cn2_dump = cn2.store.send(GetDump).await??;
+        let cn1_dump = cn1.store().send(GetDump).await??;
+        let cn2_dump = cn2.store().send(GetDump).await??;
 
         (
             rng,
-            cn1.address.clone(),
+            cn1.address(),
             cn1_dump,
-            cn2.address.clone(),
+            cn2.address(),
             cn2_dump,
             cipher,
             history,
@@ -410,7 +420,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         &cipher,
     )
     .await?;
-    let history_collector = cn1.history.clone();
+    let history_collector = cn1.history().unwrap();
     simulate_libp2p_net(&[cn1, cn2]);
 
     println!("getting collector from cn1.6");
@@ -536,10 +546,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
 
     // Setup actual ciphernodes and dispatch add events
     let ciphernodes = create_local_ciphernodes(&bus, &rng, 3, &cipher).await?;
-    let eth_addrs = ciphernodes
-        .iter()
-        .map(|tup| tup.address.to_owned())
-        .collect();
+    let eth_addrs = ciphernodes.iter().map(|tup| tup.address()).collect();
     add_ciphernodes(&bus, &eth_addrs, 1).await?;
     add_ciphernodes(&bus, &eth_addrs, 2).await?;
 
@@ -559,7 +566,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         &params, &crpoly, &rng_test, &eth_addrs,
     )?)?;
 
-    let history_collector = ciphernodes.last().unwrap().history.clone();
+    let history_collector = ciphernodes.last().unwrap().history().unwrap();
     let history = history_collector
         .send(TakeHistory::<EnclaveEvent>::new(12))
         .await?;

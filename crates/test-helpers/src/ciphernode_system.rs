@@ -4,17 +4,17 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Addr, MailboxError};
+use actix::Addr;
 use anyhow::*;
 use e3_data::InMemStore;
 use e3_events::{
     EnclaveEvent, ErrorCollector, EventBus, GetHistory, HistoryCollector, ResetHistory, TakeHistory,
 };
-use tokio::time::{sleep, timeout};
+use tokio::time::timeout;
 
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 
-use crate::{d, simulate_libp2p_net};
+use crate::simulate_libp2p_net;
 
 // This type allows us to store various dynamic async callbacks
 type SetupFn<'a> =
@@ -102,11 +102,49 @@ impl<'a> CiphernodeSystemBuilder<'a> {
 
 #[derive(Clone, Debug)]
 pub struct CiphernodeSimulated {
-    pub address: String,
-    pub store: Addr<InMemStore>,
-    pub bus: Addr<EventBus<EnclaveEvent>>,
-    pub history: Addr<HistoryCollector<EnclaveEvent>>,
-    pub errors: Addr<ErrorCollector<EnclaveEvent>>,
+    address: String,
+    store: Addr<InMemStore>,
+    bus: Addr<EventBus<EnclaveEvent>>,
+    history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
+    errors: Option<Addr<ErrorCollector<EnclaveEvent>>>,
+}
+
+impl CiphernodeSimulated {
+    pub fn new(
+        address: String,
+        store: Addr<InMemStore>,
+        bus: Addr<EventBus<EnclaveEvent>>,
+        history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
+        errors: Option<Addr<ErrorCollector<EnclaveEvent>>>,
+    ) -> Self {
+        Self {
+            address,
+            store,
+            bus,
+            history,
+            errors,
+        }
+    }
+
+    pub fn bus(&self) -> Addr<EventBus<EnclaveEvent>> {
+        self.bus.clone()
+    }
+
+    pub fn history(&self) -> Option<Addr<HistoryCollector<EnclaveEvent>>> {
+        self.history.clone()
+    }
+
+    pub fn errors(&self) -> Option<Addr<ErrorCollector<EnclaveEvent>>> {
+        self.errors.clone()
+    }
+
+    pub fn address(&self) -> String {
+        self.address.clone()
+    }
+
+    pub fn store(&self) -> Addr<InMemStore> {
+        self.store.clone()
+    }
 }
 
 pub struct CiphernodeSystem(Vec<CiphernodeSimulated>);
@@ -117,9 +155,13 @@ impl CiphernodeSystem {
             return Ok(CiphernodeHistory(vec![]));
         };
 
-        Ok(CiphernodeHistory(
-            node.history.send(GetHistory::new()).await?,
-        ))
+        let history = if let Some(history) = node.history() {
+            history.send(GetHistory::new()).await?
+        } else {
+            vec![]
+        };
+
+        Ok(CiphernodeHistory(history))
     }
 
     pub async fn take_history(&self, index: usize, count: usize) -> Result<CiphernodeHistory> {
@@ -137,7 +179,11 @@ impl CiphernodeSystem {
             bail!("No node found");
         };
 
-        let history = timeout(tout, node.history.send(TakeHistory::new(count)))
+        let Some(history) = node.history() else {
+            return Ok(CiphernodeHistory(vec![]));
+        };
+
+        let history = timeout(tout, history.send(TakeHistory::new(count)))
             .await
             .context(format!(
                 "Could not take {} events from node {}",
@@ -149,14 +195,17 @@ impl CiphernodeSystem {
     pub async fn flush_all_history(&self, millis: u64) -> Result<()> {
         let nodes = self.0.clone();
         for node in nodes.iter() {
+            let Some(history) = node.history() else {
+                break;
+            };
             loop {
-                let nhs = node.history.send(TakeHistory::new(1));
+                let nhs = history.send(TakeHistory::new(1));
                 let tr = timeout(Duration::from_millis(millis), nhs).await;
                 if !tr.is_ok() {
                     break;
                 }
             }
-            node.history.send(ResetHistory).await?;
+            history.send(ResetHistory).await?;
         }
 
         Ok(())
@@ -213,8 +262,8 @@ mod tests {
             address,
             store,
             bus,
-            history,
-            errors,
+            history: Some(history),
+            errors: Some(errors),
         })
     }
 

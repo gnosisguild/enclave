@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod ciphernode_builder;
 pub mod ciphernode_system;
 mod plaintext_writer;
 mod public_key_writer;
@@ -116,23 +117,11 @@ pub fn get_common_setup(
 ///                    └─────┘
 /// ```
 pub fn simulate_libp2p_net(nodes: &[CiphernodeSimulated]) {
-    for (i, node) in nodes.iter().enumerate() {
-        let source = &node.bus;
+    for node in nodes.iter() {
+        let source = &node.bus();
         for node in nodes.iter() {
-            let dest = &node.bus;
-            EventBus::pipe_filter(
-                source,
-                move |e: &EnclaveEvent| {
-                    // println!(
-                    //     "{}:filter:{} - allowed={}",
-                    //     i,
-                    //     e.event_type(),
-                    //     !e.is_local_only()
-                    // );
-                    !e.is_local_only()
-                },
-                dest,
-            )
+            let dest = &node.bus();
+            EventBus::pipe_filter(source, move |e: &EnclaveEvent| !e.is_local_only(), dest)
         }
     }
 }
