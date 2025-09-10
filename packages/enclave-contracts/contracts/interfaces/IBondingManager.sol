@@ -110,6 +110,7 @@ interface IBondingManager {
         uint256 licenseStake;
         uint256 registeredAt;
         bool isActive;
+        bool isRegistered;
     }
 
     /**

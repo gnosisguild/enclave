@@ -21,14 +21,10 @@ import {
     IAllocationManager
 } from "eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
 import {
-    IStrategyManager
-} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {
     OperatorSet
 } from "eigenlayer-contracts/src/contracts/libraries/OperatorSetLib.sol";
 import { IBondingManager } from "../interfaces/IBondingManager.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
-import { IServiceManager } from "../interfaces/IServiceManager.sol";
 
 contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     using SafeERC20 for IERC20;
@@ -47,8 +43,8 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     mapping(uint32 ticketId => Ticket ticket) public tickets;
     mapping(address operator => uint32[] ticketIds) public operatorTickets;
     mapping(address operator => OperatorInfo info) public operators;
-    mapping(address operator => bool registered) public registeredOperators;
-    mapping(address => uint256) public availableTicketCount;
+    mapping(address operator => uint256 availableTickets)
+        public availableTicketCount;
 
     ICiphernodeRegistry public ciphernodeRegistry;
     IDelegationManager public delegationManager;
@@ -114,7 +110,8 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
             isLicensed: true,
             licenseStake: enclAmount,
             registeredAt: block.timestamp,
-            isActive: false
+            isActive: false,
+            isRegistered: false
         });
 
         emit LicenseAcquired(msg.sender, enclAmount);
@@ -148,7 +145,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         uint32 firstTicketId = nextTicketId - uint32(ticketCount);
 
         if (
-            registeredOperators[msg.sender] &&
+            operators[msg.sender].isRegistered &&
             !operators[msg.sender].isActive &&
             availableTicketCount[msg.sender] >= minTicketBalance
         ) {
@@ -187,7 +184,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
                 t.status = TicketStatus.Active;
                 availableTicketCount[msg.sender]++;
                 if (
-                    registeredOperators[msg.sender] &&
+                    operators[msg.sender].isRegistered &&
                     !operators[msg.sender].isActive &&
                     availableTicketCount[msg.sender] >= 1
                 ) {
@@ -206,7 +203,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     }
 
     function registerCiphernode() external nonReentrant {
-        require(!registeredOperators[msg.sender], AlreadyRegistered());
+        require(!operators[msg.sender].isRegistered, AlreadyRegistered());
         require(operators[msg.sender].isLicensed, NotLicensed());
         require(
             delegationManager.isOperator(msg.sender),
@@ -223,7 +220,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
             licenseStake
         );
 
-        registeredOperators[msg.sender] = true;
+        operators[msg.sender].isRegistered = true;
         ciphernodeRegistry.addCiphernode(msg.sender);
 
         bool activeNow = availableTicketCount[msg.sender] >= 1;
@@ -236,14 +233,14 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     function deregisterCiphernode(
         uint256[] calldata siblingNodes
     ) external nonReentrant {
-        require(registeredOperators[msg.sender], OperatorNotRegistered());
+        require(operators[msg.sender].isRegistered, OperatorNotRegistered());
 
         if (operators[msg.sender].isActive) {
             operators[msg.sender].isActive = false;
             emit CiphernodeDeactivated(msg.sender);
         }
 
-        registeredOperators[msg.sender] = false;
+        operators[msg.sender].isRegistered = false;
         ciphernodeRegistry.removeCiphernode(msg.sender, siblingNodes);
         emit CiphernodeDeregistered(msg.sender);
     }
@@ -304,7 +301,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         }
 
         if (
-            registeredOperators[operator] &&
+            operators[operator].isRegistered &&
             operators[operator].isActive &&
             availableTicketCount[operator] == 0
         ) {
@@ -323,42 +320,57 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
         uint32[] memory ticketIds = operatorTickets[operator];
 
         for (uint256 i = 0; i < ticketIds.length; i++) {
-            uint32 ticketId = ticketIds[i];
-            Ticket storage ticket = tickets[ticketId];
-
-            if (ticket.status != TicketStatus.Active || ticket.isUsed) continue;
-
-            uint256 slashAmount = Math.mulDiv(
-                ticket.originalValue,
-                wadToSlash,
-                1e18
-            );
-            uint256 remaining = ticket.originalValue - ticket.slashedAmount;
-            if (slashAmount > remaining) slashAmount = remaining;
-            ticket.slashedAmount += uint96(slashAmount);
-            emit TicketSlashed(operator, ticketId, slashAmount);
-
-            if (ticket.slashedAmount == ticket.originalValue) {
-                ticket.isUsed = true;
-                ticket.status = TicketStatus.Burned;
-                emit TicketStatusChanged(
-                    operator,
-                    ticketId,
-                    TicketStatus.Burned
-                );
-            } else if (
-                uint256(ticket.slashedAmount) * BPS_DENOM >=
-                uint256(ticket.originalValue) * INACTIVE_AT_BPS
-            ) {
-                ticket.status = TicketStatus.Inactive;
-                emit TicketStatusChanged(
-                    operator,
-                    ticketId,
-                    TicketStatus.Inactive
-                );
-            }
+            _processTicketSlashing(operator, ticketIds[i], wadToSlash);
         }
 
+        availableTicketCount[operator] = _countAvailableTickets(operator);
+        _checkAndDeactivateOperator(operator);
+    }
+
+    function _processTicketSlashing(
+        address operator,
+        uint32 ticketId,
+        uint256 wadToSlash
+    ) internal {
+        Ticket storage ticket = tickets[ticketId];
+
+        if (ticket.status != TicketStatus.Active || ticket.isUsed) return;
+
+        uint256 slashAmount = Math.mulDiv(
+            ticket.originalValue,
+            wadToSlash,
+            1e18
+        );
+        uint256 remaining = ticket.originalValue - ticket.slashedAmount;
+        if (slashAmount > remaining) slashAmount = remaining;
+        ticket.slashedAmount += uint96(slashAmount);
+        emit TicketSlashed(operator, ticketId, slashAmount);
+
+        _updateTicketStatusAfterSlashing(operator, ticketId, ticket);
+    }
+
+    function _updateTicketStatusAfterSlashing(
+        address operator,
+        uint32 ticketId,
+        Ticket storage ticket
+    ) internal {
+        if (ticket.slashedAmount == ticket.originalValue) {
+            ticket.isUsed = true;
+            ticket.status = TicketStatus.Burned;
+            emit TicketStatusChanged(operator, ticketId, TicketStatus.Burned);
+        } else if (
+            uint256(ticket.slashedAmount) * BPS_DENOM >=
+            uint256(ticket.originalValue) * INACTIVE_AT_BPS
+        ) {
+            ticket.status = TicketStatus.Inactive;
+            emit TicketStatusChanged(operator, ticketId, TicketStatus.Inactive);
+        }
+    }
+
+    function _countAvailableTickets(
+        address operator
+    ) internal view returns (uint256) {
+        uint32[] memory ticketIds = operatorTickets[operator];
         uint256 newCount = 0;
         for (uint256 i = 0; i < ticketIds.length; i++) {
             Ticket storage ticket = tickets[ticketIds[i]];
@@ -371,10 +383,12 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
                 newCount++;
             }
         }
-        availableTicketCount[operator] = newCount;
+        return newCount;
+    }
 
+    function _checkAndDeactivateOperator(address operator) internal {
         if (
-            registeredOperators[operator] &&
+            operators[operator].isRegistered &&
             operators[operator].isActive &&
             availableTicketCount[operator] == 0
         ) {
@@ -398,8 +412,8 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
 
         if (belowAbsolute || belowAllocated) {
             operators[operator].isLicensed = false;
-            if (registeredOperators[operator]) {
-                registeredOperators[operator] = false;
+            if (operators[operator].isRegistered) {
+                operators[operator].isRegistered = false;
                 emit CiphernodeDeregistered(operator);
             }
             emit LicenseRevoked(operator);
@@ -497,7 +511,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     function isRegisteredOperator(
         address operator
     ) external view returns (bool) {
-        return registeredOperators[operator];
+        return operators[operator].isRegistered;
     }
 
     function isActive(address operator) external view returns (bool) {
@@ -576,7 +590,7 @@ contract BondingManager is Ownable, ReentrancyGuard, IBondingManager {
     function getCiphernodeState(
         address operator
     ) external view returns (IBondingManager.CiphernodeState) {
-        if (!registeredOperators[operator])
+        if (!operators[operator].isRegistered)
             return IBondingManager.CiphernodeState.REMOVED;
         return
             operators[operator].isActive
