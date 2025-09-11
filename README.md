@@ -90,17 +90,17 @@ See [CONTRIBUTING.md][contributing].
                 </a>
             </td>
             <td align="center">
-                <a href="https://github.com/Subhasish-Behera">
-                    <img src="https://avatars.githubusercontent.com/u/92573882?v=4" width="100;" alt="Subhasish-Behera"/>
-                    <br />
-                    <sub><b>SUBHASISH BEHERA</b></sub>
-                </a>
-            </td>
-            <td align="center">
                 <a href="https://github.com/cedoor">
                     <img src="https://avatars.githubusercontent.com/u/11427903?v=4" width="100;" alt="cedoor"/>
                     <br />
                     <sub><b>Cedoor</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/Subhasish-Behera">
+                    <img src="https://avatars.githubusercontent.com/u/92573882?v=4" width="100;" alt="Subhasish-Behera"/>
+                    <br />
+                    <sub><b>SUBHASISH BEHERA</b></sub>
                 </a>
             </td>
 		</tr>
