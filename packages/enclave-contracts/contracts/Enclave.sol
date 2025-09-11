@@ -128,7 +128,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function request(
-        E3RequestParams memory requestParams
+        E3RequestParams calldata requestParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
         // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
@@ -218,7 +218,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function activate(
         uint256 e3Id,
-        bytes memory publicKey
+        bytes calldata publicKey
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
@@ -243,7 +243,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function publishInput(
         uint256 e3Id,
-        bytes memory data
+        bytes calldata data
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
@@ -269,8 +269,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function publishCiphertextOutput(
         uint256 e3Id,
-        bytes memory ciphertextOutput,
-        bytes memory proof
+        bytes calldata ciphertextOutput,
+        bytes calldata proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         // Note: if we make 0 a no expiration, this has to be refactored
@@ -295,8 +295,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function publishPlaintextOutput(
         uint256 e3Id,
-        bytes memory plaintextOutput,
-        bytes memory proof
+        bytes calldata plaintextOutput,
+        bytes calldata proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         // Note: if we make 0 a no expiration, this has to be refactored
