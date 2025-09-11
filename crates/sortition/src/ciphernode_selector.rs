@@ -86,7 +86,12 @@ impl Handler<E3Requested> for CiphernodeSelector {
                     info!(node = address, "Ciphernode was not selected");
                     return;
                 };
-                println!("WE GOT ONE!! ");
+                println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+                println!(
+                    "@@  CIPHERNODE SELECTED: node={} address={}",
+                    party_id, address
+                );
+                println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
                     party_id,
                     e3_id: data.e3_id,

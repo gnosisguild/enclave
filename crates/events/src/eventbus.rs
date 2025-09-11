@@ -11,6 +11,7 @@ use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
+use std::time::Instant;
 use tokio::sync::oneshot;
 
 //////////////////////////////////////////////////////////////////////////////
@@ -135,22 +136,20 @@ impl<E: Event> Handler<E> for EventBus<E> {
         if self.is_duplicate(&event) {
             return;
         }
-
         if let Some(listeners) = self.listeners.get("*") {
             for listener in listeners {
-                listener.do_send(event.clone())
+                listener.do_send(event.clone());
             }
         }
 
         if let Some(listeners) = self.listeners.get(&event.event_type()) {
             for listener in listeners {
-                listener.do_send(event.clone())
+                listener.do_send(event.clone());
             }
         }
 
         // TODO: workshop to work out best display format
         tracing::info!(">>> {}", event);
-
         self.track(event);
     }
 }
@@ -288,7 +287,6 @@ impl<E: Event> Handler<GetHistory<E>> for HistoryCollector<E> {
     type Result = Vec<E>;
 
     fn handle(&mut self, _: GetHistory<E>, _: &mut Context<Self>) -> Vec<E> {
-        println!("History gettin'...");
         self.history.iter().cloned().collect()
     }
 }
@@ -334,7 +332,6 @@ impl<E: Event> Handler<ResetHistory> for HistoryCollector<E> {
     type Result = ();
 
     fn handle(&mut self, _: ResetHistory, _: &mut Context<Self>) {
-        println!("History clearn'");
         self.history.clear();
         self.pending_takes.clear();
     }
@@ -434,11 +431,6 @@ impl<E: Event> Actor for HistoryCollector<E> {
 impl<E: Event> Handler<E> for HistoryCollector<E> {
     type Result = E::Result;
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
-        println!(
-            "History loggin' id={} type={}",
-            msg.event_id(),
-            msg.event_type()
-        );
         self.add_event(msg);
     }
 }

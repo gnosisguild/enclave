@@ -37,7 +37,7 @@ pub struct ThresholdShare {
 #[rtype(result = "()")]
 pub struct ThresholdShareCreated {
     pub e3_id: E3id,
-    pub share: ThresholdShare,
+    pub share: Arc<ThresholdShare>,
 }
 
 impl Display for ThresholdShareCreated {

@@ -151,10 +151,8 @@ async fn test_trbfv() -> Result<()> {
 
     let e3_requested = E3Requested {
         e3_id: E3id::new("0", 1),
-        threshold_m: 1,
-        threshold_n: 3,
-        // threshold_m: 2,
-        // threshold_n: 5, // Committee size is 5 from 7 total nodes
+        threshold_m: 2,
+        threshold_n: 5, // Committee size is 5 from 7 total nodes
         seed: seed.clone(),
         error_size,
         esi_per_ct: 3,
@@ -170,8 +168,8 @@ async fn test_trbfv() -> Result<()> {
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
-        // "ThresholdShareCreated",
-        // "ThresholdShareCreated",
+        "ThresholdShareCreated",
+        "ThresholdShareCreated",
         "KeyshareCreated",
         "KeyshareCreated",
         "KeyshareCreated",

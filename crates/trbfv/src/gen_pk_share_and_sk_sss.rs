@@ -83,6 +83,10 @@ pub fn gen_pk_share_and_sk_sss(
     let threshold = req.trbfv_config.threshold();
     let num_ciphernodes = req.trbfv_config.num_parties();
 
+    println!(
+        "gen_pk_share_and_sk_sss: n={}, t={}",
+        num_ciphernodes, threshold
+    );
     let sk_share = { SecretKey::random(&params, &mut *rng.lock().unwrap()) };
     let pk_share = { PublicKeyShare::new(&sk_share, crp.clone(), &mut *rng.lock().unwrap())? };
 
@@ -95,7 +99,10 @@ pub fn gen_pk_share_and_sk_sss(
     let sk_sss =
         { share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())? };
 
-    println!("gen_pk_share_and_sk_sss:returning...");
+    println!(
+        "gen_pk_share_and_sk_sss:returning... sk_sss.len() == {}",
+        sk_sss.len()
+    );
     Ok(GenPkShareAndSkSssResponse::try_from((
         InnerResponse { pk_share, sk_sss },
         cipher,

@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     mem,
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use actix::prelude::*;
@@ -48,11 +48,11 @@ struct SharesGenerated;
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct AllThresholdSharesCollected {
-    shares: Vec<ThresholdShare>,
+    shares: Vec<Arc<ThresholdShare>>,
 }
 
-impl From<HashMap<u64, ThresholdShare>> for AllThresholdSharesCollected {
-    fn from(value: HashMap<u64, ThresholdShare>) -> Self {
+impl From<HashMap<u64, Arc<ThresholdShare>>> for AllThresholdSharesCollected {
+    fn from(value: HashMap<u64, Arc<ThresholdShare>>) -> Self {
         // At this point all parties should be accounted for here
 
         // extract a vector
@@ -645,15 +645,15 @@ impl Handler<SharesGenerated> for ThresholdKeyshare {
         // Currently this removes zeroizing to create bytes
         let (pk_share, sk_sss, esi_sss) =
             _dangerously_remove_zeroizing_to_simulate_pvw_encryption((pk_share, sk_sss, esi_sss));
-
+        println!(">>>> THRESHOLD SHARE ABOUT TO BE CREATED FOR {}!", party_id);
         self.bus.do_send(EnclaveEvent::from(ThresholdShareCreated {
             e3_id,
-            share: ThresholdShare {
+            share: Arc::new(ThresholdShare {
                 party_id,
                 esi_sss,
                 pk_share,
                 sk_sss,
-            },
+            }),
         }));
 
         Ok(())
@@ -669,7 +669,7 @@ pub struct DecryptionKeyCollector {
     todo: HashSet<PartyId>,
     parent: Addr<ThresholdKeyshare>,
     state: CollectorState,
-    shares: HashMap<PartyId, ThresholdShare>,
+    shares: HashMap<PartyId, Arc<ThresholdShare>>,
 }
 
 impl DecryptionKeyCollector {
@@ -692,6 +692,7 @@ impl Actor for DecryptionKeyCollector {
 impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
     type Result = ();
     fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
+        let start = Instant::now();
         println!("DecryptionKeyCollector received event");
         if let CollectorState::Finished = self.state {
             println!("DecryptionKeyCollector is finished so ignoring!");
@@ -715,6 +716,10 @@ impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
             let event: AllThresholdSharesCollected = self.shares.clone().into();
             self.parent.do_send(event)
         }
+        println!(
+            "Finished processing ThresholdShareCreated in {:?}",
+            start.elapsed()
+        );
     }
 }
 
