@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::TrBFVConfig;
+use crate::{
+    shares::{EncryptedShareSetCollection, ShareSetCollection},
+    TrBFVConfig,
+};
 use anyhow::Result;
 /// This module defines event payloads that will generate the decryption key material to create a decryption share
 use anyhow::*;
@@ -20,15 +23,15 @@ pub struct CalculateDecryptionKeyRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// All collected secret key shamir shares where SensitiveBytes is Vec<Array2<u64>>
-    pub sk_sss_collected: Vec<SensitiveBytes>,
+    pub sk_sss_collected: EncryptedShareSetCollection,
     /// All collected smudging noise shamir shares where SensitiveBytes is Vec<Array2<u64>>
-    pub esi_sss_collected: Vec<Vec<SensitiveBytes>>,
+    pub esi_sss_collected: Vec<EncryptedShareSetCollection>,
 }
 
 struct InnerRequest {
     pub trbfv_config: TrBFVConfig,
-    pub sk_sss_collected: Vec<Array2<u64>>,
-    pub esi_sss_collected: Vec<Vec<Array2<u64>>>,
+    pub sk_sss_collected: ShareSetCollection,
+    pub esi_sss_collected: Vec<ShareSetCollection>,
 }
 
 impl TryFrom<(&Cipher, CalculateDecryptionKeyRequest)> for InnerRequest {
@@ -41,22 +44,12 @@ impl TryFrom<(&Cipher, CalculateDecryptionKeyRequest)> for InnerRequest {
         println!("Converting sk_sss to collected...");
 
         // convert to collected
-        let sk_sss_collected = SensitiveBytes::access_vec(req.sk_sss_collected, cipher)?
-            .into_iter()
-            .map(deserialize_to_array2)
-            .collect::<Result<Vec<_>>>()?;
-
-        println!("Converting es_sss to collected...");
+        let sk_sss_collected = req.sk_sss_collected.decrypt(cipher)?;
         let esi_sss_collected = req
             .esi_sss_collected
             .into_iter()
-            .map(|sensitive_vec| -> Result<_> {
-                SensitiveBytes::access_vec(sensitive_vec, cipher)?
-                    .into_iter()
-                    .map(deserialize_to_array2)
-                    .collect::<Result<Vec<_>>>()
-            })
-            .collect::<Result<Vec<_>>>()?;
+            .map(|item| item.decrypt(cipher))
+            .collect::<Result<_>>()?;
 
         Ok(InnerRequest {
             sk_sss_collected,
@@ -124,7 +117,8 @@ pub fn calculate_decryption_key(
     let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
 
     println!("Calculating sk_poly_sum...");
-    let sk_poly_sum = share_manager.aggregate_collected_shares(&req.sk_sss_collected)?;
+    let sk_poly_sum =
+        share_manager.aggregate_collected_shares(&req.sk_sss_collected.try_to_ndarray_vec()?)?;
 
     println!("Calculating es_poly_sum...");
     let es_poly_sum = req
@@ -133,7 +127,7 @@ pub fn calculate_decryption_key(
         .map(|shares| -> Result<_> {
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             share_manager
-                .aggregate_collected_shares(&shares)
+                .aggregate_collected_shares(&shares.try_to_ndarray_vec()?)
                 .context("Failed to aggregate es_sss")
         })
         .collect::<Result<Vec<_>>>()?;

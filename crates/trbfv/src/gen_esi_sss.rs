@@ -4,11 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{ArcBytes, SharedRng, TrBFVConfig};
+use crate::{
+    shares::{EncryptedShareSetCollection, ShareSetCollection},
+    ArcBytes, SharedRng, TrBFVConfig,
+};
 use anyhow::{Context, Result};
-use e3_crypto::{Cipher, SensitiveBytes};
+use e3_crypto::Cipher;
 use fhe::trbfv::{smudging::SmudgingNoiseGenerator, ShareManager};
-use ndarray::{Array2, ArrayView1};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
@@ -42,7 +44,7 @@ impl TryFrom<GenEsiSssRequest> for InnerRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GenEsiSssResponse {
     /// The smudging noise shares
-    pub esi_sss: Vec<Vec<SensitiveBytes>>,
+    pub esi_sss: Vec<EncryptedShareSetCollection>,
 }
 
 impl TryFrom<(InnerResponse, &Cipher)> for GenEsiSssResponse {
@@ -54,14 +56,14 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenEsiSssResponse {
             esi_sss: value
                 .esi_sss
                 .into_iter()
-                .map(|s| SensitiveBytes::try_from_unserialized_vec(s, cipher))
+                .map(|s| s.encrypt(cipher))
                 .collect::<Result<_>>()?,
         })
     }
 }
 
 struct InnerResponse {
-    pub esi_sss: Vec<Vec<Array2<u64>>>,
+    pub esi_sss: Vec<ShareSetCollection>,
 }
 
 pub fn gen_esi_sss(
@@ -71,7 +73,6 @@ pub fn gen_esi_sss(
 ) -> Result<GenEsiSssResponse> {
     println!("gen_esi_sss");
     let req = InnerRequest::try_from(req)?;
-
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
@@ -90,13 +91,14 @@ pub fn gen_esi_sss(
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
             println!("gen_esi_sss:generate_secret_shares_from_poly...");
-            {
+            Ok({
                 share_manager
                     .generate_secret_shares_from_poly(esi_poly, &mut *rng.lock().unwrap())
-                    .context("Failed to generate secret shares from poly")
+                    .context("Failed to generate secret shares from poly")?
             }
+            .into())
         })
-        .collect::<Result<Vec<Vec<_>>>>()?;
+        .collect::<Result<_>>()?;
 
     println!("gen_esi_sss:returning...");
     Ok(GenEsiSssResponse::try_from((

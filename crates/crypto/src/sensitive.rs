@@ -64,9 +64,16 @@ impl SensitiveBytes {
     /// Access the decrypted data, wrapped in a ZeroizeOnDrop container
     // TODO: rename try_access
     pub fn access(&self, cipher: &Cipher) -> Result<Zeroizing<Vec<u8>>> {
-        let decrypted_data = cipher.decrypt_data(&self.encrypted)?;
-        Ok(Zeroizing::new(decrypted_data))
+        Ok(Zeroizing::new(self.access_raw(cipher)?))
     }
+
+    pub fn access_raw(&self, cipher: &Cipher) -> Result<Vec<u8>> {
+        cipher.decrypt_data(&self.encrypted)
+    }
+}
+
+pub trait ToSensitiveBytes {
+    fn encrypt(&self, cipher: &Cipher) -> Result<SensitiveBytes>;
 }
 
 #[cfg(test)]

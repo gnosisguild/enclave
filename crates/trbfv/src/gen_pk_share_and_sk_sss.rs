@@ -6,16 +6,18 @@
 
 /// This module defines event payloads that will generate the public key share as well as the sk shamir secret shares to be distributed to other members of the committee.
 /// This has been separated from the esi setup in order to be able to take advantage of parallelism
-use crate::{ArcBytes, SharedRng, TrBFVConfig};
+use crate::{
+    shares::{EncryptedShareSetCollection, ShareSet, ShareSetCollection},
+    ArcBytes, SharedRng, TrBFVConfig,
+};
 use anyhow::Result;
-use e3_crypto::{Cipher, SensitiveBytes};
+use e3_crypto::Cipher;
 use fhe::{
     bfv::SecretKey,
     mbfv::{CommonRandomPoly, PublicKeyShare},
     trbfv::ShareManager,
 };
 use fhe_traits::Serialize as FheSerialize;
-use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -49,7 +51,7 @@ pub struct GenPkShareAndSkSssResponse {
     /// PublicKey share for this node
     pub pk_share: ArcBytes,
     /// SecretKey Shamir Shares for other parties
-    pub sk_sss: Vec<SensitiveBytes>,
+    pub sk_sss: EncryptedShareSetCollection,
 }
 
 impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
@@ -58,7 +60,7 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
         (value, cipher): (InnerResponse, &Cipher),
     ) -> std::result::Result<Self, Self::Error> {
         let pk_share = Arc::new(value.pk_share.to_bytes());
-        let sk_sss = SensitiveBytes::try_from_unserialized_vec(value.sk_sss, cipher)?;
+        let sk_sss = value.sk_sss.encrypt(cipher)?;
         Ok(GenPkShareAndSkSssResponse { pk_share, sk_sss })
     }
 }
@@ -67,7 +69,7 @@ struct InnerResponse {
     /// PublicKey share for this node
     pub pk_share: PublicKeyShare,
     /// SecretKey Shamir Shares for other parties
-    pub sk_sss: Vec<Array2<u64>>,
+    pub sk_sss: ShareSetCollection,
 }
 
 pub fn gen_pk_share_and_sk_sss(
@@ -96,8 +98,9 @@ pub fn gen_pk_share_and_sk_sss(
     let sk_poly = share_manager.coeffs_to_poly_level0(sk_share.coeffs.clone().as_ref())?;
 
     println!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
-    let sk_sss =
-        { share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())? };
+    let sk_sss: ShareSetCollection =
+        { share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())? }
+            .into();
 
     println!(
         "gen_pk_share_and_sk_sss:returning... sk_sss.len() == {}",
