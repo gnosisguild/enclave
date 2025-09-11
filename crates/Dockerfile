@@ -32,8 +32,7 @@ COPY ./rust-toolchain.toml .
 
 WORKDIR /build/crates
 COPY --from=evm-builder /build/packages/enclave-contracts/artifacts ../packages/enclave-contracts/artifacts
-COPY --from=evm-builder /build/packages/enclave-contracts/deployments ../packages/enclave-contracts/deployments
-
+COPY --from=evm-builder /build/packages/enclave-contracts/deployed_contracts.json ../packages/enclave-contracts/deployed_contracts.json
 
 # find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n" | sed 's|COPY \(.*\) crates/|COPY \1 ./|'
 COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml

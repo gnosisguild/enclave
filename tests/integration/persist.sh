@@ -16,6 +16,9 @@ until curl -f -s "http://localhost:8545" > /dev/null; do
   sleep 1
 done
 
+pnpm evm:clean
+pnpm evm:deploy --network localhost
+
 # set wallet to ag specifically
 enclave_wallet_set ag "$PRIVATE_KEY"
 

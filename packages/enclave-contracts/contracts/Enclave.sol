@@ -170,6 +170,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         IDecryptionVerifier decryptionVerifier = decryptionVerifiers[
             encryptionSchemeId
         ];
+
         require(
             decryptionVerifiers[encryptionSchemeId] !=
                 IDecryptionVerifier(address(0)),

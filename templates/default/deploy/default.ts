@@ -4,60 +4,60 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { DeployFunction } from "hardhat-deploy/types";
-import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { readDeploymentArgs, storeDeploymentArgs } from "@enclave-e3/contracts/scripts/utils.js";
+import { Enclave__factory as EnclaveFactory } from "@enclave-e3/contracts/types";
+import hre from "hardhat";
 
-const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployer } = await hre.getNamedAccounts();
-  const { deploy } = hre.deployments;
+export const deployTemplate = async () => {
+  const { ethers } = await hre.network.connect();
+  const [owner] = await ethers.getSigners();
 
-  const [deployerAccount] = await hre.ethers.getSigners();
-  const enclave = await hre.deployments.get("Enclave");
+  const chain = hre.globalOptions.network;
+ 
+  const enclaveAddress = readDeploymentArgs("Enclave", chain)?.address;
+  if (!enclaveAddress) {
+    throw new Error("Enclave address not found, it must be deployed first");
+  }
+  const enclave = EnclaveFactory.connect(enclaveAddress, owner);
+  const verifier = await ethers.deployContract("MockRISC0Verifier");
+  await verifier.waitForDeployment();
 
-  const verifier = await deploy("MockRISC0Verifier", {
-    from: deployer,
-    args: [],
-    log: true,
-  });
+  storeDeploymentArgs({
+    address: await verifier.getAddress(),
+  }, "MockRISC0Verifier", chain);
 
-  const imageId = await deploy("ImageID", {
-    from: deployer,
-    args: [],
-    log: true,
-  });
-  const imageIdContract = await hre.ethers.getContractAt(
-    "ImageID",
-    imageId.address,
-  );
-  const programId = await imageIdContract.PROGRAM_ID();
+  const imageId = await ethers.deployContract("ImageID");
+  await imageId.waitForDeployment();
 
-  const inputValidator = await deploy("InputValidator", {
-    from: deployer,
-    args: [],
-    log: true,
-  });
+  storeDeploymentArgs({
+    address: await imageId.getAddress(),
+  }, "ImageID", chain);
 
-  const e3Program = await deploy("MyProgram", {
-    from: deployer,
-    args: [enclave.address, verifier.address, programId, inputValidator.address],
-    log: true,
-  });
+  const programId = await imageId.PROGRAM_ID();
 
-  const enclaveContract = new hre.ethers.Contract(
-    enclave.address,
-    enclave.abi,
-    deployerAccount,
-  );
-  const result = enclaveContract.interface.encodeFunctionData(
-    "enableE3Program",
-    [e3Program.address],
-  );
-  const tx = await deployerAccount.sendTransaction({
-    to: enclave.address,
-    data: result,
-  });
+  const inputValidator = await ethers.deployContract("InputValidator");
+  await inputValidator.waitForDeployment();
+
+  storeDeploymentArgs({
+    address: await inputValidator.getAddress(),
+  }, "InputValidator", chain);
+
+  const e3Program = await ethers.deployContract("MyProgram", [await enclave.getAddress(), await verifier.getAddress(), programId, await inputValidator.getAddress()]);
+  await e3Program.waitForDeployment();
+
+  storeDeploymentArgs({
+    address: await e3Program.getAddress(),
+    constructorArgs: {
+      enclave: await enclave.getAddress(),
+      verifier: await verifier.getAddress(),
+      programId,
+      inputValidator: await inputValidator.getAddress(),
+    },
+  }, "MyProgram", chain);
+
+  const tx = await enclave.enableE3Program(await e3Program.getAddress());
+
   await tx.wait();
+
+  console.log("E3 Program enabled for Enclave's template");
 };
-export default func;
-func.tags = ["default"];
-func.dependencies = ["enclave"];

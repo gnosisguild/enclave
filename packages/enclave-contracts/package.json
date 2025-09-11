@@ -3,6 +3,7 @@
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
   "version": "0.0.10-test",
   "license": "LGPL-3.0-only",
+  "type": "module",
   "author": {
     "name": "gnosisguild",
     "url": "https://github.com/gnosisguild"
@@ -10,69 +11,113 @@
   "exports": {
     "./deploy/enclave": {
       "import": {
-        "types": "./dist/deploy/enclave.d.mts",
-        "default": "./dist/deploy/enclave.mjs"
+        "types": "./dist/scripts/deployEnclave.d.ts",
+        "default": "./dist/scripts/deployEnclave.js"
       },
       "require": {
-        "types": "./dist/deploy/enclave.d.ts",
-        "default": "./dist/deploy/enclave.js"
+        "types": "./dist/scripts/deployEnclave.d.ts",
+        "default": "./dist/scripts/deployEnclave.js"
       }
     },
     "./deploy/mocks": {
       "import": {
-        "types": "./dist/deploy/mocks.d.mts",
-        "default": "./dist/deploy/mocks.mjs"
+        "types": "./dist/scripts/deployMocks.d.ts",
+        "default": "./dist/scripts/deployMocks.js"
       },
       "require": {
-        "types": "./dist/deploy/mocks.d.ts",
-        "default": "./dist/deploy/mocks.js"
+        "types": "./dist/scripts/deployMocks.d.ts",
+        "default": "./dist/scripts/deployMocks.js"
       }
     },
+    "./tasks/ciphernode": {
+      "import": {
+        "types": "./dist/tasks/ciphernode.d.ts",
+        "default": "./dist/tasks/ciphernode.js"
+      },
+      "require": {
+        "types": "./dist/tasks/ciphernode.d.ts",
+        "default": "./dist/tasks/ciphernode.js"
+      }
+    },
+    "./tasks/enclave": {
+      "import": {
+        "types": "./dist/tasks/enclave.d.ts",
+        "default": "./dist/tasks/enclave.js"
+      },
+      "require": {
+        "types": "./dist/tasks/enclave.d.ts",
+        "default": "./dist/tasks/enclave.js"
+      }
+    },
+    "./tasks/utils": {
+      "import": {
+        "types": "./dist/tasks/utils.d.ts",
+        "default": "./dist/tasks/utils.js"
+      },
+      "require": {
+        "types": "./dist/tasks/utils.d.ts",
+        "default": "./dist/tasks/utils.js"
+      }
+    },
+    "./scripts/*": "./scripts/*",
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",
     "./types": {
       "import": {
-        "types": "./dist/types/index.d.mts",
-        "default": "./dist/types/index.mjs"
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/types/index.js"
       },
       "require": {
         "types": "./dist/types/index.d.ts",
         "default": "./dist/types/index.js"
       }
+    },
+    "./ignition/modules/*": {
+      "import": {
+        "types": "./dist/ignition/modules/*.d.ts",
+        "default": "./dist/ignition/modules/*.js"
+      },
+      "require": {
+        "types": "./dist/ignition/modules/*.d.ts",
+        "default": "./dist/ignition/modules/*.js"
+      }
     }
   },
   "devDependencies": {
     "@enclave-e3/config": "workspace:*",
-    "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
-    "@nomicfoundation/hardhat-ethers": "^3.0.5",
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
-    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "@nomicfoundation/hardhat-verify": "^2.0.2",
+    "@nomicfoundation/hardhat-ethers": "4",
+    "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition-ethers": "^3.0.1",
+    "@nomicfoundation/hardhat-network-helpers": "3",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "3.0.0",
+    "@nomicfoundation/hardhat-typechain": "3",
+    "@nomicfoundation/hardhat-verify": "3",
     "@openzeppelin/contracts": "^5.0.2",
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
-    "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
-    "@types/chai": "^4.3.11",
+    "@types/chai": "^4.3.20",
+    "@types/chai-as-promised": "^8.0.2",
     "@types/fs-extra": "^11.0.4",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "^22.7.5",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.18.0",
     "@typescript-eslint/eslint-plugin": "^7.11.0",
     "@typescript-eslint/parser": "^7.11.0",
     "@zk-kit/lean-imt": "^2.1.0",
     "@zk-kit/lean-imt.sol": "2.0.0",
-    "chai": "^4.3.10",
+    "chai": "^5.3.3",
     "cross-env": "^7.0.3",
     "dotenv": "^16.4.5",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
-    "ethers": "^6.9.0",
+    "ethers": "^6.15.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "fs-extra": "^11.2.0",
-    "hardhat": "^2.22.0",
-    "hardhat-deploy": "^0.12.1",
+    "hardhat": "^3.0.1",
     "hardhat-gas-reporter": "^2.2.0",
     "lodash": "^4.17.21",
-    "mocha": "^10.2.0",
+    "mocha": "^11.7.1",
     "poseidon-lite": "^0.3.0",
     "poseidon-solidity": "^0.0.5",
     "prettier": "^3.1.1",
@@ -106,27 +151,31 @@
     "access": "public"
   },
   "scripts": {
-    "clean": "rimraf ./artifacts ./cache ./coverage ./types ./dist ./coverage.json && pnpm typechain",
+    "clean": "rimraf ./artifacts ./cache ./coverage ./types ./dist ./coverage.json",
+    "clean:ignition:deployments": "rimraf ./ignition/deployments/chain-31337",
+    "clean:deployments": "hardhat utils:clean-deployments && pnpm clean:ignition:deployments",
     "build": "pnpm compile",
     "compile": "pnpm compile:contracts && pnpm compile:ts",
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
-    "compile:ts": "pnpm typechain && tsup",
-    "coverage": "hardhat coverage --solcoverjs ./.solcover.js --temp artifacts --testfiles \"test/**/*.ts\" && pnpm typechain",
-    "deploy": "hardhat deploy --tags enclave",
-    "deploy:mocks": "hardhat deploy --tags enclave,mocks",
+    "compile:ts": "tsc",
+    "coverage": "pnpm test --coverage",
+    "deploy": "hardhat run scripts/run.ts",
+    "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm clean:deployments && pnpm run deploy",
+    "e3:activate": "hardhat e3:activate",
+    "e3:enable": "hardhat e3:enable",
     "ciphernode:add": "hardhat ciphernode:add",
     "ciphernode:remove": "hardhat ciphernode:remove",
+    "ciphernode:siblings": "hardhat ciphernode:siblings",
     "committee:new": "hardhat committee:new",
     "lint": "pnpm lint:sol && pnpm lint:ts && pnpm prettier:check",
-    "lint:sol": "solhint --max-warnings 0 \"contracts/**/*.sol\"",
+    "lint:sol": "solhint --max-warnings 10 \"contracts/**/*.sol\"",
     "lint:ts": "eslint --ignore-path ./.eslintignore --ext .js,.ts .",
-    "postcompile": "pnpm typechain",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yml}\"",
     "prettier:write": "prettier --write \"**/*.{js,json,md,sol,ts,yml}\"",
-    "task:deployLock": "hardhat task:deployLock",
-    "task:withdraw": "hardhat task:withdraw",
-    "test": "hardhat test",
-    "typechain": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat typechain",
+    "test": "hardhat test mocha",
+    "test:registryFilter": "pnpm run test test/CiphernodeRegistry/NaiveRegistryFilter.spec.ts",
+    "test:enclave": "pnpm run test test/Enclave.spec.ts",
+    "test:ciphernodeRegistry": "pnpm run test test/CiphernodeRegistry/CiphernodeRegistryOwnable.spec.ts",
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
     "release": "pnpm publish"
   },

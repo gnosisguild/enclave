@@ -3,19 +3,24 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
-import { deployCiphernodeRegistryOwnableFixture } from "../fixtures/CiphernodeRegistryOwnable.fixture";
-import { naiveRegistryFilterFixture } from "../fixtures/NaiveRegistryFilter.fixture";
-import { PoseidonT3Fixture } from "../fixtures/PoseidonT3.fixture";
+import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
+import NaiveRegistryFilterModule from "../../ignition/modules/naiveRegistryFilter";
+import {
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
+  NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
+} from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressThree = "0x0000000000000000000000000000000000000003";
+
+const { ethers, networkHelpers, ignition } = await network.connect();
+const { loadFixture } = networkHelpers;
 
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
@@ -23,17 +28,33 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 describe("NaiveRegistryFilter", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
-    if (!owner) throw new Error("Bad getSigners output");
-    if (!notTheOwner) throw new Error("Bad getSigners output");
-    const poseidon = await PoseidonT3Fixture();
-    const registry = await deployCiphernodeRegistryOwnableFixture(
-      owner.address,
-      owner.address,
-      await poseidon.getAddress(),
+
+    const registryContract = await ignition.deploy(CiphernodeRegistryModule, {
+      parameters: {
+        CiphernodeRegistry: {
+          enclaveAddress: await owner.getAddress(),
+          owner: await owner.getAddress(),
+        },
+      },
+    });
+
+    const filterContract = await ignition.deploy(NaiveRegistryFilterModule, {
+      parameters: {
+        NaiveRegistryFilter: {
+          owner: await owner.getAddress(),
+          ciphernodeRegistryAddress:
+            await registryContract.cipherNodeRegistry.getAddress(),
+        },
+      },
+    });
+
+    const registry = CiphernodeRegistryFactory.connect(
+      await registryContract.cipherNodeRegistry.getAddress(),
+      owner,
     );
-    const filter = await naiveRegistryFilterFixture(
-      owner.address,
-      await registry.getAddress(),
+    const filter = NaiveRegistryFilterFactory.connect(
+      await filterContract.naiveRegistryFilter.getAddress(),
+      owner,
     );
 
     const tree = new LeanIMT(hash);
@@ -59,7 +80,7 @@ describe("NaiveRegistryFilter", function () {
   describe("constructor / initialize()", function () {
     it("should set the owner", async function () {
       const { owner, filter } = await loadFixture(setup);
-      expect(await filter.owner()).to.equal(owner.address);
+      expect(await filter.owner()).to.equal(await owner.getAddress());
     });
     it("should set the registry", async function () {
       const { registry, filter } = await loadFixture(setup);
@@ -69,16 +90,14 @@ describe("NaiveRegistryFilter", function () {
 
   describe("requestCommittee()", function () {
     it("should revert if the caller is not the registry", async function () {
-      const { notTheOwner, filter, request } = await loadFixture(setup);
+      const { filter, request } = await loadFixture(setup);
       await expect(
-        filter
-          .connect(notTheOwner)
-          .requestCommittee(request.e3Id, request.threshold),
+        filter.requestCommittee(request.e3Id, request.threshold),
       ).to.be.revertedWithCustomError(filter, "OnlyRegistry");
     });
     it("should revert if a committee has already been requested for the given e3Id", async function () {
       const { filter, request, owner } = await loadFixture(setup);
-      await filter.setRegistry(owner.address);
+      await filter.setRegistry(await owner.getAddress());
       await filter.requestCommittee(request.e3Id, request.threshold);
       await expect(
         filter.requestCommittee(request.e3Id, request.threshold),
@@ -86,14 +105,14 @@ describe("NaiveRegistryFilter", function () {
     });
     it("should set the threshold for the requested committee", async function () {
       const { filter, owner, request } = await loadFixture(setup);
-      await filter.setRegistry(owner.address);
+      await filter.setRegistry(await owner.getAddress());
       await filter.requestCommittee(request.e3Id, request.threshold);
       const committee = await filter.getCommittee(request.e3Id);
       expect(committee.threshold).to.deep.equal(request.threshold);
     });
     it("should return true when a committee is requested", async function () {
       const { filter, owner, request } = await loadFixture(setup);
-      await filter.setRegistry(owner.address);
+      await filter.setRegistry(await owner.getAddress());
       const result = await filter.requestCommittee.staticCall(
         request.e3Id,
         request.threshold,
@@ -210,14 +229,16 @@ describe("NaiveRegistryFilter", function () {
   describe("setRegistry()", function () {
     it("should revert if the caller is not the owner", async function () {
       const { filter, notTheOwner } = await loadFixture(setup);
-      await expect(filter.connect(notTheOwner).setRegistry(notTheOwner.address))
+      await expect(
+        filter.connect(notTheOwner).setRegistry(await notTheOwner.getAddress()),
+      )
         .to.be.revertedWithCustomError(filter, "OwnableUnauthorizedAccount")
-        .withArgs(notTheOwner.address);
+        .withArgs(await notTheOwner.getAddress());
     });
     it("should set the registry", async function () {
       const { filter, owner } = await loadFixture(setup);
-      await filter.setRegistry(owner.address);
-      expect(await filter.registry()).to.equal(owner.address);
+      await filter.setRegistry(await owner.getAddress());
+      expect(await filter.registry()).to.equal(await owner.getAddress());
     });
   });
 
