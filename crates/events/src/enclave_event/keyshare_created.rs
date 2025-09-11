@@ -6,13 +6,16 @@
 
 use crate::E3id;
 use actix::Message;
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Display;
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Derivative, Message, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct KeyshareCreated {
+    #[derivative(Debug(format_with = "crate::hexf"))]
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
     pub node: String,
