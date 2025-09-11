@@ -52,15 +52,6 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         _;
     }
 
-    modifier onlyOwnerOrCiphernode() {
-        require(
-            msg.sender == owner() ||
-                ICiphernodeRegistry(registry).isCiphernodeEligible(msg.sender),
-            CiphernodeNotEnabled(msg.sender)
-        );
-        _;
-    }
-
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Initialization                       //
