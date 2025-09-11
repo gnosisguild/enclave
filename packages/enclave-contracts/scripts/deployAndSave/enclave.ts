@@ -49,8 +49,11 @@ export const deployAndSaveEnclave = async ({
       preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
       preDeployedArgs?.constructorArgs?.registry === registry)
   ) {
+    if (!preDeployedArgs?.address) {
+      throw new Error("Enclave address not found, it must be deployed first");
+    }
     const enclaveContract = EnclaveFactory.connect(
-      preDeployedArgs!.address,
+      preDeployedArgs.address,
       signer,
     );
     return { enclave: enclaveContract };
@@ -70,7 +73,7 @@ export const deployAndSaveEnclave = async ({
   await enclave.enclave.waitForDeployment();
 
   const enclaveAddress = await enclave.enclave.getAddress();
-  const blockNumber = await signer.provider?.getBlockNumber();
+  const blockNumber = await ethers.provider.getBlockNumber();
 
   storeDeploymentArgs(
     {

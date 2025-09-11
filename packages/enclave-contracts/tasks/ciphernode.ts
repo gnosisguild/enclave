@@ -44,7 +44,7 @@ export const ciphernodeRemove = task(
   .addOption({
     name: "siblings",
     description: "comma separated siblings from tree proof",
-    defaultValue: ZeroAddress,
+    defaultValue: "",
   })
   .setAction(async () => ({
     default: async ({ ciphernodeAddress, siblings }, hre) => {

@@ -20,12 +20,14 @@ export const deployTemplate = async () => {
   }
   const enclave = EnclaveFactory.connect(enclaveAddress, owner);
   const verifier = await ethers.deployContract("MockRISC0Verifier");
+  await verifier.waitForDeployment();
 
   storeDeploymentArgs({
     address: await verifier.getAddress(),
   }, "MockRISC0Verifier", chain);
 
   const imageId = await ethers.deployContract("ImageID");
+  await imageId.waitForDeployment();
 
   storeDeploymentArgs({
     address: await imageId.getAddress(),
@@ -34,12 +36,14 @@ export const deployTemplate = async () => {
   const programId = await imageId.PROGRAM_ID();
 
   const inputValidator = await ethers.deployContract("InputValidator");
+  await inputValidator.waitForDeployment();
 
   storeDeploymentArgs({
     address: await inputValidator.getAddress(),
   }, "InputValidator", chain);
 
   const e3Program = await ethers.deployContract("MyProgram", [await enclave.getAddress(), await verifier.getAddress(), programId, await inputValidator.getAddress()]);
+  await e3Program.waitForDeployment();
 
   storeDeploymentArgs({
     address: await e3Program.getAddress(),

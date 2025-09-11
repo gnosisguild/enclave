@@ -175,7 +175,7 @@ export const requestCommittee = task(
         { value: "1000000000000000000" },
       );
 
-      console.log("Reequesting committee... ", tx.hash);
+      console.log("Requesting committee... ", tx.hash);
       await tx.wait();
 
       console.log(`Committee requested`);
@@ -240,7 +240,14 @@ export const publishCommittee = task(
         hre,
       });
 
-      const nodesToSend = nodes.split(",");
+      const nodesToSend = nodes
+        .split(",")
+        .map((node) => node.trim())
+        .filter((node) => node.length > 0);
+
+      if (nodesToSend.length === 0 && nodes.length > 0) {
+        throw new Error("Invalid nodes format: no valid addresses found");
+      }
 
       const tx = await naiveRegistryFilter.publishCommittee(
         e3Id,
@@ -465,10 +472,10 @@ export const publishPlaintext = task(
         proofToSend,
       );
 
-      console.log("Publishing ciphertext... ", tx.hash);
+      console.log("Publishing plaintext... ", tx.hash);
       await tx.wait();
 
-      console.log(`Ciphertext published`);
+      console.log(`Plaintext published`);
     },
   }))
   .build();

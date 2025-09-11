@@ -5,4 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { deployEnclave } from "./deployEnclave";
 
-deployEnclave().catch((error) => console.error(error));
+deployEnclave().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

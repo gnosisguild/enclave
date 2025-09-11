@@ -16,8 +16,7 @@
     "scripts/**/*.ts",
     "ignition/modules/**/*.ts",
     "test/**/*.ts",
-    "tasks/**/*.ts",
-    "types/**/*.ts"
+    "tasks/**/*.ts"
   ],
   "exclude": ["node_modules", "dist", "types"]
 }

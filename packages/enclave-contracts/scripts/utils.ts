@@ -48,6 +48,10 @@ export const storeDeploymentArgs = (
       console.warn("Failed to parse existing deployments file, starting fresh");
       deployments = {};
     }
+  } else {
+    // create a new file
+    deployments = {};
+    fs.writeFileSync(deploymentsFile, JSON.stringify(deployments, null, 2));
   }
 
   // Initialize chain if it doesn't exist
@@ -71,6 +75,12 @@ export const readDeploymentArgs = (
   contractName: string,
   chain: string,
 ): DeploymentArgs | undefined => {
+  if (!fs.existsSync(deploymentsFile)) {
+    // create a new file
+    fs.writeFileSync(deploymentsFile, JSON.stringify({}, null, 2));
+    return undefined;
+  }
+
   const deployments = JSON.parse(
     fs.readFileSync(deploymentsFile, "utf8"),
   ) as Deployments;

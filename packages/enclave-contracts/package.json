@@ -118,7 +118,6 @@
     "hardhat-gas-reporter": "^2.2.0",
     "lodash": "^4.17.21",
     "mocha": "^11.7.1",
-    "network-helpers": "link:@nomicfoundation/hardhat-toolbox/network-helpers",
     "poseidon-lite": "^0.3.0",
     "poseidon-solidity": "^0.0.5",
     "prettier": "^3.1.1",

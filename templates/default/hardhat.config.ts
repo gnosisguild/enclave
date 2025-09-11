@@ -67,7 +67,7 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
     url: jsonRpcUrl,
     type: "http" as const,
     chainType: "l1" as const,
-    blockExporers: {
+    blockExplorers: {
       etherscan: {
         apiUrl,
       },
@@ -90,13 +90,6 @@ const config: HardhatUserConfig = {
   typechain: {
     outDir: "./types",
     tsNocheck: false,
-  },
-  ignition: {
-    strategyConfig: {
-      create2: {
-        salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
-      }
-    }
   },
   networks: {
     hardhat: {

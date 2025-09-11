@@ -37,8 +37,13 @@ export const deployAndSaveNaiveRegistryFilter = async ({
       ciphernodeRegistryAddress &&
       preDeployedArgs?.constructorArgs?.owner === owner)
   ) {
+    if (!preDeployedArgs?.address) {
+      throw new Error(
+        "NaiveRegistryFilter address not found, it must be deployed first",
+      );
+    }
     const naiveRegistryFilterContract = NaiveRegistryFilterFactory.connect(
-      preDeployedArgs!.address,
+      preDeployedArgs.address,
       signer,
     );
     return { naiveRegistryFilter: naiveRegistryFilterContract };
@@ -58,7 +63,7 @@ export const deployAndSaveNaiveRegistryFilter = async ({
   const naiveRegistryFilterAddress =
     await naiveRegistryFilter.naiveRegistryFilter.getAddress();
 
-  const blockNumber = await signer.provider?.getBlockNumber();
+  const blockNumber = await ethers.provider.getBlockNumber();
 
   storeDeploymentArgs(
     {

@@ -19,7 +19,7 @@ export const deployAndSaveMockDecryptionVerifier = async (
 }> => {
   const { ignition, ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
+  const chain = hre.globalOptions.network;
 
   const decryptionVerifier = await ignition.deploy(
     MockDecryptionVerifierModule,
@@ -29,7 +29,7 @@ export const deployAndSaveMockDecryptionVerifier = async (
   const decryptionVerifierAddress =
     await decryptionVerifier.mockDecryptionVerifier.getAddress();
 
-  const blockNumber = await signer.provider?.getBlockNumber();
+  const blockNumber = await ethers.provider.getBlockNumber();
 
   storeDeploymentArgs(
     {

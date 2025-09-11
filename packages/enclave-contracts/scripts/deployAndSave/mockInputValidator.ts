@@ -24,8 +24,8 @@ export const deployAndSaveMockInputValidator = async (
   const inputValidatorAddress =
     await inputValidator.mockInputValidator.getAddress();
 
-  const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
-  const blockNumber = await signer.provider?.getBlockNumber();
+  const chain = hre.globalOptions.network;
+  const blockNumber = await ethers.provider.getBlockNumber();
 
   storeDeploymentArgs(
     {

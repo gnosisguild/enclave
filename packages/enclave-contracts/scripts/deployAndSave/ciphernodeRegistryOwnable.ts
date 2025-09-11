@@ -45,8 +45,13 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
     (preDeployedArgs?.constructorArgs?.enclaveAddress === enclaveAddress &&
       preDeployedArgs?.constructorArgs?.owner === owner)
   ) {
+    if (!preDeployedArgs?.address) {
+      throw new Error(
+        "CiphernodeRegistry address not found, it must be deployed first",
+      );
+    }
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
-      preDeployedArgs!.address,
+      preDeployedArgs.address,
       signer,
     );
     return { ciphernodeRegistry: ciphernodeRegistryContract };
@@ -63,7 +68,7 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
 
   await ciphernodeRegistry.cipherNodeRegistry.waitForDeployment();
 
-  const blockNumber = await signer.provider?.getBlockNumber();
+  const blockNumber = await ethers.provider.getBlockNumber();
 
   const ciphernodeRegistryAddress =
     await ciphernodeRegistry.cipherNodeRegistry.getAddress();

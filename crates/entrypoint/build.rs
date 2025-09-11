@@ -36,10 +36,10 @@ fn main() -> std::io::Result<()> {
     let file = File::open(&deployments_path)?;
     let json: Value = from_reader(file)?;
 
-    // Process each network in the JSON
+    // Process Sepolia network from the JSON
     if let Some(networks) = json.as_object() {
-        for (_, network_data) in networks {
-            if let Some(contracts) = network_data.as_object() {
+        if let Some(sepolia_data) = networks.get("sepolia") {
+            if let Some(contracts) = sepolia_data.as_object() {
                 for (contract_name, contract_data) in contracts {
                     // Extract address and block number from the contract data
                     if let (Some(address), Some(deploy_block)) = (
