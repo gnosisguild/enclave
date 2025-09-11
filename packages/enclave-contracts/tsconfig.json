@@ -1,6 +1,12 @@
 {
   "extends": "@enclave-e3/config/tsconfig.json",
-  "include": ["tasks/**/*", "test/**/*", "deploy/**/*", "types/**/*"],
+  "include": [
+    "tasks/**/*",
+    "test/**/*",
+    "deploy/**/*",
+    "types/**/*",
+    "scripts/**/*"
+  ],
   "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "module": "commonjs",

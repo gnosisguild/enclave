@@ -1,0 +1,42 @@
+{
+  "strategyManager": {
+    "initPausedStatus": 0,
+    "initialOwner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "initialStrategyWhitelister": "0x959922be3caee4b8cd9a407cc3ac1c251c2007b1"
+  },
+  "delegationManager": {
+    "initPausedStatus": 0,
+    "initialOwner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "minWithdrawalDelayBlocks": 50400
+  },
+  "eigenPodManager": {
+    "initPausedStatus": 0,
+    "initialOwner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  },
+  "allocationManager": {
+    "initPausedStatus": 0,
+    "initialOwner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "deallocationDelay": 0,
+    "allocationConfigurationDelay": 0
+  },
+  "strategyFactory": {
+    "initPausedStatus": 0,
+    "initialOwner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  },
+  "avsDirectory": {
+    "initPausedStatus": 0,
+    "initialOwner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  },
+  "rewardsCoordinator": {
+    "initPausedStatus": 0,
+    "initialOwner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "rewardsUpdater": "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955",
+    "activationDelay": 0,
+    "defaultSplitBips": 1000,
+    "calculationIntervalSeconds": 86400,
+    "maxRewardsDuration": 864000,
+    "maxRetroactiveLength": 432000,
+    "maxFutureLength": 86400,
+    "genesisRewardsTimestamp": 1672531200
+  }
+}
