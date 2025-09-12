@@ -23,14 +23,14 @@
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
     "@hashcloak/semaphore-contracts-noir": "1.0.1",
-    "@enclave-e3/sdk": "^0.0.11-test",
-    "@enclave-e3/contracts": "^0.0.11-test",
+    "@enclave-e3/sdk": "^0.0.12-test",
+    "@enclave-e3/contracts": "^0.0.12-test",
     "@zk-kit/lean-imt.sol": "2.0.0",
     "poseidon-solidity": "^0.0.5",
     "solady": "^0.1.13"
   },
   "devDependencies": {
-    "@enclave-e3/config": "^0.0.11-test",
+    "@enclave-e3/config": "^0.0.12-test",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-ignition": "^3.0.0",
