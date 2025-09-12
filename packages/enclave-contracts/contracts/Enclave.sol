@@ -30,7 +30,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ICiphernodeRegistry public ciphernodeRegistry; // address of the Ciphernode registry.
     uint256 public maxDuration; // maximum duration of a computation in seconds.
     uint256 public nexte3Id; // ID of the next E3.
-    uint256 public requests; // total number of requests made to Enclave.
 
     // Mapping of allowed E3 Programs.
     mapping(IE3Program e3Program => bool allowed) public e3Programs;
