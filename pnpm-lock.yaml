@@ -64,11 +64,11 @@ importers:
   examples/CRISP:
     dependencies:
       '@enclave-e3/contracts':
-        specifier: ^0.0.10-test
-        version: 0.0.10-test
+        specifier: ^0.0.11-test
+        version: 0.0.11-test
       '@enclave-e3/sdk':
-        specifier: ^0.0.10-test
-        version: 0.0.10-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
+        specifier: ^0.0.11-test
+        version: 0.0.11-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
       '@excubiae/contracts':
         specifier: ^0.4.0
         version: 0.4.0
@@ -86,8 +86,8 @@ importers:
         version: 0.1.26
     devDependencies:
       '@enclave-e3/config':
-        specifier: ^0.0.10-test
-        version: 0.0.10-test(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))
+        specifier: ^0.0.11-test
+        version: 0.0.11-test(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))
       '@nomicfoundation/hardhat-ethers':
         specifier: ^3.0.0
         version: 3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
@@ -494,8 +494,8 @@ importers:
         specifier: workspace:*
         version: link:../enclave-contracts
       '@enclave-e3/wasm':
-        specifier: ^0.0.10-test
-        version: 0.0.10-test
+        specifier: workspace:*
+        version: link:../../crates/wasm
       '@noir-lang/noir_js':
         specifier: 1.0.0-beta.3
         version: 1.0.0-beta.3
@@ -1533,19 +1533,28 @@ packages:
   '@emotion/weak-memoize@0.4.0':
     resolution: {integrity: sha512-snKqtPW01tN0ui7yu9rGv69aJXr/a/Ywvl11sUjNtEcRc+ng/mQriFL0wLXMef74iHa/EkftbDzU9F8iFbH+zg==}
 
-  '@enclave-e3/config@0.0.10-test':
-    resolution: {integrity: sha512-MMacOEfYvzV+mb1k9PUwXjuRBXXEygHgspdzcUZBkKq56YN/JI+VZIhnfk9IUCGw0NG84sIdBAFhgQz11tZebA==}
+  '@enclave-e3/config@0.0.11-test':
+    resolution: {integrity: sha512-OeF5DzK3ePfb0PdR140yBo9U8XjPYAyIf7Xn5tUBCgak9EVWBkLZmWh5uletk88ts08UdZeYi8HeGARmHvhikQ==}
     peerDependencies:
       tsup: 8.5.0
 
   '@enclave-e3/contracts@0.0.10-test':
     resolution: {integrity: sha512-NAwFyd82Tz5l14RMyT1++uqbhjuJWiDIHVKJKiSPGUOZt5Ee07/4ZWrUZvrIaIsmfQWuCFeqUjeI3RsPW0xUTA==}
 
+  '@enclave-e3/contracts@0.0.11-test':
+    resolution: {integrity: sha512-iEHKz2xhlSlC7o3qRmr21aInaYAMTl/iCwdw/l5w/LaH+4xuvoLXt5CToi2vQslZyjh1eLh1TBhRDmRHH/Ho9g==}
+
   '@enclave-e3/sdk@0.0.10-test':
     resolution: {integrity: sha512-/athXNiSgxRlBl1Egdl/4RwZETkmnBHvIbUmSmB/cAU/gzNJh1tO4yOzMB5Gbw0jyqPoUGye7i6MS9Hc+p1GYw==}
 
+  '@enclave-e3/sdk@0.0.11-test':
+    resolution: {integrity: sha512-j2pGBSLxoHELjpxQG3gjywr4/b37/mKnugyUxMjnhStiNXf9F0Zb/jX7Twf7zUst+LFbt+2+xq7yBx+nS83/RQ==}
+
   '@enclave-e3/wasm@0.0.10-test':
     resolution: {integrity: sha512-mEfHn+exMB/seUaMGfw3zaVm9Z9/2XDU7M9k3O6UCUudwoKsfSoHsJdKXVYwFxu96bkqyDGPk9zSU7yNpwPcZg==}
+
+  '@enclave-e3/wasm@0.0.11-test':
+    resolution: {integrity: sha512-SrIMdbq1NYqxYYLCbQChHUTisRezqZ65CS7ox+VBog06TsB/CP0mH8uQr5HWeevTw9F7TzHRzhRibDpHd4OFCA==}
 
   '@esbuild/aix-ppc64@0.20.0':
     resolution: {integrity: sha512-fGFDEctNh0CcSwsiRPxiaqX0P5rq+AqE0SRhYGZ4PX46Lg1FNR6oCxJghf8YgY0WQEgQuh3lErUFE4KxLeRmmw==}
@@ -10921,11 +10930,16 @@ snapshots:
 
   '@emotion/weak-memoize@0.4.0': {}
 
-  '@enclave-e3/config@0.0.10-test(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))':
+  '@enclave-e3/config@0.0.11-test(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))':
     dependencies:
       tsup: 8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)
 
   '@enclave-e3/contracts@0.0.10-test':
+    dependencies:
+      '@excubiae/contracts': 0.4.0
+      solady: 0.1.26
+
+  '@enclave-e3/contracts@0.0.11-test':
     dependencies:
       '@excubiae/contracts': 0.4.0
       solady: 0.1.26
@@ -10965,11 +10979,11 @@ snapshots:
       - vite
       - zod
 
-  '@enclave-e3/sdk@0.0.10-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)':
+  '@enclave-e3/sdk@0.0.11-test(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)':
     dependencies:
       '@aztec/bb.js': 0.82.3
-      '@enclave-e3/contracts': 0.0.10-test
-      '@enclave-e3/wasm': 0.0.10-test
+      '@enclave-e3/contracts': 0.0.11-test
+      '@enclave-e3/wasm': 0.0.11-test
       '@noir-lang/noir_js': 1.0.0-beta.3
       comlink: 4.4.2
       viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
@@ -11001,6 +11015,8 @@ snapshots:
       - zod
 
   '@enclave-e3/wasm@0.0.10-test': {}
+
+  '@enclave-e3/wasm@0.0.11-test': {}
 
   '@esbuild/aix-ppc64@0.20.0':
     optional: true
