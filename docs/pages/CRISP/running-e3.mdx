@@ -69,11 +69,20 @@ The server will start and begin listening for blockchain events.
 Navigate to the program directory and start the program server:
 
 ```sh
-cd examples/CRISP/program
-cargo run
+cd examples/CRISP/
+enclave program start 
 ```
 
 This runs the RISC Zero program server that handles secure computations.
+
+If you would like to run the program server in dev mode, you can run the following command:
+
+```sh
+cd examples/CRISP/
+enclave program start --dev true
+```
+
+In this case, Risc0 will not be used to generate proofs, and instead these will be mocked. 
 
 ### Initialize a New Voting Round
 
