@@ -52,15 +52,6 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         _;
     }
 
-    modifier onlyOwnerOrCiphernode() {
-        require(
-            msg.sender == owner() ||
-                ICiphernodeRegistry(registry).isCiphernodeEligible(msg.sender),
-            CiphernodeNotEnabled(msg.sender)
-        );
-        _;
-    }
-
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                   Initialization                       //
@@ -94,8 +85,8 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     function publishCommittee(
         uint256 e3Id,
-        address[] memory nodes,
-        bytes memory publicKey
+        address[] calldata nodes,
+        bytes calldata publicKey
     ) external onlyOwner {
         Committee storage committee = committees[e3Id];
         require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
