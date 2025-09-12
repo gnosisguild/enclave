@@ -17,9 +17,10 @@ CRISP
 
 ## Development
 
-To start the development environment, run the following commands:
+To start the development environment, run the following commands from inside the CRISP directory:
 
 ```sh
+pnpm install # install dependencies
 pnpm dev:setup # build the project
 pnpm dev:up # run the services 
 ```
