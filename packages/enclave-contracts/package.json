@@ -9,26 +9,6 @@
     "url": "https://github.com/gnosisguild"
   },
   "exports": {
-    "./deploy/enclave": {
-      "import": {
-        "types": "./dist/scripts/deployEnclave.d.ts",
-        "default": "./dist/scripts/deployEnclave.js"
-      },
-      "require": {
-        "types": "./dist/scripts/deployEnclave.d.ts",
-        "default": "./dist/scripts/deployEnclave.js"
-      }
-    },
-    "./deploy/mocks": {
-      "import": {
-        "types": "./dist/scripts/deployMocks.d.ts",
-        "default": "./dist/scripts/deployMocks.js"
-      },
-      "require": {
-        "types": "./dist/scripts/deployMocks.d.ts",
-        "default": "./dist/scripts/deployMocks.js"
-      }
-    },
     "./tasks/ciphernode": {
       "import": {
         "types": "./dist/tasks/ciphernode.d.ts",
@@ -59,7 +39,16 @@
         "default": "./dist/tasks/utils.js"
       }
     },
-    "./scripts/*": "./scripts/*",
+    "./scripts": {
+      "import": {
+        "types": "./dist/scripts/index.d.ts",
+        "default": "./dist/scripts/index.js"
+      },
+      "require": {
+        "types": "./dist/scripts/index.d.ts",
+        "default": "./dist/scripts/index.js"
+      }
+    },
     "./contracts/*": "./contracts/*",
     "./artifacts/*": "./artifacts/*",
     "./types": {

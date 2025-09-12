@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { readDeploymentArgs, storeDeploymentArgs } from "@enclave-e3/contracts/scripts/utils.js";
+import { readDeploymentArgs, storeDeploymentArgs } from "@enclave-e3/contracts/utils";
 import { Enclave__factory as EnclaveFactory } from "@enclave-e3/contracts/types";
 import hre from "hardhat";
 
