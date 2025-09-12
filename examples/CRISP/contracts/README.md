@@ -1,26 +1,22 @@
 # Solidity Contracts
 
-This directory contains the Solidity contracts for an application with [RISC Zero] on Ethereum.
-The example contract included within the template is [`EvenNumber.sol`](./EvenNumber.sol).
-It holds a number, guaranteed to be even.
-
-The Solidity libraries for RISC Zero can be found at [github.com/risc0/risc0-ethereum].
+This directory contains the Solidity contracts for CRISP - Coercion-Resistant Impartial Selection Protocol.
 
 Contracts are built and tested with [forge], which is part of the [Foundry] toolkit.
 Tests are defined in the `tests` directory in the root of this template.
 
-## Generated Contracts
+## CRISP Program
 
-As part of the build process, this template generates the `ImageID.sol` and `Elf.sol` contracts.
-Running `cargo build --locked` will generate these contracts with up to date references to your guest code.
+This is the main logic of CRISP - an enclave program for secure voting. 
 
-- `ImageID.sol`: contains the [Image IDs][image-id] for the guests implemented in the [methods] directory.
-- `Elf.sol`: contains the path of the guest binaries implemented in the [methods] directory.
-  This contract is saved in the `tests` directory in the root of this template.
+It exposes two main functions:
 
-[Foundry]: https://getfoundry.sh/
-[RISC Zero]: https://risczero.com
-[forge]: https://github.com/foundry-rs/foundry#forge
-[github.com/risc0/risc0-ethereum]: https://github.com/risc0/risc0-ethereum/tree/main/contracts
-[image-id]: https://dev.risczero.com/terminology#image-id
-[methods]: ../methods/README.md
+* `validate` - that is called when a new E3 instance is requested on Enclave (`Enclave.request`). 
+* `verify` - that is called when the ciphertext output is published on Enclave (`Enclave.publishCiphertextOutput`). This function ensures that the ciphertext output is valid. CRISP uses Risc0 as the compute provider for running the FHE program, thus the proof will be a Risc0 proof.
+
+## Input validator
+
+The input validator contract is used to validate the input data that is submitted to the E3 instance. It is called by the Enclave contract when a new input is published (`Enclave.publishInput`). In CRISP, the data providers (the ones submitting the inputs) are the voters, and the input submitted is the vote itself. 
+
+The validator will validate the input data by checking whether the gating conditions are satisifed (this uses Semaphore by default), and that the ciphertext is constructed correctly, using [Greco](https://github.com/gnosisguild/enclave/tree/main/packages/circuits/crates/libs/greco) ([link to paper(https://eprint.iacr.org/2024/594)]).
+
