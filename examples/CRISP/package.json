@@ -23,8 +23,8 @@
   "dependencies": {
     "@excubiae/contracts": "^0.4.0",
     "@hashcloak/semaphore-contracts-noir": "1.0.1",
-    "@enclave-e3/sdk": "^0.0.12-test",
-    "@enclave-e3/contracts": "^0.0.12-test",
+    "@enclave-e3/sdk": "^0.0.13-test",
+    "@enclave-e3/contracts": "^0.0.13-test",
     "@zk-kit/lean-imt.sol": "2.0.0",
     "poseidon-solidity": "^0.0.5",
     "solady": "^0.1.13"

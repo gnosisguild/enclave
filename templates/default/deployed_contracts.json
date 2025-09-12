@@ -1,67 +1,30 @@
 {
-  "localhost": {
+  "sepolia": {
     "Enclave": {
       "constructorArgs": {
         "params": "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001",
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
         "maxDuration": "2592000",
         "registry": "0x0000000000000000000000000000000000000001"
       },
-      "blockNumber": 2,
-      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      "blockNumber": 9181738,
+      "address": "0xD43c70A343E631475d8470d0403e0c4b43c76927"
     },
     "CiphernodeRegistry": {
       "constructorArgs": {
-        "enclaveAddress": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        "enclaveAddress": "0xD43c70A343E631475d8470d0403e0c4b43c76927",
+        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676"
       },
-      "blockNumber": 4,
-      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+      "blockNumber": 9181748,
+      "address": "0x5ABDfCbA0366ABF2893D3f2465F4C97908488A6d"
     },
     "NaiveRegistryFilter": {
       "constructorArgs": {
-        "ciphernodeRegistryAddress": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+        "ciphernodeRegistryAddress": "0x5ABDfCbA0366ABF2893D3f2465F4C97908488A6d",
+        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676"
       },
-      "blockNumber": 5,
-      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-    },
-    "MockComputeProvider": {
-      "blockNumber": 7,
-      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
-    },
-    "MockDecryptionVerifier": {
-      "blockNumber": 8,
-      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-    },
-    "MockInputValidator": {
-      "blockNumber": 9,
-      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
-    },
-    "MockE3Program": {
-      "constructorArgs": {
-        "mockInputValidator": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
-      },
-      "blockNumber": 10,
-      "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
-    },
-    "MockRISC0Verifier": {
-      "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
-    },
-    "ImageID": {
-      "address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
-    },
-    "InputValidator": {
-      "address": "0x9A676e781A523b5d0C0e43731313A708CB607508"
-    },
-    "MyProgram": {
-      "address": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
-      "constructorArgs": {
-        "enclave": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-        "verifier": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-        "programId": "0xaf928ebf39fec4696c3f41f473a1a9473b67d723c6373149c6ab99ba4c1a76ef",
-        "inputValidator": "0x9A676e781A523b5d0C0e43731313A708CB607508"
-      }
+      "blockNumber": 9181753,
+      "address": "0x58708A1bf1AEdf8e75755FDa1882F8dc46985009"
     }
   }
 }

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { deployEnclave } from "@enclave-e3/contracts/deploy/enclave";
+import { deployEnclave } from "@enclave-e3/contracts/scripts";
 import { deployTemplate } from "../deploy/default";
 
 async function main() {
