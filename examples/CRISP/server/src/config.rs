@@ -43,4 +43,4 @@ impl Config {
 }
 
 pub static CONFIG: Lazy<Config> =
-    Lazy::new(|| Config::from_env().expect("Failed to load configuration"));
+    Lazy::new(|| Config::from_env().expect("Failed to load configuration from environment variables. Please check your .env file or environment setup"));
