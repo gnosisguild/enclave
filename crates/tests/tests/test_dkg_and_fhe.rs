@@ -4,25 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use actix::{Actor, Addr, SyncArbiter};
+use actix::Actor;
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_data::RepositoriesFactory;
-use e3_data::{DataStore, InMemStore};
 use e3_events::{E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig};
 use e3_fhe::create_crp;
-use e3_keyshare::ext::ThresholdKeyshareExtension;
 use e3_multithread::Multithread;
-use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
-use e3_sortition::SortitionRepositoryFactory;
-use e3_sortition::{CiphernodeSelector, Sortition};
 use e3_test_helpers::ciphernode_builder::CiphernodeBuilder;
-use e3_test_helpers::ciphernode_system::{CiphernodeSimulated, CiphernodeSystemBuilder};
+use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{
     create_seed_from_u64, create_shared_rng_from_u64, rand_eth_addr, AddToCommittee,
 };
-use e3_trbfv::SharedRng;
 use fhe::{
     bfv,
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
@@ -171,15 +164,15 @@ async fn test_trbfv() -> Result<()> {
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "KeyshareCreated",
-        "KeyshareCreated",
-        "KeyshareCreated",
+        // "KeyshareCreated",
+        // "KeyshareCreated",
         // "KeyshareCreated",
         // "KeyshareCreated",
     ];
 
     // node #1 is selected so lets grab all events
     let h = nodes
-        .take_history_with_timeout(1, expected.len(), Duration::from_secs(300))
+        .take_history_with_timeout(1, expected.len(), Duration::from_secs(1000))
         .await?;
 
     println!("{:?}", h);

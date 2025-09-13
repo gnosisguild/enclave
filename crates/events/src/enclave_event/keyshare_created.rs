@@ -15,7 +15,7 @@ use std::fmt::Display;
 #[derivative(Debug)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct KeyshareCreated {
-    #[derivative(Debug(format_with = "crate::hexf"))]
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
     pub node: String,

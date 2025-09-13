@@ -19,35 +19,6 @@ pub fn hexf(data: &[u8], f: &mut fmt::Formatter) -> fmt::Result {
     )
 }
 
-pub fn hexf_bytes_slice<T: AsRef<[u8]>>(data: &[T], f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "[")?;
-    for (i, bytes) in data.iter().enumerate() {
-        if i > 0 {
-            write!(f, ", ")?;
-        }
-        hexf(bytes.as_ref(), f)?;
-    }
-    write!(f, "]")
-}
-
-pub fn hexf_3d_bytes(data: &Vec<Vec<Vec<u8>>>, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "[")?;
-    for (i, outer) in data.iter().enumerate() {
-        if i > 0 {
-            write!(f, ", ")?;
-        }
-        write!(f, "[")?;
-        for (j, inner) in outer.iter().enumerate() {
-            if j > 0 {
-                write!(f, ", ")?;
-            }
-            hexf(inner, f)?;
-        }
-        write!(f, "]")?;
-    }
-    write!(f, "]")
-}
-
 /// truncate a string
 fn truncate(s: String) -> String {
     let threshold = 100; // will leave it

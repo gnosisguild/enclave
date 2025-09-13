@@ -25,14 +25,14 @@ pub struct E3Requested {
     pub threshold_n: usize,
     /// A seed to provide randomness for the round
     pub seed: Seed,
-    #[derivative(Debug(format_with = "crate::hexf"))]
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     /// The error size for the FHE computation. This can be calculated for the E3 program based on
     /// the size of the ciphertext and the depth of the program [tbd add link]
     pub error_size: Arc<Vec<u8>>,
     /// The number of smudging noise per ciphertext.
     pub esi_per_ct: usize,
     /// The FHE parameters
-    #[derivative(Debug(format_with = "crate::hexf"))]
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub params: Arc<Vec<u8>>,
 }
 

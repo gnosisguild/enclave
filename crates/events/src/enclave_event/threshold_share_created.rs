@@ -7,6 +7,7 @@
 use crate::E3id;
 use actix::Message;
 use derivative::Derivative;
+use e3_trbfv::shares::PvwShareSetCollection;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
@@ -23,14 +24,12 @@ pub struct ThresholdShare {
     /// The publishers party_id
     pub party_id: u64,
     /// The publishers public key share
-    #[derivative(Debug(format_with = "crate::hexf"))]
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pk_share: Arc<Vec<u8>>,
     /// PVW encrypted sk_sss list with index determining party_id
-    #[derivative(Debug(format_with = "crate::hexf_bytes_slice"))]
-    pub sk_sss: Vec<PvwBytes>,
+    pub sk_sss: PvwShareSetCollection,
     /// PVW encrypted esi_sss list with index determining party_id
-    #[derivative(Debug(format_with = "crate::hexf_3d_bytes"))]
-    pub esi_sss: Vec<Vec<PvwBytes>>,
+    pub esi_sss: Vec<PvwShareSetCollection>,
 }
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -28,6 +28,7 @@ members = [
   "crates/test-helpers",
   "crates/tests",
   "crates/trbfv",
+  "crates/utils",
   "crates/wasm",
 ]
 exclude = [
@@ -88,6 +89,7 @@ e3-support-scripts = { version = "0.0.1-test", path = "./crates/support-scripts"
 e3-test-helpers = { version = "0.0.1-test", path = "./crates/test-helpers" }
 e3-tests = { version = "0.0.1-test", path = "./crates/tests" }
 e3-trbfv = { version = "0.0.1-test", path = "./crates/trbfv" }
+e3-utils = { version = "0.0.1-test", path = "./crates/utils" }
 
 actix = "=0.13.5"
 actix-web = "=4.11.0"

@@ -14,7 +14,7 @@ use std::fmt::{self, Display};
 #[derivative(Debug)]
 #[rtype(result = "()")]
 pub struct PublicKeyAggregated {
-    #[derivative(Debug(format_with = "crate::hexf"))]
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,

@@ -18,6 +18,7 @@ use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
 use e3_trbfv::gen_esi_sss::gen_esi_sss;
 use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{SharedRng, TrBFVError, TrBFVRequest, TrBFVResponse};
+use rand::Rng;
 use rayon::{self, ThreadPool};
 
 /// Multithread actor
@@ -29,7 +30,7 @@ pub struct Multithread {
 
 impl Multithread {
     pub fn new(rng: SharedRng, cipher: Arc<Cipher>, threads: usize) -> Self {
-        let thread_pool = if threads == 1 {
+        let thread_pool = if true {
             None
         } else {
             let thread_pool = Arc::new(
@@ -87,15 +88,15 @@ impl Handler<ComputeRequest> for Multithread {
 
 // TODO: implement tracing for this
 // This enabled us to get insight into the timing of our long running functions
-fn timefunc<F>(name: &str, func: F) -> Result<ComputeResponse, ComputeRequestError>
+fn timefunc<F>(name: &str, id: u8, func: F) -> Result<ComputeResponse, ComputeRequestError>
 where
     F: FnOnce() -> Result<ComputeResponse, ComputeRequestError>,
 {
-    println!("\n$$$$$$$$$ STARTING `{}`\n", name);
+    println!("\n$$$$$$$$$ STARTING `{}({})`\n", name, id);
     let start = Instant::now();
     let out = func();
     let dur = start.elapsed();
-    println!("\n$$$$$$$$$ FINISHED `{}` in {:?}\n", name, dur);
+    println!("\n$$$$$$$$$ FINISHED `{}`({}) in {:?}\n", name, id, dur);
     out
 }
 
@@ -104,22 +105,25 @@ fn handle_compute_request(
     cipher: Arc<Cipher>,
     request: ComputeRequest,
 ) -> Result<ComputeResponse, ComputeRequestError> {
+    let id: u8 = rand::thread_rng().gen();
     match request {
         ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(req)) => timefunc(
             "gen_pk_share_and_sk_sss",
+            id,
             || match gen_pk_share_and_sk_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(o))),
                 Err(_) => Err(ComputeRequestError::TrBFV(TrBFVError::GenPkShareAndSkSss)),
             },
         ),
-        ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(req)) => {
-            timefunc("gen_esi_sss", || match gen_esi_sss(&rng, &cipher, req) {
+        ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(req)) => timefunc("gen_esi_sss", id, || {
+            match gen_esi_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(o))),
                 Err(_) => Err(ComputeRequestError::TrBFV(TrBFVError::GenEsiSss)),
-            })
-        }
+            }
+        }),
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(req)) => timefunc(
             "calculate_decryption_key",
+            id,
             || match calculate_decryption_key(&cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateDecryptionKey(o),
@@ -134,6 +138,7 @@ fn handle_compute_request(
         ),
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(req)) => timefunc(
             "calculate_decryption_share",
+            id,
             || match calculate_decryption_share(&cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateDecryptionShare(o),
@@ -145,6 +150,7 @@ fn handle_compute_request(
         ),
         ComputeRequest::TrBFV(TrBFVRequest::CalculateThresholdDecryption(req)) => timefunc(
             "calculate_threshold_decryption",
+            id,
             || match calculate_threshold_decryption(req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateThresholdDecryption(o),

@@ -21,10 +21,10 @@ pub struct CiphernodeSelected {
     pub threshold_m: usize,
     pub threshold_n: usize,
     pub seed: Seed,
-    #[derivative(Debug(format_with = "crate::hexf"))]
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub error_size: Arc<Vec<u8>>,
     pub esi_per_ct: usize,
-    #[derivative(Debug(format_with = "crate::hexf"))]
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub params: Arc<Vec<u8>>,
     pub party_id: u64,
 }

@@ -14,7 +14,7 @@ use std::{
 
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
-pub struct EventId(#[derivative(Debug(format_with = "crate::hexf"))] pub [u8; 32]);
+pub struct EventId(#[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] pub [u8; 32]);
 
 impl EventId {
     pub fn hash<T: Hash>(value: T) -> Self {

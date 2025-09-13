@@ -15,7 +15,7 @@ use std::fmt::{self, Display};
 #[rtype(result = "()")]
 pub struct PlaintextAggregated {
     pub e3_id: E3id,
-    #[derivative(Debug(format_with = "crate::hexf"))]
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub decrypted_output: Vec<u8>,
 }
 

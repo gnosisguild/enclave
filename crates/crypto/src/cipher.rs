@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::Path;
+use std::{path::Path, time::Instant};
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -53,6 +53,7 @@ fn argon2_derive_key(
 }
 
 fn encrypt_data(password_bytes: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Result<Vec<u8>> {
+    let start = Instant::now();
     // Generate a random salt for Argon2
     let mut salt = [0u8; AES_SALT_LEN];
     OsRng.fill_bytes(&mut salt);
@@ -80,7 +81,7 @@ fn encrypt_data(password_bytes: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Resu
     output.extend_from_slice(&salt);
     output.extend_from_slice(&nonce_bytes);
     output.extend_from_slice(&ciphertext);
-
+    println!("Encryption took {:?}", start.elapsed());
     Ok(output)
 }
 

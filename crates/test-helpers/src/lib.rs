@@ -14,8 +14,8 @@ use alloy::primitives::Address;
 use anyhow::*;
 use ciphernode_system::CiphernodeSimulated;
 use e3_events::{
-    CiphernodeAdded, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector,
-    Seed, Subscribe,
+    CiphernodeAdded, EnclaveEvent, ErrorCollector, Event, EventBus, EventBusConfig,
+    HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
@@ -119,9 +119,17 @@ pub fn get_common_setup(
 pub fn simulate_libp2p_net(nodes: &[CiphernodeSimulated]) {
     for node in nodes.iter() {
         let source = &node.bus();
-        for node in nodes.iter() {
+        for (id, node) in nodes.iter().enumerate() {
             let dest = &node.bus();
-            EventBus::pipe_filter(source, move |e: &EnclaveEvent| !e.is_local_only(), dest)
+            EventBus::pipe_filter(
+                source,
+                move |e: &EnclaveEvent| {
+                    let allow = !e.is_local_only();
+                    println!("Forwarding {}({}) to {}", e.event_type(), e.event_id(), id);
+                    allow
+                },
+                dest,
+            )
         }
     }
 }

@@ -12,7 +12,7 @@ use std::fmt::{self, Display};
 
 #[derive(Derivative, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
-pub struct Seed(#[derivative(Debug(format_with = "crate::hexf"))] pub [u8; 32]);
+pub struct Seed(#[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] pub [u8; 32]);
 impl From<Seed> for u64 {
     fn from(value: Seed) -> Self {
         u64::from_le_bytes(value.0[..8].try_into().unwrap())

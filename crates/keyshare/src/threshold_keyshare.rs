@@ -22,12 +22,13 @@ use e3_events::{
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
 use e3_trbfv::{
-    calculate_decryption_key::CalculateDecryptionKeyRequest, gen_esi_sss::GenEsiSssRequest,
-    gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest, SharedRng, TrBFVConfig, TrBFVRequest,
-    TrBFVResponse,
+    calculate_decryption_key::CalculateDecryptionKeyRequest,
+    gen_esi_sss::GenEsiSssRequest,
+    gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest,
+    shares::{EncryptedShareSetCollection, ShareSetCollection},
+    SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
 use fhe_traits::Serialize;
-use zeroize::Zeroizing;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "Result<()>")]
@@ -71,8 +72,8 @@ impl From<HashMap<u64, Arc<ThresholdShare>>> for AllThresholdSharesCollected {
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingThresholdShareData {
     pk_share: Option<Arc<Vec<u8>>>,
-    sk_sss: Option<Vec<SensitiveBytes>>,
-    esi_sss: Option<Vec<Vec<SensitiveBytes>>>,
+    sk_sss: Option<EncryptedShareSetCollection>,
+    esi_sss: Option<Vec<EncryptedShareSetCollection>>,
 }
 
 // TODO: Add GeneratingPvwKey state
@@ -83,14 +84,14 @@ pub enum KeyshareState {
     // Generating TrBFV share material
     GeneratingThresholdShare {
         pk_share: Option<Arc<Vec<u8>>>,
-        sk_sss: Option<Vec<SensitiveBytes>>,
-        esi_sss: Option<Vec<Vec<SensitiveBytes>>>,
+        sk_sss: Option<EncryptedShareSetCollection>,
+        esi_sss: Option<Vec<EncryptedShareSetCollection>>,
     },
     // Collecting remaining TrBFV shares to aggregate decryption key
     AggregatingDecryptionKey {
         pk_share: Arc<Vec<u8>>,
-        sk_sss: Vec<SensitiveBytes>,
-        esi_sss: Vec<Vec<SensitiveBytes>>,
+        sk_sss: EncryptedShareSetCollection,
+        esi_sss: Vec<EncryptedShareSetCollection>,
     },
     // Awaiting decryption
     ReadyForDecryption {
@@ -212,7 +213,6 @@ pub struct ThresholdKeyshare {
 
 impl ThresholdKeyshare {
     pub fn new(params: ThresholdKeyshareParams) -> Self {
-        println!("Created ThresholdKeyshare!");
         Self {
             bus: params.bus,
             cipher: params.cipher,
@@ -261,23 +261,38 @@ impl ThresholdKeyshare {
         let trbfv_config = state.into();
 
         // Shares are in order of party_id
-        let mut sk_sss_collected = vec![];
-        let mut esi_sss_collected = vec![];
-        for share in msg.shares {
-            sk_sss_collected.push(SensitiveBytes::new(
-                share.sk_sss[party_id].clone(),
-                &cipher,
-            )?);
-            esi_sss_collected.push(SensitiveBytes::try_from_vec(
-                share.esi_sss[party_id].clone(),
-                &cipher,
-            )?);
-        }
+        let received_sss: Vec<ShareSetCollection> = msg
+            .shares
+            .iter()
+            .map(|ts| ts.sk_sss.clone().try_into())
+            .collect::<Result<_>>()?;
+
+        let received_esi_sss: Vec<Vec<ShareSetCollection>> = msg
+            .shares
+            .into_iter()
+            .map(|ts| {
+                ts.esi_sss
+                    .clone()
+                    .into_iter()
+                    .map(|s| s.try_into())
+                    .collect()
+            })
+            .collect::<Result<_>>()?;
+
+        let sk_sss_collected = ShareSetCollection::from_received(received_sss, party_id)?;
+
+        let esi_sss_collected: Vec<ShareSetCollection> = received_esi_sss
+            .into_iter()
+            .map(|s| ShareSetCollection::from_received(s, party_id))
+            .collect::<Result<_>>()?;
 
         Ok(CalculateDecryptionKeyRequest {
             trbfv_config,
-            esi_sss_collected,
-            sk_sss_collected,
+            esi_sss_collected: esi_sss_collected
+                .into_iter()
+                .map(|s| s.encrypt(&cipher))
+                .collect::<Result<_>>()?,
+            sk_sss_collected: sk_sss_collected.encrypt(&cipher)?,
         })
     }
 
@@ -286,7 +301,7 @@ impl ThresholdKeyshare {
         msg: ThresholdShareCreated,
         self_addr: Addr<Self>,
     ) -> Result<()> {
-        println!("Sending ThresholdShareCreated to collector!");
+        println!("Received ThresholdShareCreated forwarding to collector!");
         let collector = self.ensure_collector(self_addr)?;
         println!("got collector address!");
         collector.do_send(msg);
@@ -296,7 +311,7 @@ impl ThresholdKeyshare {
     pub fn try_store_pk_share_and_sk_sss(
         &mut self,
         pk_share: Arc<Vec<u8>>,
-        sk_sss: Vec<SensitiveBytes>,
+        sk_sss: EncryptedShareSetCollection,
     ) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
@@ -324,7 +339,7 @@ impl ThresholdKeyshare {
         })
     }
 
-    pub fn try_store_esi_sss(&mut self, esi_sss: Vec<Vec<SensitiveBytes>>) -> Result<()> {
+    pub fn try_store_esi_sss(&mut self, esi_sss: Vec<EncryptedShareSetCollection>) -> Result<()> {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
 
@@ -635,16 +650,12 @@ impl Handler<SharesGenerated> for ThresholdKeyshare {
             bail!("Invalid state!");
         };
 
-        let sk_sss = SensitiveBytes::access_vec(sk_sss, &self.cipher)?;
+        let sk_sss = sk_sss.decrypt(&self.cipher)?.try_into()?;
         let esi_sss = esi_sss
             .into_iter()
-            .map(|s| SensitiveBytes::access_vec(s, &self.cipher))
-            .collect::<Result<Vec<_>>>()?;
+            .map(|s| s.decrypt(&self.cipher)?.try_into())
+            .collect::<Result<_>>()?;
 
-        // TODO: pvw encrypt all data
-        // Currently this removes zeroizing to create bytes
-        let (pk_share, sk_sss, esi_sss) =
-            _dangerously_remove_zeroizing_to_simulate_pvw_encryption((pk_share, sk_sss, esi_sss));
         println!(">>>> THRESHOLD SHARE ABOUT TO BE CREATED FOR {}!", party_id);
         self.bus.do_send(EnclaveEvent::from(ThresholdShareCreated {
             e3_id,
@@ -693,7 +704,7 @@ impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
     type Result = ();
     fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
         let start = Instant::now();
-        println!("DecryptionKeyCollector received event");
+        println!("DecryptionKeyCollector: ThresholdShareCreated received by collector");
         if let CollectorState::Finished = self.state {
             println!("DecryptionKeyCollector is finished so ignoring!");
             return;
@@ -723,22 +734,22 @@ impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
     }
 }
 
-// Function to prepare tuple to put on an event
-fn _dangerously_remove_zeroizing_to_simulate_pvw_encryption(
-    input: (
-        Arc<Vec<u8>>,
-        Vec<Zeroizing<Vec<u8>>>,
-        Vec<Vec<Zeroizing<Vec<u8>>>>,
-    ),
-) -> (Arc<Vec<u8>>, Vec<Vec<u8>>, Vec<Vec<Vec<u8>>>) {
-    let (first, second, third) = input;
-
-    (
-        first,                                            // Arc<Vec<u8>> stays the same
-        second.into_iter().map(|z| z.to_vec()).collect(), // Vec<Zeroizing<Vec<u8>>> -> Vec<Vec<u8>>
-        third
-            .into_iter()
-            .map(|outer_vec| outer_vec.into_iter().map(|z| z.to_vec()).collect())
-            .collect(), // Vec<Vec<Zeroizing<Vec<u8>>>> -> Vec<Vec<Vec<u8>>>
-    )
-}
+// // Function to prepare tuple to put on an event
+// fn _dangerously_remove_zeroizing_to_simulate_pvw_encryption(
+//     input: (
+//         Arc<Vec<u8>>,
+//         Vec<Zeroizing<Vec<u8>>>,
+//         Vec<Vec<Zeroizing<Vec<u8>>>>,
+//     ),
+// ) -> (Arc<Vec<u8>>, Vec<Vec<u8>>, Vec<Vec<Vec<u8>>>) {
+//     let (first, second, third) = input;
+//
+//     (
+//         first,                                            // Arc<Vec<u8>> stays the same
+//         second.into_iter().map(|z| z.to_vec()).collect(), // Vec<Zeroizing<Vec<u8>>> -> Vec<Vec<u8>>
+//         third
+//             .into_iter()
+//             .map(|outer_vec| outer_vec.into_iter().map(|z| z.to_vec()).collect())
+//             .collect(), // Vec<Vec<Zeroizing<Vec<u8>>>> -> Vec<Vec<Vec<u8>>>
+//     )
+// }
