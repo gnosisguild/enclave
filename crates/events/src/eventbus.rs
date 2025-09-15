@@ -283,47 +283,6 @@ struct PendingTake<E: Event> {
     responder: tokio::sync::oneshot::Sender<Vec<E>>,
 }
 
-impl<E: Event> Handler<GetHistory<E>> for HistoryCollector<E> {
-    type Result = Vec<E>;
-
-    fn handle(&mut self, _: GetHistory<E>, _: &mut Context<Self>) -> Vec<E> {
-        self.history.iter().cloned().collect()
-    }
-}
-
-impl<E: Event> Handler<TakeHistory<E>> for HistoryCollector<E> {
-    type Result = ResponseActFuture<Self, Vec<E>>;
-
-    fn handle(&mut self, msg: TakeHistory<E>, _: &mut Context<Self>) -> Self::Result {
-        let count = msg.amount;
-
-        // If we have enough events in history, return immediately
-        if self.history.len() >= count {
-            let events: Vec<E> = self.history.drain(..count).collect();
-            return Box::pin(async move { events }.into_actor(self));
-        }
-
-        // Create a tokio oneshot channel for the response
-        let (tx, rx) = tokio::sync::oneshot::channel();
-
-        // Collect what we can from history
-        let mut collected = Vec::new();
-        while !self.history.is_empty() && collected.len() < count {
-            collected.push(self.history.pop_front().unwrap());
-        }
-
-        // Store the pending request
-        self.pending_takes.push(PendingTake {
-            count,
-            collected,
-            responder: tx,
-        });
-
-        // Return future that waits for the response
-        Box::pin(async move { rx.await.unwrap_or_else(|_| Vec::new()) }.into_actor(self))
-    }
-}
-
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct ResetHistory;
@@ -413,6 +372,10 @@ impl<E: Event> HistoryCollector<E> {
         // First try to give to pending takes
         for pending in &mut self.pending_takes {
             if pending.collected.len() < pending.count {
+                println!(
+                    "Received event {}. Pushing to pending take...",
+                    event.event_type()
+                );
                 pending.collected.push(event);
                 self.try_fulfill_pending_takes();
                 return;
@@ -421,6 +384,53 @@ impl<E: Event> HistoryCollector<E> {
 
         // No pending take needed it, add to history
         self.history.push_back(event);
+    }
+}
+
+impl<E: Event> Handler<GetHistory<E>> for HistoryCollector<E> {
+    type Result = Vec<E>;
+
+    fn handle(&mut self, _: GetHistory<E>, _: &mut Context<Self>) -> Vec<E> {
+        self.history.iter().cloned().collect()
+    }
+}
+
+impl<E: Event> Handler<TakeHistory<E>> for HistoryCollector<E> {
+    type Result = ResponseActFuture<Self, Vec<E>>;
+
+    fn handle(&mut self, msg: TakeHistory<E>, _: &mut Context<Self>) -> Self::Result {
+        let count = msg.amount;
+
+        // If we have enough events in history, return immediately
+        if self.history.len() >= count {
+            let events: Vec<E> = self.history.drain(..count).collect();
+            return Box::pin(async move { events }.into_actor(self));
+        }
+
+        println!(
+            "Requesting {} events but only {} in the buffer. waiting for more...",
+            msg.amount,
+            self.history.len()
+        );
+
+        // Create a tokio oneshot channel for the response
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        // Collect what we can from history
+        let mut collected = Vec::new();
+        while !self.history.is_empty() && collected.len() < count {
+            collected.push(self.history.pop_front().unwrap());
+        }
+
+        // Store the pending request
+        self.pending_takes.push(PendingTake {
+            count,
+            collected,
+            responder: tx,
+        });
+
+        // Return future that waits for the response
+        Box::pin(async move { rx.await.unwrap_or_else(|_| Vec::new()) }.into_actor(self))
     }
 }
 

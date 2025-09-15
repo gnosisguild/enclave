@@ -25,24 +25,11 @@ use rand::Rng;
 use rayon::{self, ThreadPool};
 use tokio::sync::mpsc;
 
-#[derive(Message, Debug)]
-#[rtype(result = "()")]
-pub struct ComputeRequestDequeued {
-    pub request: ComputeRequest,
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-struct StartConsumer {
-    receiver: mpsc::UnboundedReceiver<ComputeRequest>,
-}
-
 /// Multithread actor
 pub struct Multithread {
     rng: SharedRng,
     cipher: Arc<Cipher>,
     thread_pool: Option<Arc<ThreadPool>>,
-    queue: Option<mpsc::UnboundedSender<ComputeRequest>>,
 }
 
 impl Multithread {
@@ -68,7 +55,6 @@ impl Multithread {
             rng,
             cipher,
             thread_pool,
-            queue: None,
         }
     }
 
@@ -87,46 +73,6 @@ impl Multithread {
 
 impl Actor for Multithread {
     type Context = actix::Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        println!("ComputeActor started");
-
-        // Create the channel
-        let (sender, receiver) = mpsc::unbounded_channel::<ComputeRequest>();
-        self.queue = Some(sender);
-
-        // Start the consumer loop
-        ctx.notify(StartConsumer { receiver });
-    }
-}
-
-impl Handler<StartConsumer> for Multithread {
-    type Result = ();
-
-    fn handle(&mut self, msg: StartConsumer, ctx: &mut Self::Context) -> Self::Result {
-        let addr = ctx.address();
-        let mut receiver = msg.receiver;
-
-        // Create the consumer future
-        let consumer_fut = async move {
-            while let Some(request) = receiver.recv().await {
-                println!("Dequeued compute request: {:?}", request);
-
-                // Notify the actor that we dequeued a request
-                let dequeued_msg = ComputeRequestDequeued { request };
-
-                // Send the dequeued notification back to the actor
-                if addr.try_send(dequeued_msg).is_err() {
-                    println!("Actor stopped, ending consumer loop");
-                    break;
-                }
-            }
-            println!("Consumer loop ended");
-        };
-
-        // Wrap the future and add it to the actor's context
-        ctx.spawn(consumer_fut.into_actor(self));
-    }
 }
 
 static PENDING_TASKS: AtomicUsize = AtomicUsize::new(0);

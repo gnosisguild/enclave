@@ -141,7 +141,6 @@ async fn create_local_ciphernodes(
         let tuple = setup_local_ciphernode(&bus, &rng, true, addr, None, cipher).await?;
         result.push(tuple);
     }
-    // let local_buses: Vec<_> = result.iter().map(|n| &n.5).collect();
     simulate_libp2p_net(&result);
 
     Ok(result)
@@ -254,6 +253,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .map(|tup| tup.address().to_owned())
         .collect::<Vec<_>>();
 
+    println!("Adding ciphernodes...");
     add_ciphernodes(&bus, &eth_addrs, 1).await?;
 
     let e3_request_event = EnclaveEvent::from(E3Requested {
@@ -261,9 +261,11 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         params: Arc::new(encode_bfv_params(&params)),
         seed: seed.clone(),
         threshold_m: 3,
+        threshold_n: 3, // Need to use n now to suggest committee size
         ..E3Requested::default()
     });
 
+    println!("Sending E3 event...");
     // Send the computation requested event
     bus.send(e3_request_event.clone()).await?;
 
@@ -281,8 +283,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         nodes: OrderedSet::from(eth_addrs.clone()),
     };
 
-    let history_collector = ciphernodes.first().unwrap().history().unwrap();
-
+    let history_collector = ciphernodes.get(2).unwrap().history().unwrap();
     let history = history_collector
         .send(TakeHistory::<EnclaveEvent>::new(9))
         .await?;
@@ -296,7 +297,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
         .collect();
 
     assert_eq!(aggregated_event, vec![expected_aggregated_event]);
-
+    println!("Aggregating decryption...");
     // Aggregate decryption
 
     // TODO:
@@ -354,6 +355,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
             EnclaveEvent::from(E3Requested {
                 e3_id: e3_id.clone(),
                 threshold_m: 2,
+                threshold_n: 2,
                 seed: seed.clone(),
                 params: Arc::new(encode_bfv_params(&params)),
                 ..E3Requested::default()
@@ -510,6 +512,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {
         e3_id: E3id::new("1235", 1),
         threshold_m: 3,
+        threshold_n: 3,
         ..CiphernodeSelected::default()
     });
 
@@ -554,6 +557,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     bus.send(EnclaveEvent::from(E3Requested {
         e3_id: E3id::new("1234", 1),
         threshold_m: 3,
+        threshold_n: 3,
         seed: seed.clone(),
         params: Arc::new(encode_bfv_params(&params)),
         ..E3Requested::default()
@@ -584,6 +588,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     bus.send(EnclaveEvent::from(E3Requested {
         e3_id: E3id::new("1234", 2),
         threshold_m: 3,
+        threshold_n: 3,
         seed: seed.clone(),
         params: Arc::new(encode_bfv_params(&params)),
         ..E3Requested::default()
@@ -627,6 +632,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     let event = EnclaveEvent::from(E3Requested {
         e3_id: E3id::new("1235", 1),
         threshold_m: 3,
+        threshold_n: 3,
         seed: seed.clone(),
         params: Arc::new(vec![1, 2, 3, 4]),
         ..E3Requested::default()

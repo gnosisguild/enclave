@@ -72,7 +72,12 @@ impl Handler<E3Requested> for CiphernodeSelector {
         Box::pin(async move {
             let seed = data.seed;
             let size = data.threshold_n;
-            println!("SEED BEFORE SELECTION: {}", seed);
+            println!(
+                "Calling GetNodeIndex address={} seed={} size={}",
+                address.clone(),
+                seed,
+                size
+            );
             if let Ok(found_index) = sortition
                 .send(GetNodeIndex {
                     chain_id,
@@ -102,6 +107,8 @@ impl Handler<E3Requested> for CiphernodeSelector {
                     params: data.params.clone(),
                     seed: data.seed.clone(),
                 }));
+            } else {
+                println!("Not selected");
             }
         })
     }

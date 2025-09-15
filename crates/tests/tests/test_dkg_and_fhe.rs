@@ -93,7 +93,9 @@ async fn test_trbfv() -> Result<()> {
     let multithread = Multithread::attach(
         rng.clone(),
         cipher.clone(),
-        Multithread::get_max_threads_minus(2),
+        // Multithread::get_max_threads_minus(2),
+        1, // TODO: There is a bug running multithread around thread starvation. We may have to
+           // setup a queue
     );
 
     let nodes = CiphernodeSystemBuilder::new()
@@ -104,6 +106,7 @@ async fn test_trbfv() -> Result<()> {
                 .with_injected_multithread(multithread.clone())
                 .with_history()
                 .with_trbfv()
+                .with_pubkey_aggregation()
                 .with_source_bus(&bus)
                 .with_logging()
                 .build()
@@ -162,10 +165,11 @@ async fn test_trbfv() -> Result<()> {
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "KeyshareCreated",
-        // "KeyshareCreated",
-        // "KeyshareCreated",
-        // "KeyshareCreated",
-        // "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "KeyshareCreated",
+        "PublicKeyAggregated",
     ];
 
     // node #1 is selected so lets grab all events

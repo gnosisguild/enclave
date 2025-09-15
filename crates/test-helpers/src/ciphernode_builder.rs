@@ -159,8 +159,9 @@ impl CiphernodeBuilder {
                 &self.rng,
                 &addr,
             ))
-        } else {
-            // NOTE: leaving this here and Keyshare below to ensure correct rng if it doesnt matter then revisit later
+        }
+
+        if !self.trbfv || self.pubkey_agg || self.plaintext_agg {
             e3_builder = e3_builder.with(FheExtension::create(&local_bus, &self.rng))
         }
 
@@ -174,7 +175,6 @@ impl CiphernodeBuilder {
                 e3_builder.with(PlaintextAggregatorExtension::create(&local_bus, &sortition))
         }
 
-        // NOTE: keeping this in this order incase will revisit if it does not break tests
         if !self.trbfv {
             e3_builder = e3_builder.with(KeyshareExtension::create(&local_bus, &addr, &self.cipher))
         }

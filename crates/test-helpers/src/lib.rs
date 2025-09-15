@@ -121,15 +121,11 @@ pub fn simulate_libp2p_net(nodes: &[CiphernodeSimulated]) {
         let source = &node.bus();
         for (id, node) in nodes.iter().enumerate() {
             let dest = &node.bus();
-            EventBus::pipe_filter(
-                source,
-                move |e: &EnclaveEvent| {
-                    let allow = !e.is_local_only();
-                    println!("Forwarding {}({}) to {}", e.event_type(), e.event_id(), id);
-                    allow
-                },
-                dest,
-            )
+            if source != dest {
+                EventBus::pipe_filter(source, move |e: &EnclaveEvent| !e.is_local_only(), dest)
+            } else {
+                println!("not piping bus to itself");
+            }
         }
     }
 }
