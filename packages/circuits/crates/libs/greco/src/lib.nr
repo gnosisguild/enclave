@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use polynomial::{flatten, Polynomial};
+use polynomial::{flatten, packer, Polynomial};
 use safe::SafeSponge;
 
 /// Cryptographic parameters for Greco circuit.
@@ -329,7 +329,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
     /// # Returns
     /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn generate_challenge(self) -> Vec<Field> {
-        let inputs = self.payload::<(10 * N - 4) * L + 4 * N>();
+        let inputs = packer(self.payload::<((10 * N - 4) * L + 4 * N)>());
 
         // Domain separator for Greco circuit - "Greco" in hex
         let domain_separator = [
@@ -341,7 +341,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
         ];
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
-        let input_size = (10 * N - 4) * L + 4 * N;
+        let input_size = (((10 * N - 4) * L + 4 * N) + 2) / 3;
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);

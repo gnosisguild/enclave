@@ -132,6 +132,50 @@ pub fn flatten<let A: u32, let L: u32, let SIZE: u32>(
     (inputs, offset)
 }
 
+/// Packs an array of `Field` elements into a more compact representation,
+/// grouping three values into a single `Field` element. If the input length
+/// `A` is not divisible by 3, the final packed element is **zero-padded**.
+///
+/// # Type Parameters
+/// * `A` - Number of input coefficients.
+///
+/// # Parameters
+/// * `values` - The input array `[Field; A]` to be packed.
+///
+/// # Returns
+/// * `[Field; (A + 2) / 3]` - A packed array with length equal to
+///   `ceil(A / 3)`.
+///
+/// # Algorithm
+/// - Computes `S = ceil(A / 3)` (using `(A + 2) / 3` for integer division).
+/// - Iterates over each output position `j`:
+///   * Initializes an accumulator `acc = 0`.
+///   * For each of the 3 input slots belonging to this output position:
+///     * Reads `values[idx]` where `idx = 3 * j + i`, or uses `0` if `idx >= A`
+///       (to avoid out-of-bounds access).
+///     * Adds an offset of `2^64` to every value (ensuring positive packing).
+///     * Updates `acc = acc * 2^65 + adjusted_value`.
+/// - Stores `acc` into the output array at position `j`.
+///
+/// # Padding Behavior
+/// If `A % 3 != 0`, the last packed element will include one or two
+/// zero-padded values, ensuring that `values[idx]` is never accessed
+/// out-of-bounds.
+pub fn packer<let A: u32>(values: [Field; A]) -> [Field; (A + 2) / 3] {
+    let mut carrier = [0; (A + 2) / 3];
+    for j in 0..(A + 2) / 3 {
+        let base: Field = 36893488147419103232; // 2^65
+        let mut acc: Field = 0;
+        for i in 0..3 {
+            let idx: u32 = 3 * j + i;
+            let v: Field = if idx < A { values[idx] } else { 0 };
+            acc = acc * base + (v + 18446744073709551616); // + 2^64
+        }
+        carrier[j] = acc;
+    }
+    carrier
+}
+
 #[test]
 fn test_polynomial_eval() {
     let coeffs = [1, 2, 3]; // represents 1x^2 + 2x + 3
