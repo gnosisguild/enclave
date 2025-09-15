@@ -19,15 +19,16 @@ use e3_net::{events::NetEvent, NetEventTranslator};
 use e3_sdk::bfv_helpers::encode_bfv_params;
 use e3_test_helpers::ciphernode_builder::CiphernodeBuilder;
 use e3_test_helpers::ciphernode_system::CiphernodeSimulated;
+use e3_test_helpers::encrypt_ciphertext;
 use e3_test_helpers::{
     create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
     AddToCommittee,
 };
 use fhe::{
-    bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
+    bfv::{BfvParameters, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
 };
-use fhe_traits::{FheEncoder, FheEncrypter, Serialize};
+use fhe_traits::Serialize;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::{sync::Arc, time::Duration};
@@ -144,29 +145,6 @@ async fn create_local_ciphernodes(
     simulate_libp2p_net(&result);
 
     Ok(result)
-}
-
-fn encrypt_ciphertext(
-    params: &Arc<BfvParameters>,
-    pubkey: PublicKey,
-    raw_plaintext: Vec<u64>,
-) -> Result<(Arc<Ciphertext>, Vec<u8>)> {
-    let padded = &pad_end(&raw_plaintext, 0, 2048);
-    let mut bytes = Vec::with_capacity(padded.len() * 8);
-    for value in padded {
-        bytes.extend_from_slice(&value.to_le_bytes());
-    }
-    let expected = bytes;
-    let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
-    let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
-    Ok((Arc::new(ciphertext), expected))
-}
-
-fn pad_end(input: &[u64], pad: u64, total: usize) -> Vec<u64> {
-    let len = input.len();
-    let mut cop = input.to_vec();
-    cop.extend(std::iter::repeat(pad).take(total - len));
-    cop
 }
 
 async fn add_ciphernodes(

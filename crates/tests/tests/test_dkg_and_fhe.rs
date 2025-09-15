@@ -7,21 +7,26 @@
 use actix::Actor;
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_events::{E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig};
+use e3_events::{
+    CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
+    PlaintextAggregated,
+};
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
 use e3_test_helpers::ciphernode_builder::CiphernodeBuilder;
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{
-    create_seed_from_u64, create_shared_rng_from_u64, rand_eth_addr, AddToCommittee,
+    create_seed_from_u64, create_shared_rng_from_u64, encrypt_ciphertext, rand_eth_addr,
+    AddToCommittee,
 };
+use fhe::bfv::PublicKey;
 use fhe::{
     bfv,
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
 };
+use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
-use std::thread;
 use std::time::Duration;
 use std::{fs, sync::Arc};
 
@@ -83,7 +88,7 @@ async fn test_trbfv() -> Result<()> {
     let crp = create_crp(params_raw.clone(), rng.clone());
 
     // Encoded Params
-    let params = Arc::new(encode_bfv_params(&params_raw));
+    let params = Arc::new(encode_bfv_params(&params_raw.clone()));
 
     // Cipher
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
@@ -140,11 +145,15 @@ async fn test_trbfv() -> Result<()> {
 
     // Calculate Error Size for E3Program (this will be done by the E3Program implementor)
     let error_size = Arc::new(BigUint::to_bytes_be(&calculate_error_size(
-        params_raw, 5, 3,
+        params_raw.clone(),
+        5,
+        3,
     )?));
 
+    let e3_id = E3id::new("0", 1);
+
     let e3_requested = E3Requested {
-        e3_id: E3id::new("0", 1),
+        e3_id: e3_id.clone(),
         threshold_m: 2,
         threshold_n: 5, // Committee size is 5 from 7 total nodes
         seed: seed.clone(),
@@ -180,6 +189,37 @@ async fn test_trbfv() -> Result<()> {
     println!("{:?}", h);
 
     assert_eq!(h.event_types(), expected);
+
+    // Aggregate decryption
+
+    // First we get the public key
+    let Some(EnclaveEvent::PublicKeyAggregated {
+        data: pubkey_event, ..
+    }) = h.last().clone()
+    else {
+        panic!("Was expecting event to be PublicKeyAggregated");
+    };
+    let pubkey_bytes = pubkey_event.pubkey.clone();
+    let pubkey = PublicKey::from_bytes(&pubkey_bytes, &params_raw)?;
+
+    // Create the plaintext
+    let raw_plaintext = vec![1234u64, 873827u64];
+
+    // Encrypt the plaintext
+    let (ciphertext, expected_bytes) = encrypt_ciphertext(&params_raw, pubkey, raw_plaintext)?;
+
+    // Created the event
+    let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
+        ciphertext_output: ciphertext.to_bytes(),
+        e3_id: e3_id.clone(),
+    });
+
+    bus.send(ciphertext_published_event.clone()).await?;
+
+    let expected_plaintext_agg_event = PlaintextAggregated {
+        e3_id: e3_id.clone(),
+        decrypted_output: expected_bytes.clone(),
+    };
 
     Ok(())
 }

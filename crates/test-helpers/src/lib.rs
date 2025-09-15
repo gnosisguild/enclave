@@ -14,13 +14,14 @@ use alloy::primitives::Address;
 use anyhow::*;
 use ciphernode_system::CiphernodeSimulated;
 use e3_events::{
-    CiphernodeAdded, EnclaveEvent, ErrorCollector, Event, EventBus, EventBusConfig,
-    HistoryCollector, Seed, Subscribe,
+    CiphernodeAdded, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector,
+    Seed, Subscribe,
 };
 use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
-use fhe::bfv::BfvParameters;
+use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
+use fhe_traits::{FheEncoder, FheEncrypter};
 pub use plaintext_writer::*;
 pub use public_key_writer::*;
 use rand::Rng;
@@ -175,4 +176,27 @@ impl AddToCommittee {
 
         Ok(evt)
     }
+}
+
+pub fn encrypt_ciphertext(
+    params: &Arc<BfvParameters>,
+    pubkey: PublicKey,
+    raw_plaintext: Vec<u64>,
+) -> Result<(Arc<Ciphertext>, Vec<u8>)> {
+    let padded = &pad_end(&raw_plaintext, 0, 2048);
+    let mut bytes = Vec::with_capacity(padded.len() * 8);
+    for value in padded {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    let expected = bytes;
+    let pt = Plaintext::try_encode(&raw_plaintext, Encoding::poly(), &params)?;
+    let ciphertext = pubkey.try_encrypt(&pt, &mut ChaCha20Rng::seed_from_u64(42))?;
+    Ok((Arc::new(ciphertext), expected))
+}
+
+fn pad_end(input: &[u64], pad: u64, total: usize) -> Vec<u64> {
+    let len = input.len();
+    let mut cop = input.to_vec();
+    cop.extend(std::iter::repeat(pad).take(total - len));
+    cop
 }
