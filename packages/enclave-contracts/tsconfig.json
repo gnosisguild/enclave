@@ -1,11 +1,22 @@
 {
-  "extends": "@enclave-e3/config/tsconfig.json",
-  "include": ["tasks/**/*", "test/**/*", "deploy/**/*", "types/**/*"],
-  "exclude": ["node_modules", "dist"],
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
-  }
+    "lib": ["es2023"],
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true
+  },
+  "include": [
+    "hardhat.config.ts",
+    "scripts/**/*.ts",
+    "ignition/modules/**/*.ts",
+    "test/**/*.ts",
+    "tasks/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "types"]
 }

@@ -12,28 +12,30 @@ CRISP
 ├── wasm-crypto
 ├── contracts - Contracts for the CRISP protocol
 ├── docker-compose.yaml
-└── scripts 
-    └── tasks - Scripts for tasks to be run inside the docker container 
+└── scripts - Scripts for the CRISP protocol, including setup and testing
 ```
 
-## Docker Development
+## Development
 
-There is a Dockerfile for easy local development which has all the tools you need preinstalled. To start the development environment, run the following command:
+To start the development environment, run the following commands from inside the CRISP directory:
 
 ```sh
-pnpm dev:setup # build the devcontainer
+pnpm install # install dependencies
+pnpm dev:setup # build the project
 pnpm dev:up # run the services 
 ```
+
+The two commands above will start everything you need to run the CRISP protocol. You can then interact with it using the web application at `http://localhost:3000`. Please ensure you follow the prerequisites installation for running the protocol locally.
 
 ## Prerequisites for running without Docker
 
 Before getting started, make sure you have the following tools installed:
 
 - **Rust**
-- **RISC Zero toolchain**
+- **RISC Zero toolchain** (not needed for development only)
 - **Foundry** and **Anvil** (for local testnet)
 - **Node.js** (for client-side dependencies)
-- **Yarn** (as Node package manager)
+- **Pnpm** (as Node package manager)
 
 ## Dependencies
 
@@ -77,6 +79,20 @@ cargo risczero --version
 
 At this point, you should have all the tools required to develop and deploy an application with [RISC Zero](https://www.risczero.com).
 
+## Setting Up the project
+
+1. Navigate to the root directory:
+
+   ```sh
+   cd examples/CRISP
+   ```
+
+2. Install dependencies:
+
+   ```sh
+   pnpm install
+   ```
+
 ## Setting Up the Web App
 
 To set up the CRISP dApp in your local environment, follow these steps:
@@ -86,14 +102,7 @@ To set up the CRISP dApp in your local environment, follow these steps:
    ```sh
    cd examples/CRISP/client
    ```
-
-2. Install dependencies:
-
-   ```sh
-   pnpm install
-   ```
-
-3. Start the development server:
+2. Start the development server:
 
    ```sh
    pnpm dev
@@ -155,9 +164,11 @@ After deployment, you will see the addresses for the following contracts:
 
 Note down the first four addresses as they will be needed to configure `risc0`, `local_testnet` and the `server`.
 
-### Step 3: Deploy the RISC Zero Contracts
+### Step 3: Deploy the RISC Zero Contracts 
 
-1. Navigate to the `CRISP/packages/risc0` directory.
+> Please note that this step is optional for development only. You can run the program server in dev mode which does not use Risc0. 
+
+1. Navigate to the `CRISP/lib/risc0-ethereum` directory.
 
 ---
 
@@ -241,27 +252,13 @@ E3_COMPUTE_PROVIDER_BATCH_SIZE=4 # Must be a power of 2
 
 ## Running Ciphernodes
 
-Please make sure that your scripts are run from the `enclave` root directory - this is mandatory to set the environment variables correctly. Depending on your operating system, you may need to give additional execution permissions to each script (using `sudo chmod +x script_name.sh`). The following commands assume that `enclave' and `CRISP' share the same parent folder.
-
-Navigate to the root of the `enclave` repository. To run 3 Ciphernodes, use the provided `run_ciphernodes.sh` script.
+To run three ciphernodes, use the following command inside the CRISP directory:
 
 ```sh
-./../CRISP/packages/local_testnet/run_ciphernodes.sh
+./scripts/dev_ciphernodes.sh
 ```
 
-After starting the ciphernodes, a new directory `enclave_data` will be created under `CRISP/packages/local_testnet`. This is where all your ciphernodes configs, data and aggregator live. If you need to rebuild your ciphernodes, we suggest you delete this directory (e.g. `rm -rf CRISP/packages/local_testnet/enclave_data`).
-
-Open a new terminal. Navigate to the root of the `enclave` repository and run the aggregator using the `run_aggregator.sh` script:
-
-```sh
-./../CRISP/packages/local_testnet/run_aggregator.sh
-```
-
-Once the aggregator is running, you can add the Ciphernodes to the registry. Open a new terminal. Navigate to the root of the `enclave` repository and run the following script `add_ciphernodes.sh`:
-
-```sh
-./../CRISP/packages/local_testnet/add_ciphernodes.sh
-```
+This script will start the ciphernodes, add the ciphernodes to the registry on chain.
 
 ## Running the CRISP Server
 
@@ -284,8 +281,6 @@ Once the CLI client is running, you can interact with the CRISP voting protocol 
 1. Select `CRISP: Voting Protocol (ETH)` from the menu.
 
 2. To initiate a new CRISP round, choose the option `Initialize new CRISP round`.
-
-3. To vote in a CRISP round, choose the option `Participate in an E3 round`.
 
 Ensure all services are running correctly and that components are communicating as expected before starting a new CRISP round.
 

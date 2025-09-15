@@ -22,8 +22,7 @@ fn main() -> std::io::Result<()> {
         .join("..")
         .join("packages")
         .join("enclave-contracts")
-        .join("deployments")
-        .join("sepolia");
+        .join("deployed_contracts.json");
 
     // Create output string for contract info
     let mut contract_info = String::from(
@@ -33,26 +32,26 @@ fn main() -> std::io::Result<()> {
         "pub static CONTRACT_DEPLOYMENTS: phf::Map<&'static str, ContractInfo> = phf::phf_map! {\n",
     );
 
-    // Process each JSON file in the deployments directory
-    for entry in fs::read_dir(deployments_path)? {
-        let entry = entry?;
-        let path = entry.path();
+    // Read the single JSON file
+    let file = File::open(&deployments_path)?;
+    let json: Value = from_reader(file)?;
 
-        if path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let contract_name = path.file_stem().and_then(|s| s.to_str()).unwrap();
-
-            let file = File::open(&path)?;
-            let json: Value = from_reader(file)?;
-
-            // Extract address and block number
-            if let (Some(address), Some(deploy_block)) = (
-                json["address"].as_str(),
-                json["receipt"]["blockNumber"].as_u64(),
-            ) {
-                contract_info.push_str(&format!(
-                    "    \"{}\" => ContractInfo {{\n        address: \"{}\",\n        deploy_block: {},\n    }},\n",
-                    contract_name, address, deploy_block
-                ));
+    // Process Sepolia network from the JSON
+    if let Some(networks) = json.as_object() {
+        if let Some(sepolia_data) = networks.get("sepolia") {
+            if let Some(contracts) = sepolia_data.as_object() {
+                for (contract_name, contract_data) in contracts {
+                    // Extract address and block number from the contract data
+                    if let (Some(address), Some(deploy_block)) = (
+                        contract_data["address"].as_str(),
+                        contract_data["blockNumber"].as_u64(),
+                    ) {
+                        contract_info.push_str(&format!(
+                            "    \"{}\" => ContractInfo {{\n        address: \"{}\",\n        deploy_block: {},\n    }},\n",
+                            contract_name, address, deploy_block
+                        ));
+                    }
+                }
             }
         }
     }
@@ -63,7 +62,7 @@ fn main() -> std::io::Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("contract_deployments.rs");
     fs::write(dest_path, contract_info)?;
-    println!("cargo:rerun-if-changed=../../packages/enclave-contracts/deployments/sepolia");
+    println!("cargo:rerun-if-changed=../../packages/enclave-contracts/deployed_contracts.json");
 
     Ok(())
 }

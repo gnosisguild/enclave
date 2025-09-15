@@ -21,10 +21,10 @@ CIPHERNODE_SECRET="We are the music makers and we are the dreamers of the dreams
 
 # These contracts are based on the deterministic order of hardhat deploy
 # We _may_ wish to get these off the hardhat environment somehow?
-ENCLAVE_CONTRACT="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+ENCLAVE_CONTRACT="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
 REGISTRY_CONTRACT="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
 REGISTRY_FILTER_CONTRACT="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-INPUT_VALIDATOR_CONTRACT="0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+INPUT_VALIDATOR_CONTRACT="0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
 
 # These are random addresses for now
 CIPHERNODE_ADDRESS_1="0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
@@ -52,6 +52,8 @@ echo "Enclave binary: $ENCLAVE_BIN"
 cleanup() {
     echo "Cleaning up processes..."
     jobs -p | xargs -r kill -9 2>/dev/null || true
+    pkill -9 -f "target/debug/enclave" || true
+    pkill -9 -f "hardhat" || true
     exit ${1:-1}
 }
 
@@ -172,7 +174,9 @@ kill_proc() {
 }
 
 kill_em_all() {
+  echo "Killing enclave"
   pkill -9 -f "target/debug/enclave" || true
+  pkill -9 -f "enclave start" || true
   pkill -9 -f "hardhat" || true
 }
 

@@ -7,8 +7,7 @@ node_modules
 /artifacts
 
 # TypeChain files
-/typechain
-/typechain-types
+/types
 
 # solidity-coverage files
 /coverage
@@ -27,3 +26,6 @@ tests/Elf.sol
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
+
+# tmux log files
+tmux-*.log

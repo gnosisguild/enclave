@@ -4,17 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import "@nomicfoundation/hardhat-foundry";
-import "@nomicfoundation/hardhat-toolbox";
-import "hardhat-deploy";
 import type { HardhatUserConfig } from "hardhat/config";
-import { vars } from "hardhat/config";
-import type { NetworkUserConfig } from "hardhat/types";
+import { configVariable } from "hardhat/config";
+import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 
-// Run 'npx hardhat vars setup' to see the list of variables that need to be set
+import { ConfigurationVariable } from "hardhat/types/config";
 
-const mnemonic: string = vars.get("MNEMONIC");
-const infuraApiKey: string = vars.get("INFURA_API_KEY");
+const mnemonic = configVariable("MNEMONIC");
+const privateKey = configVariable("PRIVATE_KEY");
+const infuraApiKey = configVariable("INFURA_API_KEY");
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -30,7 +28,7 @@ const chainIds = {
   goerli: 5,
 };
 
-function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
+function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
   let jsonRpcUrl: string;
   switch (chain) {
     case "avalanche":
@@ -42,47 +40,41 @@ function getChainConfig(chain: keyof typeof chainIds): NetworkUserConfig {
     default:
       jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
   }
-  return {
-    accounts: {
+
+  let accounts: [ConfigurationVariable] | {  count: number, mnemonic: ConfigurationVariable, path: string } ;
+  if (privateKey) {
+    accounts = [privateKey];
+  } else {
+    accounts = { 
       count: 10,
       mnemonic,
       path: "m/44'/60'/0'/0",
-    },
+     };
+  }
+
+  return {
+    accounts,
     chainId: chainIds[chain],
     url: jsonRpcUrl,
+    type: 'http' as const,
+    chainType: "l1" as const,
+    blockExporers: {
+      etherscan: {
+        apiUrl, 
+      },
+    },
   };
 }
 
 const config: HardhatUserConfig = {
-  defaultNetwork: "hardhat",
-  namedAccounts: {
-    deployer: 0,
-  },
-  etherscan: {
-    apiKey: {
-      arbitrumOne: process.env.ARBISCAN_API_KEY || "",
-      avalanche: process.env.SNOWTRACE_API_KEY || "",
-      bsc: process.env.BSCSCAN_API_KEY || "",
-      mainnet: process.env.ETHERSCAN_API_KEY || "",
-      optimisticEthereum: process.env.OPTIMISM_API_KEY || "",
-      polygon: process.env.POLYGONSCAN_API_KEY || "",
-      polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
-      sepolia: process.env.ETHERSCAN_API_KEY || "",
-      goerli: process.env.ETHERSCAN_API_KEY || "",
-    },
-  },
-  gasReporter: {
-    currency: "USD",
-    enabled: process.env.REPORT_GAS ? true : false,
-    excludeContracts: [],
-    src: "./contracts",
-  },
+  plugins: [hardhatToolboxViemPlugin],
   networks: {
     hardhat: {
       accounts: {
         mnemonic,
       },
       chainId: chainIds.hardhat,
+      type: "edr-simulated",
     },
     ganache: {
       accounts: {
@@ -90,16 +82,17 @@ const config: HardhatUserConfig = {
       },
       chainId: chainIds.ganache,
       url: "http://localhost:8545",
+      type: "http",
     },
-    arbitrum: getChainConfig("arbitrum-mainnet"),
-    avalanche: getChainConfig("avalanche"),
-    bsc: getChainConfig("bsc"),
-    mainnet: getChainConfig("mainnet"),
-    optimism: getChainConfig("optimism-mainnet"),
-    "polygon-mainnet": getChainConfig("polygon-mainnet"),
-    "polygon-mumbai": getChainConfig("polygon-mumbai"),
-    sepolia: getChainConfig("sepolia"),
-    goerli: getChainConfig("goerli"),
+    arbitrum: getChainConfig("arbitrum-mainnet", process.env.ARBISCAN_API_KEY || ""),
+    avalanche: getChainConfig("avalanche", process.env.SNOWTRACE_API_KEY || ""),
+    bsc: getChainConfig("bsc", process.env.BSCSCAN_API_KEY || ""),
+    mainnet: getChainConfig("mainnet", process.env.ETHERSCAN_API_KEY || ""),
+    optimism: getChainConfig("optimism-mainnet", process.env.OPTIMISM_API_KEY || ""),
+    "polygon-mainnet": getChainConfig("polygon-mainnet", process.env.POLYGONSCAN_API_KEY || ""),
+    "polygon-mumbai": getChainConfig("polygon-mumbai", process.env.POLYGONSCAN_API_KEY || ""),
+    sepolia: getChainConfig("sepolia", process.env.ETHERSCAN_API_KEY || ""),
+    goerli: getChainConfig("goerli", process.env.ETHERSCAN_API_KEY || ""),
   },
   paths: {
     artifacts: "./artifacts",
@@ -122,10 +115,6 @@ const config: HardhatUserConfig = {
         runs: 800,
       },
     },
-  },
-  typechain: {
-    outDir: "types",
-    target: "ethers-v6",
   },
 };
 

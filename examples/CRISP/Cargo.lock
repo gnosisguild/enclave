@@ -1850,7 +1850,7 @@ dependencies = [
  "config",
  "dialoguer",
  "dotenvy",
- "e3-compute-provider",
+ "e3-compute-provider 0.0.1-test",
  "e3-sdk",
  "env_logger",
  "eyre",
@@ -2182,6 +2182,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-compute-provider"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/enclave?rev=2ca0aa5f47dd962add5d1d0f74900d9bceb957e5#2ca0aa5f47dd962add5d1d0f74900d9bceb957e5"
+dependencies = [
+ "ark-bn254",
+ "ark-ff 0.4.2",
+ "hex",
+ "lean-imt",
+ "light-poseidon",
+ "num-bigint",
+ "num-traits",
+ "rayon",
+ "serde",
+ "sha3",
+]
+
+[[package]]
 name = "e3-evm-helpers"
 version = "0.0.1-test"
 dependencies = [
@@ -2241,11 +2258,12 @@ dependencies = [
 
 [[package]]
 name = "e3-program-server"
-version = "0.0.1-test"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/enclave?rev=2ca0aa5f47dd962add5d1d0f74900d9bceb957e5#2ca0aa5f47dd962add5d1d0f74900d9bceb957e5"
 dependencies = [
  "actix-web",
  "anyhow",
- "e3-compute-provider",
+ "e3-compute-provider 0.1.0",
  "hex",
  "reqwest",
  "serde",
@@ -2267,7 +2285,7 @@ name = "e3-support-scripts-dev"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "e3-compute-provider",
+ "e3-compute-provider 0.1.0",
  "e3-program-server",
  "e3-user-program",
  "tokio",
@@ -2278,7 +2296,7 @@ name = "e3-user-program"
 version = "0.1.0"
 dependencies = [
  "e3-bfv-helpers",
- "e3-compute-provider",
+ "e3-compute-provider 0.1.0",
  "fhe",
  "fhe-traits",
 ]

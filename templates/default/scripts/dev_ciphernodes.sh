@@ -6,7 +6,7 @@ SIGNAL_FILE=/tmp/enclave_ciphernodes_ready
 
 cleanup() {
   echo "Cleaning up processes..."
-  enclave nodes down
+  pkill -9 -f "enclave start"
   sleep 2
   pkill enclave
   echo "Cleanup complete"
@@ -33,11 +33,12 @@ enclave nodes up -v &
 
 sleep 2
 
-CN1=$(cat enclave.config.yaml | yq '.nodes.cn1.address')
-CN2=$(cat enclave.config.yaml | yq '.nodes.cn2.address')
-CN3=$(cat enclave.config.yaml | yq '.nodes.cn3.address')
+CN1=$(grep -A 1 'cn1:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
+CN2=$(grep -A 1 'cn2:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
+CN3=$(grep -A 1 'cn3:' enclave.config.yaml | grep 'address:' | sed 's/.*address: *"\([^"]*\)".*/\1/')
 
 # Add ciphernodes using variables from config.sh
+pnpm run deploy && sleep 2
 pnpm hardhat ciphernode:add --ciphernode-address $CN1 --network localhost
 pnpm hardhat ciphernode:add --ciphernode-address $CN2 --network localhost
 pnpm hardhat ciphernode:add --ciphernode-address $CN3 --network localhost

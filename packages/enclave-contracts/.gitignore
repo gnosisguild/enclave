@@ -2,10 +2,18 @@
 .coverage_artifacts
 .coverage_cache
 .coverage_contracts
-artifacts/
-!artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json
-!artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json
-!artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json
+/artifacts/
+!/artifacts/
+/artifacts/**
+!/artifacts/contracts/
+!/artifacts/contracts/interfaces/
+!/artifacts/contracts/registry/
+!/artifacts/contracts/interfaces/IEnclave.sol/
+!/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/
+!/artifacts/contracts/registry/NaiveRegistryFilter.sol/
+!/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json
+!/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json
+!/artifacts/contracts/registry/NaiveRegistryFilter.sol/NaiveRegistryFilter.json
 build
 cache
 coverage
@@ -13,6 +21,7 @@ dist
 node_modules
 types
 deployments/localhost
+ignition/deployments
 
 # files
 *.env

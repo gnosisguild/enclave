@@ -27,7 +27,6 @@ CRISP/
 |── client/                  # React frontend application
 |── server/                  # Rust coordination server
 |── program/                 # RISC Zero computation program
-|── wasm-crypto/             # WebAssembly crypto utilities
 ├── contracts/               # Smart contracts (Solidity)
 ├── circuits/                # Noir circuits for ZK proofs
 ├── scripts/                 # Development and utility scripts
@@ -66,16 +65,6 @@ The core computation logic written in Rust for zkVM:
 - Performs computations on encrypted votes
 - Counts votes without decrypting individual ballots
 - Creates proofs of correct computation
-
----
-
-### **WebAssembly Crypto** (`/wasm-crypto`)
-
-High-performance cryptographic operations compiled to WebAssembly:
-
-- Client-side fully homomorphic encryption
-- ZK Circuit input generation for Noir proofs
-- Optimized for browser execution
 
 ---
 
