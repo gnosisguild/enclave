@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::thread;
 use std::time::Instant;
 
 use actix::prelude::*;
@@ -20,17 +23,31 @@ use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
 use e3_trbfv::{SharedRng, TrBFVError, TrBFVRequest, TrBFVResponse};
 use rand::Rng;
 use rayon::{self, ThreadPool};
+use tokio::sync::mpsc;
+
+#[derive(Message, Debug)]
+#[rtype(result = "()")]
+pub struct ComputeRequestDequeued {
+    pub request: ComputeRequest,
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+struct StartConsumer {
+    receiver: mpsc::UnboundedReceiver<ComputeRequest>,
+}
 
 /// Multithread actor
 pub struct Multithread {
     rng: SharedRng,
     cipher: Arc<Cipher>,
     thread_pool: Option<Arc<ThreadPool>>,
+    queue: Option<mpsc::UnboundedSender<ComputeRequest>>,
 }
 
 impl Multithread {
     pub fn new(rng: SharedRng, cipher: Arc<Cipher>, threads: usize) -> Self {
-        let thread_pool = if true {
+        let thread_pool = if threads == 1 {
             None
         } else {
             let thread_pool = Arc::new(
@@ -51,7 +68,16 @@ impl Multithread {
             rng,
             cipher,
             thread_pool,
+            queue: None,
         }
+    }
+
+    pub fn get_max_threads_minus(amount: usize) -> usize {
+        let total_threads = thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
+        let threads_to_use = std::cmp::max(1, total_threads.saturating_sub(amount));
+        threads_to_use
     }
 
     pub fn attach(rng: SharedRng, cipher: Arc<Cipher>, threads: usize) -> Addr<Self> {
@@ -61,7 +87,50 @@ impl Multithread {
 
 impl Actor for Multithread {
     type Context = actix::Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        println!("ComputeActor started");
+
+        // Create the channel
+        let (sender, receiver) = mpsc::unbounded_channel::<ComputeRequest>();
+        self.queue = Some(sender);
+
+        // Start the consumer loop
+        ctx.notify(StartConsumer { receiver });
+    }
 }
+
+impl Handler<StartConsumer> for Multithread {
+    type Result = ();
+
+    fn handle(&mut self, msg: StartConsumer, ctx: &mut Self::Context) -> Self::Result {
+        let addr = ctx.address();
+        let mut receiver = msg.receiver;
+
+        // Create the consumer future
+        let consumer_fut = async move {
+            while let Some(request) = receiver.recv().await {
+                println!("Dequeued compute request: {:?}", request);
+
+                // Notify the actor that we dequeued a request
+                let dequeued_msg = ComputeRequestDequeued { request };
+
+                // Send the dequeued notification back to the actor
+                if addr.try_send(dequeued_msg).is_err() {
+                    println!("Actor stopped, ending consumer loop");
+                    break;
+                }
+            }
+            println!("Consumer loop ended");
+        };
+
+        // Wrap the future and add it to the actor's context
+        ctx.spawn(consumer_fut.into_actor(self));
+    }
+}
+
+static PENDING_TASKS: AtomicUsize = AtomicUsize::new(0);
+static COMPLETED_TASKS: AtomicUsize = AtomicUsize::new(0);
 
 impl Handler<ComputeRequest> for Multithread {
     type Result = ResponseFuture<Result<ComputeResponse, ComputeRequestError>>;
@@ -70,10 +139,21 @@ impl Handler<ComputeRequest> for Multithread {
         let rng = self.rng.clone();
         let thread_pool = self.thread_pool.clone();
         Box::pin(async move {
+            let pending = PENDING_TASKS.fetch_add(1, Ordering::Relaxed);
+
+            println!(
+                "Spawning task. Pending: {}, Completed: {}",
+                pending + 1,
+                COMPLETED_TASKS.load(Ordering::Relaxed)
+            );
+
             let res = if let Some(pool) = thread_pool {
                 let (tx, rx) = tokio::sync::oneshot::channel();
                 pool.spawn(move || {
                     let res = handle_compute_request(rng, cipher, msg);
+                    PENDING_TASKS.fetch_sub(1, Ordering::Relaxed);
+                    COMPLETED_TASKS.fetch_add(1, Ordering::Relaxed);
+
                     let _ = tx.send(res);
                 });
                 rx.await.unwrap()

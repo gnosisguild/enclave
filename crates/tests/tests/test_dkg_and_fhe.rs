@@ -90,13 +90,11 @@ async fn test_trbfv() -> Result<()> {
     let mut adder = AddToCommittee::new(&bus, 1);
 
     // Actor system setup
-    let total_threads = thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
-    let threads_to_use = std::cmp::max(1, total_threads.saturating_sub(1));
-    println!("Total threads available: {}", total_threads);
-    println!("Using {} threads for rayon pool", threads_to_use);
-    let multithread = Multithread::attach(rng.clone(), cipher.clone(), threads_to_use);
+    let multithread = Multithread::attach(
+        rng.clone(),
+        cipher.clone(),
+        Multithread::get_max_threads_minus(2),
+    );
 
     let nodes = CiphernodeSystemBuilder::new()
         // Adding 7 total nodes of which we are only choosing 5 for the committee
