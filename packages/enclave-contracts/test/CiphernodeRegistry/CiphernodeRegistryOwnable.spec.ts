@@ -3,19 +3,24 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
-import { deployCiphernodeRegistryOwnableFixture } from "../fixtures/CiphernodeRegistryOwnable.fixture";
-import { naiveRegistryFilterFixture } from "../fixtures/NaiveRegistryFilter.fixture";
-import { PoseidonT3Fixture } from "../fixtures/PoseidonT3.fixture";
+import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
+import NaiveRegistryFilterModule from "../../ignition/modules/naiveRegistryFilter";
+import {
+  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
+  NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
+} from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
 const AddressThree = "0x0000000000000000000000000000000000000003";
+
+const { ethers, networkHelpers, ignition } = await network.connect();
+const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
 const dataHash = ethers.keccak256(data);
@@ -26,18 +31,33 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 describe("CiphernodeRegistryOwnable", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
-    if (!owner) throw new Error("getSigners() did not return expected output");
-    if (!notTheOwner)
-      throw new Error("getSigners() did not return expected output");
-    const poseidon = await PoseidonT3Fixture();
-    const registry = await deployCiphernodeRegistryOwnableFixture(
-      owner.address,
-      owner.address,
-      await poseidon.getAddress(),
+
+    const registryContract = await ignition.deploy(CiphernodeRegistryModule, {
+      parameters: {
+        CiphernodeRegistry: {
+          enclaveAddress: await owner.getAddress(),
+          owner: await owner.getAddress(),
+        },
+      },
+    });
+
+    const filterContract = await ignition.deploy(NaiveRegistryFilterModule, {
+      parameters: {
+        NaiveRegistryFilter: {
+          owner: await owner.getAddress(),
+          ciphernodeRegistryAddress:
+            await registryContract.cipherNodeRegistry.getAddress(),
+        },
+      },
+    });
+
+    const registry = CiphernodeRegistryFactory.connect(
+      await registryContract.cipherNodeRegistry.getAddress(),
+      owner,
     );
-    const filter = await naiveRegistryFilterFixture(
-      owner.address,
-      await registry.getAddress(),
+    const filter = NaiveRegistryFilterFactory.connect(
+      await filterContract.naiveRegistryFilter.getAddress(),
+      owner,
     );
 
     const tree = new LeanIMT(hash);
@@ -143,7 +163,7 @@ describe("CiphernodeRegistryOwnable", function () {
     it("reverts if filter.requestCommittee() fails", async function () {
       const { owner, registry, filter, request } = await loadFixture(setup);
 
-      await filter.setRegistry(owner.address);
+      await filter.setRegistry(await owner.getAddress());
       await filter.requestCommittee(request.e3Id, request.threshold);
       await filter.setRegistry(await registry.getAddress());
 
@@ -219,7 +239,7 @@ describe("CiphernodeRegistryOwnable", function () {
       const { registry, notTheOwner } = await loadFixture(setup);
       await expect(registry.connect(notTheOwner).addCiphernode(AddressThree))
         .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
-        .withArgs(notTheOwner.address);
+        .withArgs(await notTheOwner.getAddress());
     });
     it("adds the ciphernode to the registry", async function () {
       const { registry } = await loadFixture(setup);
@@ -256,7 +276,7 @@ describe("CiphernodeRegistryOwnable", function () {
         registry.connect(notTheOwner).removeCiphernode(AddressOne, []),
       )
         .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
-        .withArgs(notTheOwner.address);
+        .withArgs(await notTheOwner.getAddress());
     });
     it("removes the ciphernode from the registry", async function () {
       const { registry } = await loadFixture(setup);

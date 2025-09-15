@@ -37,8 +37,6 @@ contract MockE3Program is IE3Program {
 
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
-
-        paramsHashes[e3Id] = keccak256(e3ProgramParams);
         return (ENCRYPTION_SCHEME_ID, inputValidator);
     }
 

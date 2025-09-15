@@ -4,61 +4,152 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import "@nomicfoundation/hardhat-toolbox";
-import "hardhat-deploy";
-import "@enclave-e3/contracts/deploy/enclave";
-import { task } from "hardhat/config";
-import type { TaskArguments } from "hardhat/types";
-import type { HardhatUserConfig } from "hardhat/config";
+import { ciphernodeAdd } from "@enclave-e3/contracts/tasks/ciphernode";
+import { cleanDeploymentsTask } from "@enclave-e3/contracts/tasks/utils";
 
-task("ciphernode:add", "Register a ciphernode to the registry")
-  .addParam("ciphernodeAddress", "address of ciphernode to register")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
-    const [deployer] = await hre.ethers.getSigners();
-    const registryContract = new hre.ethers.Contract(
-      registry.address,
-      registry.abi,
-      deployer,
-    );
-    const result = registryContract.interface.encodeFunctionData(
-      "addCiphernode",
-      [taskArguments.ciphernodeAddress.replace(/"/g, "")],
-    );
-    const tx = await deployer.sendTransaction({
-      to: registryContract.target,
-      data: result,
-    });
-    await tx.wait();
-    console.log(`Ciphernode ${taskArguments.ciphernodeAddress} registered`);
-  });
+import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
+import hardhatIgnitionEthers from "@nomicfoundation/hardhat-ignition-ethers";
+import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
+import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
+
+import type { HardhatUserConfig } from "hardhat/config";
+import { configVariable } from "hardhat/config";
+import { ConfigurationVariable } from "hardhat/types/config";
+
+const mnemonic = configVariable("MNEMONIC");
+const privateKey = configVariable("PRIVATE_KEY");
+const infuraApiKey = configVariable("INFURA_API_KEY");
+
+const chainIds = {
+  "arbitrum-mainnet": 42161,
+  avalanche: 43114,
+  bsc: 56,
+  ganache: 1337,
+  hardhat: 31337,
+  mainnet: 1,
+  "optimism-mainnet": 10,
+  "polygon-mainnet": 137,
+  "polygon-mumbai": 80001,
+  sepolia: 11155111,
+  goerli: 5,
+};
+
+function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
+  let jsonRpcUrl: string;
+  switch (chain) {
+    case "avalanche":
+      jsonRpcUrl = "https://api.avax.network/ext/bc/C/rpc";
+      break;
+    case "bsc":
+      jsonRpcUrl = "https://bsc-dataseed1.binance.org";
+      break;
+    default:
+      jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
+  }
+
+  let accounts:
+    | [ConfigurationVariable]
+    | { count: number; mnemonic: ConfigurationVariable; path: string };
+  if (privateKey) {
+    accounts = [privateKey];
+  } else {
+    accounts = {
+      count: 10,
+      mnemonic: mnemonic,
+      path: "m/44'/60'/0'/0",
+    };
+  }
+
+  return {
+    accounts,
+    chainId: chainIds[chain],
+    url: jsonRpcUrl,
+    type: "http" as const,
+    chainType: "l1" as const,
+    blockExplorers: {
+      etherscan: {
+        apiUrl,
+      },
+    },
+  };
+}
 
 const config: HardhatUserConfig = {
+  tasks: [
+    ciphernodeAdd,
+    cleanDeploymentsTask,
+  ],
+  plugins: [
+    hardhatTypechainPlugin,
+    hardhatEthersChaiMatchers,
+    hardhatIgnitionEthers,
+    hardhatNetworkHelpers,
+    hardhatToolboxMochaEthersPlugin,
+  ],
+  typechain: {
+    outDir: "./types",
+    tsNocheck: false,
+  },
+  networks: {
+    hardhat: {
+      type: "edr-simulated",
+      chainType: "l1",
+    },
+    ganache: {
+      accounts: {
+        mnemonic,
+      },
+      chainId: chainIds.ganache,
+      url: "http://localhost:8545",
+      type: "http",
+    },
+    arbitrum: getChainConfig(
+      "arbitrum-mainnet",
+      process.env.ARBISCAN_API_KEY || "",
+    ),
+    avalanche: getChainConfig("avalanche", process.env.SNOWTRACE_API_KEY || ""),
+    bsc: getChainConfig("bsc", process.env.BSCSCAN_API_KEY || ""),
+    mainnet: getChainConfig("mainnet", process.env.ETHERSCAN_API_KEY || ""),
+    optimism: getChainConfig(
+      "optimism-mainnet",
+      process.env.OPTIMISM_API_KEY || "",
+    ),
+    "polygon-mainnet": getChainConfig(
+      "polygon-mainnet",
+      process.env.POLYGONSCAN_API_KEY || "",
+    ),
+    "polygon-mumbai": getChainConfig(
+      "polygon-mumbai",
+      process.env.POLYGONSCAN_API_KEY || "",
+    ),
+    sepolia: getChainConfig("sepolia", process.env.ETHERSCAN_API_KEY || ""),
+    goerli: getChainConfig("goerli", process.env.ETHERSCAN_API_KEY || ""),
+  },
   solidity: {
-    version: "0.8.27",
-    overrides: {
-      "node_modules/poseidon-solidity/PoseidonT3.sol": {
-        version: "0.7.0",
+    npmFilesToBuild: [
+      "poseidon-solidity/PoseidonT3.sol", 
+      "@enclave-e3/contracts/contracts/Enclave.sol",
+      "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
+      "@enclave-e3/contracts/contracts/registry/NaiveRegistryFilter.sol",
+      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
+      "@enclave-e3/contracts/contracts/test/MockCiphernodeRegistry.sol",
+      "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
+      "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
+      "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
+      "@enclave-e3/contracts/contracts/test/MockRegistryFilter.sol",
+    ],
+    compilers: [
+      {
+        version: "0.8.27",
         settings: {
           optimizer: {
             enabled: true,
-            runs: 2 ** 32 - 1,
+            runs: 800,
           },
         },
       },
-    },
-  },
-  external: {
-    contracts: [
-      {
-        artifacts: "node_modules/@enclave-e3/contracts/artifacts",
-      },
     ],
-  },
-  namedAccounts: {
-    deployer: {
-      default: 0, // Use the first account as deployer
-    },
   },
 };
 

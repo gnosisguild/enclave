@@ -18,7 +18,7 @@ The setup includes the following:
 
 ## Quick Start with Docker (Recommended)
 
-The fastest way to get CRISP running is using the Docker development environment:
+The fastest way to get CRISP running is using the scripts provided in the `scripts/` directory:
 
 ```sh
 cd examples/CRISP
@@ -60,7 +60,7 @@ Before getting started, ensure you have the following tools installed:
 
 - **Rust** (programming language and package manager)
 - **Foundry** (Ethereum development framework)
-- **RISC Zero toolchain** (for RISC Zero program development)
+- **RISC Zero toolchain** (for RISC Zero program development) - Note that you can also run the program server in dev mode which does not use Risc0.
 - **Node.js** (JavaScript runtime for client-side dependencies)
 - **Anvil** (local Ethereum node)
 - **Enclave CLI** (for managing ciphernodes)
@@ -104,6 +104,8 @@ curl -L https://foundry.paradigm.xyz | bash
 ```
 
 ### Install RISC Zero Toolchain
+
+> Optional: you can run CRISP in dev mode which does not use Risc0.
 
 Next, install `rzup`, which provides the `cargo-risczero` toolchain.
 
@@ -185,7 +187,7 @@ Keep this terminal open and running. Open a new terminal for the next steps.
 4. Deploy the Enclave contracts on the local testnet:
 
    ```sh
-   rm -rf deployments/localhost
+   pnpm clean:deployments
    pnpm deploy:mocks --network localhost
    ```
 

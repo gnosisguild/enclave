@@ -4,70 +4,99 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { LeanIMT } from "@zk-kit/lean-imt";
+import { ZeroAddress } from "ethers";
 import { task } from "hardhat/config";
-import type { TaskArguments } from "hardhat/types";
 import { poseidon2 } from "poseidon-lite";
 
-task("ciphernode:add", "Register a ciphernode to the registry")
-  .addParam("ciphernodeAddress", "address of ciphernode to register")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
+export const ciphernodeAdd = task(
+  "ciphernode:add",
+  "Register a ciphernode to the registry",
+)
+  .addOption({
+    name: "ciphernodeAddress",
+    description: "address of ciphernode to register",
+    defaultValue: ZeroAddress,
+  })
+  .setAction(async () => ({
+    default: async ({ ciphernodeAddress }, hre) => {
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
+      );
+      const { ciphernodeRegistry } =
+        await deployAndSaveCiphernodeRegistryOwnable({ hre });
 
-    const registryContract = await hre.ethers.getContractAt(
-      "CiphernodeRegistryOwnable",
-      registry.address,
-    );
+      const tx = await ciphernodeRegistry.addCiphernode(ciphernodeAddress);
+      await tx.wait();
+      console.log(`Ciphernode ${ciphernodeAddress} registered`);
+    },
+  }))
+  .build();
 
-    const tx = await registryContract.addCiphernode(
-      taskArguments.ciphernodeAddress,
-    );
-    await tx.wait();
+export const ciphernodeRemove = task(
+  "ciphernode:remove",
+  "Remove a ciphernode from the registry",
+)
+  .addOption({
+    name: "ciphernodeAddress",
+    description: "address of ciphernode to remove",
+    defaultValue: ZeroAddress,
+  })
+  .addOption({
+    name: "siblings",
+    description: "comma separated siblings from tree proof",
+    defaultValue: "",
+  })
+  .setAction(async () => ({
+    default: async ({ ciphernodeAddress, siblings }, hre) => {
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
+      );
+      const { ciphernodeRegistry } =
+        await deployAndSaveCiphernodeRegistryOwnable({ hre });
 
-    console.log(`Ciphernode ${taskArguments.ciphernodeAddress} registered`);
-  });
+      const siblingsArray = siblings.split(",").map((s: string) => BigInt(s));
 
-task("ciphernode:remove", "Remove a ciphernode from the registry")
-  .addParam("ciphernodeAddress", "address of ciphernode to remove")
-  .addParam("siblings", "comma separated siblings from tree proof")
-  .setAction(async function (taskArguments: TaskArguments, hre) {
-    const registry = await hre.deployments.get("CiphernodeRegistryOwnable");
+      const tx = await ciphernodeRegistry.removeCiphernode(
+        ciphernodeAddress,
+        siblingsArray,
+      );
+      await tx.wait();
 
-    const registryContract = await hre.ethers.getContractAt(
-      "CiphernodeRegistryOwnable",
-      registry.address,
-    );
+      console.log(`Ciphernode ${ciphernodeAddress} removed`);
+    },
+  }))
+  .build();
 
-    const siblings = taskArguments.siblings
-      .split(",")
-      .map((s: string) => BigInt(s));
+export const ciphernodeSiblings = task(
+  "ciphernode:siblings",
+  "Get the sibling of a ciphernode in the registry",
+)
+  .addOption({
+    name: "ciphernodeAddress",
+    description: "address of ciphernode to get siblings for",
+    defaultValue: ZeroAddress,
+  })
+  .addOption({
+    name: "ciphernodeAddresses",
+    description:
+      "comma separated addresses of ciphernodes in the order they were added to the registry",
+    defaultValue: ZeroAddress,
+  })
+  .setAction(async () => ({
+    default: async ({ ciphernodeAddress, ciphernodeAddresses }, _) => {
+      const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
+      const tree = new LeanIMT(hash);
 
-    const tx = await registryContract.removeCiphernode(
-      taskArguments.ciphernodeAddress,
-      siblings,
-    );
-    await tx.wait();
+      const addresses = ciphernodeAddresses.split(",");
 
-    console.log(`Ciphernode ${taskArguments.ciphernodeAddress} removed`);
-  });
+      for (const address of addresses) {
+        tree.insert(BigInt(address));
+      }
 
-task("ciphernode:siblings", "Get the sibling of a ciphernode in the registry")
-  .addParam("ciphernodeAddress", "address of ciphernode to get siblings for")
-  .addParam(
-    "ciphernodeAddresses",
-    "comma separated addresses of ciphernodes in the order they were added to the registry",
-  )
-  .setAction(async function (taskArguments: TaskArguments) {
-    const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
-    const tree = new LeanIMT(hash);
+      const index = tree.indexOf(BigInt(ciphernodeAddress));
+      const { siblings } = tree.generateProof(index);
 
-    const addresses = taskArguments.ciphernodeAddresses.split(",");
-
-    for (const address of addresses) {
-      tree.insert(BigInt(address));
-    }
-
-    const index = tree.indexOf(BigInt(taskArguments.ciphernodeAddress));
-    const { siblings } = tree.generateProof(index);
-
-    console.log(`Siblings for ${taskArguments.ciphernodeAddress}: ${siblings}`);
-  });
+      console.log(`Siblings for ${ciphernodeAddress}: ${siblings}`);
+    },
+  }))
+  .build();

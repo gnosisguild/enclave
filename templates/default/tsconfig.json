@@ -1,19 +1,25 @@
 {
   "compilerOptions": {
+    "lib": ["es2023"],
     "target": "ES2022",
-    "module": "nodenext",
-    "esModuleInterop": true,
-    "moduleResolution": "nodenext",
-    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "strict": true,
-    "noEmit": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true
   },
   "include": [
-    "./tests/**/*",
-    "./deploy/**/*",
-    "./server/**/*",
-    "hardhat.config.ts"
-  ]
+    "hardhat.config.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "tests/**/*.ts",
+    "types/**/*.ts",
+    "server/**/*.ts",
+    "deploy/**/*.ts",
+    "client/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "types"]
 }
