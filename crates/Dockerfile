@@ -46,8 +46,8 @@ COPY crates/data/Cargo.toml ./data/Cargo.toml
 COPY crates/enclaveup/Cargo.toml ./enclaveup/Cargo.toml
 COPY crates/entrypoint/Cargo.toml ./entrypoint/Cargo.toml
 COPY crates/events/Cargo.toml ./events/Cargo.toml
-COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY crates/evm/Cargo.toml ./evm/Cargo.toml
+COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY crates/fhe/Cargo.toml ./fhe/Cargo.toml
 COPY crates/fs/Cargo.toml ./fs/Cargo.toml
 COPY crates/indexer/Cargo.toml ./indexer/Cargo.toml
@@ -64,6 +64,7 @@ COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 COPY crates/trbfv/Cargo.toml ./trbfv/Cargo.toml
+COPY crates/utils/Cargo.toml ./utils/Cargo.toml
 COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
 
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
