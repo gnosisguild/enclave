@@ -223,7 +223,12 @@ async fn test_trbfv() -> Result<()> {
     };
 
     // Lets grab decryption share events
-    let expected = vec!["DecryptionShareCreated"];
+    let expected = vec![
+        "DecryptionShareCreated",
+        "DecryptionShareCreated",
+        "DecryptionShareCreated",
+    ];
+
     let h = nodes
         .take_history_with_timeout(1, expected.len(), Duration::from_secs(1000))
         .await?;

@@ -7,7 +7,9 @@
 use crate::{
     PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState,
     PlaintextRepositoryFactory, PublicKeyAggregator, PublicKeyAggregatorParams,
-    PublicKeyAggregatorState, PublicKeyRepositoryFactory,
+    PublicKeyAggregatorState, PublicKeyRepositoryFactory, ThresholdPlaintextAggregator,
+    ThresholdPlaintextAggregatorParams, ThresholdPlaintextAggregatorState,
+    TrBfvPlaintextRepositoryFactory,
 };
 use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
@@ -229,6 +231,115 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
         // send to context
         ctx.set_event_recipient("publickey", Some(value));
+
+        Ok(())
+    }
+}
+
+pub struct ThresholdPlaintextAggregatorExtension {
+    bus: Addr<EventBus<EnclaveEvent>>,
+    sortition: Addr<Sortition>,
+}
+
+impl ThresholdPlaintextAggregatorExtension {
+    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
+        Box::new(Self {
+            bus: bus.clone(),
+            sortition: sortition.clone(),
+        })
+    }
+}
+
+const ERROR_TRBFV_PLAINTEXT_META_MISSING:&str = "Could not create PlaintextAggregator because the meta instance it depends on was not set on the context.";
+
+#[async_trait]
+impl E3Extension for ThresholdPlaintextAggregatorExtension {
+    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
+        // Save plaintext aggregator
+        let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
+            return;
+        };
+
+        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
+            self.bus.err(
+                EnclaveErrorType::PlaintextAggregation,
+                anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
+            );
+            return;
+        };
+
+        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
+            self.bus.err(
+                EnclaveErrorType::PlaintextAggregation,
+                anyhow!(ERROR_PLAINTEXT_META_MISSING),
+            );
+            return;
+        };
+
+        let e3_id = data.e3_id.clone();
+        let repo = ctx.repositories().trbfv_plaintext(&e3_id);
+        let sync_state = repo.send(Some(ThresholdPlaintextAggregatorState::init(
+            meta.threshold_m,
+            meta.threshold_n,
+            meta.seed,
+            data.ciphertext_output.clone(),
+        )));
+
+        ctx.set_event_recipient(
+            "plaintext",
+            Some(
+                ThresholdPlaintextAggregator::new(
+                    ThresholdPlaintextAggregatorParams {
+                        fhe: fhe.clone(),
+                        bus: self.bus.clone(),
+                        sortition: self.sortition.clone(),
+                        e3_id: e3_id.clone(),
+                    },
+                    sync_state,
+                )
+                .start()
+                .into(),
+            ),
+        );
+    }
+
+    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
+        // No ID on the snapshot -> bail
+        if !snapshot.contains("plaintext") {
+            return Ok(());
+        }
+
+        let repo = ctx.repositories().trbfv_plaintext(&snapshot.e3_id);
+        let sync_state = repo.load().await?;
+
+        // No Snapshot returned from the store -> bail
+        if !sync_state.has() {
+            return Ok(());
+        };
+
+        // Get deps
+        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
+            self.bus.err(
+                EnclaveErrorType::PlaintextAggregation,
+                anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
+            );
+            return Ok(());
+        };
+
+        let value = ThresholdPlaintextAggregator::new(
+            ThresholdPlaintextAggregatorParams {
+                fhe: fhe.clone(),
+                bus: self.bus.clone(),
+                sortition: self.sortition.clone(),
+                e3_id: ctx.e3_id.clone(),
+            },
+            sync_state,
+        )
+        .start()
+        .into();
+
+        // send to context
+        ctx.set_event_recipient("plaintext", Some(value));
 
         Ok(())
     }

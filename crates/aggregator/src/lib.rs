@@ -8,12 +8,13 @@ pub mod ext;
 mod plaintext_aggregator;
 mod publickey_aggregator;
 mod repo;
-
+mod trbfv_plaintext_aggregator;
 pub use plaintext_aggregator::{
     PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState,
 };
 pub use publickey_aggregator::{
     PublicKeyAggregator, PublicKeyAggregatorParams, PublicKeyAggregatorState,
 };
+pub use trbfv_plaintext_aggregator::*;
 
 pub use repo::*;

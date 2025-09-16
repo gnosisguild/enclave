@@ -5,7 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.;
 
 use actix::{Actor, Addr};
-use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
+use e3_aggregator::ext::{
+    PlaintextAggregatorExtension, PublicKeyAggregatorExtension,
+    ThresholdPlaintextAggregatorExtension,
+};
 use e3_crypto::Cipher;
 use e3_data::{DataStore, InMemStore, RepositoriesFactory};
 use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
@@ -26,6 +29,7 @@ pub struct CiphernodeBuilder {
     logging: bool,
     errors: bool,
     pubkey_agg: bool,
+    threshold_plaintext_agg: bool,
     plaintext_agg: bool,
     source_bus: Option<Addr<EventBus<EnclaveEvent>>>,
     injected_multithread: Option<Addr<Multithread>>,
@@ -44,6 +48,7 @@ impl CiphernodeBuilder {
             errors: false,
             pubkey_agg: false,
             plaintext_agg: false,
+            threshold_plaintext_agg: false,
             source_bus: None,
             data: None,
             injected_multithread: None,
@@ -99,6 +104,11 @@ impl CiphernodeBuilder {
 
     pub fn with_injected_multithread(mut self, multithread: Addr<Multithread>) -> Self {
         self.injected_multithread = Some(multithread);
+        self
+    }
+
+    pub fn with_threshold_plaintext_aggregation(mut self) -> Self {
+        self.threshold_plaintext_agg = true;
         self
     }
 
@@ -173,6 +183,12 @@ impl CiphernodeBuilder {
         if self.plaintext_agg {
             e3_builder =
                 e3_builder.with(PlaintextAggregatorExtension::create(&local_bus, &sortition))
+        }
+
+        if self.threshold_plaintext_agg {
+            e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
+                &local_bus, &sortition,
+            ))
         }
 
         if !self.trbfv {
