@@ -505,12 +505,12 @@ impl ThresholdKeyshare {
 
     pub fn create_calculate_decryption_share_request(
         &mut self,
-        ciphertext_output: Vec<u8>,
+        ciphertext_output: Vec<u8>, // TODO: should be a Vec<ArcBytes>
     ) -> Result<ComputeRequest> {
         self.set_state_to_decrypting()?;
         let state = self.state.get().ok_or(anyhow!("State not set."))?;
         let decrypting: Decrypting = state.clone().try_into()?;
-        let ciphertexts = vec![ArcBytes::from_bytes(ciphertext_output)];
+        let ciphertexts = vec![ArcBytes::from_bytes(ciphertext_output)]; // HACK
         let trbfv_config = state.get_trbfv_config();
 
         let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(
@@ -524,6 +524,7 @@ impl ThresholdKeyshare {
         ));
         Ok(event)
     }
+
     pub fn create_decryption_share_event(
         &self,
         response: CalculateDecryptionShareResponse,
@@ -545,11 +546,21 @@ impl ThresholdKeyshare {
                 .clone(),
         }))
     }
+
     pub fn try_send_decryption_share(&self, event: EnclaveEvent) -> Result<()> {
         let bus = self.bus.clone();
 
         bus.do_send(event);
         Ok(())
+    }
+
+    pub fn try_mark_decryption_complete(&mut self) -> Result<()> {
+        self.state.try_mutate(|s| {
+            use KeyshareState as K;
+            println!("Try mark decryption complete");
+
+            s.new_state(K::Completed)
+        })
     }
 }
 
@@ -584,7 +595,7 @@ impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
         } = msg;
 
         let event = match self.create_calculate_decryption_share_request(ciphertext_output) {
-            Ok(a) => a,
+            Ok(request) => request,
             Err(e) => {
                 println!("{e}");
                 return bail(self);
@@ -595,7 +606,7 @@ impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
             self.multithread
                 .send(event)
                 .into_actor(self)
-                .map(move |res, act, ctx| {
+                .map(move |res, act, _| {
                     let c = || -> Result<()> {
                         let res = res??;
                         let event = act.create_decryption_share_event(res.try_into()?)?;
@@ -603,7 +614,7 @@ impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
                         act.try_send_decryption_share(event)?;
 
                         // mark as complete
-                        // act.try_mark_decryption_complete()?;
+                        act.try_mark_decryption_complete()?;
 
                         Ok(())
                     };

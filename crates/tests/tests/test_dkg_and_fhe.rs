@@ -222,5 +222,14 @@ async fn test_trbfv() -> Result<()> {
         decrypted_output: expected_bytes.clone(),
     };
 
+    // Lets grab decryption share events
+    //
+    let expected = vec!["DecryptionShareCreated"];
+    let h = nodes
+        .take_history_with_timeout(1, expected.len(), Duration::from_secs(1000))
+        .await?;
+
+    println!("{:?}", h.event_types());
+
     Ok(())
 }
