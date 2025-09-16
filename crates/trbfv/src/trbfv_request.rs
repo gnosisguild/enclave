@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use core::fmt;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -49,4 +51,24 @@ pub enum TrBFVError {
     CalculateDecryptionKey,
     CalculateDecryptionShare,
     CalculateThresholdDecryption,
+}
+
+impl std::error::Error for TrBFVError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for TrBFVError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TrBFVError::GenEsiSss => write!(f, "GenEsiSss"),
+            TrBFVError::GenPkShareAndSkSss => write!(f, "GenPkShareAndSkSss"),
+            TrBFVError::CalculateDecryptionKey => write!(f, "CalculateDecryptionKey"),
+            TrBFVError::CalculateDecryptionShare => write!(f, "CalculateDecryptionShare"),
+            TrBFVError::CalculateThresholdDecryption => write!(f, "CalculateThresholdDecryption"),
+        }
+    }
 }

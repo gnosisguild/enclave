@@ -4,13 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Arc;
-
 use crate::{E3Context, E3ContextSnapshot, E3Extension, MetaRepositoryFactory, TypedKey};
 use anyhow::*;
 use async_trait::async_trait;
 use e3_data::RepositoriesFactory;
 use e3_events::{E3Requested, EnclaveEvent, Seed};
+use e3_utils::utility_types::ArcBytes;
 
 pub const META_KEY: TypedKey<E3Meta> = TypedKey::new("meta");
 
@@ -19,7 +18,7 @@ pub struct E3Meta {
     pub threshold_m: usize,
     pub threshold_n: usize,
     pub seed: Seed,
-    pub params: Arc<Vec<u8>>,
+    pub params: ArcBytes,
 }
 
 pub struct E3MetaExtension;

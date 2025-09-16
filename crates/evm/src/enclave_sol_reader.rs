@@ -16,6 +16,7 @@ use alloy::{sol, sol_types::SolEvent};
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{E3id, EnclaveEvent, EventBus};
+use e3_utils::utility_types::ArcBytes;
 use num_bigint::BigUint;
 use tracing::{error, info, trace};
 
@@ -30,11 +31,13 @@ struct E3RequestedWithChainId(pub IEnclave::E3Requested, pub u64);
 impl From<E3RequestedWithChainId> for e3_events::E3Requested {
     fn from(value: E3RequestedWithChainId) -> Self {
         e3_events::E3Requested {
-            params: Arc::new(value.0.e3.e3ProgramParams.to_vec()),
+            params: ArcBytes::from_bytes(value.0.e3.e3ProgramParams.to_vec()),
             threshold_m: value.0.e3.threshold[0] as usize,
             threshold_n: value.0.e3.threshold[1] as usize,
             seed: value.0.e3.seed.into(),
-            error_size: Arc::new(BigUint::from(10000000000000000000000000u128).to_bytes_be()), // XXX: what should be here?
+            error_size: ArcBytes::from_bytes(
+                BigUint::from(10000000000000000000000000u128).to_bytes_be(),
+            ), // XXX: what should be here?
             esi_per_ct: 3, // XXX: HARD CODING FOR NOW
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
         }

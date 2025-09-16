@@ -24,6 +24,7 @@ use e3_test_helpers::{
     create_random_eth_addrs, create_shared_rng_from_u64, get_common_setup, simulate_libp2p_net,
     AddToCommittee,
 };
+use e3_utils::utility_types::ArcBytes;
 use fhe::{
     bfv::{BfvParameters, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
@@ -236,7 +237,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     let e3_request_event = EnclaveEvent::from(E3Requested {
         e3_id: e3_id.clone(),
-        params: Arc::new(encode_bfv_params(&params)),
+        params: ArcBytes::from_bytes(encode_bfv_params(&params)),
         seed: seed.clone(),
         threshold_m: 3,
         threshold_n: 3, // Need to use n now to suggest committee size
@@ -335,7 +336,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
                 threshold_m: 2,
                 threshold_n: 2,
                 seed: seed.clone(),
-                params: Arc::new(encode_bfv_params(&params)),
+                params: ArcBytes::from_bytes(encode_bfv_params(&params)),
                 ..E3Requested::default()
             })
             .clone(),
@@ -537,7 +538,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         threshold_m: 3,
         threshold_n: 3,
         seed: seed.clone(),
-        params: Arc::new(encode_bfv_params(&params)),
+        params: ArcBytes::from_bytes(encode_bfv_params(&params)),
         ..E3Requested::default()
     }))
     .await?;
@@ -568,7 +569,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
         threshold_m: 3,
         threshold_n: 3,
         seed: seed.clone(),
-        params: Arc::new(encode_bfv_params(&params)),
+        params: ArcBytes::from_bytes(encode_bfv_params(&params)),
         ..E3Requested::default()
     }))
     .await?;
@@ -612,7 +613,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
         threshold_m: 3,
         threshold_n: 3,
         seed: seed.clone(),
-        params: Arc::new(vec![1, 2, 3, 4]),
+        params: ArcBytes::from_bytes(vec![1, 2, 3, 4]),
         ..E3Requested::default()
     });
 

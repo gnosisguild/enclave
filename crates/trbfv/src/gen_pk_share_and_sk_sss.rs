@@ -7,11 +7,12 @@
 /// This module defines event payloads that will generate the public key share as well as the sk shamir secret shares to be distributed to other members of the committee.
 /// This has been separated from the esi setup in order to be able to take advantage of parallelism
 use crate::{
-    shares::{EncryptedShareSetCollection, ShareSet, ShareSetCollection},
-    ArcBytes, SharedRng, TrBFVConfig,
+    shares::{EncryptedShareSetCollection, ShareSetCollection},
+    SharedRng, TrBFVConfig,
 };
 use anyhow::Result;
 use e3_crypto::Cipher;
+use e3_utils::utility_types::ArcBytes;
 use fhe::{
     bfv::SecretKey,
     mbfv::{CommonRandomPoly, PublicKeyShare},
@@ -19,7 +20,6 @@ use fhe::{
 };
 use fhe_traits::Serialize as FheSerialize;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GenPkShareAndSkSssRequest {
@@ -59,7 +59,7 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
     fn try_from(
         (value, cipher): (InnerResponse, &Cipher),
     ) -> std::result::Result<Self, Self::Error> {
-        let pk_share = Arc::new(value.pk_share.to_bytes());
+        let pk_share = ArcBytes::from_bytes(value.pk_share.to_bytes());
         let sk_sss = value.sk_sss.encrypt(cipher)?;
         Ok(GenPkShareAndSkSssResponse { pk_share, sk_sss })
     }

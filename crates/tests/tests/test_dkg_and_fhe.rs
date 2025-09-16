@@ -20,12 +20,13 @@ use e3_test_helpers::{
     create_seed_from_u64, create_shared_rng_from_u64, encrypt_ciphertext, rand_eth_addr,
     AddToCommittee,
 };
+use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::PublicKey;
 use fhe::{
     bfv,
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
 };
-use fhe_traits::{Deserialize, DeserializeParametrized, Serialize};
+use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
 use std::time::Duration;
 use std::{fs, sync::Arc};
@@ -85,10 +86,10 @@ async fn test_trbfv() -> Result<()> {
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
 
     // Common Random Polynomial for BFV
-    let crp = create_crp(params_raw.clone(), rng.clone());
+    let _crp = create_crp(params_raw.clone(), rng.clone());
 
     // Encoded Params
-    let params = Arc::new(encode_bfv_params(&params_raw.clone()));
+    let params = ArcBytes::from_bytes(encode_bfv_params(&params_raw.clone()));
 
     // Cipher
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
@@ -144,7 +145,7 @@ async fn test_trbfv() -> Result<()> {
     // let crp = create_crp(params_raw.clone(), create_rng_from_seed(seed));
 
     // Calculate Error Size for E3Program (this will be done by the E3Program implementor)
-    let error_size = Arc::new(BigUint::to_bytes_be(&calculate_error_size(
+    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
         params_raw.clone(),
         5,
         3,

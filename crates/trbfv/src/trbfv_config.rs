@@ -6,10 +6,10 @@
 
 use std::sync::Arc;
 
+use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::BfvParameters;
 use serde::{Deserialize, Serialize};
 
-use crate::ArcBytes;
 use e3_bfv_helpers::decode_bfv_params_arc;
 
 /// Convenience struct for holding threshold BFV configuration parameters

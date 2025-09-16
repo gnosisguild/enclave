@@ -7,3 +7,5 @@ description.workspace = true
 repository.workspace = true
 
 [dependencies]
+derivative.workspace = true
+serde.workspace = true

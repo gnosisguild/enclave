@@ -19,6 +19,7 @@ e3-fhe = { workspace = true }
 e3-multithread = { workspace = true }
 e3-request = { workspace = true }
 e3-trbfv = { workspace = true }
+e3-utils = { workspace = true }
 fhe-traits = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

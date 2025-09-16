@@ -16,19 +16,23 @@ use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    CiphernodeSelected, CiphertextOutputPublished, ComputeRequest, ComputeResponse, E3id,
-    EnclaveEvent, EventBus, KeyshareCreated, PartyId, ThresholdShare, ThresholdShareCreated,
+    CiphernodeSelected, CiphertextOutputPublished, ComputeRequest, ComputeResponse,
+    DecryptionshareCreated, E3id, EnclaveEvent, EventBus, KeyshareCreated, PartyId, ThresholdShare,
+    ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
 use e3_trbfv::{
     calculate_decryption_key::CalculateDecryptionKeyRequest,
-    calculate_decryption_share::CalculateDecryptionShareRequest,
-    gen_esi_sss::GenEsiSssRequest,
+    calculate_decryption_share::{
+        CalculateDecryptionShareRequest, CalculateDecryptionShareResponse,
+    },
+    gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
     gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest,
     shares::{EncryptedShareSetCollection, ShareSetCollection},
     SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
+use e3_utils::utility_types::ArcBytes;
 use fhe_traits::Serialize;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -72,28 +76,28 @@ impl From<HashMap<u64, Arc<ThresholdShare>>> for AllThresholdSharesCollected {
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingThresholdShareData {
-    pk_share: Option<Arc<Vec<u8>>>,
+    pk_share: Option<ArcBytes>,
     sk_sss: Option<EncryptedShareSetCollection>,
     esi_sss: Option<Vec<EncryptedShareSetCollection>>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AggregatingDecryptionKey {
-    pk_share: Arc<Vec<u8>>,
+    pk_share: ArcBytes,
     sk_sss: EncryptedShareSetCollection,
     esi_sss: Vec<EncryptedShareSetCollection>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReadyForDecryption {
-    pk_share: Arc<Vec<u8>>,
+    pk_share: ArcBytes,
     sk_poly_sum: SensitiveBytes,
     es_poly_sum: Vec<SensitiveBytes>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Decrypting {
-    pk_share: Arc<Vec<u8>>,
+    pk_share: ArcBytes,
     sk_poly_sum: SensitiveBytes,
     es_poly_sum: Vec<SensitiveBytes>,
 }
@@ -165,7 +169,7 @@ pub struct ThresholdKeyshareState {
     pub state: KeyshareState,
     pub threshold_m: u64,
     pub threshold_n: u64,
-    pub params: Arc<Vec<u8>>,
+    pub params: ArcBytes,
 }
 
 impl ThresholdKeyshareState {
@@ -175,7 +179,7 @@ impl ThresholdKeyshareState {
         state: KeyshareState,
         threshold_m: u64,
         threshold_n: u64,
-        params: Arc<Vec<u8>>,
+        params: ArcBytes,
         address: String,
     ) -> Self {
         Self {
@@ -217,12 +221,16 @@ impl ThresholdKeyshareState {
         self.threshold_n
     }
 
-    pub fn get_params(&self) -> &Arc<Vec<u8>> {
+    pub fn get_params(&self) -> &ArcBytes {
         &self.params
     }
 
-    pub fn get_address(&self) -> &String {
+    pub fn get_address(&self) -> &str {
         &self.address
+    }
+
+    pub fn variant_name(&self) -> &str {
+        self.state.variant_name()
     }
 }
 
@@ -382,7 +390,7 @@ impl ThresholdKeyshare {
 
     pub fn try_store_pk_share_and_sk_sss(
         &mut self,
-        pk_share: Arc<Vec<u8>>,
+        pk_share: ArcBytes,
         sk_sss: EncryptedShareSetCollection,
     ) -> Result<()> {
         use KeyshareState as K;
@@ -442,7 +450,7 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    pub fn try_start_decryption(&mut self) -> Result<()> {
+    pub fn set_state_to_decrypting(&mut self) -> Result<()> {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
 
@@ -484,11 +492,11 @@ impl ThresholdKeyshare {
     pub fn dispatch_keyshare_created(&self) -> Result<()> {
         let state = self.state.get().ok_or(anyhow!("state not set"))?;
         let e3_id = state.get_e3_id().clone();
-        let address = state.get_address().clone();
+        let address = state.get_address().to_owned();
         let current: ReadyForDecryption = state.clone().try_into()?;
 
         self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
-            pubkey: (*current.pk_share).clone(), // TODO: change KeyshareCreated to accept Arc<Vec<u8>>
+            pubkey: current.pk_share.extract_bytes(), // TODO: change KeyshareCreated to accept ArcBytes
             e3_id,
             node: address,
         }));
@@ -499,10 +507,10 @@ impl ThresholdKeyshare {
         &mut self,
         ciphertext_output: Vec<u8>,
     ) -> Result<ComputeRequest> {
-        self.try_start_decryption()?;
+        self.set_state_to_decrypting()?;
         let state = self.state.get().ok_or(anyhow!("State not set."))?;
         let decrypting: Decrypting = state.clone().try_into()?;
-        let ciphertexts = vec![Arc::new(ciphertext_output)];
+        let ciphertexts = vec![ArcBytes::from_bytes(ciphertext_output)];
         let trbfv_config = state.get_trbfv_config();
 
         let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(
@@ -515,6 +523,33 @@ impl ThresholdKeyshare {
             .into(),
         ));
         Ok(event)
+    }
+    pub fn create_decryption_share_event(
+        &self,
+        response: CalculateDecryptionShareResponse,
+    ) -> Result<EnclaveEvent> {
+        let state = self.state.get().ok_or(anyhow!("Failed to get state"))?;
+        let node = state.address;
+        let e3_id = state.e3_id;
+        let decryption_share = response.d_share_poly;
+        Ok(EnclaveEvent::from(DecryptionshareCreated {
+            node,
+            e3_id,
+            // XXX: We need to be able to have arbitrary numbers of ciphertexts to be decrypted
+            // currently we only have 1 on the event. We need to go through and correlate this
+            // ensuring we know how many shares we are holding per decription index and work out a
+            // strategy there
+            decryption_share: decryption_share
+                .first()
+                .ok_or(anyhow!("no decryption found on response"))?
+                .clone(),
+        }))
+    }
+    pub fn try_send_decryption_share(&self, event: EnclaveEvent) -> Result<()> {
+        let bus = self.bus.clone();
+
+        bus.do_send(event);
+        Ok(())
     }
 }
 
@@ -560,7 +595,24 @@ impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
             self.multithread
                 .send(event)
                 .into_actor(self)
-                .map(move |res, act, ctx| {}),
+                .map(move |res, act, ctx| {
+                    let c = || -> Result<()> {
+                        let res = res??;
+                        let event = act.create_decryption_share_event(res.try_into()?)?;
+                        // send the decryption share
+                        act.try_send_decryption_share(event)?;
+
+                        // mark as complete
+                        // act.try_mark_decryption_complete()?;
+
+                        Ok(())
+                    };
+
+                    match c() {
+                        Ok(_) => (),
+                        Err(e) => eprintln!("{:?}", e),
+                    }
+                }),
         )
     }
 }
@@ -624,23 +676,23 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
                 .send(event)
                 .into_actor(self)
                 .map(move |res, act, ctx| {
-                    let c = || {
+                    let c = || -> Result<()> {
                         println!("\nRECEIVED GEN ESI SSS");
-                        let Ok(ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(output))) = res?
-                        else {
-                            bail!("Error extracting data from compute process")
-                        };
+
+                        let output: GenEsiSssResponse = res??.try_into()?;
 
                         println!("\nSTORING GEN ESI SSS...");
+
                         act.try_store_esi_sss(output.esi_sss)?;
 
-                        if let Some(ThresholdKeyshareState {
-                            state: KeyshareState::AggregatingDecryptionKey { .. },
-                            ..
-                        }) = act.state.get()
-                        {
-                            ctx.notify(SharesGenerated)
-                        }
+                        let Some(state) = act.state.get() else {
+                            bail!("State not found.")
+                        };
+
+                        match state.variant_name() {
+                            "AggregatingDecryptionKey" => ctx.notify(SharesGenerated),
+                            _ => bail!("State expected to be AggregatingDecryptionKey"),
+                        };
 
                         Ok(())
                     };
@@ -648,7 +700,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
                     match c() {
                         Ok(_) => (),
                         Err(e) => println!("There was an error: GenEsiSss, {}", e),
-                    };
+                    }
                 }),
         )
     }
@@ -665,7 +717,8 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
 
         let trbfv_config: TrBFVConfig = state.get_trbfv_config();
 
-        let crp = Arc::new(create_crp(trbfv_config.params(), self.rng.clone()).to_bytes());
+        let crp =
+            ArcBytes::from_bytes(create_crp(trbfv_config.params(), self.rng.clone()).to_bytes());
         let event = ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(
             GenPkShareAndSkSssRequest { trbfv_config, crp }.into(),
         ));

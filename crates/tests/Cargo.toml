@@ -30,6 +30,7 @@ e3-sdk = { workspace = true }
 e3-sortition = { workspace = true }
 e3-test-helpers = { workspace = true }
 e3-trbfv = { workspace = true }
+e3-utils = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 fhe = { workspace = true }

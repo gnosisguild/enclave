@@ -20,7 +20,6 @@ use std::sync::{Arc, Mutex};
 
 pub use trbfv_config::*;
 
-pub type ArcBytes = Arc<Vec<u8>>;
 pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 /// Semantic PartyId
 pub type PartyId = u64;

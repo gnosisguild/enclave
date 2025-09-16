@@ -6,15 +6,11 @@
 
 use crate::{E3id, Seed};
 use actix::Message;
-use derivative::Derivative;
+use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{self, Display},
-    sync::Arc,
-};
+use std::fmt::{self, Display};
 
-#[derive(Derivative, Message, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derivative(Debug)]
+#[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct E3Requested {
     /// The E3 round ID
@@ -25,24 +21,22 @@ pub struct E3Requested {
     pub threshold_n: usize,
     /// A seed to provide randomness for the round
     pub seed: Seed,
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     /// The error size for the FHE computation. This can be calculated for the E3 program based on
     /// the size of the ciphertext and the depth of the program [tbd add link]
-    pub error_size: Arc<Vec<u8>>,
+    pub error_size: ArcBytes,
     /// The number of smudging noise per ciphertext.
     pub esi_per_ct: usize,
     /// The FHE parameters
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub params: Arc<Vec<u8>>,
+    pub params: ArcBytes,
 }
 
 impl Default for E3Requested {
     fn default() -> Self {
         E3Requested {
             e3_id: E3id::new("99", 0),
-            error_size: Arc::new(vec![]),
+            error_size: ArcBytes::from_bytes(vec![]),
             esi_per_ct: 0,
-            params: Arc::new(vec![]),
+            params: ArcBytes::from_bytes(vec![]),
             seed: Seed([0u8; 32]),
             threshold_m: 0,
             threshold_n: 0,

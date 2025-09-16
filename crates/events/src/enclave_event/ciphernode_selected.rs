@@ -6,26 +6,20 @@
 
 use crate::{E3id, Seed};
 use actix::Message;
-use derivative::Derivative;
+use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{self, Display},
-    sync::Arc,
-};
+use std::fmt::{self, Display};
 
-#[derive(Derivative, Message, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derivative(Debug)]
+#[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct CiphernodeSelected {
     pub e3_id: E3id,
     pub threshold_m: usize,
     pub threshold_n: usize,
     pub seed: Seed,
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub error_size: Arc<Vec<u8>>,
+    pub error_size: ArcBytes,
     pub esi_per_ct: usize,
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub params: Arc<Vec<u8>>,
+    pub params: ArcBytes,
     pub party_id: u64,
 }
 
@@ -33,9 +27,9 @@ impl Default for CiphernodeSelected {
     fn default() -> Self {
         CiphernodeSelected {
             e3_id: E3id::new("99", 0),
-            error_size: Arc::new(vec![]),
+            error_size: ArcBytes::from_bytes(vec![]),
             esi_per_ct: 0,
-            params: Arc::new(vec![]),
+            params: ArcBytes::from_bytes(vec![]),
             party_id: 0,
             seed: Seed([0u8; 32]),
             threshold_m: 0,

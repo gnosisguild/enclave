@@ -10,6 +10,7 @@ repository = "https://github.com/gnosisguild/enclave/crates/request"
 actix = { workspace = true }
 e3-events = { workspace = true }
 e3-data = { workspace = true}
+e3-utils = { workspace = true}
 anyhow = { workspace = true }
 serde = { workspace = true }
 e3-config = { workspace = true }

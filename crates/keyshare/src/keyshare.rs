@@ -13,6 +13,7 @@ use e3_events::{
     E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
 use e3_fhe::{DecryptCiphertext, Fhe};
+use e3_utils::utility_types::ArcBytes;
 use std::sync::Arc;
 use tracing::warn;
 
@@ -151,7 +152,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
 
         self.bus.do_send(EnclaveEvent::from(DecryptionshareCreated {
             e3_id,
-            decryption_share,
+            decryption_share: ArcBytes::from_bytes(decryption_share),
             node: self.address.clone(),
         }));
     }

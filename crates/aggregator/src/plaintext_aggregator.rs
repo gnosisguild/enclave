@@ -173,7 +173,7 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                     }
 
                     // add the keyshare and
-                    act.add_share(decryption_share)?;
+                    act.add_share(decryption_share.extract_bytes())?;
 
                     // Check the state and if it has changed to the computing
                     if let Some(PlaintextAggregatorState::Computing {

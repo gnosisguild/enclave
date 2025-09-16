@@ -6,16 +6,15 @@
 
 use crate::E3id;
 use actix::Message;
-use derivative::Derivative;
+use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-#[derive(Derivative, Message, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derivative(Debug)]
+#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct DecryptionshareCreated {
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub decryption_share: Vec<u8>,
+    pub decryption_share: ArcBytes, // per index depending on what is required for the
+    // ciphertext
     pub e3_id: E3id,
     pub node: String,
 }

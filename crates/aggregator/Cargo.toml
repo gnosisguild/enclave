@@ -18,4 +18,5 @@ e3-fhe = { workspace = true }
 e3-sortition = {  workspace = true }
 e3-request = { workspace = true }
 e3-data = { workspace = true }
+e3-utils = { workspace = true }
 tracing = { workspace = true }
