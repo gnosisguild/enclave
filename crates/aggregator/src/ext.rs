@@ -62,6 +62,7 @@ impl E3Extension for PlaintextAggregatorExtension {
         let repo = ctx.repositories().plaintext(&e3_id);
         let sync_state = repo.send(Some(PlaintextAggregatorState::init(
             meta.threshold_m,
+            meta.threshold_n,
             meta.seed,
             data.ciphertext_output.clone(),
         )));

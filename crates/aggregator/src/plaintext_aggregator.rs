@@ -20,6 +20,7 @@ use tracing::error;
 pub enum PlaintextAggregatorState {
     Collecting {
         threshold_m: usize,
+        threshold_n: usize,
         shares: OrderedSet<Vec<u8>>,
         seed: Seed,
         ciphertext_output: Vec<u8>,
@@ -35,9 +36,15 @@ pub enum PlaintextAggregatorState {
 }
 
 impl PlaintextAggregatorState {
-    pub fn init(threshold_m: usize, seed: Seed, ciphertext_output: Vec<u8>) -> Self {
+    pub fn init(
+        threshold_m: usize,
+        threshold_n: usize,
+        seed: Seed,
+        ciphertext_output: Vec<u8>,
+    ) -> Self {
         PlaintextAggregatorState::Collecting {
             threshold_m,
+            threshold_n,
             shares: OrderedSet::new(),
             seed,
             ciphertext_output,
@@ -138,14 +145,14 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
 
     fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
         let Some(PlaintextAggregatorState::Collecting {
-            threshold_m, seed, ..
+            threshold_n, seed, ..
         }) = self.state.get()
         else {
             error!(state=?self.state, "Aggregator has been closed for collecting.");
             return Box::pin(fut::ready(Ok(())));
         };
 
-        let size = threshold_m;
+        let size = threshold_n;
         let address = event.node;
         let chain_id = event.e3_id.chain_id();
         let e3_id = event.e3_id.clone();
