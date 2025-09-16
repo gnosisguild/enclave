@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::ticket::{best_ticket_for_node, RegisteredNode, WinnerTicket};
+use crate::ticket::RegisteredNode;
 use crate::ticket_sortition::ScoreSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
@@ -93,23 +93,8 @@ impl SortitionList<String> for SortitionModule {
 
         let seed_u64: u64 = seed.into();
 
-        // Compute per-node winners (skip nodes without tickets)
-        let mut winners: Vec<WinnerTicket> = Vec::with_capacity(self.registered.len());
-        for node in &self.registered {
-            if node.tickets.is_empty() {
-                continue;
-            }
-            if let Ok(w) = best_ticket_for_node(seed_u64, node) {
-                winners.push(w);
-            }
-        }
-
-        if winners.is_empty() {
-            return Ok(false);
-        }
-
-        // Select top-N committee
-        let committee = ScoreSortition::new(size).get_committee(&winners)?;
+        // Let ScoreSortition compute each node's winner internally from the snapshot.
+        let committee = ScoreSortition::new(size).get_committee(seed_u64, &self.registered)?;
 
         // Membership check
         let want: Address = address.parse()?;
