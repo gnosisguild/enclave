@@ -18,11 +18,13 @@ e3-crypto = { workspace = true }
 e3-config = { workspace = true }
 e3-data = { workspace = true }
 e3-events = { workspace = true }
+e3-utils = { workspace = true }
 futures-util = { workspace = true }
 e3-sortition = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+num-bigint = { workspace = true }
 url = { workspace = true }
 zeroize = { workspace = true }
 

@@ -12,7 +12,7 @@ use e3_events::{
     Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};
-use e3_sortition::{GetHasNode, Sortition};
+use e3_sortition::{GetNodeIndex, Sortition};
 use std::sync::Arc;
 use tracing::error;
 
@@ -20,6 +20,7 @@ use tracing::error;
 pub enum PlaintextAggregatorState {
     Collecting {
         threshold_m: usize,
+        threshold_n: usize,
         shares: OrderedSet<Vec<u8>>,
         seed: Seed,
         ciphertext_output: Vec<u8>,
@@ -35,9 +36,15 @@ pub enum PlaintextAggregatorState {
 }
 
 impl PlaintextAggregatorState {
-    pub fn init(threshold_m: usize, seed: Seed, ciphertext_output: Vec<u8>) -> Self {
+    pub fn init(
+        threshold_m: usize,
+        threshold_n: usize,
+        seed: Seed,
+        ciphertext_output: Vec<u8>,
+    ) -> Self {
         PlaintextAggregatorState::Collecting {
             threshold_m,
+            threshold_n,
             shares: OrderedSet::new(),
             seed,
             ciphertext_output,
@@ -138,14 +145,14 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
 
     fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
         let Some(PlaintextAggregatorState::Collecting {
-            threshold_m, seed, ..
+            threshold_n, seed, ..
         }) = self.state.get()
         else {
             error!(state=?self.state, "Aggregator has been closed for collecting.");
             return Box::pin(fut::ready(Ok(())));
         };
 
-        let size = threshold_m;
+        let size = threshold_n;
         let address = event.node;
         let chain_id = event.e3_id.chain_id();
         let e3_id = event.e3_id.clone();
@@ -153,7 +160,7 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
 
         Box::pin(
             self.sortition
-                .send(GetHasNode {
+                .send(GetNodeIndex {
                     chain_id,
                     address,
                     size,
@@ -161,11 +168,11 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                 })
                 .into_actor(self)
                 .map(move |res, act, ctx| {
-                    let has_node = res?;
-                    if !has_node {
+                    let maybe_found_index = res?;
+                    let Some(_) = maybe_found_index else {
                         error!("Node not found in committee");
                         return Ok(());
-                    }
+                    };
 
                     if e3_id != act.e3_id {
                         error!("Wrong e3_id sent to aggregator. This should not happen.");
@@ -173,7 +180,7 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                     }
 
                     // add the keyshare and
-                    act.add_share(decryption_share)?;
+                    act.add_share(decryption_share.extract_bytes())?;
 
                     // Check the state and if it has changed to the computing
                     if let Some(PlaintextAggregatorState::Computing {

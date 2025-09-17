@@ -13,7 +13,8 @@ use std::fmt::{self, Display};
 #[rtype(result = "()")]
 pub struct CiphertextOutputPublished {
     pub e3_id: E3id,
-    pub ciphertext_output: Vec<u8>,
+    pub ciphertext_output: Vec<u8>, // TODO: change this to be Vec<ArcBytes> and use that to keep
+                                    // track of how many ciphertexts we are decrypting
 }
 
 impl Display for CiphertextOutputPublished {

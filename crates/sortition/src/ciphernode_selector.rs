@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{GetHasNode, Sortition};
+use crate::{GetNodeIndex, Sortition};
 /// CiphernodeSelector is an actor that determines if a ciphernode is part of a committee and if so
 /// forwards a CiphernodeSelected event to the event bus
 use actix::prelude::*;
@@ -63,6 +63,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, data: E3Requested, _ctx: &mut Self::Context) -> Self::Result {
+        info!("CiphernodeSelector is handling E3Requested!!!");
         let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
@@ -70,10 +71,15 @@ impl Handler<E3Requested> for CiphernodeSelector {
 
         Box::pin(async move {
             let seed = data.seed;
-            let size = data.threshold_m;
-
-            if let Ok(is_selected) = sortition
-                .send(GetHasNode {
+            let size = data.threshold_n;
+            info!(
+                "Calling GetNodeIndex address={} seed={} size={}",
+                address.clone(),
+                seed,
+                size
+            );
+            if let Ok(found_index) = sortition
+                .send(GetNodeIndex {
                     chain_id,
                     seed,
                     address: address.clone(),
@@ -81,15 +87,23 @@ impl Handler<E3Requested> for CiphernodeSelector {
                 })
                 .await
             {
-                if !is_selected {
+                let Some(party_id) = found_index else {
                     info!(node = address, "Ciphernode was not selected");
                     return;
-                }
-
+                };
+                info!("CIPHERNODE SELECTED: node={} address={}", party_id, address);
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+                    party_id,
                     e3_id: data.e3_id,
                     threshold_m: data.threshold_m,
+                    threshold_n: data.threshold_n,
+                    esi_per_ct: data.esi_per_ct,
+                    error_size: data.error_size,
+                    params: data.params.clone(),
+                    seed: data.seed.clone(),
                 }));
+            } else {
+                info!("This node is not selected");
             }
         })
     }
@@ -98,7 +112,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
 impl Handler<Shutdown> for CiphernodeSelector {
     type Result = ();
     fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) -> Self::Result {
-        tracing::info!("Killing CiphernodeSelector");
+        info!("Killing CiphernodeSelector");
         ctx.stop();
     }
 }
