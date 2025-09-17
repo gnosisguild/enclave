@@ -4,7 +4,42 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import init from "./dist/web/e3_wasm.js";
+import * as bindgen from "../srcWasm/summon_ts_wasm.js";
+
+let promise;
+
 export default async function initializeWasm(initParams) {
-  return await init(initParams);
+  promise ??= (async () => {
+    const { default: base64 } = await import(
+      "../srcWasm/summon_ts_wasm_base64.js"
+    );
+
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    bindgen.initSync({ module: bytes });
+    bindgen.init_ext();
+    lib = bindgen;
+
+    return bindgen;
+  })();
+
+  return promise;
+}
+
+function base64ToUint8Array(base64) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return bytes;
 }
