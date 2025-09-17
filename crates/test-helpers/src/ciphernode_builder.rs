@@ -187,7 +187,9 @@ impl CiphernodeBuilder {
 
         if self.threshold_plaintext_agg {
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &local_bus, &sortition,
+                &local_bus,
+                &sortition,
+                &multithread,
             ))
         }
 

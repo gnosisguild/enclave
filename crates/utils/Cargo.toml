@@ -9,3 +9,5 @@ repository.workspace = true
 [dependencies]
 derivative.workspace = true
 serde.workspace = true
+actix.workspace = true
+anyhow.workspace = true

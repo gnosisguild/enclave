@@ -17,6 +17,7 @@ use async_trait::async_trait;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use e3_fhe::ext::FHE_KEY;
+use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use e3_sortition::Sortition;
 
@@ -239,13 +240,19 @@ impl E3Extension for PublicKeyAggregatorExtension {
 pub struct ThresholdPlaintextAggregatorExtension {
     bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
+    multithread: Addr<Multithread>,
 }
 
 impl ThresholdPlaintextAggregatorExtension {
-    pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
+    pub fn create(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        sortition: &Addr<Sortition>,
+        multithread: &Addr<Multithread>,
+    ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             sortition: sortition.clone(),
+            multithread: multithread.clone(),
         })
     }
 }
@@ -260,14 +267,6 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
             return;
         };
 
-        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::PlaintextAggregation,
-                anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
-            );
-            return;
-        };
-
         let Some(ref meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PlaintextAggregation,
@@ -279,10 +278,11 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
         let e3_id = data.e3_id.clone();
         let repo = ctx.repositories().trbfv_plaintext(&e3_id);
         let sync_state = repo.send(Some(ThresholdPlaintextAggregatorState::init(
-            meta.threshold_m,
-            meta.threshold_n,
+            meta.threshold_m as u64,
+            meta.threshold_n as u64,
             meta.seed,
             data.ciphertext_output.clone(),
+            meta.params.clone(),
         )));
 
         ctx.set_event_recipient(
@@ -290,10 +290,10 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
             Some(
                 ThresholdPlaintextAggregator::new(
                     ThresholdPlaintextAggregatorParams {
-                        fhe: fhe.clone(),
                         bus: self.bus.clone(),
                         sortition: self.sortition.clone(),
                         e3_id: e3_id.clone(),
+                        multithread: self.multithread.clone(),
                     },
                     sync_state,
                 )
@@ -317,21 +317,12 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
             return Ok(());
         };
 
-        // Get deps
-        let Some(fhe) = ctx.get_dependency(FHE_KEY) else {
-            self.bus.err(
-                EnclaveErrorType::PlaintextAggregation,
-                anyhow!(ERROR_PLAINTEXT_FHE_MISSING),
-            );
-            return Ok(());
-        };
-
         let value = ThresholdPlaintextAggregator::new(
             ThresholdPlaintextAggregatorParams {
-                fhe: fhe.clone(),
                 bus: self.bus.clone(),
                 sortition: self.sortition.clone(),
                 e3_id: ctx.e3_id.clone(),
+                multithread: self.multithread.clone(),
             },
             sync_state,
         )

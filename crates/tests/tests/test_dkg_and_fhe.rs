@@ -30,6 +30,7 @@ use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
 use std::time::Duration;
 use std::{fs, sync::Arc};
+use tokio::time::sleep;
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
@@ -113,6 +114,7 @@ async fn test_trbfv() -> Result<()> {
                 .with_history()
                 .with_trbfv()
                 .with_pubkey_aggregation()
+                .with_threshold_plaintext_aggregation()
                 .with_source_bus(&bus)
                 .with_logging()
                 .build()
@@ -224,6 +226,8 @@ async fn test_trbfv() -> Result<()> {
 
     // Lets grab decryption share events
     let expected = vec![
+        "CiphertextOutputPublished",
+        "DecryptionShareCreated",
         "DecryptionShareCreated",
         "DecryptionShareCreated",
         "DecryptionShareCreated",
@@ -234,6 +238,18 @@ async fn test_trbfv() -> Result<()> {
         .await?;
 
     println!("{:?}", h.event_types());
+    sleep(Duration::from_millis(6000)).await;
+    //
+    // GETTING THIS:
+    //
+    // thread 'test_trbfv' panicked at /home/user/.cargo/git/checkouts/fhe.rs-28554c2cc2152fe4/135e484/crates/fhe-math/src/rq/ops.rs:22:9:
+    // assertion `left == right` failed: Incompatible representations
+    //   left: Ntt
+    //  right: PowerBasis
+
+    let rest = nodes.get_history(1).await?;
+
+    println!("rest {:?}", rest.event_types());
 
     Ok(())
 }
