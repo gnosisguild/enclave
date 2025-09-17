@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import * as bindgen from "../srcWasm/summon_ts_wasm.js";
+import * as bindgen from "../dist/web/e3_wasm.js";
 
 let promise;
 
@@ -20,7 +20,7 @@ export default async function initializeWasm(initParams) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    bindgen.initSync({ module: bytes });
+    bindgen.initSync(bytes);
     bindgen.init_ext();
     lib = bindgen;
 
