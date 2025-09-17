@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { execa } from "execa";
-import { readFile, writeFile, unlink } from "fs/promises";
+import { readFile, writeFile, rm } from "fs/promises";
 import replaceInFile from "replace-in-file";
 
 try {
@@ -29,10 +29,12 @@ try {
 
   // Parallel cleanup and JS modification to prevent Next.js and other bundlers static analysis issues.
   await Promise.all([
-    unlink("./dist/web/e3_wasm_bg.wasm"),
-    unlink("./dist/web/e3_wasm_bg.wasm.d.ts"),
-    unlink("./dist/web/.gitignore"),
-    unlink("./dist/node/.gitignore"),
+    await Promise.all([
+      rm("./dist/web/e3_wasm_bg.wasm", { force: true }),
+      rm("./dist/web/e3_wasm_bg.wasm.d.ts", { force: true }),
+      rm("./dist/web/.gitignore", { force: true }),
+      rm("./dist/node/.gitignore", { force: true }),
+    ]),
     replaceInFile({
       files: "./dist/web/e3_wasm.js",
       from: "module_or_path = new URL('e3_wasm_bg.wasm', import.meta.url);",
