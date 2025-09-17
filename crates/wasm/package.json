@@ -2,7 +2,6 @@
   "name": "@enclave-e3/wasm",
   "version": "0.0.13-test",
   "description": "Wasm modules for enclave.",
-  "type": "module",
   "main": "dist/node/e3_wasm.js",
   "module": "dist/web/e3_wasm.js",
   "types": "dist/web/e3_wasm.d.ts",
