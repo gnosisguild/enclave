@@ -4,13 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import * as bindgen from "../dist/web/e3_wasm.js";
+import * as bindgen from "./dist/web/e3_wasm.js";
 
 let promise;
 
 export default async function initializeWasm(initParams) {
   promise ??= (async () => {
-    const { default: base64 } = await import("../dist/web/e3_wasm_base64.js");
+    const { default: base64 } = await import("./dist/web/e3_wasm_base64.js");
 
     const binaryString = atob(base64);
     const len = binaryString.length;
