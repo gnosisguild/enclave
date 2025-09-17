@@ -21,8 +21,6 @@ export default async function initializeWasm(initParams) {
     }
 
     bindgen.initSync(bytes);
-    bindgen.init_ext();
-    lib = bindgen;
 
     return bindgen;
   })();
