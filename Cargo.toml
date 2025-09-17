@@ -161,6 +161,7 @@ tokio = { version = "=1.46.1", features = ["full"] }
 tracing = "=0.1.41"
 tracing-opentelemetry = "=0.30.0"
 tracing-subscriber = { version = "=0.3.19", features = ["env-filter", "time"] }
+tracing-test = { version = "=0.2.5", features = ["no-env-filter"] }
 url = "=2.5.4"
 vfs = { git = "https://github.com/ryardley/rust-vfs.git", features = ["async-vfs"] }
 libp2p = { version = "=0.54.1", features = [

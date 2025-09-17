@@ -14,6 +14,7 @@ use e3_utils::utility_types::ArcBytes;
 use fhe::trbfv::{smudging::SmudgingNoiseGenerator, ShareManager};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GenEsiSssRequest {
@@ -72,7 +73,7 @@ pub fn gen_esi_sss(
     cipher: &Cipher,
     req: GenEsiSssRequest,
 ) -> Result<GenEsiSssResponse> {
-    println!("gen_esi_sss");
+    info!("gen_esi_sss");
     let req = InnerRequest::try_from(req)?;
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
@@ -81,9 +82,9 @@ pub fn gen_esi_sss(
     let esi_per_ct = req.esi_per_ct as usize;
     let esi_sss = (0..esi_per_ct)
         .map(|_| -> Result<_> {
-            println!("gen_esi_sss:mapping...");
+            info!("gen_esi_sss:mapping...");
             let generator = SmudgingNoiseGenerator::new(params.clone(), error_size.clone());
-            println!("gen_esi_sss:generate_smudging_error...");
+            info!("gen_esi_sss:generate_smudging_error...");
             let esi_coeffs = {
                 generator
                     .generate_smudging_error(&mut *rng.lock().unwrap())
@@ -91,7 +92,7 @@ pub fn gen_esi_sss(
             };
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
-            println!("gen_esi_sss:generate_secret_shares_from_poly...");
+            info!("gen_esi_sss:generate_secret_shares_from_poly...");
             Ok({
                 share_manager
                     .generate_secret_shares_from_poly(esi_poly, &mut *rng.lock().unwrap())
@@ -101,7 +102,7 @@ pub fn gen_esi_sss(
         })
         .collect::<Result<_>>()?;
 
-    println!("gen_esi_sss:returning...");
+    info!("gen_esi_sss:returning...");
     Ok(GenEsiSssResponse::try_from((
         InnerResponse { esi_sss },
         cipher,

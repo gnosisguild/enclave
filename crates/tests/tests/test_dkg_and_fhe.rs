@@ -48,6 +48,7 @@ pub fn calculate_error_size(
 }
 
 /// Test trbfv
+#[tracing_test::traced_test]
 #[actix::test]
 #[serial_test::serial]
 async fn test_trbfv() -> Result<()> {
@@ -239,13 +240,6 @@ async fn test_trbfv() -> Result<()> {
 
     println!("{:?}", h.event_types());
     sleep(Duration::from_millis(6000)).await;
-    //
-    // GETTING THIS:
-    //
-    // thread 'test_trbfv' panicked at /home/user/.cargo/git/checkouts/fhe.rs-28554c2cc2152fe4/135e484/crates/fhe-math/src/rq/ops.rs:22:9:
-    // assertion `left == right` failed: Incompatible representations
-    //   left: Ntt
-    //  right: PowerBasis
 
     let rest = nodes.get_history(1).await?;
 

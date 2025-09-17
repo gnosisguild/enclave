@@ -16,6 +16,7 @@ use fhe::trbfv::ShareManager;
 use fhe_math::rq::Poly;
 use fhe_traits::Serialize;
 use ndarray::Array2;
+use tracing::info;
 use zeroize::Zeroizing;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -41,7 +42,7 @@ impl TryFrom<(&Cipher, CalculateDecryptionKeyRequest)> for InnerRequest {
     ) -> std::result::Result<Self, Self::Error> {
         let cipher = value.0;
         let req = value.1;
-        println!("Converting sk_sss to collected...");
+        info!("Converting sk_sss to collected...");
 
         // convert to collected
         let sk_sss_collected = req.sk_sss_collected.decrypt(cipher)?;
@@ -107,7 +108,7 @@ pub fn calculate_decryption_key(
     cipher: &Cipher,
     req: CalculateDecryptionKeyRequest,
 ) -> Result<CalculateDecryptionKeyResponse> {
-    println!("Calculating decryption key...");
+    info!("Calculating decryption key...");
 
     let req = InnerRequest::try_from((cipher, req))?;
 
@@ -116,11 +117,11 @@ pub fn calculate_decryption_key(
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
     let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
 
-    println!("Calculating sk_poly_sum...");
+    info!("Calculating sk_poly_sum...");
     let sk_poly_sum =
         share_manager.aggregate_collected_shares(&req.sk_sss_collected.try_to_ndarray_vec()?)?;
 
-    println!("Calculating es_poly_sum...");
+    info!("Calculating es_poly_sum...");
     let es_poly_sum = req
         .esi_sss_collected
         .into_iter()
@@ -132,7 +133,7 @@ pub fn calculate_decryption_key(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    println!("Returning successful result! Encrypting for transit...");
+    info!("Returning successful result! Encrypting for transit...");
 
     Ok(CalculateDecryptionKeyResponse::try_from((
         cipher,

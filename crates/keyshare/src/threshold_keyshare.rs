@@ -34,6 +34,7 @@ use e3_trbfv::{
 };
 use e3_utils::utility_types::ArcBytes;
 use fhe_traits::Serialize;
+use tracing::{error, info};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "Result<()>")]
@@ -317,7 +318,7 @@ impl ThresholdKeyshare {
             bail!("State not found on threshold keyshare. This should not happen.");
         };
 
-        println!(
+        info!(
             "Setting up key collector for addr: {} and {} nodes",
             state.address, state.threshold_n
         );
@@ -381,9 +382,9 @@ impl ThresholdKeyshare {
         msg: ThresholdShareCreated,
         self_addr: Addr<Self>,
     ) -> Result<()> {
-        println!("Received ThresholdShareCreated forwarding to collector!");
+        info!("Received ThresholdShareCreated forwarding to collector!");
         let collector = self.ensure_collector(self_addr)?;
-        println!("got collector address!");
+        info!("got collector address!");
         collector.do_send(msg);
         Ok(())
     }
@@ -395,7 +396,7 @@ impl ThresholdKeyshare {
     ) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
-            println!("TRY STORE PK");
+            info!("try_store_pk_share_and_sk_sss");
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
             let esi_sss = current.esi_sss;
             let next = match esi_sss {
@@ -420,7 +421,7 @@ impl ThresholdKeyshare {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
 
-            println!("TRY STORE ESI");
+            info!("try_store_esi_sss");
 
             let current: GeneratingThresholdShareData = s.clone().try_into()?;
             let pk_share = current.pk_share;
@@ -446,7 +447,7 @@ impl ThresholdKeyshare {
             s.new_state(next)
         })?;
 
-        println!("ESI STORED");
+        info!("esi stored");
         Ok(())
     }
 
@@ -454,7 +455,7 @@ impl ThresholdKeyshare {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
 
-            println!("TRY STORE ESI");
+            info!("TRY STORE ESI");
             let current: ReadyForDecryption = s.clone().try_into()?;
 
             let next = K::Decrypting(Decrypting {
@@ -476,7 +477,7 @@ impl ThresholdKeyshare {
     ) -> Result<()> {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
-            println!("Try store decryption key");
+            info!("Try store decryption key");
 
             let current: AggregatingDecryptionKey = s.clone().try_into()?;
             let next = K::ReadyForDecryption(ReadyForDecryption {
@@ -556,10 +557,10 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    pub fn try_mark_decryption_complete(&mut self) -> Result<()> {
+    pub fn try_mark_decryption_share_sent(&mut self) -> Result<()> {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
-            println!("Try mark decryption complete");
+            info!("Decfryption share sending process is complete");
 
             s.new_state(K::Completed)
         })
@@ -599,7 +600,7 @@ impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
         let event = match self.create_calculate_decryption_share_request(ciphertext_output) {
             Ok(request) => request,
             Err(e) => {
-                println!("{e}");
+                error!("{e}");
                 return e3_utils::bail(self);
             }
         };
@@ -616,14 +617,14 @@ impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
                         act.try_send_decryption_share(event)?;
 
                         // mark as complete
-                        act.try_mark_decryption_complete()?;
+                        act.try_mark_decryption_share_sent()?;
 
                         Ok(())
                     };
 
                     match c() {
                         Ok(_) => (),
-                        Err(e) => eprintln!("{:?}", e),
+                        Err(e) => error!("{:?}", e),
                     }
                 }),
         )
@@ -660,7 +661,7 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
 impl Handler<GenEsiSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenEsiSss, _: &mut Self::Context) -> Self::Result {
-        println!("GenEsiSss on ThresholdKeyshare");
+        info!("GenEsiSss on ThresholdKeyshare");
         let CiphernodeSelected {
             // TODO: should these be on meta? These seem TrBFV specific. perhaps it is best to
             // bundle them in with the params
@@ -690,11 +691,11 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
                 .into_actor(self)
                 .map(move |res, act, ctx| {
                     let c = || -> Result<()> {
-                        println!("\nRECEIVED GEN ESI SSS");
+                        info!("\nRECEIVED GEN ESI SSS");
 
                         let output: GenEsiSssResponse = res??.try_into()?;
 
-                        println!("\nSTORING GEN ESI SSS...");
+                        info!("\nSTORING GEN ESI SSS...");
 
                         act.try_store_esi_sss(output.esi_sss)?;
 
@@ -712,7 +713,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
 
                     match c() {
                         Ok(_) => (),
-                        Err(e) => println!("There was an error: GenEsiSss, {}", e),
+                        Err(e) => error!("There was an error: GenEsiSss, {}", e),
                     }
                 }),
         )
@@ -722,7 +723,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
 impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenPkShareAndSkSss, ctx: &mut Self::Context) -> Self::Result {
-        println!("GenPkShareAndSkSss on ThresholdKeyshare");
+        info!("GenPkShareAndSkSss on ThresholdKeyshare");
         let CiphernodeSelected { .. } = msg.0;
         let Some(state) = self.state.get() else {
             return e3_utils::bail(self);
@@ -742,14 +743,14 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
                 .into_actor(self)
                 .map(move |res, act, ctx| {
                     let c = || {
-                        println!("\nRECEIVED GEN PK SHARE AND SK SSS");
+                        info!("\nRECEIVED GEN PK SHARE AND SK SSS");
                         let Ok(ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(output))) =
                             res?
                         else {
                             bail!("Error extracting data from compute process")
                         };
 
-                        println!("\nSTORING GEN PK SHARE AND SK SSS...");
+                        info!("\nSTORING GEN PK SHARE AND SK SSS...");
                         act.try_store_pk_share_and_sk_sss(output.pk_share, output.sk_sss)?;
                         if let Some(ThresholdKeyshareState {
                             state: KeyshareState::AggregatingDecryptionKey { .. },
@@ -763,7 +764,7 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
 
                     match c() {
                         Ok(_) => (),
-                        Err(e) => println!("There was an error: GenPkShareAndSkSss"),
+                        Err(e) => error!("There was an error: GenPkShareAndSkSss"),
                     };
                 }),
         )
@@ -777,7 +778,7 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
         msg: AllThresholdSharesCollected,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        println!("AllThresholdSharesCollected");
+        info!("AllThresholdSharesCollected");
         let Ok(request) = self.try_generate_compute_decryption_key_request(msg) else {
             return e3_utils::bail(self);
         };
@@ -796,7 +797,7 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
                             bail!("Error extracting data from compute process")
                         };
 
-                        println!("\nSTORING DECRYPTION KEY...");
+                        info!("\nSTORING DECRYPTION KEY...");
 
                         act.try_store_decryption_key(output.sk_poly_sum, output.es_poly_sum)?;
 
@@ -806,7 +807,7 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
 
                     match c() {
                         Ok(_) => (),
-                        Err(e) => println!("There was an error: CalculateDecryptionKey"),
+                        Err(e) => error!("There was an error: CalculateDecryptionKey"),
                     };
                 }),
         )
@@ -838,7 +839,7 @@ impl Handler<SharesGenerated> for ThresholdKeyshare {
             .map(|s| s.decrypt(&self.cipher)?.try_into())
             .collect::<Result<_>>()?;
 
-        println!(">>>> THRESHOLD SHARE ABOUT TO BE CREATED FOR {}!", party_id);
+        info!(">>>> THRESHOLD SHARE ABOUT TO BE CREATED FOR {}!", party_id);
         self.bus.do_send(EnclaveEvent::from(ThresholdShareCreated {
             e3_id,
             share: Arc::new(ThresholdShare {
@@ -886,30 +887,30 @@ impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
     type Result = ();
     fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
         let start = Instant::now();
-        println!("DecryptionKeyCollector: ThresholdShareCreated received by collector");
+        info!("DecryptionKeyCollector: ThresholdShareCreated received by collector");
         if let CollectorState::Finished = self.state {
-            println!("DecryptionKeyCollector is finished so ignoring!");
+            info!("DecryptionKeyCollector is finished so ignoring!");
             return;
         };
 
         let pid = msg.share.party_id;
-        println!("DecryptionKeyCollector party id: {}", pid);
+        info!("DecryptionKeyCollector party id: {}", pid);
         let Some(_) = self.todo.take(&pid) else {
-            println!(
+            info!(
                 "Error: {} was not in decryption key collectors ID list",
                 pid
             );
             return;
         };
-        println!("Inserting... waiting on: {}", self.todo.len());
+        info!("Inserting... waiting on: {}", self.todo.len());
         self.shares.insert(pid, msg.share);
         if self.todo.len() == 0 {
-            println!("We have recieved all the things");
+            info!("We have recieved all the things");
             self.state = CollectorState::Finished;
             let event: AllThresholdSharesCollected = self.shares.clone().into();
             self.parent.do_send(event)
         }
-        println!(
+        info!(
             "Finished processing ThresholdShareCreated in {:?}",
             start.elapsed()
         );

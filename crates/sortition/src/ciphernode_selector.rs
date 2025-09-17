@@ -63,7 +63,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, data: E3Requested, _ctx: &mut Self::Context) -> Self::Result {
-        println!(">>>>>>> E3Requested!!!");
+        info!("CiphernodeSelector is handling E3Requested!!!");
         let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
@@ -72,7 +72,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
         Box::pin(async move {
             let seed = data.seed;
             let size = data.threshold_n;
-            println!(
+            info!(
                 "Calling GetNodeIndex address={} seed={} size={}",
                 address.clone(),
                 seed,
@@ -91,12 +91,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
                     info!(node = address, "Ciphernode was not selected");
                     return;
                 };
-                println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-                println!(
-                    "@@  CIPHERNODE SELECTED: node={} address={}",
-                    party_id, address
-                );
-                println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+                info!("CIPHERNODE SELECTED: node={} address={}", party_id, address);
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
                     party_id,
                     e3_id: data.e3_id,
@@ -108,7 +103,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
                     seed: data.seed.clone(),
                 }));
             } else {
-                println!("Not selected");
+                info!("This node is not selected");
             }
         })
     }
@@ -117,7 +112,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
 impl Handler<Shutdown> for CiphernodeSelector {
     type Result = ();
     fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) -> Self::Result {
-        tracing::info!("Killing CiphernodeSelector");
+        info!("Killing CiphernodeSelector");
         ctx.stop();
     }
 }

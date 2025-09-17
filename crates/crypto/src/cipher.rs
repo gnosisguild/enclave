@@ -13,6 +13,7 @@ use aes_gcm::{
 use anyhow::{anyhow, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
 use rand::{rngs::OsRng, RngCore};
+use tracing::info;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::{
@@ -76,7 +77,7 @@ fn encrypt_data(derived_key: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Result<
     let mut output = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
     output.extend_from_slice(&nonce_bytes);
     output.extend_from_slice(&ciphertext);
-    println!("Encryption took {:?}", start.elapsed());
+    info!("Encryption took {:?}", start.elapsed());
     Ok(output)
 }
 

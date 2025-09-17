@@ -20,4 +20,5 @@ ndarray.workspace = true
 num-bigint.workspace = true
 rand_chacha.workspace = true
 serde.workspace = true
+tracing.workspace = true
 zeroize.workspace = true

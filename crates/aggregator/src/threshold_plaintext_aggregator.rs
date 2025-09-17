@@ -20,7 +20,7 @@ use e3_trbfv::{
     TrBFVConfig, TrBFVRequest,
 };
 use e3_utils::utility_types::ArcBytes;
-use tracing::error;
+use tracing::{error, info};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
@@ -231,6 +231,7 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
 
     fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
+        info!("Processing DecryptionShareCreated...");
         let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting {
             threshold_n,
             seed,
@@ -298,8 +299,6 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
 impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
     fn handle(&mut self, msg: ComputeAggregate, _: &mut Self::Context) -> Self::Result {
-        // ciphertexts and match up with other correlated values
-        //
         let event = match self.create_calculate_threshold_decryption_event(msg) {
             Ok(event) => event,
             Err(e) => {

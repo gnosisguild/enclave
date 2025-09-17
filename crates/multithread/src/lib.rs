@@ -24,6 +24,8 @@ use e3_trbfv::{SharedRng, TrBFVError, TrBFVRequest, TrBFVResponse};
 use rand::Rng;
 use rayon::{self, ThreadPool};
 use tokio::sync::mpsc;
+use tracing::error;
+use tracing::info;
 
 /// Multithread actor
 pub struct Multithread {
@@ -43,8 +45,8 @@ impl Multithread {
                     .build()
                     .expect("Failed to create Rayon thread pool"),
             );
-            println!(
-                "$$$$$$$$  Created threadpool with {} threads.",
+            info!(
+                "Created threadpool with {} threads.",
                 thread_pool.current_num_threads()
             );
 
@@ -87,7 +89,7 @@ impl Handler<ComputeRequest> for Multithread {
         Box::pin(async move {
             let pending = PENDING_TASKS.fetch_add(1, Ordering::Relaxed);
 
-            println!(
+            info!(
                 "Spawning task. Pending: {}, Completed: {}",
                 pending + 1,
                 COMPLETED_TASKS.load(Ordering::Relaxed)
@@ -118,11 +120,11 @@ fn timefunc<F>(name: &str, id: u8, func: F) -> Result<ComputeResponse, ComputeRe
 where
     F: FnOnce() -> Result<ComputeResponse, ComputeRequestError>,
 {
-    println!("\n$$$$$$$$$ STARTING `{}({})`\n", name, id);
+    info!("\nSTARTING MULTITHREAD `{}({})`\n", name, id);
     let start = Instant::now();
     let out = func();
     let dur = start.elapsed();
-    println!("\n$$$$$$$$$ FINISHED `{}`({}) in {:?}\n", name, id, dur);
+    info!("\nFINISHED MULTITHREAD `{}`({}) in {:?}\n", name, id, dur);
     out
 }
 
@@ -155,7 +157,7 @@ fn handle_compute_request(
                     TrBFVResponse::CalculateDecryptionKey(o),
                 )),
                 Err(e) => {
-                    println!("Error calculating decryption key: {}", e);
+                    error!("Error calculating decryption key: {}", e);
                     Err(ComputeRequestError::TrBFV(
                         TrBFVError::CalculateDecryptionKey,
                     ))

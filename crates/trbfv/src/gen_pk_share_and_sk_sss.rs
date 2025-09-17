@@ -20,6 +20,7 @@ use fhe::{
 };
 use fhe_traits::Serialize as FheSerialize;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GenPkShareAndSkSssRequest {
@@ -77,7 +78,7 @@ pub fn gen_pk_share_and_sk_sss(
     cipher: &Cipher,
     req: GenPkShareAndSkSssRequest,
 ) -> Result<GenPkShareAndSkSssResponse> {
-    println!("gen_pk_share_and_sk_sss");
+    info!("gen_pk_share_and_sk_sss");
     let req = InnerRequest::try_from(req)?;
 
     let params = req.trbfv_config.params();
@@ -85,7 +86,7 @@ pub fn gen_pk_share_and_sk_sss(
     let threshold = req.trbfv_config.threshold();
     let num_ciphernodes = req.trbfv_config.num_parties();
 
-    println!(
+    info!(
         "gen_pk_share_and_sk_sss: n={}, t={}",
         num_ciphernodes, threshold
     );
@@ -97,12 +98,12 @@ pub fn gen_pk_share_and_sk_sss(
 
     let sk_poly = share_manager.coeffs_to_poly_level0(sk_share.coeffs.clone().as_ref())?;
 
-    println!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
+    info!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
     let sk_sss: ShareSetCollection =
         { share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())? }
             .into();
 
-    println!(
+    info!(
         "gen_pk_share_and_sk_sss:returning... sk_sss.len() == {}",
         sk_sss.len()
     );

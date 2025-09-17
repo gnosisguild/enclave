@@ -18,6 +18,7 @@ use e3_fhe::{ext::FHE_KEY, SharedRng};
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;
+use tracing::info;
 
 pub struct KeyshareExtension {
     bus: Addr<EventBus<EnclaveEvent>>,
@@ -175,7 +176,6 @@ impl E3Extension for ThresholdKeyshareExtension {
         )));
 
         // New container with None
-        println!("got container");
         ctx.set_event_recipient(
             "threshold_keyshare",
             Some(
