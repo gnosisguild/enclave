@@ -18,11 +18,21 @@ importers:
       '@changesets/cli':
         specifier: ^2.27.1
         version: 2.29.6(@types/node@22.7.5)
+      '@types/node':
+        specifier: 22.7.5
+        version: 22.7.5
       husky:
         specifier: ^9.1.7
         version: 9.1.7
 
-  crates/wasm: {}
+  crates/wasm:
+    devDependencies:
+      execa:
+        specifier: ^8.0.1
+        version: 8.0.1
+      replace-in-file:
+        specifier: ^7.2.0
+        version: 7.2.0
 
   docs:
     dependencies:
@@ -8170,6 +8180,11 @@ packages:
   repeat-string@1.6.1:
     resolution: {integrity: sha512-PV0dzCYDNfRi1jCDbJzpW7jNNDRuCOG/jI5ctQcGKt/clZD+YcPS3yIlWuTJMmESC8aevCFmWJy5wjAFgNqN6w==}
     engines: {node: '>=0.10'}
+
+  replace-in-file@7.2.0:
+    resolution: {integrity: sha512-CiLXVop3o8/h2Kd1PwKPPimmS9wUV0Ki6Fl8+1ITD35nB3Gl/PrW5IONpTE0AXk0z4v8WYcpEpdeZqMXvSnWpg==}
+    engines: {node: '>=10'}
+    hasBin: true
 
   req-cwd@2.0.0:
     resolution: {integrity: sha512-ueoIoLo1OfB6b05COxAA9UpeoscNpYyM+BqYlA7H6LVF4hKGPXQQSSaD2YmvDVJMkk4UDpAHIeU1zG53IqjvlQ==}
@@ -19779,6 +19794,12 @@ snapshots:
   remove-accents@0.5.0: {}
 
   repeat-string@1.6.1: {}
+
+  replace-in-file@7.2.0:
+    dependencies:
+      chalk: 4.1.2
+      glob: 8.1.0
+      yargs: 17.7.2
 
   req-cwd@2.0.0:
     dependencies:
