@@ -32,7 +32,7 @@ try {
     unlink("./dist/web/e3_wasm_bg.wasm"),
     unlink("./dist/web/e3_wasm_bg.wasm.d.ts"),
     unlink("./dist/web/.gitignore"),
-    unlink("./dist/web/.gitignore"),
+    unlink("./dist/node/.gitignore"),
     replaceInFile({
       files: "./dist/web/e3_wasm.js",
       from: "module_or_path = new URL('e3_wasm_bg.wasm', import.meta.url);",
