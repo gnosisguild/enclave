@@ -10,9 +10,7 @@ let promise;
 
 export default async function initializeWasm(initParams) {
   promise ??= (async () => {
-    const { default: base64 } = await import(
-      "../srcWasm/summon_ts_wasm_base64.js"
-    );
+    const { default: base64 } = await import("../dist/web/e3_wasm_base64.js");
 
     const binaryString = atob(base64);
     const len = binaryString.length;
