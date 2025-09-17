@@ -149,6 +149,7 @@ impl ThresholdPlaintextAggregator {
 
     pub fn add_share(&mut self, party_id: u64, share: ArcBytes) -> Result<()> {
         self.state.try_mutate(|state| {
+            info!("Adding share for party_id={}", party_id);
             let current: Collecting = state.clone().try_into()?;
             let ciphertext_output = current.ciphertext_output;
             let threshold_m = current.threshold_m;
@@ -156,19 +157,36 @@ impl ThresholdPlaintextAggregator {
             let params = current.params.clone();
             let mut shares = current.shares;
             {
+                info!("pushing to shares collection");
                 shares.push((party_id, share));
             }
-            if shares.len() == threshold_m as usize {
-                return Ok(ThresholdPlaintextAggregatorState::Computing(Computing {
-                    shares: shares.clone(),
-                    ciphertext_output: ciphertext_output.to_vec(),
-                    threshold_m,
-                    threshold_n,
+
+            info!(
+                "Shares len = {} | threshold_m = {}",
+                shares.len(),
+                threshold_m
+            );
+
+            if shares.len() < threshold_m as usize {
+                return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {
                     params,
+                    threshold_n,
+                    threshold_m,
+                    ciphertext_output,
+                    shares,
+                    seed: current.seed,
                 }));
             }
 
-            Ok(state)
+            info!("Changing state to computing because received enough shares...");
+
+            Ok(ThresholdPlaintextAggregatorState::Computing(Computing {
+                shares: shares.clone(),
+                ciphertext_output: ciphertext_output.to_vec(),
+                threshold_m,
+                threshold_n,
+                params,
+            }))
         })
     }
 
@@ -191,14 +209,19 @@ impl ThresholdPlaintextAggregator {
         &self,
         msg: ComputeAggregate,
     ) -> Result<ComputeRequest> {
+        info!("create_calculate_threshold_decryption_event...");
+
         let state: Computing = self
             .state
             .get()
             .ok_or(anyhow!("Could not get state"))?
             .try_into()?;
+
         let trbfv_config =
             TrBFVConfig::new(state.params.clone(), state.threshold_n, state.threshold_m);
+
         let ciphertexts = vec![ArcBytes::from_bytes(msg.ciphertext_output)];
+
         Ok(ComputeRequest::TrBFV(
             TrBFVRequest::CalculateThresholdDecryption(
                 CalculateThresholdDecryptionRequest {
@@ -302,7 +325,7 @@ impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
         let event = match self.create_calculate_threshold_decryption_event(msg) {
             Ok(event) => event,
             Err(e) => {
-                println!("{e}");
+                error!("{e}");
                 return e3_utils::actix::bail_result(self, "{e}");
             }
         };
@@ -311,12 +334,23 @@ impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
                 .send(event)
                 .into_actor(self)
                 .map(move |res, act, _| {
-                    let response: CalculateThresholdDecryptionResponse = res??.try_into()?;
+                    let response: CalculateThresholdDecryptionResponse = match res? {
+                        Ok(res) => res.try_into()?,
+                        Err(e) => {
+                            error!("{e}");
+                            bail!(e)
+                        }
+                    };
+
+                    info!("Received response {:?}", response);
+
                     // Update the local state
                     let plaintext = response.plaintext;
+
                     act.set_decryption(plaintext.clone())?;
+
                     let Some(plaintext) = plaintext.first() else {
-                        return anyhow::bail!("Nothing in plaintext");
+                        bail!("Nothing in plaintext")
                     };
 
                     // Dispatch the PlaintextAggregated event
@@ -325,6 +359,7 @@ impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
                         e3_id: act.e3_id.clone(),
                     });
 
+                    info!("Dispatching plaintext event {:?}", event);
                     act.bus.do_send(event);
                     Ok(())
                 }),

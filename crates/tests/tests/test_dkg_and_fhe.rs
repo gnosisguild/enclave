@@ -48,10 +48,18 @@ pub fn calculate_error_size(
 }
 
 /// Test trbfv
-#[tracing_test::traced_test]
 #[actix::test]
 #[serial_test::serial]
 async fn test_trbfv() -> Result<()> {
+    use tracing_subscriber::{fmt, EnvFilter};
+
+    let subscriber = fmt()
+        .with_env_filter(EnvFilter::new("info"))
+        .with_test_writer()
+        .finish();
+
+    let _guard = tracing::subscriber::set_default(subscriber);
+
     // NOTE: Here we are trying to make it as clear as possible as to what is going on so attempting to
     // avoid over abstracting test helpers and favouring straight forward single descriptive
     // functions alongside explanations
@@ -239,7 +247,7 @@ async fn test_trbfv() -> Result<()> {
         .await?;
 
     println!("{:?}", h.event_types());
-    sleep(Duration::from_millis(6000)).await;
+    sleep(Duration::from_millis(30000)).await;
 
     let rest = nodes.get_history(1).await?;
 

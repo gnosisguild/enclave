@@ -3123,7 +3123,7 @@ dependencies = [
  "serial_test",
  "tokio",
  "tracing",
- "tracing-test",
+ "tracing-subscriber",
  "zeroize",
 ]
 

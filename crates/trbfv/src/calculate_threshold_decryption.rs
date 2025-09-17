@@ -14,6 +14,7 @@ use fhe::bfv::Encoding;
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_traits::DeserializeParametrized;
 use fhe_traits::FheDecoder;
+use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CalculateThresholdDecryptionRequest {
@@ -39,6 +40,7 @@ pub fn calculate_threshold_decryption(
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
     let mut ordered_polys = req.d_share_polys;
     ordered_polys.sort_by_key(|&(key, _)| key);
+    info!("ordered_polys: {:?}", ordered_polys);
     let d_share_polys = ordered_polys
         .into_iter()
         .map(|(_, bytes)| -> Result<_> {
@@ -61,6 +63,9 @@ pub fn calculate_threshold_decryption(
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
 
             // TODO: should probably not need to clone here...
+            info!("d_share_polys: {:?}", d_share_polys);
+            info!("ciphertext: {:?}", ciphertext);
+
             share_manager
                 .decrypt_from_shares(d_share_polys.clone(), Arc::new(ciphertext))
                 .context("Could not decrypt ciphertext")

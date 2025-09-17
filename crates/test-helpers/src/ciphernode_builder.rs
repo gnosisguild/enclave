@@ -18,6 +18,7 @@ use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sortition::{CiphernodeSelector, Sortition, SortitionRepositoryFactory};
 use std::sync::Arc;
+use tracing::info;
 
 use crate::{ciphernode_system::CiphernodeSimulated, rand_eth_addr};
 
@@ -124,25 +125,30 @@ impl CiphernodeBuilder {
         let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
 
         if let Some(ref bus) = self.source_bus {
+            info!("Setting up Event pipe");
             EventBus::pipe(bus, &local_bus);
         }
 
         // History collector for taking historical events for analysis
         let history = if self.history {
+            info!("Setting up history collector");
             Some(EventBus::<EnclaveEvent>::history(&local_bus))
         } else {
             None
         };
 
         let errors = if self.errors {
+            info!("Setting up error collector");
             Some(EventBus::<EnclaveEvent>::error(&local_bus))
         } else {
             None
         };
 
         let addr = if let Some(addr) = self.address.clone() {
+            info!("Using eth address = {}", addr);
             addr
         } else {
+            info!("Using random eth address");
             rand_eth_addr(&self.rng)
         };
 
@@ -165,7 +171,7 @@ impl CiphernodeBuilder {
 
         if self.trbfv {
             let multithread = self.ensure_multithread();
-
+            info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &local_bus,
                 &self.cipher,
@@ -176,20 +182,24 @@ impl CiphernodeBuilder {
         }
 
         if !self.trbfv || self.pubkey_agg || self.plaintext_agg {
+            info!("Setting up FheExtension");
             e3_builder = e3_builder.with(FheExtension::create(&local_bus, &self.rng))
         }
 
         if self.pubkey_agg {
+            info!("Setting up PublicKeyAggregationExtension");
             e3_builder =
                 e3_builder.with(PublicKeyAggregatorExtension::create(&local_bus, &sortition))
         }
 
         if self.plaintext_agg {
+            info!("Setting up PlaintextAggregationExtension (legacy)");
             e3_builder =
                 e3_builder.with(PlaintextAggregatorExtension::create(&local_bus, &sortition))
         }
 
         if self.threshold_plaintext_agg {
+            info!("Setting up ThresholdPlaintextAggregatorExtension NEW!");
             let multithread = self.ensure_multithread();
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
                 &local_bus,
@@ -199,9 +209,10 @@ impl CiphernodeBuilder {
         }
 
         if !self.trbfv {
+            info!("Setting up KeyshareExtension (legacy)!");
             e3_builder = e3_builder.with(KeyshareExtension::create(&local_bus, &addr, &self.cipher))
         }
-
+        info!("building...");
         e3_builder.build().await?;
 
         Ok(CiphernodeSimulated::new(
@@ -218,7 +229,7 @@ impl CiphernodeBuilder {
         if let Some(cached) = self.multithread_cache.clone() {
             return cached;
         }
-
+        info!("Setting up multithread actor...");
         // Create it
         let addr = Multithread::attach(
             self.rng.clone(),

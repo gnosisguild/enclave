@@ -6,6 +6,7 @@
 
 use core::fmt;
 
+use anyhow::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -46,11 +47,11 @@ pub enum TrBFVResponse {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TrBFVError {
-    GenEsiSss,
-    GenPkShareAndSkSss,
-    CalculateDecryptionKey,
-    CalculateDecryptionShare,
-    CalculateThresholdDecryption,
+    GenEsiSss(String),
+    GenPkShareAndSkSss(String),
+    CalculateDecryptionKey(String),
+    CalculateDecryptionShare(String),
+    CalculateThresholdDecryption(String),
 }
 
 impl std::error::Error for TrBFVError {
@@ -64,11 +65,13 @@ impl std::error::Error for TrBFVError {
 impl fmt::Display for TrBFVError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TrBFVError::GenEsiSss => write!(f, "GenEsiSss"),
-            TrBFVError::GenPkShareAndSkSss => write!(f, "GenPkShareAndSkSss"),
-            TrBFVError::CalculateDecryptionKey => write!(f, "CalculateDecryptionKey"),
-            TrBFVError::CalculateDecryptionShare => write!(f, "CalculateDecryptionShare"),
-            TrBFVError::CalculateThresholdDecryption => write!(f, "CalculateThresholdDecryption"),
+            TrBFVError::GenEsiSss(_) => write!(f, "GenEsiSss"),
+            TrBFVError::GenPkShareAndSkSss(_) => write!(f, "GenPkShareAndSkSss"),
+            TrBFVError::CalculateDecryptionKey(_) => write!(f, "CalculateDecryptionKey"),
+            TrBFVError::CalculateDecryptionShare(_) => write!(f, "CalculateDecryptionShare"),
+            TrBFVError::CalculateThresholdDecryption(_) => {
+                write!(f, "CalculateThresholdDecryption")
+            }
         }
     }
 }

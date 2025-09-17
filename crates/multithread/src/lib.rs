@@ -140,13 +140,17 @@ fn handle_compute_request(
             id,
             || match gen_pk_share_and_sk_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(o))),
-                Err(_) => Err(ComputeRequestError::TrBFV(TrBFVError::GenPkShareAndSkSss)),
+                Err(e) => Err(ComputeRequestError::TrBFV(TrBFVError::GenPkShareAndSkSss(
+                    e.to_string(),
+                ))),
             },
         ),
         ComputeRequest::TrBFV(TrBFVRequest::GenEsiSss(req)) => timefunc("gen_esi_sss", id, || {
             match gen_esi_sss(&rng, &cipher, req) {
                 Ok(o) => Ok(ComputeResponse::TrBFV(TrBFVResponse::GenEsiSss(o))),
-                Err(_) => Err(ComputeRequestError::TrBFV(TrBFVError::GenEsiSss)),
+                Err(e) => Err(ComputeRequestError::TrBFV(TrBFVError::GenEsiSss(
+                    e.to_string(),
+                ))),
             }
         }),
         ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(req)) => timefunc(
@@ -159,7 +163,7 @@ fn handle_compute_request(
                 Err(e) => {
                     error!("Error calculating decryption key: {}", e);
                     Err(ComputeRequestError::TrBFV(
-                        TrBFVError::CalculateDecryptionKey,
+                        TrBFVError::CalculateDecryptionKey(e.to_string()),
                     ))
                 }
             },
@@ -171,8 +175,8 @@ fn handle_compute_request(
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateDecryptionShare(o),
                 )),
-                Err(_) => Err(ComputeRequestError::TrBFV(
-                    TrBFVError::CalculateDecryptionShare,
+                Err(e) => Err(ComputeRequestError::TrBFV(
+                    TrBFVError::CalculateDecryptionShare(e.to_string()),
                 )),
             },
         ),
@@ -183,8 +187,8 @@ fn handle_compute_request(
                 Ok(o) => Ok(ComputeResponse::TrBFV(
                     TrBFVResponse::CalculateThresholdDecryption(o),
                 )),
-                Err(_) => Err(ComputeRequestError::TrBFV(
-                    TrBFVError::CalculateThresholdDecryption,
+                Err(e) => Err(ComputeRequestError::TrBFV(
+                    TrBFVError::CalculateThresholdDecryption(e.to_string()),
                 )),
             },
         ),
