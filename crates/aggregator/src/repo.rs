@@ -8,7 +8,9 @@ use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
 use e3_events::E3id;
 
-use crate::{PlaintextAggregatorState, PublicKeyAggregatorState, TrBfvPlaintextAggregatorState};
+use crate::{
+    PlaintextAggregatorState, PublicKeyAggregatorState, ThresholdPlaintextAggregatorState,
+};
 
 pub trait PlaintextRepositoryFactory {
     fn plaintext(&self, e3_id: &E3id) -> Repository<PlaintextAggregatorState>;
@@ -21,11 +23,11 @@ impl PlaintextRepositoryFactory for Repositories {
 }
 
 pub trait TrBfvPlaintextRepositoryFactory {
-    fn trbfv_plaintext(&self, e3_id: &E3id) -> Repository<TrBfvPlaintextAggregatorState>;
+    fn trbfv_plaintext(&self, e3_id: &E3id) -> Repository<ThresholdPlaintextAggregatorState>;
 }
 
 impl TrBfvPlaintextRepositoryFactory for Repositories {
-    fn trbfv_plaintext(&self, e3_id: &E3id) -> Repository<TrBfvPlaintextAggregatorState> {
+    fn trbfv_plaintext(&self, e3_id: &E3id) -> Repository<ThresholdPlaintextAggregatorState> {
         Repository::new(self.store.scope(StoreKeys::plaintext(e3_id)))
     }
 }

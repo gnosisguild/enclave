@@ -2595,8 +2595,10 @@ dependencies = [
  "e3-data",
  "e3-events",
  "e3-fhe",
+ "e3-multithread",
  "e3-request",
  "e3-sortition",
+ "e3-trbfv",
  "e3-utils",
  "serde",
  "tracing",
@@ -3145,6 +3147,8 @@ dependencies = [
 name = "e3-utils"
 version = "0.0.1-test"
 dependencies = [
+ "actix",
+ "anyhow",
  "derivative",
  "serde",
 ]

@@ -29,10 +29,11 @@ pub struct CiphernodeBuilder {
     logging: bool,
     errors: bool,
     pubkey_agg: bool,
+    threads: Option<usize>,
     threshold_plaintext_agg: bool,
     plaintext_agg: bool,
     source_bus: Option<Addr<EventBus<EnclaveEvent>>>,
-    injected_multithread: Option<Addr<Multithread>>,
+    multithread_cache: Option<Addr<Multithread>>,
     data: Option<Addr<InMemStore>>,
     rng: SharedRng,
     cipher: Arc<Cipher>,
@@ -51,7 +52,8 @@ impl CiphernodeBuilder {
             threshold_plaintext_agg: false,
             source_bus: None,
             data: None,
-            injected_multithread: None,
+            threads: None,
+            multithread_cache: None,
             rng,
             cipher,
         }
@@ -103,7 +105,12 @@ impl CiphernodeBuilder {
     }
 
     pub fn with_injected_multithread(mut self, multithread: Addr<Multithread>) -> Self {
-        self.injected_multithread = Some(multithread);
+        self.multithread_cache = Some(multithread);
+        self
+    }
+
+    pub fn with_threads(mut self, threads: usize) -> Self {
+        self.threads = Some(threads);
         self
     }
 
@@ -112,12 +119,12 @@ impl CiphernodeBuilder {
         self
     }
 
-    pub async fn build(self) -> anyhow::Result<CiphernodeSimulated> {
+    pub async fn build(mut self) -> anyhow::Result<CiphernodeSimulated> {
         // Local bus for ciphernode events
         let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
 
-        if let Some(bus) = self.source_bus {
-            EventBus::pipe(&bus, &local_bus);
+        if let Some(ref bus) = self.source_bus {
+            EventBus::pipe(bus, &local_bus);
         }
 
         // History collector for taking historical events for analysis
@@ -157,10 +164,7 @@ impl CiphernodeBuilder {
         let mut e3_builder = E3Router::builder(&local_bus, store);
 
         if self.trbfv {
-            let multithread = self
-                .injected_multithread
-                .clone()
-                .unwrap_or_else(|| Multithread::attach(self.rng.clone(), self.cipher.clone(), 1));
+            let multithread = self.ensure_multithread();
 
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
                 &local_bus,
@@ -186,8 +190,11 @@ impl CiphernodeBuilder {
         }
 
         if self.threshold_plaintext_agg {
+            let multithread = self.ensure_multithread();
             e3_builder = e3_builder.with(ThresholdPlaintextAggregatorExtension::create(
-                &local_bus, &sortition,
+                &local_bus,
+                &sortition,
+                &multithread,
             ))
         }
 
@@ -204,5 +211,25 @@ impl CiphernodeBuilder {
             history,
             errors,
         ))
+    }
+
+    fn ensure_multithread(&mut self) -> Addr<Multithread> {
+        // If we have it cached return it
+        if let Some(cached) = self.multithread_cache.clone() {
+            return cached;
+        }
+
+        // Create it
+        let addr = Multithread::attach(
+            self.rng.clone(),
+            self.cipher.clone(),
+            self.threads.unwrap_or(1),
+        );
+
+        // Set the cache
+        self.multithread_cache = Some(addr.clone());
+
+        // return it
+        addr
     }
 }

@@ -530,10 +530,12 @@ impl ThresholdKeyshare {
         response: CalculateDecryptionShareResponse,
     ) -> Result<EnclaveEvent> {
         let state = self.state.get().ok_or(anyhow!("Failed to get state"))?;
+        let party_id = state.party_id;
         let node = state.address;
         let e3_id = state.e3_id;
         let decryption_share = response.d_share_poly;
         Ok(EnclaveEvent::from(DecryptionshareCreated {
+            party_id,
             node,
             e3_id,
             // XXX: We need to be able to have arbitrary numbers of ciphertexts to be decrypted
@@ -598,7 +600,7 @@ impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
             Ok(request) => request,
             Err(e) => {
                 println!("{e}");
-                return bail(self);
+                return e3_utils::bail(self);
             }
         };
 
@@ -668,7 +670,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
         } = msg.0;
 
         let Some(state) = self.state.get() else {
-            return bail(self);
+            return e3_utils::bail(self);
         };
 
         let trbfv_config = state.get_trbfv_config();
@@ -723,7 +725,7 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
         println!("GenPkShareAndSkSss on ThresholdKeyshare");
         let CiphernodeSelected { .. } = msg.0;
         let Some(state) = self.state.get() else {
-            return bail(self);
+            return e3_utils::bail(self);
         };
 
         let trbfv_config: TrBFVConfig = state.get_trbfv_config();
@@ -777,7 +779,7 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
     ) -> Self::Result {
         println!("AllThresholdSharesCollected");
         let Ok(request) = self.try_generate_compute_decryption_key_request(msg) else {
-            return bail(self);
+            return e3_utils::bail(self);
         };
         let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionKey(request));
 
@@ -914,17 +916,7 @@ impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
     }
 }
 
-// Helper to allow for bail behaviour in actor model async handlers
-fn bail<T: Actor>(a: &T) -> ResponseActFuture<T, ()> {
-    Box::pin(async {}.into_actor(a))
-}
-
 // TODO: do we need this?
-fn bail_result<T: Actor>(a: &T, msg: impl Into<String>) -> ResponseActFuture<T, Result<()>> {
-    let m: String = msg.into();
-    Box::pin(async { Err(anyhow!(m)) }.into_actor(a))
-}
-
 // // Function to prepare tuple to put on an event
 // fn _dangerously_remove_zeroizing_to_simulate_pvw_encryption(
 //     input: (
