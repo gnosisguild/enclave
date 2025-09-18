@@ -65,7 +65,7 @@ pub enum NetEvent {
         error: Arc<DialError>,
     },
 
-    /// This node received a document pubilshed notification
+    /// This node received a document published notification
     DocumentPublishedNotification(DocumentPublishedNotification),
     /// This node received a document from a Kademlia Request
     FetchDocumentSucceeded {
