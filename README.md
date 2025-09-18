@@ -76,17 +76,17 @@ See [CONTRIBUTING.md][contributing].
 		</tr>
 		<tr>
             <td align="center">
-                <a href="https://github.com/0xjei">
-                    <img src="https://avatars.githubusercontent.com/u/20580910?v=4" width="100;" alt="0xjei"/>
-                    <br />
-                    <sub><b>Giacomo</b></sub>
-                </a>
-            </td>
-            <td align="center">
                 <a href="https://github.com/ctrlc03">
                     <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
                     <br />
                     <sub><b>ctrlc03</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/0xjei">
+                    <img src="https://avatars.githubusercontent.com/u/20580910?v=4" width="100;" alt="0xjei"/>
+                    <br />
+                    <sub><b>Giacomo</b></sub>
                 </a>
             </td>
             <td align="center">
