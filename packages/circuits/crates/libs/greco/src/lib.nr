@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use polynomial::{flatten, packer, Polynomial};
+use polynomial::{flatten, Polynomial};
 use safe::SafeSponge;
 
 /// Cryptographic parameters for Greco circuit.
@@ -233,27 +233,27 @@ impl<let N: u32, let L: u32> Greco<N, L> {
     ///
     /// # Returns
     /// An array containing all polynomials coefficients in flattened form
-    fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
-        let mut inputs = [0; SIZE];
+    fn payload(self) -> Vec<Field> {
+        let mut inputs = Vec::new();
         let mut offset = 0;
 
         // Flatten public key and ciphertext polynomials first (public inputs)
-        let (inputs, offset) = flatten(inputs, self.pk0is, offset);
-        let (inputs, offset) = flatten(inputs, self.pk1is, offset);
-        let (inputs, offset) = flatten(inputs, self.ct0is, offset);
-        let (inputs, offset) = flatten(inputs, self.ct1is, offset);
+        let (inputs, offset) = flatten(inputs, self.pk0is, offset, 60);
+        let (inputs, offset) = flatten(inputs, self.pk1is, offset, 60);
+        let (inputs, offset) = flatten(inputs, self.ct0is, offset, 60);
+        let (inputs, offset) = flatten(inputs, self.ct1is, offset, 60);
 
         // Flatten common polynomials (used across all CRT bases)
-        let (inputs, offset) = flatten(inputs, [self.e0], offset);
-        let (inputs, offset) = flatten(inputs, [self.e1], offset);
-        let (inputs, offset) = flatten(inputs, [self.u], offset);
-        let (inputs, offset) = flatten(inputs, [self.k1], offset);
+        let (inputs, offset) = flatten(inputs, [self.e0], offset, 5);
+        let (inputs, offset) = flatten(inputs, [self.e1], offset, 5);
+        let (inputs, offset) = flatten(inputs, [self.u], offset, 5);
+        let (inputs, offset) = flatten(inputs, [self.k1], offset, 20);
 
         // Flatten randomness polynomials for each CRT basis
-        let (inputs, offset) = flatten(inputs, self.r1is, offset);
-        let (inputs, offset) = flatten(inputs, self.r2is, offset);
-        let (inputs, offset) = flatten(inputs, self.p1is, offset);
-        let (inputs, _) = flatten(inputs, self.p2is, offset);
+        let (inputs, offset) = flatten(inputs, self.r1is, offset, 60);
+        let (inputs, offset) = flatten(inputs, self.r2is, offset, 60);
+        let (inputs, offset) = flatten(inputs, self.p1is, offset, 20);
+        let (inputs, _) = flatten(inputs, self.p2is, offset, 60);
 
         inputs
     }
@@ -329,7 +329,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
     /// # Returns
     /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn generate_challenge(self) -> Vec<Field> {
-        let inputs = packer(self.payload::<((10 * N - 4) * L + 4 * N)>());
+        let inputs = self.payload();
 
         // Domain separator for Greco circuit - "Greco" in hex
         let domain_separator = [
@@ -341,7 +341,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
         ];
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
-        let input_size = (((10 * N - 4) * L + 4 * N) + 2) / 3;
+        let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);

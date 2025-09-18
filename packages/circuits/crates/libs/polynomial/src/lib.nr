@@ -117,61 +117,38 @@ impl<let N: u32> Polynomial<N> {
 /// A tuple containing:
 /// * The updated inputs array with flattened coefficients
 /// * The new offset position after flattening
-pub fn flatten<let A: u32, let L: u32, let SIZE: u32>(
-    mut inputs: [Field; SIZE],
+pub fn flatten<let A: u32, let L: u32>(
+    mut inputs: Vec<Field>,
     poly: [Polynomial<A>; L],
     mut offset: u32,
-) -> ([Field; SIZE], u32) {
+    bit: u32,
+) -> (Vec<Field>, u32) {
     for j in 0..L {
-        for i in 0..A {
-            inputs[i + offset] = poly[j].coefficients[i];
+        let pack = packer(poly[j].coefficients, bit);
+        for i in 0..(A / (254 / bit)) {
+            //inputs[i + offset] = pack[i];
+            inputs.push(pack.get(i));
         }
-        offset += A;
+        offset += (((A + (254 / bit)) - 1) / (254 / bit));
     }
 
     (inputs, offset)
 }
 
-/// Packs an array of `Field` elements into a more compact representation,
-/// grouping three values into a single `Field` element. If the input length
-/// `A` is not divisible by 3, the final packed element is **zero-padded**.
-///
-/// # Type Parameters
-/// * `A` - Number of input coefficients.
-///
-/// # Parameters
-/// * `values` - The input array `[Field; A]` to be packed.
-///
-/// # Returns
-/// * `[Field; (A + 2) / 3]` - A packed array with length equal to
-///   `ceil(A / 3)`.
-///
-/// # Algorithm
-/// - Computes `S = ceil(A / 3)` (using `(A + 2) / 3` for integer division).
-/// - Iterates over each output position `j`:
-///   * Initializes an accumulator `acc = 0`.
-///   * For each of the 3 input slots belonging to this output position:
-///     * Reads `values[idx]` where `idx = 3 * j + i`, or uses `0` if `idx >= A`
-///       (to avoid out-of-bounds access).
-///     * Adds an offset of `2^64` to every value (ensuring positive packing).
-///     * Updates `acc = acc * 2^65 + adjusted_value`.
-/// - Stores `acc` into the output array at position `j`.
-///
-/// # Padding Behavior
-/// If `A % 3 != 0`, the last packed element will include one or two
-/// zero-padded values, ensuring that `values[idx]` is never accessed
-/// out-of-bounds.
-pub fn packer<let A: u32>(values: [Field; A]) -> [Field; (A + 2) / 3] {
-    let mut carrier = [0; (A + 2) / 3];
-    for j in 0..(A + 2) / 3 {
-        let base: Field = 36893488147419103232; // 2^65
+pub fn packer<let A: u32>(values: [Field; A], bit: u32) -> Vec<Field> {
+    let group = 254 / bit;
+    let mut carrier = Vec::new();
+    let base = 2.pow_32(bit as Field); // 2^bit
+    let base_plus = 2.pow_32((bit + 1) as Field);
+
+    for j in 0..((A + group - 1) / group) {
         let mut acc: Field = 0;
-        for i in 0..3 {
-            let idx: u32 = 3 * j + i;
+        for i in 0..group {
+            let idx: u32 = group * j + i;
             let v: Field = if idx < A { values[idx] } else { 0 };
-            acc = acc * base + (v + 18446744073709551616); // + 2^64
+            acc = acc * base_plus + (v + base);
         }
-        carrier[j] = acc;
+        carrier.push(acc);
     }
     carrier
 }
@@ -235,11 +212,12 @@ fn test_flatten() {
     let polynomials = [poly1, poly2, poly3];
 
     // Initialize target array with zeros
-    let mut inputs = [0; 10]; // Size to accommodate 3 polynomials of degree 2 + offset
+    let mut inputs = Vec::from_slice([0; 10].as_slice()); // Size to accommodate 3 polynomials of degree 2 + offset
+
     let offset = 1; // Start at position 1
 
     // Flatten the polynomials
-    let (result, new_offset): ([Field; 10], u32) = flatten(inputs, polynomials, offset);
+    let (result, new_offset) = flatten(inputs, polynomials, offset, 64);
 
     // Verify the flattened coefficients are in the correct positions
     // Expected: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -247,16 +225,16 @@ fn test_flatten() {
     //           |     poly1     poly2     poly3
     //           offset
 
-    assert_eq(result[0], 0); // Should remain unchanged (before offset)
-    assert_eq(result[1], 1); // poly1[0]
-    assert_eq(result[2], 2); // poly1[1]
-    assert_eq(result[3], 3); // poly1[2]
-    assert_eq(result[4], 4); // poly2[0]
-    assert_eq(result[5], 5); // poly2[1]
-    assert_eq(result[6], 6); // poly2[2]
-    assert_eq(result[7], 7); // poly3[0]
-    assert_eq(result[8], 8); // poly3[1]
-    assert_eq(result[9], 9); // poly3[2]
+    assert_eq(result.get(0), 0); // Should remain unchanged (before offset)
+    assert_eq(result.get(1), 1); // poly1[0]
+    assert_eq(result.get(2), 2); // poly1[1]
+    assert_eq(result.get(3), 3); // poly1[2]
+    assert_eq(result.get(4), 4); // poly2[0]
+    assert_eq(result.get(5), 5); // poly2[1]
+    assert_eq(result.get(6), 6); // poly2[2]
+    assert_eq(result.get(7), 7); // poly3[0]
+    assert_eq(result.get(8), 8); // poly3[1]
+    assert_eq(result.get(9), 9); // poly3[2]
 
     // Verify the new offset is correct (original offset + total coefficients)
     assert_eq(new_offset, offset + 3 * 3); // offset + num_polynomials * degree
