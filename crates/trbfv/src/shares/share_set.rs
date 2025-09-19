@@ -4,13 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::ops::Deref;
+
 use anyhow::{bail, Result};
 use ndarray::Array2;
 
 use crate::shares::pvw::PvwShareSet;
 use crate::shares::share::Share;
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ShareSet(pub Vec<Share>);
 
 impl ShareSet {
@@ -29,12 +31,29 @@ impl ShareSet {
         Ok(row.clone())
     }
 
+    pub fn to_vec(&self) -> Vec<Share> {
+        self.0.clone()
+    }
+
     pub fn add(&mut self, share: Share) {
         self.0.push(share);
     }
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+}
+
+impl Deref for ShareSet {
+    type Target = Vec<Share>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Vec<Share>> for ShareSet {
+    fn from(value: Vec<Share>) -> Self {
+        Self(value)
     }
 }
 
@@ -97,5 +116,36 @@ impl TryFrom<ShareSet> for Array2<u64> {
 
         Array2::from_shape_vec((num_rows, num_cols), data)
             .map_err(|e| anyhow::anyhow!("Shape mismatch: {}", e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::Array2;
+
+    #[test]
+    fn test_array2_shareset_roundtrip() {
+        // Create a simple 3x4 array with some test data
+        let original_array =
+            Array2::from_shape_vec((3, 4), vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).unwrap();
+
+        // Convert Array2 -> ShareSet
+        let share_set = ShareSet::from(original_array.clone());
+
+        // Verify the ShareSet was created correctly
+        assert_eq!(share_set.0.len(), 3); // 3 rows
+        assert_eq!(share_set.0[0].len(), 4); // 4 columns
+
+        // Convert ShareSet -> Array2
+        let converted_array = Array2::try_from(share_set).unwrap();
+
+        // Verify we got back exactly what we started with
+        assert_eq!(original_array, converted_array);
+
+        // Also verify the actual values for clarity
+        assert_eq!(converted_array[[0, 0]], 1);
+        assert_eq!(converted_array[[0, 3]], 4);
+        assert_eq!(converted_array[[2, 3]], 12);
     }
 }

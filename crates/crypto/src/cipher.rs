@@ -13,7 +13,7 @@ use aes_gcm::{
 use anyhow::{anyhow, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
 use rand::{rngs::OsRng, RngCore};
-use tracing::{info, trace};
+use tracing::trace;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::{
@@ -64,7 +64,8 @@ fn encrypt_data(derived_key: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Result<
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     // Create AES-GCM cipher
-    let cipher = Aes256Gcm::new_from_slice(&derived_key)?;
+    let cipher = Aes256Gcm::new_from_slice(&derived_key)
+        .map_err(|e| anyhow!("Failed to create cipher: {:?}", e))?;
 
     // Encrypt the data
     let ciphertext = cipher
@@ -93,7 +94,8 @@ fn decrypt_data(derived_key: &Zeroizing<Vec<u8>>, encrypted_data: &[u8]) -> Resu
     let ciphertext = &encrypted_data[AES_HEADER_LEN..];
 
     // Create cipher and decrypt
-    let cipher = Aes256Gcm::new_from_slice(&derived_key)?;
+    let cipher = Aes256Gcm::new_from_slice(&derived_key)
+        .map_err(|e| anyhow!("Failed to create cipher: {:?}", e))?;
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
         .map_err(|_| anyhow!("Could not decrypt data"))?;

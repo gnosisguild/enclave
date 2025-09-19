@@ -6,8 +6,7 @@
 
 use crate::Cipher;
 use anyhow::Result;
-// use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use e3_utils::ArcBytes;
 use zeroize::Zeroizing;
 
 /// A container that holds encrypted data
@@ -15,7 +14,7 @@ use zeroize::Zeroizing;
 /// means we get the type system indicating when data is encrypted
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SensitiveBytes {
-    encrypted: Arc<Vec<u8>>,
+    encrypted: ArcBytes,
 }
 
 impl SensitiveBytes {
@@ -25,7 +24,7 @@ impl SensitiveBytes {
         let mut bytes = input.into();
         let encrypted = cipher.encrypt_data(&mut bytes)?;
         Ok(Self {
-            encrypted: Arc::new(encrypted),
+            encrypted: ArcBytes::from_bytes(encrypted),
         })
     }
 

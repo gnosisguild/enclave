@@ -121,6 +121,8 @@ pub fn calculate_decryption_key(
     let sk_poly_sum =
         share_manager.aggregate_collected_shares(&req.sk_sss_collected.try_to_ndarray_vec()?)?;
 
+    panic!("DIE");
+
     info!("Calculating es_poly_sum...");
     let es_poly_sum = req
         .esi_sss_collected

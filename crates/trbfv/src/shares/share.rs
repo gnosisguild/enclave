@@ -10,7 +10,7 @@ use std::ops::Deref;
 
 use crate::shares::pvw::PvwShare;
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Share(pub Vec<u64>);
 
 impl Deref for Share {

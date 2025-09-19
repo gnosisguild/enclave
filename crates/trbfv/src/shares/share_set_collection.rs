@@ -13,7 +13,9 @@ use crate::shares::pvw::PvwShareSetCollection;
 use crate::shares::share_set::ShareSet;
 use e3_crypto::ToSensitiveBytes;
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+use super::Share;
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ShareSetCollection(pub Vec<ShareSet>);
 
 impl From<Vec<Array2<u64>>> for ShareSetCollection {
@@ -63,21 +65,29 @@ impl ShareSetCollection {
 
         // Each external set is in order based on party_id
         // Here we start a sets vector for this collection
-        let mut sets = vec![];
+        let mut matrix = vec![];
         for col in collections {
             // Check Invariant
             if col.len() != len {
                 bail!("Invalid external modulus length!")
             }
+
             let set = col.extract_set(party_id, total)?;
-            sets.push(set)
+
+            matrix.push(set);
         }
-        Ok(Self(sets))
+
+        let share_sets: Vec<ShareSet> = transpose_matrix(matrix)
+            .into_iter()
+            .map(|s| ShareSet::from(s))
+            .collect();
+
+        Ok(ShareSetCollection::from(share_sets))
     }
 
     // We need to extract the specific share for our party_id from the external set
-    pub fn extract_set(&self, party_id: usize, total: usize) -> Result<ShareSet> {
-        let mut set = ShareSet::new();
+    pub fn extract_set(&self, party_id: usize, total: usize) -> Result<Vec<Share>> {
+        let mut set = vec![];
         for current in self.0.iter() {
             if current.len() != total {
                 bail!(
@@ -87,7 +97,7 @@ impl ShareSetCollection {
                 )
             }
             let share = current.get_cloned(party_id)?;
-            set.add(share);
+            set.push(share);
         }
         Ok(set)
     }
@@ -108,6 +118,18 @@ impl ShareSetCollection {
             .collect::<Result<Vec<Vec<_>>>>()?;
         Ok(EncryptedShareSetCollection::new(out))
     }
+}
+
+fn transpose_matrix<T: Clone>(matrix: Vec<Vec<T>>) -> Vec<Vec<T>> {
+    if matrix.is_empty() || matrix[0].is_empty() {
+        return Vec::new();
+    }
+
+    let cols = matrix[0].len();
+
+    (0..cols)
+        .map(|col_idx| matrix.iter().map(|row| row[col_idx].clone()).collect())
+        .collect()
 }
 
 // This currently serializes but will eventually encrypt to pvw
@@ -137,5 +159,162 @@ impl TryFrom<PvwShareSetCollection> for ShareSetCollection {
                 .map(|s| s.try_into())
                 .collect::<Result<_>>()?,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+
+    use crate::shares::{Share, ShareSet};
+
+    use super::ShareSetCollection;
+
+    #[test]
+    fn test_swap_shares() -> Result<()> {
+        let collections = vec![
+            // party 0
+            ShareSetCollection::from(vec![
+                // mod 0
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![0, 0, 0]),
+                    Share::new(vec![0, 0, 1]),
+                    Share::new(vec![0, 0, 2]),
+                    Share::new(vec![0, 0, 3]),
+                ]),
+                // mod 1
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![0, 1, 0]),
+                    Share::new(vec![0, 1, 1]),
+                    Share::new(vec![0, 1, 2]),
+                    Share::new(vec![0, 1, 3]),
+                ]),
+                // mod 2
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![0, 2, 0]),
+                    Share::new(vec![0, 2, 1]),
+                    Share::new(vec![0, 2, 2]),
+                    Share::new(vec![0, 2, 3]),
+                ]),
+            ]),
+            // party 1
+            ShareSetCollection::from(vec![
+                // mod 0
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![1, 0, 0]),
+                    Share::new(vec![1, 0, 1]),
+                    Share::new(vec![1, 0, 2]),
+                    Share::new(vec![1, 0, 3]),
+                ]),
+                // mod 1
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![1, 1, 0]),
+                    Share::new(vec![1, 1, 1]),
+                    Share::new(vec![1, 1, 2]),
+                    Share::new(vec![1, 1, 3]),
+                ]),
+                // mod 2
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![1, 2, 0]),
+                    Share::new(vec![1, 2, 1]),
+                    Share::new(vec![1, 2, 2]),
+                    Share::new(vec![1, 2, 3]),
+                ]),
+            ]),
+            // party 2
+            ShareSetCollection::from(vec![
+                // mod 0
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![2, 0, 0]),
+                    Share::new(vec![2, 0, 1]),
+                    Share::new(vec![2, 0, 2]),
+                    Share::new(vec![2, 0, 3]),
+                ]),
+                // mod 1
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![2, 1, 0]),
+                    Share::new(vec![2, 1, 1]),
+                    Share::new(vec![2, 1, 2]),
+                    Share::new(vec![2, 1, 3]),
+                ]),
+                // mod 2
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![2, 2, 0]),
+                    Share::new(vec![2, 2, 1]),
+                    Share::new(vec![2, 2, 2]),
+                    Share::new(vec![2, 2, 3]),
+                ]),
+            ]),
+            // party 3
+            ShareSetCollection::from(vec![
+                // mod 0
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![3, 0, 0]),
+                    Share::new(vec![3, 0, 1]),
+                    Share::new(vec![3, 0, 2]),
+                    Share::new(vec![3, 0, 3]),
+                ]),
+                // mod 1
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![3, 1, 0]),
+                    Share::new(vec![3, 1, 1]),
+                    Share::new(vec![3, 1, 2]),
+                    Share::new(vec![3, 1, 3]),
+                ]),
+                // mod 2
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![3, 2, 0]),
+                    Share::new(vec![3, 2, 1]),
+                    Share::new(vec![3, 2, 2]),
+                    Share::new(vec![3, 2, 3]),
+                ]),
+            ]),
+        ];
+
+        let party_3 = ShareSetCollection::from_received(collections, 3)?;
+        assert_eq!(
+            party_3,
+            // party 3
+            ShareSetCollection::from(vec![
+                // mod 0
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![0, 0, 3]),
+                    Share::new(vec![1, 0, 3]),
+                    Share::new(vec![2, 0, 3]),
+                    Share::new(vec![3, 0, 3]),
+                ]),
+                // mod 1
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![0, 1, 3]),
+                    Share::new(vec![1, 1, 3]),
+                    Share::new(vec![2, 1, 3]),
+                    Share::new(vec![3, 1, 3]),
+                ]),
+                // mod 2
+                ShareSet::from(vec![
+                    // [from, mod, to]
+                    Share::new(vec![0, 2, 3]),
+                    Share::new(vec![1, 2, 3]),
+                    Share::new(vec![2, 2, 3]),
+                    Share::new(vec![3, 2, 3]),
+                ]),
+            ]),
+        );
+
+        Ok(())
     }
 }

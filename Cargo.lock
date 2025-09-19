@@ -2696,6 +2696,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "bincode",
+ "e3-utils",
  "rand 0.8.5",
  "serde",
  "tokio",
