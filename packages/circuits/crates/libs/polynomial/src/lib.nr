@@ -146,7 +146,7 @@ pub fn packer<let A: u32>(values: [Field; A], bit: u32) -> Vec<Field> {
         for i in 0..group {
             let idx: u32 = group * j + i;
             let v: Field = if idx < A { values[idx] } else { 0 };
-            acc = acc * base_plus + (v + base);
+            acc = acc * base_plus + (v + base); // + 2^bit+1
         }
         carrier.push(acc);
     }

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use polynomial::{flatten, Polynomial};
+use polynomial::{bitlen, flatten, Polynomial};
 use safe::SafeSponge;
 
 /// Cryptographic parameters for Greco circuit.
@@ -234,28 +234,34 @@ impl<let N: u32, let L: u32> Greco<N, L> {
     /// # Returns
     /// An array containing all polynomials coefficients in flattened form
     fn payload(self) -> Vec<Field> {
-        let mut inputs = Vec::new();
-        let mut offset = 0;
+        let mut inputs = (Vec::new(), 0);
 
         // Flatten public key and ciphertext polynomials first (public inputs)
-        let (inputs, offset) = flatten(inputs, self.pk0is, offset, 60);
-        let (inputs, offset) = flatten(inputs, self.pk1is, offset, 60);
-        let (inputs, offset) = flatten(inputs, self.ct0is, offset, 60);
-        let (inputs, offset) = flatten(inputs, self.ct1is, offset, 60);
+
+        if self.params.bound_params().e_bound < 50 {
+            inputs = flatten(inputs.0, self.pk0is, inputs.1, 60);
+        }
+        if self.params.bound_params().e_bound > 50 {
+            inputs = flatten(inputs.0, self.pk0is, inputs.1, 64);
+        }
+
+        inputs = flatten(inputs.0, self.pk1is, inputs.1, 60);
+        inputs = flatten(inputs.0, self.ct0is, inputs.1, 60);
+        inputs = flatten(inputs.0, self.ct1is, inputs.1, 60);
 
         // Flatten common polynomials (used across all CRT bases)
-        let (inputs, offset) = flatten(inputs, [self.e0], offset, 5);
-        let (inputs, offset) = flatten(inputs, [self.e1], offset, 5);
-        let (inputs, offset) = flatten(inputs, [self.u], offset, 5);
-        let (inputs, offset) = flatten(inputs, [self.k1], offset, 20);
+        inputs = flatten(inputs.0, [self.e0], inputs.1, 5);
+        inputs = flatten(inputs.0, [self.e1], inputs.1, 5);
+        inputs = flatten(inputs.0, [self.u], inputs.1, 5);
+        inputs = flatten(inputs.0, [self.k1], inputs.1, 20);
 
         // Flatten randomness polynomials for each CRT basis
-        let (inputs, offset) = flatten(inputs, self.r1is, offset, 60);
-        let (inputs, offset) = flatten(inputs, self.r2is, offset, 60);
-        let (inputs, offset) = flatten(inputs, self.p1is, offset, 20);
-        let (inputs, _) = flatten(inputs, self.p2is, offset, 60);
+        inputs = flatten(inputs.0, self.r1is, inputs.1, 60);
+        inputs = flatten(inputs.0, self.r2is, inputs.1, 60);
+        inputs = flatten(inputs.0, self.p1is, inputs.1, 20);
+        inputs = flatten(inputs.0, self.p2is, inputs.1, 60);
 
-        inputs
+        inputs.0
     }
 
     /// Verifies the correct encryption constraints for the Greco circuit.
@@ -341,7 +347,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
         ];
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
-        let input_size = inputs.len();
+        let input_size = 4894;
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);
