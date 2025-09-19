@@ -21,6 +21,6 @@ pub struct PlaintextAggregated {
 
 impl Display for PlaintextAggregated {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "e3_id: {}", self.e3_id)
+        write!(f, "{:?}", self)
     }
 }

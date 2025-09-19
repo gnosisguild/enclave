@@ -222,7 +222,7 @@ async fn test_trbfv() -> Result<()> {
 
     // Created the event
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
-        ciphertext_output: ciphertext.to_bytes(),
+        ciphertext_output: ArcBytes::from_bytes(ciphertext.to_bytes()),
         e3_id: e3_id.clone(),
     });
 

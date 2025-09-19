@@ -506,12 +506,12 @@ impl ThresholdKeyshare {
 
     pub fn create_calculate_decryption_share_request(
         &mut self,
-        ciphertext_output: Vec<u8>, // TODO: should be a Vec<ArcBytes>
+        ciphertext_output: ArcBytes,
     ) -> Result<ComputeRequest> {
         self.set_state_to_decrypting()?;
         let state = self.state.get().ok_or(anyhow!("State not set."))?;
         let decrypting: Decrypting = state.clone().try_into()?;
-        let ciphertexts = vec![ArcBytes::from_bytes(ciphertext_output)]; // HACK
+        let ciphertexts = vec![ciphertext_output]; // HACK wrap in vector
         let trbfv_config = state.get_trbfv_config();
 
         let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(
@@ -592,7 +592,7 @@ impl Handler<CiphernodeSelected> for ThresholdKeyshare {
 
 impl Handler<CiphertextOutputPublished> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
-    fn handle(&mut self, msg: CiphertextOutputPublished, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: CiphertextOutputPublished, _: &mut Self::Context) -> Self::Result {
         let CiphertextOutputPublished {
             ciphertext_output, ..
         } = msg;

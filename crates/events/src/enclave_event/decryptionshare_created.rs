@@ -22,6 +22,6 @@ pub struct DecryptionshareCreated {
 
 impl Display for DecryptionshareCreated {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "e3_id: {}, node: {}", self.e3_id, self.node,)
+        write!(f, "{:?}", self)
     }
 }

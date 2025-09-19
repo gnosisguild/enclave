@@ -22,10 +22,6 @@ pub struct PublicKeyAggregated {
 
 impl Display for PublicKeyAggregated {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "e3_id: {}, nodes: <omitted>, pubkey: <omitted>",
-            self.e3_id,
-        )
+        write!(f, "{:?}", self)
     }
 }

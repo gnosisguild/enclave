@@ -40,10 +40,6 @@ impl Default for CiphernodeSelected {
 
 impl Display for CiphernodeSelected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "e3_id: {}, threshold_m: {}, threshold_n: {}",
-            self.e3_id, self.threshold_m, self.threshold_n
-        )
+        write!(f, "{:?}", self)
     }
 }

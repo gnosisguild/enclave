@@ -28,7 +28,7 @@ pub struct Collecting {
     threshold_n: u64,
     shares: Vec<(u64, ArcBytes)>,
     seed: Seed,
-    ciphertext_output: Vec<u8>,
+    ciphertext_output: ArcBytes,
     params: ArcBytes,
 }
 
@@ -37,7 +37,7 @@ pub struct Computing {
     threshold_m: u64,
     threshold_n: u64,
     shares: Vec<(u64, ArcBytes)>,
-    ciphertext_output: Vec<u8>,
+    ciphertext_output: ArcBytes,
     params: ArcBytes,
 }
 
@@ -95,7 +95,7 @@ impl ThresholdPlaintextAggregatorState {
         threshold_m: u64,
         threshold_n: u64,
         seed: Seed,
-        ciphertext_output: Vec<u8>,
+        ciphertext_output: ArcBytes,
         params: ArcBytes,
     ) -> Self {
         ThresholdPlaintextAggregatorState::Collecting(Collecting {
@@ -182,7 +182,7 @@ impl ThresholdPlaintextAggregator {
 
             Ok(ThresholdPlaintextAggregatorState::Computing(Computing {
                 shares: shares.clone(),
-                ciphertext_output: ciphertext_output.to_vec(),
+                ciphertext_output,
                 threshold_m,
                 threshold_n,
                 params,

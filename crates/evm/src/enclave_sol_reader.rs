@@ -4,8 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Arc;
-
 use crate::event_reader::EvmEventReaderState;
 use crate::helpers::EthProvider;
 use crate::EvmEventReader;
@@ -57,7 +55,7 @@ impl From<CiphertextOutputPublishedWithChainId> for e3_events::CiphertextOutputP
     fn from(value: CiphertextOutputPublishedWithChainId) -> Self {
         e3_events::CiphertextOutputPublished {
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
-            ciphertext_output: value.0.ciphertextOutput.to_vec(),
+            ciphertext_output: ArcBytes::from_bytes(value.0.ciphertextOutput.to_vec()),
         }
     }
 }

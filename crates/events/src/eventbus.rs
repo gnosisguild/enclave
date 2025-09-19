@@ -13,6 +13,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::time::Instant;
 use tokio::sync::oneshot;
+use tracing::info;
 
 //////////////////////////////////////////////////////////////////////////////
 // Core Traits
@@ -368,11 +369,12 @@ impl<E: Event> HistoryCollector<E> {
             let _ = pending.responder.send(events);
         }
     }
+
     fn add_event(&mut self, event: E) {
         // First try to give to pending takes
         for pending in &mut self.pending_takes {
             if pending.collected.len() < pending.count {
-                println!(
+                info!(
                     "Received event {}. Pushing to pending take...",
                     event.event_type()
                 );
@@ -407,7 +409,7 @@ impl<E: Event> Handler<TakeHistory<E>> for HistoryCollector<E> {
             return Box::pin(async move { events }.into_actor(self));
         }
 
-        println!(
+        info!(
             "Requesting {} events but only {} in the buffer. waiting for more...",
             msg.amount,
             self.history.len()

@@ -140,7 +140,7 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
         };
 
         let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
-            ciphertext: ciphertext_output.clone(),
+            ciphertext: ciphertext_output.extract_bytes(),
             unsafe_secret: secret,
         }) else {
             self.bus.err(

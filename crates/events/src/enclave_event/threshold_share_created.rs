@@ -42,6 +42,6 @@ pub struct ThresholdShareCreated {
 
 impl Display for ThresholdShareCreated {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "e3_id: {}", self.e3_id)
+        write!(f, "{:?}", self)
     }
 }

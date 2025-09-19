@@ -13,6 +13,7 @@ use e3_events::{
 };
 use e3_fhe::{Fhe, GetAggregatePlaintext};
 use e3_sortition::{GetNodeIndex, Sortition};
+use e3_utils::ArcBytes;
 use std::sync::Arc;
 use tracing::error;
 
@@ -23,11 +24,11 @@ pub enum PlaintextAggregatorState {
         threshold_n: usize,
         shares: OrderedSet<Vec<u8>>,
         seed: Seed,
-        ciphertext_output: Vec<u8>,
+        ciphertext_output: ArcBytes,
     },
     Computing {
         shares: OrderedSet<Vec<u8>>,
-        ciphertext_output: Vec<u8>,
+        ciphertext_output: ArcBytes,
     },
     Complete {
         decrypted: Vec<u8>,
@@ -40,7 +41,7 @@ impl PlaintextAggregatorState {
         threshold_m: usize,
         threshold_n: usize,
         seed: Seed,
-        ciphertext_output: Vec<u8>,
+        ciphertext_output: ArcBytes,
     ) -> Self {
         PlaintextAggregatorState::Collecting {
             threshold_m,
@@ -105,7 +106,7 @@ impl PlaintextAggregator {
             if shares.len() == *threshold_m {
                 return Ok(PlaintextAggregatorState::Computing {
                     shares: shares.clone(),
-                    ciphertext_output: ciphertext_output.to_vec(),
+                    ciphertext_output: ciphertext_output.clone(),
                 });
             }
 

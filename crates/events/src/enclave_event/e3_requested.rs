@@ -46,10 +46,6 @@ impl Default for E3Requested {
 
 impl Display for E3Requested {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "e3_id: {}, threshold_m: {}, threshold_n: {}, seed: {}, params: <omitted>",
-            self.e3_id, self.threshold_m, self.threshold_n, self.seed
-        )
+        write!(f, "{:?}", self)
     }
 }

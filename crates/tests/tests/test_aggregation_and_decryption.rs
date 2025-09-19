@@ -287,7 +287,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     // Setup Ciphertext Published Event
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
-        ciphertext_output: ciphertext.to_bytes(),
+        ciphertext_output: ArcBytes::from_bytes(ciphertext.to_bytes()),
         e3_id: e3_id.clone(),
     });
 
@@ -422,7 +422,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
-            ciphertext_output: ciphertext.to_bytes(),
+            ciphertext_output: ArcBytes::from_bytes(ciphertext.to_bytes()),
             e3_id: e3_id.clone(),
         })
         .clone(),
