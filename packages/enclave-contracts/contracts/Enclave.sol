@@ -247,7 +247,7 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     function publishInput(
         uint256 e3Id,
         bytes calldata data
-    ) external nonReentrant returns (bool success) {
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
         // Note: if we make 0 a no expiration, this has to be refactored
@@ -276,8 +276,9 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint256 e3Id,
         bytes calldata ciphertextOutput,
         bytes calldata proof
-    ) external nonReentrant returns (bool success) {
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
         require(
@@ -290,10 +291,12 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             e3.ciphertextOutput == bytes32(0),
             CiphertextOutputAlreadyPublished(e3Id)
         );
+
         bytes32 ciphertextOutputHash = keccak256(ciphertextOutput);
+        e3s[e3Id].ciphertextOutput = ciphertextOutputHash;
+
         (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
         require(success, InvalidOutput(ciphertextOutput));
-        e3s[e3Id].ciphertextOutput = ciphertextOutputHash;
 
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
     }
@@ -302,8 +305,9 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         uint256 e3Id,
         bytes calldata plaintextOutput,
         bytes calldata proof
-    ) external nonReentrant returns (bool success) {
+    ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
         require(
@@ -314,13 +318,15 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             e3.plaintextOutput.length == 0,
             PlaintextOutputAlreadyPublished(e3Id)
         );
+
+        e3s[e3Id].plaintextOutput = plaintextOutput;
+
         (success) = e3.decryptionVerifier.verify(
             e3Id,
             keccak256(plaintextOutput),
             proof
         );
         require(success, InvalidOutput(plaintextOutput));
-        e3s[e3Id].plaintextOutput = plaintextOutput;
 
         emit PlaintextOutputPublished(e3Id, plaintextOutput);
     }
