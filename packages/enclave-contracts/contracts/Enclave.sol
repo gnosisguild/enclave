@@ -13,15 +13,12 @@ import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {
     InternalLeanIMT,
     LeanIMTData,
     PoseidonT3
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
-contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract Enclave is IEnclave, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
 
     ////////////////////////////////////////////////////////////
@@ -117,7 +114,6 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
-        __ReentrancyGuard_init();
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
         setE3ProgramsParams(_e3ProgramsParams);
@@ -132,7 +128,7 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     function request(
         E3RequestParams calldata requestParams
-    ) external payable nonReentrant returns (uint256 e3Id, E3 memory e3) {
+    ) external payable returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
         // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
         require(msg.value > 0, PaymentRequired(msg.value));
@@ -161,6 +157,18 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
+        e3.seed = seed;
+        e3.threshold = requestParams.threshold;
+        e3.requestBlock = block.number;
+        e3.startWindow = requestParams.startWindow;
+        e3.duration = requestParams.duration;
+        e3.expiration = 0;
+        e3.e3Program = requestParams.e3Program;
+        e3.e3ProgramParams = requestParams.e3ProgramParams;
+        e3.committeePublicKey = hex"";
+        e3.ciphertextOutput = hex"";
+        e3.plaintextOutput = hex"";
+
         (
             bytes32 encryptionSchemeId,
             IInputValidator inputValidator
@@ -184,22 +192,10 @@ contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             InvalidComputationRequest(inputValidator)
         );
 
-        e3 = E3({
-            seed: seed,
-            threshold: requestParams.threshold,
-            requestBlock: block.number,
-            startWindow: requestParams.startWindow,
-            duration: requestParams.duration,
-            expiration: 0,
-            encryptionSchemeId: encryptionSchemeId,
-            e3Program: requestParams.e3Program,
-            e3ProgramParams: requestParams.e3ProgramParams,
-            inputValidator: inputValidator,
-            decryptionVerifier: decryptionVerifier,
-            committeePublicKey: hex"",
-            ciphertextOutput: hex"",
-            plaintextOutput: hex""
-        });
+        e3.encryptionSchemeId = encryptionSchemeId;
+        e3.inputValidator = inputValidator;
+        e3.decryptionVerifier = decryptionVerifier;
+
         e3s[e3Id] = e3;
 
         require(
