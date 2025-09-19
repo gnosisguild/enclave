@@ -7,6 +7,7 @@ pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
+import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -20,17 +21,30 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     ////////////////////////////////////////////////////////////
     //                                                        //
+    //                        Events                          //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    event BondingRegistrySet(address indexed bondingRegistry);
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
     //                 Storage Variables                      //
     //                                                        //
     ////////////////////////////////////////////////////////////
 
     address public enclave;
+    address public bondingRegistry;
     uint256 public numCiphernodes;
     LeanIMTData public ciphernodes;
 
     mapping(uint256 e3Id => IRegistryFilter filter) public registryFilters;
     mapping(uint256 e3Id => uint256 root) public roots;
     mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
+
+    // Committee tracking for active job management
+    mapping(uint256 e3Id => bool) public committeeActive;
+    mapping(address node => uint256 count) public activeCommitteeCount;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -44,6 +58,12 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     error CommitteeNotPublished();
     error CiphernodeNotEnabled(address node);
     error OnlyEnclave();
+    error OnlyBondingRegistry();
+    error NotOwnerOrBondingRegistry();
+    error NodeNotBonded(address node);
+    error ZeroAddress();
+    error BondingRegistryNotSet();
+    error Unauthorized();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -53,6 +73,19 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     modifier onlyEnclave() {
         require(msg.sender == enclave, OnlyEnclave());
+        _;
+    }
+
+    modifier onlyBondingRegistry() {
+        require(msg.sender == bondingRegistry, OnlyBondingRegistry());
+        _;
+    }
+
+    modifier onlyOwnerOrBondingVault() {
+        require(
+            msg.sender == owner() || msg.sender == bondingRegistry,
+            NotOwnerOrBondingRegistry()
+        );
         _;
     }
 
@@ -67,6 +100,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     function initialize(address _owner, address _enclave) public initializer {
+        require(_owner != address(0), ZeroAddress());
+        require(_enclave != address(0), ZeroAddress());
+
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
         if (_owner != owner()) transferOwnership(_owner);
@@ -107,7 +143,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         emit CommitteePublished(e3Id, publicKey);
     }
 
-    function addCiphernode(address node) external onlyOwner {
+    function addCiphernode(address node) external onlyOwnerOrBondingVault {
+        if (isEnabled(node)) {
+            return;
+        }
+
         uint160 ciphernode = uint160(node);
         ciphernodes._insert(ciphernode);
         numCiphernodes++;
@@ -122,7 +162,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function removeCiphernode(
         address node,
         uint256[] calldata siblingNodes
-    ) external onlyOwner {
+    ) external onlyOwnerOrBondingVault {
+        require(isEnabled(node), CiphernodeNotEnabled(node));
+
         uint160 ciphernode = uint160(node);
         uint256 index = ciphernodes._indexOf(ciphernode);
         ciphernodes._remove(ciphernode, siblingNodes);
@@ -137,8 +179,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     function setEnclave(address _enclave) public onlyOwner {
+        require(_enclave != address(0), ZeroAddress());
         enclave = _enclave;
         emit EnclaveSet(_enclave);
+    }
+
+    function setBondingRegistry(address _bondingRegistry) public onlyOwner {
+        require(_bondingRegistry != address(0), ZeroAddress());
+        bondingRegistry = _bondingRegistry;
+        emit BondingRegistrySet(_bondingRegistry);
     }
 
     ////////////////////////////////////////////////////////////
@@ -155,7 +204,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     function isCiphernodeEligible(address node) external view returns (bool) {
-        return isEnabled(node);
+        if (!isEnabled(node)) return false;
+
+        require(bondingRegistry != address(0), BondingRegistryNotSet());
+        return IBondingRegistry(bondingRegistry).isActive(node);
     }
 
     function isEnabled(address node) public view returns (bool) {
@@ -170,11 +222,83 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         return roots[e3Id];
     }
 
-    function getFilter(uint256 e3Id) public view returns (IRegistryFilter) {
-        return registryFilters[e3Id];
+    function getFilter(uint256 e3Id) public view returns (address filter) {
+        return address(registryFilters[e3Id]);
+    }
+
+    function getCommittee(
+        uint256 e3Id
+    ) public view returns (IRegistryFilter.Committee memory) {
+        return registryFilters[e3Id].getCommittee(e3Id);
     }
 
     function treeSize() public view returns (uint256) {
         return ciphernodes.size;
+    }
+
+    function getBondingRegistry() external view returns (address) {
+        return bondingRegistry;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                Committee Tracking                      //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function markCommitteeActive(
+        uint256 e3Id,
+        address[] calldata members
+    ) external {
+        require(msg.sender == enclave || msg.sender == owner(), Unauthorized());
+
+        // Idempotent: only process if not already active
+        if (!committeeActive[e3Id]) {
+            committeeActive[e3Id] = true;
+
+            // Increment active committee count for each member
+            for (uint256 i = 0; i < members.length; i++) {
+                activeCommitteeCount[members[i]]++;
+            }
+
+            emit CommitteeActivationChanged(e3Id, true);
+        }
+    }
+
+    function markCommitteeCompleted(
+        uint256 e3Id,
+        address[] calldata members
+    ) external {
+        require(msg.sender == enclave || msg.sender == owner(), Unauthorized());
+
+        // Only process if currently active
+        if (committeeActive[e3Id]) {
+            committeeActive[e3Id] = false;
+
+            // Decrement active committee count for each member
+            for (uint256 i = 0; i < members.length; i++) {
+                if (activeCommitteeCount[members[i]] > 0) {
+                    activeCommitteeCount[members[i]]--;
+                }
+            }
+
+            emit CommitteeActivationChanged(e3Id, false);
+        }
+    }
+
+    function isNodeActiveInAnyCommittee(
+        address node
+    ) external view returns (bool) {
+        return activeCommitteeCount[node] > 0;
+    }
+
+    function activeCommitteeCountOf(
+        address node
+    ) external view returns (uint256) {
+        return activeCommitteeCount[node];
+    }
+
+    function isCommitteeActive(uint256 e3Id) external view returns (bool) {
+        return committeeActive[e3Id];
     }
 }
