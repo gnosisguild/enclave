@@ -16,6 +16,7 @@ use fhe::{bfv::Ciphertext, trbfv::ShareManager};
 use fhe_math::rq::Poly;
 use fhe_traits::DeserializeParametrized;
 use fhe_traits::Serialize;
+use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CalculateDecryptionShareRequest {
@@ -52,9 +53,9 @@ impl TryFrom<(&Cipher, CalculateDecryptionShareRequest)> for InnerRequest {
             .into_iter()
             .map(|ciphertext| {
                 Ciphertext::from_bytes(&ciphertext, &trbfv_config.params())
-                    .context("cannot deserialize ciphertext")
+                    .context("Could not parse ciphertext")
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<Ciphertext>>>()?;
 
         let sk_poly_sum =
             try_poly_from_sensitive_bytes(value.1.sk_poly_sum, trbfv_config.params(), value.0)?;
@@ -99,6 +100,7 @@ pub fn calculate_decryption_share(
     cipher: &Cipher,
     req: CalculateDecryptionShareRequest,
 ) -> Result<CalculateDecryptionShareResponse> {
+    info!("Calculating decryption share...");
     let req: InnerRequest = (cipher, req).try_into()?;
 
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
@@ -107,21 +109,23 @@ pub fn calculate_decryption_share(
     let sk_poly_sum = req.sk_poly_sum;
     let es_poly_sum = req.es_poly_sum;
 
+    info!("Calculating d_share_poly...");
     let d_share_poly = req
         .ciphertexts
         .into_iter()
         .enumerate()
-        .map(|(idx, ciphertext)| {
+        .map(|(index, ciphertext)| {
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
+            info!("Create decryption share for ct index {}...", index);
             share_manager
                 .decryption_share(
                     Arc::new(ciphertext),
                     sk_poly_sum.clone(),
-                    es_poly_sum[idx].clone(),
+                    es_poly_sum[index].clone(),
                 )
-                .context(format!("Could not decrypt ciphertext {}", idx))
+                .context(format!("Could not decrypt ciphertext {}", index))
         })
         .collect::<Result<Vec<Poly>>>()?;
-
+    info!("Returning successful result...");
     Ok(InnerResponse { d_share_poly }.into())
 }

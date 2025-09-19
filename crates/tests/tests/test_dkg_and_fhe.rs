@@ -20,6 +20,7 @@ use e3_test_helpers::{
     create_seed_from_u64, create_shared_rng_from_u64, encrypt_ciphertext, rand_eth_addr,
     AddToCommittee,
 };
+use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::PublicKey;
 use fhe::{
@@ -35,16 +36,6 @@ use tokio::time::sleep;
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
     fs::write(format!("tests/{file_name}"), bytes).unwrap();
-}
-
-pub fn calculate_error_size(
-    params: Arc<bfv::BfvParameters>,
-    n: usize,
-    num_ciphertexts: usize,
-) -> Result<BigUint> {
-    let config = SmudgingBoundCalculatorConfig::new(params, n, num_ciphertexts);
-    let calculator = SmudgingBoundCalculator::new(config);
-    Ok(calculator.calculate_sm_bound()?)
 }
 
 /// Test trbfv

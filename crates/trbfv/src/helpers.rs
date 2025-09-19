@@ -6,9 +6,13 @@
 
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
-use fhe::bfv::BfvParameters;
+use fhe::{
+    bfv::{self, BfvParameters},
+    trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
+};
 use fhe_math::rq::Poly;
 use fhe_traits::DeserializeWithContext;
+use num_bigint::BigUint;
 use std::sync::Arc;
 
 pub fn try_poly_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly> {
@@ -32,4 +36,14 @@ pub fn try_polys_from_sensitive_bytes_vec(
         .into_iter()
         .map(|s| try_poly_from_sensitive_bytes(s, params.clone(), cipher))
         .collect::<Result<Vec<_>>>()
+}
+
+pub fn calculate_error_size(
+    params: Arc<bfv::BfvParameters>,
+    n: usize,
+    num_ciphertexts: usize,
+) -> Result<BigUint> {
+    let config = SmudgingBoundCalculatorConfig::new(params, n, num_ciphertexts);
+    let calculator = SmudgingBoundCalculator::new(config);
+    Ok(calculator.calculate_sm_bound()?)
 }

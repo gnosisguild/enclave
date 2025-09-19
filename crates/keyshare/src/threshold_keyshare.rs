@@ -29,10 +29,10 @@ use e3_trbfv::{
     },
     gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
     gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest,
-    shares::{EncryptedShareSetCollection, ShareSetCollection},
+    shares::{EncryptableVec, Encrypted, PvwEncrypted, ShamirShare, SharedSecret},
     SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
-use e3_utils::utility_types::ArcBytes;
+use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
 use fhe_traits::Serialize;
 use tracing::{error, info};
 
@@ -60,33 +60,24 @@ pub struct AllThresholdSharesCollected {
 
 impl From<HashMap<u64, Arc<ThresholdShare>>> for AllThresholdSharesCollected {
     fn from(value: HashMap<u64, Arc<ThresholdShare>>) -> Self {
-        // At this point all parties should be accounted for here
-
-        // extract a vector
-        let mut pairs: Vec<_> = value.into_iter().collect();
-
-        // Ensure keys are sorted
-        pairs.sort_by_key(|&(key, _)| key);
-
-        // Extract to Vec of ThresholdShares in order
-        let shares = pairs.into_iter().map(|(_, value)| value).collect();
-
-        AllThresholdSharesCollected { shares }
+        AllThresholdSharesCollected {
+            shares: to_ordered_vec(value),
+        }
     }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingThresholdShareData {
     pk_share: Option<ArcBytes>,
-    sk_sss: Option<EncryptedShareSetCollection>,
-    esi_sss: Option<Vec<EncryptedShareSetCollection>>,
+    sk_sss: Option<Encrypted<SharedSecret>>,
+    esi_sss: Option<Vec<Encrypted<SharedSecret>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AggregatingDecryptionKey {
     pk_share: ArcBytes,
-    sk_sss: EncryptedShareSetCollection,
-    esi_sss: Vec<EncryptedShareSetCollection>,
+    sk_sss: Encrypted<SharedSecret>,
+    esi_sss: Vec<Encrypted<SharedSecret>>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -342,29 +333,37 @@ impl ThresholdKeyshare {
         let trbfv_config = state.get_trbfv_config();
 
         // Shares are in order of party_id
-        let received_sss: Vec<ShareSetCollection> = msg
+        let received_sss: Vec<SharedSecret> = msg
             .shares
-            .iter()
-            .map(|ts| ts.sk_sss.clone().try_into())
+            .clone()
+            .into_iter()
+            .map(|ts| ts.sk_sss.clone().pvw_decrypt())
             .collect::<Result<_>>()?;
 
-        let received_esi_sss: Vec<Vec<ShareSetCollection>> = msg
+        let received_esi_sss: Vec<Vec<SharedSecret>> = msg
             .shares
             .into_iter()
             .map(|ts| {
                 ts.esi_sss
                     .clone()
                     .into_iter()
-                    .map(|s| s.try_into())
+                    .map(|s| s.pvw_decrypt())
                     .collect()
             })
             .collect::<Result<_>>()?;
 
-        let sk_sss_collected = ShareSetCollection::from_received(received_sss, party_id)?;
-
-        let esi_sss_collected: Vec<ShareSetCollection> = received_esi_sss
+        let sk_sss_collected: Vec<ShamirShare> = received_sss
             .into_iter()
-            .map(|s| ShareSetCollection::from_received(s, party_id))
+            .map(|s| s.extract_party_share(party_id))
+            .collect::<Result<_>>()?;
+
+        let esi_sss_collected: Vec<Vec<ShamirShare>> = received_esi_sss
+            .into_iter()
+            .map(|esi| {
+                esi.into_iter()
+                    .map(|s| s.extract_party_share(party_id))
+                    .collect()
+            })
             .collect::<Result<_>>()?;
 
         Ok(CalculateDecryptionKeyRequest {
@@ -392,7 +391,7 @@ impl ThresholdKeyshare {
     pub fn try_store_pk_share_and_sk_sss(
         &mut self,
         pk_share: ArcBytes,
-        sk_sss: EncryptedShareSetCollection,
+        sk_sss: Encrypted<SharedSecret>,
     ) -> Result<()> {
         use KeyshareState as K;
         self.state.try_mutate(|s| {
@@ -417,7 +416,7 @@ impl ThresholdKeyshare {
         })
     }
 
-    pub fn try_store_esi_sss(&mut self, esi_sss: Vec<EncryptedShareSetCollection>) -> Result<()> {
+    pub fn try_store_esi_sss(&mut self, esi_sss: Vec<Encrypted<SharedSecret>>) -> Result<()> {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
 
@@ -539,20 +538,12 @@ impl ThresholdKeyshare {
             party_id,
             node,
             e3_id,
-            // XXX: We need to be able to have arbitrary numbers of ciphertexts to be decrypted
-            // currently we only have 1 on the event. We need to go through and correlate this
-            // ensuring we know how many shares we are holding per decription index and work out a
-            // strategy there
-            decryption_share: decryption_share
-                .first()
-                .ok_or(anyhow!("no decryption found on response"))?
-                .clone(),
+            decryption_share,
         }))
     }
 
     pub fn try_send_decryption_share(&self, event: EnclaveEvent) -> Result<()> {
         let bus = self.bus.clone();
-
         bus.do_send(event);
         Ok(())
     }
@@ -722,7 +713,7 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
 
 impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
-    fn handle(&mut self, msg: GenPkShareAndSkSss, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GenPkShareAndSkSss, _: &mut Self::Context) -> Self::Result {
         info!("GenPkShareAndSkSss on ThresholdKeyshare");
         let CiphernodeSelected { .. } = msg.0;
         let Some(state) = self.state.get() else {
@@ -764,7 +755,7 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
 
                     match c() {
                         Ok(_) => (),
-                        Err(e) => error!("There was an error: GenPkShareAndSkSss"),
+                        Err(_) => error!("There was an error: GenPkShareAndSkSss"),
                     };
                 }),
         )
@@ -773,11 +764,7 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
 
 impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
-    fn handle(
-        &mut self,
-        msg: AllThresholdSharesCollected,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: AllThresholdSharesCollected, _: &mut Self::Context) -> Self::Result {
         info!("AllThresholdSharesCollected");
         let Ok(request) = self.try_generate_compute_decryption_key_request(msg) else {
             return e3_utils::bail(self);
@@ -788,7 +775,7 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
             self.multithread
                 .send(event)
                 .into_actor(self)
-                .map(move |res, act, ctx| {
+                .map(move |res, act, _| {
                     let c = || {
                         let Ok(ComputeResponse::TrBFV(TrBFVResponse::CalculateDecryptionKey(
                             output,
@@ -807,7 +794,7 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
 
                     match c() {
                         Ok(_) => (),
-                        Err(e) => error!("There was an error: CalculateDecryptionKey"),
+                        Err(_) => error!("There was an error: CalculateDecryptionKey"),
                     };
                 }),
         )
@@ -816,7 +803,7 @@ impl Handler<AllThresholdSharesCollected> for ThresholdKeyshare {
 
 impl Handler<SharesGenerated> for ThresholdKeyshare {
     type Result = Result<()>;
-    fn handle(&mut self, msg: SharesGenerated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _: SharesGenerated, _: &mut Self::Context) -> Self::Result {
         let Some(ThresholdKeyshareState {
             state:
                 KeyshareState::AggregatingDecryptionKey(AggregatingDecryptionKey {
@@ -833,10 +820,11 @@ impl Handler<SharesGenerated> for ThresholdKeyshare {
             bail!("Invalid state!");
         };
 
-        let sk_sss = sk_sss.decrypt(&self.cipher)?.try_into()?;
+        let decrypted = sk_sss.decrypt(&self.cipher)?;
+        let sk_sss: PvwEncrypted<SharedSecret> = PvwEncrypted::new(decrypted)?;
         let esi_sss = esi_sss
             .into_iter()
-            .map(|s| s.decrypt(&self.cipher)?.try_into())
+            .map(|s| PvwEncrypted::new(s.decrypt(&self.cipher)?))
             .collect::<Result<_>>()?;
 
         info!(">>>> THRESHOLD SHARE ABOUT TO BE CREATED FOR {}!", party_id);
@@ -885,7 +873,7 @@ impl Actor for DecryptionKeyCollector {
 
 impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
     type Result = ();
-    fn handle(&mut self, msg: ThresholdShareCreated, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ThresholdShareCreated, _: &mut Self::Context) -> Self::Result {
         let start = Instant::now();
         info!("DecryptionKeyCollector: ThresholdShareCreated received by collector");
         if let CollectorState::Finished = self.state {
@@ -916,24 +904,3 @@ impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
         );
     }
 }
-
-// TODO: do we need this?
-// // Function to prepare tuple to put on an event
-// fn _dangerously_remove_zeroizing_to_simulate_pvw_encryption(
-//     input: (
-//         Arc<Vec<u8>>,
-//         Vec<Zeroizing<Vec<u8>>>,
-//         Vec<Vec<Zeroizing<Vec<u8>>>>,
-//     ),
-// ) -> (Arc<Vec<u8>>, Vec<Vec<u8>>, Vec<Vec<Vec<u8>>>) {
-//     let (first, second, third) = input;
-//
-//     (
-//         first,                                            // Arc<Vec<u8>> stays the same
-//         second.into_iter().map(|z| z.to_vec()).collect(), // Vec<Zeroizing<Vec<u8>>> -> Vec<Vec<u8>>
-//         third
-//             .into_iter()
-//             .map(|outer_vec| outer_vec.into_iter().map(|z| z.to_vec()).collect())
-//             .collect(), // Vec<Vec<Zeroizing<Vec<u8>>>> -> Vec<Vec<Vec<u8>>>
-//     )
-// }

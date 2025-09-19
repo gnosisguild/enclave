@@ -181,7 +181,12 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
                     }
 
                     // add the keyshare and
-                    act.add_share(decryption_share.extract_bytes())?;
+                    let Some(share) = decryption_share.first() else {
+                        error!("Share not found in decryption_share vector");
+                        return Ok(());
+                    };
+
+                    act.add_share(share.extract_bytes())?;
 
                     // Check the state and if it has changed to the computing
                     if let Some(PlaintextAggregatorState::Computing {

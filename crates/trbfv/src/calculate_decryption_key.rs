@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    shares::{EncryptedShareSetCollection, ShareSetCollection},
+    shares::{DecryptVec, Encrypted, ShamirShare, ShamirShareSliceExt},
     TrBFVConfig,
 };
 use anyhow::Result;
@@ -24,15 +24,15 @@ pub struct CalculateDecryptionKeyRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// All collected secret key shamir shares where SensitiveBytes is Vec<Array2<u64>>
-    pub sk_sss_collected: EncryptedShareSetCollection,
+    pub sk_sss_collected: Vec<Encrypted<ShamirShare>>,
     /// All collected smudging noise shamir shares where SensitiveBytes is Vec<Array2<u64>>
-    pub esi_sss_collected: Vec<EncryptedShareSetCollection>,
+    pub esi_sss_collected: Vec<Vec<Encrypted<ShamirShare>>>,
 }
 
 struct InnerRequest {
     pub trbfv_config: TrBFVConfig,
-    pub sk_sss_collected: ShareSetCollection,
-    pub esi_sss_collected: Vec<ShareSetCollection>,
+    pub sk_sss_collected: Vec<ShamirShare>,
+    pub esi_sss_collected: Vec<Vec<ShamirShare>>,
 }
 
 impl TryFrom<(&Cipher, CalculateDecryptionKeyRequest)> for InnerRequest {
@@ -119,7 +119,7 @@ pub fn calculate_decryption_key(
 
     info!("Calculating sk_poly_sum...");
     let sk_poly_sum =
-        share_manager.aggregate_collected_shares(&req.sk_sss_collected.try_to_ndarray_vec()?)?;
+        share_manager.aggregate_collected_shares(&req.sk_sss_collected.to_array_data())?;
 
     info!("Calculating es_poly_sum...");
     let es_poly_sum = req
@@ -128,7 +128,7 @@ pub fn calculate_decryption_key(
         .map(|shares| -> Result<_> {
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             share_manager
-                .aggregate_collected_shares(&shares.try_to_ndarray_vec()?)
+                .aggregate_collected_shares(&shares.to_array_data())
                 .context("Failed to aggregate es_sss")
         })
         .collect::<Result<Vec<_>>>()?;

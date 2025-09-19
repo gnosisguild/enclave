@@ -14,7 +14,7 @@ use std::fmt::{self, Display};
 #[rtype(result = "anyhow::Result<()>")]
 pub struct DecryptionshareCreated {
     pub party_id: u64,
-    pub decryption_share: ArcBytes, // per index depending on what is required for the
+    pub decryption_share: Vec<ArcBytes>, // per index depending on what is required for the
     // ciphertext
     pub e3_id: E3id,
     pub node: String,

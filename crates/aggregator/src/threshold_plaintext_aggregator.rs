@@ -26,7 +26,7 @@ use tracing::{error, info};
 pub struct Collecting {
     threshold_m: u64,
     threshold_n: u64,
-    shares: Vec<(u64, ArcBytes)>,
+    shares: Vec<(u64, Vec<ArcBytes>)>,
     seed: Seed,
     ciphertext_output: ArcBytes,
     params: ArcBytes,
@@ -36,7 +36,7 @@ pub struct Collecting {
 pub struct Computing {
     threshold_m: u64,
     threshold_n: u64,
-    shares: Vec<(u64, ArcBytes)>,
+    shares: Vec<(u64, Vec<ArcBytes>)>,
     ciphertext_output: ArcBytes,
     params: ArcBytes,
 }
@@ -44,7 +44,7 @@ pub struct Computing {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Complete {
     decrypted: Vec<ArcBytes>,
-    shares: Vec<(u64, ArcBytes)>,
+    shares: Vec<(u64, Vec<ArcBytes>)>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -112,7 +112,7 @@ impl ThresholdPlaintextAggregatorState {
 #[derive(Message)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct ComputeAggregate {
-    pub shares: Vec<(u64, ArcBytes)>,
+    pub shares: Vec<(u64, Vec<ArcBytes>)>,
     pub ciphertext_output: Vec<u8>,
     pub threshold_m: u64,
     pub threshold_n: u64,
@@ -147,7 +147,7 @@ impl ThresholdPlaintextAggregator {
         }
     }
 
-    pub fn add_share(&mut self, party_id: u64, share: ArcBytes) -> Result<()> {
+    pub fn add_share(&mut self, party_id: u64, share: Vec<ArcBytes>) -> Result<()> {
         self.state.try_mutate(|state| {
             info!("Adding share for party_id={}", party_id);
             let current: Collecting = state.clone().try_into()?;

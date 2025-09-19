@@ -3,69 +3,59 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
+use anyhow::Result;
 
-use derivative::Derivative;
-use std::ops::Deref;
+use super::DeserializableValue;
 
-/// Privacy-preserving wrapper for Share data
-#[derive(Derivative, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[derivative(Debug)]
-pub struct PvwShare(#[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] Vec<u8>);
-
-impl Deref for PvwShare {
-    type Target = Vec<u8>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl PvwShare {
-    pub fn new(data: Vec<u8>) -> Self {
-        Self(data)
-    }
-
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
-
-    pub fn into_vec(self) -> Vec<u8> {
-        self.0
-    }
-}
-
-/// Privacy-preserving wrapper for ShareSet data
+/// Encrypted version of T for secure storage/transmission
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct PvwShareSet(Vec<PvwShare>);
+// TODO: Currently we are simply serializing the data in preparation for PVW encryption
+// expecting to pass in keys to encrypt and decrypt as required at a later point
+pub struct PvwEncrypted<T>(Vec<u8>, std::marker::PhantomData<T>);
 
-impl PvwShareSet {
-    pub fn new(shares: Vec<PvwShare>) -> Self {
-        Self(shares)
+impl<T> PvwEncrypted<T>
+where
+    T: DeserializableValue,
+{
+    /// Create a new encrypted wrapper from data of type T
+    pub fn new(data: T) -> Result<Self> {
+        Ok(Self(bincode::serialize(&data)?, std::marker::PhantomData))
     }
 
-    pub fn into_vec(self) -> Vec<PvwShare> {
-        self.0
-    }
-
-    pub fn as_slice(&self) -> &[PvwShare] {
-        &self.0
+    /// Decrypt and deserialize back to type T
+    pub fn pvw_decrypt(self) -> Result<T> {
+        let value = self.0;
+        Ok(bincode::deserialize(&value)?)
     }
 }
 
-/// Privacy-preserving wrapper for ShareSetCollection data
-#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct PvwShareSetCollection(Vec<PvwShareSet>);
+pub trait PvwEncryptedVecExt<T> {
+    fn to_vec_decrypted(self) -> Result<Vec<T>>;
+}
 
-impl PvwShareSetCollection {
-    pub fn new(share_sets: Vec<PvwShareSet>) -> Self {
-        Self(share_sets)
+impl<T> PvwEncryptedVecExt<T> for Vec<PvwEncrypted<T>>
+where
+    T: DeserializableValue,
+{
+    fn to_vec_decrypted(self) -> Result<Vec<T>> {
+        self.into_iter().map(|s| s.pvw_decrypt()).collect()
     }
+}
 
-    pub fn into_vec(self) -> Vec<PvwShareSet> {
-        self.0
-    }
+/// Trait to add decrypt functionality to Vec<Encrypted<T>>
+pub trait PvwEncryptableVec<T> {
+    /// Decrypt all encrypted values in the vector
+    /// Returns a vector of decrypted values or the first error encountered
+    fn pvw_encrypt(self) -> Result<Vec<PvwEncrypted<T>>>;
+}
 
-    pub fn as_slice(&self) -> &[PvwShareSet] {
-        &self.0
+impl<T> PvwEncryptableVec<T> for Vec<T>
+where
+    T: DeserializableValue,
+{
+    fn pvw_encrypt(self) -> Result<Vec<PvwEncrypted<T>>> {
+        self.into_iter()
+            .map(|encryptable| PvwEncrypted::new(encryptable))
+            .collect()
     }
 }

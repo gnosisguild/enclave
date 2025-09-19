@@ -21,15 +21,19 @@ use tracing::info;
 pub struct CalculateThresholdDecryptionRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
-    /// All decryption shares from a threshold quorum of nodes polys.
-    pub d_share_polys: Vec<(PartyId, ArcBytes)>,
-    /// One or more Ciphertexts to decrypt
+    /// Qurum of decryption share arrays. Each array is a single ciphertext element in the
+    /// ciphertexts vector
+    pub d_share_polys: Vec<(PartyId, Vec<ArcBytes>)>,
+    /// A vector of Ciphertexts to decrypt
     pub ciphertexts: Vec<ArcBytes>,
 }
 
 struct InnerRequest {
+    /// TrBFV configuration
     trbfv_config: TrBFVConfig,
-    d_share_polys: Vec<Poly>,
+    /// Qurum of decryption share arrays 2D array indexed by [ciphpernode quorum index] -> [ciphertext element]
+    d_share_polys: Vec<Vec<Poly>>,
+    /// A vector of Ciphertexts to decrypt
     ciphertexts: Vec<Ciphertext>,
 }
 
@@ -53,14 +57,20 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
         // Ensure the polys are ordered by party_id
         let mut ordered_polys = value.d_share_polys;
         ordered_polys.sort_by_key(|&(key, _)| key);
+
         let d_share_polys = ordered_polys
             .into_iter()
-            .map(|(_, bytes)| -> Result<_> {
-                let poly = try_poly_from_bytes(&bytes, &params)?;
-                Ok(poly)
+            .map(|(_, vec_of_bytes)| -> Result<_> {
+                vec_of_bytes
+                    .iter()
+                    .map(|bytes| try_poly_from_bytes(&bytes, &params))
+                    .collect()
             })
             .collect::<Result<Vec<_>>>()?;
+        // Now this is indexed by ciphertext
+        let d_share_polys = transpose(d_share_polys);
 
+        // For each d_share_poly in d_share_polys assemble
         Ok(InnerRequest {
             d_share_polys,
             ciphertexts,
@@ -71,7 +81,7 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CalculateThresholdDecryptionResponse {
-    /// The resultant plaintext
+    /// The resultant plaintext vector corresponding to the ciphertext vector
     pub plaintext: Vec<ArcBytes>,
 }
 
@@ -87,15 +97,16 @@ impl TryFrom<InnerResponse> for CalculateThresholdDecryptionResponse {
                 .plaintext
                 .into_iter()
                 .map(|open_result| -> Result<_> {
-                    let plaintext = Vec::<u64>::try_decode(&open_result, Encoding::poly())
+                    let vec_64 = Vec::<u64>::try_decode(&open_result, Encoding::poly())
                         .context("could not decode plaintext")?;
-                    let bytes = bincode::serialize(&plaintext)?;
+                    let bytes = bincode::serialize(&vec_64)?;
                     Ok(ArcBytes::from_bytes(bytes))
                 })
                 .collect::<Result<_>>()?,
         })
     }
 }
+
 pub fn calculate_threshold_decryption(
     req: CalculateThresholdDecryptionRequest,
 ) -> Result<CalculateThresholdDecryptionResponse> {
@@ -110,18 +121,41 @@ pub fn calculate_threshold_decryption(
     let plaintext = req
         .ciphertexts
         .into_iter()
-        .map(|ciphertext| {
+        .enumerate()
+        .map(|(index, ciphertext)| {
+            info!(
+                "Calculating threshold decryption for ciphertext {}...",
+                index
+            );
+
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
-
-            // TODO: should probably not need to clone here...
-            info!("d_share_polys: {:?}", d_share_polys);
-            info!("ciphertext: {:?}", ciphertext);
-
+            let Some(threshold_shares) = d_share_polys.get(index) else {
+                bail!("Poly not found for index {}", index)
+            };
             share_manager
-                .decrypt_from_shares(d_share_polys.clone(), Arc::new(ciphertext))
+                .decrypt_from_shares(threshold_shares.clone(), Arc::new(ciphertext))
                 .context("Could not decrypt ciphertext")
         })
         .collect::<Result<Vec<_>>>()?;
-
+    info!("Successfully calculated threshold decryption! Returning...");
     InnerResponse { plaintext }.try_into()
+}
+
+fn transpose<T: Clone>(matrix: Vec<Vec<T>>) -> Vec<Vec<T>> {
+    if matrix.is_empty() || matrix[0].is_empty() {
+        return vec![];
+    }
+
+    let rows = matrix.len();
+    let cols = matrix[0].len();
+
+    let mut result: Vec<Vec<T>> = (0..cols).map(|_| Vec::with_capacity(rows)).collect();
+
+    for row in matrix {
+        for (col_idx, item) in row.into_iter().enumerate() {
+            result[col_idx].push(item);
+        }
+    }
+
+    result
 }

@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    shares::{EncryptedShareSetCollection, ShareSetCollection},
+    shares::{Encrypted, SharedSecret},
     SharedRng, TrBFVConfig,
 };
 use anyhow::{Context, Result};
@@ -46,7 +46,7 @@ impl TryFrom<GenEsiSssRequest> for InnerRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GenEsiSssResponse {
     /// The smudging noise shares
-    pub esi_sss: Vec<EncryptedShareSetCollection>,
+    pub esi_sss: Vec<Encrypted<SharedSecret>>,
 }
 
 impl TryFrom<(InnerResponse, &Cipher)> for GenEsiSssResponse {
@@ -58,14 +58,14 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenEsiSssResponse {
             esi_sss: value
                 .esi_sss
                 .into_iter()
-                .map(|s| s.encrypt(cipher))
+                .map(|s| Encrypted::new(s, cipher))
                 .collect::<Result<_>>()?,
         })
     }
 }
 
 struct InnerResponse {
-    pub esi_sss: Vec<ShareSetCollection>,
+    pub esi_sss: Vec<SharedSecret>,
 }
 
 pub fn gen_esi_sss(
@@ -94,12 +94,11 @@ pub fn gen_esi_sss(
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
             info!("gen_esi_sss:generate_secret_shares_from_poly...");
-            Ok({
+            Ok(SharedSecret::from({
                 share_manager
                     .generate_secret_shares_from_poly(esi_poly, &mut *rng.lock().unwrap())
                     .context("Failed to generate secret shares from poly")?
-            }
-            .into())
+            }))
         })
         .collect::<Result<_>>()?;
 

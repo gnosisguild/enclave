@@ -7,7 +7,7 @@
 /// This module defines event payloads that will generate the public key share as well as the sk shamir secret shares to be distributed to other members of the committee.
 /// This has been separated from the esi setup in order to be able to take advantage of parallelism
 use crate::{
-    shares::{EncryptedShareSetCollection, ShareSetCollection},
+    shares::{Encrypted, SharedSecret},
     SharedRng, TrBFVConfig,
 };
 use anyhow::Result;
@@ -52,7 +52,7 @@ pub struct GenPkShareAndSkSssResponse {
     /// PublicKey share for this node
     pub pk_share: ArcBytes,
     /// SecretKey Shamir Shares for other parties
-    pub sk_sss: EncryptedShareSetCollection,
+    pub sk_sss: Encrypted<SharedSecret>,
 }
 
 impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
@@ -61,7 +61,7 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
         (value, cipher): (InnerResponse, &Cipher),
     ) -> std::result::Result<Self, Self::Error> {
         let pk_share = ArcBytes::from_bytes(value.pk_share.to_bytes());
-        let sk_sss = value.sk_sss.encrypt(cipher)?;
+        let sk_sss = Encrypted::new(value.sk_sss, cipher)?;
         Ok(GenPkShareAndSkSssResponse { pk_share, sk_sss })
     }
 }
@@ -70,7 +70,7 @@ struct InnerResponse {
     /// PublicKey share for this node
     pub pk_share: PublicKeyShare,
     /// SecretKey Shamir Shares for other parties
-    pub sk_sss: ShareSetCollection,
+    pub sk_sss: SharedSecret,
 }
 
 pub fn gen_pk_share_and_sk_sss(
@@ -99,14 +99,9 @@ pub fn gen_pk_share_and_sk_sss(
     let sk_poly = share_manager.coeffs_to_poly_level0(sk_share.coeffs.clone().as_ref())?;
 
     info!("gen_pk_share_and_sk_sss:generate_secret_shares_from_poly...");
-    let sk_sss: ShareSetCollection =
-        { share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())? }
-            .into();
-
-    info!(
-        "gen_pk_share_and_sk_sss:returning... sk_sss.len() == {}",
-        sk_sss.len()
-    );
+    let sk_sss = SharedSecret::from({
+        share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())?
+    });
 
     (InnerResponse { pk_share, sk_sss }, cipher).try_into()
 }
