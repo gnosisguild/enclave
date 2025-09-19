@@ -13,12 +13,15 @@ import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
     InternalLeanIMT,
     LeanIMTData,
     PoseidonT3
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
-contract Enclave is IEnclave, OwnableUpgradeable {
+contract Enclave is IEnclave, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using InternalLeanIMT for LeanIMTData;
 
     ////////////////////////////////////////////////////////////
@@ -114,6 +117,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
         setE3ProgramsParams(_e3ProgramsParams);
@@ -128,7 +132,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function request(
         E3RequestParams calldata requestParams
-    ) external payable returns (uint256 e3Id, E3 memory e3) {
+    ) external payable nonReentrant returns (uint256 e3Id, E3 memory e3) {
         // TODO: allow for other payment methods or only native tokens?
         // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
         require(msg.value > 0, PaymentRequired(msg.value));
@@ -243,7 +247,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function publishInput(
         uint256 e3Id,
         bytes calldata data
-    ) external returns (bool success) {
+    ) external nonReentrant returns (bool success) {
         E3 memory e3 = getE3(e3Id);
 
         // Note: if we make 0 a no expiration, this has to be refactored
@@ -254,23 +258,25 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InputDeadlinePassed(e3Id, e3.expiration)
         );
 
-        bytes memory input = e3.inputValidator.validate(msg.sender, data);
-        uint256 inputHash = PoseidonT3.hash(
-            [uint256(keccak256(input)), inputCounts[e3Id]]
-        );
+        uint256 inputIndex = inputCounts[e3Id];
+        inputCounts[e3Id] = inputIndex + 1;
 
-        inputCounts[e3Id]++;
+        bytes memory input = e3.inputValidator.validate(msg.sender, data);
+
+        uint256 inputHash = PoseidonT3.hash(
+            [uint256(keccak256(input)), inputIndex]
+        );
         inputs[e3Id]._insert(inputHash);
         success = true;
 
-        emit InputPublished(e3Id, input, inputHash, inputCounts[e3Id] - 1);
+        emit InputPublished(e3Id, input, inputHash, inputIndex);
     }
 
     function publishCiphertextOutput(
         uint256 e3Id,
         bytes calldata ciphertextOutput,
         bytes calldata proof
-    ) external returns (bool success) {
+    ) external nonReentrant returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
@@ -296,7 +302,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         uint256 e3Id,
         bytes calldata plaintextOutput,
         bytes calldata proof
-    ) external returns (bool success) {
+    ) external nonReentrant returns (bool success) {
         E3 memory e3 = getE3(e3Id);
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
