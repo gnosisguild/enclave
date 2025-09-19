@@ -10,8 +10,9 @@ use std::sync::Arc;
 use crate::{helpers::try_poly_from_bytes, PartyId, TrBFVConfig};
 use anyhow::*;
 use e3_utils::utility_types::ArcBytes;
-use fhe::bfv::Encoding;
+use fhe::bfv::{Encoding, Plaintext};
 use fhe::{bfv::Ciphertext, trbfv::ShareManager};
+use fhe_math::rq::Poly;
 use fhe_traits::DeserializeParametrized;
 use fhe_traits::FheDecoder;
 use tracing::info;
@@ -26,38 +27,88 @@ pub struct CalculateThresholdDecryptionRequest {
     pub ciphertexts: Vec<ArcBytes>,
 }
 
+struct InnerRequest {
+    trbfv_config: TrBFVConfig,
+    d_share_polys: Vec<Poly>,
+    ciphertexts: Vec<Ciphertext>,
+}
+
+impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
+    type Error = anyhow::Error;
+    fn try_from(
+        value: CalculateThresholdDecryptionRequest,
+    ) -> std::result::Result<Self, Self::Error> {
+        let trbfv_config = value.trbfv_config.clone();
+
+        let params = value.trbfv_config.params();
+        let ciphertexts = value
+            .ciphertexts
+            .into_iter()
+            .map(|ciphertext| {
+                Ciphertext::from_bytes(&ciphertext, &trbfv_config.params())
+                    .context("cannot deserialize ciphertext")
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Ensure the polys are ordered by party_id
+        let mut ordered_polys = value.d_share_polys;
+        ordered_polys.sort_by_key(|&(key, _)| key);
+        let d_share_polys = ordered_polys
+            .into_iter()
+            .map(|(_, bytes)| -> Result<_> {
+                let poly = try_poly_from_bytes(&bytes, &params)?;
+                Ok(poly)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(InnerRequest {
+            d_share_polys,
+            ciphertexts,
+            trbfv_config,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CalculateThresholdDecryptionResponse {
     /// The resultant plaintext
     pub plaintext: Vec<ArcBytes>,
 }
 
+struct InnerResponse {
+    plaintext: Vec<Plaintext>,
+}
+
+impl TryFrom<InnerResponse> for CalculateThresholdDecryptionResponse {
+    type Error = anyhow::Error;
+    fn try_from(value: InnerResponse) -> std::result::Result<Self, Self::Error> {
+        Ok(CalculateThresholdDecryptionResponse {
+            plaintext: value
+                .plaintext
+                .into_iter()
+                .map(|open_result| -> Result<_> {
+                    let plaintext = Vec::<u64>::try_decode(&open_result, Encoding::poly())
+                        .context("could not decode plaintext")?;
+                    let bytes = bincode::serialize(&plaintext)?;
+                    Ok(ArcBytes::from_bytes(bytes))
+                })
+                .collect::<Result<_>>()?,
+        })
+    }
+}
 pub fn calculate_threshold_decryption(
     req: CalculateThresholdDecryptionRequest,
 ) -> Result<CalculateThresholdDecryptionResponse> {
+    info!("Calculating threshold decryption...");
+    let req: InnerRequest = req.try_into()?;
+
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
-    let mut ordered_polys = req.d_share_polys;
-    ordered_polys.sort_by_key(|&(key, _)| key);
-    info!("ordered_polys: {:?}", ordered_polys);
-    let d_share_polys = ordered_polys
-        .into_iter()
-        .map(|(_, bytes)| -> Result<_> {
-            let poly = try_poly_from_bytes(&bytes, &params)?;
-            Ok(poly)
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let d_share_polys = req.d_share_polys.clone();
 
-    let ciphertexts = req
+    let plaintext = req
         .ciphertexts
-        .into_iter()
-        .map(|ciphertext| {
-            Ciphertext::from_bytes(&ciphertext, &params).context("cannot deserialize ciphertext")
-        })
-        .collect::<Result<Vec<_>>>()?;
-
-    let open_results = ciphertexts
         .into_iter()
         .map(|ciphertext| {
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
@@ -72,15 +123,5 @@ pub fn calculate_threshold_decryption(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    Ok(CalculateThresholdDecryptionResponse {
-        plaintext: open_results
-            .into_iter()
-            .map(|open_result| -> Result<_> {
-                let plaintext = Vec::<u64>::try_decode(&open_result, Encoding::poly())
-                    .context("could not decode plaintext")?;
-                let bytes = bincode::serialize(&plaintext)?;
-                Ok(ArcBytes::from_bytes(bytes))
-            })
-            .collect::<Result<_>>()?,
-    })
+    InnerResponse { plaintext }.try_into()
 }

@@ -99,7 +99,7 @@ pub fn calculate_decryption_share(
     cipher: &Cipher,
     req: CalculateDecryptionShareRequest,
 ) -> Result<CalculateDecryptionShareResponse> {
-    let req = InnerRequest::try_from((cipher, req))?;
+    let req: InnerRequest = (cipher, req).try_into()?;
 
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
     let threshold = req.trbfv_config.threshold() as usize;

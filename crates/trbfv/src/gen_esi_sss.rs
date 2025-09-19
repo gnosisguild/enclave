@@ -74,7 +74,8 @@ pub fn gen_esi_sss(
     req: GenEsiSssRequest,
 ) -> Result<GenEsiSssResponse> {
     info!("gen_esi_sss");
-    let req = InnerRequest::try_from(req)?;
+    let req: InnerRequest = req.try_into()?;
+
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
@@ -103,8 +104,6 @@ pub fn gen_esi_sss(
         .collect::<Result<_>>()?;
 
     info!("gen_esi_sss:returning...");
-    Ok(GenEsiSssResponse::try_from((
-        InnerResponse { esi_sss },
-        cipher,
-    ))?)
+
+    (InnerResponse { esi_sss }, cipher).try_into()
 }

@@ -13,13 +13,9 @@ pub mod helpers;
 pub mod shares;
 pub mod trbfv_config;
 pub mod trbfv_request;
-pub use trbfv_request::*;
-
 use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
-
 pub use trbfv_config::*;
-
+pub use trbfv_request::*;
 pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
-/// Semantic PartyId
 pub type PartyId = u64;

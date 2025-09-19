@@ -4,11 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use core::fmt;
-
-use anyhow::Error;
-use serde::{Deserialize, Serialize};
-
 use crate::{
     calculate_decryption_key::{CalculateDecryptionKeyRequest, CalculateDecryptionKeyResponse},
     calculate_decryption_share::{
@@ -20,6 +15,8 @@ use crate::{
     gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
     gen_pk_share_and_sk_sss::{GenPkShareAndSkSssRequest, GenPkShareAndSkSssResponse},
 };
+use core::fmt;
+use serde::{Deserialize, Serialize};
 
 // NOTE: All size values use u64 instead of usize to maintain a stable
 // protocol that works across different architectures. Convert these

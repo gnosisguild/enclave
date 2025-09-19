@@ -79,7 +79,7 @@ pub fn gen_pk_share_and_sk_sss(
     req: GenPkShareAndSkSssRequest,
 ) -> Result<GenPkShareAndSkSssResponse> {
     info!("gen_pk_share_and_sk_sss");
-    let req = InnerRequest::try_from(req)?;
+    let req: InnerRequest = req.try_into()?;
 
     let params = req.trbfv_config.params();
     let crp = req.crp;
@@ -107,8 +107,6 @@ pub fn gen_pk_share_and_sk_sss(
         "gen_pk_share_and_sk_sss:returning... sk_sss.len() == {}",
         sk_sss.len()
     );
-    Ok(GenPkShareAndSkSssResponse::try_from((
-        InnerResponse { pk_share, sk_sss },
-        cipher,
-    ))?)
+
+    (InnerResponse { pk_share, sk_sss }, cipher).try_into()
 }

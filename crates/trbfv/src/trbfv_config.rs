@@ -4,13 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Arc;
-
+use e3_bfv_helpers::decode_bfv_params_arc;
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::BfvParameters;
 use serde::{Deserialize, Serialize};
-
-use e3_bfv_helpers::decode_bfv_params_arc;
+use std::sync::Arc;
 
 /// Convenience struct for holding threshold BFV configuration parameters
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

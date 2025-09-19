@@ -110,7 +110,7 @@ pub fn calculate_decryption_key(
 ) -> Result<CalculateDecryptionKeyResponse> {
     info!("Calculating decryption key...");
 
-    let req = InnerRequest::try_from((cipher, req))?;
+    let req: InnerRequest = (cipher, req).try_into()?;
 
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
@@ -135,11 +135,12 @@ pub fn calculate_decryption_key(
 
     info!("Returning successful result! Encrypting for transit...");
 
-    Ok(CalculateDecryptionKeyResponse::try_from((
+    (
         cipher,
         InnerResponse {
             sk_poly_sum,
             es_poly_sum,
         },
-    ))?)
+    )
+        .try_into()
 }

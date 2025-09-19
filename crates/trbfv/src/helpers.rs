@@ -4,14 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe::bfv::BfvParameters;
 use fhe_math::rq::Poly;
 use fhe_traits::DeserializeWithContext;
-use ndarray::Array2;
+use std::sync::Arc;
 
 pub fn try_poly_from_bytes(bytes: &[u8], params: &BfvParameters) -> Result<Poly> {
     Ok(Poly::from_bytes(bytes, params.ctx_at_level(0)?)?)
