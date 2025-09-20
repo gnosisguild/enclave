@@ -21,4 +21,11 @@ num-bigint.workspace = true
 rand_chacha.workspace = true
 serde.workspace = true
 tracing.workspace = true
+tokio.workspace = true
 zeroize.workspace = true
+
+[dev-dependencies]
+e3-test-helpers.workspace = true
+e3-fhe.workspace = true
+e3-events.workspace = true
+tracing-subscriber.workspace = true

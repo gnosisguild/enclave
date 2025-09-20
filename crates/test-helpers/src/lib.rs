@@ -21,6 +21,7 @@ use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
+use fhe::trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig};
 use fhe_traits::{FheEncoder, FheEncrypter};
 pub use plaintext_writer::*;
 pub use public_key_writer::*;

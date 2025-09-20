@@ -3137,6 +3137,9 @@ dependencies = [
  "derivative",
  "e3-bfv-helpers",
  "e3-crypto",
+ "e3-events",
+ "e3-fhe",
+ "e3-test-helpers",
  "e3-utils",
  "fhe",
  "fhe-math",
@@ -3145,7 +3148,9 @@ dependencies = [
  "num-bigint",
  "rand_chacha 0.3.1",
  "serde",
+ "tokio",
  "tracing",
+ "tracing-subscriber",
  "zeroize",
 ]
 
