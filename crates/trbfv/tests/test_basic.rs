@@ -1,16 +1,23 @@
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use e3_bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
 use e3_crypto::Cipher;
-use e3_events::{DecryptionshareCreated, ThresholdShare};
+use e3_events::ThresholdShare;
 use e3_fhe::create_crp;
-use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64};
+use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, encrypt_ciphertext};
 use e3_trbfv::{
     calculate_decryption_key::{
         calculate_decryption_key, CalculateDecryptionKeyRequest, CalculateDecryptionKeyResponse,
     },
-    calculate_decryption_share::{calculate_decryption_share, CalculateDecryptionShareRequest},
+    calculate_decryption_share::{
+        calculate_decryption_share, CalculateDecryptionShareRequest,
+        CalculateDecryptionShareResponse,
+    },
+    calculate_threshold_decryption::{
+        calculate_threshold_decryption, CalculateThresholdDecryptionRequest,
+        CalculateThresholdDecryptionResponse,
+    },
     gen_esi_sss::{gen_esi_sss, GenEsiSssRequest, GenEsiSssResponse},
     gen_pk_share_and_sk_sss::{
         gen_pk_share_and_sk_sss, GenPkShareAndSkSssRequest, GenPkShareAndSkSssResponse,
@@ -20,7 +27,11 @@ use e3_trbfv::{
     TrBFVConfig,
 };
 use e3_utils::ArcBytes;
-use fhe_traits::Serialize;
+use fhe::{
+    bfv::PublicKey,
+    mbfv::{AggregateIter, PublicKeyShare},
+};
+use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
 
 // TODO: Write a test of the trbfv share swapping algorhythm without the use of any events
@@ -50,7 +61,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
     let params = ArcBytes::from_bytes(encode_bfv_params(&params_raw.clone()));
 
-    let crp = create_crp(params_raw.clone(), rng.clone());
+    let crp_raw = create_crp(params_raw.clone(), rng.clone());
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
     let seed = create_seed_from_u64(123);
     let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
@@ -66,7 +77,7 @@ async fn test_trbfv_isolation() -> Result<()> {
     let esi_per_ct = 3;
 
     let trbfv_config = TrBFVConfig::new(params, threshold_n, threshold_m);
-    let crp = ArcBytes::from_bytes(crp.to_bytes());
+    let crp = ArcBytes::from_bytes(crp_raw.to_bytes());
     let mut shares_hash_map = HashMap::new();
 
     for party_id in 0u64..threshold_n {
@@ -106,6 +117,18 @@ async fn test_trbfv_isolation() -> Result<()> {
             },
         );
     }
+
+    let pubkey: PublicKey = shares_hash_map
+        .clone()
+        .into_iter()
+        .map(|(_, v)| v.pk_share)
+        .map(|k| {
+            PublicKeyShare::deserialize(&k, &params_raw, crp_raw.clone())
+                .context("Could not deserialize public key")
+        })
+        .collect::<Result<Vec<PublicKeyShare>>>()?
+        .into_iter()
+        .aggregate()?;
 
     // All shares_hash_map should receive the same encrypted list from all other shares_hash_map
     let shares = to_ordered_vec(shares_hash_map);
@@ -153,18 +176,42 @@ async fn test_trbfv_isolation() -> Result<()> {
         decryption_keys.insert(party_id, (es_poly_sum, sk_poly_sum));
     }
 
+    // Create the plaintext
+    let raw_plaintext = vec![1234u64, 873827u64];
+
+    // Encrypt the plaintext
+
+    let (ciphertext, expected_bytes) = encrypt_ciphertext(&params_raw, pubkey, raw_plaintext)?;
+
+    let ciphertexts = vec![ArcBytes::from_bytes(ciphertext.to_bytes())];
     let mut decryption_shares = HashMap::new();
+
     for party_id in 0..threshold_m as usize {
-        let (_, sk_poly_sum) = decryption_keys.get(&party_id).unwrap();
-        calculate_decryption_share(
+        let (es_poly_sum, sk_poly_sum) = decryption_keys.get(&party_id).unwrap();
+        let CalculateDecryptionShareResponse { d_share_poly } = calculate_decryption_share(
             &cipher,
             CalculateDecryptionShareRequest {
                 sk_poly_sum: sk_poly_sum.clone(),
                 trbfv_config: trbfv_config.clone(),
-                ciphertexts,
+                es_poly_sum: es_poly_sum.clone(),
+                ciphertexts: ciphertexts.clone(),
             },
         )?;
+        // get the first for now TODO: refactor
+        decryption_shares.insert(party_id as u64, d_share_poly.first().unwrap().clone());
     }
+
+    let CalculateThresholdDecryptionResponse { plaintext } =
+        calculate_threshold_decryption(CalculateThresholdDecryptionRequest {
+            ciphertexts,
+            trbfv_config: trbfv_config.clone(),
+            d_share_polys: decryption_shares.into_iter().collect(),
+        })?;
+
+    let first_plaintext = plaintext.first().unwrap();
+
+    let output = first_plaintext.extract_bytes();
+
     Ok(())
 }
 
