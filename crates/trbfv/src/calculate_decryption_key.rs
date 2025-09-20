@@ -118,10 +118,11 @@ pub fn calculate_decryption_key(
     let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
 
     info!("Calculating sk_poly_sum...");
+    // XXX: The following fails due to a modulus issue:
     let sk_poly_sum =
         share_manager.aggregate_collected_shares(&req.sk_sss_collected.try_to_ndarray_vec()?)?;
 
-    panic!("DIE");
+    panic!("Escaping for clarity...");
 
     info!("Calculating es_poly_sum...");
     let es_poly_sum = req

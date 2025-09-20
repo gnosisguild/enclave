@@ -159,6 +159,13 @@ async fn test_trbfv_isolation() -> Result<()> {
             .map(|s| ShareSetCollection::from_received(s, party_id))
             .collect::<Result<_>>()?;
 
+        // XXX: The following fails with this error:
+        //
+        // thread '<unnamed>' panicked at /home/user/.cargo/git/checkouts/fhe.rs-28554c2cc2152fe4/135e484/crates/fhe-math/src/zq/mod.rs:56:9:
+        // assertion failed: a < self.p && b < self.p
+        // note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        // Seems like a modulus issue...
+
         let CalculateDecryptionKeyResponse {
             es_poly_sum,
             sk_poly_sum,
