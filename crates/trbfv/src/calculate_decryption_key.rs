@@ -119,6 +119,11 @@ pub fn calculate_decryption_key(
 
     info!("Calculating sk_poly_sum...");
     // XXX: The following fails due to a modulus issue:
+    //
+    // thread '<unnamed>' panicked at /home/user/.cargo/git/checkouts/fhe.rs-28554c2cc2152fe4/135e484/crates/fhe-math/src/zq/mod.rs:56:9:
+    // assertion failed: a < self.p && b < self.p
+    // note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
     let sk_poly_sum =
         share_manager.aggregate_collected_shares(&req.sk_sss_collected.try_to_ndarray_vec()?)?;
 
