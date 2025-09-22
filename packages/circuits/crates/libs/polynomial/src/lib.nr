@@ -98,76 +98,65 @@ impl<let N: u32> Polynomial<N> {
     }
 }
 
-/// Flattens an array of polynomials into a 1D array of Field elements.
-///
-/// This helper function serializes polynomial coefficients maintaining a deterministic
-/// ordering of coefficients to ensure reproducible challenge values.
-///
-/// # Generic Parameters
-/// * `A` - The degree of each polynomial in the array
-/// * `L` - The number of polynomials in the array
-/// * `SIZE` - The total size of the target array
-///
-/// # Arguments
-/// * `inputs` - The target array to store flattened coefficients
-/// * `poly` - Array of polynomials to flatten
-/// * `offset` - Starting position in the inputs array
-///
-/// # Returns
-/// A tuple containing:
-/// * The updated inputs array with flattened coefficients
-/// * The new offset position after flattening
 pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
     mut inputs: Vec<Field>,
     poly: [Polynomial<A>; L],
 ) -> Vec<Field> {
+    let nibble_bits = ((BIT + 3) / 4) * 4;
+    let limb_bits = nibble_bits + 4;
+    assert(limb_bits <= 254);
+
+    let group = 254 / limb_bits;
+    assert(group >= 1);
+
+    let num_chunks = (A + group - 1) / group;
+
     for j in 0..L {
-        let pack = packer::<A, BIT>(poly[j].coefficients);
-        for i in 0..(A / (254 / BIT)) {
-            inputs.push(pack.get(i));
+        let packed = packer::<A, BIT>(poly[j].coefficients);
+        for i in 0..num_chunks {
+            inputs.push(packed.get(i));
         }
     }
 
     inputs
 }
 
-/// Pack `values` into fewer Field elements.
-/// - Each value is assumed to fit in `bit` bits.
-/// - Uses limbs of size `bit+1` to be safe because of the shifting; up to `254 / bit` values per output field.
-/// - Packs in big-endian order and pads the tail with zeros.
 pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
-    // Number of values packed into one 254-bit field.
-    let group = 254 / BIT;
+    assert(BIT >= 1);
 
-    // Output carriers.
-    let mut carrier = Vec::new();
+    let nibble_bits = ((BIT + 3) / 4) * 4;
+    let limb_bits = nibble_bits + 4;
+    assert(limb_bits <= 254);
 
-    // Bases: 2^bit and 2^(bit+1).
-    let base = 2.pow_32(BIT as Field); // 2^bit
-    let base_plus = 2.pow_32((BIT + 1) as Field); // 2^(bit+1)
+    let group = 254 / limb_bits;
+    assert(group >= 1);
 
-    // Process input in chunks of `group` values.
-    for j in 0..((A + group - 1) / group) {
-        let mut acc: Field = 0; // current packed carrier
+    let base = 2.pow_32(nibble_bits as Field);
+    let radix = 2.pow_32(limb_bits as Field);
 
-        // Pack one chunk, big-endian (earlier values go to higher limbs).
-        for i in 0..group {
-            let idx = group * j + i;
+    let num_chunks = (A + group - 1) / group;
+    let mut out = Vec::new();
 
-            // Read value if in range; otherwise pad with zero.
-            let v = if idx < A { values[idx] } else { 0 };
+    for chunk in 0..num_chunks {
+        let remain = if A > chunk * group {
+            A - chunk * group
+        } else {
+            0
+        };
+        let take = if remain < group { remain } else { group };
 
-            // Shift left by one limb (including shifting size) and append (v + 2^bit).
-            acc = acc * base_plus + (v + base);
+        let mut acc = 0;
+        for i in 0..take {
+            let v = values[chunk * group + i];
+            acc = acc * radix + (v + base);
         }
-
-        // Store the carrier for this chunk.
-        carrier.push(acc);
+        for _ in 0..(group - take) {
+            acc = acc * radix + base;
+        }
+        out.push(acc);
     }
-
-    carrier
+    out
 }
-
 #[test]
 fn test_polynomial_eval() {
     let coeffs = [1, 2, 3]; // represents 1x^2 + 2x + 3
@@ -221,31 +210,85 @@ fn test_polynomial_out_of_bounds_coefficients() {
 fn test_flatten() {
     // Create test polynomials
     let poly1 = Polynomial::new([1, 2, 3]); // degree 2
-    let poly2 = Polynomial::new([4, 5, 6]); // degree 2
-    let poly3 = Polynomial::new([7, 8, 9]); // degree 2
+    let poly2 = Polynomial::new([4, -16, 6]); // degree 2
+    let poly3 = Polynomial::new([-7, 8, 9]); // degree 2
 
     let polynomials = [poly1, poly2, poly3];
 
     // Initialize target array with zeros
-    let mut inputs = Vec::from_slice([0; 10].as_slice()); // Size to accommodate 3 polynomials of degree 2 + offset
+    let mut inputs = Vec::new();
 
     // Flatten the polynomials
-    let result = flatten::<_, _, 64>(inputs, polynomials);
+    let result = flatten::<_, _, 4>(inputs, polynomials);
 
     // Verify the flattened coefficients are in the correct positions
-    // Expected: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    //           ^     ^^^^^^^^  ^^^^^^^^  ^^^^^^^^
-    //           |     poly1     poly2     poly3
-    //           offset
+    // Every value shifted 1 nibble incase of negative integers
+    assert_eq(result.get(0), 0x11121310101010101010101010101010101010101010101010101010101010);
+    assert_eq(result.get(1), 0x14001610101010101010101010101010101010101010101010101010101010); // -16 became 00 at  0x 14 00 16,
+    assert_eq(result.get(2), 0x09181910101010101010101010101010101010101010101010101010101010); // -7 became 09 at 0x 09 18 19(16 - 7 = 9)
+}
 
-    assert_eq(result.get(0), 0); // Should remain unchanged (before offset)
-    assert_eq(result.get(1), 1); // poly1[0]
-    assert_eq(result.get(2), 2); // poly1[1]
-    assert_eq(result.get(3), 3); // poly1[2]
-    assert_eq(result.get(4), 4); // poly2[0]
-    assert_eq(result.get(5), 5); // poly2[1]
-    assert_eq(result.get(6), 6); // poly2[2]
-    assert_eq(result.get(7), 7); // poly3[0]
-    assert_eq(result.get(8), 8); // poly3[1]
-    assert_eq(result.get(9), 9); // poly3[2]
+#[test]
+fn test_flatten_big() {
+    // Create test polynomials
+    let poly1 = Polynomial::new([
+        1791218451968394,
+        21888242871839275222246405745257275088548364400416034343698198265248580087864,
+        21888242871839275222246405745257275088548364400416034343698200542108324633466,
+        5430119342984413,
+        704811298945172,
+        8901715723925099,
+        21888242871839275222246405745257275088548364400416034343698203098124042812559,
+        21888242871839275222246405745257275088548364400416034343698200215091693880034,
+    ]);
+    let poly2 = Polynomial::new([
+        21888242871839275222246405745257275088548364400416034343698200314078269634250,
+        21888242871839275222246405745257275088548364400416034343698200967285641915872,
+        2909990636858607,
+        7896103832076587,
+        2078397209533893,
+        21888242871839275222246405745257275088548364400416034343698199792421452734531,
+        614400389245817,
+        8290314119277588,
+    ]);
+    let poly3 = Polynomial::new([
+        21888242871839275222246405745257275088548364400416034343698201373175279892906,
+        21888242871839275222246405745257275088548364400416034343698201087241869723721,
+        6768789983786188,
+        635797784303388,
+        7610153424227556,
+        4633893206538324,
+        2016269760615332,
+        21888242871839275222246405745257275088548364400416034343698201007080554428142,
+    ]);
+
+    let polynomials = [poly1, poly2, poly3];
+
+    // Initialize target array with zeros
+    let mut inputs = Vec::new();
+
+    // Flatten the polynomials
+    let result = flatten::<_, _, 54>(inputs, polynomials);
+
+    // Verify the flattened coefficients are in the correct positions
+    // Every value shifted 1 nibble incase of negative integers
+
+    // For the first index of result operation goes like this,
+
+    // First four index of poly1
+    // 1791218451968394,
+    // 21888242871839275222246405745257275088548364400416034343698198265248580087864,
+    // 21888242871839275222246405745257275088548364400416034343698200542108324633466,
+    // 5430119342984413,
+
+    // base + 1791218451968394 = 0x1065d1a8b8b718a
+    // base - 5921327228407753 = 0xeaf69591f3b037 (negative coefficient shifted)
+    // base - 3644467483862151 = 0xf30d604a3a9b79 (negative coefficient shifted)
+    // base + 5430119342984413 = 0x1134aaa2e86ccdd
+    assert_eq(result.get(0), 0x1065d1a8b8b718a0eaf69591f3b0370f30d604a3a9b791134aaa2e86ccdd);
+    assert_eq(result.get(1), 0x1028105ab1b789411fa010339db66b0fc220f1326bc8e0f1e3f4cc1e02e1);
+    assert_eq(result.get(2), 0x0f23dfbe7cd76c90f4901299312ddf10a569efe35acef11c0d76f005412b);
+    assert_eq(result.get(3), 0x107624a8f605dc50f0638a368960421022ecb3cf36b7911d73ff2c27ec14);
+    assert_eq(result.get(4), 0x0f6013a24e1b9a90f4fd2c158a08481180c2dba8af4cc10242413515171c);
+    assert_eq(result.get(5), 0x11b0964eb898ce411076805680b85410729c962da53a40f4b44412d0f6ed);
 }
