@@ -532,6 +532,9 @@ jobs:
       - name: Build the sdk
         run: pnpm sdk:build
 
+      - name: Run the tests
+        run: pnpm sdk:test
+
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@v4
         with:
