@@ -98,21 +98,30 @@ impl<let N: u32> Polynomial<N> {
     }
 }
 
+/// Flatten `L` polynomials (each `Polynomial<A>`) into a linear Vec<Field> of packed carriers.
+/// - Uses the same hex-aligned packing as `packer::<A, BIT>`:
+///   `nibble_bits = ceil_to_nibble(BIT)`, `limb_bits = nibble_bits + 4`,
+///   `group = 254 / limb_bits` carriers per chunk.
+/// - Preserves deterministic order: iterate polynomials in `j`, then append all their carriers.
 pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
     mut inputs: Vec<Field>,
     poly: [Polynomial<A>; L],
 ) -> Vec<Field> {
-    let nibble_bits = ((BIT + 3) / 4) * 4;
-    let limb_bits = nibble_bits + 4;
+    // Compute packing layout (must mirror `packer`).
+    let nibble_bits = ((BIT + 3) / 4) * 4; // ceil to multiple of 4
+    let limb_bits = nibble_bits + 4; // +1 nibble offset
     assert(limb_bits <= 254);
 
-    let group = 254 / limb_bits;
+    let group = 254 / limb_bits; // max limbs per field
     assert(group >= 1);
 
+    // Carriers produced per polynomial.
     let num_chunks = (A + group - 1) / group;
 
+    // Pack each polynomial, then append all its carriers in order.
     for j in 0..L {
         let packed = packer::<A, BIT>(poly[j].coefficients);
+        // `packed.len()` == `num_chunks`; push explicitly to be clear/stable.
         for i in 0..num_chunks {
             inputs.push(packed.get(i));
         }
@@ -121,23 +130,33 @@ pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
     inputs
 }
 
+/// Pack `values` into as few `Field` carriers as possible (hex-aligned).
+/// - `BIT`: bit width of each value (before offset). We round it up to a nibble.
+/// - Limb = `v + 2^nibble_bits` (lifts negatives); radix per limb = `2^(nibble_bits+4)`.
+/// - Packs `group = 254 / (nibble_bits+4)` values per carrier, big-endian; pads tail with `2^nibble_bits`.
 pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
     assert(BIT >= 1);
 
-    let nibble_bits = ((BIT + 3) / 4) * 4;
-    let limb_bits = nibble_bits + 4;
+    // Align to hex digits (4 bits) and add +1 nibble headroom.
+    let nibble_bits = ((BIT + 3) / 4) * 4; // ceil_to_nibble(BIT)
+    let limb_bits = nibble_bits + 4; // limb width used for packing
     assert(limb_bits <= 254);
 
+    // Max limbs per 254-bit field element.
     let group = 254 / limb_bits;
     assert(group >= 1);
 
-    let base = 2.pow_32(nibble_bits as Field);
-    let radix = 2.pow_32(limb_bits as Field);
+    // Offset and radix for limb concatenation.
+    let base = 2.pow_32(nibble_bits as Field); // 2^nibble_bits
+    let radix = 2.pow_32(limb_bits as Field); // 2^(nibble_bits+4)
 
+    // Number of carriers needed.
     let num_chunks = (A + group - 1) / group;
     let mut out = Vec::new();
 
+    // Process in fixed-size chunks of `group` limbs.
     for chunk in 0..num_chunks {
+        // How many real values to take in this chunk.
         let remain = if A > chunk * group {
             A - chunk * group
         } else {
@@ -145,18 +164,23 @@ pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
         };
         let take = if remain < group { remain } else { group };
 
+        // Build one carrier (big-endian): acc = acc * radix + (v + base)
         let mut acc = 0;
         for i in 0..take {
             let v = values[chunk * group + i];
             acc = acc * radix + (v + base);
         }
+
+        // Pad remaining limbs with `base` (encodes v=0) to keep layout deterministic.
         for _ in 0..(group - take) {
             acc = acc * radix + base;
         }
+
         out.push(acc);
     }
     out
 }
+
 #[test]
 fn test_polynomial_eval() {
     let coeffs = [1, 2, 3]; // represents 1x^2 + 2x + 3
@@ -291,4 +315,24 @@ fn test_flatten_big() {
     assert_eq(result.get(3), 0x107624a8f605dc50f0638a368960421022ecb3cf36b7911d73ff2c27ec14);
     assert_eq(result.get(4), 0x0f6013a24e1b9a90f4fd2c158a08481180c2dba8af4cc10242413515171c);
     assert_eq(result.get(5), 0x11b0964eb898ce411076805680b85410729c962da53a40f4b44412d0f6ed);
+}
+
+#[test]
+fn test_flatten_small() {
+    // Create test polynomials
+    let poly1 = Polynomial::new([712345, 104857, 999999, 500001, 123, 654321, 77]);
+    let poly2 = Polynomial::new([1, 524287, 888888, 23456, 34567, 765432, 0]);
+    let poly3 = Polynomial::new([444444, 333333, 222222, 111111, 987654, 246810, 13579]);
+
+    let polynomials = [poly1, poly2, poly3];
+
+    // Initialize target array with zeros
+    let mut inputs = Vec::new();
+
+    // Flatten the polynomials
+    let result = flatten::<_, _, 20>(inputs, polynomials);
+
+    assert_eq(result.get(0), 0x1ade991199991f423f17a12110007b19fbf110004d100000100000100000);
+    assert_eq(result.get(1), 0x10000117ffff1d9038105ba01087071badf8100000100000100000100000);
+    assert_eq(result.get(2), 0x16c81c15161513640e11b2071f120613c41a10350b100000100000100000);
 }
