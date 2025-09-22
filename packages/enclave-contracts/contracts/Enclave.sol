@@ -157,6 +157,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         nexte3Id++;
         uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
 
+        e3.seed = seed;
+        e3.threshold = requestParams.threshold;
+        e3.requestBlock = block.number;
+        e3.startWindow = requestParams.startWindow;
+        e3.duration = requestParams.duration;
+        e3.expiration = 0;
+        e3.e3Program = requestParams.e3Program;
+        e3.e3ProgramParams = requestParams.e3ProgramParams;
+        e3.committeePublicKey = hex"";
+        e3.ciphertextOutput = hex"";
+        e3.plaintextOutput = hex"";
+
         (
             bytes32 encryptionSchemeId,
             IInputValidator inputValidator
@@ -180,22 +192,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InvalidComputationRequest(inputValidator)
         );
 
-        e3 = E3({
-            seed: seed,
-            threshold: requestParams.threshold,
-            requestBlock: block.number,
-            startWindow: requestParams.startWindow,
-            duration: requestParams.duration,
-            expiration: 0,
-            encryptionSchemeId: encryptionSchemeId,
-            e3Program: requestParams.e3Program,
-            e3ProgramParams: requestParams.e3ProgramParams,
-            inputValidator: inputValidator,
-            decryptionVerifier: decryptionVerifier,
-            committeePublicKey: hex"",
-            ciphertextOutput: hex"",
-            plaintextOutput: hex""
-        });
+        e3.encryptionSchemeId = encryptionSchemeId;
+        e3.inputValidator = inputValidator;
+        e3.decryptionVerifier = decryptionVerifier;
+
         e3s[e3Id] = e3;
 
         require(
@@ -254,16 +254,18 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             InputDeadlinePassed(e3Id, e3.expiration)
         );
 
-        bytes memory input = e3.inputValidator.validate(msg.sender, data);
-        uint256 inputHash = PoseidonT3.hash(
-            [uint256(keccak256(input)), inputCounts[e3Id]]
-        );
+        uint256 inputIndex = inputCounts[e3Id];
+        inputCounts[e3Id] = inputIndex + 1;
 
-        inputCounts[e3Id]++;
+        bytes memory input = e3.inputValidator.validate(msg.sender, data);
+
+        uint256 inputHash = PoseidonT3.hash(
+            [uint256(keccak256(input)), inputIndex]
+        );
         inputs[e3Id]._insert(inputHash);
         success = true;
 
-        emit InputPublished(e3Id, input, inputHash, inputCounts[e3Id] - 1);
+        emit InputPublished(e3Id, input, inputHash, inputIndex);
     }
 
     function publishCiphertextOutput(
@@ -272,6 +274,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes calldata proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
         require(
@@ -284,10 +287,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3.ciphertextOutput == bytes32(0),
             CiphertextOutputAlreadyPublished(e3Id)
         );
+
         bytes32 ciphertextOutputHash = keccak256(ciphertextOutput);
+        e3s[e3Id].ciphertextOutput = ciphertextOutputHash;
+
         (success) = e3.e3Program.verify(e3Id, ciphertextOutputHash, proof);
         require(success, InvalidOutput(ciphertextOutput));
-        e3s[e3Id].ciphertextOutput = ciphertextOutputHash;
 
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
     }
@@ -298,6 +303,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         bytes calldata proof
     ) external returns (bool success) {
         E3 memory e3 = getE3(e3Id);
+
         // Note: if we make 0 a no expiration, this has to be refactored
         require(e3.expiration > 0, E3NotActivated(e3Id));
         require(
@@ -308,13 +314,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             e3.plaintextOutput.length == 0,
             PlaintextOutputAlreadyPublished(e3Id)
         );
+
+        e3s[e3Id].plaintextOutput = plaintextOutput;
+
         (success) = e3.decryptionVerifier.verify(
             e3Id,
             keccak256(plaintextOutput),
             proof
         );
         require(success, InvalidOutput(plaintextOutput));
-        e3s[e3Id].plaintextOutput = plaintextOutput;
 
         emit PlaintextOutputPublished(e3Id, plaintextOutput);
     }
