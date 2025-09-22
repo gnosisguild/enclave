@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use polynomial::{bitlen, flatten, Polynomial};
+use polynomial::{flatten, Polynomial};
 use safe::SafeSponge;
 
 /// Cryptographic parameters for Greco circuit.
@@ -163,7 +163,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// * `k1` - Scaled message polynomial
 /// * `r1is`, `r2is` - Randomness polynomials for each i-th CRT basis.
 /// * `p1is`, `p2is` - Randomness polynomials for each i-th CRT basis.
-pub struct Greco<let N: u32, let L: u32> {
+pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     params: Params<N, L>,
     pk0is: [Polynomial<N>; L],
@@ -180,7 +180,7 @@ pub struct Greco<let N: u32, let L: u32> {
     p2is: [Polynomial<N - 1>; L],
 }
 
-impl<let N: u32, let L: u32> Greco<N, L> {
+impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
     /// Creates a new Greco instance.
     ///
     /// This constructor initializes all the polynomials and parameters needed for
@@ -217,7 +217,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
         r2is: [Polynomial<N - 1>; L],
         p1is: [Polynomial<2 * N - 1>; L],
         p2is: [Polynomial<N - 1>; L],
-    ) -> Greco<N, L> {
+    ) -> Greco<N, L, BIT_PK, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
         Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, k1, r1is, r2is, p1is, p2is }
     }
 
@@ -238,28 +238,22 @@ impl<let N: u32, let L: u32> Greco<N, L> {
 
         // Flatten public key and ciphertext polynomials first (public inputs)
 
-        if self.params.bound_params().e_bound < 50 {
-            inputs = flatten(inputs.0, self.pk0is, inputs.1, 60);
-        }
-        if self.params.bound_params().e_bound > 50 {
-            inputs = flatten(inputs.0, self.pk0is, inputs.1, 64);
-        }
-
-        inputs = flatten(inputs.0, self.pk1is, inputs.1, 60);
-        inputs = flatten(inputs.0, self.ct0is, inputs.1, 60);
-        inputs = flatten(inputs.0, self.ct1is, inputs.1, 60);
+        inputs = flatten(inputs.0, self.pk0is, inputs.1, BIT_PK);
+        inputs = flatten(inputs.0, self.pk1is, inputs.1, BIT_PK);
+        inputs = flatten(inputs.0, self.ct0is, inputs.1, BIT_PK);
+        inputs = flatten(inputs.0, self.ct1is, inputs.1, BIT_PK);
 
         // Flatten common polynomials (used across all CRT bases)
-        inputs = flatten(inputs.0, [self.e0], inputs.1, 5);
-        inputs = flatten(inputs.0, [self.e1], inputs.1, 5);
-        inputs = flatten(inputs.0, [self.u], inputs.1, 5);
-        inputs = flatten(inputs.0, [self.k1], inputs.1, 20);
+        inputs = flatten(inputs.0, [self.e0], inputs.1, BIT_E);
+        inputs = flatten(inputs.0, [self.e1], inputs.1, BIT_E);
+        inputs = flatten(inputs.0, [self.u], inputs.1, BIT_U);
+        inputs = flatten(inputs.0, [self.k1], inputs.1, BIT_K);
 
         // Flatten randomness polynomials for each CRT basis
-        inputs = flatten(inputs.0, self.r1is, inputs.1, 60);
-        inputs = flatten(inputs.0, self.r2is, inputs.1, 60);
-        inputs = flatten(inputs.0, self.p1is, inputs.1, 20);
-        inputs = flatten(inputs.0, self.p2is, inputs.1, 60);
+        inputs = flatten(inputs.0, self.r1is, inputs.1, BIT_R1);
+        inputs = flatten(inputs.0, self.r2is, inputs.1, BIT_R2);
+        inputs = flatten(inputs.0, self.p1is, inputs.1, BIT_P1);
+        inputs = flatten(inputs.0, self.p2is, inputs.1, BIT_P2);
 
         inputs.0
     }
@@ -347,7 +341,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
         ];
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
-        let input_size = 4894;
+        let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);

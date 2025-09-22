@@ -22,7 +22,7 @@ fn main(
     p1is: [Polynomial<4095>; 1],
     p2is: [Polynomial<2047>; 1],
 ) {
-    let circuit = Greco::new(
+    let circuit: Greco<2048, 1, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
         params,
         pk0is,
         pk1is,
