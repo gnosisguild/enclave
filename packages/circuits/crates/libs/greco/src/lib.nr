@@ -234,28 +234,28 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_U: u32, let BIT_E: u32, le
     /// # Returns
     /// An array containing all polynomials coefficients in flattened form
     fn payload(self) -> Vec<Field> {
-        let mut inputs = (Vec::new(), 0);
+        let mut inputs = Vec::new();
 
         // Flatten public key and ciphertext polynomials first (public inputs)
 
-        inputs = flatten(inputs.0, self.pk0is, inputs.1, BIT_PK);
-        inputs = flatten(inputs.0, self.pk1is, inputs.1, BIT_PK);
-        inputs = flatten(inputs.0, self.ct0is, inputs.1, BIT_PK);
-        inputs = flatten(inputs.0, self.ct1is, inputs.1, BIT_PK);
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.ct0is);
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.ct1is);
 
         // Flatten common polynomials (used across all CRT bases)
-        inputs = flatten(inputs.0, [self.e0], inputs.1, BIT_E);
-        inputs = flatten(inputs.0, [self.e1], inputs.1, BIT_E);
-        inputs = flatten(inputs.0, [self.u], inputs.1, BIT_U);
-        inputs = flatten(inputs.0, [self.k1], inputs.1, BIT_K);
+        inputs = flatten::<_, _, BIT_E>(inputs, [self.e0]);
+        inputs = flatten::<_, _, BIT_E>(inputs, [self.e1]);
+        inputs = flatten::<_, _, BIT_U>(inputs, [self.u]);
+        inputs = flatten::<_, _, BIT_K>(inputs, [self.k1]);
 
         // Flatten randomness polynomials for each CRT basis
-        inputs = flatten(inputs.0, self.r1is, inputs.1, BIT_R1);
-        inputs = flatten(inputs.0, self.r2is, inputs.1, BIT_R2);
-        inputs = flatten(inputs.0, self.p1is, inputs.1, BIT_P1);
-        inputs = flatten(inputs.0, self.p2is, inputs.1, BIT_P2);
+        inputs = flatten::<_, _, BIT_R1>(inputs, self.r1is);
+        inputs = flatten::<_, _, BIT_R2>(inputs, self.r2is);
+        inputs = flatten::<_, _, BIT_P1>(inputs, self.p1is);
+        inputs = flatten::<_, _, BIT_P2>(inputs, self.p2is);
 
-        inputs.0
+        inputs
     }
 
     /// Verifies the correct encryption constraints for the Greco circuit.

@@ -117,39 +117,54 @@ impl<let N: u32> Polynomial<N> {
 /// A tuple containing:
 /// * The updated inputs array with flattened coefficients
 /// * The new offset position after flattening
-pub fn flatten<let A: u32, let L: u32>(
+pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
     mut inputs: Vec<Field>,
     poly: [Polynomial<A>; L],
-    mut offset: u32,
-    bit: u32,
-) -> (Vec<Field>, u32) {
+) -> Vec<Field> {
     for j in 0..L {
-        let pack = packer(poly[j].coefficients, bit);
-        for i in 0..(A / (254 / bit)) {
-            //inputs[i + offset] = pack[i];
+        let pack = packer::<A, BIT>(poly[j].coefficients);
+        for i in 0..(A / (254 / BIT)) {
             inputs.push(pack.get(i));
         }
-        offset += (((A + (254 / bit)) - 1) / (254 / bit));
     }
 
-    (inputs, offset)
+    inputs
 }
 
-pub fn packer<let A: u32>(values: [Field; A], bit: u32) -> Vec<Field> {
-    let group = 254 / bit;
-    let mut carrier = Vec::new();
-    let base = 2.pow_32(bit as Field); // 2^bit
-    let base_plus = 2.pow_32((bit + 1) as Field);
+/// Pack `values` into fewer Field elements.
+/// - Each value is assumed to fit in `bit` bits.
+/// - Uses limbs of size `bit+1` to be safe because of the shifting; up to `254 / bit` values per output field.
+/// - Packs in big-endian order and pads the tail with zeros.
+pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
+    // Number of values packed into one 254-bit field.
+    let group = 254 / BIT;
 
+    // Output carriers.
+    let mut carrier = Vec::new();
+
+    // Bases: 2^bit and 2^(bit+1).
+    let base = 2.pow_32(BIT as Field); // 2^bit
+    let base_plus = 2.pow_32((BIT + 1) as Field); // 2^(bit+1)
+
+    // Process input in chunks of `group` values.
     for j in 0..((A + group - 1) / group) {
-        let mut acc: Field = 0;
+        let mut acc: Field = 0; // current packed carrier
+
+        // Pack one chunk, big-endian (earlier values go to higher limbs).
         for i in 0..group {
-            let idx: u32 = group * j + i;
-            let v: Field = if idx < A { values[idx] } else { 0 };
-            acc = acc * base_plus + (v + base); // + 2^bit+1
+            let idx = group * j + i;
+
+            // Read value if in range; otherwise pad with zero.
+            let v = if idx < A { values[idx] } else { 0 };
+
+            // Shift left by one limb (including shifting size) and append (v + 2^bit).
+            acc = acc * base_plus + (v + base);
         }
+
+        // Store the carrier for this chunk.
         carrier.push(acc);
     }
+
     carrier
 }
 
@@ -214,10 +229,8 @@ fn test_flatten() {
     // Initialize target array with zeros
     let mut inputs = Vec::from_slice([0; 10].as_slice()); // Size to accommodate 3 polynomials of degree 2 + offset
 
-    let offset = 1; // Start at position 1
-
     // Flatten the polynomials
-    let (result, new_offset) = flatten(inputs, polynomials, offset, 64);
+    let result = flatten::<_, _, 64>(inputs, polynomials);
 
     // Verify the flattened coefficients are in the correct positions
     // Expected: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -235,7 +248,4 @@ fn test_flatten() {
     assert_eq(result.get(7), 7); // poly3[0]
     assert_eq(result.get(8), 8); // poly3[1]
     assert_eq(result.get(9), 9); // poly3[2]
-
-    // Verify the new offset is correct (original offset + total coefficients)
-    assert_eq(new_offset, offset + 3 * 3); // offset + num_polynomials * degree
 }
