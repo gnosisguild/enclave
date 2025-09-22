@@ -40,7 +40,7 @@ impl ScoreSortition {
             return Ok(Vec::new());
         }
 
-        let mut best_map: HashMap<[u8; 20], WinnerTicket> = HashMap::with_capacity(nodes.len());
+        let mut best_map: HashMap<Address, WinnerTicket> = HashMap::with_capacity(nodes.len());
 
         for n in nodes {
             if n.tickets.is_empty() {
@@ -48,9 +48,18 @@ impl ScoreSortition {
             }
 
             let w = best_ticket_for_node(seed, n)?;
-            let key = w.address.0 .0;
-
+            let key = w.address.clone();
             match best_map.get_mut(&key) {
+                None => {
+                    best_map.insert(key, w);
+                }
+                Some(cur) => {
+                    if w.score < cur.score || (w.score == cur.score && w.ticket_id < cur.ticket_id)
+                    {
+                        *cur = w;
+                    }
+                }
+            }
                 None => {
                     best_map.insert(key, w);
                 }
