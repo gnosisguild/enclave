@@ -1,6 +1,5 @@
 src/
 scripts/
-*.ts
 tsconfig.json
 .gitignore
 node_modules/
