@@ -5,8 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::ticket::{best_ticket_for_node, RegisteredNode, WinnerTicket};
+use alloy::primitives::Address;
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 /// Deterministic committee selection based on ticket scores.
 ///
@@ -48,22 +49,12 @@ impl ScoreSortition {
             }
 
             let w = best_ticket_for_node(seed, n)?;
-            let key = w.address.clone();
-            match best_map.get_mut(&key) {
-                None => {
-                    best_map.insert(key, w);
+            match best_map.entry(w.address) {
+                Entry::Vacant(v) => {
+                    v.insert(w);
                 }
-                Some(cur) => {
-                    if w.score < cur.score || (w.score == cur.score && w.ticket_id < cur.ticket_id)
-                    {
-                        *cur = w;
-                    }
-                }
-            }
-                None => {
-                    best_map.insert(key, w);
-                }
-                Some(cur) => {
+                Entry::Occupied(mut o) => {
+                    let cur = o.get_mut();
                     if w.score < cur.score || (w.score == cur.score && w.ticket_id < cur.ticket_id)
                     {
                         *cur = w;
@@ -74,6 +65,7 @@ impl ScoreSortition {
 
         let mut items: Vec<WinnerTicket> = best_map.into_values().collect();
 
+        // Sort ascending by (score, ticket_id)
         items.sort_unstable_by(|a, b| a.score.cmp(&b.score).then(a.ticket_id.cmp(&b.ticket_id)));
 
         let k = self.size.min(items.len());
@@ -87,6 +79,7 @@ mod tests {
     use crate::ticket::{RegisteredNode, Ticket, WinnerTicket};
     use crate::ticket_sortition::ScoreSortition;
     use alloy::primitives::{keccak256, Address};
+    use std::collections::HashSet;
 
     fn ticket_count(i: u64) -> u64 {
         let h = keccak256([b"tickets".as_slice(), &i.to_be_bytes()].concat());
@@ -129,7 +122,7 @@ mod tests {
 
         println!("NODES {:#?}", nodes);
 
-        let mut all_ids = std::collections::HashSet::new();
+        let mut all_ids = HashSet::new();
         for n in &nodes {
             for t in &n.tickets {
                 assert!(all_ids.insert(t.ticket_id));
