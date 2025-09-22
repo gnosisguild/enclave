@@ -22,7 +22,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
-    esbuildOptions: { target: "esnext" },
+    esbuildOptions: { target: 'esnext' },
     exclude: ['@rollup/browser', '@noir-lang/noirc_abi', '@noir-lang/acvm_js', '@enclave-e3/wasm', '@enclave-e3/wasm/init'],
   },
   resolve: {
