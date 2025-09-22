@@ -7,7 +7,6 @@
 mod ciphernode_selector;
 mod distance;
 mod index;
-mod merkle_committee;
 mod repo;
 mod sortition;
 mod ticket;

@@ -72,3 +72,66 @@ impl ScoreSortition {
         Ok(items)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::ticket::{RegisteredNode, Ticket, WinnerTicket};
+    use crate::ticket_sortition::ScoreSortition;
+    use alloy::primitives::{keccak256, Address};
+
+    fn ticket_count(i: u64) -> u64 {
+        let h = keccak256([b"tickets".as_slice(), &i.to_be_bytes()].concat());
+        (u128::from_be_bytes(h.0[0..16].try_into().unwrap()) % 7 + 1) as u64
+    }
+
+    fn address(i: u64) -> Address {
+        let h = keccak256([b"addr".as_slice(), &i.to_be_bytes()].concat());
+        let mut bytes20 = [0u8; 20];
+        bytes20.copy_from_slice(&h.0[12..32]);
+        Address::from(bytes20)
+    }
+
+    fn build_nodes() -> Vec<RegisteredNode> {
+        let mut next_ticket_id: u64 = 1;
+        (0u64..10)
+            .map(|i| {
+                let address = address(i);
+                let t = ticket_count(i);
+                let mut tickets = Vec::with_capacity(t as usize);
+                for _ in 0..t {
+                    tickets.push(Ticket {
+                        ticket_id: next_ticket_id,
+                    });
+                    next_ticket_id += 1;
+                }
+                RegisteredNode { address, tickets }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_ticket_sortition() {
+        let seed: u64 = 0xA1B2_C3D4_E5F6_7788;
+        let committee_size: usize = 3;
+
+        let nodes = build_nodes();
+        assert_eq!(nodes.len(), 10);
+        assert!(nodes.iter().all(|n| !n.tickets.is_empty()));
+
+        println!("NODES {:#?}", nodes);
+
+        let mut all_ids = std::collections::HashSet::new();
+        for n in &nodes {
+            for t in &n.tickets {
+                assert!(all_ids.insert(t.ticket_id));
+            }
+        }
+
+        let committee: Vec<WinnerTicket> = ScoreSortition::new(committee_size)
+            .get_committee(seed, &nodes)
+            .expect("score sortition should succeed");
+        assert_eq!(committee.len(), committee_size);
+
+        println!("COMMITTEE {:#?}", committee);
+    }
+}
