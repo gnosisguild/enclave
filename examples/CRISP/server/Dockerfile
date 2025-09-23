@@ -8,8 +8,13 @@ ENV CARGO_HOME=/usr/local/cargo
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev curl ca-certificates && \
+    jq pkg-config libssl-dev curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+
+RUN wget https://github.com/argotorg/solidity/releases/download/v0.8.27/solc-static-linux \
+    && chmod +x solc-static-linux \
+    && mv solc-static-linux /usr/local/bin/solc \
+    && solc --version
 
 RUN curl -sSfL https://risczero.com/install | bash
 
