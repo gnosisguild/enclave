@@ -6,14 +6,14 @@
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-pub struct IndexSortition {
+pub struct _IndexSortition {
     pub random_seed: u64,
     pub num_nodes: usize,
     pub size: usize,
 }
 
-impl IndexSortition {
-    pub fn new(random_seed: u64, num_nodes: usize, size: usize) -> Self {
+impl _IndexSortition {
+    pub fn _new(random_seed: u64, num_nodes: usize, size: usize) -> Self {
         Self {
             random_seed,
             num_nodes,

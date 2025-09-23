@@ -39,7 +39,7 @@ pub struct WinnerTicket {
 ///
 /// Message format:
 /// `b"ticket_score" || seed_be64 || address(20B) || ticket_id_be64`
-fn score_message(seed: u64, address: Address, ticket_id: u64) -> Vec<u8> {
+fn serialize_message(seed: u64, address: Address, ticket_id: u64) -> Vec<u8> {
     let mut buf = Vec::with_capacity(12 + 8 + 20 + 8);
     buf.extend_from_slice(b"ticket_score"); // domain separation tag
     buf.extend_from_slice(&seed.to_be_bytes());
@@ -53,7 +53,7 @@ fn score_message(seed: u64, address: Address, ticket_id: u64) -> Vec<u8> {
 /// The score is defined as the Keccak-256 hash of the domain-separated
 /// message, interpreted as a big-endian integer.
 pub fn hash_to_score(seed: u64, address: Address, ticket_id: u64) -> BigUint {
-    let msg = score_message(seed, address, ticket_id);
+    let msg = serialize_message(seed, address, ticket_id);
     let digest = keccak256(&msg);
     BigUint::from_bytes_be(&digest.0)
 }
@@ -66,7 +66,10 @@ pub fn hash_to_score(seed: u64, address: Address, ticket_id: u64) -> BigUint {
 ///
 /// # Errors
 /// Returns an error if the node has no tickets.
-pub fn best_ticket_for_node(seed: u64, registered_node: &RegisteredNode) -> Result<WinnerTicket> {
+pub fn calculate_best_ticket_for_node(
+    seed: u64,
+    registered_node: &RegisteredNode,
+) -> Result<WinnerTicket> {
     if registered_node.tickets.is_empty() {
         return Err(anyhow!("no tickets in the registered node"));
     }

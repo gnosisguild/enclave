@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::ticket::{best_ticket_for_node, RegisteredNode, WinnerTicket};
+use crate::ticket::{calculate_best_ticket_for_node, RegisteredNode, WinnerTicket};
 use alloy::primitives::Address;
 use anyhow::Result;
 use std::collections::{hash_map::Entry, HashMap};
@@ -48,7 +48,7 @@ impl ScoreSortition {
                 continue;
             }
 
-            let w = best_ticket_for_node(seed, n)?;
+            let w = calculate_best_ticket_for_node(seed, n)?;
             match best_map.entry(w.address) {
                 Entry::Vacant(v) => {
                     v.insert(w);
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_ticket_sortition() {
-        let seed: u64 = 0xA1B2_C3D4_E5F6_7788;
+        let seed: u64 = 0xA1B2_C3D4_E5F6_7789;
         let committee_size: usize = 3;
 
         let nodes = build_nodes();
@@ -133,6 +133,11 @@ mod tests {
             .get_committee(seed, &nodes)
             .expect("score sortition should succeed");
         assert_eq!(committee.len(), committee_size);
+
+        // Check winners deterministically for the given seed
+        assert_eq!(committee[0].address, nodes[9].address);
+        assert_eq!(committee[1].address, nodes[1].address);
+        assert_eq!(committee[2].address, nodes[0].address);
 
         println!("COMMITTEE {:#?}", committee);
     }
