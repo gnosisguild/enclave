@@ -23,6 +23,13 @@ ENV CARGO_INCREMENTAL=1
 ENV RUSTC_FORCE_INCREMENTAL=1
 ENV CARGO_BUILD_JOBS=8
 
+# Install deps
+RUN apt-get update && apt-get install -y --no-install-recommends jq
+RUN wget https://github.com/argotorg/solidity/releases/download/v0.8.27/solc-static-linux \
+    && chmod +x solc-static-linux \
+    && sudo mv solc-static-linux /usr/local/bin/solc \
+    && solc --version
+
 # Create build directory
 
 WORKDIR /build

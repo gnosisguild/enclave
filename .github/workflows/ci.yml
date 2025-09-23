@@ -202,6 +202,11 @@ jobs:
         with:
           path: "**/node_modules"
           key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
       - name: "Install the dependencies"
         run: "pnpm install"
       - name: "Lint the code"
@@ -317,6 +322,11 @@ jobs:
             target/
           key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: rust-deps-
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
       - name: Build enclave CLI
         run: cargo install --locked --path crates/cli --bin enclave
       - name: Upload enclave binary
