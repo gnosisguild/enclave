@@ -505,17 +505,16 @@ impl ThresholdKeyshare {
 
     pub fn create_calculate_decryption_share_request(
         &mut self,
-        ciphertext_output: ArcBytes,
+        ciphertext_output: Vec<ArcBytes>,
     ) -> Result<ComputeRequest> {
         self.set_state_to_decrypting()?;
         let state = self.state.get().ok_or(anyhow!("State not set."))?;
         let decrypting: Decrypting = state.clone().try_into()?;
-        let ciphertexts = vec![ciphertext_output]; // HACK wrap in vector
         let trbfv_config = state.get_trbfv_config();
 
         let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(
             CalculateDecryptionShareRequest {
-                ciphertexts,
+                ciphertexts: ciphertext_output,
                 sk_poly_sum: decrypting.sk_poly_sum,
                 es_poly_sum: decrypting.es_poly_sum,
                 trbfv_config,

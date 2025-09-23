@@ -41,7 +41,7 @@ pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
 /// Test trbfv
 #[actix::test]
 #[serial_test::serial]
-async fn test_trbfv() -> Result<()> {
+async fn test_trbfv_actor() -> Result<()> {
     use tracing_subscriber::{fmt, EnvFilter};
 
     let subscriber = fmt()
@@ -189,48 +189,62 @@ async fn test_trbfv() -> Result<()> {
         .take_history_with_timeout(1, expected.len(), Duration::from_secs(1000))
         .await?;
 
-    println!("{:?}", h);
-
     assert_eq!(h.event_types(), expected);
 
     // Aggregate decryption
 
     // First we get the public key
+    println!("Getting public key");
     let Some(EnclaveEvent::PublicKeyAggregated {
         data: pubkey_event, ..
     }) = h.last().clone()
     else {
         panic!("Was expecting event to be PublicKeyAggregated");
     };
+
     let pubkey_bytes = pubkey_event.pubkey.clone();
     let pubkey = PublicKey::from_bytes(&pubkey_bytes, &params_raw)?;
 
-    // Create the plaintext
-    let raw_plaintext = vec![1234u64, 873827u64];
+    println!("Generating inputs this takes some time...");
+    // Create the inputs
+    let num_votes_per_voter = 3;
+    let num_voters = 10;
+    let (inputs, numbers) = e3_test_helpers::application::generate_ciphertexts(
+        &pubkey,
+        params_raw.clone(),
+        num_voters,
+        num_votes_per_voter,
+    );
 
-    // Encrypt the plaintext
-    let (ciphertext, expected_bytes) = encrypt_ciphertext(&params_raw, pubkey, raw_plaintext)?;
+    println!("Running application to generate outputs...");
+    let outputs =
+        e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
+
+    println!("Have outputs. Creating ciphertexts...");
+    let ciphertexts = outputs
+        .into_iter()
+        .map(|ct| ArcBytes::from_bytes((*ct).clone().to_bytes()))
+        .collect::<Vec<ArcBytes>>();
 
     // Created the event
+    println!("Publishing CiphertextOutputPublished...");
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
-        ciphertext_output: ArcBytes::from_bytes(ciphertext.to_bytes()),
+        ciphertext_output: ciphertexts,
         e3_id: e3_id.clone(),
     });
 
     bus.send(ciphertext_published_event.clone()).await?;
 
-    let expected_plaintext_agg_event = PlaintextAggregated {
-        e3_id: e3_id.clone(),
-        decrypted_output: expected_bytes.clone(),
-    };
+    println!("CiphertextOutputPublished event has been dispatched!");
 
     // Lets grab decryption share events
     let expected = vec![
         "CiphertextOutputPublished",
-        "DecryptionShareCreated",
-        "DecryptionShareCreated",
-        "DecryptionShareCreated",
-        "DecryptionShareCreated",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
+        "DecryptionshareCreated",
     ];
 
     let h = nodes
@@ -238,7 +252,9 @@ async fn test_trbfv() -> Result<()> {
         .await?;
 
     println!("{:?}", h.event_types());
-    sleep(Duration::from_millis(30000)).await;
+    assert_eq!(h.event_types(), expected);
+
+    sleep(Duration::from_millis(3000)).await;
 
     let rest = nodes.get_history(1).await?;
 

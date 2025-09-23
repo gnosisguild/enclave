@@ -287,14 +287,14 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     // Setup Ciphertext Published Event
     let ciphertext_published_event = EnclaveEvent::from(CiphertextOutputPublished {
-        ciphertext_output: ArcBytes::from_bytes(ciphertext.to_bytes()),
+        ciphertext_output: vec![ArcBytes::from_bytes(ciphertext.to_bytes())],
         e3_id: e3_id.clone(),
     });
 
     bus.send(ciphertext_published_event.clone()).await?;
     let expected_plaintext_agg_event = PlaintextAggregated {
         e3_id: e3_id.clone(),
-        decrypted_output: expected.clone(),
+        decrypted_output: vec![ArcBytes::from_bytes(expected.clone())],
     };
 
     let history = history_collector
@@ -422,7 +422,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     let (ciphertext, expected) = encrypt_ciphertext(&params, pubkey, raw_plaintext)?;
     bus.send(
         EnclaveEvent::from(CiphertextOutputPublished {
-            ciphertext_output: ArcBytes::from_bytes(ciphertext.to_bytes()),
+            ciphertext_output: vec![ArcBytes::from_bytes(ciphertext.to_bytes())],
             e3_id: e3_id.clone(),
         })
         .clone(),
@@ -437,7 +437,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.decrypted_output.clone()),
         _ => None,
     });
-    assert_eq!(actual, Some(expected));
+    assert_eq!(actual, Some(vec![ArcBytes::from_bytes(expected)]));
 
     Ok(())
 }
@@ -480,12 +480,12 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     let evt_1 = EnclaveEvent::from(PlaintextAggregated {
         e3_id: E3id::new("1235", 1),
-        decrypted_output: vec![1, 2, 3, 4],
+        decrypted_output: vec![ArcBytes::from_bytes(vec![1, 2, 3, 4])],
     });
 
     let evt_2 = EnclaveEvent::from(PlaintextAggregated {
         e3_id: E3id::new("1236", 1),
-        decrypted_output: vec![1, 2, 3, 4],
+        decrypted_output: vec![ArcBytes::from_bytes(vec![1, 2, 3, 4])],
     });
 
     let local_evt_3 = EnclaveEvent::from(CiphernodeSelected {

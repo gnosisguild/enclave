@@ -63,11 +63,20 @@ impl E3Extension for PlaintextAggregatorExtension {
 
         let e3_id = data.e3_id.clone();
         let repo = ctx.repositories().plaintext(&e3_id);
+
+        let Some(single_ciphertext) = data.ciphertext_output.first() else {
+            self.bus.err(
+                EnclaveErrorType::PlaintextAggregation,
+                anyhow!("Could not extract ciphertext from array"),
+            );
+            return;
+        };
+
         let sync_state = repo.send(Some(PlaintextAggregatorState::init(
             meta.threshold_m,
             meta.threshold_n,
             meta.seed,
-            data.ciphertext_output.clone(),
+            single_ciphertext.clone(),
         )));
 
         ctx.set_event_recipient(

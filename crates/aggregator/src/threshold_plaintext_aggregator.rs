@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::collections::HashMap;
+
 use actix::prelude::*;
 use anyhow::{anyhow, bail, Result};
 use e3_data::Persistable;
@@ -20,15 +22,15 @@ use e3_trbfv::{
     TrBFVConfig, TrBFVRequest,
 };
 use e3_utils::utility_types::ArcBytes;
-use tracing::{error, info};
+use tracing::{error, info, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
     threshold_m: u64,
     threshold_n: u64,
-    shares: Vec<(u64, Vec<ArcBytes>)>,
+    shares: HashMap<u64, Vec<ArcBytes>>,
     seed: Seed,
-    ciphertext_output: ArcBytes,
+    ciphertext_output: Vec<ArcBytes>,
     params: ArcBytes,
 }
 
@@ -37,7 +39,7 @@ pub struct Computing {
     threshold_m: u64,
     threshold_n: u64,
     shares: Vec<(u64, Vec<ArcBytes>)>,
-    ciphertext_output: ArcBytes,
+    ciphertext_output: Vec<ArcBytes>,
     params: ArcBytes,
 }
 
@@ -95,13 +97,13 @@ impl ThresholdPlaintextAggregatorState {
         threshold_m: u64,
         threshold_n: u64,
         seed: Seed,
-        ciphertext_output: ArcBytes,
+        ciphertext_output: Vec<ArcBytes>,
         params: ArcBytes,
     ) -> Self {
         ThresholdPlaintextAggregatorState::Collecting(Collecting {
             threshold_m,
             threshold_n,
-            shares: vec![],
+            shares: HashMap::new(),
             seed,
             ciphertext_output,
             params,
@@ -113,7 +115,7 @@ impl ThresholdPlaintextAggregatorState {
 #[rtype(result = "anyhow::Result<()>")]
 pub struct ComputeAggregate {
     pub shares: Vec<(u64, Vec<ArcBytes>)>,
-    pub ciphertext_output: Vec<u8>,
+    pub ciphertext_output: Vec<ArcBytes>,
     pub threshold_m: u64,
     pub threshold_n: u64,
 }
@@ -157,8 +159,8 @@ impl ThresholdPlaintextAggregator {
             let params = current.params.clone();
             let mut shares = current.shares;
             {
-                info!("pushing to shares collection");
-                shares.push((party_id, share));
+                info!("pushing to share collection");
+                shares.insert(party_id, share);
             }
 
             info!(
@@ -181,7 +183,7 @@ impl ThresholdPlaintextAggregator {
             info!("Changing state to computing because received enough shares...");
 
             Ok(ThresholdPlaintextAggregatorState::Computing(Computing {
-                shares: shares.clone(),
+                shares: shares.into_iter().collect(),
                 ciphertext_output,
                 threshold_m,
                 threshold_n,
@@ -220,12 +222,10 @@ impl ThresholdPlaintextAggregator {
         let trbfv_config =
             TrBFVConfig::new(state.params.clone(), state.threshold_n, state.threshold_m);
 
-        let ciphertexts = vec![ArcBytes::from_bytes(msg.ciphertext_output)];
-
         Ok(ComputeRequest::TrBFV(
             TrBFVRequest::CalculateThresholdDecryption(
                 CalculateThresholdDecryptionRequest {
-                    ciphertexts,
+                    ciphertexts: msg.ciphertext_output,
                     trbfv_config,
                     d_share_polys: msg.shares,
                 }
@@ -272,21 +272,31 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
         let e3_id = event.e3_id.clone();
         let decryption_share = event.decryption_share.clone();
 
+        // Why do we need to get the node index when the event contains the party_id? I guess we
+        // don't trust the event. Maybe that is fine.
         Box::pin(
             self.sortition
                 .send(GetNodeIndex {
                     chain_id,
-                    address,
+                    address: address.clone(),
                     size,
                     seed,
                 })
                 .into_actor(self)
                 .map(move |res, act, ctx| {
                     let maybe_found_index = res?;
-                    let Some(_) = maybe_found_index else {
-                        error!("Node not found in committee");
+                    let Some(party) = maybe_found_index else {
+                        error!("Attempting to aggregate share but party not found in committee");
                         return Ok(());
                     };
+
+                    if party != party_id {
+                        error!(
+                            "Bad aggregation state! Address {} not found at index {} instead it was found at {}",
+                            address, party_id, party
+                        );
+                        return Ok(());
+                    }
 
                     if e3_id != act.e3_id {
                         error!("Wrong e3_id sent to aggregator. This should not happen.");
@@ -307,7 +317,7 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
                     {
                         ctx.notify(ComputeAggregate {
                             shares: shares.clone(),
-                            ciphertext_output: ciphertext_output.to_vec(),
+                            ciphertext_output: ciphertext_output.clone(),
                             threshold_m,
                             threshold_n,
                         })
@@ -349,13 +359,9 @@ impl Handler<ComputeAggregate> for ThresholdPlaintextAggregator {
 
                     act.set_decryption(plaintext.clone())?;
 
-                    let Some(plaintext) = plaintext.first() else {
-                        bail!("Nothing in plaintext")
-                    };
-
                     // Dispatch the PlaintextAggregated event
                     let event = EnclaveEvent::from(PlaintextAggregated {
-                        decrypted_output: plaintext.extract_bytes(), // Extracting here for now
+                        decrypted_output: plaintext, // Extracting here for now
                         e3_id: act.e3_id.clone(),
                     });
 

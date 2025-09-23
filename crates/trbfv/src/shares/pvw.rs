@@ -4,14 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use anyhow::Result;
+use derivative::Derivative;
 
 use super::DeserializableValue;
 
 /// Encrypted version of T for secure storage/transmission
-#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derivative(Debug)]
 // TODO: Currently we are simply serializing the data in preparation for PVW encryption
 // expecting to pass in keys to encrypt and decrypt as required at a later point
-pub struct PvwEncrypted<T>(Vec<u8>, std::marker::PhantomData<T>);
+pub struct PvwEncrypted<T>(
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] Vec<u8>,
+    std::marker::PhantomData<T>,
+);
 
 impl<T> PvwEncrypted<T>
 where

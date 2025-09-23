@@ -219,7 +219,7 @@ impl Handler<ComputeAggregate> for PlaintextAggregator {
 
         // Dispatch the PlaintextAggregated event
         let event = EnclaveEvent::from(PlaintextAggregated {
-            decrypted_output,
+            decrypted_output: vec![ArcBytes::from_bytes(decrypted_output)],
             e3_id: self.e3_id.clone(),
         });
 

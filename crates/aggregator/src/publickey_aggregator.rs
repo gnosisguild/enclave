@@ -13,7 +13,7 @@ use e3_events::{
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
@@ -174,7 +174,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
                     // we will not be doing a send
                     let maybe_found_index = res?;
                     let Some(_) = maybe_found_index else {
-                        error!("Node not found in committee");
+                        trace!("Node not found in committee");
                         return Ok(());
                     };
 

@@ -139,8 +139,16 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             return;
         };
 
+        let Some(ciphertext) = ciphertext_output.first() else {
+            self.bus.err(
+                EnclaveErrorType::Decryption,
+                anyhow!("Ciphernode output array is empty!"),
+            );
+            return;
+        };
+
         let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
-            ciphertext: ciphertext_output.extract_bytes(),
+            ciphertext: ciphertext.extract_bytes(),
             unsafe_secret: secret,
         }) else {
             self.bus.err(

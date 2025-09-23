@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod application;
 pub mod ciphernode_builder;
 pub mod ciphernode_system;
 mod plaintext_writer;

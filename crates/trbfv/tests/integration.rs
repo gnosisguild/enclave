@@ -74,10 +74,6 @@ async fn test_trbfv_isolation() -> Result<()> {
         3,
     )?));
 
-    // Application vars
-    let num_votes_per_voter = 3;
-    let num_voters = 1000;
-
     // Parameters
     let threshold_m = 2;
     let threshold_n = 5;
@@ -186,14 +182,17 @@ async fn test_trbfv_isolation() -> Result<()> {
     }
 
     // Create the inputs
-    let (inputs, numbers) = application::generate_ciphertexts(
+    let num_votes_per_voter = 3;
+    let num_voters = 1000;
+    let (inputs, numbers) = e3_test_helpers::application::generate_ciphertexts(
         &pubkey,
         params_raw.clone(),
         num_voters,
         num_votes_per_voter,
     );
 
-    let outputs = application::run_application(&inputs, params_raw, num_votes_per_voter);
+    let outputs =
+        e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
 
     // Encrypt the plaintext
     let mut decryption_shares = HashMap::new();
@@ -250,69 +249,4 @@ async fn test_trbfv_isolation() -> Result<()> {
         assert_eq!(res, exp);
     }
     Ok(())
-}
-
-mod application {
-    use rand::{distributions::Uniform, prelude::Distribution, thread_rng};
-
-    use fhe_traits::{FheEncoder, FheEncrypter};
-    use std::sync::Arc;
-
-    use fhe::bfv::{self, Ciphertext, Encoding, Plaintext, PublicKey};
-
-    /// Each Voter encrypts `num_votes_per_voter` random bits and returns the ciphertexts along with
-    /// the underlying plaintexts for verification.
-    pub fn generate_ciphertexts(
-        pk: &PublicKey,
-        params: Arc<bfv::BfvParameters>,
-        num_voters: usize,
-        num_votes_per_voter: usize,
-    ) -> (Vec<Vec<Ciphertext>>, Vec<Vec<u64>>) {
-        let dist = Uniform::new_inclusive(0, 1);
-        let mut rng = thread_rng();
-        let numbers: Vec<Vec<u64>> = (0..num_voters)
-            .map(|_| {
-                (0..num_votes_per_voter)
-                    .map(|_| dist.sample(&mut rng))
-                    .collect()
-            })
-            .collect();
-
-        let ciphertexts: Vec<Vec<Ciphertext>> = numbers
-            .iter()
-            .map(|vals| {
-                let mut rng = thread_rng();
-                vals.iter()
-                    .map(|&val| {
-                        let pt = Plaintext::try_encode(&[val], Encoding::poly(), &params).unwrap();
-                        pk.try_encrypt(&pt, &mut rng).unwrap()
-                    })
-                    .collect()
-            })
-            .collect();
-        (ciphertexts, numbers)
-    }
-
-    /// Tally the submitted ciphertexts column-wise to produce aggregated sums.
-    pub fn run_application(
-        ciphertexts: &[Vec<Ciphertext>],
-        params: Arc<bfv::BfvParameters>,
-        num_votes_per_voter: usize,
-    ) -> Vec<Arc<Ciphertext>> {
-        if ciphertexts.is_empty() {
-            return Vec::new();
-        }
-
-        let mut sums: Vec<Ciphertext> = (0..num_votes_per_voter)
-            .map(|_| Ciphertext::zero(&params))
-            .collect();
-
-        for ct_group in ciphertexts {
-            for (j, ciphertext) in ct_group.iter().enumerate() {
-                sums[j] += ciphertext;
-            }
-        }
-
-        sums.into_iter().map(Arc::new).collect()
-    }
 }
