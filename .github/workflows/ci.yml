@@ -64,8 +64,11 @@ jobs:
       - name: Checking code format ciphernode
         run: pnpm ciphernode:lint
 
-      - name: Run tests
-        run: "pnpm ciphernode:test"
+      - name: Run Unit Tests
+        run: "cargo test --lib && cargo test --doc"
+
+      - name: Run Integration Tests
+        run: "cargo test --test integration -- --nocapture && cargo test --test integration_legacy -- --nocapture"
 
   build_e3_support_risc0:
     runs-on: ubuntu-latest
