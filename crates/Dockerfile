@@ -27,7 +27,7 @@ ENV CARGO_BUILD_JOBS=8
 RUN apt-get update && apt-get install -y --no-install-recommends jq
 RUN wget https://github.com/argotorg/solidity/releases/download/v0.8.27/solc-static-linux \
     && chmod +x solc-static-linux \
-    && sudo mv solc-static-linux /usr/local/bin/solc \
+    && mv solc-static-linux /usr/local/bin/solc \
     && solc --version
 
 # Create build directory
