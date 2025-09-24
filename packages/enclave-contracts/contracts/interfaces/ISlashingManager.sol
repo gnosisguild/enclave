@@ -22,10 +22,8 @@ interface ISlashingManager {
      * @notice Slashing policy configuration for different slash reasons
      */
     struct SlashPolicy {
-        uint256 ticketPenalty; // Amount or BPS for ticket collateral penalty
-        uint256 licensePenalty; // Amount or BPS for license stake penalty
-        bool useTicketBps; // True if ticket penalty is in BPS, false if absolute amount
-        bool useLicenseBps; // True if license penalty is in BPS, false if absolute amount
+        uint256 ticketPenalty; // Amount for ticket collateral penalty
+        uint256 licensePenalty; // Amount for license stake penalty
         bool requiresProof; // True if slash requires verifier proof
         address proofVerifier; // Address of the verifier contract for proof verification
         bool banNode; // True if this slash type would result in banning
@@ -63,6 +61,8 @@ interface ISlashingManager {
     error InvalidProposal();
     error ProofRequired();
     error InvalidProof();
+    error AppealUpheld();
+    error AppealPending();
     error AppealWindowExpired();
     error AppealWindowActive();
     error AlreadyAppealed();
@@ -71,6 +71,7 @@ interface ISlashingManager {
     error SlashReasonNotFound();
     error SlashReasonDisabled();
     error CiphernodeBanned();
+    error VerifierNotSet();
 
     // ======================
     // Events

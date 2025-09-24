@@ -18,6 +18,7 @@ interface IBondingRegistry {
     // General
     error ZeroAddress();
     error ZeroAmount();
+    error CiphernodeBanned();
     error Unauthorized();
     error InsufficientBalance();
     error ActiveCommittee();
@@ -82,16 +83,6 @@ interface IBondingRegistry {
         address indexed operator,
         uint256 ticketRefund,
         uint256 licenseRefund
-    );
-
-    /**
-     * @notice Emitted when operator registration status changes
-     * @param operator Address of the operator
-     * @param registered True if registered, false if deregistered
-     */
-    event OperatorRegistrationChanged(
-        address indexed operator,
-        bool registered
     );
 
     /**
@@ -301,19 +292,6 @@ interface IBondingRegistry {
         bytes32 reason
     ) external;
 
-    /**
-     * @notice Slash operator's license bond by percentage (basis points)
-     * @param operator Address of the operator to slash
-     * @param bps Percentage to slash in basis points (0-10000)
-     * @param reason Reason for slashing (stored in event)
-     * @dev Only callable by authorized slashing manager
-     */
-    function slashLicenseBps(
-        address operator,
-        uint256 bps,
-        bytes32 reason
-    ) external;
-
     // ======================
     // Admin Functions
     // ======================
@@ -327,10 +305,17 @@ interface IBondingRegistry {
 
     /**
      * @notice Set license bond price required
-     * @param newlicenseRequiredBond New license bond price
+     * @param newLicenseRequiredBond New license bond price
      * @dev Only callable by contract owner
      */
-    function setlicenseRequiredBond(uint256 newlicenseRequiredBond) external;
+    function setLicenseRequiredBond(uint256 newLicenseRequiredBond) external;
+
+    /**
+     * @notice Set license active BPS
+     * @param newBps New license active BPS
+     * @dev Only callable by contract owner
+     */
+    function setLicenseActiveBps(uint256 newBps) external;
 
     /**
      * @notice Set minimum ticket balance required for activation
