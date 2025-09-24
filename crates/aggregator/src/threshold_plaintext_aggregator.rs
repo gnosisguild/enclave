@@ -169,7 +169,7 @@ impl ThresholdPlaintextAggregator {
                 threshold_m
             );
 
-            if shares.len() < threshold_m as usize {
+            if shares.len() <= threshold_m as usize {
                 return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {
                     params,
                     threshold_n,

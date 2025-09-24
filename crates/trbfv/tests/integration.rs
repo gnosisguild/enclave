@@ -195,12 +195,12 @@ async fn test_trbfv_isolation() -> Result<()> {
         e3_test_helpers::application::run_application(&inputs, params_raw, num_votes_per_voter);
 
     // Encrypt the plaintext
-    let mut decryption_shares = HashMap::new();
     let ciphertexts = outputs
         .into_iter()
         .map(|ct| ArcBytes::from_bytes((*ct).clone().to_bytes()))
         .collect::<Vec<ArcBytes>>();
 
+    let mut decryption_shares = HashMap::new();
     for party_id in 0..=threshold_m as usize {
         let (es_poly_sum, sk_poly_sum) = decryption_keys.get(&party_id).unwrap();
         let CalculateDecryptionShareResponse { d_share_poly } = calculate_decryption_share(
@@ -250,3 +250,8 @@ async fn test_trbfv_isolation() -> Result<()> {
     }
     Ok(())
 }
+// sleep(Duration::from_millis(3000)).await;
+//
+// let rest = nodes.get_history(1).await?;
+//
+// println!("rest {:?}", rest.event_types());

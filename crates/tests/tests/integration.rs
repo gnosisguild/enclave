@@ -5,11 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Actor;
-use anyhow::Result;
+use anyhow::{anyhow, bail, Context, Result};
 use e3_crypto::Cipher;
 use e3_events::{
     CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
-    PlaintextAggregated,
+    PlaintextAggregated, ThresholdShare,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
@@ -86,9 +86,6 @@ async fn test_trbfv_actor() -> Result<()> {
     // Params for BFV
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
 
-    // Common Random Polynomial for BFV
-    let _crp = create_crp(params_raw.clone(), rng.clone());
-
     // Encoded Params
     let params = ArcBytes::from_bytes(encode_bfv_params(&params_raw.clone()));
 
@@ -144,8 +141,6 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let seed = create_seed_from_u64(123);
 
-    // let crp = create_crp(params_raw.clone(), create_rng_from_seed(seed));
-
     // Calculate Error Size for E3Program (this will be done by the E3Program implementor)
     let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
         params_raw.clone(),
@@ -191,6 +186,23 @@ async fn test_trbfv_actor() -> Result<()> {
 
     assert_eq!(h.event_types(), expected);
 
+    let threshold_events: Vec<Arc<ThresholdShare>> = h
+        .iter()
+        .cloned()
+        .filter_map(|e| match e {
+            EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.share),
+            _ => None,
+        })
+        .collect();
+
+    println!(
+        "{:?}",
+        threshold_events
+            .iter()
+            .map(|d| d.party_id)
+            .collect::<Vec<u64>>()
+    );
+
     // Aggregate decryption
 
     // First we get the public key
@@ -206,6 +218,7 @@ async fn test_trbfv_actor() -> Result<()> {
     let pubkey = PublicKey::from_bytes(&pubkey_bytes, &params_raw)?;
 
     println!("Generating inputs this takes some time...");
+
     // Create the inputs
     let num_votes_per_voter = 3;
     let num_voters = 10;
@@ -245,20 +258,48 @@ async fn test_trbfv_actor() -> Result<()> {
         "DecryptionshareCreated",
         "DecryptionshareCreated",
         "DecryptionshareCreated",
+        "PlaintextAggregated",
     ];
 
     let h = nodes
         .take_history_with_timeout(1, expected.len(), Duration::from_secs(1000))
         .await?;
 
-    println!("{:?}", h.event_types());
     assert_eq!(h.event_types(), expected);
 
-    sleep(Duration::from_millis(3000)).await;
+    let Some(EnclaveEvent::PlaintextAggregated {
+        data:
+            PlaintextAggregated {
+                decrypted_output: plaintext,
+                ..
+            },
+        ..
+    }) = h.last()
+    else {
+        bail!("bad event")
+    };
 
-    let rest = nodes.get_history(1).await?;
+    let results: Vec<u64> = plaintext
+        .into_iter()
+        .map(|a| {
+            bincode::deserialize::<Vec<u64>>(&a.extract_bytes())
+                .context("Could not deserialize plaintext")
+                .map(|v| *v.first().unwrap())
+        })
+        .collect::<Result<Vec<u64>>>()?;
 
-    println!("rest {:?}", rest.event_types());
+    // Show summation result
+    let mut expected_result = vec![0u64; 3];
+    for vals in &numbers {
+        for j in 0..num_votes_per_voter {
+            expected_result[j] += vals[j];
+        }
+    }
+
+    for (i, (res, exp)) in results.iter().zip(expected_result.iter()).enumerate() {
+        println!("Tally {i} result = {res} / {exp}");
+        assert_eq!(res, exp);
+    }
 
     Ok(())
 }
