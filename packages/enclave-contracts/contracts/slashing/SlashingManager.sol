@@ -47,8 +47,6 @@ contract SlashingManager is
     bytes32 public constant VERIFIER_ROLE = keccak256("VERIFIER_ROLE");
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
-    uint256 private constant BPS_DENOMINATOR = 10_000;
-
     // ======================
     // Storage
     // ======================
@@ -143,7 +141,7 @@ contract SlashingManager is
     function getSlashProposal(
         uint256 proposalId
     ) external view returns (SlashProposal memory) {
-        if (proposalId >= totalProposals) revert InvalidProposal();
+        require(proposalId < totalProposals, InvalidProposal());
         return proposals[proposalId];
     }
 
@@ -158,12 +156,20 @@ contract SlashingManager is
     function setSlashPolicy(
         bytes32 reason,
         SlashPolicy calldata policy
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external onlyRole(GOVERNANCE_ROLE) {
         require(reason != bytes32(0), InvalidPolicy());
-        if (policy.useTicketBps && policy.ticketPenalty > BPS_DENOMINATOR)
-            revert InvalidPolicy();
-        if (policy.useLicenseBps && policy.licensePenalty > BPS_DENOMINATOR)
-            revert InvalidPolicy();
+        require(policy.enabled, InvalidPolicy());
+        require(
+            policy.ticketPenalty > 0 || policy.licensePenalty > 0,
+            InvalidPolicy()
+        );
+
+        if (policy.requiresProof) {
+            require(policy.proofVerifier != address(0), VerifierNotSet());
+            require(policy.appealWindow == 0, InvalidPolicy());
+        } else {
+            require(policy.appealWindow > 0, InvalidPolicy());
+        }
 
         slashPolicies[reason] = policy;
         emit SlashPolicyUpdated(reason, policy);
@@ -215,53 +221,30 @@ contract SlashingManager is
         notBanned(operator)
         returns (uint256 proposalId)
     {
+        require(operator != address(0), ZeroAddress());
+
         SlashPolicy storage policy = slashPolicies[reason];
         require(policy.enabled, SlashReasonDisabled());
-        require(!(policy.requiresProof && proof.length == 0), ProofRequired());
 
-        uint256 ticketAmount = 0;
-        uint256 licenseAmount = 0;
-
-        if (policy.ticketPenalty > 0) {
-            if (policy.useTicketBps) {
-                uint256 ticketBalance = bondingRegistry.getTicketBalance(
-                    operator
-                );
-                ticketAmount =
-                    (ticketBalance * policy.ticketPenalty) /
-                    BPS_DENOMINATOR;
-            } else {
-                ticketAmount = policy.ticketPenalty;
-            }
-        }
-
-        if (policy.licensePenalty > 0) {
-            if (policy.useLicenseBps) {
-                uint256 bond = bondingRegistry.getLicenseBond(operator);
-                licenseAmount =
-                    (bond * policy.licensePenalty) /
-                    BPS_DENOMINATOR;
-            } else {
-                licenseAmount = policy.licensePenalty;
-            }
-        }
-
-        proposalId = totalProposals++;
-        uint256 executableAt = block.timestamp + policy.appealWindow;
-
+        uint256 nextId = totalProposals;
         bool proofVerified = false;
+
         if (policy.requiresProof) {
+            require(proof.length != 0, ProofRequired());
             proofVerified = ISlashVerifier(policy.proofVerifier).verify(
-                proposalId,
+                nextId,
                 proof
             );
+            require(proofVerified, InvalidProof());
         }
 
-        proposals[proposalId] = SlashProposal({
+        uint256 executableAt = block.timestamp + policy.appealWindow;
+
+        proposals[nextId] = SlashProposal({
             operator: operator,
             reason: reason,
-            ticketAmount: ticketAmount,
-            licenseAmount: licenseAmount,
+            ticketAmount: policy.ticketPenalty,
+            licenseAmount: policy.licensePenalty,
             executedTicket: false,
             executedLicense: false,
             appealed: false,
@@ -275,71 +258,76 @@ contract SlashingManager is
         });
 
         emit SlashProposed(
-            proposalId,
+            nextId,
             operator,
             reason,
-            ticketAmount,
-            licenseAmount,
+            policy.ticketPenalty,
+            policy.licensePenalty,
             executableAt,
             msg.sender
         );
+
+        totalProposals = nextId + 1;
+        return nextId;
     }
 
     function executeSlash(
         uint256 proposalId
     ) external onlySlasher whenNotPaused nonReentrant {
         require(proposalId < totalProposals, InvalidProposal());
+        SlashProposal storage p = proposals[proposalId];
 
-        SlashProposal storage proposal = proposals[proposalId];
+        // Has already been executed?
+        require(!(p.executedTicket && p.executedLicense), AlreadyExecuted());
 
-        require(
-            !(proposal.appealed && !proposal.resolved),
-            AppealWindowActive()
-        );
-        require(!(proposal.resolved && proposal.approved), AlreadyExecuted());
-        require(block.timestamp >= proposal.executableAt, AppealWindowActive());
-        require(
-            !(proposal.executedTicket && proposal.executedLicense),
-            AlreadyExecuted()
-        );
+        SlashPolicy storage policy = slashPolicies[p.reason];
 
-        bool ticketExecuted = proposal.executedTicket;
-        bool licenseExecuted = proposal.executedLicense;
+        if (policy.requiresProof) {
+            // Appeal window is 0 by policy validation, so we dont check for appeal gating
+            require(p.proofVerified, InvalidProof());
+        } else {
+            // Evidence mode with appeals
+            require(block.timestamp >= p.executableAt, AppealWindowActive());
+            if (p.appealed) {
+                require(p.resolved, AppealPending());
+                require(!p.approved, AppealUpheld()); // approved = appeal upheld => cancel slash, maybe we return here instead
+            }
+        }
 
-        // Ticket Slash
-        if (!proposal.executedTicket && proposal.ticketAmount > 0) {
+        bool ticketExecuted = p.executedTicket;
+        bool licenseExecuted = p.executedLicense;
+
+        if (!p.executedTicket && p.ticketAmount > 0) {
             bondingRegistry.slashTicketBalance(
-                proposal.operator,
-                proposal.ticketAmount,
-                proposal.reason
+                p.operator,
+                p.ticketAmount,
+                p.reason
             );
-            proposal.executedTicket = true;
+            p.executedTicket = true;
             ticketExecuted = true;
         }
 
-        // License bond slash
-        if (!proposal.executedLicense && proposal.licenseAmount > 0) {
+        if (!p.executedLicense && p.licenseAmount > 0) {
             bondingRegistry.slashLicenseBond(
-                proposal.operator,
-                proposal.licenseAmount,
-                proposal.reason
+                p.operator,
+                p.licenseAmount,
+                p.reason
             );
-            proposal.executedLicense = true;
+            p.executedLicense = true;
             licenseExecuted = true;
         }
 
-        SlashPolicy storage policy = slashPolicies[proposal.reason];
         if (policy.banNode) {
-            banned[proposal.operator] = true;
-            emit NodeBanned(proposal.operator, proposal.reason, address(this));
+            banned[p.operator] = true;
+            emit NodeBanned(p.operator, p.reason, address(this));
         }
 
         emit SlashExecuted(
             proposalId,
-            proposal.operator,
-            proposal.reason,
-            proposal.ticketAmount,
-            proposal.licenseAmount,
+            p.operator,
+            p.reason,
+            p.ticketAmount,
+            p.licenseAmount,
             ticketExecuted,
             licenseExecuted
         );
@@ -354,20 +342,18 @@ contract SlashingManager is
         string calldata evidence
     ) external whenNotPaused {
         require(proposalId < totalProposals, InvalidProposal());
+        SlashProposal storage p = proposals[proposalId];
 
-        SlashProposal storage proposal = proposals[proposalId];
-        require(msg.sender == proposal.operator, Unauthorized());
-        require(!proposal.appealed, AlreadyAppealed());
-        require(block.timestamp < proposal.executableAt, AppealWindowExpired());
+        // Only the accused can appeal
+        require(msg.sender == p.operator, Unauthorized());
+        // Only in the window
+        require(block.timestamp < p.executableAt, AppealWindowExpired());
+        // Only once
+        require(!p.appealed, AlreadyAppealed());
 
-        proposal.appealed = true;
+        p.appealed = true;
 
-        emit AppealFiled(
-            proposalId,
-            proposal.operator,
-            proposal.reason,
-            evidence
-        );
+        emit AppealFiled(proposalId, p.operator, p.reason, evidence);
     }
 
     function resolveAppeal(
@@ -376,17 +362,17 @@ contract SlashingManager is
         string calldata resolution
     ) external onlyGovernance {
         require(proposalId < totalProposals, InvalidProposal());
+        SlashProposal storage p = proposals[proposalId];
 
-        SlashProposal storage proposal = proposals[proposalId];
-        require(proposal.appealed, InvalidProposal());
-        require(!proposal.resolved, AlreadyResolved());
+        require(p.appealed, InvalidProposal());
+        require(!p.resolved, AlreadyResolved());
 
-        proposal.resolved = true;
-        proposal.approved = approved;
+        p.resolved = true;
+        p.approved = approved; // true => cancel slash, false => slash stands
 
         emit AppealResolved(
             proposalId,
-            proposal.operator,
+            p.operator,
             approved,
             msg.sender,
             resolution
