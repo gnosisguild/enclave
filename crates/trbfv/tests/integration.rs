@@ -201,7 +201,12 @@ async fn test_trbfv_isolation() -> Result<()> {
         .collect::<Vec<ArcBytes>>();
 
     let mut decryption_shares = HashMap::new();
-    for party_id in 0..=threshold_m as usize {
+    // commenting out for now:
+    // for party_id in 0..=threshold_m as usize {
+    //
+    // XXX: The following fails although I am not sure it should. n = 5, m = 2
+    // This should simply get a random bunch of shares and attempt to decrypt with them
+    for party_id in [0, 3, 2] {
         let (es_poly_sum, sk_poly_sum) = decryption_keys.get(&party_id).unwrap();
         let CalculateDecryptionShareResponse { d_share_poly } = calculate_decryption_share(
             &cipher,
@@ -212,12 +217,16 @@ async fn test_trbfv_isolation() -> Result<()> {
                 ciphertexts: ciphertexts.clone(),
             },
         )?;
+
+        // store the decryption shares in a hash map indexed by party_id
         decryption_shares.insert(party_id as u64, d_share_poly);
     }
 
+    // Get a vector of the shares
     let d_share_polys: Vec<(u64, Vec<ArcBytes>)> = decryption_shares.into_iter().collect();
 
     let CalculateThresholdDecryptionResponse { plaintext } =
+        // NOTE: data prep in this function will sort the decryption shares by party_id
         calculate_threshold_decryption(CalculateThresholdDecryptionRequest {
             ciphertexts,
             trbfv_config: trbfv_config.clone(),

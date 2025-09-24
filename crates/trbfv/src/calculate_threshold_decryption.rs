@@ -54,7 +54,7 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        // Ensure the polys are ordered by party_id
+        // NOTE: Ensure the polys are ordered by party_id
         let mut ordered_polys = value.d_share_polys;
         ordered_polys.sort_by_key(|&(key, _)| key);
 
