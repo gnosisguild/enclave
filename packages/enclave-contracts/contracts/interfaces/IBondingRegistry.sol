@@ -21,7 +21,6 @@ interface IBondingRegistry {
     error CiphernodeBanned();
     error Unauthorized();
     error InsufficientBalance();
-    error ActiveCommittee();
     error NotLicensed();
     error AlreadyRegistered();
     error NotRegistered();
