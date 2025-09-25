@@ -188,7 +188,7 @@ pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
 ///
 /// ## Preconditions / Notes
 /// - Call with the raw coefficients whose magnitudes already satisfy the BIT bound
-///   (as enforced by the upstream range checks); `packer` performs the signed → unsigned
+///   (as enforced by the upstream range checks); `packer` performs the signed -> unsigned
 ///   shift internally via `v + base`.
 /// - `group >= 1` is enforced by `packing_layout::<BIT>()`.
 /// - Padding with `digit = 2^nibble_bits` encodes `zero limb` consistently.
