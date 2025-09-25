@@ -154,6 +154,15 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// # Generic Parameters
 /// * `N` - The degree of polynomials (ring dimension)
 /// * `L` - The number of CRT (Chinese Remainder Theorem) bases
+/// * `BIT_PK` - Bit-width bound per coefficient for public keys `pk0is`/`pk1is`
+/// * `BIT_CT` - Bit-width bound per coefficient for cipher texts `ct0is`/`ct1is`
+/// * `BIT_U` - Bit-width bound per coefficient for the ternary secret `u`
+/// * `BIT_E` - Bit-width bound per coefficient for error polynomials `e0`/`e1`
+/// * `BIT_K` - Bit-width bound per coefficient for the scaled message polynomial `k1`
+/// * `BIT_R1` - Bit-width bound per coefficient for randomness polynomials `r1is`
+/// * `BIT_R2` - Bit-width bound per coefficient for randomness polynomials `r2is`
+/// * `BIT_P1` - Bit-width bound per coefficient for randomness polynomials `p1is`
+/// * `BIT_P2` - Bit-width bound per coefficient for randomness polynomials `p2is`
 ///
 /// # Circuit Inputs
 /// * `pk0is`, `pk1is` - Public key polynomials
@@ -163,7 +172,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// * `k1` - Scaled message polynomial
 /// * `r1is`, `r2is` - Randomness polynomials for each i-th CRT basis.
 /// * `p1is`, `p2is` - Randomness polynomials for each i-th CRT basis.
-pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
+pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     params: Params<N, L>,
     pk0is: [Polynomial<N>; L],
@@ -180,7 +189,7 @@ pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_U: u32, let BI
     p2is: [Polynomial<N - 1>; L],
 }
 
-impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
+impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
     /// Creates a new Greco instance.
     ///
     /// This constructor initializes all the polynomials and parameters needed for
@@ -217,7 +226,7 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_U: u32, let BIT_E: u32, le
         r2is: [Polynomial<N - 1>; L],
         p1is: [Polynomial<2 * N - 1>; L],
         p2is: [Polynomial<N - 1>; L],
-    ) -> Greco<N, L, BIT_PK, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
+    ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
         Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, k1, r1is, r2is, p1is, p2is }
     }
 
@@ -228,20 +237,16 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_U: u32, let BIT_E: u32, le
     /// The coefficients are arranged in a specific order to ensure deterministic
     /// challenge generation.
     ///
-    /// # Generic Parameters
-    /// * `SIZE` - The total size of the flattened array: (10 * N - 4) * L + 4 * N
-    ///
     /// # Returns
     /// An array containing all polynomials coefficients in flattened form
     fn payload(self) -> Vec<Field> {
         let mut inputs = Vec::new();
 
         // Flatten public key and ciphertext polynomials first (public inputs)
-
         inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
         inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.ct0is);
-        inputs = flatten::<_, _, BIT_PK>(inputs, self.ct1is);
+        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0is);
+        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1is);
 
         // Flatten common polynomials (used across all CRT bases)
         inputs = flatten::<_, _, BIT_E>(inputs, [self.e0]);

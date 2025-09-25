@@ -98,80 +98,137 @@ impl<let N: u32> Polynomial<N> {
     }
 }
 
-/// Flatten `L` polynomials (each `Polynomial<A>`) into a linear Vec<Field> of packed carriers.
-/// - Uses the same hex-aligned packing as `packer::<A, BIT>`:
-///   `nibble_bits = ceil_to_nibble(BIT)`, `limb_bits = nibble_bits + 4`,
-///   `group = 254 / limb_bits` carriers per chunk.
-/// - Preserves deterministic order: iterate polynomials in `j`, then append all their carriers.
+/// Compute hex-aligned packing parameters for a given `BIT`.
+///
+/// # Purpose
+/// Returns `(nibble_bits, group)` for use by packer/flatten so layout stays consistent.
+/// - `nibble_bits`: ceil (`BIT`) to the next multiple of 4 (nibble alignment).
+///   - Examples: `BIT = 7 -> 8`, `BIT = 8 -> 8`, `BIT = 9 -> 12`, `BIT = 10 -> 12`, `BIT = 11 -> 12`,
+///     `BIT=16 -> 16`, `BIT = 17 -> 20`.
+/// - `group`: max number of encoded limbs that fit in one BN254 field element,
+///            when each limb uses an extra 4 bits (see below).
+///
+/// # Rationale
+/// - We align to nibbles so powers of two are hex-friendly and deterministic.
+/// - We reserve one extra nibble (4 bits) per stored value to lift signed
+///   coefficients into the non-negative range (e.g., store `v + 2^nibble_bits`),
+///   which implies a radix of `2^(nibble_bits + 4)`.
+///
+/// # Safety
+/// - Asserts `nibble_bits + 4 <= 254` to avoid mod-p wrap on BN254.
+/// - Ensures at least one limb fits: `group >= 1`.
+fn packing_layout<let BIT: u32>() -> (u32, u32) {
+    // Ceil BIT up to the next multiple of 4 (nibble alignment).
+    let nibble_bits = ((BIT + 3) / 4) * 4;
+
+    // Each stored limb uses an extra nibble because negative coefficients
+    // will be shifted to positive, so radix = 2^(nibble_bits+4).
+    assert(nibble_bits + 4 <= 254);
+
+    // Maximum limbs that fit in one BN254 element without wrap.
+    let group = 254 / (nibble_bits + 4);
+    assert(group >= 1);
+    (nibble_bits, group)
+}
+
+/// Flatten `L` polynomials into a single linear stream of packed `Field` carriers.
+///
+/// ## What this does
+/// - For each CRT limb `j` in `0..L`, it packs the coefficients of `poly[j]`
+///   with `packer::<A, BIT>` and appends all resulting carriers to `inputs`.
+/// - The packing layout (nibble-aligned width and `group` size) is taken from
+///   `packing_layout::<BIT>()` and must match what `packer` uses.
+///
+/// ## Determinism & order
+/// - Preserves a stable order: iterate `j = 0..L`, then for each `j` append
+///   carriers in ascending chunk index `i = 0..num_chunks`.
+/// - This ensures transcripts remain deterministic across runs.
+///
+/// ## Generics
+/// - `A`: polynomial degree (number of coefficients per polynomial).
+/// - `L`: number of CRT bases (polynomials).
+/// - `BIT`: per-coefficient bit bound used by the packing layout (compile-time).
+///
+/// ## Preconditions
+/// - `packing_layout::<BIT>()` must yield `group >= 1`.
+/// - `packer::<A, BIT>` must produce exactly `num_chunks = ceil(A / group)` carriers.
+///
+/// ## Returns
+/// - The same `inputs` vector, extended with all carriers in deterministic order.
 pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
     mut inputs: Vec<Field>,
     poly: [Polynomial<A>; L],
 ) -> Vec<Field> {
-    // Compute packing layout (must mirror `packer`).
-    let nibble_bits = ((BIT + 3) / 4) * 4; // ceil to multiple of 4
-    let limb_bits = nibble_bits + 4; // +1 nibble offset
-    assert(limb_bits <= 254);
-
-    let group = 254 / limb_bits; // max limbs per field
-    assert(group >= 1);
-
-    // Carriers produced per polynomial.
-    let num_chunks = (A + group - 1) / group;
-
-    // Pack each polynomial, then append all its carriers in order.
     for j in 0..L {
+        // Pack its A coefficients into `num_chunks` carriers using the same BIT layout.
         let packed = packer::<A, BIT>(poly[j].coefficients);
-        // `packed.len()` == `num_chunks`; push explicitly to be clear/stable.
-        for i in 0..num_chunks {
+
+        // Append carriers in-order to `inputs` to keep a stable transcript layout.
+        // Assumes `packed.get(i)` is defined for `i < num_chunks`.
+        for i in 0..packed.len() {
             inputs.push(packed.get(i));
         }
     }
 
+    // Return the extended input stream.
     inputs
 }
 
-/// Pack `values` into as few `Field` carriers as possible (hex-aligned).
-/// - `BIT`: bit width of each value (before offset). We round it up to a nibble.
-/// - Limb = `v + 2^nibble_bits` (lifts negatives); radix per limb = `2^(nibble_bits+4)`.
-/// - Packs `group = 254 / (nibble_bits+4)` values per carrier, big-endian; pads tail with `2^nibble_bits`.
+/// Pack `A` values into a `Vec<Field>` of carriers using the shared hex-aligned layout.
+///
+/// ## What this does
+/// - Computes `(nibble_bits, group)` via `packing_layout::<BIT>()`.
+/// - Encodes each value as a limb `digit = v + 2^nibble_bits` and concatenates
+///   limbs in base `radix = 2^(nibble_bits + 4)` (one extra nibble of headroom).
+/// - Packs up to `group` limbs per carrier (fits within BN254 254-bit capacity).
+/// - Pads the last, partial carrier with `digit = 2^nibble_bits` to keep a stable layout.
+///
+/// ## Determinism & order
+/// - Processes values in increasing index order and emits carriers in chunk order
+///   (`chunk = 0..num_chunks`). Padding is deterministic.
+///
+/// ## Generics
+/// - `A`: number of input values.
+/// - `BIT`: per-value bit bound; rounded up to `nibble_bits` by `packing_layout`.
+///
+/// ## Preconditions / Notes
+/// - Caller should ensure each `v` fits the bound: `v < 2^nibble_bits` (after any
+///   signed -> unsigned shift done by the caller).
+/// - `group >= 1` is enforced by `packing_layout::<BIT>()`.
+/// - Padding with `digit = 2^nibble_bits` encodes `zero limb` consistently.
+///
+/// ## Returns
+/// - A `Vec<Field>` where each element is a concatenation of up to `group` limbs,
+///   suitable for hashing or transcript I/O.
 pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
-    assert(BIT >= 1);
+    // Layout parameters: nibble-aligned width and limbs-per-carrier group size.
+    let (nibble_bits, group) = packing_layout::<BIT>();
 
-    // Align to hex digits (4 bits) and add +1 nibble headroom.
-    let nibble_bits = ((BIT + 3) / 4) * 4; // ceil_to_nibble(BIT)
-    let limb_bits = nibble_bits + 4; // limb width used for packing
-    assert(limb_bits <= 254);
-
-    // Max limbs per 254-bit field element.
-    let group = 254 / limb_bits;
-    assert(group >= 1);
-
-    // Offset and radix for limb concatenation.
+    // Limb offset/tag and radix:
+    //   digit = v + 2^nibble_bits
+    //   acc   = acc * 2^(nibble_bits+4) + digit
     let base = 2.pow_32(nibble_bits as Field); // 2^nibble_bits
-    let radix = 2.pow_32(limb_bits as Field); // 2^(nibble_bits+4)
+    let radix = 2.pow_32((nibble_bits + 4) as Field); // 2^(nibble_bits + 4)
 
-    // Number of carriers needed.
+    // Number of chunks to emit: ceil(A / group).
     let num_chunks = (A + group - 1) / group;
     let mut out = Vec::new();
 
     // Process in fixed-size chunks of `group` limbs.
     for chunk in 0..num_chunks {
-        // How many real values to take in this chunk.
-        let remain = if A > chunk * group {
-            A - chunk * group
-        } else {
-            0
-        };
+        // How many real values go into this chunk.
+        let remain = A - (chunk * group);
         let take = if remain < group { remain } else { group };
 
-        // Build one carrier (big-endian): acc = acc * radix + (v + base)
+        // Build one carrier (big-endian concatenation in `radix`).
         let mut acc = 0;
         for i in 0..take {
             let v = values[chunk * group + i];
+            // Optional (caller may have checked already): assert(v < base);
             acc = acc * radix + (v + base);
         }
 
-        // Pad remaining limbs with `base` (encodes v=0) to keep layout deterministic.
+        // Pad remaining limb slots with the canonical zero-limb `digit = base`.
         for _ in 0..(group - take) {
             acc = acc * radix + base;
         }
