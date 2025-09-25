@@ -149,10 +149,6 @@ fn packing_layout<let BIT: u32>() -> (u32, u32) {
 /// - `L`: number of CRT bases (polynomials).
 /// - `BIT`: per-coefficient bit bound used by the packing layout (compile-time).
 ///
-/// ## Preconditions
-/// - `packing_layout::<BIT>()` must yield `group >= 1`.
-/// - `packer::<A, BIT>` must produce exactly `num_chunks = ceil(A / group)` carriers.
-///
 /// ## Returns
 /// - The same `inputs` vector, extended with all carriers in deterministic order.
 pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
@@ -164,7 +160,6 @@ pub fn flatten<let A: u32, let L: u32, let BIT: u32>(
         let packed = packer::<A, BIT>(poly[j].coefficients);
 
         // Append carriers in-order to `inputs` to keep a stable transcript layout.
-        // Assumes `packed.get(i)` is defined for `i < num_chunks`.
         for i in 0..packed.len() {
             inputs.push(packed.get(i));
         }
@@ -204,9 +199,6 @@ pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
     // Layout parameters: nibble-aligned width and limbs-per-carrier group size.
     let (nibble_bits, group) = packing_layout::<BIT>();
 
-    // Limb offset/tag and radix:
-    //   digit = v + 2^nibble_bits
-    //   acc   = acc * 2^(nibble_bits+4) + digit
     let base = 2.pow_32(nibble_bits as Field); // 2^nibble_bits
     let radix = 2.pow_32((nibble_bits + 4) as Field); // 2^(nibble_bits + 4)
 
@@ -220,11 +212,10 @@ pub fn packer<let A: u32, let BIT: u32>(values: [Field; A]) -> Vec<Field> {
         let remain = A - (chunk * group);
         let take = if remain < group { remain } else { group };
 
-        // Build one carrier (big-endian concatenation in `radix`).
+        // Build field element accumulator (big-endian concatenation in `radix`).
         let mut acc = 0;
         for i in 0..take {
             let v = values[chunk * group + i];
-            // Optional (caller may have checked already): assert(v < base);
             acc = acc * radix + (v + base);
         }
 
