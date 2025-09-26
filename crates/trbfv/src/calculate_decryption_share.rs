@@ -4,9 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 
-use crate::helpers::{try_poly_from_sensitive_bytes, try_polys_from_sensitive_bytes_vec};
+use crate::helpers::{
+    print_poly, try_poly_from_sensitive_bytes, try_polys_from_sensitive_bytes_vec,
+};
 /// This module defines event payloads that will generate a decryption share for the given ciphertext for this node
 use crate::TrBFVConfig;
 use anyhow::*;
@@ -20,6 +23,8 @@ use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CalculateDecryptionShareRequest {
+    /// Name to identify the job.
+    pub name: String,
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// One or more Ciphertexts to decrypt
@@ -31,6 +36,8 @@ pub struct CalculateDecryptionShareRequest {
 }
 
 struct InnerRequest {
+    /// Name to identify the job.
+    pub name: String,
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
     /// One or more Ciphertexts to decrypt
@@ -66,6 +73,7 @@ impl TryFrom<(&Cipher, CalculateDecryptionShareRequest)> for InnerRequest {
         )?;
 
         Ok(InnerRequest {
+            name: value.1.name,
             sk_poly_sum,
             es_poly_sum,
             ciphertexts,
@@ -86,6 +94,12 @@ struct InnerResponse {
 
 impl From<InnerResponse> for CalculateDecryptionShareResponse {
     fn from(value: InnerResponse) -> Self {
+        println!("CalculateDecryptionShareResponse:");
+        value
+            .d_share_poly
+            .iter()
+            .for_each(|pol| print_poly(" ->", pol));
+
         CalculateDecryptionShareResponse {
             d_share_poly: value
                 .d_share_poly
@@ -100,7 +114,7 @@ pub fn calculate_decryption_share(
     cipher: &Cipher,
     req: CalculateDecryptionShareRequest,
 ) -> Result<CalculateDecryptionShareResponse> {
-    info!("Calculating decryption share...");
+    info!("Calculating decryption share: `{}`...", req.name);
     let req: InnerRequest = (cipher, req).try_into()?;
 
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
@@ -115,7 +129,7 @@ pub fn calculate_decryption_share(
         .into_iter()
         .enumerate()
         .map(|(index, ciphertext)| {
-            let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
+            let share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             info!("Create decryption share for ct index {}...", index);
             share_manager
                 .decryption_share(
@@ -127,5 +141,6 @@ pub fn calculate_decryption_share(
         })
         .collect::<Result<Vec<Poly>>>()?;
     info!("Returning successful result...");
+
     Ok(InnerResponse { d_share_poly }.into())
 }

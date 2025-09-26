@@ -511,9 +511,9 @@ impl ThresholdKeyshare {
         let state = self.state.get().ok_or(anyhow!("State not set."))?;
         let decrypting: Decrypting = state.clone().try_into()?;
         let trbfv_config = state.get_trbfv_config();
-
         let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(
             CalculateDecryptionShareRequest {
+                name: format!("party_id({})", state.party_id),
                 ciphertexts: ciphertext_output,
                 sk_poly_sum: decrypting.sk_poly_sum,
                 es_poly_sum: decrypting.es_poly_sum,

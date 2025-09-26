@@ -3,7 +3,11 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use e3_bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
@@ -36,6 +40,7 @@ use fhe::{
     bfv::PublicKey,
     mbfv::{AggregateIter, PublicKeyShare},
 };
+use fhe_math::rq::Poly;
 use fhe_traits::Serialize;
 use num_bigint::BigUint;
 
@@ -183,7 +188,7 @@ async fn test_trbfv_isolation() -> Result<()> {
 
     // Create the inputs
     let num_votes_per_voter = 3;
-    let num_voters = 300;
+    let num_voters = 30;
     let (inputs, numbers) = e3_test_helpers::application::generate_ciphertexts(
         &pubkey,
         params_raw.clone(),
@@ -201,11 +206,14 @@ async fn test_trbfv_isolation() -> Result<()> {
         .collect::<Vec<ArcBytes>>();
 
     let mut decryption_shares = HashMap::new();
-    for party_id in 0..=threshold_m as usize {
+    // for party_id in 0..=threshold_m as usize {
+    for party_id in [1, 4, 2] {
         let (es_poly_sum, sk_poly_sum) = decryption_keys.get(&party_id).unwrap();
+        println!("calculate_decryption_share for party_id={}", party_id);
         let CalculateDecryptionShareResponse { d_share_poly } = calculate_decryption_share(
             &cipher,
             CalculateDecryptionShareRequest {
+                name: format!("party_id({})", party_id),
                 sk_poly_sum: sk_poly_sum.clone(),
                 trbfv_config: trbfv_config.clone(),
                 es_poly_sum: es_poly_sum.clone(),
@@ -259,3 +267,5 @@ async fn test_trbfv_isolation() -> Result<()> {
 // let rest = nodes.get_history(1).await?;
 //
 // println!("rest {:?}", rest.event_types());
+
+// TMP using this to get a hash for the poly for tracing
