@@ -201,6 +201,19 @@ export class EnclaveSDK {
   }
 
   /**
+   * Get the public key for an E3 computation
+   * @param e3Id - The ID of the E3 computation
+   * @returns The public key
+   */
+  public async getE3PublicKey(e3Id: bigint): Promise<`0x${string}`> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    return this.contractClient.getE3PublicKey(e3Id);
+  }
+
+  /**
    * Activate an E3 computation
    */
   public async activateE3(

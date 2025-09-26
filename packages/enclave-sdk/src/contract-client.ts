@@ -295,6 +295,31 @@ export class ContractClient {
   }
 
   /**
+   * Get the public key for an E3 computation
+   * Based on the contract: committeePublicKey(uint256 e3Id) returns (bytes32 publicKeyHash)
+   * @param e3Id 
+   * @returns The public key
+   */
+  public async getE3PublicKey(e3Id: bigint): Promise<`0x${string}`> {
+    if (!this.contractInfo) {
+      await this.initialize();
+    }
+
+    try {
+      const result: `0x${string}` = await this.publicClient.readContract({
+        address: this.addresses.ciphernodeRegistry,
+        abi: CiphernodeRegistryOwnable__factory.abi,
+        functionName: "committeePublicKey",
+        args: [e3Id],
+      });
+
+      return result;
+    } catch (error) {
+      throw new SDKError(`Failed to get E3 public key: ${error}`, "GET_E3_PUBLIC_KEY_FAILED");
+    }
+  }
+
+  /**
    * Estimate gas for a transaction
    */
   public async estimateGas(
