@@ -89,8 +89,9 @@ pub struct ComputeProviderParams {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CronRequestE3 {
+pub struct RoundRequest {
     pub cron_api_key: String,
+    pub token_address: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -165,6 +166,7 @@ pub struct E3Crisp {
     pub status: String,
     pub votes_option_1: u64,
     pub votes_option_2: u64,
+    pub token_holder_hashes: Vec<String>,
 }
 
 impl From<E3> for WebResultRequest {
@@ -197,4 +199,19 @@ impl From<E3> for E3StateLite {
             emojis: e3.emojis,
         }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EtherscanResponse {
+    pub status: String,
+    pub message: String,
+    pub result: Vec<TokenHolderData>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TokenHolderData {
+    #[serde(rename = "TokenHolderAddress")]
+    pub address: String,
+    #[serde(rename = "TokenHolderQuantity")]
+    pub quantity: String,
 }
