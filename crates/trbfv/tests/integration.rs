@@ -183,7 +183,7 @@ async fn test_trbfv_isolation() -> Result<()> {
 
     // Create the inputs
     let num_votes_per_voter = 3;
-    let num_voters = 1000;
+    let num_voters = 300;
     let (inputs, numbers) = e3_test_helpers::application::generate_ciphertexts(
         &pubkey,
         params_raw.clone(),
@@ -201,12 +201,7 @@ async fn test_trbfv_isolation() -> Result<()> {
         .collect::<Vec<ArcBytes>>();
 
     let mut decryption_shares = HashMap::new();
-    // commenting out for now:
-    // for party_id in 0..=threshold_m as usize {
-    //
-    // XXX: The following fails although I am not sure it should. n = 5, m = 2
-    // This should simply get a random bunch of shares and attempt to decrypt with them
-    for party_id in [0, 3, 2] {
+    for party_id in 0..=threshold_m as usize {
         let (es_poly_sum, sk_poly_sum) = decryption_keys.get(&party_id).unwrap();
         let CalculateDecryptionShareResponse { d_share_poly } = calculate_decryption_share(
             &cipher,

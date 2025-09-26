@@ -23,6 +23,7 @@ pub fn generate_ciphertexts(
 ) -> (Vec<Vec<Ciphertext>>, Vec<Vec<u64>>) {
     let dist = Uniform::new_inclusive(0, 1);
     let mut rng = thread_rng();
+    println!("generating ciphertexts...");
     let numbers: Vec<Vec<u64>> = (0..num_voters)
         .map(|_| {
             (0..num_votes_per_voter)
@@ -30,19 +31,24 @@ pub fn generate_ciphertexts(
                 .collect()
         })
         .collect();
-
+    println!("Encrypting ciphertexts...");
+    let nl = numbers.len();
     let ciphertexts: Vec<Vec<Ciphertext>> = numbers
         .iter()
-        .map(|vals| {
+        .enumerate()
+        .map(|(ni, vals)| {
             let mut rng = thread_rng();
             vals.iter()
-                .map(|&val| {
+                .enumerate()
+                .map(|(i, &val)| {
+                    println!("Encrypting {}/{}/{}", i, ni, nl);
                     let pt = Plaintext::try_encode(&[val], Encoding::poly(), &params).unwrap();
                     pk.try_encrypt(&pt, &mut rng).unwrap()
                 })
                 .collect()
         })
         .collect();
+    println!("Finished encryption!");
     (ciphertexts, numbers)
 }
 
@@ -52,6 +58,7 @@ pub fn run_application(
     params: Arc<bfv::BfvParameters>,
     num_votes_per_voter: usize,
 ) -> Vec<Arc<Ciphertext>> {
+    println!("Running application");
     if ciphertexts.is_empty() {
         return Vec::new();
     }
@@ -65,6 +72,5 @@ pub fn run_application(
             sums[j] += ciphertext;
         }
     }
-
     sums.into_iter().map(Arc::new).collect()
 }

@@ -17,13 +17,20 @@ use fhe_traits::DeserializeParametrized;
 use fhe_traits::FheDecoder;
 use tracing::info;
 
+/// Shamir shares for a single party to decrypt a batch of ciphertexts.
+/// shares[i] is the decryption share that corresponds to ciphertext[i] at the same index.
+type SinglePartysDecryptionShares = Vec<ArcBytes>;
+
+/// Decoded shamir shares for decrypting a single ciphertext from all parties
+/// shares[i] is a single parties share for a single ciphertext
+type AllPartysDecodedShares = Vec<Poly>;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct CalculateThresholdDecryptionRequest {
     /// TrBFV configuration
     pub trbfv_config: TrBFVConfig,
-    /// Qurum of decryption share arrays. Each array is a single ciphertext element in the
-    /// ciphertexts vector
-    pub d_share_polys: Vec<(PartyId, Vec<ArcBytes>)>,
+    /// Each party's ID (0 based) unordered and their Shamir shares for decrypting the ciphertext batch.
+    pub d_share_polys: Vec<(PartyId, SinglePartysDecryptionShares)>,
     /// A vector of Ciphertexts to decrypt
     pub ciphertexts: Vec<ArcBytes>,
 }
@@ -31,10 +38,14 @@ pub struct CalculateThresholdDecryptionRequest {
 struct InnerRequest {
     /// TrBFV configuration
     trbfv_config: TrBFVConfig,
-    /// Qurum of decryption share arrays 2D array indexed by [ciphpernode quorum index] -> [ciphertext element]
-    d_share_polys: Vec<Vec<Poly>>,
+    /// Transposed decryption shares organized by ciphertext index.
+    /// Eg. `d_share_polys[i]` contains all parties' shares for decrypting ciphertext `i`.
+    d_share_polys: Vec<AllPartysDecodedShares>,
     /// A vector of Ciphertexts to decrypt
     ciphertexts: Vec<Ciphertext>,
+    /// A list of party_ids that corresponds to the index order in the d_share_polys matrix. Note
+    /// this is still 0 based at this stage.
+    reconstructing_parties: Vec<usize>,
 }
 
 impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
@@ -58,16 +69,21 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
         let mut ordered_polys = value.d_share_polys;
         ordered_polys.sort_by_key(|&(key, _)| key);
 
-        let d_share_polys = ordered_polys
-            .into_iter()
-            .map(|(_, vec_of_bytes)| -> Result<_> {
-                vec_of_bytes
-                    .iter()
-                    .map(|bytes| try_poly_from_bytes(&bytes, &params))
-                    .collect()
-            })
-            .collect::<Result<Vec<_>>>()?;
-        // Now this is indexed by ciphertext
+        let capacity = ordered_polys.len();
+        let mut d_share_polys = Vec::with_capacity(capacity);
+        let mut reconstructing_parties = Vec::with_capacity(capacity);
+
+        for (party_id, vec_of_bytes) in ordered_polys {
+            let polys: Vec<Poly> = vec_of_bytes
+                .iter()
+                .map(|bytes| try_poly_from_bytes(&bytes, &params))
+                .collect::<Result<Vec<_>>>()?;
+
+            d_share_polys.push(polys);
+            reconstructing_parties.push(party_id as usize);
+        }
+
+        // Now this is indexed by ciphertext -> ciphernode
         let d_share_polys = transpose(d_share_polys);
 
         // For each d_share_poly in d_share_polys assemble
@@ -75,6 +91,7 @@ impl TryFrom<CalculateThresholdDecryptionRequest> for InnerRequest {
             d_share_polys,
             ciphertexts,
             trbfv_config,
+            reconstructing_parties,
         })
     }
 }
@@ -116,8 +133,13 @@ pub fn calculate_threshold_decryption(
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
-    let d_share_polys = req.d_share_polys.clone();
+    let d_share_polys = req.d_share_polys;
 
+    // NOTE: party_ids must be 1 based not 0 based
+    let reconstructing_parties: Vec<usize> =
+        req.reconstructing_parties.iter().map(|n| n + 1).collect();
+
+    info!("Decryption share party_ids: {:?}", reconstructing_parties);
     let plaintext = req
         .ciphertexts
         .into_iter()
@@ -128,12 +150,16 @@ pub fn calculate_threshold_decryption(
                 index
             );
 
-            let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
+            let share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             let Some(threshold_shares) = d_share_polys.get(index) else {
                 bail!("Poly not found for index {}", index)
             };
             share_manager
-                .decrypt_from_shares(threshold_shares.clone(), Arc::new(ciphertext))
+                .decrypt_from_shares(
+                    threshold_shares.clone(),
+                    reconstructing_parties.clone(),
+                    Arc::new(ciphertext),
+                )
                 .context("Could not decrypt ciphertext")
         })
         .collect::<Result<Vec<_>>>()?;

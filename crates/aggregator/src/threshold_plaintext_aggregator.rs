@@ -151,23 +151,17 @@ impl ThresholdPlaintextAggregator {
 
     pub fn add_share(&mut self, party_id: u64, share: Vec<ArcBytes>) -> Result<()> {
         self.state.try_mutate(|state| {
-            info!("Adding share for party_id={}", party_id);
             let current: Collecting = state.clone().try_into()?;
+            info!("Adding share for party_id={}", party_id);
             let ciphertext_output = current.ciphertext_output;
             let threshold_m = current.threshold_m;
             let threshold_n = current.threshold_n;
             let params = current.params.clone();
             let mut shares = current.shares;
             {
-                info!("pushing to share collection");
+                info!("pushing to share collection {} {:?}", party_id, share);
                 shares.insert(party_id, share);
             }
-
-            info!(
-                "Shares len = {} | threshold_m = {}",
-                shares.len(),
-                threshold_m
-            );
 
             if shares.len() <= threshold_m as usize {
                 return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {
@@ -254,7 +248,7 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
     type Result = ResponseActFuture<Self, Result<()>>;
 
     fn handle(&mut self, event: DecryptionshareCreated, _: &mut Self::Context) -> Self::Result {
-        info!("Processing DecryptionShareCreated...");
+        info!(event=?event, "Processing DecryptionShareCreated...");
         let Some(ThresholdPlaintextAggregatorState::Collecting(Collecting {
             threshold_n,
             seed,

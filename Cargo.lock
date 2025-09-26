@@ -2860,7 +2860,7 @@ dependencies = [
 [[package]]
 name = "e3-greco-generator"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/greco?branch=ry%2Fallow-for-deterministic-rng#8c74a6e4c0bc9bd2f3cbf0e4e37d71c1dab20ba9"
+source = "git+https://github.com/gnosisguild/greco?branch=trbfv_random_parties_reconstructing#493080bdda0ea7788e556c8b5845fa8e9fb405fc"
 dependencies = [
  "blake3",
  "clap",
@@ -2881,7 +2881,7 @@ dependencies = [
 [[package]]
 name = "e3-greco-polynomial"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/greco?branch=ry%2Fallow-for-deterministic-rng#8c74a6e4c0bc9bd2f3cbf0e4e37d71c1dab20ba9"
+source = "git+https://github.com/gnosisguild/greco?branch=trbfv_random_parties_reconstructing#493080bdda0ea7788e556c8b5845fa8e9fb405fc"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -3386,7 +3386,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#135e484b7cbd4cc75f389e59d91f9b914144994f"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=trbfv_random_parties_reconstructing#1049dc51e10f29641c07d12f43a037b0cd2eba9a"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -3411,7 +3411,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#135e484b7cbd4cc75f389e59d91f9b914144994f"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=trbfv_random_parties_reconstructing#1049dc51e10f29641c07d12f43a037b0cd2eba9a"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3433,7 +3433,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#135e484b7cbd4cc75f389e59d91f9b914144994f"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=trbfv_random_parties_reconstructing#1049dc51e10f29641c07d12f43a037b0cd2eba9a"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3441,7 +3441,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=ry%2Fallow-for-deterministic-rng#135e484b7cbd4cc75f389e59d91f9b914144994f"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=trbfv_random_parties_reconstructing#1049dc51e10f29641c07d12f43a037b0cd2eba9a"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",

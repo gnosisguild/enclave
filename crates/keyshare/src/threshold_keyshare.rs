@@ -550,7 +550,7 @@ impl ThresholdKeyshare {
     pub fn try_mark_decryption_share_sent(&mut self) -> Result<()> {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
-            info!("Decfryption share sending process is complete");
+            info!("Decryption share sending process is complete");
 
             s.new_state(K::Completed)
         })

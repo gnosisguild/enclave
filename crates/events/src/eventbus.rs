@@ -375,8 +375,10 @@ impl<E: Event> HistoryCollector<E> {
         for pending in &mut self.pending_takes {
             if pending.collected.len() < pending.count {
                 info!(
-                    "Received event {}. Pushing to pending take...",
-                    event.event_type()
+                    "Received event {}. Pushing to pending take {}/{}...",
+                    event.event_type(),
+                    pending.collected.len() + 1,
+                    pending.count
                 );
                 pending.collected.push(event);
                 self.try_fulfill_pending_takes();

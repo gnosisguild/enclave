@@ -104,14 +104,31 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let nodes = CiphernodeSystemBuilder::new()
         // Adding 7 total nodes of which we are only choosing 5 for the committee
-        .add_group(7, || async {
+        .add_group(1, || async {
+            let addr = rand_eth_addr(&rng);
+            println!("Building collector {}!", addr);
             CiphernodeBuilder::new(rng.clone(), cipher.clone())
-                .with_address(&rand_eth_addr(&rng))
+                .with_address(&addr)
                 .with_injected_multithread(multithread.clone())
                 .with_history()
                 .with_trbfv()
                 .with_pubkey_aggregation()
                 .with_threshold_plaintext_aggregation()
+                .with_source_bus(&bus)
+                .with_logging()
+                .build()
+                .await
+        })
+        .add_group(6, || async {
+            let addr = rand_eth_addr(&rng);
+            println!("Building normal {}", &addr);
+            CiphernodeBuilder::new(rng.clone(), cipher.clone())
+                .with_address(&addr)
+                .with_injected_multithread(multithread.clone())
+                // .with_history()
+                .with_trbfv()
+                // .with_pubkey_aggregation()
+                // .with_threshold_plaintext_aggregation()
                 .with_source_bus(&bus)
                 .with_logging()
                 .build()
@@ -163,9 +180,11 @@ async fn test_trbfv_actor() -> Result<()> {
     let event = EnclaveEvent::from(e3_requested);
 
     bus.do_send(event);
+
+    // NOTE: We are using node 0 as the aggregator but it is not selected in this seed which is why
+    // there is no CiphernodeSelected event
     let expected = vec![
         "E3Requested",
-        "CiphernodeSelected",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
         "ThresholdShareCreated",
@@ -179,9 +198,8 @@ async fn test_trbfv_actor() -> Result<()> {
         "PublicKeyAggregated",
     ];
 
-    // node #1 is selected so lets grab all events
     let h = nodes
-        .take_history_with_timeout(1, expected.len(), Duration::from_secs(1000))
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
 
     assert_eq!(h.event_types(), expected);
@@ -262,7 +280,7 @@ async fn test_trbfv_actor() -> Result<()> {
     ];
 
     let h = nodes
-        .take_history_with_timeout(1, expected.len(), Duration::from_secs(1000))
+        .take_history_with_timeout(0, expected.len(), Duration::from_secs(1000))
         .await?;
 
     assert_eq!(h.event_types(), expected);
