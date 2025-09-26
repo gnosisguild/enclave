@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity ^0.8.27;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -17,12 +21,7 @@ import { Nonces } from "@openzeppelin/contracts/utils/Nonces.sol";
 
 /**
  * @title EnclaveTicketToken (ETK)
- * @notice Non-transferable ERC20Votes wrapper over USDC for operator staking
- * @dev Features:
- *      - Only BondingRegistry can deposit/withdraw
- *      - Auto self-delegation on first mint for voting
- *      - Slashing burns shares and sends USDC to treasury
- *      - Non-transferable between users
+ * @notice Non-transferable non-delegatable ERC20Votes wrapper over USDC for operator staking
  */
 contract EnclaveTicketToken is
     ERC20,
@@ -32,7 +31,6 @@ contract EnclaveTicketToken is
     ERC20Wrapper
 {
     address public registry;
-    address public slashedFundsTreasury;
 
     error NotRegistry();
     error TransferNotAllowed();
@@ -47,7 +45,6 @@ contract EnclaveTicketToken is
     constructor(
         IERC20 underlyingUSDC,
         address registry_,
-        address treasury_,
         address initialOwner_
     )
         ERC20("Enclave Ticket Token", "ETK")
@@ -56,19 +53,12 @@ contract EnclaveTicketToken is
         Ownable(initialOwner_)
     {
         require(registry_ != address(0), ZeroAddress());
-        require(treasury_ != address(0), ZeroAddress());
         registry = registry_;
-        slashedFundsTreasury = treasury_;
     }
 
     function setRegistry(address newRegistry) external onlyOwner {
         require(newRegistry != address(0), ZeroAddress());
         registry = newRegistry;
-    }
-
-    function setTreasury(address newTreasury) external onlyOwner {
-        require(newTreasury != address(0), ZeroAddress());
-        slashedFundsTreasury = newTreasury;
     }
 
     /**
@@ -122,11 +112,11 @@ contract EnclaveTicketToken is
     }
 
     /**
-     * @notice Lock ticket tokens for exit
-     * @param operator Address to lock from
-     * @param amount Amount of ticket tokens to lock
+     * @notice Burn ticket tokens
+     * @param operator Address to burn from
+     * @param amount Amount of ticket tokens to burn
      */
-    function lockForExit(
+    function burnTickets(
         address operator,
         uint256 amount
     ) external onlyRegistry {
@@ -140,15 +130,6 @@ contract EnclaveTicketToken is
      */
     function payout(address to, uint256 amount) external onlyRegistry {
         IERC20(address(underlying())).transfer(to, amount);
-    }
-
-    /**
-     * @notice Slash ticket tokens by burning shares and transferring USDC to treasury
-     * @param operator Operator to slash
-     * @param amount Amount to slash
-     */
-    function slash(address operator, uint256 amount) external onlyRegistry {
-        _burn(operator, amount);
     }
 
     /**
@@ -169,7 +150,6 @@ contract EnclaveTicketToken is
      * @notice Delegate voting power to an address.
      * @dev This function is locked and cannot be used.
      */
-
     function delegate(address) public pure override {
         revert DelegationLocked();
     }
@@ -178,7 +158,6 @@ contract EnclaveTicketToken is
      * @notice Delegate voting power to an address using a signature.
      * @dev This function is locked and cannot be used.
      */
-
     function delegateBySig(
         address,
         uint256,

@@ -69,6 +69,9 @@ contract BondingRegistry is
     /// @notice Authorized slashing manager
     address public slashingManager;
 
+    /// @notice Authorized reward distributor
+    address public rewardDistributor;
+
     /// @notice Treasury address for slashed funds
     address public slashedFundsTreasury;
 
@@ -285,7 +288,7 @@ contract BondingRegistry is
         uint256 ticketOut = ticketToken.balanceOf(msg.sender);
         uint256 licenseOut = op.licenseBond;
         if (ticketOut != 0) {
-            ticketToken.lockForExit(msg.sender, ticketOut);
+            ticketToken.burnTickets(msg.sender, ticketOut);
             emit TicketBalanceUpdated(
                 msg.sender,
                 -int256(ticketOut),
@@ -349,7 +352,7 @@ contract BondingRegistry is
             InsufficientBalance()
         );
 
-        ticketToken.lockForExit(msg.sender, amount);
+        ticketToken.burnTickets(msg.sender, amount);
         _exits.queueTicketsForExit(msg.sender, exitDelay, amount);
 
         emit TicketBalanceUpdated(
@@ -456,7 +459,7 @@ contract BondingRegistry is
             activeBalance
         );
         if (slashedFromActiveBalance > 0) {
-            ticketToken.slash(operator, slashedFromActiveBalance);
+            ticketToken.burnTickets(operator, slashedFromActiveBalance);
         }
 
         // Slash remaining amount from pending queue
@@ -531,6 +534,29 @@ contract BondingRegistry is
     }
 
     // ======================
+    // Reward Distribution Functions
+    // ======================
+
+    function distributeRewards(
+        IERC20 rewardToken,
+        address[] calldata recipients,
+        uint256[] calldata amounts
+    ) external {
+        require(msg.sender == rewardDistributor, OnlyRewardDistributor());
+        require(recipients.length == amounts.length, ArrayLengthMismatch());
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            if (amounts[i] > 0 && operators[recipients[i]].registered) {
+                rewardToken.safeTransferFrom(
+                    rewardDistributor,
+                    recipients[i],
+                    amounts[i]
+                );
+            }
+        }
+    }
+
+    // ======================
     // Admin Functions
     // ======================
 
@@ -600,6 +626,12 @@ contract BondingRegistry is
 
     function setSlashingManager(address newSlashingManager) external onlyOwner {
         slashingManager = newSlashingManager;
+    }
+
+    function setRewardDistributor(
+        address newRewardDistributor
+    ) external onlyOwner {
+        rewardDistributor = newRewardDistributor;
     }
 
     function withdrawSlashedFunds(
