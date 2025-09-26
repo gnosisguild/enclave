@@ -73,18 +73,6 @@ interface IBondingRegistry {
     );
 
     /**
-     * @notice Emitted when operator's deregistration is finalized
-     * @param operator Address of the operator
-     * @param ticketRefund Amount of ticket balance refunded
-     * @param licenseRefund Amount of license bond refunded
-     */
-    event DeregistrationFinalized(
-        address indexed operator,
-        uint256 ticketRefund,
-        uint256 licenseRefund
-    );
-
-    /**
      * @notice Emitted when operator active status changes
      * @param operator Address of the operator
      * @param active True if active, false if inactive
@@ -254,12 +242,6 @@ interface IBondingRegistry {
      * @dev Requires operator to provide sibling nodes for immediate IMT removal
      */
     function deregisterOperator(uint256[] calldata siblingNodes) external;
-
-    /**
-     * @notice Finalize deregistration and withdraw all remaining funds
-     * @dev Can only be called after deregistration delay has passed
-     */
-    function finalizeDeregistration() external;
 
     // ======================
     // Slashing Functions (Role-Restricted)

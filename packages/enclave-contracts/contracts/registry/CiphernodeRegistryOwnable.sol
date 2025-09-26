@@ -43,7 +43,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
 
     // Committee tracking for active job management
-    mapping(uint256 e3Id => bool) public committeeActive;
+    mapping(uint256 e3Id => bool active) public committeeActive;
     mapping(address node => uint256 count) public activeCommitteeCount;
 
     ////////////////////////////////////////////////////////////
