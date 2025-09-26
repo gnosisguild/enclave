@@ -19,10 +19,6 @@ pub struct CiphernodeAdded {
 
 impl Display for CiphernodeAdded {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "address: {}, index: {}, num_nodes: {}",
-            self.address, self.index, self.num_nodes
-        )
+        write!(f, "{:?}", self)
     }
 }

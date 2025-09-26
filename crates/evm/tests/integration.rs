@@ -248,7 +248,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     }
 
     // Ensure shutdown doesn't cause event to be lost.
-    sleep(Duration::from_millis(1)).await;
+    sleep(Duration::from_millis(10)).await;
     addr1.send(EnclaveEvent::from(Shutdown)).await?;
 
     for msg in ["these", "are", "not", "lost"] {
@@ -260,7 +260,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
             .await?;
     }
 
-    sleep(Duration::from_millis(1)).await;
+    sleep(Duration::from_millis(10)).await;
     let msgs = get_msgs(&history_collector).await?;
     assert_eq!(msgs, ["before", "online", "live", "events"]);
 
@@ -275,7 +275,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
     )
     .await?;
 
-    sleep(Duration::from_millis(1)).await;
+    sleep(Duration::from_millis(10)).await;
     let msgs = get_msgs(&history_collector).await?;
     assert_eq!(
         msgs,
@@ -291,7 +291,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
             .await?;
     }
 
-    sleep(Duration::from_millis(1)).await;
+    sleep(Duration::from_millis(10)).await;
     let msgs = get_msgs(&history_collector).await?;
     assert_eq!(
         msgs,

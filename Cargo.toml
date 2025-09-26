@@ -18,6 +18,7 @@ members = [
   "crates/init", 
   "crates/keyshare",
   "crates/logger",
+  "crates/multithread",
   "crates/net", 
   "crates/program-server", 
   "crates/request",
@@ -26,6 +27,8 @@ members = [
   "crates/support-scripts",
   "crates/test-helpers",
   "crates/tests",
+  "crates/trbfv",
+  "crates/utils",
   "crates/wasm",
 ]
 exclude = [
@@ -75,6 +78,7 @@ e3-evm-helpers = { version = "0.0.1-test", path = "./crates/evm-helpers" }
 e3-fhe = { version = "0.0.1-test", path = "./crates/fhe" }
 e3-fs = { version = "0.0.1-test", path = "./crates/fs" }
 e3-indexer = { version = "0.0.1-test", path = "./crates/indexer" }
+e3-multithread = { version = "0.0.1-test", path = "./crates/multithread" }
 e3-keyshare = { version = "0.0.1-test", path = "./crates/keyshare" }
 e3-logger = { version = "0.0.1-test", path = "./crates/logger" }
 e3-net = { version = "0.0.1-test", path = "./crates/net" }
@@ -84,6 +88,8 @@ e3-program-server = { version = "0.0.1-test", path = "./crates/program-server" }
 e3-support-scripts = { version = "0.0.1-test", path = "./crates/support-scripts" }
 e3-test-helpers = { version = "0.0.1-test", path = "./crates/test-helpers" }
 e3-tests = { version = "0.0.1-test", path = "./crates/tests" }
+e3-trbfv = { version = "0.0.1-test", path = "./crates/trbfv" }
+e3-utils = { version = "0.0.1-test", path = "./crates/utils" }
 
 actix = "=0.13.5"
 actix-web = "=4.11.0"
@@ -108,24 +114,27 @@ base64 = "=0.22.1"
 clap = { version = "=4.5.41", features = ["derive"] }
 chrono = { version = "=0.4.41", features = ["serde"] }
 compile-time = "=0.2.0"
+derivative = "=2.2.0"
 dirs = "=5.0.1"
 dialoguer = "=0.11.0"
 duct = "=1.0.0"
 eyre = { version = "=0.6.12" }
-fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs" }
-fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", branch = "trbfv_random_parties_reconstructing" }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", branch = "trbfv_random_parties_reconstructing" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs.git", branch = "trbfv_random_parties_reconstructing" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", branch = "trbfv_random_parties_reconstructing" }
 figment = { version = "=0.10.19", features = ["yaml", "test"] }
 futures = "=0.3.31"
 futures-util = "=0.3.31"
 glob = "=0.3.2"
 git2 = "=0.20.2"
+greco = { package = "e3-greco-generator", git = "https://github.com/gnosisguild/greco", branch = "trbfv_random_parties_reconstructing" } 
 hex = "=0.4.3"
 lazy_static = "=1.5.0"
 num = "=0.4.3"
 num-bigint = "=0.4.6"
 num-traits = "=0.2.19"
+ndarray = { version = "=0.15.6", features = ["serde"] }
 once_cell = "=1.21.3"
 opentelemetry = "=0.29.0"
 opentelemetry-otlp = { version = "=0.29.0", features = ["grpc-tonic"] }
@@ -136,10 +145,12 @@ petname = "=2.0.2"
 phf = { version = "=0.11.3", features = ["macros"] }
 rand_chacha = "=0.3.1"
 rand = "=0.8.5"
+rayon = "=1.10.0"
 regex = "=1.11.1" 
 reqwest = { version = "=0.12.22", features = ["json"] }
 serde = { version = "=1.0.219", features = ["derive"] }
 serde_json = "=1.0.141"
+serial_test = "=3.2.0"
 sled = "=0.34.7"
 serde_yaml = "=0.9.34"
 sha2 = "=0.10.9"
@@ -150,6 +161,7 @@ tokio = { version = "=1.46.1", features = ["full"] }
 tracing = "=0.1.41"
 tracing-opentelemetry = "=0.30.0"
 tracing-subscriber = { version = "=0.3.19", features = ["env-filter", "time"] }
+tracing-test = { version = "=0.2.5", features = ["no-env-filter"] }
 url = "=2.5.4"
 vfs = { git = "https://github.com/ryardley/rust-vfs.git", features = ["async-vfs"] }
 libp2p = { version = "=0.54.1", features = [
@@ -163,3 +175,4 @@ libp2p = { version = "=0.54.1", features = [
   "tokio",
 ]}
 zeroize = "=1.8.1"
+

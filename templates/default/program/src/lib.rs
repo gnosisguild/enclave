@@ -6,7 +6,7 @@
 
 use e3_bfv_helpers::decode_bfv_params_arc;
 use e3_compute_provider::FHEInputs;
-use fhe_rs::bfv::Ciphertext;
+use fhe::bfv::Ciphertext;
 use fhe_traits::{DeserializeParametrized, Serialize};
 
 /// Implementation of the CiphertextProcessor function
@@ -27,7 +27,7 @@ mod tests {
     use super::*;
     use anyhow::Result;
     use e3_bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
-    use fhe_rs::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
+    use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
     use fhe_traits::FheEncoder;
     use fhe_traits::FheEncrypter;
     use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};

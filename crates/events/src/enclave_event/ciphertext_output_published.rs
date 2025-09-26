@@ -6,6 +6,7 @@
 
 use crate::E3id;
 use actix::Message;
+use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -13,11 +14,11 @@ use std::fmt::{self, Display};
 #[rtype(result = "()")]
 pub struct CiphertextOutputPublished {
     pub e3_id: E3id,
-    pub ciphertext_output: Vec<u8>,
+    pub ciphertext_output: Vec<ArcBytes>,
 }
 
 impl Display for CiphertextOutputPublished {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "e3_id: {}", self.e3_id,)
+        write!(f, "{:?}", self)
     }
 }
