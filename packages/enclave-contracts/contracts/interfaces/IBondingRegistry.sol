@@ -6,6 +6,8 @@
 
 pragma solidity >=0.8.27;
 
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 /**
  * @title IBondingRegistry
  * @notice Interface for the main bonding registry that holds operator balance and license bonds
@@ -29,6 +31,8 @@ interface IBondingRegistry {
     error InvalidAmount();
     error InvalidConfiguration();
     error NoPendingDeregistration();
+    error OnlyRewardDistributor();
+    error ArrayLengthMismatch();
 
     // ======================
     // Events (Protocol-Named)
@@ -203,6 +207,19 @@ interface IBondingRegistry {
     // ======================
 
     /**
+     * @notice Register as an operator (callable by licensed operators)
+     * @dev Requires sufficient license bond and calls registry
+     */
+    function registerOperator() external;
+
+    /**
+     * @notice Deregister as an operator and remove from IMT
+     * @param siblingNodes Sibling node proofs for IMT removal
+     * @dev Requires operator to provide sibling nodes for immediate IMT removal
+     */
+    function deregisterOperator(uint256[] calldata siblingNodes) external;
+
+    /**
      * @notice Increase operator's ticket balance by depositing tokens
      * @param amount Amount of ticket tokens to deposit
      * @dev Requires approval for ticket token transfer
@@ -230,21 +247,22 @@ interface IBondingRegistry {
      */
     function unbondLicense(uint256 amount) external;
 
-    /**
-     * @notice Register as an operator (callable by licensed operators)
-     * @dev Requires sufficient license bond and calls registry
-     */
-    function registerOperator() external;
+    // ======================
+    // Claim Functions
+    // ======================
 
     /**
-     * @notice Deregister as an operator and remove from IMT
-     * @param siblingNodes Sibling node proofs for IMT removal
-     * @dev Requires operator to provide sibling nodes for immediate IMT removal
+     * @notice Claim operator's ticket balance and license bond
+     * @param maxTicketAmount Maximum amount of ticket tokens to claim
+     * @param maxLicenseAmount Maximum amount of license tokens to claim
      */
-    function deregisterOperator(uint256[] calldata siblingNodes) external;
+    function claimExits(
+        uint256 maxTicketAmount,
+        uint256 maxLicenseAmount
+    ) external;
 
     // ======================
-    // Slashing Functions (Role-Restricted)
+    // Slashing Functions
     // ======================
 
     /**
@@ -271,6 +289,22 @@ interface IBondingRegistry {
         address operator,
         uint256 amount,
         bytes32 reason
+    ) external;
+
+    // ======================
+    // Reward Distribution Functions
+    // ======================
+    /**
+     * @notice Distribute rewards to operators
+     * @param rewardToken Reward token contract
+     * @param operators Addresses of the operators to distribute rewards to
+     * @param amounts Amounts of rewards to distribute to each operator
+     * @dev Only callable by contract owner
+     */
+    function distributeRewards(
+        IERC20 rewardToken,
+        address[] calldata operators,
+        uint256[] calldata amounts
     ) external;
 
     // ======================

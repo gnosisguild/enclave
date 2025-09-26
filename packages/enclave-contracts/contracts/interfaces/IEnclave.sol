@@ -70,6 +70,14 @@ interface IEnclave {
     /// @param ciphernodeRegistry The address of the CiphernodeRegistry contract.
     event CiphernodeRegistrySet(address ciphernodeRegistry);
 
+    /// @notice This event MUST be emitted any time the BondingRegistry is set.
+    /// @param bondingRegistry The address of the BondingRegistry contract.
+    event BondingRegistrySet(address bondingRegistry);
+
+    /// @notice This event MUST be emitted any time the USDC token is set.
+    /// @param usdcToken The address of the USDC token.
+    event UsdcTokenSet(address usdcToken);
+
     /// @notice The event MUST be emitted any time an encryption scheme is enabled.
     /// @param encryptionSchemeId The ID of the encryption scheme that was enabled.
     event EncryptionSchemeEnabled(bytes32 encryptionSchemeId);
@@ -125,7 +133,7 @@ interface IEnclave {
     /// @return e3Id ID of the E3.
     /// @return e3 The E3 struct.
     function request(
-        E3RequestParams memory requestParams
+        E3RequestParams calldata requestParams
     ) external payable returns (uint256 e3Id, E3 memory e3);
 
     /// @notice This function should be called to activate an Encrypted Execution Environment (E3) once it has been
@@ -220,4 +228,12 @@ interface IEnclave {
     /// @param e3Id ID of the E3.
     /// @return root The root of the input merkle tree.
     function getInputRoot(uint256 e3Id) external view returns (uint256 root);
+
+    /// @notice This function returns the fee of an E3
+    /// @dev This function MUST revert if the E3 parameters are invalid.
+    /// @param e3Params the struct representing the E3 request parameters
+    /// @return fee the fee of the E3
+    function getE3Quote(
+        E3RequestParams memory e3Params
+    ) external view returns (uint256 fee);
 }

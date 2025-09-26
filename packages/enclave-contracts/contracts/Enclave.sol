@@ -8,10 +8,16 @@ pragma solidity >=0.8.27;
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
+import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
+import { IRegistryFilter } from "./interfaces/IRegistryFilter.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     InternalLeanIMT,
     LeanIMTData,
@@ -20,6 +26,7 @@ import {
 
 contract Enclave is IEnclave, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
+    using SafeERC20 for IERC20;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -28,6 +35,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     ////////////////////////////////////////////////////////////
 
     ICiphernodeRegistry public ciphernodeRegistry; // address of the Ciphernode registry.
+    IBondingRegistry public bondingRegistry; // address of the Bonding registry.
+    IERC20 public usdcToken; // address of the USDC token.
     uint256 public maxDuration; // maximum duration of a computation in seconds.
     uint256 public nexte3Id; // ID of the next E3.
 
@@ -49,6 +58,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     /// Mapping that stores the valid E3 program ABI encoded parameter sets (e.g., BFV).
     mapping(bytes e3ProgramParams => bool allowed) public e3ProgramsParams;
+
+    // Mapping of E3 payments.
+    mapping(uint256 e3Id => uint256 e3Payment) public e3Payments;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -79,6 +91,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error CiphertextOutputNotPublished(uint256 e3Id);
     error PaymentRequired(uint256 value);
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
+    error InsufficientBalance();
+    error InsufficientAllowance();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -92,12 +106,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     constructor(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
+        IBondingRegistry _bondingRegistry,
+        IERC20 _usdcToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
     ) {
         initialize(
             _owner,
             _ciphernodeRegistry,
+            _bondingRegistry,
+            _usdcToken,
             _maxDuration,
             _e3ProgramsParams
         );
@@ -110,12 +128,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function initialize(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
+        IBondingRegistry _bondingRegistry,
+        IERC20 _usdcToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
+        setBondingRegistry(_bondingRegistry);
+        setUsdcToken(_usdcToken);
         setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
@@ -129,9 +151,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function request(
         E3RequestParams calldata requestParams
     ) external payable returns (uint256 e3Id, E3 memory e3) {
-        // TODO: allow for other payment methods or only native tokens?
-        // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
-        require(msg.value > 0, PaymentRequired(msg.value));
+        uint256 e3Fee = getE3Quote(requestParams);
+        require(e3Fee > 0, PaymentRequired(e3Fee));
         require(
             requestParams.threshold[1] >= requestParams.threshold[0] &&
                 requestParams.threshold[0] > 0,
@@ -197,6 +218,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.decryptionVerifier = decryptionVerifier;
 
         e3s[e3Id] = e3;
+
+        usdcToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         require(
             ciphernodeRegistry.requestCommittee(
@@ -324,7 +347,38 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         require(success, InvalidOutput(plaintextOutput));
 
+        _distributeRewards(e3Id);
+
         emit PlaintextOutputPublished(e3Id, plaintextOutput);
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Internal Functions                   //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function _distributeRewards(uint256 e3Id) internal {
+        IRegistryFilter.Committee memory committee = ciphernodeRegistry
+            .getCommittee(e3Id);
+
+        uint256[] memory amounts = new uint256[](committee.nodes.length);
+
+        // We might need to pay different amounts to different nodes.
+        // For now, we'll pay the same amount to all nodes.
+        uint256 amount = e3Payments[e3Id] / committee.nodes.length;
+        for (uint256 i = 0; i < committee.nodes.length; i++) {
+            amounts[i] = amount;
+        }
+
+        // Approve the BondingRegistry to spend the USDC tokens
+        usdcToken.approve(address(bondingRegistry), e3Payments[e3Id]);
+        // Distribute rewards to the committee
+        bondingRegistry.distributeRewards(usdcToken, committee.nodes, amounts);
+        // Zero out the payment
+        e3Payments[e3Id] = 0;
+        // Where does dust go? Treasury maybe?
+        usdcToken.approve(address(bondingRegistry), 0);
     }
 
     ////////////////////////////////////////////////////////////
@@ -352,6 +406,22 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         ciphernodeRegistry = _ciphernodeRegistry;
         success = true;
         emit CiphernodeRegistrySet(address(_ciphernodeRegistry));
+    }
+
+    function setBondingRegistry(
+        IBondingRegistry _bondingRegistry
+    ) public onlyOwner returns (bool success) {
+        bondingRegistry = _bondingRegistry;
+        success = true;
+        emit BondingRegistrySet(address(_bondingRegistry));
+    }
+
+    function setUsdcToken(
+        IERC20 _usdcToken
+    ) public onlyOwner returns (bool success) {
+        usdcToken = _usdcToken;
+        success = true;
+        emit UsdcTokenSet(address(_usdcToken));
     }
 
     function enableE3Program(
@@ -435,6 +505,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             E3DoesNotExist(e3Id)
         );
         return InternalLeanIMT._root(inputs[e3Id]);
+    }
+
+    function getE3Quote(
+        E3RequestParams calldata
+    ) public pure returns (uint256 fee) {
+        fee = 1 * 10 ** 18;
     }
 
     function getDecryptionVerifier(
