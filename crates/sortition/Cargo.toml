@@ -20,3 +20,4 @@ num = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+num-bigint = { workspace = true }
