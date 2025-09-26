@@ -23,14 +23,12 @@ import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import {
-    Checkpoints
-} from "@openzeppelin/contracts/utils/structs/Checkpoints.sol";
-import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import { ExitQueueLib } from "../lib/ExitQueueLib.sol";
 
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
+import { EnclaveTicketToken } from "../token/EnclaveTicket.sol";
 
 /**
  * @title BondingRegistry
@@ -44,8 +42,7 @@ contract BondingRegistry is
     IBondingRegistry
 {
     using SafeERC20 for IERC20;
-    using Checkpoints for Checkpoints.Trace208;
-    using SafeCast for uint256;
+    using ExitQueueLib for ExitQueueLib.ExitQueueState;
 
     // ======================
     // Constants
@@ -60,8 +57,8 @@ contract BondingRegistry is
     // Storage
     // ======================
 
-    /// @notice Ticket token (USDC)
-    IERC20 public ticketToken;
+    /// @notice ticket token (ETK (Underlying USDC))
+    EnclaveTicketToken public ticketToken;
 
     /// @notice License token (ENCL)
     IERC20 public licenseToken;
@@ -84,7 +81,6 @@ contract BondingRegistry is
 
     // Operator data structure
     struct Operator {
-        uint256 ticketBalance;
         uint256 licenseBond;
         uint64 exitUnlocksAt;
         bool registered;
@@ -95,13 +91,14 @@ contract BondingRegistry is
     // Operator data
     mapping(address operator => Operator data) internal operators;
 
-    // Per-operator ticket balance checkpoints (key = block.number)
-    mapping(address operator => Checkpoints.Trace208 ticketCkpts)
-        private _ticketCkpts;
-
     // Total slashed funds available for treasury withdrawal
     uint256 public slashedTicketBalance;
     uint256 public slashedLicenseBond;
+
+    // ======================
+    // Exit Queue library state
+    // ======================
+    ExitQueueLib.ExitQueueState private _exits;
 
     // ======================
     // Storage Gaps for Upgrades
@@ -119,7 +116,9 @@ contract BondingRegistry is
     }
 
     modifier noExitInProgress(address operator) {
-        if (operators[operator].exitRequested) revert ExitInProgress();
+        Operator storage op = operators[operator];
+        if (op.exitRequested && block.timestamp < op.exitUnlocksAt)
+            revert ExitInProgress();
         _;
     }
 
@@ -146,7 +145,7 @@ contract BondingRegistry is
      */
     function initialize(
         address owner,
-        IERC20 _ticketToken,
+        EnclaveTicketToken _ticketToken,
         IERC20 _licenseToken,
         address _registry,
         address _slashedFundsTreasury,
@@ -182,14 +181,7 @@ contract BondingRegistry is
     function getTicketBalance(
         address operator
     ) external view returns (uint256) {
-        return operators[operator].ticketBalance;
-    }
-
-    function getTicketBalanceAtBlock(
-        address operator,
-        uint256 blockNumber
-    ) external view returns (uint256) {
-        return uint256(_ticketCkpts[operator].upperLookup(uint48(blockNumber)));
+        return ticketToken.balanceOf(operator);
     }
 
     function getLicenseBond(address operator) external view returns (uint256) {
@@ -200,7 +192,26 @@ contract BondingRegistry is
         address operator
     ) external view returns (uint256) {
         if (ticketPrice == 0) return 0;
-        return operators[operator].ticketBalance / ticketPrice;
+        return ticketToken.balanceOf(operator) / ticketPrice;
+    }
+
+    function getTicketBalanceAtBlock(
+        address operator,
+        uint256 blockNumber
+    ) external view returns (uint256) {
+        return ticketToken.getPastVotes(operator, blockNumber);
+    }
+
+    function pendingExits(
+        address operator
+    ) external view returns (uint256 ticket, uint256 license) {
+        return _exits.getPendingAmounts(operator);
+    }
+
+    function previewClaimable(
+        address operator
+    ) external view returns (uint256 ticket, uint256 license) {
+        return _exits.previewClaimableAmounts(operator);
     }
 
     function isLicensed(address operator) external view returns (bool) {
@@ -217,16 +228,98 @@ contract BondingRegistry is
             op.registered &&
             op.licenseBond >= _minLicenseBond() &&
             (ticketPrice == 0 ||
-                op.ticketBalance / ticketPrice >= minTicketBalance);
+                ticketToken.balanceOf(operator) / ticketPrice >=
+                minTicketBalance);
     }
 
     function hasExitInProgress(address operator) external view returns (bool) {
-        return operators[operator].exitRequested;
+        Operator storage op = operators[operator];
+        return op.exitRequested && block.timestamp < op.exitUnlocksAt;
     }
 
     // ======================
     // Operator Functions
     // ======================
+
+    function registerOperator()
+        external
+        whenNotPaused
+        noExitInProgress(msg.sender)
+    {
+        // Clear previous exit request
+        if (operators[msg.sender].exitRequested) {
+            operators[msg.sender].exitRequested = false;
+            operators[msg.sender].exitUnlocksAt = 0;
+        }
+
+        require(
+            !ISlashingManager(slashingManager).isBanned(msg.sender),
+            CiphernodeBanned()
+        );
+        require(!operators[msg.sender].registered, AlreadyRegistered());
+        require(
+            operators[msg.sender].licenseBond >= licenseRequiredBond,
+            NotLicensed()
+        );
+
+        operators[msg.sender].registered = true;
+
+        if (address(registry) != address(0)) {
+            // CiphernodeRegistry already emits an event when a ciphernode is added
+            registry.addCiphernode(msg.sender);
+        }
+
+        _updateOperatorStatus(msg.sender);
+    }
+
+    function deregisterOperator(
+        uint256[] calldata siblingNodes
+    ) external whenNotPaused noExitInProgress(msg.sender) {
+        Operator storage op = operators[msg.sender];
+        require(op.registered, NotRegistered());
+
+        op.registered = false;
+        op.exitRequested = true;
+        op.exitUnlocksAt = uint64(block.timestamp) + exitDelay;
+
+        uint256 ticketOut = ticketToken.balanceOf(msg.sender);
+        uint256 licenseOut = op.licenseBond;
+        if (ticketOut != 0) {
+            ticketToken.lockForExit(msg.sender, ticketOut);
+            emit TicketBalanceUpdated(
+                msg.sender,
+                -int256(ticketOut),
+                0,
+                REASON_WITHDRAW
+            );
+        }
+        if (licenseOut != 0) {
+            op.licenseBond = 0;
+            emit LicenseBondUpdated(
+                msg.sender,
+                -int256(licenseOut),
+                0,
+                REASON_UNBOND
+            );
+        }
+
+        if (ticketOut != 0 || licenseOut != 0) {
+            _exits.queueAssetsForExit(
+                msg.sender,
+                exitDelay,
+                ticketOut,
+                licenseOut
+            );
+        }
+
+        if (address(registry) != address(0)) {
+            // CiphernodeRegistry already emits an event when a ciphernode is removed
+            registry.removeCiphernode(msg.sender, siblingNodes);
+        }
+
+        emit CiphernodeDeregistrationRequested(msg.sender, op.exitUnlocksAt);
+        _updateOperatorStatus(msg.sender);
+    }
 
     function addTicketBalance(
         uint256 amount
@@ -234,18 +327,12 @@ contract BondingRegistry is
         require(amount != 0, ZeroAmount());
         require(operators[msg.sender].registered, NotRegistered());
 
-        uint256 balanceBefore = ticketToken.balanceOf(address(this));
-        ticketToken.safeTransferFrom(msg.sender, address(this), amount);
-        uint256 actualReceived = ticketToken.balanceOf(address(this)) -
-            balanceBefore;
-
-        operators[msg.sender].ticketBalance += actualReceived;
-        _writeTicketCheckpoint(msg.sender);
+        ticketToken.depositFrom(msg.sender, msg.sender, amount);
 
         emit TicketBalanceUpdated(
             msg.sender,
-            int256(actualReceived),
-            operators[msg.sender].ticketBalance,
+            int256(amount),
+            ticketToken.balanceOf(msg.sender),
             REASON_DEPOSIT
         );
 
@@ -258,18 +345,17 @@ contract BondingRegistry is
         require(amount != 0, ZeroAmount());
         require(operators[msg.sender].registered, NotRegistered());
         require(
-            operators[msg.sender].ticketBalance >= amount,
+            ticketToken.balanceOf(msg.sender) >= amount,
             InsufficientBalance()
         );
 
-        operators[msg.sender].ticketBalance -= amount;
-        ticketToken.safeTransfer(msg.sender, amount);
-        _writeTicketCheckpoint(msg.sender);
+        ticketToken.lockForExit(msg.sender, amount);
+        _exits.queueTicketsForExit(msg.sender, exitDelay, amount);
 
         emit TicketBalanceUpdated(
             msg.sender,
             -int256(amount),
-            operators[msg.sender].ticketBalance,
+            ticketToken.balanceOf(msg.sender),
             REASON_WITHDRAW
         );
 
@@ -308,7 +394,7 @@ contract BondingRegistry is
         );
 
         operators[msg.sender].licenseBond -= amount;
-        licenseToken.safeTransfer(msg.sender, amount);
+        _exits.queueLicensesForExit(msg.sender, exitDelay, amount);
 
         emit LicenseBondUpdated(
             msg.sender,
@@ -320,94 +406,24 @@ contract BondingRegistry is
         _updateOperatorStatus(msg.sender);
     }
 
-    function registerOperator()
-        external
-        whenNotPaused
-        noExitInProgress(msg.sender)
-    {
-        require(
-            !ISlashingManager(slashingManager).isBanned(msg.sender),
-            CiphernodeBanned()
-        );
-        require(!operators[msg.sender].registered, AlreadyRegistered());
-        require(
-            operators[msg.sender].licenseBond >= licenseRequiredBond,
-            NotLicensed()
-        );
+    // ======================
+    // Claim Functions
+    // ======================
 
-        operators[msg.sender].registered = true;
-
-        if (address(registry) != address(0)) {
-            // CiphernodeRegistry already emits an event when a ciphernode is added
-            registry.addCiphernode(msg.sender);
-        }
-
-        _updateOperatorStatus(msg.sender);
-    }
-
-    /**
-     * @notice Deregister as an operator and remove from IMT
-     * @param siblingNodes Sibling node proofs for IMT removal
-     * @dev Requires operator to provide sibling nodes for immediate IMT removal
-     */
-    function deregisterOperator(
-        uint256[] calldata siblingNodes
-    ) external whenNotPaused noExitInProgress(msg.sender) {
-        require(operators[msg.sender].registered, NotRegistered());
-
-        operators[msg.sender].registered = false;
-        operators[msg.sender].exitRequested = true;
-        operators[msg.sender].exitUnlocksAt =
-            uint64(block.timestamp) +
-            exitDelay;
-
-        if (address(registry) != address(0)) {
-            // CiphernodeRegistry already emits an event when a ciphernode is removed
-            registry.removeCiphernode(msg.sender, siblingNodes);
-        }
-
-        emit CiphernodeDeregistrationRequested(
+    function claimExits(
+        uint256 maxTicketAmount,
+        uint256 maxLicenseAmount
+    ) external whenNotPaused {
+        (uint256 ticketClaim, uint256 licenseClaim) = _exits.claimAssets(
             msg.sender,
-            operators[msg.sender].exitUnlocksAt
+            maxTicketAmount,
+            maxLicenseAmount
         );
-        _updateOperatorStatus(msg.sender);
-    }
+        require(ticketClaim > 0 || licenseClaim > 0, ExitNotReady());
 
-    function finalizeDeregistration() external {
-        Operator storage op = operators[msg.sender];
-        require(op.exitRequested, ExitInProgress());
-        require(block.timestamp >= op.exitUnlocksAt, ExitNotReady());
-
-        uint256 ticketRefund = op.ticketBalance;
-        uint256 licenseRefund = op.licenseBond;
-
-        op.ticketBalance = 0;
-        op.licenseBond = 0;
-        op.exitRequested = false;
-        op.exitUnlocksAt = 0;
-
-        if (ticketRefund > 0) {
-            ticketToken.safeTransfer(msg.sender, ticketRefund);
-        }
-        if (licenseRefund > 0) {
-            licenseToken.safeTransfer(msg.sender, licenseRefund);
-        }
-        _writeTicketCheckpoint(msg.sender);
-
-        emit TicketBalanceUpdated(
-            msg.sender,
-            -int256(ticketRefund),
-            0,
-            REASON_WITHDRAW
-        );
-        emit LicenseBondUpdated(
-            msg.sender,
-            -int256(licenseRefund),
-            0,
-            REASON_UNBOND
-        );
-        emit DeregistrationFinalized(msg.sender, ticketRefund, licenseRefund);
-        _updateOperatorStatus(msg.sender);
+        if (ticketClaim > 0) ticketToken.payout(msg.sender, ticketClaim);
+        if (licenseClaim > 0)
+            licenseToken.safeTransfer(msg.sender, licenseClaim);
     }
 
     // ======================
@@ -416,55 +432,102 @@ contract BondingRegistry is
 
     function slashTicketBalance(
         address operator,
-        uint256 amount,
-        bytes32 reason
+        uint256 requestedSlashAmount,
+        bytes32 slashReason
     ) external onlySlashingManager {
-        require(amount != 0, ZeroAmount());
+        require(requestedSlashAmount != 0, ZeroAmount());
 
-        Operator storage op = operators[operator];
-        uint256 currentBalance = op.ticketBalance;
-        uint256 slashAmount = Math.min(amount, currentBalance);
+        (uint256 pendingTicketBalance, ) = _exits.getPendingAmounts(operator);
+        uint256 activeBalance = ticketToken.balanceOf(operator);
+        uint256 totalAvailableBalance = activeBalance + pendingTicketBalance;
 
-        if (slashAmount > 0) {
-            op.ticketBalance -= slashAmount;
-            slashedTicketBalance += slashAmount;
-            _writeTicketCheckpoint(operator);
+        uint256 actualSlashAmount = Math.min(
+            requestedSlashAmount,
+            totalAvailableBalance
+        );
 
-            emit TicketBalanceUpdated(
-                operator,
-                -int256(slashAmount),
-                op.ticketBalance,
-                reason
-            );
-
-            _updateOperatorStatus(operator);
+        if (actualSlashAmount == 0) {
+            return;
         }
+
+        // Slash from active balance first
+        uint256 slashedFromActiveBalance = Math.min(
+            actualSlashAmount,
+            activeBalance
+        );
+        if (slashedFromActiveBalance > 0) {
+            ticketToken.slash(operator, slashedFromActiveBalance);
+        }
+
+        // Slash remaining amount from pending queue
+        uint256 remainingToSlash = actualSlashAmount - slashedFromActiveBalance;
+        if (remainingToSlash > 0) {
+            _exits.slashPendingAssets(
+                operator,
+                remainingToSlash,
+                0, // licenseAmount
+                true
+            );
+        }
+
+        slashedTicketBalance += actualSlashAmount;
+        emit TicketBalanceUpdated(
+            operator,
+            -int256(actualSlashAmount),
+            ticketToken.balanceOf(operator),
+            slashReason
+        );
+
+        _updateOperatorStatus(operator);
     }
 
     function slashLicenseBond(
         address operator,
-        uint256 amount,
-        bytes32 reason
+        uint256 requestedSlashAmount,
+        bytes32 slashReason
     ) external onlySlashingManager {
-        require(amount != 0, ZeroAmount());
+        require(requestedSlashAmount != 0, ZeroAmount());
 
-        Operator storage op = operators[operator];
-        uint256 currentBond = op.licenseBond;
-        uint256 slashAmount = Math.min(amount, currentBond);
+        Operator storage operatorData = operators[operator];
+        (, uint256 pendingLicenseBalance) = _exits.getPendingAmounts(operator);
+        uint256 totalAvailableBalance = operatorData.licenseBond +
+            pendingLicenseBalance;
+        uint256 actualSlashAmount = Math.min(
+            requestedSlashAmount,
+            totalAvailableBalance
+        );
 
-        if (slashAmount > 0) {
-            op.licenseBond -= slashAmount;
-            slashedLicenseBond += slashAmount;
+        if (actualSlashAmount == 0) return;
 
-            emit LicenseBondUpdated(
-                operator,
-                -int256(slashAmount),
-                op.licenseBond,
-                reason
-            );
-
-            _updateOperatorStatus(operator);
+        // Slash from active balance first
+        uint256 slashedFromActiveBalance = Math.min(
+            actualSlashAmount,
+            operatorData.licenseBond
+        );
+        if (slashedFromActiveBalance > 0) {
+            operatorData.licenseBond -= slashedFromActiveBalance;
         }
+
+        // Slash remaining amount from pending queue
+        uint256 remainingToSlash = actualSlashAmount - slashedFromActiveBalance;
+        if (remainingToSlash > 0) {
+            _exits.slashPendingAssets(
+                operator,
+                0, // ticketAmount
+                remainingToSlash,
+                true
+            );
+        }
+
+        slashedLicenseBond += actualSlashAmount;
+        emit LicenseBondUpdated(
+            operator,
+            -int256(actualSlashAmount),
+            operatorData.licenseBond,
+            slashReason
+        );
+
+        _updateOperatorStatus(operator);
     }
 
     // ======================
@@ -548,7 +611,7 @@ contract BondingRegistry is
 
         if (ticketAmount > 0) {
             slashedTicketBalance -= ticketAmount;
-            ticketToken.safeTransfer(slashedFundsTreasury, ticketAmount);
+            ticketToken.payout(slashedFundsTreasury, ticketAmount);
         }
 
         if (licenseAmount > 0) {
@@ -580,19 +643,13 @@ contract BondingRegistry is
         bool newActiveStatus = op.registered &&
             op.licenseBond >= _minLicenseBond() &&
             (ticketPrice == 0 ||
-                op.ticketBalance / ticketPrice >= minTicketBalance);
+                ticketToken.balanceOf(operator) / ticketPrice >=
+                minTicketBalance);
 
         if (op.active != newActiveStatus) {
             op.active = newActiveStatus;
             emit OperatorActivationChanged(operator, newActiveStatus);
         }
-    }
-
-    function _writeTicketCheckpoint(address operator) internal {
-        _ticketCkpts[operator].push(
-            uint48(block.number),
-            operators[operator].ticketBalance.toUint208()
-        );
     }
 
     function _minLicenseBond() internal view returns (uint256) {

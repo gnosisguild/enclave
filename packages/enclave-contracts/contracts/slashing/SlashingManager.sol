@@ -290,7 +290,7 @@ contract SlashingManager is
             require(block.timestamp >= p.executableAt, AppealWindowActive());
             if (p.appealed) {
                 require(p.resolved, AppealPending());
-                require(!p.approved, AppealUpheld()); // approved = appeal upheld => cancel slash, maybe we return here instead
+                require(!p.approved, AppealUpheld()); // approved = appeal upheld => cancel slash, return?
             }
         }
 
@@ -409,6 +409,7 @@ contract SlashingManager is
     // Internal Functions
     // ======================
 
+    // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
