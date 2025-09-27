@@ -2,6 +2,28 @@
 
 This directory contains utility scripts for the Enclave project.
 
+## Version Bumper
+
+`bump-versions.ts` - Bumps the versions of all packages and crates in the project.
+
+### Usage
+
+```bash
+pnpm bump:versions
+```
+
+Example: 
+
+```bash
+pnpm bump:versions 1.0.0
+```
+
+### What it does
+
+- Bumps the versions of all packages and crates in the project.
+- Updates the versions in the `Cargo.toml` files.
+- Updates the versions in the `package.json` files.
+
 ## License Header Checker
 
 `check-license-headers.sh` - Checks and fixes SPDX license headers in source files.

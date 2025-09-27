@@ -52,7 +52,7 @@ push-remote = "origin"
 publish = true
 
 [workspace.package]
-version = "0.0.1-test"
+version = "0.0.15-test"
 edition = "2021"
 license = "LGPL-3.0-only"
 description = "E3 — Encrypted Execution Environments"

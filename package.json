@@ -9,7 +9,7 @@
     "url": "https://github.com/gnosisguild"
   },
   "scripts": {
-    "bump:versions": "pnpm --filter \"@enclave-e3/contracts\" --filter \"@enclave-e3/sdk\" --filter \"@enclave-e3/react\" --filter \"@enclave-e3/config\" --filter \"@enclave-e3/wasm\" exec npm version", 
+    "bump:versions": "tsx scripts/bump-versions.ts",
     "clean": "cd packages/enclave-contracts && pnpm clean",
     "compile": "pnpm evm:build && pnpm sdk:build && pnpm react:build && pnpm ciphernode:build && ./scripts/compile-circuits.sh",
     "lint": "pnpm evm:lint && pnpm ciphernode:lint && ./scripts/lint-circuits.sh",
@@ -59,7 +59,9 @@
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
     "@types/node": "22.7.5",
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "tsx": "^4.20.3",
+    "typescript": "5.8.3"
   },
   "pnpm": {
     "overrides": {
