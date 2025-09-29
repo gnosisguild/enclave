@@ -71,7 +71,7 @@ export const requestCommittee = task(
   .addOption({
     name: "customParams",
     description: "parameters for the custom params",
-    defaultValue: "",
+    defaultValue: ZeroAddress,
     type: ArgumentType.STRING,
   })
   .setAction(async () => ({
