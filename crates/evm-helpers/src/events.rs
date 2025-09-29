@@ -13,6 +13,28 @@ sol! {
     event E3Activated(uint256 e3Id, uint256 expiration, bytes committeePublicKey);
 
     #[derive(Debug)]
+    event E3Requested(uint256 e3Id, E3 e3, address filter, IE3Program indexed e3Program);
+
+    #[derive(Debug)]
+    interface IE3Program {
+        function e3Program() external view returns (address);
+    }
+
+    #[derive(Debug)]
+    struct E3 {
+        uint256 seed;
+        uint32[2] threshold;
+        uint256 requestBlock;
+        uint256[2] startWindow;
+        uint256 duration;
+        uint256 expiration;
+        bytes32 encryptionSchemeId;
+        address e3Program;
+        bytes e3ProgramParams;
+        bytes customParams;
+    }
+
+    #[derive(Debug)]
     event InputPublished(uint256 indexed e3Id, bytes data, uint256 inputHash, uint256 index);
 
     #[derive(Debug)]

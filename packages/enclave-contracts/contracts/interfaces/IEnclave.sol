@@ -103,6 +103,8 @@ interface IEnclave {
     /// @param duration The duration of the computation in seconds.
     /// @param e3Program The address of the E3 Program.
     /// @param e3ProgramParams The ABI encoded computation parameters.
+    /// @param computeProviderParams The ABI encoded compute provider parameters.
+    /// @param customParams Arbitrary ABI-encoded application-defined parameters.
     struct E3RequestParams {
         address filter;
         uint32[2] threshold;
@@ -111,6 +113,7 @@ interface IEnclave {
         IE3Program e3Program;
         bytes e3ProgramParams;
         bytes computeProviderParams;
+        bytes customParams;
     }
 
     ////////////////////////////////////////////////////////////

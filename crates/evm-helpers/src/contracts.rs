@@ -49,6 +49,7 @@ sol! {
         bytes32 encryptionSchemeId;
         address e3Program;
         bytes e3ProgramParams;
+        bytes customParams;
         address inputValidator;
         address decryptionVerifier;
         bytes32 committeePublicKey;
@@ -65,6 +66,7 @@ sol! {
         address e3Program;
         bytes e3ProgramParams;
         bytes computeProviderParams;
+        bytes customParams;
     }
 
     #[derive(Debug)]
@@ -123,6 +125,7 @@ pub trait EnclaveWrite {
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
+        custom_params: Bytes,
     ) -> Result<TransactionReceipt>;
 
     /// Activate an E3 with a public key
@@ -344,6 +347,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
+        custom_params: Bytes,
     ) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
         let nonce = next_pending_nonce(&*self.provider).await?;
@@ -356,6 +360,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             e3Program: e3_program,
             e3ProgramParams: e3_params.clone(),
             computeProviderParams: compute_provider_params.clone(),
+            customParams: custom_params.clone(),
         };
 
         let contract = Enclave::new(self.contract_address, &self.provider);

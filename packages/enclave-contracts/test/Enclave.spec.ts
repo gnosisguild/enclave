@@ -148,6 +148,10 @@ describe("Enclave", function () {
         ["address"],
         [await decryptionVerifier.mockDecryptionVerifier.getAddress()],
       ),
+      customParams: abiCoder.encode(
+        ["address"],
+        ["0x1234567890123456789012345678901234567890"], // arbitrary address.
+      ),
     };
 
     return {
@@ -344,6 +348,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -594,6 +599,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         }),
       ).to.be.revertedWithCustomError(enclave, "PaymentRequired");
     });
@@ -609,6 +615,7 @@ describe("Enclave", function () {
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
             computeProviderParams: request.computeProviderParams,
+            customParams: request.customParams,
           },
           { value: 10 },
         ),
@@ -626,6 +633,7 @@ describe("Enclave", function () {
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
             computeProviderParams: request.computeProviderParams,
+            customParams: request.customParams,
           },
           { value: 10 },
         ),
@@ -643,6 +651,7 @@ describe("Enclave", function () {
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
             computeProviderParams: request.computeProviderParams,
+            customParams: request.customParams,
           },
           { value: 10 },
         ),
@@ -660,6 +669,7 @@ describe("Enclave", function () {
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
             computeProviderParams: request.computeProviderParams,
+            customParams: request.customParams,
           },
           { value: 10 },
         ),
@@ -677,6 +687,7 @@ describe("Enclave", function () {
             e3Program: ethers.ZeroAddress,
             e3ProgramParams: request.e3ProgramParams,
             computeProviderParams: request.computeProviderParams,
+            customParams: request.customParams,
           },
           { value: 10 },
         ),
@@ -697,6 +708,7 @@ describe("Enclave", function () {
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
             computeProviderParams: request.computeProviderParams,
+            customParams: request.customParams,
           },
           { value: 10 },
         ),
@@ -717,6 +729,7 @@ describe("Enclave", function () {
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
             computeProviderParams: request.computeProviderParams,
+            customParams: request.customParams,
           },
           { value: 10 },
         ),
@@ -734,6 +747,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -766,6 +780,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -797,6 +812,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -825,6 +841,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -849,6 +866,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -875,6 +893,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -899,6 +918,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -922,6 +942,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -958,6 +979,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -986,6 +1008,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1008,6 +1031,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1042,6 +1066,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1068,6 +1093,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1090,6 +1116,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1118,6 +1145,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1135,6 +1163,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1157,6 +1186,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1184,6 +1214,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1214,6 +1245,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1251,6 +1283,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1269,6 +1302,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1296,6 +1330,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1322,6 +1357,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1344,6 +1380,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1366,6 +1403,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1388,6 +1426,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1421,6 +1460,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1441,6 +1481,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1462,6 +1503,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1489,6 +1531,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1512,6 +1555,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1536,6 +1580,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );
@@ -1559,6 +1604,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         },
         { value: 10 },
       );

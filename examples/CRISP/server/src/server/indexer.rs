@@ -6,9 +6,9 @@
 
 use crate::server::{
     models::CurrentRound,
+    program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
     CONFIG,
-    program_server_request::run_compute,
 };
 use e3_sdk::{
     evm_helpers::{
@@ -16,7 +16,8 @@ use e3_sdk::{
             EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveWrite, ReadWrite,
         },
         events::{
-            CiphertextOutputPublished, CommitteePublished, E3Activated, PlaintextOutputPublished,
+            CiphertextOutputPublished, CommitteePublished, E3Activated, E3Requested,
+            PlaintextOutputPublished,
         },
         listener::EventListener,
     },
@@ -29,6 +30,24 @@ use tokio::time::{sleep_until, Instant};
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 
+pub async fn register_e3_requested(
+    mut indexer: EnclaveIndexer<impl DataStore>,
+) -> Result<EnclaveIndexer<impl DataStore>> {
+    // E3Requested
+    indexer
+        .add_event_handler(move |event: E3Requested, store| {
+            let e3_id = event.e3Id.to::<u64>();
+            let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+            async move {
+                info!("Custom params: {:?}", event.e3.customParams);
+
+                Ok(())
+            }
+        })
+        .await;
+    Ok(indexer)
+}
+
 pub async fn register_e3_activated(
     mut indexer: EnclaveIndexer<impl DataStore>,
 ) -> Result<EnclaveIndexer<impl DataStore>> {
@@ -39,7 +58,7 @@ pub async fn register_e3_activated(
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
             let mut current_round_repo = CurrentRoundRepository::new(store);
             let expiration = event.expiration.to::<u64>();
-            
+
             info!("Handling E3 request with id {}", e3_id);
             async move {
                 repo.initialize_round().await?;
@@ -56,24 +75,37 @@ pub async fn register_e3_activated(
 
                 sleep_until(expiration).await;
 
-                let e3 = repo.get_e3().await?;
+                let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
                 repo.update_status("Expired").await?;
 
                 if repo.get_vote_count().await? > 0 {
                     info!("Starting computation for E3: {}", e3_id);
                     repo.update_status("Computing").await?;
 
-                    let (id, status) =
-                        run_compute(e3_id, e3.e3_params, e3.ciphertext_inputs, format!("{}/state/add-result", CONFIG.enclave_server_url))
-                            .await
-                            .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
+                    let (id, status) = run_compute(
+                        e3_id,
+                        e3.e3_params,
+                        e3.ciphertext_inputs,
+                        format!("{}/state/add-result", CONFIG.enclave_server_url),
+                    )
+                    .await
+                    .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
 
                     if id != e3_id {
-                        return Err(eyre::eyre!("Computation request returned unexpected E3 ID: expected {}, got {}", e3_id, id).into());
+                        return Err(eyre::eyre!(
+                            "Computation request returned unexpected E3 ID: expected {}, got {}",
+                            e3_id,
+                            id
+                        )
+                        .into());
                     }
 
                     if status != "processing" {
-                        return Err(eyre::eyre!("Computation request failed with status: {}", status).into());
+                        return Err(eyre::eyre!(
+                            "Computation request failed with status: {}",
+                            status
+                        )
+                        .into());
                     }
 
                     info!("Request Computation for E3: {}", e3_id);
@@ -201,6 +233,7 @@ pub async fn start_indexer(
     // CRISP indexer
     let crisp_indexer =
         EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store).await?;
+    let crisp_indexer = register_e3_requested(crisp_indexer).await?;
     let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;

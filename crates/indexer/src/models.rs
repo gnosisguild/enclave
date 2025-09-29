@@ -16,6 +16,7 @@ pub struct E3 {
     pub committee_public_key: Vec<u8>,
     pub duration: u64,
     pub e3_params: Vec<u8>,
+    pub custom_params: Vec<u8>,
     pub enclave_address: String,
     pub encryption_scheme_id: Vec<u8>,
     pub expiration: u64,
