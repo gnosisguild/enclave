@@ -8,14 +8,19 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
+import BondingRegistryModule from "../ignition/modules/bondingRegistry";
 import EnclaveModule from "../ignition/modules/enclave";
+import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
+import EnclaveTokenModule from "../ignition/modules/enclaveToken";
 import MockCiphernodeRegistryModule from "../ignition/modules/mockCiphernodeRegistry";
 import MockCiphernodeRegistryEmptyKeyModule from "../ignition/modules/mockCiphernodeRegistryEmptyKey";
 import mockComputeProviderModule from "../ignition/modules/mockComputeProvider";
 import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVerifier";
 import MockE3ProgramModule from "../ignition/modules/mockE3Program";
 import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
+import MockStableTokenModule from "../ignition/modules/mockStableToken";
 import NaiveRegistryFilterModule from "../ignition/modules/naiveRegistryFilter";
+import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
   Enclave__factory as EnclaveFactory,
@@ -53,10 +58,95 @@ describe("Enclave", function () {
   // Hash function used to compute the tree nodes.
   const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
+  // Helper function to approve USDC and make request
+  const makeRequest = async (
+    enclave: any,
+    usdcToken: any,
+    requestParams: any,
+    signer?: any,
+  ) => {
+    const fee = await enclave.getE3Quote(requestParams);
+    const tokenContract = signer ? usdcToken.connect(signer) : usdcToken;
+    const enclaveContract = signer ? enclave.connect(signer) : enclave;
+
+    await tokenContract.approve(await enclave.getAddress(), fee);
+    return enclaveContract.request(requestParams);
+  };
+
   const setup = async () => {
     const [owner, notTheOwner] = await ethers.getSigners();
 
     const ownerAddress = await owner.getAddress();
+
+    // Deploy PoseidonT3 library first
+    const poseidonFactory = await ethers.getContractFactory("PoseidonT3");
+    const poseidonDeployment = await poseidonFactory.deploy();
+
+    // Deploy USDC mock
+    const usdcContract = await ignition.deploy(MockStableTokenModule, {
+      parameters: {
+        MockUSDC: {
+          initialSupply: 1000000, // 1M USDC (with 6 decimals)
+        },
+      },
+    });
+
+    // Deploy ENCL token
+    const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
+      parameters: {
+        EnclaveToken: {
+          owner: ownerAddress,
+        },
+      },
+    });
+
+    // Deploy EnclaveTicketToken
+    const ticketTokenContract = await ignition.deploy(
+      EnclaveTicketTokenModule,
+      {
+        parameters: {
+          EnclaveTicketToken: {
+            underlyingUSDC: await usdcContract.mockUSDC.getAddress(),
+            registry: addressOne, // temporary, will be updated
+            owner: ownerAddress,
+          },
+        },
+      },
+    );
+
+    // Deploy SlashingManager
+    const slashingManagerContract = await ignition.deploy(
+      SlashingManagerModule,
+      {
+        parameters: {
+          SlashingManager: {
+            admin: ownerAddress,
+            bondingRegistry: addressOne, // temporary, will be updated
+          },
+        },
+      },
+    );
+
+    // Deploy BondingRegistry
+    const bondingRegistryContract = await ignition.deploy(
+      BondingRegistryModule,
+      {
+        parameters: {
+          BondingRegistry: {
+            owner: ownerAddress,
+            ticketToken:
+              await ticketTokenContract.enclaveTicketToken.getAddress(),
+            licenseToken: await enclTokenContract.enclaveToken.getAddress(),
+            registry: addressOne, // will be updated when ciphernode registry is ready
+            slashedFundsTreasury: ownerAddress,
+            ticketPrice: ethers.parseEther("10"), // 10 USDC per ticket (scaled to 18 decimals for calculation)
+            licenseRequiredBond: ethers.parseEther("1000"), // 1000 ENCL required
+            minTicketBalance: 5, // minimum 5 tickets
+            exitDelay: 7 * 24 * 60 * 60, // 7 days in seconds
+          },
+        },
+      },
+    );
 
     const enclaveContract = await ignition.deploy(EnclaveModule, {
       parameters: {
@@ -64,19 +154,28 @@ describe("Enclave", function () {
           params: encodedE3ProgramParams,
           owner: ownerAddress,
           maxDuration: THIRTY_DAYS_IN_SECONDS,
-          registry: addressOne,
+          registry: addressOne, // will be updated when ciphernode registry is ready
+          bondingRegistry:
+            await bondingRegistryContract.bondingRegistry.getAddress(),
+          usdcToken: await usdcContract.mockUSDC.getAddress(),
         },
       },
     });
 
     const enclaveAddress = await enclaveContract.enclave.getAddress();
 
-    const ciphernodeRegistry = await ignition.deploy(
-      MockCiphernodeRegistryModule,
+    // Deploy MockCiphernodeRegistry manually
+    const ciphernodeRegistryFactory = await ethers.getContractFactory(
+      "MockCiphernodeRegistry",
+      {
+        libraries: {
+          PoseidonT3: await poseidonDeployment.getAddress(),
+        },
+      },
     );
-
+    const ciphernodeRegistryContract = await ciphernodeRegistryFactory.deploy();
     const ciphernodeRegistryAddress =
-      await ciphernodeRegistry.mockCiphernodeRegistry.getAddress();
+      await ciphernodeRegistryContract.getAddress();
 
     const naiveRegistryFilter = await ignition.deploy(
       NaiveRegistryFilterModule,
@@ -94,10 +193,11 @@ describe("Enclave", function () {
       await naiveRegistryFilter.naiveRegistryFilter.getAddress();
 
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
-    const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
-      ciphernodeRegistryAddress,
-      owner,
-    );
+    const ciphernodeRegistryOwnableContract =
+      CiphernodeRegistryOwnableFactory.connect(
+        ciphernodeRegistryAddress,
+        owner,
+      );
     const naiveRegistryFilterContract = NaiveRegistryFilterFactory.connect(
       naiveRegistryFilterAddress,
       owner,
@@ -107,6 +207,20 @@ describe("Enclave", function () {
     if (registryAddress !== ciphernodeRegistryAddress) {
       await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
     }
+
+    // Update contract references with actual addresses
+    await ticketTokenContract.enclaveTicketToken.setRegistry(
+      await bondingRegistryContract.bondingRegistry.getAddress(),
+    );
+    await bondingRegistryContract.bondingRegistry.setRegistry(
+      ciphernodeRegistryAddress,
+    );
+    await bondingRegistryContract.bondingRegistry.setSlashingManager(
+      await slashingManagerContract.slashingManager.getAddress(),
+    );
+    await slashingManagerContract.slashingManager.setBondingRegistry(
+      await bondingRegistryContract.bondingRegistry.getAddress(),
+    );
 
     const mockComputeProvider = await ignition.deploy(
       mockComputeProviderModule,
@@ -137,7 +251,7 @@ describe("Enclave", function () {
     const request = {
       filter: await naiveRegistryFilterContract.getAddress(),
       threshold: [2, 2] as [number, number],
-      startTime: [await time.latest(), (await time.latest()) + 100] as [
+      startWindow: [await time.latest(), (await time.latest()) + 100] as [
         number,
         number,
       ],
@@ -150,10 +264,35 @@ describe("Enclave", function () {
       ),
     };
 
+    // Setup initial token balances
+    await usdcContract.mockUSDC.mint(
+      ownerAddress,
+      ethers.parseUnits("10000", 6),
+    ); // 10k USDC
+    await usdcContract.mockUSDC.mint(
+      await notTheOwner.getAddress(),
+      ethers.parseUnits("10000", 6),
+    ); // 10k USDC
+    await enclTokenContract.enclaveToken.mintAllocation(
+      ownerAddress,
+      ethers.parseEther("10000"),
+      "Test allocation",
+    );
+    await enclTokenContract.enclaveToken.mintAllocation(
+      await notTheOwner.getAddress(),
+      ethers.parseEther("10000"),
+      "Test allocation",
+    );
+
     return {
       enclave,
-      ciphernodeRegistryContract,
+      ciphernodeRegistryContract: ciphernodeRegistryOwnableContract,
       naiveRegistryFilterContract,
+      bondingRegistry: bondingRegistryContract.bondingRegistry,
+      ticketToken: ticketTokenContract.enclaveTicketToken,
+      licenseToken: enclTokenContract.enclaveToken,
+      usdcToken: usdcContract.mockUSDC,
+      slashingManager: slashingManagerContract.slashingManager,
       mocks: {
         decryptionVerifier: decryptionVerifier.mockDecryptionVerifier,
         inputValidator: inputValidator.mockInputValidator,
@@ -339,7 +478,7 @@ describe("Enclave", function () {
         {
           filter: await naiveRegistryFilterContract.getAddress(),
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -583,13 +722,13 @@ describe("Enclave", function () {
   });
 
   describe("request()", function () {
-    it("reverts if msg.value is 0", async function () {
+    it("reverts if USDC allowance is insufficient", async function () {
       const { enclave, request } = await loadFixture(setup);
       await expect(
         enclave.request({
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -598,20 +737,27 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "PaymentRequired");
     });
     it("reverts if threshold is 0", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, usdcToken, owner } = await loadFixture(setup);
+      const fee = await enclave.getE3Quote({
+        filter: request.filter,
+        threshold: [0, 2],
+        startWindow: request.startWindow,
+        duration: request.duration,
+        e3Program: request.e3Program,
+        e3ProgramParams: request.e3ProgramParams,
+        computeProviderParams: request.computeProviderParams,
+      });
+      await usdcToken.approve(await enclave.getAddress(), fee);
       await expect(
-        enclave.request(
-          {
-            filter: request.filter,
-            threshold: [0, 2],
-            startWindow: request.startTime,
-            duration: request.duration,
-            e3Program: request.e3Program,
-            e3ProgramParams: request.e3ProgramParams,
-            computeProviderParams: request.computeProviderParams,
-          },
-          { value: 10 },
-        ),
+        enclave.request({
+          filter: request.filter,
+          threshold: [0, 2],
+          startWindow: request.startWindow,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        }),
       ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
     });
     it("reverts if threshold is greater than number", async function () {
@@ -621,7 +767,7 @@ describe("Enclave", function () {
           {
             filter: request.filter,
             threshold: [3, 2],
-            startWindow: request.startTime,
+            startWindow: request.startWindow,
             duration: request.duration,
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
@@ -638,7 +784,7 @@ describe("Enclave", function () {
           {
             filter: request.filter,
             threshold: request.threshold,
-            startWindow: request.startTime,
+            startWindow: request.startWindow,
             duration: 0,
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
@@ -655,7 +801,7 @@ describe("Enclave", function () {
           {
             filter: request.filter,
             threshold: request.threshold,
-            startWindow: request.startTime,
+            startWindow: request.startWindow,
             duration: time.duration.days(31),
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
@@ -672,7 +818,7 @@ describe("Enclave", function () {
           {
             filter: request.filter,
             threshold: request.threshold,
-            startWindow: request.startTime,
+            startWindow: request.startWindow,
             duration: request.duration,
             e3Program: ethers.ZeroAddress,
             e3ProgramParams: request.e3ProgramParams,
@@ -692,7 +838,7 @@ describe("Enclave", function () {
           {
             filter: request.filter,
             threshold: request.threshold,
-            startWindow: request.startTime,
+            startWindow: request.startWindow,
             duration: request.duration,
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
@@ -712,7 +858,7 @@ describe("Enclave", function () {
           {
             filter: AddressTwo,
             threshold: request.threshold,
-            startWindow: request.startTime,
+            startWindow: request.startWindow,
             duration: request.duration,
             e3Program: request.e3Program,
             e3ProgramParams: request.e3ProgramParams,
@@ -723,20 +869,17 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
     });
     it("instantiates a new E3", async function () {
-      const { enclave, request, mocks } = await loadFixture(setup);
+      const { enclave, request, mocks, usdcToken } = await loadFixture(setup);
 
-      await enclave.request(
-        {
-          filter: request.filter,
-          threshold: request.threshold,
-          startWindow: request.startTime,
-          duration: request.duration,
-          e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
-          computeProviderParams: request.computeProviderParams,
-        },
-        { value: 10 },
-      );
+      await makeRequest(enclave, usdcToken, {
+        filter: request.filter,
+        threshold: request.threshold,
+        startWindow: request.startWindow,
+        duration: request.duration,
+        e3Program: request.e3Program,
+        e3ProgramParams: request.e3ProgramParams,
+        computeProviderParams: request.computeProviderParams,
+      });
 
       const e3 = await enclave.getE3(0);
       const block = await ethers.provider.getBlock("latest").catch((e) => e);
@@ -756,19 +899,16 @@ describe("Enclave", function () {
       expect(e3.plaintextOutput).to.equal("0x");
     });
     it("emits E3Requested event", async function () {
-      const { enclave, request } = await loadFixture(setup);
-      const tx = await enclave.request(
-        {
-          filter: request.filter,
-          threshold: request.threshold,
-          startWindow: request.startTime,
-          duration: request.duration,
-          e3Program: request.e3Program,
-          e3ProgramParams: request.e3ProgramParams,
-          computeProviderParams: request.computeProviderParams,
-        },
-        { value: 10 },
-      );
+      const { enclave, request, usdcToken } = await loadFixture(setup);
+      const tx = await makeRequest(enclave, usdcToken, {
+        filter: request.filter,
+        threshold: request.threshold,
+        startWindow: request.startWindow,
+        duration: request.duration,
+        e3Program: request.e3Program,
+        e3ProgramParams: request.e3ProgramParams,
+        computeProviderParams: request.computeProviderParams,
+      });
       const e3 = await enclave.getE3(0);
 
       await expect(tx)
@@ -792,7 +932,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -917,7 +1057,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -953,7 +1093,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -981,7 +1121,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1003,7 +1143,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1037,7 +1177,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1063,7 +1203,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1085,7 +1225,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1113,7 +1253,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1130,7 +1270,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1152,7 +1292,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1179,7 +1319,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1209,7 +1349,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
@@ -1246,7 +1386,7 @@ describe("Enclave", function () {
         {
           filter: request.filter,
           threshold: request.threshold,
-          startWindow: request.startTime,
+          startWindow: request.startWindow,
           duration: request.duration,
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
