@@ -119,41 +119,4 @@ interface ICiphernodeRegistry {
     function getCommittee(
         uint256 e3Id
     ) external view returns (IRegistryFilter.Committee memory committee);
-
-    /// @notice Mark a committee as active when a job starts
-    /// @param e3Id ID of the E3 committee
-    /// @param members Array of committee member addresses
-    /// @dev Should be called by authorized entities when job execution begins
-    function markCommitteeActive(
-        uint256 e3Id,
-        address[] calldata members
-    ) external;
-
-    /// @notice Mark a committee as completed when a job ends
-    /// @param e3Id ID of the E3 committee
-    /// @param members Array of committee member addresses
-    /// @dev Should be called by authorized entities when job execution completes
-    function markCommitteeCompleted(
-        uint256 e3Id,
-        address[] calldata members
-    ) external;
-
-    /// @notice Check if a node is active in any committee
-    /// @param node Address of the node to check
-    /// @return True if the node is currently active in at least one committee
-    function isNodeActiveInAnyCommittee(
-        address node
-    ) external view returns (bool);
-
-    /// @notice Get the number of active committees a node is in
-    /// @param node Address of the node to check
-    /// @return Number of active committees the node is participating in
-    function activeCommitteeCountOf(
-        address node
-    ) external view returns (uint256);
-
-    /// @notice Check if a specific committee is active
-    /// @param e3Id ID of the E3 committee to check
-    /// @return True if the committee is currently active
-    function isCommitteeActive(uint256 e3Id) external view returns (bool);
 }

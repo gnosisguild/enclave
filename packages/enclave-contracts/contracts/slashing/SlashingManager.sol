@@ -7,21 +7,8 @@
 pragma solidity >=0.8.27;
 
 import {
-    UUPSUpgradeable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    Initializable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {
-    AccessControlUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {
-    PausableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-
+    AccessControl
+} from "@openzeppelin/contracts/access/AccessControl.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ISlashVerifier } from "../interfaces/ISlashVerifier.sol";
@@ -31,14 +18,7 @@ import { ISlashVerifier } from "../interfaces/ISlashVerifier.sol";
  * @notice Manages slashing proposals, appeals, and execution for the bonding system
  * @dev UUPS upgradeable contract with role-based access control
  */
-contract SlashingManager is
-    Initializable,
-    UUPSUpgradeable,
-    AccessControlUpgradeable,
-    PausableUpgradeable,
-    ReentrancyGuardUpgradeable,
-    ISlashingManager
-{
+contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
     // Constants & Roles
     // ======================
@@ -67,12 +47,6 @@ contract SlashingManager is
     mapping(address node => bool banned) public banned;
 
     // ======================
-    // Storage Gaps for Upgrades
-    // ======================
-
-    uint256[50] private __gap;
-
-    // ======================
     // Modifiers
     // ======================
 
@@ -97,28 +71,10 @@ contract SlashingManager is
     }
 
     // ======================
-    // Initialization
+    // Constructor
     // ======================
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    /**
-     * @notice Initialize the contract
-     * @param admin Contract admin (gets DEFAULT_ADMIN_ROLE and GOVERNANCE_ROLE)
-     * @param _bondingRegistry Bonding registry contract address
-     */
-    function initialize(
-        address admin,
-        address _bondingRegistry
-    ) external initializer {
-        __AccessControl_init();
-        __Pausable_init();
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
-
+    constructor(address admin, address _bondingRegistry) {
         require(admin != address(0), ZeroAddress());
         require(_bondingRegistry != address(0), ZeroAddress());
 
@@ -214,13 +170,7 @@ contract SlashingManager is
         address operator,
         bytes32 reason,
         bytes calldata proof
-    )
-        external
-        onlySlasher
-        whenNotPaused
-        notBanned(operator)
-        returns (uint256 proposalId)
-    {
+    ) external onlySlasher notBanned(operator) returns (uint256 proposalId) {
         require(operator != address(0), ZeroAddress());
 
         SlashPolicy storage policy = slashPolicies[reason];
@@ -271,9 +221,7 @@ contract SlashingManager is
         return nextId;
     }
 
-    function executeSlash(
-        uint256 proposalId
-    ) external onlySlasher whenNotPaused nonReentrant {
+    function executeSlash(uint256 proposalId) external onlySlasher {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = proposals[proposalId];
 
@@ -337,10 +285,7 @@ contract SlashingManager is
     // Appeal Functions
     // ======================
 
-    function fileAppeal(
-        uint256 proposalId,
-        string calldata evidence
-    ) external whenNotPaused {
+    function fileAppeal(uint256 proposalId, string calldata evidence) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = proposals[proposalId];
 
@@ -396,21 +341,4 @@ contract SlashingManager is
         banned[node] = false;
         emit NodeUnbanned(node, msg.sender);
     }
-
-    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _pause();
-    }
-
-    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _unpause();
-    }
-
-    // ======================
-    // Internal Functions
-    // ======================
-
-    // solhint-disable-next-line no-empty-blocks
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

@@ -7,6 +7,8 @@
 pragma solidity >=0.8.27;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ICiphernodeRegistry } from "./ICiphernodeRegistry.sol";
+import { EnclaveTicketToken } from "../token/EnclaveTicketToken.sol";
 
 /**
  * @title IBondingRegistry
@@ -347,6 +349,20 @@ interface IBondingRegistry {
     function setExitDelay(uint64 newExitDelay) external;
 
     /**
+     * @notice Set ticket token
+     * @param newTicketToken New ticket token
+     * @dev Only callable by contract owner
+     */
+    function setTicketToken(EnclaveTicketToken newTicketToken) external;
+
+    /**
+     * @notice Set license token
+     * @param newLicenseToken New license token
+     * @dev Only callable by contract owner
+     */
+    function setLicenseToken(IERC20 newLicenseToken) external;
+
+    /**
      * @notice Set slashed funds treasury address
      * @param newSlashedFundsTreasury New slashed funds treasury address
      * @dev Only callable by contract owner
@@ -358,7 +374,7 @@ interface IBondingRegistry {
      * @param newRegistry New registry contract address
      * @dev Only callable by contract owner
      */
-    function setRegistry(address newRegistry) external;
+    function setRegistry(ICiphernodeRegistry newRegistry) external;
 
     /**
      * @notice Set slashing manager address
@@ -377,16 +393,4 @@ interface IBondingRegistry {
         uint256 ticketAmount,
         uint256 licenseAmount
     ) external;
-
-    /**
-     * @notice Emergency pause the contract
-     * @dev Only callable by contract owner
-     */
-    function pause() external;
-
-    /**
-     * @notice Unpause the contract
-     * @dev Only callable by contract owner
-     */
-    function unpause() external;
 }

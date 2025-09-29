@@ -7,17 +7,8 @@
 pragma solidity >=0.8.27;
 
 import {
-    UUPSUpgradeable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    Initializable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {
-    PausableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     SafeERC20
@@ -28,19 +19,13 @@ import { ExitQueueLib } from "../lib/ExitQueueLib.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
-import { EnclaveTicketToken } from "../token/EnclaveTicket.sol";
+import { EnclaveTicketToken } from "../token/EnclaveTicketToken.sol";
 
 /**
  * @title BondingRegistry
  * @notice Main registry for operator balance and license bonds
  */
-contract BondingRegistry is
-    Initializable,
-    UUPSUpgradeable,
-    OwnableUpgradeable,
-    PausableUpgradeable,
-    IBondingRegistry
-{
+contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     using SafeERC20 for IERC20;
     using ExitQueueLib for ExitQueueLib.ExitQueueState;
 
@@ -104,12 +89,6 @@ contract BondingRegistry is
     ExitQueueLib.ExitQueueState private _exits;
 
     // ======================
-    // Storage Gaps for Upgrades
-    // ======================
-
-    uint256[50] private __gap;
-
-    // ======================
     // Modifiers
     // ======================
 
@@ -125,56 +104,57 @@ contract BondingRegistry is
         _;
     }
 
-    // ======================
-    // Initialization
-    // ======================
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Initialization                       //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    /**
-     * @notice Initialize the contract
-     * @param owner Contract owner
-     * @param _ticketToken Ticket token contract
-     * @param _licenseToken License token contract
-     * @param _registry Registry contract
-     * @param _slashedFundsTreasury Slashed funds treasury address
-     * @param _ticketPrice Initial ticket price
-     * @param _licenseRequiredBond Initial license bond price
-     * @param _minTicketBalance Initial minimum ticket balance for activation
-     * @param _exitDelay Initial exit delay period
-     */
-    function initialize(
-        address owner,
+    constructor(
+        address _owner,
         EnclaveTicketToken _ticketToken,
         IERC20 _licenseToken,
-        address _registry,
+        ICiphernodeRegistry _registry,
         address _slashedFundsTreasury,
         uint256 _ticketPrice,
         uint256 _licenseRequiredBond,
         uint256 _minTicketBalance,
         uint64 _exitDelay
-    ) external initializer {
-        __Ownable_init(owner);
-        __Pausable_init();
-        __UUPSUpgradeable_init();
+    ) {
+        initialize(
+            _owner,
+            _ticketToken,
+            _licenseToken,
+            _registry,
+            _slashedFundsTreasury,
+            _ticketPrice,
+            _licenseRequiredBond,
+            _minTicketBalance,
+            _exitDelay
+        );
+    }
 
-        require(address(_ticketToken) != address(0), ZeroAddress());
-        require(address(_licenseToken) != address(0), ZeroAddress());
-        require(_slashedFundsTreasury != address(0), ZeroAddress());
-        require(_ticketPrice != 0, InvalidConfiguration());
-        require(_licenseRequiredBond != 0, InvalidConfiguration());
-
-        ticketToken = _ticketToken;
-        licenseToken = _licenseToken;
-        registry = ICiphernodeRegistry(_registry);
-        slashedFundsTreasury = _slashedFundsTreasury;
-        ticketPrice = _ticketPrice;
-        licenseRequiredBond = _licenseRequiredBond;
-        minTicketBalance = _minTicketBalance;
-        exitDelay = _exitDelay;
+    function initialize(
+        address _owner,
+        EnclaveTicketToken _ticketToken,
+        IERC20 _licenseToken,
+        ICiphernodeRegistry _registry,
+        address _slashedFundsTreasury,
+        uint256 _ticketPrice,
+        uint256 _licenseRequiredBond,
+        uint256 _minTicketBalance,
+        uint64 _exitDelay
+    ) public initializer {
+        __Ownable_init(msg.sender);
+        setTicketToken(_ticketToken);
+        setLicenseToken(_licenseToken);
+        setRegistry(_registry);
+        setSlashedFundsTreasury(_slashedFundsTreasury);
+        setTicketPrice(_ticketPrice);
+        setLicenseRequiredBond(_licenseRequiredBond);
+        setMinTicketBalance(_minTicketBalance);
+        setExitDelay(_exitDelay);
+        if (_owner != owner()) transferOwnership(_owner);
     }
 
     // ======================
@@ -226,13 +206,7 @@ contract BondingRegistry is
     }
 
     function isActive(address operator) external view returns (bool) {
-        Operator storage op = operators[operator];
-        return
-            op.registered &&
-            op.licenseBond >= _minLicenseBond() &&
-            (ticketPrice == 0 ||
-                ticketToken.balanceOf(operator) / ticketPrice >=
-                minTicketBalance);
+        return operators[operator].active;
     }
 
     function hasExitInProgress(address operator) external view returns (bool) {
@@ -244,11 +218,7 @@ contract BondingRegistry is
     // Operator Functions
     // ======================
 
-    function registerOperator()
-        external
-        whenNotPaused
-        noExitInProgress(msg.sender)
-    {
+    function registerOperator() external noExitInProgress(msg.sender) {
         // Clear previous exit request
         if (operators[msg.sender].exitRequested) {
             operators[msg.sender].exitRequested = false;
@@ -277,7 +247,7 @@ contract BondingRegistry is
 
     function deregisterOperator(
         uint256[] calldata siblingNodes
-    ) external whenNotPaused noExitInProgress(msg.sender) {
+    ) external noExitInProgress(msg.sender) {
         Operator storage op = operators[msg.sender];
         require(op.registered, NotRegistered());
 
@@ -326,7 +296,7 @@ contract BondingRegistry is
 
     function addTicketBalance(
         uint256 amount
-    ) external whenNotPaused noExitInProgress(msg.sender) {
+    ) external noExitInProgress(msg.sender) {
         require(amount != 0, ZeroAmount());
         require(operators[msg.sender].registered, NotRegistered());
 
@@ -344,7 +314,7 @@ contract BondingRegistry is
 
     function removeTicketBalance(
         uint256 amount
-    ) external whenNotPaused noExitInProgress(msg.sender) {
+    ) external noExitInProgress(msg.sender) {
         require(amount != 0, ZeroAmount());
         require(operators[msg.sender].registered, NotRegistered());
         require(
@@ -365,9 +335,7 @@ contract BondingRegistry is
         _updateOperatorStatus(msg.sender);
     }
 
-    function bondLicense(
-        uint256 amount
-    ) external whenNotPaused noExitInProgress(msg.sender) {
+    function bondLicense(uint256 amount) external noExitInProgress(msg.sender) {
         require(amount != 0, ZeroAmount());
 
         uint256 balanceBefore = licenseToken.balanceOf(address(this));
@@ -389,7 +357,7 @@ contract BondingRegistry is
 
     function unbondLicense(
         uint256 amount
-    ) external whenNotPaused noExitInProgress(msg.sender) {
+    ) external noExitInProgress(msg.sender) {
         require(amount != 0, ZeroAmount());
         require(
             operators[msg.sender].licenseBond >= amount,
@@ -416,7 +384,7 @@ contract BondingRegistry is
     function claimExits(
         uint256 maxTicketAmount,
         uint256 maxLicenseAmount
-    ) external whenNotPaused {
+    ) external {
         (uint256 ticketClaim, uint256 licenseClaim) = _exits.claimAssets(
             msg.sender,
             maxTicketAmount,
@@ -560,7 +528,7 @@ contract BondingRegistry is
     // Admin Functions
     // ======================
 
-    function setTicketPrice(uint256 newTicketPrice) external onlyOwner {
+    function setTicketPrice(uint256 newTicketPrice) public onlyOwner {
         require(newTicketPrice != 0, InvalidConfiguration());
 
         uint256 oldValue = ticketPrice;
@@ -571,7 +539,7 @@ contract BondingRegistry is
 
     function setLicenseRequiredBond(
         uint256 newLicenseRequiredBond
-    ) external onlyOwner {
+    ) public onlyOwner {
         require(newLicenseRequiredBond != 0, InvalidConfiguration());
 
         uint256 oldValue = licenseRequiredBond;
@@ -584,7 +552,7 @@ contract BondingRegistry is
         );
     }
 
-    function setLicenseActiveBps(uint256 newBps) external onlyOwner {
+    function setLicenseActiveBps(uint256 newBps) public onlyOwner {
         require(newBps > 0 && newBps <= 10_000, InvalidConfiguration());
 
         uint256 oldValue = licenseActiveBps;
@@ -593,9 +561,7 @@ contract BondingRegistry is
         emit ConfigurationUpdated("licenseActiveBps", oldValue, newBps);
     }
 
-    function setMinTicketBalance(
-        uint256 newMinTicketBalance
-    ) external onlyOwner {
+    function setMinTicketBalance(uint256 newMinTicketBalance) public onlyOwner {
         uint256 oldValue = minTicketBalance;
         minTicketBalance = newMinTicketBalance;
 
@@ -606,7 +572,7 @@ contract BondingRegistry is
         );
     }
 
-    function setExitDelay(uint64 newExitDelay) external onlyOwner {
+    function setExitDelay(uint64 newExitDelay) public onlyOwner {
         uint256 oldValue = uint256(exitDelay);
         exitDelay = newExitDelay;
 
@@ -615,29 +581,39 @@ contract BondingRegistry is
 
     function setSlashedFundsTreasury(
         address newSlashedFundsTreasury
-    ) external onlyOwner {
+    ) public onlyOwner {
         require(newSlashedFundsTreasury != address(0), ZeroAddress());
         slashedFundsTreasury = newSlashedFundsTreasury;
     }
 
-    function setRegistry(address newRegistry) external onlyOwner {
-        registry = ICiphernodeRegistry(newRegistry);
+    function setTicketToken(
+        EnclaveTicketToken newTicketToken
+    ) public onlyOwner {
+        ticketToken = newTicketToken;
     }
 
-    function setSlashingManager(address newSlashingManager) external onlyOwner {
+    function setLicenseToken(IERC20 newLicenseToken) public onlyOwner {
+        licenseToken = newLicenseToken;
+    }
+
+    function setRegistry(ICiphernodeRegistry newRegistry) public onlyOwner {
+        registry = newRegistry;
+    }
+
+    function setSlashingManager(address newSlashingManager) public onlyOwner {
         slashingManager = newSlashingManager;
     }
 
     function setRewardDistributor(
         address newRewardDistributor
-    ) external onlyOwner {
+    ) public onlyOwner {
         rewardDistributor = newRewardDistributor;
     }
 
     function withdrawSlashedFunds(
         uint256 ticketAmount,
         uint256 licenseAmount
-    ) external onlyOwner {
+    ) public onlyOwner {
         require(ticketAmount <= slashedTicketBalance, InsufficientBalance());
         require(licenseAmount <= slashedLicenseBond, InsufficientBalance());
 
@@ -656,14 +632,6 @@ contract BondingRegistry is
             ticketAmount,
             licenseAmount
         );
-    }
-
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
     }
 
     // ======================
@@ -687,8 +655,4 @@ contract BondingRegistry is
     function _minLicenseBond() internal view returns (uint256) {
         return (licenseRequiredBond * licenseActiveBps) / 10_000;
     }
-
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
 }

@@ -234,6 +234,6 @@ interface IEnclave {
     /// @param e3Params the struct representing the E3 request parameters
     /// @return fee the fee of the E3
     function getE3Quote(
-        E3RequestParams memory e3Params
+        E3RequestParams calldata e3Params
     ) external view returns (uint256 fee);
 }

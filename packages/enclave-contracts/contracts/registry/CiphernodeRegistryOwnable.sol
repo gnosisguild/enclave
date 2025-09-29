@@ -42,10 +42,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     mapping(uint256 e3Id => uint256 root) public roots;
     mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
 
-    // Committee tracking for active job management
-    mapping(uint256 e3Id => bool active) public committeeActive;
-    mapping(address node => uint256 count) public activeCommitteeCount;
-
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                        Errors                          //
@@ -238,67 +234,5 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function getBondingRegistry() external view returns (address) {
         return bondingRegistry;
-    }
-
-    ////////////////////////////////////////////////////////////
-    //                                                        //
-    //                Committee Tracking                      //
-    //                                                        //
-    ////////////////////////////////////////////////////////////
-
-    function markCommitteeActive(
-        uint256 e3Id,
-        address[] calldata members
-    ) external {
-        require(msg.sender == enclave || msg.sender == owner(), Unauthorized());
-
-        // Idempotent: only process if not already active
-        if (!committeeActive[e3Id]) {
-            committeeActive[e3Id] = true;
-
-            // Increment active committee count for each member
-            for (uint256 i = 0; i < members.length; i++) {
-                activeCommitteeCount[members[i]]++;
-            }
-
-            emit CommitteeActivationChanged(e3Id, true);
-        }
-    }
-
-    function markCommitteeCompleted(
-        uint256 e3Id,
-        address[] calldata members
-    ) external {
-        require(msg.sender == enclave || msg.sender == owner(), Unauthorized());
-
-        // Only process if currently active
-        if (committeeActive[e3Id]) {
-            committeeActive[e3Id] = false;
-
-            // Decrement active committee count for each member
-            for (uint256 i = 0; i < members.length; i++) {
-                if (activeCommitteeCount[members[i]] > 0) {
-                    activeCommitteeCount[members[i]]--;
-                }
-            }
-
-            emit CommitteeActivationChanged(e3Id, false);
-        }
-    }
-
-    function isNodeActiveInAnyCommittee(
-        address node
-    ) external view returns (bool) {
-        return activeCommitteeCount[node] > 0;
-    }
-
-    function activeCommitteeCountOf(
-        address node
-    ) external view returns (uint256) {
-        return activeCommitteeCount[node];
-    }
-
-    function isCommitteeActive(uint256 e3Id) external view returns (bool) {
-        return committeeActive[e3Id];
     }
 }

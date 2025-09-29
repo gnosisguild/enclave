@@ -282,14 +282,4 @@ interface ISlashingManager {
      * @param node Address to unban
      */
     function unbanNode(address node) external;
-
-    /**
-     * @notice Emergency pause slashing operations
-     */
-    function pause() external;
-
-    /**
-     * @notice Unpause slashing operations
-     */
-    function unpause() external;
 }

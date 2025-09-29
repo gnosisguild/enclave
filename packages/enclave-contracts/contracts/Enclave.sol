@@ -218,6 +218,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.decryptionVerifier = decryptionVerifier;
 
         e3s[e3Id] = e3;
+        e3Payments[e3Id] = e3Fee;
 
         usdcToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 

@@ -6,6 +6,7 @@
 pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
+import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 
 contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function requestCommittee(
@@ -19,6 +20,14 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
             success = true;
         }
     }
+
+    function addCiphernode(address) external {}
+
+    function isEnabled(address) external pure returns (bool) {
+        return true;
+    }
+
+    function removeCiphernode(address, uint256[] calldata) external {}
 
     // solhint-disable no-empty-blocks
     function publishCommittee(
@@ -38,6 +47,21 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function isCiphernodeEligible(address) external pure returns (bool) {
         return false;
     }
+
+    function getFilter(uint256) external pure returns (address) {
+        return address(0);
+    }
+
+    function getCommittee(
+        uint256
+    ) external pure returns (IRegistryFilter.Committee memory) {
+        return
+            IRegistryFilter.Committee(
+                new address[](0),
+                [uint32(0), uint32(0)],
+                bytes32(0)
+            );
+    }
 }
 
 contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
@@ -53,12 +77,35 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         }
     }
 
+    function addCiphernode(address) external {}
+
+    function isEnabled(address) external pure returns (bool) {
+        return true;
+    }
+
+    function removeCiphernode(address, uint256[] calldata) external {}
+
     // solhint-disable no-empty-blocks
     function publishCommittee(
         uint256,
         bytes calldata,
         bytes calldata
     ) external {} // solhint-disable-line no-empty-blocks
+
+    function getFilter(uint256) external pure returns (address) {
+        return address(0);
+    }
+
+    function getCommittee(
+        uint256
+    ) external pure returns (IRegistryFilter.Committee memory) {
+        return
+            IRegistryFilter.Committee(
+                new address[](0),
+                [uint32(0), uint32(0)],
+                bytes32(0)
+            );
+    }
 
     function committeePublicKey(uint256) external pure returns (bytes32) {
         return bytes32(0);
