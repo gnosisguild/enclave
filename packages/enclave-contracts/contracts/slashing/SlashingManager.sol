@@ -38,7 +38,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     mapping(bytes32 reason => SlashPolicy policy) public slashPolicies;
 
     /// @notice All slash proposals
-    mapping(uint256 proposalId => SlashProposal proposal) public proposals;
+    mapping(uint256 proposalId => SlashProposal proposal) internal _proposals;
 
     /// @notice Total number of proposals created
     uint256 public totalProposals;
@@ -98,7 +98,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         uint256 proposalId
     ) external view returns (SlashProposal memory) {
         require(proposalId < totalProposals, InvalidProposal());
-        return proposals[proposalId];
+        return _proposals[proposalId];
     }
 
     function isBanned(address node) external view returns (bool) {
@@ -176,39 +176,38 @@ contract SlashingManager is ISlashingManager, AccessControl {
         SlashPolicy storage policy = slashPolicies[reason];
         require(policy.enabled, SlashReasonDisabled());
 
-        uint256 nextId = totalProposals;
+        proposalId = totalProposals;
         bool proofVerified = false;
 
         if (policy.requiresProof) {
             require(proof.length != 0, ProofRequired());
             proofVerified = ISlashVerifier(policy.proofVerifier).verify(
-                nextId,
+                proposalId,
                 proof
             );
             require(proofVerified, InvalidProof());
         }
 
         uint256 executableAt = block.timestamp + policy.appealWindow;
+        SlashProposal storage p = _proposals[proposalId];
 
-        proposals[nextId] = SlashProposal({
-            operator: operator,
-            reason: reason,
-            ticketAmount: policy.ticketPenalty,
-            licenseAmount: policy.licensePenalty,
-            executedTicket: false,
-            executedLicense: false,
-            appealed: false,
-            resolved: false,
-            approved: false,
-            proposedAt: block.timestamp,
-            executableAt: executableAt,
-            proposer: msg.sender,
-            proofHash: keccak256(proof),
-            proofVerified: proofVerified
-        });
+        p.operator = operator;
+        p.reason = reason;
+        p.ticketAmount = policy.ticketPenalty;
+        p.licenseAmount = policy.licensePenalty;
+        p.executedTicket = false;
+        p.executedLicense = false;
+        p.appealed = false;
+        p.resolved = false;
+        p.approved = false;
+        p.proposedAt = block.timestamp;
+        p.executableAt = executableAt;
+        p.proposer = msg.sender;
+        p.proofHash = keccak256(proof);
+        p.proofVerified = proofVerified;
 
         emit SlashProposed(
-            nextId,
+            proposalId,
             operator,
             reason,
             policy.ticketPenalty,
@@ -217,13 +216,12 @@ contract SlashingManager is ISlashingManager, AccessControl {
             msg.sender
         );
 
-        totalProposals = nextId + 1;
-        return nextId;
+        totalProposals = proposalId + 1;
     }
 
     function executeSlash(uint256 proposalId) external onlySlasher {
         require(proposalId < totalProposals, InvalidProposal());
-        SlashProposal storage p = proposals[proposalId];
+        SlashProposal storage p = _proposals[proposalId];
 
         // Has already been executed?
         require(!(p.executedTicket && p.executedLicense), AlreadyExecuted());
@@ -287,7 +285,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     function fileAppeal(uint256 proposalId, string calldata evidence) external {
         require(proposalId < totalProposals, InvalidProposal());
-        SlashProposal storage p = proposals[proposalId];
+        SlashProposal storage p = _proposals[proposalId];
 
         // Only the accused can appeal
         require(msg.sender == p.operator, Unauthorized());
@@ -307,7 +305,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         string calldata resolution
     ) external onlyGovernance {
         require(proposalId < totalProposals, InvalidProposal());
-        SlashProposal storage p = proposals[proposalId];
+        SlashProposal storage p = _proposals[proposalId];
 
         require(p.appealed, InvalidProposal());
         require(!p.resolved, AlreadyResolved());

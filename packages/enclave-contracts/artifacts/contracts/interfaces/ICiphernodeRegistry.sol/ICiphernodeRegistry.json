@@ -76,6 +76,25 @@
         },
         {
           "indexed": false,
+          "internalType": "bool",
+          "name": "active",
+          "type": "bool"
+        }
+      ],
+      "name": "CommitteeActivationChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
           "internalType": "bytes",
           "name": "publicKey",
           "type": "bytes"
@@ -125,6 +144,19 @@
     {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        }
+      ],
+      "name": "addCiphernode",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -136,6 +168,61 @@
           "internalType": "bytes32",
           "name": "publicKeyHash",
           "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCommittee",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "address[]",
+              "name": "nodes",
+              "type": "address[]"
+            },
+            {
+              "internalType": "uint32[2]",
+              "name": "threshold",
+              "type": "uint32[2]"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "publicKey",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IRegistryFilter.Committee",
+          "name": "committee",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getFilter",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "filter",
+          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -163,6 +250,25 @@
     {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        }
+      ],
+      "name": "isEnabled",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "enabled",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
@@ -179,6 +285,24 @@
         }
       ],
       "name": "publishCommittee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "siblingNodes",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "removeCiphernode",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -219,5 +343,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_27-8287ebf5be05227965814498ddef24fc9009e2f0"
+  "buildInfoId": "solc-0_8_27-57dc158663b619d7ef07ffec146d462efa6e9350"
 }

@@ -22,6 +22,19 @@
         {
           "indexed": false,
           "internalType": "address",
+          "name": "bondingRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "BondingRegistrySet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
           "name": "ciphernodeRegistry",
           "type": "address"
         }
@@ -292,6 +305,19 @@
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "usdcToken",
+          "type": "address"
+        }
+      ],
+      "name": "UsdcTokenSet",
+      "type": "event"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint256",
@@ -439,6 +465,62 @@
           "internalType": "struct E3",
           "name": "e3",
           "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "filter",
+              "type": "address"
+            },
+            {
+              "internalType": "uint32[2]",
+              "name": "threshold",
+              "type": "uint32[2]"
+            },
+            {
+              "internalType": "uint256[2]",
+              "name": "startWindow",
+              "type": "uint256[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "duration",
+              "type": "uint256"
+            },
+            {
+              "internalType": "contract IE3Program",
+              "name": "e3Program",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "e3ProgramParams",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "computeProviderParams",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct IEnclave.E3RequestParams",
+          "name": "e3Params",
+          "type": "tuple"
+        }
+      ],
+      "name": "getE3Quote",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "fee",
+          "type": "uint256"
         }
       ],
       "stateMutability": "view",
@@ -704,5 +786,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_27-8287ebf5be05227965814498ddef24fc9009e2f0"
+  "buildInfoId": "solc-0_8_27-57dc158663b619d7ef07ffec146d462efa6e9350"
 }
