@@ -10,9 +10,9 @@ use log::info;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use super::{CLI_DB};
+use super::CLI_DB;
 use alloy::primitives::{Address, Bytes, U256};
-use crisp::config::CONFIG; 
+use crisp::config::CONFIG;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use fhe_rs::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -49,8 +49,13 @@ struct CTRequest {
     ct_bytes: Vec<u8>,
 }
 
-pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("Starting new CRISP round!");
+pub async fn initialize_crisp_round(
+    token_address: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    info!(
+        "Starting new CRISP round with token address: {}",
+        token_address
+    );
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
@@ -73,6 +78,10 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         }
         Err(e) => info!("Error checking E3 Program enabled: {:?}", e),
     }
+
+    // Convert the token address from hex string to bytes.
+    let token_addr: Address = token_address.parse()?;
+    let custom_params = Bytes::from(token_addr.into_array().to_vec());
 
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
@@ -98,6 +107,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
             e3_program,
             e3_params,
             compute_provider_params_bytes,
+            custom_params,
         )
         .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);

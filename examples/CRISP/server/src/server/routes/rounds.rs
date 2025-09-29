@@ -173,10 +173,9 @@ pub async fn initialize_crisp_round(
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
     let params = encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli));
 
-    // Add token address to params
-    // TODO: this needs to be encoded properly.
-    let mut params_with_token = params.clone();
-    params_with_token.extend_from_slice(token_address.as_bytes());
+    // Convert the token address from hex string to bytes.
+    let token_addr: Address = token_address.parse()?;
+    let custom_params = Bytes::from(token_addr.into_array().to_vec());
 
     info!("Requesting E3...");
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
@@ -186,7 +185,7 @@ pub async fn initialize_crisp_round(
         U256::from(Utc::now().timestamp() + CONFIG.e3_window_size as i64),
     ];
     let duration: U256 = U256::from(CONFIG.e3_duration);
-    let e3_params = Bytes::from(params_with_token);
+    let e3_params = Bytes::from(params);
     let compute_provider_params = ComputeProviderParams {
         name: CONFIG.e3_compute_provider_name.clone(),
         parallel: CONFIG.e3_compute_provider_parallel,
@@ -202,6 +201,7 @@ pub async fn initialize_crisp_round(
             e3_program,
             e3_params,
             compute_provider_params,
+            custom_params,
         )
         .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);

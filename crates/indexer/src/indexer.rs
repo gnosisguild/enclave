@@ -253,6 +253,7 @@ impl<S: DataStore> EnclaveIndexer<S> {
                         ciphertext_output: vec![],
                         committee_public_key: e.committeePublicKey.to_vec(),
                         duration,
+                        custom_params: e3.customParams.to_vec(),
                         e3_params: e3.e3ProgramParams.to_vec(),
                         enclave_address,
                         encryption_scheme_id: e3.encryptionSchemeId.to_vec(),
