@@ -104,9 +104,19 @@ describe("NaiveRegistryFilter", function () {
       ).to.be.revertedWithCustomError(filter, "CommitteeAlreadyExists");
     });
     it("should set the threshold for the requested committee", async function () {
-      const { filter, owner, request } = await loadFixture(setup);
-      await filter.setRegistry(await owner.getAddress());
-      await filter.requestCommittee(request.e3Id, request.threshold);
+      const { filter, registry, request } = await loadFixture(setup);
+      await filter.setRegistry(await registry.getAddress());
+
+      await registry.requestCommittee(
+        request.e3Id,
+        await filter.getAddress(),
+        request.threshold,
+      );
+
+      const nodes = [AddressOne, AddressTwo];
+      const publicKey = "0x1234567890abcdef";
+      await filter.publishCommittee(request.e3Id, nodes, publicKey);
+
       const committee = await filter.getCommittee(request.e3Id);
       expect(committee.threshold).to.deep.equal(request.threshold);
     });

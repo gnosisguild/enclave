@@ -511,7 +511,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function getE3Quote(
         E3RequestParams calldata
     ) public pure returns (uint256 fee) {
-        fee = 1 * 10 ** 18;
+        fee = 1 * 10 ** 6;
     }
 
     function getDecryptionVerifier(

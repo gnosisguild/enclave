@@ -237,14 +237,14 @@ describe("CiphernodeRegistryOwnable", function () {
   describe("addCiphernode()", function () {
     it("reverts if the caller is not the owner", async function () {
       const { registry, notTheOwner } = await loadFixture(setup);
-      await expect(registry.connect(notTheOwner).addCiphernode(AddressThree))
-        .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
-        .withArgs(await notTheOwner.getAddress());
+      await expect(
+        registry.connect(notTheOwner).addCiphernode(AddressThree),
+      ).to.be.revertedWithCustomError(registry, "NotOwnerOrBondingRegistry");
     });
     it("adds the ciphernode to the registry", async function () {
       const { registry } = await loadFixture(setup);
       expect(await registry.addCiphernode(AddressThree));
-      expect(await registry.isCiphernodeEligible(AddressThree)).to.be.true;
+      expect(await registry.isEnabled(AddressThree)).to.be.true;
     });
     it("increments numCiphernodes", async function () {
       const { registry } = await loadFixture(setup);
@@ -274,9 +274,7 @@ describe("CiphernodeRegistryOwnable", function () {
       const { registry, notTheOwner } = await loadFixture(setup);
       await expect(
         registry.connect(notTheOwner).removeCiphernode(AddressOne, []),
-      )
-        .to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount")
-        .withArgs(await notTheOwner.getAddress());
+      ).to.be.revertedWithCustomError(registry, "NotOwnerOrBondingRegistry");
     });
     it("removes the ciphernode from the registry", async function () {
       const { registry } = await loadFixture(setup);
@@ -366,7 +364,7 @@ describe("CiphernodeRegistryOwnable", function () {
   describe("isCiphernodeEligible()", function () {
     it("returns true if the ciphernode is in the registry", async function () {
       const { registry } = await loadFixture(setup);
-      expect(await registry.isCiphernodeEligible(AddressOne)).to.be.true;
+      expect(await registry.isEnabled(AddressOne)).to.be.true;
     });
     it("returns false if the ciphernode is not in the registry", async function () {
       const { registry } = await loadFixture(setup);
