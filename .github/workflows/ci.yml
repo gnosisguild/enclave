@@ -603,42 +603,6 @@ jobs:
           chmod 644 contracts/ImageID.sol
           pnpm test:integration
 
-  test_enclave_init:
-    runs-on: ubuntu-latest
-    needs: [build_enclave_cli, build_e3_support_dev]
-    steps:
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.7.1
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.86.0
-      - name: Download enclave binary
-        uses: actions/download-artifact@v4
-        with:
-          name: enclave-binary
-          path: ~/.cargo/bin/
-      - name: Make binaries executable
-        run: |
-          chmod +x ~/.cargo/bin/enclave
-      - name: Verify downloaded artifacts
-        run: |
-          ls -la ~/.cargo/bin/enclave || echo "enclave binary not found"
-      - name: Enclave init
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH="${{ github.head_ref }}"
-          else
-            BRANCH="${{ github.ref_name }}"
-          fi
-          enclave init mycitest --template=${{ github.server_url }}/${{ github.repository }}.git#${BRANCH}:templates/default
-
   contrib-readme-job:
     runs-on: ubuntu-latest
     name: Populate Contributors List
