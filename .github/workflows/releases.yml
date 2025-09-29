@@ -58,7 +58,7 @@ jobs:
           pr_branch="${{ fromJSON(steps.release-plz.outputs.pr).head_branch }}"
           git pull
           git checkout "$pr_branch"
-          $HOME/.dprint/bin/dprint fmt
+          cargo fmt 
           git commit -am 'chore: format files'
           git push origin "$pr_branch"
 
