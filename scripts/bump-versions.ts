@@ -6,7 +6,6 @@ import { join, resolve } from 'path'
 interface PackageJson {
   name: string
   version: string
-  [key: string]: any
 }
 
 class VersionBumper {
@@ -21,7 +20,7 @@ class VersionBumper {
   /**
    * Main entry point to bump all versions
    */
-  async bumpAll(): Promise<void> {
+  bumpAll(): void {
     console.log(`🚀 Bumping all versions to ${this.newVersion}`)
     
     try {
@@ -29,10 +28,10 @@ class VersionBumper {
       this.validateVersion(this.newVersion)
       
       // Bump Rust crates
-      await this.bumpRustCrates()
+      this.bumpRustCrates()
       
       // Bump npm packages
-      await this.bumpNpmPackages()
+      this.bumpNpmPackages()
       
       console.log('✅ All versions bumped successfully!')
       console.log('\n📋 Summary:')
@@ -62,12 +61,12 @@ class VersionBumper {
   /**
    * Bump versions in all Rust crates
    */
-  private async bumpRustCrates(): Promise<void> {
+  private bumpRustCrates(): void {
     console.log('\n🦀 Bumping Rust crate versions...')
     
     // Update root Cargo.toml workspace version (this propagates to all crates)
     const rootCargoPath = join(this.rootDir, 'Cargo.toml')
-    this.updateCargoToml(rootCargoPath, 'workspace.package.version')
+    this.updateCargoToml(rootCargoPath)
     
     // Update workspace dependencies in root Cargo.toml
     this.updateWorkspaceDependencies(rootCargoPath)
@@ -78,7 +77,7 @@ class VersionBumper {
   /**
    * Bump versions in all npm packages
    */
-  private async bumpNpmPackages(): Promise<void> {
+  private bumpNpmPackages(): void {
     console.log('\n📦 Bumping NPM package versions...')
     
     // Main packages to bump (excluding examples and templates)
@@ -103,35 +102,48 @@ class VersionBumper {
   }
 
   /**
-   * Update Cargo.toml file
+   * Update Cargo.toml file (workspace version and dependencies)
    */
-  private updateCargoToml(filePath: string, versionKey: string): void {
+  private updateCargoToml(filePath: string): void {
     const content = readFileSync(filePath, 'utf-8')
     const lines = content.split('\n')
     
-    let inTargetSection = false
     let updated = false
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim()
       
-      // Check if we're in the target section
-      if (line === `[${versionKey.split('.').join('].')}]` || 
-          (versionKey === 'workspace.package.version' && line === '[workspace.package]')) {
-        inTargetSection = true
-        continue
+      // Update workspace package version
+      if (line === '[workspace.package]') {
+        // Look for version in the next few lines
+        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+          if (lines[j].trim().startsWith('version = ')) {
+            lines[j] = `version = "${this.newVersion}"`
+            updated = true
+            break
+          }
+        }
       }
       
-      // If we're in the target section and find a version line
-      if (inTargetSection && line.startsWith('version = ')) {
-        lines[i] = `version = "${this.newVersion}"`
-        updated = true
-        break
-      }
-      
-      // Reset section flag when we hit a new section
-      if (line.startsWith('[') && inTargetSection) {
-        break
+      // Update workspace dependencies
+      if (line === '[workspace.dependencies]') {
+        // Look for dependency lines with inline versions
+        for (let j = i + 1; j < lines.length; j++) {
+          const depLine = lines[j].trim()
+          
+          // Skip empty lines and new sections
+          if (depLine === '' || depLine.startsWith('[')) {
+            break
+          }
+          
+          // Update lines that have version = "..." in them
+          if (depLine.includes('version = ')) {
+            // Replace the version part while preserving the rest
+            const updatedLine = depLine.replace(/version = "[^"]*"/, `version = "${this.newVersion}"`)
+            lines[j] = updatedLine
+            updated = true
+          }
+        }
       }
     }
     
@@ -201,7 +213,7 @@ class VersionBumper {
 }
 
 // CLI interface
-async function main() {
+function main() {
   const args = process.argv.slice(2)
   
   if (args.length === 0) {
@@ -213,12 +225,12 @@ async function main() {
   
   const version = args[0]
   const bumper = new VersionBumper(version)
-  await bumper.bumpAll()
+  bumper.bumpAll()
 }
 
 // Run if called directly
 if (require.main === module) {
-  main().catch(console.error)
+  main()
 }
 
 export { VersionBumper }
