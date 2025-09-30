@@ -437,14 +437,17 @@ pub fn load_config(
 pub struct OsDirs;
 impl OsDirs {
     pub fn config_dir() -> PathBuf {
-        dirs::config_dir()
-            .expect("Enclave may only be run on an OS that can provide a config dir. See https://docs.rs/dirs for more information.")
+        dirs::home_dir()
+            .expect("Enclave may only be run on an OS that can provide a home dir.")
+            .join(".config")
             .join("enclave")
     }
 
     pub fn data_dir() -> PathBuf {
-        dirs::data_local_dir()
-            .expect("Enclave may only be run on an OS that can provide a data dir. See https://docs.rs/dirs for more information.")
+        dirs::home_dir()
+            .expect("Enclave may only be run on an OS that can provide a home dir.")
+            .join(".local")
+            .join("share")
             .join("enclave")
     }
 }
