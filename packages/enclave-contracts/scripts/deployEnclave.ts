@@ -5,9 +5,14 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import hre from "hardhat";
 
+import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
+import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
+import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
+import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
 import { deployAndSaveNaiveRegistryFilter } from "./deployAndSave/naiveRegistryFilter";
+import { deployAndSaveSlashingManager } from "./deployAndSave/slashingManager";
 import { deployMocks } from "./deployMocks";
 
 /**
@@ -32,51 +37,123 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
+  const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
+  let usdcTokenAddress: string;
+
+  if (shouldDeployMocks) {
+    console.log("Deploying mock USDC token...");
+    const { mockStableToken } = await deployAndSaveMockStableToken({
+      initialSupply: 1000000,
+      hre,
+    });
+    usdcTokenAddress = await mockStableToken.getAddress();
+    console.log("MockUSDC deployed to:", usdcTokenAddress);
+  } else {
+    throw new Error(
+      "USDC token address must be provided for production deployment",
+    );
+  }
+
+  console.log("Deploying ENCL token...");
+  const { enclaveToken } = await deployAndSaveEnclaveToken({
+    owner: ownerAddress,
+    hre,
+  });
+  const enclaveTokenAddress = await enclaveToken.getAddress();
+  console.log("EnclaveToken deployed to:", enclaveTokenAddress);
+
+  console.log("Deploying EnclaveTicketToken...");
+  const { enclaveTicketToken } = await deployAndSaveEnclaveTicketToken({
+    underlyingUSDC: usdcTokenAddress,
+    registry: addressOne,
+    owner: ownerAddress,
+    hre,
+  });
+  const enclaveTicketTokenAddress = await enclaveTicketToken.getAddress();
+  console.log("EnclaveTicketToken deployed to:", enclaveTicketTokenAddress);
+
+  console.log("Deploying SlashingManager...");
+  const { slashingManager } = await deployAndSaveSlashingManager({
+    admin: ownerAddress,
+    bondingRegistry: addressOne,
+    hre,
+  });
+  const slashingManagerAddress = await slashingManager.getAddress();
+  console.log("SlashingManager deployed to:", slashingManagerAddress);
+
+  console.log("Deploying BondingRegistry...");
+  const { bondingRegistry } = await deployAndSaveBondingRegistry({
+    owner: ownerAddress,
+    ticketToken: enclaveTicketTokenAddress,
+    licenseToken: enclaveTokenAddress,
+    registry: addressOne,
+    slashedFundsTreasury: ownerAddress,
+    ticketPrice: ethers.parseUnits("10", 6).toString(),
+    licenseRequiredBond: ethers.parseEther("1000").toString(),
+    minTicketBalance: 1,
+    exitDelay: 7 * 24 * 60 * 60,
+    hre,
+  });
+  const bondingRegistryAddress = await bondingRegistry.getAddress();
+  console.log("BondingRegistry deployed to:", bondingRegistryAddress);
+
+  console.log("Deploying CiphernodeRegistry...");
+  const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
+    enclaveAddress: addressOne,
+    owner: ownerAddress,
+    hre,
+  });
+  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
+  console.log("CiphernodeRegistry deployed to:", ciphernodeRegistryAddress);
+
+  console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
     params: encoded,
     owner: ownerAddress,
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
-    registry: addressOne,
+    registry: ciphernodeRegistryAddress,
+    bondingRegistry: bondingRegistryAddress,
+    usdcToken: usdcTokenAddress,
     hre,
   });
-
   const enclaveAddress = await enclave.getAddress();
+  console.log("Enclave deployed to:", enclaveAddress);
 
-  console.log("Enclave deployed to: ", enclaveAddress);
-
-  const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
-    enclaveAddress: enclaveAddress,
-    owner: ownerAddress,
-    hre,
-  });
-
-  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
-
-  console.log("CiphernodeRegistry deployed to: ", ciphernodeRegistryAddress);
-
+  console.log("Deploying NaiveRegistryFilter...");
   const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
     ciphernodeRegistryAddress: ciphernodeRegistryAddress,
     owner: ownerAddress,
     hre,
   });
-
   const naiveRegistryFilterAddress = await naiveRegistryFilter.getAddress();
+  console.log("NaiveRegistryFilter deployed to:", naiveRegistryFilterAddress);
 
-  console.log("NaiveRegistryFilter deployed to: ", naiveRegistryFilterAddress);
+  ///////////////////////////////////////////
+  // Configure cross-contract dependencies
+  ///////////////////////////////////////////
 
-  const registryAddress = await enclave.ciphernodeRegistry();
+  console.log("Configuring cross-contract dependencies...");
 
-  if (registryAddress === ciphernodeRegistryAddress) {
-    console.log(`Enclave contract already has registry`);
-  } else {
-    const tx = await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
-    await tx.wait();
+  console.log("Setting Enclave address in CiphernodeRegistry...");
+  await ciphernodeRegistry.setEnclave(enclaveAddress);
 
-    console.log(`Enclave contract updated with registry`);
-  }
+  console.log("Setting BondingRegistry address in CiphernodeRegistry...");
+  await ciphernodeRegistry.setBondingRegistry(bondingRegistryAddress);
 
-  // Deploy mocks only if specified
-  const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
+  console.log("Setting BondingRegistry address in EnclaveTicketToken...");
+  await enclaveTicketToken.setRegistry(bondingRegistryAddress);
+
+  console.log("Setting CiphernodeRegistry address in BondingRegistry...");
+  await bondingRegistry.setRegistry(ciphernodeRegistryAddress);
+
+  console.log("Setting BondingRegistry address in SlashingManager...");
+  await slashingManager.setBondingRegistry(bondingRegistryAddress);
+
+  console.log("Setting SlashingManager address in BondingRegistry...");
+  await bondingRegistry.setSlashingManager(slashingManagerAddress);
+
+  console.log("Setting Enclave as reward distributor in BondingRegistry...");
+  await bondingRegistry.setRewardDistributor(enclaveAddress);
 
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
@@ -106,4 +183,19 @@ export const deployEnclave = async (withMocks?: boolean) => {
     await tx.wait();
     console.log(`Successfully enabled E3 Program in Enclave contract`);
   }
+
+  console.log(`
+    ============================================
+    Deployment Complete!
+    ============================================
+    MockUSDC: ${usdcTokenAddress}
+    EnclaveToken (ENCL): ${enclaveTokenAddress}
+    EnclaveTicketToken: ${enclaveTicketTokenAddress}
+    SlashingManager: ${slashingManagerAddress}
+    BondingRegistry: ${bondingRegistryAddress}
+    CiphernodeRegistry: ${ciphernodeRegistryAddress}
+    Enclave: ${enclaveAddress}
+    NaiveRegistryFilter: ${naiveRegistryFilterAddress}
+    ============================================
+  `);
 };

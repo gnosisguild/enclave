@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
+import type { Signer } from "ethers";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
@@ -24,8 +25,11 @@ import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
   Enclave__factory as EnclaveFactory,
+  MockUSDC__factory as MockUSDCFactory,
   NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
 } from "../types";
+import type { Enclave } from "../types/contracts/Enclave";
+import type { MockUSDC } from "../types/contracts/test/MockStableToken.sol/MockUSDC";
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture, time, mine } = networkHelpers;
@@ -60,10 +64,10 @@ describe("Enclave", function () {
 
   // Helper function to approve USDC and make request
   const makeRequest = async (
-    enclave: any,
-    usdcToken: any,
-    requestParams: any,
-    signer?: any,
+    enclave: Enclave,
+    usdcToken: MockUSDC,
+    requestParams: Parameters<Enclave["request"]>[0],
+    signer?: Signer,
   ) => {
     const fee = await enclave.getE3Quote(requestParams);
     const tokenContract = signer ? usdcToken.connect(signer) : usdcToken;
@@ -86,6 +90,11 @@ describe("Enclave", function () {
       },
     });
 
+    const usdcToken = MockUSDCFactory.connect(
+      await usdcContract.mockUSDC.getAddress(),
+      owner,
+    );
+
     const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
       parameters: {
         EnclaveToken: {
@@ -99,7 +108,7 @@ describe("Enclave", function () {
       {
         parameters: {
           EnclaveTicketToken: {
-            underlyingUSDC: await usdcContract.mockUSDC.getAddress(),
+            underlyingUSDC: await usdcToken.getAddress(),
             registry: addressOne,
             owner: ownerAddress,
           },
@@ -148,7 +157,7 @@ describe("Enclave", function () {
           registry: addressOne,
           bondingRegistry:
             await bondingRegistryContract.bondingRegistry.getAddress(),
-          usdcToken: await usdcContract.mockUSDC.getAddress(),
+          usdcToken: await usdcToken.getAddress(),
         },
       },
     });
@@ -264,11 +273,8 @@ describe("Enclave", function () {
       ),
     };
 
-    await usdcContract.mockUSDC.mint(
-      ownerAddress,
-      ethers.parseUnits("1000000", 6),
-    );
-    await usdcContract.mockUSDC.mint(
+    await usdcToken.mint(ownerAddress, ethers.parseUnits("1000000", 6));
+    await usdcToken.mint(
       await notTheOwner.getAddress(),
       ethers.parseUnits("1000000", 6),
     );
@@ -290,7 +296,7 @@ describe("Enclave", function () {
       bondingRegistry: bondingRegistryContract.bondingRegistry,
       ticketToken: ticketTokenContract.enclaveTicketToken,
       licenseToken: enclTokenContract.enclaveToken,
-      usdcToken: usdcContract.mockUSDC,
+      usdcToken,
       slashingManager: slashingManagerContract.slashingManager,
       tree,
       mocks: {
@@ -739,7 +745,7 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(usdcToken, "ERC20InsufficientAllowance");
     });
     it("reverts if threshold is 0", async function () {
-      const { enclave, request, usdcToken, owner } = await loadFixture(setup);
+      const { enclave, request, usdcToken } = await loadFixture(setup);
       const fee = await enclave.getE3Quote({
         filter: request.filter,
         threshold: [0, 2],
@@ -1414,7 +1420,7 @@ describe("Enclave", function () {
       const { enclave, request, usdcToken, naiveRegistryFilterContract } =
         await loadFixture(setup);
       const currentTime = await time.latest();
-      const tx = await makeRequest(enclave, usdcToken, {
+      await makeRequest(enclave, usdcToken, {
         ...request,
         startWindow: [currentTime, currentTime + 100],
       });

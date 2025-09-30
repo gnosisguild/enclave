@@ -85,6 +85,7 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
 
   const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
     ciphernodeRegistryAddress,
+    signer,
   );
 
   return { ciphernodeRegistry: ciphernodeRegistryContract };

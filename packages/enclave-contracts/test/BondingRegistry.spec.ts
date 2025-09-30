@@ -24,16 +24,12 @@ import {
 } from "../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
-const AddressTwo = "0x0000000000000000000000000000000000000002";
-const AddressThree = "0x0000000000000000000000000000000000000003";
 
 const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture, time } = networkHelpers;
 
-// Hash function used to compute the tree nodes for ciphernode registry.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 
-// Reason constants matching the contract
 const REASON_DEPOSIT = ethers.encodeBytes32String("DEPOSIT");
 const REASON_WITHDRAW = ethers.encodeBytes32String("WITHDRAW");
 const REASON_BOND = ethers.encodeBytes32String("BOND");
@@ -41,10 +37,9 @@ const REASON_UNBOND = ethers.encodeBytes32String("UNBOND");
 
 describe("BondingRegistry", function () {
   const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60;
-  const TICKET_PRICE = ethers.parseUnits("10", 6); // 10 USDC per ticket (6 decimals)
-  const LICENSE_REQUIRED_BOND = ethers.parseEther("1000"); // 1000 ENCL required
-  const MIN_TICKET_BALANCE = 5; // minimum 5 tickets
-
+  const TICKET_PRICE = ethers.parseUnits("10", 6);
+  const LICENSE_REQUIRED_BOND = ethers.parseEther("1000");
+  const MIN_TICKET_BALANCE = 5;
   async function setup() {
     const [owner, operator1, operator2, treasury, notTheOwner] =
       await ethers.getSigners();
@@ -54,16 +49,14 @@ describe("BondingRegistry", function () {
     const operator2Address = await operator2.getAddress();
     const treasuryAddress = await treasury.getAddress();
 
-    // Deploy USDC mock
     const usdcContract = await ignition.deploy(MockStableTokenModule, {
       parameters: {
         MockUSDC: {
-          initialSupply: 1000000, // 1M USDC (with 6 decimals)
+          initialSupply: 1000000,
         },
       },
     });
 
-    // Deploy ENCL token
     const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
       parameters: {
         EnclaveToken: {
@@ -72,7 +65,6 @@ describe("BondingRegistry", function () {
       },
     });
 
-    // Deploy CiphernodeRegistry for testing
     const ciphernodeRegistryContract = await ignition.deploy(
       MockCiphernodeRegistryModule,
       {
@@ -85,34 +77,31 @@ describe("BondingRegistry", function () {
       },
     );
 
-    // Deploy EnclaveTicketToken
     const ticketTokenContract = await ignition.deploy(
       EnclaveTicketTokenModule,
       {
         parameters: {
           EnclaveTicketToken: {
             underlyingUSDC: await usdcContract.mockUSDC.getAddress(),
-            registry: AddressOne, // temporary, will be updated
+            registry: AddressOne,
             owner: ownerAddress,
           },
         },
       },
     );
 
-    // Deploy SlashingManager
     const slashingManagerContract = await ignition.deploy(
       SlashingManagerModule,
       {
         parameters: {
           SlashingManager: {
             admin: ownerAddress,
-            bondingRegistry: AddressOne, // temporary, will be updated
+            bondingRegistry: AddressOne,
           },
         },
       },
     );
 
-    // Deploy BondingRegistry
     const bondingRegistryContract = await ignition.deploy(
       BondingRegistryModule,
       {
@@ -134,7 +123,6 @@ describe("BondingRegistry", function () {
       },
     );
 
-    // Connect to deployed contracts
     const bondingRegistry = BondingRegistryFactory.connect(
       await bondingRegistryContract.bondingRegistry.getAddress(),
       owner,
@@ -160,7 +148,6 @@ describe("BondingRegistry", function () {
       owner,
     );
 
-    // Update contract references with actual addresses
     await ticketToken.setRegistry(await bondingRegistry.getAddress());
     await slashingManager.setBondingRegistry(
       await bondingRegistry.getAddress(),
@@ -169,11 +156,9 @@ describe("BondingRegistry", function () {
       await slashingManager.getAddress(),
     );
 
-    // Setup initial token balances and approvals
-    await usdcToken.mint(ownerAddress, ethers.parseUnits("100000", 6)); // 100k USDC
-    await usdcToken.mint(operator1Address, ethers.parseUnits("100000", 6)); // 100k USDC
-    await usdcToken.mint(operator2Address, ethers.parseUnits("100000", 6)); // 100k USDC
-
+    await usdcToken.mint(ownerAddress, ethers.parseUnits("100000", 6));
+    await usdcToken.mint(operator1Address, ethers.parseUnits("100000", 6));
+    await usdcToken.mint(operator2Address, ethers.parseUnits("100000", 6));
     await licenseToken.mintAllocation(
       ownerAddress,
       ethers.parseEther("100000"),
@@ -190,10 +175,8 @@ describe("BondingRegistry", function () {
       "Test allocation",
     );
 
-    // Enable transfers for testing
     await licenseToken.setTransferRestriction(false);
 
-    // Setup Merkle tree for ciphernode registry
     const tree = new LeanIMT(hash);
 
     return {
@@ -238,7 +221,7 @@ describe("BondingRegistry", function () {
         MIN_TICKET_BALANCE,
       );
       expect(await bondingRegistry.exitDelay()).to.equal(SEVEN_DAYS_IN_SECONDS);
-      expect(await bondingRegistry.licenseActiveBps()).to.equal(8000); // 80%
+      expect(await bondingRegistry.licenseActiveBps()).to.equal(8000);
     });
   });
 
@@ -278,20 +261,16 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond initial license
       const bondAmount = ethers.parseEther("1000");
       await licenseToken
         .connect(operator1)
         .approve(await bondingRegistry.getAddress(), bondAmount);
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
 
-      // Register operator
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Start deregistration (which triggers exit)
       await bondingRegistry.connect(operator1).deregisterOperator([]);
 
-      // Try to bond more during exit
       await licenseToken
         .connect(operator1)
         .approve(await bondingRegistry.getAddress(), bondAmount);
@@ -331,13 +310,11 @@ describe("BondingRegistry", function () {
       const bondAmount = ethers.parseEther("1000");
       const unbondAmount = ethers.parseEther("200");
 
-      // Bond first
       await licenseToken
         .connect(operator1)
         .approve(await bondingRegistry.getAddress(), bondAmount);
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
 
-      // Unbond
       await expect(
         bondingRegistry.connect(operator1).unbondLicense(unbondAmount),
       )
@@ -379,17 +356,16 @@ describe("BondingRegistry", function () {
       const bondAmount = ethers.parseEther("1000");
       const unbondAmount = ethers.parseEther("200");
 
-      // Bond first
       await licenseToken
         .connect(operator1)
         .approve(await bondingRegistry.getAddress(), bondAmount);
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
 
-      // Unbond
       await bondingRegistry.connect(operator1).unbondLicense(unbondAmount);
 
-      const [ticketPending, licensePending] =
-        await bondingRegistry.pendingExits(await operator1.getAddress());
+      const [, licensePending] = await bondingRegistry.pendingExits(
+        await operator1.getAddress(),
+      );
       expect(licensePending).to.equal(unbondAmount);
     });
   });
@@ -399,7 +375,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond enough license tokens
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -411,7 +386,7 @@ describe("BondingRegistry", function () {
       expect(await bondingRegistry.isRegistered(await operator1.getAddress()))
         .to.be.true;
       expect(await bondingRegistry.isActive(await operator1.getAddress())).to.be
-        .false; // no tickets yet
+        .false;
     });
 
     it("reverts if not properly licensed", async function () {
@@ -426,7 +401,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -434,7 +408,6 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Try to register again
       await expect(
         bondingRegistry.connect(operator1).registerOperator(),
       ).to.be.revertedWithCustomError(bondingRegistry, "AlreadyRegistered");
@@ -444,7 +417,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -452,13 +424,10 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Deregister
       await bondingRegistry.connect(operator1).deregisterOperator([]);
 
-      // Wait for exit delay to pass
       await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
 
-      // Re-bond and register
       await licenseToken
         .connect(operator1)
         .approve(await bondingRegistry.getAddress(), bondAmount);
@@ -476,7 +445,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -516,7 +484,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Bond license
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -524,14 +491,12 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Add tickets
-      const ticketAmount = ethers.parseUnits("100", 6); // 100 USDC
+      const ticketAmount = ethers.parseUnits("100", 6);
       await usdcToken
         .connect(operator1)
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
 
-      // Deregister
       await bondingRegistry.connect(operator1).deregisterOperator([]);
 
       const [ticketPending, licensePending] =
@@ -551,7 +516,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -559,8 +523,7 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Add tickets
-      const ticketAmount = ethers.parseUnits("100", 6); // 100 USDC
+      const ticketAmount = ethers.parseUnits("100", 6);
       await usdcToken
         .connect(operator1)
         .approve(await ticketToken.getAddress(), ticketAmount);
@@ -590,7 +553,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -598,7 +560,6 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Add enough tickets to become active (5 tickets * 10 USDC each = 50 USDC)
       const ticketAmount = ethers.parseUnits("50", 6);
       await usdcToken
         .connect(operator1)
@@ -628,7 +589,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -652,7 +612,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Setup operator with tickets
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -666,7 +625,6 @@ describe("BondingRegistry", function () {
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
 
-      // Remove some tickets
       const removeAmount = ethers.parseUnits("30", 6);
       await expect(
         bondingRegistry.connect(operator1).removeTicketBalance(removeAmount),
@@ -693,7 +651,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Setup operator with tickets
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -707,14 +664,14 @@ describe("BondingRegistry", function () {
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
 
-      // Remove some tickets
       const removeAmount = ethers.parseUnits("30", 6);
       await bondingRegistry
         .connect(operator1)
         .removeTicketBalance(removeAmount);
 
-      const [ticketPending, licensePending] =
-        await bondingRegistry.pendingExits(await operator1.getAddress());
+      const [ticketPending] = await bondingRegistry.pendingExits(
+        await operator1.getAddress(),
+      );
       expect(ticketPending).to.equal(removeAmount);
     });
 
@@ -727,7 +684,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Setup active operator
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -735,13 +691,12 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      const ticketAmount = ethers.parseUnits("60", 6); // 6 tickets worth
+      const ticketAmount = ethers.parseUnits("60", 6);
       await usdcToken
         .connect(operator1)
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
 
-      // Remove enough to go below minimum (remove 2 tickets worth, leaving 4 < 5 minimum)
       const removeAmount = ethers.parseUnits("20", 6);
       await expect(
         bondingRegistry.connect(operator1).removeTicketBalance(removeAmount),
@@ -757,7 +712,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -783,7 +737,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Setup operator and bond/tickets
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -797,13 +750,10 @@ describe("BondingRegistry", function () {
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator1).addTicketBalance(ticketAmount);
 
-      // Deregister to queue assets for exit
       await bondingRegistry.connect(operator1).deregisterOperator([]);
 
-      // Wait for exit delay
       await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
 
-      // Claim exits
       const initialUSDCBalance = await usdcToken.balanceOf(
         await operator1.getAddress(),
       );
@@ -827,7 +777,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -835,7 +784,6 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Deregister but don't wait
       await bondingRegistry.connect(operator1).deregisterOperator([]);
 
       await expect(
@@ -852,7 +800,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Setup and queue assets for exit
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -868,10 +815,8 @@ describe("BondingRegistry", function () {
 
       await bondingRegistry.connect(operator1).deregisterOperator([]);
 
-      // Wait for exit delay
       await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
 
-      // Claim partial amounts
       const partialTickets = ethers.parseUnits("50", 6);
       const partialLicense = ethers.parseEther("500");
 
@@ -893,7 +838,6 @@ describe("BondingRegistry", function () {
         await licenseToken.balanceOf(await operator1.getAddress()),
       ).to.equal(initialENCLBalance + partialLicense);
 
-      // Check remaining pending amounts
       const [remainingTickets, remainingLicense] =
         await bondingRegistry.pendingExits(await operator1.getAddress());
       expect(remainingTickets).to.equal(ticketAmount - partialTickets);
@@ -906,7 +850,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond exactly the minimum required (80% of LICENSE_REQUIRED_BOND)
       const minBond = (LICENSE_REQUIRED_BOND * 8000n) / 10000n;
       await licenseToken
         .connect(operator1)
@@ -921,7 +864,6 @@ describe("BondingRegistry", function () {
       const { bondingRegistry, licenseToken, operator1 } =
         await loadFixture(setup);
 
-      // Bond less than minimum required
       const insufficientBond = (LICENSE_REQUIRED_BOND * 7999n) / 10000n;
       await licenseToken
         .connect(operator1)
@@ -943,7 +885,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Bond and register
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -951,7 +892,6 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Add tickets worth exactly 10 tickets (10 * 10 USDC = 100 USDC)
       const ticketAmount = ethers.parseUnits("100", 6);
       await usdcToken
         .connect(operator1)
@@ -966,9 +906,6 @@ describe("BondingRegistry", function () {
     it("returns 0 when ticket price is 0", async function () {
       const { bondingRegistry, operator1 } = await loadFixture(setup);
 
-      // This test should check the internal logic - if ticketPrice were 0, it would return 0
-      // Since we can't set ticketPrice to 0 via setTicketPrice due to validation,
-      // we just verify that a fresh operator has 0 available tickets
       expect(
         await bondingRegistry.availableTickets(await operator1.getAddress()),
       ).to.equal(0);
@@ -1021,7 +958,7 @@ describe("BondingRegistry", function () {
       it("allows owner to set license active basis points", async function () {
         const { bondingRegistry } = await loadFixture(setup);
 
-        const newBps = 9000; // 90%
+        const newBps = 9000;
         await expect(bondingRegistry.setLicenseActiveBps(newBps))
           .to.emit(bondingRegistry, "ConfigurationUpdated")
           .withArgs(
@@ -1060,11 +997,6 @@ describe("BondingRegistry", function () {
       it("allows owner to withdraw slashed funds", async function () {
         const { bondingRegistry, treasury } = await loadFixture(setup);
 
-        // Simulate some slashed funds (would normally come from slashing operations)
-        // For testing, we'll directly set the slashed balances by calling internal slashing functions
-        // This would normally be done by the slashing manager
-
-        // Test that the function exists and can be called (even with 0 amounts)
         await expect(bondingRegistry.withdrawSlashedFunds(0, 0))
           .to.emit(bondingRegistry, "SlashedFundsWithdrawn")
           .withArgs(await treasury.getAddress(), 0, 0);
@@ -1093,7 +1025,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // Setup active operator
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -1110,10 +1041,8 @@ describe("BondingRegistry", function () {
       expect(await bondingRegistry.isActive(await operator1.getAddress())).to.be
         .true;
 
-      // Unbond enough license to fall below 80% threshold
-      const unbondAmount = LICENSE_REQUIRED_BOND / 5n; // Remove 20%, leaving 80% exactly at threshold
-      await bondingRegistry.connect(operator1).unbondLicense(unbondAmount + 1n); // Remove just 1 wei more
-
+      const unbondAmount = LICENSE_REQUIRED_BOND / 5n;
+      await bondingRegistry.connect(operator1).unbondLicense(unbondAmount + 1n);
       expect(await bondingRegistry.isActive(await operator1.getAddress())).to.be
         .false;
       expect(await bondingRegistry.isLicensed(await operator1.getAddress())).to
@@ -1130,7 +1059,6 @@ describe("BondingRegistry", function () {
         operator2,
       } = await loadFixture(setup);
 
-      // Operator 1: Licensed but not active (no tickets)
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -1138,7 +1066,6 @@ describe("BondingRegistry", function () {
       await bondingRegistry.connect(operator1).bondLicense(bondAmount);
       await bondingRegistry.connect(operator1).registerOperator();
 
-      // Operator 2: Licensed and active
       await licenseToken
         .connect(operator2)
         .approve(await bondingRegistry.getAddress(), bondAmount);
@@ -1151,7 +1078,6 @@ describe("BondingRegistry", function () {
         .approve(await ticketToken.getAddress(), ticketAmount);
       await bondingRegistry.connect(operator2).addTicketBalance(ticketAmount);
 
-      // Check states
       expect(await bondingRegistry.isRegistered(await operator1.getAddress()))
         .to.be.true;
       expect(await bondingRegistry.isActive(await operator1.getAddress())).to.be
@@ -1172,7 +1098,6 @@ describe("BondingRegistry", function () {
         operator1,
       } = await loadFixture(setup);
 
-      // 1. Bond license
       const bondAmount = LICENSE_REQUIRED_BOND;
       await licenseToken
         .connect(operator1)
@@ -1181,14 +1106,12 @@ describe("BondingRegistry", function () {
       expect(await bondingRegistry.isLicensed(await operator1.getAddress())).to
         .be.true;
 
-      // 2. Register
       await bondingRegistry.connect(operator1).registerOperator();
       expect(await bondingRegistry.isRegistered(await operator1.getAddress()))
         .to.be.true;
       expect(await bondingRegistry.isActive(await operator1.getAddress())).to.be
         .false;
 
-      // 3. Add tickets to become active
       const ticketAmount = ethers.parseUnits("60", 6);
       await usdcToken
         .connect(operator1)
@@ -1197,7 +1120,6 @@ describe("BondingRegistry", function () {
       expect(await bondingRegistry.isActive(await operator1.getAddress())).to.be
         .true;
 
-      // 4. Deregister
       await bondingRegistry.connect(operator1).deregisterOperator([]);
       expect(await bondingRegistry.isRegistered(await operator1.getAddress()))
         .to.be.false;
@@ -1205,7 +1127,6 @@ describe("BondingRegistry", function () {
         await bondingRegistry.hasExitInProgress(await operator1.getAddress()),
       ).to.be.true;
 
-      // 5. Wait and claim
       await time.increase(SEVEN_DAYS_IN_SECONDS + 1);
 
       const initialUSDCBalance = await usdcToken.balanceOf(
@@ -1226,7 +1147,6 @@ describe("BondingRegistry", function () {
         await licenseToken.balanceOf(await operator1.getAddress()),
       ).to.equal(initialENCLBalance + bondAmount);
 
-      // 6. Re-register after claiming
       await licenseToken
         .connect(operator1)
         .approve(await bondingRegistry.getAddress(), bondAmount);

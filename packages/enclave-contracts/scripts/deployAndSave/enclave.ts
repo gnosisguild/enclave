@@ -17,6 +17,8 @@ export interface EnclaveArgs {
   owner?: string;
   maxDuration?: string;
   registry?: string;
+  bondingRegistry?: string;
+  usdcToken?: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -30,6 +32,8 @@ export const deployAndSaveEnclave = async ({
   owner,
   maxDuration,
   registry,
+  bondingRegistry,
+  usdcToken,
   hre,
 }: EnclaveArgs): Promise<{ enclave: Enclave }> => {
   const { ignition, ethers } = await hre.network.connect();
@@ -44,10 +48,14 @@ export const deployAndSaveEnclave = async ({
     !owner ||
     !maxDuration ||
     !registry ||
+    !bondingRegistry ||
+    !usdcToken ||
     (preDeployedArgs?.constructorArgs?.params === params &&
       preDeployedArgs?.constructorArgs?.owner === owner &&
       preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
-      preDeployedArgs?.constructorArgs?.registry === registry)
+      preDeployedArgs?.constructorArgs?.registry === registry &&
+      preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
+      preDeployedArgs?.constructorArgs?.usdcToken === usdcToken)
   ) {
     if (!preDeployedArgs?.address) {
       throw new Error("Enclave address not found, it must be deployed first");
@@ -66,6 +74,8 @@ export const deployAndSaveEnclave = async ({
         owner,
         maxDuration,
         registry,
+        bondingRegistry,
+        usdcToken,
       },
     },
   });
@@ -77,7 +87,14 @@ export const deployAndSaveEnclave = async ({
 
   storeDeploymentArgs(
     {
-      constructorArgs: { params, owner, maxDuration, registry },
+      constructorArgs: {
+        params,
+        owner,
+        maxDuration,
+        registry,
+        bondingRegistry,
+        usdcToken,
+      },
       blockNumber,
       address: enclaveAddress,
     },
