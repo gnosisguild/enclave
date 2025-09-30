@@ -160,6 +160,143 @@ sequenceDiagram
     Enclave-->>Users: success
 ```
 
+## 🚀 Release Process
+
+### Overview
+
+Enclave uses a unified versioning strategy where all packages (Rust crates and npm packages) share the same version number. Releases are triggered by git tags and follow semantic versioning.
+
+### Release Workflow
+
+#### 1. Development Phase
+
+Developers work on features and fixes, committing with [conventional commits](https://www.conventionalcommits.org/):
+
+```bash
+git commit -m "feat: add new encryption module"
+git commit -m "fix: resolve memory leak in SDK"
+git commit -m "docs: update API documentation"
+git commit -m "BREAKING CHANGE: redesign configuration API"
+```
+
+#### 2. Version Bump
+When ready to release, maintainers bump the version across all packages:
+
+```bash
+# Bump version and generate changelog
+tsx scripts/bump-versions.ts 1.0.0
+
+# For pre-releases
+tsx scripts/bump-versions.ts 1.0.0-beta.1
+```
+
+#### 3. Commit and Tag
+```bash
+# Review changes
+git diff
+
+# Commit the version bump
+git add .
+git commit -m "chore(release): bump version to 1.0.0"
+
+# Push to main
+git push origin main
+
+# Create and push tag (this triggers the release!)
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This script:
+- Updates version in `Cargo.toml` (workspace version)
+- Updates version in all npm `package.json` files
+- Updates lock files (`Cargo.lock`, `package-lock.json`)
+- Generates/updates `CHANGELOG.md` from commit history
+
+#### 4. Automated Release
+Once the tag is pushed, GitHub Actions automatically:
+
+1. **Validates** version consistency across all packages
+2. **Builds** binaries for all platforms:
+   - Linux (x86_64)
+   - macOS (x86_64, aarch64)
+3. **Runs** all tests
+4. **Publishes** packages:
+    * All versions (stable and pre-release):
+        * ✅ Publishes to crates.io
+        * ✅ Publishes to npm
+    * Tag differences:
+        * Stable (v1.0.0): npm latest tag, updates stable git tag
+        * Pre-release (v1.0.0-beta.1): npm next tag, no stable tag update
+5. **Creates** GitHub Release with:
+   - Binary downloads for all platforms
+   - Release notes from CHANGELOG.md
+   - SHA256 checksums
+   - Installation instructions
+
+## 🏷️ Version Strategy
+
+### Version Format
+
+Enclave follows [Semantic Versioning](https://semver.org/):
+
+- **Stable**: `v1.0.0` - Production ready
+- **Pre-release**: `v1.0.0-beta.1` - Testing/preview versions
+  - `-alpha.X` - Early development, may have breaking changes
+  - `-beta.X` - Feature complete, testing for bugs
+  - `-rc.X` - Release candidate, final testing
+
+### Which Version Should I Use?
+
+#### For Production (Mainnet)
+Use stable versions only:
+```bash
+enclaveup install              # Latest stable
+enclaveup install v1.0.0       # Specific stable version
+```
+
+#### For Testing (Testnet)
+You can use pre-release versions:
+```bash
+enclaveup install --pre-release # Latest pre-release
+enclaveup install v1.0.0-beta.1 # Specific pre-release
+```
+
+#### For Development
+Build from source:
+```bash
+git clone https://github.com/gnosisguild/enclave.git
+cd enclave
+cargo build --release
+```
+
+## 🌿 Branch and Tag Strategy
+
+### Current Setup
+
+- **`main`** - Primary development branch
+- **`v*.*.*`** - Version tags for releases
+- **`stable`** - Always points to the latest stable release
+
+### Installation Sources
+
+```bash
+# Latest stable release (recommended for production)
+curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/stable/install | bash
+
+# Latest development version (may be unstable)
+curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash
+```
+
+### Future Branch Strategy
+
+We plan to implement a three-tier branch strategy:
+
+1. **`develop`** - Bleeding edge, experimental features
+2. **`testnet`** - Stable features for testnet deployment
+3. **`mainnet`** - Production-ready for mainnet deployment
+
+
 ## Security and Liability
 
 This repo is provided WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

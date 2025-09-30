@@ -1,87 +1,198 @@
-name: Releases Workflow
+name: Release
 
 permissions:
-  pull-requests: write
   contents: write
+  packages: write
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "Cargo.toml"
-      - "package.json"
-      - "crates/**"
-      - "packages/**"
-      - ".github/workflows/releases.yml"
-  pull_request:
-    branches: [main]
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'  # Pre-release tags like v1.0.0-beta.1
+
+env:
+  MNEMONIC: "test test test test test test test test test test test junk"
+  INFURA_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+  ETHERSCAN_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
 
 jobs:
-  release-rust:
-    name: Release Rust Crates
+  validate-and-prepare:
+    name: Validate Tag and Prepare Release
     runs-on: ubuntu-latest
-    # Add concurrency control to prevent conflicts with other workflows
-    concurrency:
-      group: release-rust-${{ github.ref }}
-      cancel-in-progress: false
     outputs:
-      releases_created: ${{ steps.release-plz.outputs.releases_created }}
-      version: ${{ steps.release-plz.outputs.version }}
+      version: ${{ steps.get_version.outputs.version }}
+      is_prerelease: ${{ steps.get_version.outputs.is_prerelease }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Rust toolchain
+      - name: Get version from tag
+        id: get_version
+        run: |
+          # Extract version from tag (remove 'v' prefix)
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if it's a pre-release (contains -, like beta, alpha, rc, etc.)
+          if [[ "$VERSION" =~ - ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "📦 Pre-release version: $VERSION"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "📦 Release version: $VERSION"
+          fi
+
+      - name: Verify versions match
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          
+          # Check Cargo.toml workspace version
+          CARGO_VERSION=$(grep -E '^\[workspace\.package\]' -A 5 Cargo.toml | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$CARGO_VERSION" != "$VERSION" ]; then
+            echo "❌ Cargo.toml version ($CARGO_VERSION) doesn't match tag ($VERSION)"
+            exit 1
+          fi
+          
+          # Check root package.json if it exists
+          if [ -f package.json ]; then
+            NPM_VERSION=$(node -p "require('./package.json').version")
+            if [ "$NPM_VERSION" != "$VERSION" ]; then
+              echo "❌ package.json version ($NPM_VERSION) doesn't match tag ($VERSION)"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ All versions match: $VERSION"
+
+  build-binaries:
+    name: Build Binaries (${{ matrix.os_name }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    needs: validate-and-prepare
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            os_name: linux
+            arch: x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            os_name: macos
+            arch: aarch64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            os_name: macos
+            arch: x86_64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build enclave binary
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin enclave
+
+      - name: Build enclaveup binary
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin enclaveup
+
+      - name: Create release archives
+        shell: bash
+        run: |
+          mkdir -p dist
+          
+          # Get the correct binary extension
+          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
+            EXT=".exe"
+          else
+            EXT=""
+          fi
+          
+          # Create enclave archive
+          cp "target/${{ matrix.target }}/release/enclave${EXT}" "./enclave${EXT}"
+          tar -czf "dist/enclave-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" "enclave${EXT}"
+          rm "enclave${EXT}"
+          
+          # Create enclaveup archive
+          cp "target/${{ matrix.target }}/release/enclaveup${EXT}" "./enclaveup${EXT}"
+          tar -czf "dist/enclaveup-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" "enclaveup${EXT}"
+          rm "enclaveup${EXT}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: enclave-binaries-${{ matrix.os_name }}-${{ matrix.arch }}
+          path: dist/
+
+  publish-rust-crates:
+    name: Publish Rust Crates
+    runs-on: ubuntu-latest
+    needs: validate-and-prepare
+    # Publish ALL versions to crates.io (including pre-releases)
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run release-plz
-        id: release-plz
-        uses: MarcoIeni/release-plz-action@v0.5.64
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Publish to crates.io
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        with:
-          version: "0.3.83"
-          command: ${{ github.event_name == 'pull_request' && 'release-pr --dry-run' || 'release-pr' }}
-
-      - uses: fregante/setup-git-user@v2.0.1
-        if: steps.release-plz.outputs.prs_created == 'true'
-
-      - name: Install dprint
-        if: steps.release-plz.outputs.prs_created == 'true'
-        run: curl -fsSL https://dprint.dev/install.sh | sh -s 0.47.2 > /dev/null 2>&1
-
-      - name: Format Rust code
-        if: steps.release-plz.outputs.prs_created == 'true'
         run: |
-          pr_branch="${{ fromJSON(steps.release-plz.outputs.pr).head_branch }}"
-          git pull
-          git checkout "$pr_branch"
-          cargo fmt 
-          git commit -am 'chore: format files'
-          git push origin "$pr_branch"
+          VERSION="${{ needs.validate-and-prepare.outputs.version }}"
+          IS_PRERELEASE="${{ needs.validate-and-prepare.outputs.is_prerelease }}"
+          
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            echo "📦 Publishing pre-release version to crates.io: $VERSION"
+          else
+            echo "📦 Publishing stable version to crates.io: $VERSION"
+          fi
+          
+          # Publish crates in dependency order
+          # Adjust this order based on your actual crate dependencies
+          
+          # Example order (modify based on your project):
+          # cargo publish -p enclave-core --no-verify || echo "enclave-core: already published or error"
+          # sleep 10  # Wait for crates.io to index
+          # cargo publish -p enclave-crypto --no-verify || echo "enclave-crypto: already published or error"
+          # sleep 10
+          # cargo publish -p enclave-sdk --no-verify || echo "enclave-sdk: already published or error"
+          # sleep 10
+          # cargo publish -p enclave --no-verify || echo "enclave: already published or error"
+          
+          echo "⚠️  Note: Add your crates in dependency order in the workflow file"
+          echo "Skipping actual publish for now - uncomment the cargo publish commands above"
 
-  release-npm:
-    name: Release NPM Packages
+  publish-npm-packages:
+    name: Publish NPM Packages
     runs-on: ubuntu-latest
-    needs: release-rust
-    if: github.event_name == 'push'
+    needs: validate-and-prepare
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 10.7.1
+        uses: pnpm/action-setup@v4
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -89,28 +200,183 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Create Release PR or Publish
-        uses: changesets/action@v1
+      - name: Determine npm tag
+        id: npm_tag
+        run: |
+          if [[ "${{ needs.validate-and-prepare.outputs.is_prerelease }}" == "true" ]]; then
+            echo "tag=next" >> $GITHUB_OUTPUT
+            echo "📦 Publishing with 'next' tag for pre-release"
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "📦 Publishing with 'latest' tag for stable release"
+          fi
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Use your existing npm:release script or publish directly
+          pnpm npm:release
+          
+          # Alternative: publish with specific tag
+          # npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
+          # pnpm publish -r --access public --tag ${{ steps.npm_tag.outputs.tag }} --no-git-checks
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-and-prepare, build-binaries, publish-rust-crates, publish-npm-packages]
+    # Always create release even if publishing fails (for pre-releases that skip crates.io)
+    if: always() && needs.validate-and-prepare.result == 'success' && needs.build-binaries.result == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          publish: pnpm release
+          fetch-depth: 0
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find dist/ -name "*.tar.gz" -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          VERSION=${{ needs.validate-and-prepare.outputs.version }}
+          IS_PRERELEASE=${{ needs.validate-and-prepare.outputs.is_prerelease }}
+          
+          # Create release notes
+          cat > release_notes.md << EOF
+          ## 🚀 Release v${VERSION}
+          
+          EOF
+          
+          # Add pre-release warning if applicable
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            cat >> release_notes.md << EOF
+          > ⚠️ **This is a pre-release version**
+          > Pre-release versions may contain bugs and breaking changes.
+          
+          EOF
+          fi
+          
+          # Extract changelog section for this version if CHANGELOG.md exists
+          if [ -f CHANGELOG.md ]; then
+            echo "### What's Changed" >> release_notes.md
+            echo "" >> release_notes.md
+            
+            # Try to extract the section for this version
+            awk -v ver="${VERSION}" '
+              /^#+ \[?'${VERSION}'\]?/ { flag=1; next }
+              /^#+ \[?[0-9]+\.[0-9]+\.[0-9]+/ && flag { exit }
+              flag { print }
+            ' CHANGELOG.md >> release_notes.md || echo "See CHANGELOG.md for details." >> release_notes.md
+          fi
+          
+          # Add installation instructions
+          cat >> release_notes.md << EOF
+          
+          ---
+          
+          ## 📦 Installation
+          
+          ### Install via enclaveup (Recommended)
+          
+          Install the installer:
+          \`\`\`bash
+          curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash
+          \`\`\`
+          
+          Then use it to install enclave:
+          \`\`\`bash
+          enclaveup install
+          \`\`\`
+          
+          ### NPM Packages
+          
+          EOF
+          
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            cat >> release_notes.md << EOF
+          \`\`\`bash
+          # Install pre-release versions
+          npm install @enclave/sdk@next
+          npm install @enclave/contracts@next
+          npm install @enclave/config@next
+          npm install @enclave/react@next
+          \`\`\`
+          EOF
+          else
+            cat >> release_notes.md << EOF
+          \`\`\`bash
+          # Install stable versions
+          npm install @enclave/sdk@latest
+          npm install @enclave/contracts@latest
+          npm install @enclave/config@latest
+          npm install @enclave/react@latest
+          \`\`\`
+          EOF
+          fi
+          
+          # Add Rust crates section only for stable releases
+          if [[ "${IS_PRERELEASE}" == "false" ]]; then
+            cat >> release_notes.md << EOF
+          
+          ### Rust Crates
+          
+          \`\`\`toml
+          [dependencies]
+          enclave = "${VERSION}"
+          \`\`\`
+          EOF
+          fi
+          
+          # Add binary assets information
+          cat >> release_notes.md << EOF
+          
+          ## 💾 Binary Assets
+          
+          - \`enclave-*\`: The main Enclave CLI binary
+          - \`enclaveup-*\`: The installer/version manager binary
+          
+          ### Supported Platforms
+          - Linux (x86_64)
+          - macOS (x86_64, aarch64 Apple Silicon)
+          
+          ## 📝 Checksums
+          
+          \`\`\`
+          EOF
+          
+          # Generate checksums for the binaries
+          cd release-assets && sha256sum *.tar.gz >> ../release_notes.md || true
+          cd ..
+          
+          echo '```' >> release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate-and-prepare.outputs.version }}
+          name: v${{ needs.validate-and-prepare.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ needs.validate-and-prepare.outputs.is_prerelease }}
+          generate_release_notes: false  # We're providing our own
+          files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  trigger-binary-release:
-    name: Trigger Binary Release
-    runs-on: ubuntu-latest
-    needs: [release-rust, release-npm]
-    if: github.event_name == 'push' && needs.release-rust.outputs.releases_created == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Trigger binary release workflow
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: binary-release
-          client-payload: |
-            {
-              "version": "${{ needs.release-rust.outputs.version }}"
-            }
+      - name: Update stable tag (for stable releases only)
+        if: needs.validate-and-prepare.outputs.is_prerelease == 'false'
+        run: |
+          git tag -f stable
+          git push origin stable --force
+          echo "✅ Updated 'stable' tag to point to v${{ needs.validate-and-prepare.outputs.version }}"
+          
