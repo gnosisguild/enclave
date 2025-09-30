@@ -21,6 +21,29 @@ export interface EnclaveTokenArgs {
 }
 
 /**
+ * Disables transfer restrictions for local development
+ */
+async function disableTransferRestrictionsForLocal(
+  contract: EnclaveToken,
+  chain: string,
+): Promise<void> {
+  if (chain !== "localhost" && chain !== "hardhat") {
+    return;
+  }
+
+  try {
+    const isRestricted = await contract.transfersRestricted();
+    if (isRestricted) {
+      const tx = await contract.setTransferRestriction(false);
+      await tx.wait();
+      console.log("Transfer restrictions disabled for local development");
+    }
+  } catch (error) {
+    console.warn("Failed to disable transfer restrictions:", error);
+  }
+}
+
+/**
  * Deploys the EnclaveToken contract and saves the deployment arguments
  * @param param0 - The deployment arguments
  * @returns The deployed EnclaveToken contract
@@ -48,18 +71,7 @@ export const deployAndSaveEnclaveToken = async ({
       signer,
     );
 
-    if (chain === "localhost" || chain === "hardhat") {
-      try {
-        const isRestricted = await enclaveTokenContract.transfersRestricted();
-        if (isRestricted) {
-          const tx = await enclaveTokenContract.setTransferRestriction(false);
-          await tx.wait();
-          console.log("Transfer restrictions disabled for local development");
-        }
-      } catch (error) {
-        console.warn("Failed to disable transfer restrictions:", error);
-      }
-    }
+    await disableTransferRestrictionsForLocal(enclaveTokenContract, chain);
 
     return { enclaveToken: enclaveTokenContract };
   }
@@ -95,15 +107,7 @@ export const deployAndSaveEnclaveToken = async ({
     signer,
   );
 
-  if (chain === "localhost" || chain === "hardhat") {
-    try {
-      const tx = await enclaveTokenContract.setTransferRestriction(false);
-      await tx.wait();
-      console.log("Transfer restrictions disabled for local development");
-    } catch (error) {
-      console.warn("Failed to disable transfer restrictions:", error);
-    }
-  }
+  await disableTransferRestrictionsForLocal(enclaveTokenContract, chain);
 
   return { enclaveToken: enclaveTokenContract };
 };

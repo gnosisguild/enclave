@@ -6,12 +6,12 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 
-import BondingRegistryModule from "../ignition/modules/bondingRegistry";
-import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
-import EnclaveTokenModule from "../ignition/modules/enclaveToken";
-import MockSlashingVerifierModule from "../ignition/modules/mockSlashingVerifier";
-import MockStableTokenModule from "../ignition/modules/mockStableToken";
-import SlashingManagerModule from "../ignition/modules/slashingManager";
+import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
+import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
+import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
+import MockSlashingVerifierModule from "../../ignition/modules/mockSlashingVerifier";
+import MockStableTokenModule from "../../ignition/modules/mockStableToken";
+import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
   BondingRegistry__factory as BondingRegistryFactory,
   EnclaveTicketToken__factory as EnclaveTicketTokenFactory,
@@ -19,9 +19,9 @@ import {
   MockSlashingVerifier__factory as MockSlashingVerifierFactory,
   MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
-} from "../types";
-import type { SlashingManager } from "../types/contracts/slashing/SlashingManager";
-import type { MockSlashingVerifier } from "../types/contracts/test/MockSlashingVerifier";
+} from "../../types";
+import type { SlashingManager } from "../../types/contracts/slashing/SlashingManager";
+import type { MockSlashingVerifier } from "../../types/contracts/test/MockSlashingVerifier";
 
 const { ethers, networkHelpers, ignition } = await network.connect();
 const { loadFixture, time } = networkHelpers;

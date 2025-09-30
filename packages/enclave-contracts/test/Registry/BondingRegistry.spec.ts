@@ -8,12 +8,12 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
-import BondingRegistryModule from "../ignition/modules/bondingRegistry";
-import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
-import EnclaveTokenModule from "../ignition/modules/enclaveToken";
-import MockCiphernodeRegistryModule from "../ignition/modules/mockCiphernodeRegistry";
-import MockStableTokenModule from "../ignition/modules/mockStableToken";
-import SlashingManagerModule from "../ignition/modules/slashingManager";
+import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
+import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
+import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
+import MockCiphernodeRegistryModule from "../../ignition/modules/mockCiphernodeRegistry";
+import MockStableTokenModule from "../../ignition/modules/mockStableToken";
+import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
   BondingRegistry__factory as BondingRegistryFactory,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
@@ -21,7 +21,7 @@ import {
   EnclaveToken__factory as EnclaveTokenFactory,
   MockUSDC__factory as MockUSDCFactory,
   SlashingManager__factory as SlashingManagerFactory,
-} from "../types";
+} from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 
