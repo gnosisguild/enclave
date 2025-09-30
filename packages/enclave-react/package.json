@@ -1,6 +1,6 @@
 {
   "name": "@enclave-e3/react",
-  "version": "0.0.15-test",
+  "version": "0.0.14-test",
   "description": "React hooks and utilities for Enclave SDK",
   "type": "module",
   "private": false,

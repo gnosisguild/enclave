@@ -1,6 +1,6 @@
 {
   "name": "@enclave-e3/config",
-  "version": "0.0.15-test",
+  "version": "0.0.14-test",
   "publishConfig": {
     "access": "public"
   },
