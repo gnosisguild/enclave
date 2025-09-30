@@ -8,13 +8,6 @@ import { ZeroAddress } from "ethers";
 import { task } from "hardhat/config";
 import { poseidon2 } from "poseidon-lite";
 
-import {
-  BondingRegistry__factory as BondingRegistryFactory,
-  EnclaveTicketToken__factory as EnclaveTicketTokenFactory,
-  EnclaveToken__factory as EnclaveTokenFactory,
-  MockUSDC__factory as MockUSDCFactory,
-} from "../types";
-
 export const ciphernodeAdd = task(
   "ciphernode:add",
   "Register a ciphernode to the bonding registry and ciphernode registry",
@@ -29,13 +22,13 @@ export const ciphernodeAdd = task(
     name: "licenseBondAmount",
     description:
       "amount of ENCL to bond (in wei, e.g., 1000000000000000000000 for 1000 ENCL)",
-    defaultValue: "1000000000000000000000", // 1000 ENCL
+    defaultValue: "1000000000000000000000",
   })
   .addOption({
     name: "ticketAmount",
     description:
       "amount of USDC to deposit for tickets (in wei, e.g., 100000000 for 100 USDC)",
-    defaultValue: "1000000000", // 1000 USDC
+    defaultValue: "1000000000",
   })
   .setAction(async () => ({
     default: async ({ privateKey, licenseBondAmount, ticketAmount }, hre) => {
@@ -52,27 +45,26 @@ export const ciphernodeAdd = task(
       const { deployAndSaveBondingRegistry } = await import(
         "../scripts/deployAndSave/bondingRegistry"
       );
+      const { deployAndSaveEnclaveTicketToken } = await import(
+        "../scripts/deployAndSave/enclaveTicketToken"
+      );
+      const { deployAndSaveEnclaveToken } = await import(
+        "../scripts/deployAndSave/enclaveToken"
+      );
+      const { deployAndSaveMockStableToken } = await import(
+        "../scripts/deployAndSave/mockStableToken"
+      );
       const { bondingRegistry } = await deployAndSaveBondingRegistry({ hre });
+      const { enclaveToken } = await deployAndSaveEnclaveToken({ hre });
+      const { enclaveTicketToken } = await deployAndSaveEnclaveTicketToken({
+        hre,
+      });
+      const { mockStableToken } = await deployAndSaveMockStableToken({ hre });
 
-      const licenseTokenAddress = await bondingRegistry.licenseToken();
-      const licenseToken = EnclaveTokenFactory.connect(
-        licenseTokenAddress,
-        wallet,
-      );
-
-      const ticketTokenAddress = await bondingRegistry.ticketToken();
-      const ticketToken = EnclaveTicketTokenFactory.connect(
-        ticketTokenAddress,
-        wallet,
-      );
-
-      const usdcAddress = await ticketToken.underlying();
-      const usdcToken = MockUSDCFactory.connect(usdcAddress, wallet);
-
-      const bondingRegistryConnected = BondingRegistryFactory.connect(
-        await bondingRegistry.getAddress(),
-        wallet,
-      );
+      const licenseToken = enclaveToken.connect(wallet);
+      const ticketToken = enclaveTicketToken.connect(wallet);
+      const usdcToken = mockStableToken.connect(wallet);
+      const bondingRegistryConnected = bondingRegistry.connect(wallet);
 
       try {
         console.log("Step 1: Checking balances...");
@@ -123,7 +115,7 @@ export const ciphernodeAdd = task(
 
         console.log("Step 5: Approving USDC for ticket purchase...");
         const approveUsdcTx = await usdcToken.approve(
-          ticketTokenAddress,
+          ticketToken.getAddress(),
           ticketAmountBigInt,
         );
         await approveUsdcTx.wait();
@@ -257,26 +249,19 @@ export const ciphernodeMintTokens = task(
       const { deployAndSaveMockStableToken } = await import(
         "../scripts/deployAndSave/mockStableToken"
       );
-      const { mockStableToken: mockUSDC } = await deployAndSaveMockStableToken({
+      const { mockStableToken } = await deployAndSaveMockStableToken({
         hre,
       });
 
-      // Get properly typed contracts using factories
       const [signer] = await ethers.getSigners();
-      const enclaveTokenTyped = EnclaveTokenFactory.connect(
-        await enclaveToken.getAddress(),
-        signer,
-      );
-      const mockUSDCTyped = MockUSDCFactory.connect(
-        await mockUSDC.getAddress(),
-        signer,
-      );
+      const enclaveTokenContract = enclaveToken.connect(signer);
+      const mockUSDCContract = mockStableToken.connect(signer);
 
       try {
         console.log(`Minting tokens for: ${ciphernodeAddress}`);
 
         console.log(`Minting ${enclAmount} ENCL...`);
-        const enclTx = await enclaveTokenTyped.mintAllocation(
+        const enclTx = await enclaveTokenContract.mintAllocation(
           ciphernodeAddress,
           ethers.parseEther(enclAmount),
           "Ciphernode allocation",
@@ -285,7 +270,7 @@ export const ciphernodeMintTokens = task(
         console.log(`${enclAmount} ENCL minted`);
 
         console.log(`Minting ${usdcAmount} USDC...`);
-        const usdcTx = await mockUSDCTyped.mint(
+        const usdcTx = await mockUSDCContract.mint(
           ciphernodeAddress,
           ethers.parseUnits(usdcAmount, 6),
         );
@@ -293,8 +278,8 @@ export const ciphernodeMintTokens = task(
         console.log(`${usdcAmount} USDC minted`);
 
         const enclBalance =
-          await enclaveTokenTyped.balanceOf(ciphernodeAddress);
-        const usdcBalance = await mockUSDCTyped.balanceOf(ciphernodeAddress);
+          await enclaveTokenContract.balanceOf(ciphernodeAddress);
+        const usdcBalance = await mockUSDCContract.balanceOf(ciphernodeAddress);
 
         console.log("\n=== Token Balances ===");
         console.log(`ENCL: ${ethers.formatEther(enclBalance)}`);
@@ -377,11 +362,9 @@ export const ciphernodeAdminAdd = task(
         hre,
       });
 
-      // Connect contracts to admin wallet
       const enclaveTokenConnected = enclaveToken.connect(adminWallet);
       const mockUSDCConnected = mockUSDC.connect(adminWallet);
 
-      // Get ticket token address
       const ticketTokenAddress = await bondingRegistry.ticketToken();
 
       try {
@@ -390,7 +373,6 @@ export const ciphernodeAdminAdd = task(
 
         console.log("Step 1: Minting and transferring ENCL to ciphernode...");
 
-        // Mint ENCL tokens to admin
         const enclTx = await enclaveTokenConnected.mintAllocation(
           adminWallet.address,
           licenseBondWei,
@@ -398,7 +380,6 @@ export const ciphernodeAdminAdd = task(
         );
         await enclTx.wait();
 
-        // Transfer ENCL to ciphernode
         const transferTx = await enclaveTokenConnected.transfer(
           ciphernodeAddress,
           licenseBondWei,
@@ -414,7 +395,6 @@ export const ciphernodeAdminAdd = task(
         await usdcTx.wait();
         console.log(`${ticketAmount} USDC minted to admin`);
 
-        // Impersonate the ciphernode for license bonding and registration
         console.log(
           "Step 3: Impersonating ciphernode for license operations...",
         );
@@ -423,10 +403,9 @@ export const ciphernodeAdminAdd = task(
           params: [ciphernodeAddress],
         });
 
-        // Fund the impersonated account with ETH for gas
         await connection.provider.request({
           method: "hardhat_setBalance",
-          params: [ciphernodeAddress, "0x1000000000000000000000"], // 1 ETH
+          params: [ciphernodeAddress, "0x1000000000000000000000"],
         });
 
         const ciphernodeSigner = await ethers.getSigner(ciphernodeAddress);
@@ -434,7 +413,6 @@ export const ciphernodeAdminAdd = task(
         const bondingRegistryAsCiphernode =
           bondingRegistry.connect(ciphernodeSigner);
 
-        // Approve and bond license as ciphernode
         const approveTx = await enclaveTokenAsCiphernode.approve(
           await bondingRegistry.getAddress(),
           licenseBondWei,
@@ -446,51 +424,45 @@ export const ciphernodeAdminAdd = task(
         await bondTx.wait();
         console.log(`License bonded: ${licenseBondAmount} ENCL`);
 
-        // Register as operator
         const registerTx = await bondingRegistryAsCiphernode.registerOperator();
         await registerTx.wait();
         console.log(
           "Operator registered (automatically added to CiphernodeRegistry)",
         );
 
-        // Stop impersonating
         await connection.provider.request({
           method: "hardhat_stopImpersonatingAccount",
           params: [ciphernodeAddress],
         });
 
         console.log("Step 4: Adding ticket balance via admin...");
-        // Now add ticket balance - admin approves USDC, then calls addTicketBalance as ciphernode
+
         const approveUsdcTx = await mockUSDCConnected.approve(
           ticketTokenAddress,
           ticketAmountWei,
         );
         await approveUsdcTx.wait();
 
-        // Impersonate again for ticket balance
         await connection.provider.request({
           method: "hardhat_impersonateAccount",
           params: [ciphernodeAddress],
         });
 
-        // Fund the impersonated account with ETH for gas (again)
         await connection.provider.request({
           method: "hardhat_setBalance",
-          params: [ciphernodeAddress, "0x1000000000000000000000"], // 1 ETH
+          params: [ciphernodeAddress, "0x1000000000000000000000"],
         });
 
         const ciphernodeSigner2 = await ethers.getSigner(ciphernodeAddress);
         const bondingRegistryAsCiphernode2 =
           bondingRegistry.connect(ciphernodeSigner2);
 
-        // Transfer USDC from admin to ciphernode first
         const usdcTransferTx = await mockUSDCConnected.transfer(
           ciphernodeAddress,
           ticketAmountWei,
         );
         await usdcTransferTx.wait();
 
-        // Now ciphernode can add ticket balance
         const mockUSDCAsCiphernode = mockUSDC.connect(ciphernodeSigner2);
         const approveUsdcAsCiphernodeTx = await mockUSDCAsCiphernode.approve(
           ticketTokenAddress,
@@ -503,13 +475,11 @@ export const ciphernodeAdminAdd = task(
         await addTicketTx.wait();
         console.log(`Ticket balance added: ${ticketAmount} USDC worth`);
 
-        // Stop impersonating
         await connection.provider.request({
           method: "hardhat_stopImpersonatingAccount",
           params: [ciphernodeAddress],
         });
 
-        // Check final status
         const isRegistered =
           await bondingRegistry.isRegistered(ciphernodeAddress);
         const isActive = await bondingRegistry.isActive(ciphernodeAddress);
