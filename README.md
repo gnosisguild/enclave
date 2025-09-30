@@ -184,10 +184,10 @@ When ready to release, maintainers bump the version across all packages:
 
 ```bash
 # Bump version and generate changelog
-tsx scripts/bump-versions.ts 1.0.0
+pnpm bump:versions 1.0.0
 
 # For pre-releases
-tsx scripts/bump-versions.ts 1.0.0-beta.1
+pnpm bump:versions 1.0.0-beta.1
 ```
 
 #### 3. Commit and Tag
@@ -199,8 +199,10 @@ git diff
 git add .
 git commit -m "chore(release): bump version to 1.0.0"
 
-# Push to main
-git push origin main
+# Push to a release branch
+git push origin chore/release/v1.0.0
+
+# Then open a PR to main 
 
 # Create and push tag (this triggers the release!)
 git tag v1.0.0
