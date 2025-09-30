@@ -21,12 +21,14 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         }
     }
 
+    // solhint-disable-next-line no-empty-blocks
     function addCiphernode(address) external {}
 
     function isEnabled(address) external pure returns (bool) {
         return true;
     }
 
+    // solhint-disable-next-line no-empty-blocks
     function removeCiphernode(address, uint256[] calldata) external {}
 
     // solhint-disable no-empty-blocks
@@ -77,12 +79,14 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         }
     }
 
+    // solhint-disable-next-line no-empty-blocks
     function addCiphernode(address) external {}
 
     function isEnabled(address) external pure returns (bool) {
         return true;
     }
 
+    // solhint-disable-next-line no-empty-blocks
     function removeCiphernode(address, uint256[] calldata) external {}
 
     // solhint-disable no-empty-blocks

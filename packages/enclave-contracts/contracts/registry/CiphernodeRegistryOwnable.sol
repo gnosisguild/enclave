@@ -224,8 +224,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     function getCommittee(
         uint256 e3Id
-    ) public view returns (IRegistryFilter.Committee memory) {
-        return registryFilters[e3Id].getCommittee(e3Id);
+    ) public view returns (IRegistryFilter.Committee memory committee) {
+        committee = registryFilters[e3Id].getCommittee(e3Id);
+        require(committee.nodes.length > 0, CommitteeNotPublished());
     }
 
     function treeSize() public view returns (uint256) {

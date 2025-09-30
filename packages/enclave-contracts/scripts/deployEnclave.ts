@@ -89,7 +89,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
     registry: addressOne,
     slashedFundsTreasury: ownerAddress,
     ticketPrice: ethers.parseUnits("10", 6).toString(),
-    licenseRequiredBond: ethers.parseEther("1000").toString(),
+    licenseRequiredBond: ethers.parseEther("100").toString(),
     minTicketBalance: 1,
     exitDelay: 7 * 24 * 60 * 60,
     hre,

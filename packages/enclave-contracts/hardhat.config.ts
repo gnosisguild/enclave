@@ -13,6 +13,8 @@ import type { HardhatUserConfig } from "hardhat/config";
 
 import {
   ciphernodeAdd,
+  ciphernodeAdminAdd,
+  ciphernodeMintTokens,
   ciphernodeRemove,
   ciphernodeSiblings,
 } from "./tasks/ciphernode";
@@ -97,6 +99,8 @@ const config: HardhatUserConfig = {
   ],
   tasks: [
     ciphernodeAdd,
+    ciphernodeAdminAdd,
+    ciphernodeMintTokens,
     ciphernodeRemove,
     ciphernodeSiblings,
     requestCommittee,

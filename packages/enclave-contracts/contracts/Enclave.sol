@@ -93,6 +93,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
     error InsufficientBalance();
     error InsufficientAllowance();
+    error InvalidBondingRegistry(IBondingRegistry bondingRegistry);
+    error InvalidUsdcToken(IERC20 usdcToken);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -362,7 +364,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function _distributeRewards(uint256 e3Id) internal {
         IRegistryFilter.Committee memory committee = ciphernodeRegistry
             .getCommittee(e3Id);
-
         uint256[] memory amounts = new uint256[](committee.nodes.length);
 
         // We might need to pay different amounts to different nodes.
@@ -374,10 +375,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         // Approve the BondingRegistry to spend the USDC tokens
         usdcToken.approve(address(bondingRegistry), e3Payments[e3Id]);
-        // Distribute rewards to the committee
-        bondingRegistry.distributeRewards(usdcToken, committee.nodes, amounts);
         // Zero out the payment
         e3Payments[e3Id] = 0;
+        // Distribute rewards to the committee
+        bondingRegistry.distributeRewards(usdcToken, committee.nodes, amounts);
         // Where does dust go? Treasury maybe?
         usdcToken.approve(address(bondingRegistry), 0);
     }
@@ -412,6 +413,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function setBondingRegistry(
         IBondingRegistry _bondingRegistry
     ) public onlyOwner returns (bool success) {
+        require(
+            address(_bondingRegistry) != address(0) &&
+                _bondingRegistry != bondingRegistry,
+            InvalidBondingRegistry(_bondingRegistry)
+        );
         bondingRegistry = _bondingRegistry;
         success = true;
         emit BondingRegistrySet(address(_bondingRegistry));
@@ -420,6 +426,10 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     function setUsdcToken(
         IERC20 _usdcToken
     ) public onlyOwner returns (bool success) {
+        require(
+            address(_usdcToken) != address(0) && _usdcToken != usdcToken,
+            InvalidUsdcToken(_usdcToken)
+        );
         usdcToken = _usdcToken;
         success = true;
         emit UsdcTokenSet(address(_usdcToken));

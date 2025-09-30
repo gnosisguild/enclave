@@ -47,6 +47,20 @@ export const deployAndSaveEnclaveToken = async ({
       preDeployedArgs.address,
       signer,
     );
+
+    if (chain === "localhost" || chain === "hardhat") {
+      try {
+        const isRestricted = await enclaveTokenContract.transfersRestricted();
+        if (isRestricted) {
+          const tx = await enclaveTokenContract.setTransferRestriction(false);
+          await tx.wait();
+          console.log("Transfer restrictions disabled for local development");
+        }
+      } catch (error) {
+        console.warn("Failed to disable transfer restrictions:", error);
+      }
+    }
+
     return { enclaveToken: enclaveTokenContract };
   }
 
@@ -80,6 +94,16 @@ export const deployAndSaveEnclaveToken = async ({
     enclaveTokenAddress,
     signer,
   );
+
+  if (chain === "localhost" || chain === "hardhat") {
+    try {
+      const tx = await enclaveTokenContract.setTransferRestriction(false);
+      await tx.wait();
+      console.log("Transfer restrictions disabled for local development");
+    } catch (error) {
+      console.warn("Failed to disable transfer restrictions:", error);
+    }
+  }
 
   return { enclaveToken: enclaveTokenContract };
 };
