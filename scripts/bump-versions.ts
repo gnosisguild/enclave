@@ -203,11 +203,16 @@ class VersionBumper {
           console.log('   Pushing to remote...')
           
           // Push commits
-          execSync('git push', {
+          const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', {
+            cwd: this.rootDir,
+            encoding: 'utf8'
+          }).trim()
+
+          execSync(`git push origin ${currentBranch}`, {
             cwd: this.rootDir,
             stdio: 'pipe'
           })
-          console.log('   ✓ Pushed commits')
+          console.log(`   ✓ Pushed commits to ${currentBranch}`)
           
           // Push tag
           execSync(`git push origin ${tagName}`, {
