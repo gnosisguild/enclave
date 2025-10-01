@@ -1850,7 +1850,7 @@ dependencies = [
  "config",
  "dialoguer",
  "dotenvy",
- "e3-compute-provider 0.0.1-test",
+ "e3-compute-provider 0.0.14-test",
  "e3-sdk",
  "env_logger",
  "eyre",
@@ -2151,7 +2151,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "e3-bfv-helpers"
-version = "0.0.1-test"
+version = "0.0.14-test"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -2167,7 +2167,7 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.0.1-test"
+version = "0.0.14-test"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
@@ -2200,7 +2200,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm-helpers"
-version = "0.0.1-test"
+version = "0.0.14-test"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2244,7 +2244,7 @@ dependencies = [
 
 [[package]]
 name = "e3-indexer"
-version = "0.0.1-test"
+version = "0.0.14-test"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sdk"
-version = "0.0.1-test"
+version = "0.0.14-test"
 dependencies = [
  "e3-bfv-helpers",
  "e3-evm-helpers",
