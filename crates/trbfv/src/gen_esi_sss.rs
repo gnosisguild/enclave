@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
+    helpers::print_shared_secret,
     shares::{Encrypted, SharedSecret},
     SharedRng, TrBFVConfig,
 };
@@ -81,7 +82,7 @@ pub fn gen_esi_sss(
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
     let error_size = req.error_size;
     let esi_per_ct = req.esi_per_ct as usize;
-    let esi_sss = (0..esi_per_ct)
+    let esi_sss: Vec<SharedSecret> = (0..esi_per_ct)
         .map(|_| -> Result<_> {
             info!("gen_esi_sss:mapping...");
             let generator = SmudgingNoiseGenerator::new(params.clone(), error_size.clone());
@@ -103,6 +104,10 @@ pub fn gen_esi_sss(
         .collect::<Result<_>>()?;
 
     info!("gen_esi_sss:returning...");
+
+    // temp debugging
+    println!("gen_esi_sss:");
+    esi_sss.iter().for_each(|s| print_shared_secret(" >>", s));
 
     (InnerResponse { esi_sss }, cipher).try_into()
 }

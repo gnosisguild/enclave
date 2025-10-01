@@ -16,7 +16,7 @@ use std::fmt::Display;
 #[rtype(result = "anyhow::Result<()>")]
 pub struct KeyshareCreated {
     #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub pubkey: Vec<u8>,
+    pub pubkey: Vec<u8>, // TODO: Make this ArcBytes
     pub e3_id: E3id,
     pub node: String,
 }

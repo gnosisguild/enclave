@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
+    helpers::{print_shamir_share_vec, print_shamir_share_vec_vec},
     shares::{DecryptVec, Encrypted, ShamirShare, ShamirShareSliceExt},
     TrBFVConfig,
 };
@@ -112,10 +113,13 @@ pub fn calculate_decryption_key(
 
     let req: InnerRequest = (cipher, req).try_into()?;
 
+    print_shamir_share_vec("# sk_sss_collected", req.sk_sss_collected.clone());
+    print_shamir_share_vec_vec("# esi_sss_collected", req.esi_sss_collected.clone());
+
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;
-    let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
+    let share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
 
     info!("Calculating sk_poly_sum...");
     let sk_poly_sum =
@@ -126,7 +130,7 @@ pub fn calculate_decryption_key(
         .esi_sss_collected
         .into_iter()
         .map(|shares| -> Result<_> {
-            let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
+            let share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
             share_manager
                 .aggregate_collected_shares(&shares.to_array_data())
                 .context("Failed to aggregate es_sss")

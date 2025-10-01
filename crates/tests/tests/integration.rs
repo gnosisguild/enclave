@@ -5,33 +5,28 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Actor;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use e3_crypto::Cipher;
 use e3_events::{
     CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
     PlaintextAggregated, ThresholdShare,
 };
-use e3_fhe::create_crp;
 use e3_multithread::Multithread;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
 use e3_test_helpers::ciphernode_builder::CiphernodeBuilder;
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{
-    create_seed_from_u64, create_shared_rng_from_u64, encrypt_ciphertext, rand_eth_addr,
-    AddToCommittee,
+    create_crp_from_seed, create_seed_from_u64, create_shared_rng_from_u64, rand_eth_addr,
+    usecase_helpers, AddToCommittee,
 };
 use e3_trbfv::helpers::calculate_error_size;
+use e3_trbfv::{trbfv_config, TrBFVConfig};
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::PublicKey;
-use fhe::{
-    bfv,
-    trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
-};
 use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
 use std::time::Duration;
 use std::{fs, sync::Arc};
-use tokio::time::sleep;
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
@@ -68,6 +63,9 @@ async fn test_trbfv_actor() -> Result<()> {
     // Create rng
     let rng = create_shared_rng_from_u64(42);
 
+    // Create test rng for testing
+    let test_rng = create_shared_rng_from_u64(42);
+
     // Create "trigger" bus
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
 
@@ -82,12 +80,22 @@ async fn test_trbfv_actor() -> Result<()> {
             0xfffffebc001u64,   //
         ] as &[u64],
     );
-
     // Params for BFV
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
 
     // Encoded Params
     let params = ArcBytes::from_bytes(encode_bfv_params(&params_raw.clone()));
+
+    // round information
+    let threshold_m = 2;
+    let threshold_n = 5;
+    let esi_per_ct = 3;
+    let seed = create_seed_from_u64(123);
+    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
+        params_raw.clone(),
+        threshold_n,
+        threshold_m,
+    )?));
 
     // Cipher
     let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
@@ -125,10 +133,7 @@ async fn test_trbfv_actor() -> Result<()> {
             CiphernodeBuilder::new(rng.clone(), cipher.clone())
                 .with_address(&addr)
                 .with_injected_multithread(multithread.clone())
-                // .with_history()
                 .with_trbfv()
-                // .with_pubkey_aggregation()
-                // .with_threshold_plaintext_aggregation()
                 .with_source_bus(&bus)
                 .with_logging()
                 .build()
@@ -145,6 +150,26 @@ async fn test_trbfv_actor() -> Result<()> {
     // Flush all events
     nodes.flush_all_history(100).await?;
 
+    ///////////////////////////////////////////////////////////////
+    // RUN TEST CALCULATION
+    ///////////////////////////////////////////////////////////////
+
+    let test_trbfv_config =
+        TrBFVConfig::new(params.clone(), threshold_n as u64, threshold_m as u64);
+    let test_crp = create_crp_from_seed(&test_trbfv_config.params(), &seed)?;
+
+    let shares_hash_map = usecase_helpers::generate_shares_hash_map(
+        &test_trbfv_config,
+        esi_per_ct,
+        &error_size,
+        &test_crp,
+        &test_rng,
+        &cipher,
+    )?;
+
+    let test_pubkey =
+        usecase_helpers::get_public_key(&shares_hash_map, test_trbfv_config.params(), &test_crp)?;
+
     ///////////////////////////////////////////////////////////////////////////////////
     // 2. Trigger E3Requested
     //
@@ -156,24 +181,18 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Prepare round
 
-    let seed = create_seed_from_u64(123);
-
     // Calculate Error Size for E3Program (this will be done by the E3Program implementor)
-    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
-        params_raw.clone(),
-        5,
-        3,
-    )?));
 
+    // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
     let e3_requested = E3Requested {
         e3_id: e3_id.clone(),
-        threshold_m: 2,
-        threshold_n: 5, // Committee size is 5 from 7 total nodes
+        threshold_m,
+        threshold_n,
         seed: seed.clone(),
         error_size,
-        esi_per_ct: 3,
+        esi_per_ct: esi_per_ct as usize,
         params,
     };
 
@@ -235,11 +254,13 @@ async fn test_trbfv_actor() -> Result<()> {
     let pubkey_bytes = pubkey_event.pubkey.clone();
     let pubkey = PublicKey::from_bytes(&pubkey_bytes, &params_raw)?;
 
+    assert_eq!(pubkey, test_pubkey, "Pubkeys were not equal");
+
     println!("Generating inputs this takes some time...");
 
     // Create the inputs
     let num_votes_per_voter = 3;
-    let num_voters = 10;
+    let num_voters = 30;
     let (inputs, numbers) = e3_test_helpers::application::generate_ciphertexts(
         &pubkey,
         params_raw.clone(),
@@ -297,14 +318,17 @@ async fn test_trbfv_actor() -> Result<()> {
         bail!("bad event")
     };
 
-    let results: Vec<u64> = plaintext
+    let results = plaintext
         .into_iter()
         .map(|a| {
-            bincode::deserialize::<Vec<u64>>(&a.extract_bytes())
-                .context("Could not deserialize plaintext")
-                .map(|v| *v.first().unwrap())
+            bincode::deserialize(&a.extract_bytes()).context("Could not deserialize plaintext")
         })
-        .collect::<Result<Vec<u64>>>()?;
+        .collect::<Result<Vec<Vec<u64>>>>()?;
+
+    let results: Vec<u64> = results
+        .into_iter()
+        .map(|r| r.first().unwrap().clone())
+        .collect();
 
     // Show summation result
     let mut expected_result = vec![0u64; 3];

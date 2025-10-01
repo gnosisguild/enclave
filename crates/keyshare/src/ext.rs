@@ -18,7 +18,6 @@ use e3_fhe::{ext::FHE_KEY, SharedRng};
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;
-use tracing::info;
 
 pub struct KeyshareExtension {
     bus: Addr<EventBus<EnclaveEvent>>,
@@ -125,7 +124,6 @@ pub struct ThresholdKeyshareExtension {
     bus: Addr<EventBus<EnclaveEvent>>,
     cipher: Arc<Cipher>,
     address: String,
-    rng: SharedRng,
     multithread: Addr<Multithread>,
 }
 
@@ -134,14 +132,12 @@ impl ThresholdKeyshareExtension {
         bus: &Addr<EventBus<EnclaveEvent>>,
         cipher: &Arc<Cipher>,
         multithread: &Addr<Multithread>,
-        rng: &SharedRng,
         address: &str,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
             cipher: cipher.to_owned(),
             multithread: multithread.clone(),
-            rng: rng.clone(),
             address: address.to_owned(),
         })
     }
@@ -183,7 +179,6 @@ impl E3Extension for ThresholdKeyshareExtension {
                     bus: self.bus.clone(),
                     cipher: self.cipher.clone(),
                     multithread: self.multithread.clone(),
-                    rng: self.rng.clone(),
                     state: container,
                 })
                 .start()
@@ -214,7 +209,6 @@ impl E3Extension for ThresholdKeyshareExtension {
             bus: self.bus.clone(),
             cipher: self.cipher.clone(),
             multithread: self.multithread.clone(),
-            rng: self.rng.clone(),
             state,
         })
         .start()

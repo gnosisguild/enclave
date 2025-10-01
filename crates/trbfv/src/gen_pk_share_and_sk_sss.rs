@@ -7,6 +7,7 @@
 /// This module defines event payloads that will generate the public key share as well as the sk shamir secret shares to be distributed to other members of the committee.
 /// This has been separated from the esi setup in order to be able to take advantage of parallelism
 use crate::{
+    helpers::print_shared_secret,
     shares::{Encrypted, SharedSecret},
     SharedRng, TrBFVConfig,
 };
@@ -102,6 +103,9 @@ pub fn gen_pk_share_and_sk_sss(
     let sk_sss = SharedSecret::from({
         share_manager.generate_secret_shares_from_poly(sk_poly, &mut *rng.lock().unwrap())?
     });
+
+    println!("gen_pk_share_and_sk_sss:");
+    print_shared_secret(" sk_sss", &sk_sss);
 
     (InnerResponse { pk_share, sk_sss }, cipher).try_into()
 }

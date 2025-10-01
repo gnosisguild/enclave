@@ -4,13 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::{
-    collections::{HashMap, HashSet},
-    mem,
-    sync::Arc,
-    time::{Duration, Instant},
-};
-
 use actix::prelude::*;
 use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
@@ -30,10 +23,18 @@ use e3_trbfv::{
     gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
     gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest,
     shares::{EncryptableVec, Encrypted, PvwEncrypted, ShamirShare, SharedSecret},
-    SharedRng, TrBFVConfig, TrBFVRequest, TrBFVResponse,
+    TrBFVConfig, TrBFVRequest, TrBFVResponse,
 };
 use e3_utils::{to_ordered_vec, utility_types::ArcBytes};
 use fhe_traits::Serialize;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
+use std::{
+    collections::{HashMap, HashSet},
+    mem,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 use tracing::{error, info};
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -270,7 +271,6 @@ pub struct ThresholdKeyshareParams {
     pub bus: Addr<EventBus<EnclaveEvent>>,
     pub cipher: Arc<Cipher>,
     pub multithread: Addr<Multithread>,
-    pub rng: SharedRng,
     pub state: Persistable<ThresholdKeyshareState>,
 }
 
@@ -279,7 +279,6 @@ pub struct ThresholdKeyshare {
     cipher: Arc<Cipher>,
     decryption_key_collector: Option<Addr<DecryptionKeyCollector>>,
     multithread: Addr<Multithread>,
-    rng: SharedRng,
     state: Persistable<ThresholdKeyshareState>,
 }
 
@@ -290,7 +289,6 @@ impl ThresholdKeyshare {
             cipher: params.cipher,
             decryption_key_collector: None,
             multithread: params.multithread,
-            rng: params.rng,
             state: params.state,
         }
     }
@@ -478,7 +476,10 @@ impl ThresholdKeyshare {
             use KeyshareState as K;
             info!("Try store decryption key");
 
+            // Attempt to get pk_share from current state
             let current: AggregatingDecryptionKey = s.clone().try_into()?;
+
+            // Transition to ReadyForDecryption
             let next = K::ReadyForDecryption(ReadyForDecryption {
                 pk_share: current.pk_share,
                 sk_poly_sum,
@@ -628,8 +629,6 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
         msg: StartThresholdShareGeneration,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let CiphernodeSelected { .. } = msg.0.clone();
-
         // Initialize State
         self.state.try_mutate(|s| {
             s.new_state(KeyshareState::GeneratingThresholdShare(
@@ -641,8 +640,6 @@ impl Handler<StartThresholdShareGeneration> for ThresholdKeyshare {
             ))
         })?;
 
-        // Run both simultaneously
-        ctx.notify(GenPkShareAndSkSss(msg.0.clone()));
         ctx.notify_later(GenEsiSss(msg.0), Duration::from_millis(1));
         Ok(())
     }
@@ -652,13 +649,15 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenEsiSss, _: &mut Self::Context) -> Self::Result {
         info!("GenEsiSss on ThresholdKeyshare");
+
+        let evt = msg.0;
         let CiphernodeSelected {
             // TODO: should these be on meta? These seem TrBFV specific. perhaps it is best to
             // bundle them in with the params
             error_size,
             esi_per_ct,
             ..
-        } = msg.0;
+        } = evt.clone();
 
         let Some(state) = self.state.get() else {
             return e3_utils::bail(self);
@@ -689,14 +688,13 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
 
                         act.try_store_esi_sss(output.esi_sss)?;
 
-                        let Some(state) = act.state.get() else {
-                            bail!("State not found.")
-                        };
-
-                        match state.variant_name() {
-                            "AggregatingDecryptionKey" => ctx.notify(SharesGenerated),
-                            _ => bail!("State expected to be AggregatingDecryptionKey"),
-                        };
+                        if let Some(ThresholdKeyshareState {
+                            state: KeyshareState::AggregatingDecryptionKey { .. },
+                            ..
+                        }) = act.state.get()
+                        {
+                            ctx.notify(SharesGenerated);
+                        }
 
                         Ok(())
                     };
@@ -704,7 +702,9 @@ impl Handler<GenEsiSss> for ThresholdKeyshare {
                     match c() {
                         Ok(_) => (),
                         Err(e) => error!("There was an error: GenEsiSss, {}", e),
-                    }
+                    };
+
+                    ctx.notify_later(GenPkShareAndSkSss(evt.clone()), Duration::from_millis(1));
                 }),
         )
     }
@@ -714,15 +714,20 @@ impl Handler<GenPkShareAndSkSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenPkShareAndSkSss, _: &mut Self::Context) -> Self::Result {
         info!("GenPkShareAndSkSss on ThresholdKeyshare");
-        let CiphernodeSelected { .. } = msg.0;
+        let CiphernodeSelected { seed, .. } = msg.0;
         let Some(state) = self.state.get() else {
             return e3_utils::bail(self);
         };
 
         let trbfv_config: TrBFVConfig = state.get_trbfv_config();
 
-        let crp =
-            ArcBytes::from_bytes(create_crp(trbfv_config.params(), self.rng.clone()).to_bytes());
+        let crp = ArcBytes::from_bytes(
+            create_crp(
+                trbfv_config.params(),
+                Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
+            )
+            .to_bytes(),
+        );
         let event = ComputeRequest::TrBFV(TrBFVRequest::GenPkShareAndSkSss(
             GenPkShareAndSkSssRequest { trbfv_config, crp }.into(),
         ));

@@ -4,6 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::shares::ShamirShare;
+use crate::shares::ShamirShareArrayExt;
+use crate::shares::SharedSecret;
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe::{
@@ -60,10 +63,30 @@ pub fn print_poly(name: &str, poly: &Poly) {
     println!("{}", stringify_poly(name, poly));
 }
 
+pub fn print_shared_secret(name: &str, secret: &SharedSecret) {
+    println!("{}", stringify_shared_secret(name, secret));
+}
+
+pub fn print_shamir_share(name: &str, share: &ShamirShare) {
+    println!("ShamirShare({})", stringify_shamir_share(name, share));
+}
+
+pub fn print_shamir_share_vec(name: &str, share: Vec<ShamirShare>) {
+    println!("Vec<ShamirShare>({})", name);
+    share.iter().for_each(|sh| print_shamir_share(" ", sh));
+}
+
+pub fn print_shamir_share_vec_vec(name: &str, share: Vec<Vec<ShamirShare>>) {
+    println!("Vec<Vec<ShamirShare>>({})", name);
+    share
+        .iter()
+        .for_each(|vsh| print_shamir_share_vec(" ", vsh.clone()))
+}
+
 fn hash_to_petname(hash: u64) -> String {
     let petnames = Petnames::default();
 
-    // Access as fields, not methods
+    // Access as fields, not methods:
     let adjectives = &petnames.adjectives;
     let nouns = &petnames.nouns;
 
@@ -71,6 +94,11 @@ fn hash_to_petname(hash: u64) -> String {
     let noun_idx = ((hash / adjectives.len() as u64) % nouns.len() as u64) as usize;
 
     format!("{}-{}", adjectives[adj_idx], nouns[noun_idx])
+}
+
+fn hash_to_colored_petname(hash: u64) -> String {
+    let petname = hash_to_petname(hash);
+    format!("{}  {}  {}", hash_to_bg_color(hash), petname, reset_color())
 }
 
 fn hash_poly(poly: &Poly) -> u64 {
@@ -81,4 +109,56 @@ fn hash_bytes(data: &[u8]) -> u64 {
     let mut hasher = DefaultHasher::new();
     data.hash(&mut hasher);
     hasher.finish()
+}
+
+fn stringify_shamir_share(name: &str, share: &ShamirShare) -> String {
+    format!(
+        "{}{}",
+        name,
+        hash_to_colored_petname(hash_share(share).unwrap())
+    )
+}
+
+fn stringify_shared_secret(name: &str, secret: &SharedSecret) -> String {
+    let shares = secret.clone().to_vec_shamir_share();
+    let mut out: Vec<String> = vec![];
+    out.push(format!("{}=SharedSecret", name));
+    shares.iter().for_each(|sh| {
+        out.push(stringify_shamir_share("  party", sh));
+    });
+    out.join("\n")
+}
+
+fn hash_shared_secret(secret: &SharedSecret) -> Result<u64> {
+    let bytes = bincode::serialize(secret)?;
+    Ok(hash_bytes(&bytes))
+}
+
+fn hash_share(share: &ShamirShare) -> Result<u64> {
+    let bytes = bincode::serialize(share)?;
+    Ok(hash_bytes(&bytes))
+}
+
+fn hash_to_bg_color(hash: u64) -> String {
+    // Extract RGB from the hash
+    let r = (hash & 0xFF) as u8;
+    let g = ((hash >> 8) & 0xFF) as u8;
+    let b = ((hash >> 16) & 0xFF) as u8;
+
+    // Calculate relative luminance
+    let luminance = (0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64) / 255.0;
+
+    // Choose black or white text based on luminance
+    let fg_color = if luminance > 0.5 {
+        "\x1b[30m"
+    } else {
+        "\x1b[97m"
+    };
+
+    // Return ANSI escape code for background + foreground
+    format!("\x1b[48;2;{};{};{}m{}", r, g, b, fg_color)
+}
+
+fn reset_color() -> &'static str {
+    "\x1b[0m"
 }
