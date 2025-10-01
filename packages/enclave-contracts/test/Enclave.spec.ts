@@ -108,7 +108,7 @@ describe("Enclave", function () {
       {
         parameters: {
           EnclaveTicketToken: {
-            underlyingUSDC: await usdcToken.getAddress(),
+            baseToken: await usdcToken.getAddress(),
             registry: addressOne,
             owner: ownerAddress,
           },
@@ -157,7 +157,7 @@ describe("Enclave", function () {
           registry: addressOne,
           bondingRegistry:
             await bondingRegistryContract.bondingRegistry.getAddress(),
-          usdcToken: await usdcToken.getAddress(),
+          feeToken: await usdcToken.getAddress(),
         },
       },
     });

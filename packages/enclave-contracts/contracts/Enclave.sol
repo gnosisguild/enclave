@@ -36,7 +36,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     ICiphernodeRegistry public ciphernodeRegistry; // address of the Ciphernode registry.
     IBondingRegistry public bondingRegistry; // address of the Bonding registry.
-    IERC20 public usdcToken; // address of the USDC token.
+    IERC20 public feeToken; // address of the Fee token.
     uint256 public maxDuration; // maximum duration of a computation in seconds.
     uint256 public nexte3Id; // ID of the next E3.
 
@@ -94,7 +94,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     error InsufficientBalance();
     error InsufficientAllowance();
     error InvalidBondingRegistry(IBondingRegistry bondingRegistry);
-    error InvalidUsdcToken(IERC20 usdcToken);
+    error InvalidFeeToken(IERC20 feeToken);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -109,7 +109,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
         IBondingRegistry _bondingRegistry,
-        IERC20 _usdcToken,
+        IERC20 _feeToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
     ) {
@@ -117,7 +117,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             _owner,
             _ciphernodeRegistry,
             _bondingRegistry,
-            _usdcToken,
+            _feeToken,
             _maxDuration,
             _e3ProgramsParams
         );
@@ -131,7 +131,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
         IBondingRegistry _bondingRegistry,
-        IERC20 _usdcToken,
+        IERC20 _feeToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
     ) public initializer {
@@ -139,7 +139,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
         setBondingRegistry(_bondingRegistry);
-        setUsdcToken(_usdcToken);
+        setFeeToken(_feeToken);
         setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
@@ -222,7 +222,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3s[e3Id] = e3;
         e3Payments[e3Id] = e3Fee;
 
-        usdcToken.safeTransferFrom(msg.sender, address(this), e3Fee);
+        feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         require(
             ciphernodeRegistry.requestCommittee(
@@ -366,21 +366,24 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             .getCommittee(e3Id);
         uint256[] memory amounts = new uint256[](committee.nodes.length);
 
-        // We might need to pay different amounts to different nodes.
+        // TODO: do we need to pay different amounts to different nodes?
         // For now, we'll pay the same amount to all nodes.
         uint256 amount = e3Payments[e3Id] / committee.nodes.length;
         for (uint256 i = 0; i < committee.nodes.length; i++) {
             amounts[i] = amount;
         }
 
-        // Approve the BondingRegistry to spend the USDC tokens
-        usdcToken.approve(address(bondingRegistry), e3Payments[e3Id]);
-        // Zero out the payment
+        uint256 totalAmount = e3Payments[e3Id];
         e3Payments[e3Id] = 0;
-        // Distribute rewards to the committee
-        bondingRegistry.distributeRewards(usdcToken, committee.nodes, amounts);
-        // Where does dust go? Treasury maybe?
-        usdcToken.approve(address(bondingRegistry), 0);
+
+        feeToken.approve(address(bondingRegistry), totalAmount);
+
+        bondingRegistry.distributeRewards(feeToken, committee.nodes, amounts);
+
+        // TODO: decide where does dust go? Treasury maybe?
+        feeToken.approve(address(bondingRegistry), 0);
+
+        emit RewardsDistributed(e3Id, committee.nodes, amounts);
     }
 
     ////////////////////////////////////////////////////////////
@@ -423,16 +426,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit BondingRegistrySet(address(_bondingRegistry));
     }
 
-    function setUsdcToken(
-        IERC20 _usdcToken
+    function setFeeToken(
+        IERC20 _feeToken
     ) public onlyOwner returns (bool success) {
         require(
-            address(_usdcToken) != address(0) && _usdcToken != usdcToken,
-            InvalidUsdcToken(_usdcToken)
+            address(_feeToken) != address(0) && _feeToken != feeToken,
+            InvalidFeeToken(_feeToken)
         );
-        usdcToken = _usdcToken;
+        feeToken = _feeToken;
         success = true;
-        emit UsdcTokenSet(address(_usdcToken));
+        emit FeeTokenSet(address(_feeToken));
     }
 
     function enableE3Program(
@@ -518,6 +521,8 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         return InternalLeanIMT._root(inputs[e3Id]);
     }
 
+    // TODO: this should be calculated based on the E3 program and the parameters
+    // This is just a placeholder for now
     function getE3Quote(
         E3RequestParams calldata
     ) public pure returns (uint256 fee) {

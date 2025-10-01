@@ -89,8 +89,8 @@ contract NaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     function publishCommittee(
         uint256 e3Id,
-        address[] memory nodes,
-        bytes memory publicKey
+        address[] calldata nodes,
+        bytes calldata publicKey
     ) external onlyOwner {
         IRegistryFilter.Committee storage committee = committees[e3Id];
         require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());

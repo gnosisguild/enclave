@@ -82,7 +82,7 @@ describe("BondingRegistry", function () {
       {
         parameters: {
           EnclaveTicketToken: {
-            underlyingUSDC: await usdcContract.mockUSDC.getAddress(),
+            baseToken: await usdcContract.mockUSDC.getAddress(),
             registry: AddressOne,
             owner: ownerAddress,
           },

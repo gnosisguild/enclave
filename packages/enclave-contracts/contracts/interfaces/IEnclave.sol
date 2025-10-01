@@ -74,9 +74,19 @@ interface IEnclave {
     /// @param bondingRegistry The address of the BondingRegistry contract.
     event BondingRegistrySet(address bondingRegistry);
 
-    /// @notice This event MUST be emitted any time the USDC token is set.
-    /// @param usdcToken The address of the USDC token.
-    event UsdcTokenSet(address usdcToken);
+    /// @notice This event MUST be emitted any time the fee token is set.
+    /// @param feeToken The address of the fee token.
+    event FeeTokenSet(address feeToken);
+
+    /// @notice This event MUST be emitted when rewards are distributed to committee members.
+    /// @param e3Id The ID of the E3 computation.
+    /// @param nodes The addresses of the committee members receiving rewards.
+    /// @param amounts The reward amounts for each committee member.
+    event RewardsDistributed(
+        uint256 indexed e3Id,
+        address[] nodes,
+        uint256[] amounts
+    );
 
     /// @notice The event MUST be emitted any time an encryption scheme is enabled.
     /// @param encryptionSchemeId The ID of the encryption scheme that was enabled.

@@ -114,32 +114,30 @@ contract EnclaveToken is
      * @param allocations Array of allocation descriptions.
      */
     function batchMintAllocations(
-        address[] memory recipients,
-        uint256[] memory amounts,
-        string[] memory allocations
+        address[] calldata recipients,
+        uint256[] calldata amounts,
+        string[] calldata allocations
     ) external onlyRole(MINTER_ROLE) {
-        if (
-            recipients.length != amounts.length ||
-            amounts.length != allocations.length
-        ) revert ArrayLengthMismatch();
+        uint256 len = recipients.length;
+        if (amounts.length != len || allocations.length != len)
+            revert ArrayLengthMismatch();
 
-        uint256 totalAmount = 0;
-        for (uint256 i = 0; i < amounts.length; i++) {
-            totalAmount += amounts[i];
+        uint256 minted = totalMinted;
+
+        for (uint256 i = 0; i < len; i++) {
+            address recipient = recipients[i];
+            uint256 amount = amounts[i];
+            if (recipient == address(0)) revert ZeroAddress();
+            if (amount == 0) revert ZeroAmount();
+
+            if (amount > TOTAL_SUPPLY - minted) revert ExceedsTotalSupply();
+            minted += amount;
+
+            _mint(recipient, amount);
+            emit AllocationMinted(recipient, amount, allocations[i]);
         }
-        if (totalMinted + totalAmount > TOTAL_SUPPLY)
-            revert ExceedsTotalSupply();
 
-        for (uint256 i = 0; i < recipients.length; i++) {
-            address rec = recipients[i];
-            uint256 amt = amounts[i];
-            if (rec == address(0)) revert ZeroAddress();
-            if (amt == 0) revert ZeroAmount();
-
-            _mint(rec, amt);
-            emit AllocationMinted(rec, amt, allocations[i]);
-        }
-        totalMinted += totalAmount;
+        totalMinted = minted;
     }
 
     /**
@@ -150,20 +148,6 @@ contract EnclaveToken is
     function setTransferRestriction(bool restricted) external onlyOwner {
         transfersRestricted = restricted;
         emit TransferRestrictionUpdated(restricted);
-    }
-
-    /**
-     * @notice Add or remove an address from the transfer whitelist.
-     * @dev Only the owner may call this.
-     * @param account Address whose whitelist status is to be updated.
-     * @param whitelisted Whether the address should be whitelisted.
-     */
-    function setTransferWhitelist(
-        address account,
-        bool whitelisted
-    ) external onlyOwner {
-        transferWhitelisted[account] = whitelisted;
-        emit TransferWhitelistUpdated(account, whitelisted);
     }
 
     /**

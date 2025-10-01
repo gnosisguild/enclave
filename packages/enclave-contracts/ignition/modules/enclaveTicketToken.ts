@@ -8,12 +8,12 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("EnclaveTicketToken", (m) => {
-  const underlyingUSDC = m.getParameter("underlyingUSDC");
+  const baseToken = m.getParameter("baseToken");
   const registry = m.getParameter("registry");
   const owner = m.getParameter("owner");
 
   const enclaveTicketToken = m.contract("EnclaveTicketToken", [
-    underlyingUSDC,
+    baseToken,
     registry,
     owner,
   ]);

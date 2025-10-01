@@ -13,13 +13,13 @@ export default buildModule("Enclave", (m) => {
   const maxDuration = m.getParameter("maxDuration");
   const registry = m.getParameter("registry");
   const bondingRegistry = m.getParameter("bondingRegistry");
-  const usdcToken = m.getParameter("usdcToken");
+  const feeToken = m.getParameter("feeToken");
 
   const poseidonT3 = m.library("PoseidonT3");
 
   const enclave = m.contract(
     "Enclave",
-    [owner, registry, bondingRegistry, usdcToken, maxDuration, [params]],
+    [owner, registry, bondingRegistry, feeToken, maxDuration, [params]],
     {
       libraries: {
         PoseidonT3: poseidonT3,

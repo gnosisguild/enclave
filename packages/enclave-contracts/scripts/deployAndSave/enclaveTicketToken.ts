@@ -16,7 +16,7 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
  * The arguments for the deployAndSaveEnclaveTicketToken function
  */
 export interface EnclaveTicketTokenArgs {
-  underlyingUSDC?: string;
+  baseToken?: string;
   registry?: string;
   owner?: string;
   hre: HardhatRuntimeEnvironment;
@@ -28,7 +28,7 @@ export interface EnclaveTicketTokenArgs {
  * @returns The deployed EnclaveTicketToken contract
  */
 export const deployAndSaveEnclaveTicketToken = async ({
-  underlyingUSDC,
+  baseToken,
   registry,
   owner,
   hre,
@@ -42,10 +42,10 @@ export const deployAndSaveEnclaveTicketToken = async ({
   const preDeployedArgs = readDeploymentArgs("EnclaveTicketToken", chain);
 
   if (
-    !underlyingUSDC ||
+    !baseToken ||
     !registry ||
     !owner ||
-    (preDeployedArgs?.constructorArgs?.underlyingUSDC === underlyingUSDC &&
+    (preDeployedArgs?.constructorArgs?.baseToken === baseToken &&
       preDeployedArgs?.constructorArgs?.registry === registry &&
       preDeployedArgs?.constructorArgs?.owner === owner)
   ) {
@@ -64,7 +64,7 @@ export const deployAndSaveEnclaveTicketToken = async ({
   const enclaveTicketToken = await ignition.deploy(EnclaveTicketTokenModule, {
     parameters: {
       EnclaveTicketToken: {
-        underlyingUSDC,
+        baseToken,
         registry,
         owner,
       },
@@ -81,7 +81,7 @@ export const deployAndSaveEnclaveTicketToken = async ({
   storeDeploymentArgs(
     {
       constructorArgs: {
-        underlyingUSDC,
+        baseToken,
         registry,
         owner,
       },

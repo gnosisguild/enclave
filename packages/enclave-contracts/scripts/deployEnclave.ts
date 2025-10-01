@@ -38,19 +38,19 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const addressOne = "0x0000000000000000000000000000000000000001";
 
   const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
-  let usdcTokenAddress: string;
+  let feeTokenAddress: string;
 
   if (shouldDeployMocks) {
-    console.log("Deploying mock USDC token...");
+    console.log("Deploying mock Fee token...");
     const { mockStableToken } = await deployAndSaveMockStableToken({
       initialSupply: 1000000,
       hre,
     });
-    usdcTokenAddress = await mockStableToken.getAddress();
-    console.log("MockUSDC deployed to:", usdcTokenAddress);
+    feeTokenAddress = await mockStableToken.getAddress();
+    console.log("MockFeeToken deployed to:", feeTokenAddress);
   } else {
     throw new Error(
-      "USDC token address must be provided for production deployment",
+      "Fee token address must be provided for production deployment",
     );
   }
 
@@ -64,7 +64,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   console.log("Deploying EnclaveTicketToken...");
   const { enclaveTicketToken } = await deployAndSaveEnclaveTicketToken({
-    underlyingUSDC: usdcTokenAddress,
+    baseToken: feeTokenAddress,
     registry: addressOne,
     owner: ownerAddress,
     hre,
@@ -113,7 +113,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: ciphernodeRegistryAddress,
     bondingRegistry: bondingRegistryAddress,
-    usdcToken: usdcTokenAddress,
+    feeToken: feeTokenAddress,
     hre,
   });
   const enclaveAddress = await enclave.getAddress();
@@ -188,7 +188,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
     ============================================
     Deployment Complete!
     ============================================
-    MockUSDC: ${usdcTokenAddress}
+    MockFeeToken: ${feeTokenAddress}
     EnclaveToken (ENCL): ${enclaveTokenAddress}
     EnclaveTicketToken: ${enclaveTicketTokenAddress}
     SlashingManager: ${slashingManagerAddress}

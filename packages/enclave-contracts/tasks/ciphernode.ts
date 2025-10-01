@@ -13,12 +13,6 @@ export const ciphernodeAdd = task(
   "Register a ciphernode to the bonding registry and ciphernode registry",
 )
   .addOption({
-    name: "privateKey",
-    description:
-      "private key of the ciphernode to register (must have ENCL and USDC)",
-    defaultValue: "",
-  })
-  .addOption({
     name: "licenseBondAmount",
     description:
       "amount of ENCL to bond (in wei, e.g., 1000000000000000000000 for 1000 ENCL)",
@@ -31,16 +25,12 @@ export const ciphernodeAdd = task(
     defaultValue: "1000000000",
   })
   .setAction(async () => ({
-    default: async ({ privateKey, licenseBondAmount, ticketAmount }, hre) => {
+    default: async ({ licenseBondAmount, ticketAmount }, hre) => {
       const connection = await hre.network.connect();
       const { ethers } = connection;
 
-      if (!privateKey) {
-        throw new Error("Private key is required. Use --private-key option.");
-      }
-
-      const wallet = new ethers.Wallet(privateKey, ethers.provider);
-      console.log(`Registering ciphernode: ${wallet.address}`);
+      const [signer] = await ethers.getSigners();
+      console.log(`Registering ciphernode: ${signer.address}`);
 
       const { deployAndSaveBondingRegistry } = await import(
         "../scripts/deployAndSave/bondingRegistry"
@@ -61,15 +51,15 @@ export const ciphernodeAdd = task(
       });
       const { mockStableToken } = await deployAndSaveMockStableToken({ hre });
 
-      const licenseToken = enclaveToken.connect(wallet);
-      const ticketToken = enclaveTicketToken.connect(wallet);
-      const usdcToken = mockStableToken.connect(wallet);
-      const bondingRegistryConnected = bondingRegistry.connect(wallet);
+      const licenseToken = enclaveToken.connect(signer);
+      const ticketToken = enclaveTicketToken.connect(signer);
+      const usdcToken = mockStableToken.connect(signer);
+      const bondingRegistryConnected = bondingRegistry.connect(signer);
 
       try {
         console.log("Step 1: Checking balances...");
-        const enclBalance = await licenseToken.balanceOf(wallet.address);
-        const usdcBalance = await usdcToken.balanceOf(wallet.address);
+        const enclBalance = await licenseToken.balanceOf(signer.address);
+        const usdcBalance = await usdcToken.balanceOf(signer.address);
 
         console.log(`ENCL balance: ${ethers.formatEther(enclBalance)}`);
         console.log(`USDC balance: ${ethers.formatUnits(usdcBalance, 6)}`);
@@ -129,17 +119,17 @@ export const ciphernodeAdd = task(
           `Ticket balance added: ${ethers.formatUnits(ticketAmountBigInt, 6)} USDC worth`,
         );
 
-        const isRegistered = await bondingRegistry.isRegistered(wallet.address);
-        const isActive = await bondingRegistry.isActive(wallet.address);
+        const isRegistered = await bondingRegistry.isRegistered(signer.address);
+        const isActive = await bondingRegistry.isActive(signer.address);
         const licenseBond = await bondingRegistry.getLicenseBond(
-          wallet.address,
+          signer.address,
         );
         const ticketBalance = await bondingRegistry.getTicketBalance(
-          wallet.address,
+          signer.address,
         );
 
         console.log("\n=== Registration Complete ===");
-        console.log(`Ciphernode: ${wallet.address}`);
+        console.log(`Ciphernode: ${signer.address}`);
         console.log(`Registered: ${isRegistered}`);
         console.log(`Active: ${isActive}`);
         console.log(`License Bond: ${ethers.formatEther(licenseBond)} ENCL`);
@@ -159,33 +149,24 @@ export const ciphernodeRemove = task(
   "Deregister a ciphernode from the bonding registry",
 )
   .addOption({
-    name: "privateKey",
-    description: "private key of the ciphernode to deregister",
-    defaultValue: "",
-  })
-  .addOption({
     name: "siblings",
     description: "comma separated siblings from tree proof",
     defaultValue: "",
   })
   .setAction(async () => ({
-    default: async ({ privateKey, siblings }, hre) => {
+    default: async ({ siblings }, hre) => {
       const connection = await hre.network.connect();
       const { ethers } = connection;
 
-      if (!privateKey) {
-        throw new Error("Private key is required. Use --private-key option.");
-      }
-
-      const wallet = new ethers.Wallet(privateKey, ethers.provider);
-      console.log(`Deregistering ciphernode: ${wallet.address}`);
+      const [signer] = await ethers.getSigners();
+      console.log(`Deregistering ciphernode: ${signer.address}`);
 
       const { deployAndSaveBondingRegistry } = await import(
         "../scripts/deployAndSave/bondingRegistry"
       );
       const { bondingRegistry } = await deployAndSaveBondingRegistry({ hre });
 
-      const bondingRegistryConnected = bondingRegistry.connect(wallet);
+      const bondingRegistryConnected = bondingRegistry.connect(signer);
 
       const siblingsArray = siblings.split(",").map((s: string) => BigInt(s));
 
@@ -197,7 +178,7 @@ export const ciphernodeRemove = task(
           await bondingRegistryConnected.deregisterOperator(siblingsArray);
         await tx.wait();
 
-        console.log(`Ciphernode ${wallet.address} deregistered`);
+        console.log(`Ciphernode ${signer.address} deregistered`);
         console.log(
           "Note: Funds are now in exit queue. Use claimExits() after the exit delay period.",
         );

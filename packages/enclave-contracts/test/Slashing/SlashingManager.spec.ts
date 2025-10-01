@@ -104,7 +104,7 @@ describe("SlashingManager", function () {
       {
         parameters: {
           EnclaveTicketToken: {
-            underlyingUSDC: await usdcContract.mockUSDC.getAddress(),
+            baseToken: await usdcContract.mockUSDC.getAddress(),
             registry: ownerAddress,
             owner: ownerAddress,
           },
