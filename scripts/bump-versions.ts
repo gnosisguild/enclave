@@ -34,7 +34,7 @@ class VersionBumper {
   /**
    * Main entry point to bump all versions
    */
-  async bumpAll(): Promise<void> {
+  bumpAll(): void {
     console.log(`🚀 Bumping all versions to ${this.newVersion}`)
 
     if (this.options.dryRun) {
@@ -48,6 +48,35 @@ class VersionBumper {
       // Get current version from root package.json or Cargo.toml
       this.oldVersion = this.getCurrentVersion()
       console.log(`📌 Current version: ${this.oldVersion || 'unknown'}`)
+
+      // Check for uncommitted changes
+      if (!this.options.skipGit && !this.options.dryRun) {
+        this.checkGitStatus()
+      }
+      
+      // In dry-run mode, just show what would happen
+      if (this.options.dryRun) {
+        console.log('\n📋 Would perform the following actions:')
+        console.log('   1. Update Rust workspace version in Cargo.toml')
+        console.log('   2. Update NPM package versions in:')
+        console.log('      - Root package.json')
+        console.log('      - packages/enclave-sdk')
+        console.log('      - packages/enclave-contracts')
+        console.log('      - packages/enclave-config')
+        console.log('      - packages/enclave-react')
+        console.log('      - crates/wasm')
+        console.log('   3. Update lock files (Cargo.lock, pnpm-lock.yaml)')
+        console.log('   4. Generate/update CHANGELOG.md')
+        if (!this.options.skipGit) {
+          console.log('   5. Commit changes')
+          console.log(`   6. Create tag: v${this.newVersion}`)
+          if (!this.options.skipPush) {
+            console.log('   7. Push commits and tag to origin')
+          }
+        }
+        console.log('\n✅ Dry run complete. Run without --dry-run to perform these actions.')
+        return  
+      }
       
       // Bump Rust crates
       this.bumpRustCrates()

@@ -272,9 +272,10 @@ jobs:
             echo "" >> release_notes.md
             
             # Try to extract the section for this version
+            # Fixed regex to handle both stable and pre-release versions
             awk -v ver="${VERSION}" '
-              /^#+ \[?'${VERSION}'\]?/ { flag=1; next }
-              /^#+ \[?[0-9]+\.[0-9]+\.[0-9]+/ && flag { exit }
+              /^#+ \[?'"${VERSION//./\\.}"'\]?/ { flag=1; next }
+              /^#+ \[?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?/ && flag { exit }
               flag { print }
             ' CHANGELOG.md >> release_notes.md || echo "See CHANGELOG.md for details." >> release_notes.md
           fi
@@ -379,4 +380,3 @@ jobs:
           git tag -f stable
           git push origin stable --force
           echo "✅ Updated 'stable' tag to point to v${{ needs.validate-and-prepare.outputs.version }}"
-          
