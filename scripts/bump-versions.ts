@@ -348,7 +348,6 @@ class VersionBumper {
       this.updatePackageJson(packageJsonPath)
       const packageName = this.getPackageName(packageJsonPath)
       console.log(`   ✓ ${packageName}`)
-      
     }
   }
 

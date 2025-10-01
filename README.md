@@ -166,7 +166,22 @@ sequenceDiagram
 
 Enclave uses a unified versioning strategy where all packages (Rust crates and npm packages) share the same version number. Releases are triggered by git tags and follow semantic versioning.
 
-### Release Workflow
+### Quick Release
+
+```bash
+# One command to release! 🎉
+pnpm bump:versions 1.0.0
+
+# This automatically:
+# - Bumps all versions
+# - Generates changelog
+# - Commits changes
+# - Creates tag
+# - Pushes to GitHub
+# - Triggers release workflow
+```
+
+### Detailed Release Workflow
 
 #### 1. Development Phase
 
@@ -179,43 +194,47 @@ git commit -m "docs: update API documentation"
 git commit -m "BREAKING CHANGE: redesign configuration API"
 ```
 
-#### 2. Version Bump
-When ready to release, maintainers bump the version across all packages:
+#### 2. Release Execution
+
+When ready to release, maintainers run a single command:
 
 ```bash
-# Bump version and generate changelog
+# For stable release
 pnpm bump:versions 1.0.0
 
-# For pre-releases
+# For pre-release
 pnpm bump:versions 1.0.0-beta.1
 ```
 
-#### 3. Commit and Tag
+This command automatically:
+- ✅ Validates working directory is clean
+- ✅ Updates version in `Cargo.toml` (workspace version)
+- ✅ Updates version in all npm `package.json` files
+- ✅ Updates lock files (`Cargo.lock`, `pnpm-lock.yaml`)
+- ✅ Generates/updates `CHANGELOG.md` from commit history
+- ✅ Commits changes: `chore(release): bump version to X.Y.Z`
+- ✅ Creates annotated tag: `vX.Y.Z`
+- ✅ Pushes commits and tag to GitHub
+- ✅ **Triggers automated release workflow**
+
+#### 3. Alternative: Manual Review Before Push
+
+If you prefer to review changes before pushing:
+
 ```bash
-# Review changes
-git diff
+# Prepare release locally (no push)
+pnpm bump:versions --no-push 1.0.0
 
-# Commit the version bump
-git add .
-git commit -m "chore(release): bump version to 1.0.0"
+# Review the changes
+git diff HEAD~1
+cat CHANGELOG.md
 
-# Push to a release branch
-git push origin chore/release/v1.0.0
-
-# Then open a PR to main 
-
-# Create and push tag (this triggers the release!)
-git tag v1.0.0
-git push origin v1.0.0
+# If everything looks good, push
+git push && git push --tags
 ```
 
-This script:
-- Updates version in `Cargo.toml` (workspace version)
-- Updates version in all npm `package.json` files
-- Updates lock files (`Cargo.lock`, `package-lock.json`)
-- Generates/updates `CHANGELOG.md` from commit history
+#### 4. Automated Release Pipeline
 
-#### 4. Automated Release
 Once the tag is pushed, GitHub Actions automatically:
 
 1. **Validates** version consistency across all packages
@@ -228,8 +247,8 @@ Once the tag is pushed, GitHub Actions automatically:
         * ✅ Publishes to crates.io
         * ✅ Publishes to npm
     * Tag differences:
-        * Stable (v1.0.0): npm latest tag, updates stable git tag
-        * Pre-release (v1.0.0-beta.1): npm next tag, no stable tag update
+        * Stable (`v1.0.0`): npm `latest` tag, updates `stable` git tag
+        * Pre-release (`v1.0.0-beta.1`): npm `next` tag, no `stable` tag update
 5. **Creates** GitHub Release with:
    - Binary downloads for all platforms
    - Release notes from CHANGELOG.md
@@ -298,6 +317,62 @@ We plan to implement a three-tier branch strategy:
 2. **`testnet`** - Stable features for testnet deployment
 3. **`mainnet`** - Production-ready for mainnet deployment
 
+## 📋 Release Checklist
+
+For maintainers doing a release:
+
+- [ ] Ensure all tests pass on `main`
+- [ ] Review commits since last release for proper conventional format
+- [ ] Decide version number (major/minor/patch)
+- [ ] Run: `pnpm bump:versions X.Y.Z`
+- [ ] Monitor GitHub Actions for successful deployment
+- [ ] Verify packages on [npm](https://www.npmjs.com/org/enclave) and [crates.io](https://crates.io/search?q=enclave)
+- [ ] Check GitHub release page for binaries and changelog
+- [ ] Announce release (Discord/Twitter/etc)
+
+## 🔧 Script Options
+
+The `bump:versions` script supports several options:
+
+```bash
+# Full automatic release (default)
+pnpm bump:versions 1.0.0
+
+# Local only - don't push
+pnpm bump:versions --no-push 1.0.0
+
+# Skip git operations entirely
+pnpm bump:versions --skip-git 1.0.0
+
+# Dry run - see what would happen
+pnpm bump:versions --dry-run 1.0.0
+
+# Show help
+pnpm bump:versions --help
+```
+
+## 🔄 Rollback Procedure
+
+If a release has issues:
+
+1. **Mark as deprecated on npm**:
+   ```bash
+   npm deprecate @enclave/sdk@1.0.0 "Critical bug, use 1.0.1"
+   ```
+
+2. **Yank from crates.io** (if critical):
+   ```bash
+   cargo yank --version 1.0.0 enclave
+   ```
+
+3. **Fix and release patch**:
+   ```bash
+   pnpm bump:versions 1.0.1
+   ```
+
+## 📊 Version History
+
+Check our [Releases page](https://github.com/gnosisguild/enclave/releases) for full version history and changelogs.
 
 ## Security and Liability
 
