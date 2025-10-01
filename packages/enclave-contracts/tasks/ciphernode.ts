@@ -21,7 +21,7 @@ export const ciphernodeAdd = task(
   .addOption({
     name: "ticketAmount",
     description:
-      "amount of USDC to deposit for tickets (in wei, e.g., 100000000 for 100 USDC)",
+      "amount of USDC to deposit for tickets (in wei, e.g., 1000000000 for 1000 USDC)",
     defaultValue: "1000000000",
   })
   .setAction(async () => ({

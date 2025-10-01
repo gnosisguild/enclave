@@ -144,7 +144,7 @@ interface IEnclave {
     /// @return e3 The E3 struct.
     function request(
         E3RequestParams calldata requestParams
-    ) external payable returns (uint256 e3Id, E3 memory e3);
+    ) external returns (uint256 e3Id, E3 memory e3);
 
     /// @notice This function should be called to activate an Encrypted Execution Environment (E3) once it has been
     /// initialized and is ready for input.

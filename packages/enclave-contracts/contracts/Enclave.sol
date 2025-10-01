@@ -152,7 +152,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
     function request(
         E3RequestParams calldata requestParams
-    ) external payable returns (uint256 e3Id, E3 memory e3) {
+    ) external returns (uint256 e3Id, E3 memory e3) {
         uint256 e3Fee = getE3Quote(requestParams);
         require(e3Fee > 0, PaymentRequired(e3Fee));
         require(

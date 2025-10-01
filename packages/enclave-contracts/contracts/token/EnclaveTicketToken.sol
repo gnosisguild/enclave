@@ -8,6 +8,9 @@ pragma solidity ^0.8.27;
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {
     ERC20Wrapper
 } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Wrapper.sol";
 import {
@@ -30,6 +33,7 @@ contract EnclaveTicketToken is
     Ownable,
     ERC20Wrapper
 {
+    using SafeERC20 for IERC20;
     // Custom errors
     error NotRegistry();
     error TransferNotAllowed();
@@ -105,7 +109,12 @@ contract EnclaveTicketToken is
         address to,
         uint256 amount
     ) external onlyRegistry returns (bool) {
-        IERC20(address(underlying())).transferFrom(from, address(this), amount);
+        SafeERC20.safeTransferFrom(
+            IERC20(address(underlying())),
+            from,
+            address(this),
+            amount
+        );
         _mint(to, amount);
         if (delegates(to) == address(0)) _delegate(to, to);
         return true;
@@ -145,7 +154,7 @@ contract EnclaveTicketToken is
      * @param amount Amount of ticket tokens to payout.
      */
     function payout(address to, uint256 amount) external onlyRegistry {
-        IERC20(address(underlying())).transfer(to, amount);
+        SafeERC20.safeTransfer(IERC20(address(underlying())), to, amount);
     }
 
     /**

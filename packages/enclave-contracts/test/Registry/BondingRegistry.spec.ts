@@ -903,7 +903,7 @@ describe("BondingRegistry", function () {
       ).to.equal(10);
     });
 
-    it("returns 0 when ticket price is 0", async function () {
+    it("returns 0 when operator has zero ticket balance", async function () {
       const { bondingRegistry, operator1 } = await loadFixture(setup);
 
       expect(
