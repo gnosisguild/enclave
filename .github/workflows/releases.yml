@@ -88,14 +88,15 @@ jobs:
             target: x86_64-unknown-linux-gnu
             os_name: linux
             arch: x86_64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            os_name: macos
-            arch: aarch64
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            os_name: macos
-            arch: x86_64
+          # Comment out for testing only 
+          # - os: macos-latest
+          #   target: aarch64-apple-darwin
+          #   os_name: macos
+          #   arch: aarch64
+          # - os: macos-latest
+          #   target: x86_64-apple-darwin
+          #   os_name: macos
+          #   arch: x86_64
 
     steps:
       - name: Checkout
@@ -207,11 +208,6 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Install Nargo
-        uses: noir-lang/noirup@v0.1.4
-        with:
-          toolchain: v1.0.0-beta.11
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -240,7 +236,7 @@ jobs:
           TAG="${{ steps.npm_tag.outputs.tag }}"
           
           # Build first (same as npm:release)
-          pnpm build
+          pnpm build:ts
           
           # Publish each package explicitly with the correct tag
           pnpm --filter @enclave-e3/config publish --access public --tag $TAG --no-git-checks
