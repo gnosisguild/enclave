@@ -42,6 +42,15 @@ pub async fn register_e3_requested(
             info!("E3Requested: {:?}", event);
 
             async move {
+                // Validate custom params length before converting to address.
+                if event.e3.customParams.len() != 20 {
+                    return Err(eyre::eyre!(
+                        "Invalid customParams length: expected 20 bytes, got {} bytes. Skipping E3 request.",
+                        event.e3.customParams.len()
+                    )
+                    .into());
+                }
+
                 // Convert custom params bytes back to token address.
                 let token_address: Address = Address::from_slice(&event.e3.customParams);
 
