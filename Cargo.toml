@@ -52,38 +52,38 @@ push-remote = "origin"
 publish = true
 
 [workspace.package]
-version = "0.0.14-test"
+version = "0.1.3"
 edition = "2021"
 license = "LGPL-3.0-only"
 description = "E3 — Encrypted Execution Environments"
 repository = "https://github.com/gnosisguild/enclave"
 
 [workspace.dependencies]
-e3-aggregator = { version = "0.0.14-test", path = "./crates/aggregator" }
-e3-bfv-helpers = { version = "0.0.14-test",  path = "./crates/bfv-helpers" }
-e3-config = { version = "0.0.14-test", path = "./crates/config" }
-e3-crypto = { version = "0.0.14-test", path = "./crates/crypto" }
-e3-data = { version = "0.0.14-test", path = "./crates/data" }
-e3-request = { version = "0.0.14-test", path = "./crates/request" }
-e3-sdk = { version = "0.0.14-test", path = "./crates/sdk" }
-e3-cli = { version = "0.0.14-test", path = "./crates/cli" }
-e3-entrypoint = { version = "0.0.14-test", path = "./crates/entrypoint" }
-e3-init = { version = "0.0.14-test", path = "./crates/init" }
-e3-events = { version = "0.0.14-test", path = "./crates/events" }
-e3-evm = { version = "0.0.14-test", path = "./crates/evm" }
-e3-evm-helpers = { version = "0.0.14-test", path = "./crates/evm-helpers" }
-e3-fhe = { version = "0.0.14-test", path = "./crates/fhe" }
-e3-fs = { version = "0.0.14-test", path = "./crates/fs" }
-e3-indexer = { version = "0.0.14-test", path = "./crates/indexer" }
-e3-keyshare = { version = "0.0.14-test", path = "./crates/keyshare" }
-e3-logger = { version = "0.0.14-test", path = "./crates/logger" }
-e3-net = { version = "0.0.14-test", path = "./crates/net" }
-e3-compute-provider = { version = "0.0.14-test", path = "./crates/compute-provider" }
-e3-sortition = { version = "0.0.14-test", path = "./crates/sortition" }
-e3-program-server = { version = "0.0.14-test", path = "./crates/program-server" }
-e3-support-scripts = { version = "0.0.14-test", path = "./crates/support-scripts" }
-e3-test-helpers = { version = "0.0.14-test", path = "./crates/test-helpers" }
-e3-tests = { version = "0.0.14-test", path = "./crates/tests" }
+e3-aggregator = { version = "0.1.3", path = "./crates/aggregator" }
+e3-bfv-helpers = { version = "0.1.3",  path = "./crates/bfv-helpers" }
+e3-config = { version = "0.1.3", path = "./crates/config" }
+e3-crypto = { version = "0.1.3", path = "./crates/crypto" }
+e3-data = { version = "0.1.3", path = "./crates/data" }
+e3-request = { version = "0.1.3", path = "./crates/request" }
+e3-sdk = { version = "0.1.3", path = "./crates/sdk" }
+e3-cli = { version = "0.1.3", path = "./crates/cli" }
+e3-entrypoint = { version = "0.1.3", path = "./crates/entrypoint" }
+e3-init = { version = "0.1.3", path = "./crates/init" }
+e3-events = { version = "0.1.3", path = "./crates/events" }
+e3-evm = { version = "0.1.3", path = "./crates/evm" }
+e3-evm-helpers = { version = "0.1.3", path = "./crates/evm-helpers" }
+e3-fhe = { version = "0.1.3", path = "./crates/fhe" }
+e3-fs = { version = "0.1.3", path = "./crates/fs" }
+e3-indexer = { version = "0.1.3", path = "./crates/indexer" }
+e3-keyshare = { version = "0.1.3", path = "./crates/keyshare" }
+e3-logger = { version = "0.1.3", path = "./crates/logger" }
+e3-net = { version = "0.1.3", path = "./crates/net" }
+e3-compute-provider = { version = "0.1.3", path = "./crates/compute-provider" }
+e3-sortition = { version = "0.1.3", path = "./crates/sortition" }
+e3-program-server = { version = "0.1.3", path = "./crates/program-server" }
+e3-support-scripts = { version = "0.1.3", path = "./crates/support-scripts" }
+e3-test-helpers = { version = "0.1.3", path = "./crates/test-helpers" }
+e3-tests = { version = "0.1.3", path = "./crates/tests" }
 
 actix = "=0.13.5"
 actix-web = "=4.11.0"
