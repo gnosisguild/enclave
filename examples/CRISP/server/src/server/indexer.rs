@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::server::utils::{get_mock_token_holders, BitqueryClient};
 use crate::server::{
     models::CurrentRound,
     program_server_request::run_compute,
@@ -12,7 +13,6 @@ use crate::server::{
     CONFIG,
 };
 use alloy_primitives::Address;
-use e3_bitquery::{get_mock_token_holders, BitqueryClient};
 use e3_sdk::{
     evm_helpers::{
         contracts::{

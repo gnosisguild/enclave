@@ -10,7 +10,7 @@ use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use std::str::FromStr;
 
-use e3_bitquery::TokenHolder;
+use super::TokenHolder;
 
 /// Computes Poseidon hashes for token holder address + balance pairs.
 ///
