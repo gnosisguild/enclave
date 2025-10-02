@@ -8,9 +8,10 @@ mod app_data;
 mod database;
 mod indexer;
 mod models;
+mod program_server_request;
 mod repo;
 mod routes;
-mod program_server_request;
+pub mod utils;
 
 use std::sync::Arc;
 

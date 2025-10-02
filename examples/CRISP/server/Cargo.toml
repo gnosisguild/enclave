@@ -34,9 +34,17 @@ async-trait = { version = "=0.1.88" }
 fhe_rs.workspace = true
 fhe-traits.workspace = true
 
+# Poseidon hashing dependencies
+ark-bn254 = "=0.4.0"
+ark-ff = "=0.4.2"
+light-poseidon = "=0.1.0"
+num-bigint = "=0.4.6"
+lean-imt = "=0.1.2"
+
 # Local dependencies
 e3-compute-provider = { path = "../../../crates/compute-provider" }
 e3-sdk = { path = "../../../crates/sdk" }
+e3-bitquery = { path = "../../../crates/bitquery" }
 
 # CLI and user interaction
 dialoguer = { version = "=0.11.0", features = ["fuzzy-select"] }
