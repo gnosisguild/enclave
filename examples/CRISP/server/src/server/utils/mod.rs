@@ -4,8 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+pub mod bitquery;
 pub mod lean_imt_builder;
 pub mod token_holder_hashes;
 
+pub use bitquery::*;
 pub use lean_imt_builder::*;
 pub use token_holder_hashes::*;

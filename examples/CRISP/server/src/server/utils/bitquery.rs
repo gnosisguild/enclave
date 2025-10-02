@@ -227,13 +227,13 @@ mod tests {
     //! These include:
     //! - A **live integration test** (ignored by default) that requires a valid `BITQUERY_API_KEY`
     //!   and exercises the real Bitquery API end‑to‑end. Run it manually with:
-    //!   `cargo test --package e3-bitquery -- --ignored`
+    //!   `cargo test --package crisp -- --ignored`
     //! - A **negative test** that verifies proper erroring with an invalid API key,
     //!   without depending on any third‑party mocking framework.
     //!
     //! Rationale:
     //! - Keep unit tests hermetic when possible; for external HTTP, run live tests only on demand.
-    //! - Avoid “always‑green” tests; failures should surface incorrect credentials or error handling.
+    //! - Avoid "always‑green" tests; failures should surface incorrect credentials or error handling.
 
     use super::*;
     use std::env;
@@ -262,7 +262,7 @@ mod tests {
     ///
     /// Execution:
     /// ```text
-    /// cargo test --package e3-bitquery -- --ignored
+    /// cargo test --package crisp -- --ignored
     /// ```
     ///
     /// Expectations:
