@@ -173,21 +173,10 @@ contract SlashingManager is ISlashingManager, AccessControl {
     ) external onlySlasher notBanned(operator) returns (uint256 proposalId) {
         require(operator != address(0), ZeroAddress());
 
-        SlashPolicy storage policy = slashPolicies[reason];
+        SlashPolicy memory policy = slashPolicies[reason];
         require(policy.enabled, SlashReasonDisabled());
 
         proposalId = totalProposals;
-        bool proofVerified = false;
-
-        if (policy.requiresProof) {
-            require(proof.length != 0, ProofRequired());
-            proofVerified = ISlashVerifier(policy.proofVerifier).verify(
-                proposalId,
-                proof
-            );
-            require(proofVerified, InvalidProof());
-        }
-
         uint256 executableAt = block.timestamp + policy.appealWindow;
         SlashProposal storage p = _proposals[proposalId];
 
@@ -199,12 +188,21 @@ contract SlashingManager is ISlashingManager, AccessControl {
         p.executedLicense = false;
         p.appealed = false;
         p.resolved = false;
-        p.approved = false;
+        p.appealUpheld = false;
         p.proposedAt = block.timestamp;
         p.executableAt = executableAt;
         p.proposer = msg.sender;
         p.proofHash = keccak256(proof);
-        p.proofVerified = proofVerified;
+
+        if (policy.requiresProof) {
+            require(proof.length != 0, ProofRequired());
+            bool ok = ISlashVerifier(policy.proofVerifier).verify(
+                proposalId,
+                proof
+            );
+            require(ok, InvalidProof());
+            p.proofVerified = true;
+        }
 
         emit SlashProposed(
             proposalId,
@@ -226,7 +224,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         // Has already been executed?
         require(!(p.executedTicket && p.executedLicense), AlreadyExecuted());
 
-        SlashPolicy storage policy = slashPolicies[p.reason];
+        SlashPolicy memory policy = slashPolicies[p.reason];
 
         if (policy.requiresProof) {
             // Appeal window is 0 by policy validation, so we dont check for appeal gating
@@ -236,7 +234,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
             require(block.timestamp >= p.executableAt, AppealWindowActive());
             if (p.appealed) {
                 require(p.resolved, AppealPending());
-                require(!p.approved, AppealUpheld()); // approved = appeal upheld => cancel slash, return?
+                require(!p.appealUpheld, AppealUpheld()); // approved = appeal upheld => cancel slash, return?
             }
         }
 
@@ -301,7 +299,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
     function resolveAppeal(
         uint256 proposalId,
-        bool approved,
+        bool appealUpheld,
         string calldata resolution
     ) external onlyGovernance {
         require(proposalId < totalProposals, InvalidProposal());
@@ -311,12 +309,12 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(!p.resolved, AlreadyResolved());
 
         p.resolved = true;
-        p.approved = approved; // true => cancel slash, false => slash stands
+        p.appealUpheld = appealUpheld; // true => cancel slash, false => slash stands
 
         emit AppealResolved(
             proposalId,
             p.operator,
-            approved,
+            appealUpheld,
             msg.sender,
             resolution
         );

@@ -37,7 +37,7 @@ contract EnclaveToken is
     error TransferNotAllowed();
 
     /// @dev Maximum supply of the token (18 decimals).
-    uint256 public constant TOTAL_SUPPLY = 1_200_000_000e18;
+    uint256 public constant MAX_SUPPLY = 1_200_000_000e18;
 
     /// @dev Role allowing accounts to mint new tokens.
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -76,7 +76,6 @@ contract EnclaveToken is
         _grantRole(MINTER_ROLE, _owner);
 
         // Initialise state variables.
-        totalMinted = 0;
         transfersRestricted = true;
         transferWhitelisted[_owner] = true;
 
@@ -99,7 +98,7 @@ contract EnclaveToken is
         if (recipient == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         // Ensure we do not exceed the total supply.
-        if (totalMinted + amount > TOTAL_SUPPLY) revert ExceedsTotalSupply();
+        if (totalMinted + amount > MAX_SUPPLY) revert ExceedsTotalSupply();
 
         _mint(recipient, amount);
         totalMinted += amount;
@@ -122,22 +121,19 @@ contract EnclaveToken is
         if (amounts.length != len || allocations.length != len)
             revert ArrayLengthMismatch();
 
-        uint256 minted = totalMinted;
+        uint256 minted = totalSupply();
 
         for (uint256 i = 0; i < len; i++) {
             address recipient = recipients[i];
             uint256 amount = amounts[i];
-            if (recipient == address(0)) revert ZeroAddress();
             if (amount == 0) revert ZeroAmount();
 
-            if (amount > TOTAL_SUPPLY - minted) revert ExceedsTotalSupply();
+            if (amount > MAX_SUPPLY - minted) revert ExceedsTotalSupply();
             minted += amount;
 
             _mint(recipient, amount);
             emit AllocationMinted(recipient, amount, allocations[i]);
         }
-
-        totalMinted = minted;
     }
 
     /**

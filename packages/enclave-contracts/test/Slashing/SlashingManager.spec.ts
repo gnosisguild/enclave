@@ -954,7 +954,7 @@ describe("SlashingManager", function () {
 
       const proposal = await slashingManager.getSlashProposal(0);
       expect(proposal.resolved).to.be.true;
-      expect(proposal.approved).to.be.true;
+      expect(proposal.appealUpheld).to.be.true;
     });
 
     it("should allow governance to resolve appeal (deny)", async function () {
@@ -984,7 +984,7 @@ describe("SlashingManager", function () {
 
       const proposal = await slashingManager.getSlashProposal(0);
       expect(proposal.resolved).to.be.true;
-      expect(proposal.approved).to.be.false;
+      expect(proposal.appealUpheld).to.be.false;
     });
 
     it("should block execution if appeal is pending", async function () {

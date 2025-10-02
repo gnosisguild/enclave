@@ -766,94 +766,96 @@ describe("Enclave", function () {
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
         }),
-      ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
+      )
+        .to.be.revertedWithCustomError(enclave, "InvalidThreshold")
+        .withArgs([0, 2]);
     });
     it("reverts if threshold is greater than number", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+        await loadFixture(setup);
+
       await expect(
-        enclave.request(
-          {
-            filter: request.filter,
-            threshold: [3, 2],
-            startWindow: request.startWindow,
-            duration: request.duration,
-            e3Program: request.e3Program,
-            e3ProgramParams: request.e3ProgramParams,
-            computeProviderParams: request.computeProviderParams,
-          },
-          { value: 10 },
-        ),
-      ).to.be.revertedWithCustomError(enclave, "InvalidThreshold");
+        makeRequest(enclave, usdcToken, {
+          filter: await naiveRegistryFilterContract.getAddress(),
+          threshold: [3, 2],
+          startWindow: request.startWindow,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        }),
+      )
+        .to.be.revertedWithCustomError(enclave, "InvalidThreshold")
+        .withArgs([3, 2]);
     });
     it("reverts if duration is 0", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+        await loadFixture(setup);
+
       await expect(
-        enclave.request(
-          {
-            filter: request.filter,
-            threshold: request.threshold,
-            startWindow: request.startWindow,
-            duration: 0,
-            e3Program: request.e3Program,
-            e3ProgramParams: request.e3ProgramParams,
-            computeProviderParams: request.computeProviderParams,
-          },
-          { value: 10 },
-        ),
-      ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
+        makeRequest(enclave, usdcToken, {
+          filter: await naiveRegistryFilterContract.getAddress(),
+          threshold: request.threshold,
+          startWindow: request.startWindow,
+          duration: 0,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        }),
+      )
+        .to.be.revertedWithCustomError(enclave, "InvalidDuration")
+        .withArgs(0);
     });
     it("reverts if duration is greater than maxDuration", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+        await loadFixture(setup);
+
       await expect(
-        enclave.request(
-          {
-            filter: request.filter,
-            threshold: request.threshold,
-            startWindow: request.startWindow,
-            duration: time.duration.days(31),
-            e3Program: request.e3Program,
-            e3ProgramParams: request.e3ProgramParams,
-            computeProviderParams: request.computeProviderParams,
-          },
-          { value: 10 },
-        ),
-      ).to.be.revertedWithCustomError(enclave, "InvalidDuration");
+        makeRequest(enclave, usdcToken, {
+          filter: await naiveRegistryFilterContract.getAddress(),
+          threshold: request.threshold,
+          startWindow: request.startWindow,
+          duration: time.duration.days(31),
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        }),
+      )
+        .to.be.revertedWithCustomError(enclave, "InvalidDuration")
+        .withArgs(time.duration.days(31));
     });
     it("reverts if E3 Program is not enabled", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+        await loadFixture(setup);
+
       await expect(
-        enclave.request(
-          {
-            filter: request.filter,
-            threshold: request.threshold,
-            startWindow: request.startWindow,
-            duration: request.duration,
-            e3Program: ethers.ZeroAddress,
-            e3ProgramParams: request.e3ProgramParams,
-            computeProviderParams: request.computeProviderParams,
-          },
-          { value: 10 },
-        ),
+        makeRequest(enclave, usdcToken, {
+          filter: await naiveRegistryFilterContract.getAddress(),
+          threshold: request.threshold,
+          startWindow: request.startWindow,
+          duration: request.duration,
+          e3Program: ethers.ZeroAddress,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        }),
       )
         .to.be.revertedWithCustomError(enclave, "E3ProgramNotAllowed")
         .withArgs(ethers.ZeroAddress);
     });
     it("reverts if given encryption scheme is not enabled", async function () {
-      const { enclave, request } = await loadFixture(setup);
+      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+        await loadFixture(setup);
       await enclave.disableEncryptionScheme(encryptionSchemeId);
       await expect(
-        enclave.request(
-          {
-            filter: request.filter,
-            threshold: request.threshold,
-            startWindow: request.startWindow,
-            duration: request.duration,
-            e3Program: request.e3Program,
-            e3ProgramParams: request.e3ProgramParams,
-            computeProviderParams: request.computeProviderParams,
-          },
-          { value: 10 },
-        ),
+        makeRequest(enclave, usdcToken, {
+          filter: await naiveRegistryFilterContract.getAddress(),
+          threshold: request.threshold,
+          startWindow: request.startWindow,
+          duration: request.duration,
+          e3Program: request.e3Program,
+          e3ProgramParams: request.e3ProgramParams,
+          computeProviderParams: request.computeProviderParams,
+        }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
         .withArgs(encryptionSchemeId);

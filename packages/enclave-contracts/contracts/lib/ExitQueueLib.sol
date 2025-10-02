@@ -86,8 +86,7 @@ library ExitQueueLib {
         }
 
         if (!merged) {
-            operatorQueue.push();
-            ExitTranche storage t = operatorQueue[len];
+            ExitTranche storage t = operatorQueue.push();
             t.unlockTimestamp = unlockTimestamp;
             t.ticketAmount = ticketAmount;
             t.licenseAmount = licenseAmount;

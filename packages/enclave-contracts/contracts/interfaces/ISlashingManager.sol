@@ -43,7 +43,7 @@ interface ISlashingManager {
         bool executedLicense; // True if license penalty executed
         bool appealed; // True if operator filed appeal
         bool resolved; // True if appeal was resolved
-        bool approved; // True if appeal was approved (penalty cancelled)
+        bool appealUpheld; // True if appeal was approved (penalty cancelled)
         uint256 proposedAt; // Timestamp when proposed
         uint256 executableAt; // Timestamp when execution is allowed
         address proposer; // Address that proposed the slash
@@ -124,7 +124,7 @@ interface ISlashingManager {
     event AppealResolved(
         uint256 indexed proposalId,
         address indexed operator,
-        bool approved,
+        bool appealUpheld,
         address resolver,
         string resolution
     );
@@ -257,12 +257,12 @@ interface ISlashingManager {
     /**
      * @notice Resolve an appeal (governance only)
      * @param proposalId ID of the proposal with appeal
-     * @param approved True to approve appeal (cancel slash), false to deny
+     * @param appealUpheld True to approve appeal (cancel slash), false to deny
      * @param resolution Resolution explanation string
      */
     function resolveAppeal(
         uint256 proposalId,
-        bool approved,
+        bool appealUpheld,
         string calldata resolution
     ) external;
 
