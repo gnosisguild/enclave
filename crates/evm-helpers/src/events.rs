@@ -21,6 +21,16 @@ sol! {
     }
 
     #[derive(Debug)]
+    interface IInputValidator {
+        function validateInput(bytes data) external view returns (bool);
+    }
+
+    #[derive(Debug)]
+    interface IDecryptionVerifier {
+        function verifyDecryption(bytes data) external view returns (bool);
+    }
+
+    #[derive(Debug)]
     struct E3 {
         uint256 seed;
         uint32[2] threshold;
@@ -29,9 +39,14 @@ sol! {
         uint256 duration;
         uint256 expiration;
         bytes32 encryptionSchemeId;
-        address e3Program;
+        IE3Program e3Program;
         bytes e3ProgramParams;
         bytes customParams;
+        IInputValidator inputValidator;
+        IDecryptionVerifier decryptionVerifier;
+        bytes32 committeePublicKey;
+        bytes32 ciphertextOutput;
+        bytes plaintextOutput;
     }
 
     #[derive(Debug)]
