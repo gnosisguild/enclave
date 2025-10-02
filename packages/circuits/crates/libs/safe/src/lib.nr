@@ -111,7 +111,7 @@ impl<let L: u32> SafeSponge<L> {
     ///
     /// # Arguments
     /// - `input`: Array of field elements to absorb (variable length, must match IO pattern)
-    pub fn absorb(&mut self, input: [Field]) {
+    pub fn absorb(&mut self, input: Vec<Field>) {
         let length = input.len() as u32;
 
         // Validate against IO pattern.
@@ -138,7 +138,7 @@ impl<let L: u32> SafeSponge<L> {
             // Add X[i] to state at absorb_pos (spec 2.4).
             // Note: absorb_pos is the rate position, not capacity position.
             self.state[self.absorb_pos + CAPACITY] =
-                self.state[self.absorb_pos + CAPACITY] + input[i];
+                self.state[self.absorb_pos + CAPACITY] + input.get(i);
             self.absorb_pos += 1;
         }
 
@@ -328,7 +328,7 @@ fn test_safe_hashing() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let elements = [1, 2, 3];
+    let elements = Vec::from_slice(&[1, 2, 3]);
 
     // Pattern: ABSORB(3), SQUEEZE(1)
     let io_pattern = [0x80000003, 0x00000001];
@@ -359,14 +359,14 @@ fn test_merkle_node() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let left = 123;
-    let right = 456;
+    let left = Vec::from_slice([123]);
+    let right = Vec::from_slice([456]);
 
     // Pattern: ABSORB(1), ABSORB(1), SQUEEZE(1)
     let io_pattern = [0x80000001, 0x80000001, 0x00000001];
     let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-    sponge.absorb([left]);
-    sponge.absorb([right]);
+    sponge.absorb(left);
+    sponge.absorb(right);
     let output = sponge.squeeze();
     sponge.finish();
 
@@ -375,8 +375,8 @@ fn test_merkle_node() {
 
     // Test determinism
     let mut sponge2 = SafeSponge::start(io_pattern, domain_separator);
-    sponge2.absorb([left]);
-    sponge2.absorb([right]);
+    sponge2.absorb(left);
+    sponge2.absorb(right);
     let output2 = sponge2.squeeze();
     sponge2.finish();
 
@@ -393,7 +393,7 @@ fn test_commitment_scheme() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let values = [10, 20, 30];
+    let values = Vec::from_slice([10, 20, 30]);
 
     // Pattern: ABSORB(3), SQUEEZE(1)
     let io_pattern = [0x80000003, 0x00000001];
@@ -419,7 +419,7 @@ fn test_commitment_scheme() {
 fn test_domain_separation() {
     // Verifies that different domain separators produce different outputs for the same input.
     // This is crucial for cross-protocol security and preventing collisions between different applications.
-    let elements = [1, 2, 3];
+    let elements = Vec::from_slice([1, 2, 3]);
     let domain1 = [
         0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -458,7 +458,7 @@ fn test_multiple_squeeze() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0,
     ];
-    let elements = [1, 2, 3];
+    let elements = Vec::from_slice([1, 2, 3]);
 
     // Pattern: ABSORB(3), SQUEEZE(2)
     let io_pattern = [0x80000003, 0x00000002];
@@ -486,7 +486,7 @@ fn test_zero_length_operations() {
     // Pattern: ABSORB(0), SQUEEZE(1)
     let io_pattern = [0x80000000, 0x00000001];
     let mut sponge = SafeSponge::start(io_pattern, domain_separator);
-    sponge.absorb([]);
+    sponge.absorb(Vec::new());
     let output = sponge.squeeze();
     sponge.finish();
 

@@ -154,6 +154,15 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// # Generic Parameters
 /// * `N` - The degree of polynomials (ring dimension)
 /// * `L` - The number of CRT (Chinese Remainder Theorem) bases
+/// * `BIT_PK` - Bit-width bound per coefficient for public keys `pk0is`/`pk1is`
+/// * `BIT_CT` - Bit-width bound per coefficient for cipher texts `ct0is`/`ct1is`
+/// * `BIT_U` - Bit-width bound per coefficient for the ternary secret `u`
+/// * `BIT_E` - Bit-width bound per coefficient for error polynomials `e0`/`e1`
+/// * `BIT_K` - Bit-width bound per coefficient for the scaled message polynomial `k1`
+/// * `BIT_R1` - Bit-width bound per coefficient for randomness polynomials `r1is`
+/// * `BIT_R2` - Bit-width bound per coefficient for randomness polynomials `r2is`
+/// * `BIT_P1` - Bit-width bound per coefficient for randomness polynomials `p1is`
+/// * `BIT_P2` - Bit-width bound per coefficient for randomness polynomials `p2is`
 ///
 /// # Circuit Inputs
 /// * `pk0is`, `pk1is` - Public key polynomials
@@ -163,7 +172,7 @@ impl<let N: u32, let L: u32> Params<N, L> {
 /// * `k1` - Scaled message polynomial
 /// * `r1is`, `r2is` - Randomness polynomials for each i-th CRT basis.
 /// * `p1is`, `p2is` - Randomness polynomials for each i-th CRT basis.
-pub struct Greco<let N: u32, let L: u32> {
+pub struct Greco<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> {
     /// Cryptographic parameters including bounds, moduli, and constants.
     params: Params<N, L>,
     pk0is: [Polynomial<N>; L],
@@ -180,7 +189,7 @@ pub struct Greco<let N: u32, let L: u32> {
     p2is: [Polynomial<N - 1>; L],
 }
 
-impl<let N: u32, let L: u32> Greco<N, L> {
+impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E: u32, let BIT_K: u32, let BIT_R1: u32, let BIT_R2: u32, let BIT_P1: u32, let BIT_P2: u32> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
     /// Creates a new Greco instance.
     ///
     /// This constructor initializes all the polynomials and parameters needed for
@@ -217,7 +226,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
         r2is: [Polynomial<N - 1>; L],
         p1is: [Polynomial<2 * N - 1>; L],
         p2is: [Polynomial<N - 1>; L],
-    ) -> Greco<N, L> {
+    ) -> Greco<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E, BIT_K, BIT_R1, BIT_R2, BIT_P1, BIT_P2> {
         Greco { params, pk0is, pk1is, ct0is, ct1is, u, e0, e1, k1, r1is, r2is, p1is, p2is }
     }
 
@@ -228,32 +237,28 @@ impl<let N: u32, let L: u32> Greco<N, L> {
     /// The coefficients are arranged in a specific order to ensure deterministic
     /// challenge generation.
     ///
-    /// # Generic Parameters
-    /// * `SIZE` - The total size of the flattened array: (10 * N - 4) * L + 4 * N
-    ///
     /// # Returns
     /// An array containing all polynomials coefficients in flattened form
-    fn payload<let SIZE: u32>(self) -> [Field; SIZE] {
-        let mut inputs = [0; SIZE];
-        let mut offset = 0;
+    fn payload(self) -> Vec<Field> {
+        let mut inputs = Vec::new();
 
         // Flatten public key and ciphertext polynomials first (public inputs)
-        let (inputs, offset) = flatten(inputs, self.pk0is, offset);
-        let (inputs, offset) = flatten(inputs, self.pk1is, offset);
-        let (inputs, offset) = flatten(inputs, self.ct0is, offset);
-        let (inputs, offset) = flatten(inputs, self.ct1is, offset);
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk0is);
+        inputs = flatten::<_, _, BIT_PK>(inputs, self.pk1is);
+        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct0is);
+        inputs = flatten::<_, _, BIT_CT>(inputs, self.ct1is);
 
         // Flatten common polynomials (used across all CRT bases)
-        let (inputs, offset) = flatten(inputs, [self.e0], offset);
-        let (inputs, offset) = flatten(inputs, [self.e1], offset);
-        let (inputs, offset) = flatten(inputs, [self.u], offset);
-        let (inputs, offset) = flatten(inputs, [self.k1], offset);
+        inputs = flatten::<_, _, BIT_E>(inputs, [self.e0]);
+        inputs = flatten::<_, _, BIT_E>(inputs, [self.e1]);
+        inputs = flatten::<_, _, BIT_U>(inputs, [self.u]);
+        inputs = flatten::<_, _, BIT_K>(inputs, [self.k1]);
 
         // Flatten randomness polynomials for each CRT basis
-        let (inputs, offset) = flatten(inputs, self.r1is, offset);
-        let (inputs, offset) = flatten(inputs, self.r2is, offset);
-        let (inputs, offset) = flatten(inputs, self.p1is, offset);
-        let (inputs, _) = flatten(inputs, self.p2is, offset);
+        inputs = flatten::<_, _, BIT_R1>(inputs, self.r1is);
+        inputs = flatten::<_, _, BIT_R2>(inputs, self.r2is);
+        inputs = flatten::<_, _, BIT_P1>(inputs, self.p1is);
+        inputs = flatten::<_, _, BIT_P2>(inputs, self.p2is);
 
         inputs
     }
@@ -329,7 +334,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
     /// # Returns
     /// Vector of challenge values [gamma_0, gamma_1, ..., gamma_{2L-1}]
     fn generate_challenge(self) -> Vec<Field> {
-        let inputs = self.payload::<(10 * N - 4) * L + 4 * N>();
+        let inputs = self.payload();
 
         // Domain separator for Greco circuit - "Greco" in hex
         let domain_separator = [
@@ -341,7 +346,7 @@ impl<let N: u32, let L: u32> Greco<N, L> {
         ];
 
         // IO Pattern: ABSORB(input_size), SQUEEZE(2*L)
-        let input_size = (10 * N - 4) * L + 4 * N;
+        let input_size = inputs.len();
         let io_pattern = [0x80000000 | input_size, 0x00000000 | (2 * L)];
 
         let mut sponge = SafeSponge::start(io_pattern, domain_separator);

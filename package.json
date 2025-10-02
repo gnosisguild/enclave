@@ -1,7 +1,7 @@
 {
   "name": "@enclave/main",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
-  "version": "0.0.0",
+  "version": "0.0.14-test",
   "private": true,
   "license": "LGPL-3.0-only",
   "author": {
@@ -9,7 +9,7 @@
     "url": "https://github.com/gnosisguild"
   },
   "scripts": {
-    "bump:versions": "pnpm --filter \"@enclave-e3/contracts\" --filter \"@enclave-e3/sdk\" --filter \"@enclave-e3/react\" --filter \"@enclave-e3/config\" --filter \"@enclave-e3/wasm\" exec npm version", 
+    "bump:versions": "tsx scripts/bump-versions.ts",
     "clean": "cd packages/enclave-contracts && pnpm clean",
     "compile": "pnpm evm:build && pnpm sdk:build && pnpm react:build && pnpm ciphernode:build && ./scripts/compile-circuits.sh",
     "lint": "pnpm evm:lint && pnpm ciphernode:lint && ./scripts/lint-circuits.sh",
@@ -49,17 +49,17 @@
     "npm:release": "pnpm build && pnpm config:release && pnpm evm:release && pnpm wasm:release && pnpm sdk:release && pnpm react:release",
     "support:build": "cd crates/support && ./scripts/build.sh",
     "build": "pnpm compile",
-    "changeset": "changeset",
-    "version": "changeset version",
     "wasm:build": "cd ./crates/wasm && pnpm build",
     "release": "pnpm build && changeset publish",
     "build:ts": "pnpm evm:build && pnpm sdk:build && pnpm react:build"
   },
   "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808",
   "devDependencies": {
-    "@changesets/cli": "^2.27.1",
     "@types/node": "22.7.5",
-    "husky": "^9.1.7"
+    "conventional-changelog-cli": "^5.0.0",
+    "husky": "^9.1.7",
+    "tsx": "^4.20.3",
+    "typescript": "5.8.3"
   },
   "pnpm": {
     "overrides": {
