@@ -80,13 +80,13 @@ impl BitqueryClient {
     }
 
     /// Retrieves token holders for a specific contract at a given block.
-    /// 
+    ///
     /// # Arguments
     /// * `token_contract` - The token contract address
     /// * `block_number` - The block number to query
     /// * `chain_id` - The blockchain network ID
     /// * `limit` - Maximum number of holders to return
-    /// 
+    ///
     /// # Returns
     /// A vector of `TokenHolder` structs, or an error if the request fails.
     pub async fn get_token_holders(
@@ -156,7 +156,7 @@ impl BitqueryClient {
 
     /// Returns mocked token holder data for testing purposes.
     /// This is useful for local networks and testing scenarios where you don't want to make actual API calls.
-    /// 
+    ///
     /// # Returns
     /// A vector of 10 `TokenHolder` structs with realistic test data.
     pub fn get_mock_token_holders() -> Vec<TokenHolder> {
@@ -171,7 +171,7 @@ impl BitqueryClient {
             },
             TokenHolder {
                 address: "0x3456789012345678901234567890123456789012".to_string(),
-                balance: "250".to_string()
+                balance: "250".to_string(),
             },
             TokenHolder {
                 address: "0x4567890123456789012345678901234567890123".to_string(),
@@ -207,7 +207,7 @@ impl BitqueryClient {
 
 /// Convenience function to get mocked token holder data for testing.
 /// This is useful when you don't need a BitqueryClient instance.
-/// 
+///
 /// # Returns
 /// A vector of 10 `TokenHolder` structs with realistic test data.
 pub fn get_mock_token_holders() -> Vec<TokenHolder> {
@@ -266,31 +266,54 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn live_get_token_holders_succeeds_with_valid_key() {
-        let api_key = env::var("BITQUERY_API_KEY")
-            .expect("Set BITQUERY_API_KEY to run this live test");
+        let api_key =
+            env::var("BITQUERY_API_KEY").expect("Set BITQUERY_API_KEY to run this live test");
 
         let client = BitqueryClient::new(api_key);
         let (token, block, chain_id, limit) = example_params();
 
-        let res = client.get_token_holders(token, block, chain_id, limit).await;
+        let res = client
+            .get_token_holders(token, block, chain_id, limit)
+            .await;
         assert!(res.is_ok(), "Live call failed: {res:?}");
-        
+
         // Check shape: accessing the vector ensures deserialization happened.
         let holders = res.unwrap();
-        
+
         // Verify the number of holders matches the expected limit.
-        assert_eq!(holders.len(), 5, "Expected exactly 5 holders, got {}", holders.len());
-        
+        assert_eq!(
+            holders.len(),
+            5,
+            "Expected exactly 5 holders, got {}",
+            holders.len()
+        );
+
         // Verify that all holders have valid addresses and balances.
         for holder in &holders {
-            assert!(!holder.address.is_empty(), "Holder address should not be empty");
-            assert!(!holder.balance.is_empty(), "Holder balance should not be empty");
+            assert!(
+                !holder.address.is_empty(),
+                "Holder address should not be empty"
+            );
+            assert!(
+                !holder.balance.is_empty(),
+                "Holder balance should not be empty"
+            );
             // Verify address format (should start with 0x and be 42 characters)
-            assert!(holder.address.starts_with("0x"), "Address should start with 0x");
-            assert_eq!(holder.address.len(), 42, "Address should be 42 characters long");
+            assert!(
+                holder.address.starts_with("0x"),
+                "Address should start with 0x"
+            );
+            assert_eq!(
+                holder.address.len(),
+                42,
+                "Address should be 42 characters long"
+            );
             // Verify balance is a valid number string.
-            assert!(holder.balance.parse::<u64>().is_ok() || holder.balance.parse::<f64>().is_ok(), 
-                   "Balance should be a valid number: {}", holder.balance);
+            assert!(
+                holder.balance.parse::<u64>().is_ok() || holder.balance.parse::<f64>().is_ok(),
+                "Balance should be a valid number: {}",
+                holder.balance
+            );
         }
     }
 
@@ -308,7 +331,9 @@ mod tests {
         let client = BitqueryClient::new("invalid_key_for_test_purposes".to_string());
         let (token, block, chain_id, limit) = example_params();
 
-        let res = client.get_token_holders(token, block, chain_id, limit).await;
+        let res = client
+            .get_token_holders(token, block, chain_id, limit)
+            .await;
 
         assert!(
             res.is_err(),
