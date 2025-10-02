@@ -52,7 +52,10 @@ fn poseidon_hash(nodes: Vec<String>) -> String {
     let mut poseidon = Poseidon::<Fr>::new_circom(2).unwrap();
     let mut field_elements = Vec::new();
 
-    for node in nodes {
+    for mut node in nodes {
+        if let Some(stripped) = node.strip_prefix("0x") {
+            node = stripped.to_string();
+        }
         let bigint = BigUint::parse_bytes(node.as_bytes(), 16).unwrap();
         let field_repr = Fr::from_str(&bigint.to_string()).unwrap();
         field_elements.push(field_repr);
