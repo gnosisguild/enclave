@@ -199,18 +199,3 @@ impl From<E3> for E3StateLite {
         }
     }
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct EtherscanResponse {
-    pub status: String,
-    pub message: String,
-    pub result: Vec<TokenHolderData>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TokenHolderData {
-    #[serde(rename = "TokenHolderAddress")]
-    pub address: String,
-    #[serde(rename = "TokenHolderQuantity")]
-    pub quantity: String,
-}
