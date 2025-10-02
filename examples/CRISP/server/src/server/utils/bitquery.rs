@@ -70,18 +70,18 @@ impl BitqueryClient {
     }
 
     /// Maps chain IDs to Bitquery network names.
-    /// Falls back to "eth" for unsupported chains.
-    fn get_network_name(chain_id: u32) -> &'static str {
+    /// Returns an error for unsupported chains.
+    fn get_network_name(chain_id: u64) -> Result<&'static str, String> {
         match chain_id {
-            1 => "eth",
-            11155111 => "sepolia",
-            56 => "bsc",
-            137 => "matic",
-            250 => "fantom",
-            43114 => "avalanche",
-            42161 => "arbitrum",
-            10 => "optimism",
-            _ => "eth",
+            1 => Ok("eth"),
+            11155111 => Ok("sepolia"),
+            56 => Ok("bsc"),
+            137 => Ok("matic"),
+            250 => Ok("fantom"),
+            43114 => Ok("avalanche"),
+            42161 => Ok("arbitrum"),
+            10 => Ok("optimism"),
+            _ => Err(format!("unsupported chain id: {}", chain_id)),
         }
     }
 
@@ -99,10 +99,10 @@ impl BitqueryClient {
         &self,
         token_contract: &str,
         block_number: u64,
-        chain_id: u32,
+        chain_id: u64,
         limit: u32,
     ) -> Result<Vec<TokenHolder>, Box<dyn std::error::Error>> {
-        let network = Self::get_network_name(chain_id);
+        let network = Self::get_network_name(chain_id)?;
 
         // Build GraphQL query to fetch token holders with non-zero balances
         let query = format!(
@@ -241,7 +241,7 @@ mod tests {
     /// Returns a known‑good tuple commonly used in examples:
     /// - USDT contract on Ethereum mainnet.
     /// - A historical block chosen to be well after deployment.
-    fn example_params() -> (&'static str, u64, u32, u32) {
+    fn example_params() -> (&'static str, u64, u64, u32) {
         (
             // Token contract
             "0xdAC17F958D2ee523a2206206994597C13D831ec7",

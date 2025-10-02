@@ -62,7 +62,7 @@ pub async fn register_e3_requested(
                         .get_token_holders(
                             &token_address.to_string(),
                             event.e3.requestBlock.to::<u64>(),
-                            CONFIG.chain_id as u32,
+                            CONFIG.chain_id,
                             100,
                         )
                         .await
