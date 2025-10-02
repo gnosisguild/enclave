@@ -8,8 +8,11 @@ use crate::server::{
     models::CurrentRound,
     program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
+    utils::{build_lean_imt, compute_token_holder_hashes},
     CONFIG,
 };
+use alloy_primitives::Address;
+use e3_bitquery::{get_mock_token_holders, BitqueryClient};
 use e3_sdk::{
     evm_helpers::{
         contracts::{
@@ -35,11 +38,59 @@ pub async fn register_e3_requested(
 ) -> Result<EnclaveIndexer<impl DataStore>> {
     // E3Requested
     indexer
-        .add_event_handler(move |event: E3Requested, store| {
-            let e3_id = event.e3Id.to::<u64>();
-            let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+        .add_event_handler(move |event: E3Requested, _store| {
+            info!("E3Requested: {:?}", event);
+
             async move {
-                info!("Custom params: {:?}", event.e3.customParams);
+                // Convert custom params bytes back to token address.
+                let token_address: Address = Address::from_slice(&event.e3.customParams);
+
+                // Get token holders from Bitquery API or mocked data.
+                let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
+                    info!(
+                        "Using mocked token holders for local network (chain_id: {})",
+                        CONFIG.chain_id
+                    );
+                    get_mock_token_holders()
+                } else {
+                    info!(
+                        "Using Bitquery API for network (chain_id: {})",
+                        CONFIG.chain_id
+                    );
+                    let bitquery_client = BitqueryClient::new(CONFIG.bitquery_api_key.clone());
+                    bitquery_client
+                        .get_token_holders(
+                            &token_address.to_string(),
+                            event.e3.requestBlock.to::<u64>(),
+                            CONFIG.chain_id as u32,
+                            100,
+                        )
+                        .await
+                        .map_err(|e| eyre::eyre!("Bitquery error: {}", e))?
+                };
+
+                info!("Token holders: {:?}", token_holders);
+
+                // Compute Poseidon hashes for token holder address + balance pairs.
+                let poseidon_hashes = compute_token_holder_hashes(&token_holders);
+
+                info!(
+                    "Computed {} Poseidon hashes for token holders",
+                    poseidon_hashes.len()
+                );
+                for (i, hash) in poseidon_hashes.iter().enumerate() {
+                    info!(
+                        "Hash {}: {} (address: {}, balance: {})",
+                        i, hash, token_holders[i].address, token_holders[i].balance
+                    );
+                }
+
+                let lean_imt = build_lean_imt(poseidon_hashes);
+                let merkle_root = lean_imt.root().unwrap();
+                info!("Merkle root: {}", merkle_root);
+
+                // TODO: Save poseidon hashes and merkle root to store.
+                // TODO: Publish merkle root on-chain.
 
                 Ok(())
             }
