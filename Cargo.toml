@@ -85,6 +85,7 @@ e3-program-server = { version = "0.0.14-test", path = "./crates/program-server" 
 e3-support-scripts = { version = "0.0.14-test", path = "./crates/support-scripts" }
 e3-test-helpers = { version = "0.0.14-test", path = "./crates/test-helpers" }
 e3-tests = { version = "0.0.14-test", path = "./crates/tests" }
+e3-bitquery = { version = "0.0.14-test", path = "./crates/bitquery" }
 
 actix = "=0.13.5"
 actix-web = "=4.11.0"
