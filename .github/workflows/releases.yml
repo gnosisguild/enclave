@@ -163,21 +163,8 @@ jobs:
             echo "📦 Publishing stable version to crates.io: $VERSION"
           fi
           
-          # Publish crates in dependency order
-          # Adjust this order based on your actual crate dependencies
-          
-          # Example order (modify based on your project):
-          # cargo publish -p enclave-core --no-verify || echo "enclave-core: already published or error"
-          # sleep 10  # Wait for crates.io to index
-          # cargo publish -p enclave-crypto --no-verify || echo "enclave-crypto: already published or error"
-          # sleep 10
-          # cargo publish -p enclave-sdk --no-verify || echo "enclave-sdk: already published or error"
-          # sleep 10
-          # cargo publish -p enclave --no-verify || echo "enclave: already published or error"
-          
-          echo "⚠️  Note: Add your crates in dependency order in the workflow file"
-          echo "Skipping actual publish for now - uncomment the cargo publish commands above"
-
+          cargo install cargo-workspaces
+          cargo workspaces publish --from-git --yes
   publish-npm-packages:
     name: Publish NPM Packages
     runs-on: ubuntu-latest
