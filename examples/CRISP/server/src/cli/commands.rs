@@ -80,8 +80,8 @@ pub async fn initialize_crisp_round(
     }
 
     // Convert the token address from hex string to bytes.
-    let token_addr: Address = token_address.parse()?;
-    let custom_params = Bytes::from(token_addr.into_array().to_vec());
+    let token_address: Address = token_address.parse()?;
+    let custom_params = Bytes::from(token_address.as_slice().to_vec());
 
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
