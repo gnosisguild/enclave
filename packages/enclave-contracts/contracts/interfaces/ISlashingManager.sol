@@ -39,8 +39,7 @@ interface ISlashingManager {
         bytes32 reason; // Reason hash (maps to SlashPolicy)
         uint256 ticketAmount; // Calculated ticket penalty amount
         uint256 licenseAmount; // Calculated license penalty amount
-        bool executedTicket; // True if ticket penalty executed
-        bool executedLicense; // True if license penalty executed
+        bool executed; // True if penalty executed
         bool appealed; // True if operator filed appeal
         bool resolved; // True if appeal was resolved
         bool appealUpheld; // True if appeal was approved (penalty cancelled)
@@ -104,8 +103,7 @@ interface ISlashingManager {
         bytes32 indexed reason,
         uint256 ticketAmount,
         uint256 licenseAmount,
-        bool ticketExecuted,
-        bool licenseExecuted
+        bool executed
     );
 
     /**

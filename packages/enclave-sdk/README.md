@@ -160,7 +160,7 @@ interface EnclaveEvent<T extends AllEventTypes> {
 The SDK includes a React hook for easy integration:
 
 ```typescript
-import { useEnclaveSDK } from '@enclave-e3/contracts/sdk';
+import { useEnclaveSDK } from "@enclave-e3/contracts/sdk";
 
 function MyComponent() {
   const {
@@ -171,20 +171,20 @@ function MyComponent() {
     connectWallet,
     requestE3,
     onEnclaveEvent,
-    EnclaveEventType
+    EnclaveEventType,
   } = useEnclaveSDK({
     contracts: {
-      enclave: '0x...',
-      ciphernodeRegistry: '0x...'
+      enclave: "0x...",
+      ciphernodeRegistry: "0x...",
     },
-    rpcUrl: 'YOUR_RPC_URL',
-    autoConnect: true
+    rpcUrl: "YOUR_RPC_URL",
+    autoConnect: true,
   });
 
   useEffect(() => {
     if (isInitialized) {
       onEnclaveEvent(EnclaveEventType.E3_REQUESTED, (event) => {
-        console.log('New E3 request:', event);
+        console.log("New E3 request:", event);
       });
     }
   }, [isInitialized]);
@@ -193,7 +193,7 @@ function MyComponent() {
     <div>
       {!isInitialized && (
         <button onClick={connectWallet} disabled={isConnecting}>
-          {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          {isConnecting ? "Connecting..." : "Connect Wallet"}
         </button>
       )}
       {/* Your UI */}
@@ -218,7 +218,6 @@ await sdk.requestE3({
   e3Program: `0x${string}`,
   e3ProgramParams: `0x${string}`,
   computeProviderParams: `0x${string}`,
-  value?: bigint,
   gasLimit?: bigint
 });
 

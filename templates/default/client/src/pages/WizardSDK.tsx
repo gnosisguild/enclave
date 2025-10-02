@@ -732,7 +732,6 @@ const WizardSDK: React.FC = () => {
         e3Program: contracts.e3Program,
         e3ProgramParams,
         computeProviderParams,
-        value: BigInt('1000000000000000'), // 0.001 ETH
       })
 
       setLastTransactionHash(hash)

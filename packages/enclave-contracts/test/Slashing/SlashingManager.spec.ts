@@ -706,12 +706,10 @@ describe("SlashingManager", function () {
           ethers.parseUnits("50", 6),
           ethers.parseEther("100"),
           true,
-          true,
         );
 
       const proposal = await slashingManager.getSlashProposal(0);
-      expect(proposal.executedTicket).to.be.true;
-      expect(proposal.executedLicense).to.be.true;
+      expect(proposal.executed).to.be.true;
     });
 
     it("should execute slash after appeal window expires", async function () {
@@ -1115,27 +1113,6 @@ describe("SlashingManager", function () {
           .connect(notTheOwner)
           .banNode(operatorAddress, ethers.encodeBytes32String("test")),
       ).to.be.revertedWithCustomError(slashingManager, "Unauthorized");
-    });
-
-    it("should prevent proposing slashes against banned nodes", async function () {
-      const { slashingManager, owner, slasher, operatorAddress, mockVerifier } =
-        await loadFixture(setup);
-
-      await setupPolicies(slashingManager, mockVerifier);
-
-      await slashingManager
-        .connect(owner)
-        .banNode(operatorAddress, ethers.encodeBytes32String("test"));
-
-      await expect(
-        slashingManager
-          .connect(slasher)
-          .proposeSlash(
-            operatorAddress,
-            REASON_MISBEHAVIOR,
-            ethers.toUtf8Bytes("proof"),
-          ),
-      ).to.be.revertedWithCustomError(slashingManager, "CiphernodeBanned");
     });
   });
 

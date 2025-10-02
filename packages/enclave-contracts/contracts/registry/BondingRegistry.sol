@@ -65,6 +65,10 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     uint256 public licenseRequiredBond;
     uint256 public minTicketBalance;
     uint64 public exitDelay;
+
+    // TODO: There's a scenario where a node can bond the required license bond,
+    // then register and immediately withdraw 20% of the license bond. And still be a part of
+    // the protocol. Is this correct?
     uint256 public licenseActiveBps = 8_000; // 80%
 
     // Operator data structure

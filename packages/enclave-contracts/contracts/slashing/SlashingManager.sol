@@ -65,11 +65,6 @@ contract SlashingManager is ISlashingManager, AccessControl {
         _;
     }
 
-    modifier notBanned(address node) {
-        if (banned[node]) revert CiphernodeBanned();
-        _;
-    }
-
     // ======================
     // Constructor
     // ======================
@@ -122,6 +117,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
         if (policy.requiresProof) {
             require(policy.proofVerifier != address(0), VerifierNotSet());
+            // TODO: Should we allow appeal window for proof required?
             require(policy.appealWindow == 0, InvalidPolicy());
         } else {
             require(policy.appealWindow > 0, InvalidPolicy());
@@ -170,7 +166,13 @@ contract SlashingManager is ISlashingManager, AccessControl {
         address operator,
         bytes32 reason,
         bytes calldata proof
-    ) external onlySlasher notBanned(operator) returns (uint256 proposalId) {
+    )
+        external
+        // TODO: Do we need an onlySlasher modifier?
+        // Can anyone propose a slash?
+        onlySlasher
+        returns (uint256 proposalId)
+    {
         require(operator != address(0), ZeroAddress());
 
         SlashPolicy memory policy = slashPolicies[reason];
@@ -184,11 +186,6 @@ contract SlashingManager is ISlashingManager, AccessControl {
         p.reason = reason;
         p.ticketAmount = policy.ticketPenalty;
         p.licenseAmount = policy.licensePenalty;
-        p.executedTicket = false;
-        p.executedLicense = false;
-        p.appealed = false;
-        p.resolved = false;
-        p.appealUpheld = false;
         p.proposedAt = block.timestamp;
         p.executableAt = executableAt;
         p.proposer = msg.sender;
@@ -222,7 +219,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
         SlashProposal storage p = _proposals[proposalId];
 
         // Has already been executed?
-        require(!(p.executedTicket && p.executedLicense), AlreadyExecuted());
+        require(!p.executed, AlreadyExecuted());
+        p.executed = true;
 
         SlashPolicy memory policy = slashPolicies[p.reason];
 
@@ -238,27 +236,20 @@ contract SlashingManager is ISlashingManager, AccessControl {
             }
         }
 
-        bool ticketExecuted = p.executedTicket;
-        bool licenseExecuted = p.executedLicense;
-
-        if (!p.executedTicket && p.ticketAmount > 0) {
+        if (p.ticketAmount > 0) {
             bondingRegistry.slashTicketBalance(
                 p.operator,
                 p.ticketAmount,
                 p.reason
             );
-            p.executedTicket = true;
-            ticketExecuted = true;
         }
 
-        if (!p.executedLicense && p.licenseAmount > 0) {
+        if (p.licenseAmount > 0) {
             bondingRegistry.slashLicenseBond(
                 p.operator,
                 p.licenseAmount,
                 p.reason
             );
-            p.executedLicense = true;
-            licenseExecuted = true;
         }
 
         if (policy.banNode) {
@@ -272,8 +263,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
             p.reason,
             p.ticketAmount,
             p.licenseAmount,
-            ticketExecuted,
-            licenseExecuted
+            p.executed
         );
     }
 
