@@ -127,7 +127,7 @@ async fn get_public_key(data: web::Json<PKRequest>, store: web::Data<AppData>) -
 /// Initialize a new CRISP round
 ///
 /// Creates a new CRISP round by enabling the E3 program, generating the necessary parameters,
-/// fetching token holders from Etherscan, and requesting E3.
+/// and requesting E3.
 ///
 /// # Arguments
 ///
@@ -174,8 +174,8 @@ pub async fn initialize_crisp_round(
     let params = encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli));
 
     // Convert the token address from hex string to bytes.
-    let token_addr: Address = token_address.parse()?;
-    let custom_params = Bytes::from(token_addr.into_array().to_vec());
+    let token_address: Address = token_address.parse()?;
+    let custom_params = Bytes::from(token_address.as_slice().to_vec());
 
     info!("Requesting E3...");
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
