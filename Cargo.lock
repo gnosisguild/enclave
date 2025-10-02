@@ -2626,7 +2626,7 @@ dependencies = [
 
 [[package]]
 name = "e3-bitquery"
-version = "0.0.1-test"
+version = "0.1.3"
 dependencies = [
  "reqwest 0.11.27",
  "serde",

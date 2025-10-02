@@ -108,21 +108,21 @@ impl BitqueryClient {
         let query = format!(
             r#"
             {{
-              EVM(dataset: archive, network: {}) {{
-                BalanceUpdates(
-                  where: {{
-                    Block: {{ Number: {{ eq: "{}" }} }}
-                    Currency: {{ SmartContract: {{ is: "{}" }} }}
-                    BalanceUpdate: {{ Amount: {{ gt: "0" }} }}
-                  }}
-                  limit: {{ count: {} }}
-                ) {{
-                  Balance: sum(of: BalanceUpdate_Amount)
-                  BalanceUpdate {{
-                    Address
-                  }}
+                EVM(dataset: archive, network: {}) {{
+                    BalanceUpdates(
+                        where: {{
+                            Block: {{ Number: {{ le: "{}" }} }}
+                            Currency: {{ SmartContract: {{ is: "{}" }} }}
+                            BalanceUpdate: {{ Amount: {{ gt: "0" }} }}
+                        }}
+                        limit: {{ count: {} }}
+                    ) {{
+                        BalanceUpdate {{
+                            Address
+                        }}
+                        Balance: sum(of: BalanceUpdate_Amount, selectWhere: {{ gt: "0" }})
+                    }}
                 }}
-              }}
             }}
             "#,
             network, block_number, token_contract, limit
