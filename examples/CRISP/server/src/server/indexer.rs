@@ -26,7 +26,7 @@ use e3_sdk::{
     },
     indexer::{DataStore, EnclaveIndexer},
 };
-use log::info;
+use log::{info, warn};
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
@@ -77,6 +77,15 @@ pub async fn register_e3_requested(
                         .await
                         .map_err(|e| eyre::eyre!("Bitquery error: {}", e))?
                 };
+
+                if token_holders.is_empty() {
+                    warn!("No eligible token holders found");
+
+                    return Err(eyre::eyre!(
+                        "No eligible token holders found for token address {}. Cannot build Merkle tree.",
+                        token_address
+                    ).into());
+                }
 
                 info!("Token holders: {:?}", token_holders);
 
