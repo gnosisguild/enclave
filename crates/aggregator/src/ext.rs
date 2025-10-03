@@ -21,10 +21,12 @@ use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use e3_sortition::Sortition;
 
+#[deprecated = "In favour of ThresholdPlaintextAggregatorExtension"]
 pub struct PlaintextAggregatorExtension {
     bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
 }
+
 impl PlaintextAggregatorExtension {
     pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
@@ -64,6 +66,7 @@ impl E3Extension for PlaintextAggregatorExtension {
         let e3_id = data.e3_id.clone();
         let repo = ctx.repositories().plaintext(&e3_id);
 
+        // This is a single ciphertext for the legacy PlaintextAggregator
         let Some(single_ciphertext) = data.ciphertext_output.first() else {
             self.bus.err(
                 EnclaveErrorType::PlaintextAggregation,
@@ -266,7 +269,7 @@ impl ThresholdPlaintextAggregatorExtension {
     }
 }
 
-const ERROR_TRBFV_PLAINTEXT_META_MISSING:&str = "Could not create PlaintextAggregator because the meta instance it depends on was not set on the context.";
+const ERROR_TRBFV_PLAINTEXT_META_MISSING:&str = "Could not create ThresholdPlaintextAggregator because the meta instance it depends on was not set on the context.";
 
 #[async_trait]
 impl E3Extension for ThresholdPlaintextAggregatorExtension {
@@ -279,7 +282,7 @@ impl E3Extension for ThresholdPlaintextAggregatorExtension {
         let Some(ref meta) = ctx.get_dependency(META_KEY) else {
             self.bus.err(
                 EnclaveErrorType::PlaintextAggregation,
-                anyhow!(ERROR_PLAINTEXT_META_MISSING),
+                anyhow!(ERROR_TRBFV_PLAINTEXT_META_MISSING),
             );
             return;
         };
