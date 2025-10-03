@@ -28,35 +28,10 @@ impl SensitiveBytes {
         })
     }
 
-    /// Helper to access a vector of sensitive bytes
-    // TODO: rename try_access_vec
-    pub fn access_vec(
-        sensitive_vec: Vec<SensitiveBytes>,
-        cipher: &Cipher,
-    ) -> Result<Vec<Zeroizing<Vec<u8>>>> {
-        sensitive_vec
-            .into_iter()
-            .map(|s| s.access(cipher))
-            .collect()
-    }
-
     pub fn try_from_vec(inputs: Vec<Vec<u8>>, cipher: &Cipher) -> Result<Vec<Self>> {
         inputs
             .into_iter()
             .map(|i| SensitiveBytes::new(i, cipher))
-            .collect::<Result<_>>()
-    }
-
-    pub fn try_from_unserialized_vec<T: Sized>(
-        value: Vec<T>,
-        cipher: &Cipher,
-    ) -> Result<Vec<SensitiveBytes>>
-    where
-        T: ?Sized + serde::Serialize,
-    {
-        value
-            .into_iter()
-            .map(|s| SensitiveBytes::new(bincode::serialize(&s)?, cipher))
             .collect::<Result<_>>()
     }
 

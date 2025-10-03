@@ -34,6 +34,7 @@ const ARGON2_VERSION: Version = Version::V0x13;
 // const AES_SALT_LEN: usize = 32;
 const AES_NONCE_LEN: usize = 12;
 
+// TODO: Currently using a fixed salt to make encryption faster. Was ~300ms now ~30ms This should be revised.
 const APP_SALT: [u8; 32] = *b">>ENCLAVE_SYSTEMS_SALT_2025_V1<<";
 
 fn argon2_derive_key(
