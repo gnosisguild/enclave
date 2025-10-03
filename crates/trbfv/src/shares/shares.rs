@@ -88,3 +88,16 @@ impl ShamirShareArrayExt for Vec<Array2<u64>> {
         self.into_iter().map(|s| ShamirShare::new(s)).collect()
     }
 }
+
+impl ShamirShareArrayExt for SharedSecret {
+    fn to_vec_shamir_share(self) -> Vec<ShamirShare> {
+        let (r, _) = self.moduli_data.get(0).unwrap().dim();
+        let mut shares = vec![];
+        for party in 0..r {
+            let share = self.extract_party_share(party).unwrap();
+            shares.push(share);
+        }
+
+        shares
+    }
+}

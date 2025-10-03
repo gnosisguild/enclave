@@ -176,7 +176,6 @@ impl CiphernodeBuilder {
                 &local_bus,
                 &self.cipher,
                 &multithread,
-                &self.rng,
                 &addr,
             ))
         }

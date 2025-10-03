@@ -22,7 +22,7 @@ use e3_trbfv::{
     TrBFVConfig, TrBFVRequest,
 };
 use e3_utils::utility_types::ArcBytes;
-use tracing::{error, info, trace};
+use tracing::{error, info};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Collecting {
@@ -151,17 +151,16 @@ impl ThresholdPlaintextAggregator {
 
     pub fn add_share(&mut self, party_id: u64, share: Vec<ArcBytes>) -> Result<()> {
         self.state.try_mutate(|state| {
-            let current: Collecting = state.clone().try_into()?;
             info!("Adding share for party_id={}", party_id);
+            let current: Collecting = state.clone().try_into()?;
             let ciphertext_output = current.ciphertext_output;
             let threshold_m = current.threshold_m;
             let threshold_n = current.threshold_n;
             let params = current.params.clone();
             let mut shares = current.shares;
-            {
-                info!("pushing to share collection {} {:?}", party_id, share);
-                shares.insert(party_id, share);
-            }
+
+            info!("pushing to share collection {} {:?}", party_id, share);
+            shares.insert(party_id, share);
 
             if shares.len() <= threshold_m as usize {
                 return Ok(ThresholdPlaintextAggregatorState::Collecting(Collecting {

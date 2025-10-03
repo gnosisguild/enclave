@@ -9,6 +9,7 @@ pub mod ciphernode_builder;
 pub mod ciphernode_system;
 mod plaintext_writer;
 mod public_key_writer;
+pub mod usecase_helpers;
 mod utils;
 use actix::prelude::*;
 use alloy::primitives::Address;
@@ -18,7 +19,7 @@ use e3_events::{
     CiphernodeAdded, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector,
     Seed, Subscribe,
 };
-use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
+use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
 use fhe::mbfv::CommonRandomPoly;
@@ -41,6 +42,11 @@ pub fn create_seed_from_u64(value: u64) -> Seed {
 
 pub fn create_rng_from_seed(seed: Seed) -> SharedRng {
     Arc::new(std::sync::Mutex::new(ChaCha20Rng::from_seed(seed.into())))
+}
+
+pub fn create_crp_from_seed(params: &Arc<BfvParameters>, seed: &Seed) -> Result<CommonRandomPoly> {
+    let rng = create_rng_from_seed(seed.clone());
+    Ok(create_crp(params.clone(), rng))
 }
 
 pub fn create_crp_bytes_params(
