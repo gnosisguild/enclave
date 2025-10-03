@@ -54,6 +54,7 @@ impl Fhe {
             params.clone(),
             Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
         );
+
         Ok(Fhe::new(params, crp, rng))
     }
 

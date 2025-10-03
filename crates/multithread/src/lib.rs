@@ -86,15 +86,15 @@ impl Handler<ComputeRequest> for Multithread {
         let rng = self.rng.clone();
         let thread_pool = self.thread_pool.clone();
         Box::pin(async move {
-            let pending = PENDING_TASKS.fetch_add(1, Ordering::Relaxed);
-
-            info!(
-                "Spawning task. Pending: {}, Completed: {}",
-                pending + 1,
-                COMPLETED_TASKS.load(Ordering::Relaxed)
-            );
-
+            // This uses channels to traack pending and complete tasks when
+            // using the thread pool
             let res = if let Some(pool) = thread_pool {
+                let pending = PENDING_TASKS.fetch_add(1, Ordering::Relaxed);
+                info!(
+                    "Spawning task. Pending: {}, Completed: {}",
+                    pending + 1,
+                    COMPLETED_TASKS.load(Ordering::Relaxed)
+                );
                 let (tx, rx) = tokio::sync::oneshot::channel();
                 pool.spawn(move || {
                     let res = handle_compute_request(rng, cipher, msg);
@@ -105,6 +105,7 @@ impl Handler<ComputeRequest> for Multithread {
                 });
                 rx.await.unwrap()
             } else {
+                // If not using the thread pool simply call inline
                 handle_compute_request(rng, cipher, msg)
             };
 

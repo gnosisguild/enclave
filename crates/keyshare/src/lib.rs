@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod decryption_key_collector;
 pub mod ext;
 mod keyshare;
 mod repo;
