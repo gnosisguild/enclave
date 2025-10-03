@@ -388,6 +388,25 @@
     {
       "inputs": [
         {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "disableEncryptionScheme",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "contract IE3Program",
           "name": "e3Program",
           "type": "address"
@@ -402,6 +421,25 @@
         }
       ],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getDecryptionVerifier",
+      "outputs": [
+        {
+          "internalType": "contract IDecryptionVerifier",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -788,6 +826,106 @@
     {
       "inputs": [
         {
+          "internalType": "contract IBondingRegistry",
+          "name": "_bondingRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "setBondingRegistry",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract ICiphernodeRegistry",
+          "name": "_ciphernodeRegistry",
+          "type": "address"
+        }
+      ],
+      "name": "setCiphernodeRegistry",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "encryptionSchemeId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "contract IDecryptionVerifier",
+          "name": "decryptionVerifier",
+          "type": "address"
+        }
+      ],
+      "name": "setDecryptionVerifier",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes[]",
+          "name": "_e3ProgramsParams",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "setE3ProgramsParams",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "contract IERC20",
+          "name": "_feeToken",
+          "type": "address"
+        }
+      ],
+      "name": "setFeeToken",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "uint256",
           "name": "_maxDuration",
           "type": "uint256"
@@ -811,5 +949,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-  "buildInfoId": "solc-0_8_27-6b881742dbc2999fe64dba44ba36cf997f70c079"
+  "buildInfoId": "solc-0_8_27-5dc5e83b3f2c44cf8644ab0f2ffb318134b8c5b4"
 }

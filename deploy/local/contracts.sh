@@ -1,7 +1,7 @@
 # !/bin/bash
 
 # Install the enclave binary
-cargo install --locked --path ./crates/cli --bin enclave -f
+# cargo install --locked --path ./crates/cli --bin enclave -f
 
 # Deploy Contacts
 (cd packages/enclave-contracts && rm -rf deployments/localhost && pnpm deploy:mocks --network localhost)

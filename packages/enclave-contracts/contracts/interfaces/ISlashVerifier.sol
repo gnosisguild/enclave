@@ -5,12 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
+/**
+ * @title ISlashVerifier
+ * @notice Interface for verifying slash proofs
+ * @dev Slash verifiers implement cryptographic or logical verification of slash proposals
+ */
 interface ISlashVerifier {
-    /// @notice This function should be called by the SlashingManager contract to verify the
-    /// proof of a slash.
-    /// @param proposalId ID of the proposal.
-    /// @param proof ABI encoded proof of the given proposal.
-    /// @return success Whether or not the proof was successfully verified.
+    /// @notice Verify a slash proof
+    /// @dev This function is called by the SlashingManager contract during slash proposal to verify proof validity
+    /// @param proposalId ID of the slash proposal
+    /// @param proof ABI encoded proof data supporting the slash
+    /// @return success Whether the proof was successfully verified
     function verify(
         uint256 proposalId,
         bytes memory proof

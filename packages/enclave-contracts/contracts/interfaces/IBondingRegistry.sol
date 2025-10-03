@@ -187,6 +187,37 @@ interface IBondingRegistry {
     function exitDelay() external view returns (uint64);
 
     /**
+     * @notice Get operator's ticket balance at a specific block
+     * @param operator Address of the operator
+     * @param blockNumber Block number to query
+     * @return Ticket balance at the specified block
+     */
+    function getTicketBalanceAtBlock(
+        address operator,
+        uint256 blockNumber
+    ) external view returns (uint256);
+
+    /**
+     * @notice Get operator's total pending exit amounts
+     * @param operator Address of the operator
+     * @return ticket Total pending ticket balance in exit queue
+     * @return license Total pending license bond in exit queue
+     */
+    function pendingExits(
+        address operator
+    ) external view returns (uint256 ticket, uint256 license);
+
+    /**
+     * @notice Preview how much an operator can currently claim
+     * @param operator Address of the operator
+     * @return ticket Claimable ticket balance
+     * @return license Claimable license bond
+     */
+    function previewClaimable(
+        address operator
+    ) external view returns (uint256 ticket, uint256 license);
+
+    /**
      * @notice Get slashed funds treasury address
      * @return Address where slashed funds are sent
      */
@@ -382,6 +413,13 @@ interface IBondingRegistry {
      * @dev Only callable by contract owner
      */
     function setSlashingManager(address newSlashingManager) external;
+
+    /**
+     * @notice Set reward distributor address
+     * @param newRewardDistributor New reward distributor address
+     * @dev Only callable by contract owner
+     */
+    function setRewardDistributor(address newRewardDistributor) external;
 
     /**
      * @notice Withdraw slashed funds to treasury

@@ -15,51 +15,67 @@ import { ISlashVerifier } from "../interfaces/ISlashVerifier.sol";
 
 /**
  * @title SlashingManager
- * @notice Manages slashing proposals, appeals, and execution for the bonding system
- * @dev UUPS upgradeable contract with role-based access control
+ * @notice Implementation of slashing management with proposal, appeal, and execution workflows
+ * @dev Role-based access control for slashers, verifiers, and governance with configurable slash policies
  */
 contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
     // Constants & Roles
     // ======================
 
+    /// @notice Role identifier for accounts authorized to propose and execute slashes
     bytes32 public constant SLASHER_ROLE = keccak256("SLASHER_ROLE");
+
+    /// @notice Role identifier for accounts authorized to verify cryptographic proofs in slash proposals
     bytes32 public constant VERIFIER_ROLE = keccak256("VERIFIER_ROLE");
+
+    /// @notice Role identifier for governance accounts that can configure policies, resolve appeals, and manage bans
     bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
     // ======================
     // Storage
     // ======================
 
-    /// @notice Bonding registry contract
+    /// @notice Reference to the bonding registry contract where slash penalties are executed
+    /// @dev Used to call slashTicketBalance() and slashLicenseBond() when executing slashes
     IBondingRegistry public bondingRegistry;
 
-    /// @notice Slash policies by reason hash
+    /// @notice Mapping from slash reason hash to its configured policy
+    /// @dev Stores penalty amounts, proof requirements, and appeal settings for each slash type
     mapping(bytes32 reason => SlashPolicy policy) public slashPolicies;
 
-    /// @notice All slash proposals
+    /// @notice Internal storage for all slash proposals indexed by proposal ID
+    /// @dev Sequentially indexed starting from 0, accessed via getSlashProposal()
     mapping(uint256 proposalId => SlashProposal proposal) internal _proposals;
 
-    /// @notice Total number of proposals created
+    /// @notice Counter for total number of slash proposals ever created
+    /// @dev Also serves as the next proposal ID to be assigned
     uint256 public totalProposals;
 
-    /// @notice Banned nodes
+    /// @notice Mapping tracking which nodes are currently banned from the network
+    /// @dev Set to true when a node is banned (either via executeSlash or banNode), false when unbanned
     mapping(address node => bool banned) public banned;
 
     // ======================
     // Modifiers
     // ======================
 
+    /// @notice Restricts function access to accounts with SLASHER_ROLE
+    /// @dev Reverts with Unauthorized() if caller lacks the role
     modifier onlySlasher() {
         if (!hasRole(SLASHER_ROLE, msg.sender)) revert Unauthorized();
         _;
     }
 
+    /// @notice Restricts function access to accounts with VERIFIER_ROLE
+    /// @dev Reverts with Unauthorized() if caller lacks the role
     modifier onlyVerifier() {
         if (!hasRole(VERIFIER_ROLE, msg.sender)) revert Unauthorized();
         _;
     }
 
+    /// @notice Restricts function access to accounts with GOVERNANCE_ROLE
+    /// @dev Reverts with Unauthorized() if caller lacks the role
     modifier onlyGovernance() {
         if (!hasRole(GOVERNANCE_ROLE, msg.sender)) revert Unauthorized();
         _;
@@ -69,6 +85,15 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // Constructor
     // ======================
 
+    /**
+     * @notice Initializes the SlashingManager contract with admin and bonding registry
+     * @dev Sets up initial role assignments and bonding registry reference
+     * @param admin Address to receive DEFAULT_ADMIN_ROLE and GOVERNANCE_ROLE
+     * @param _bondingRegistry Address of the bonding registry contract for executing slashes
+     * Requirements:
+     * - admin must not be zero address
+     * - _bondingRegistry must not be zero address
+     */
     constructor(address admin, address _bondingRegistry) {
         require(admin != address(0), ZeroAddress());
         require(_bondingRegistry != address(0), ZeroAddress());
@@ -83,12 +108,14 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // View Functions
     // ======================
 
+    /// @inheritdoc ISlashingManager
     function getSlashPolicy(
         bytes32 reason
     ) external view returns (SlashPolicy memory) {
         return slashPolicies[reason];
     }
 
+    /// @inheritdoc ISlashingManager
     function getSlashProposal(
         uint256 proposalId
     ) external view returns (SlashProposal memory) {
@@ -96,6 +123,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         return _proposals[proposalId];
     }
 
+    /// @inheritdoc ISlashingManager
     function isBanned(address node) external view returns (bool) {
         return banned[node];
     }
@@ -104,6 +132,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // Admin Functions
     // ======================
 
+    /// @inheritdoc ISlashingManager
     function setSlashPolicy(
         bytes32 reason,
         SlashPolicy calldata policy
@@ -127,6 +156,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         emit SlashPolicyUpdated(reason, policy);
     }
 
+    /// @inheritdoc ISlashingManager
     function setBondingRegistry(
         address newBondingRegistry
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -134,17 +164,20 @@ contract SlashingManager is ISlashingManager, AccessControl {
         bondingRegistry = IBondingRegistry(newBondingRegistry);
     }
 
+    /// @inheritdoc ISlashingManager
     function addSlasher(address slasher) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(slasher != address(0), ZeroAddress());
         _grantRole(SLASHER_ROLE, slasher);
     }
 
+    /// @inheritdoc ISlashingManager
     function removeSlasher(
         address slasher
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _revokeRole(SLASHER_ROLE, slasher);
     }
 
+    /// @inheritdoc ISlashingManager
     function addVerifier(
         address verifier
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -152,6 +185,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         _grantRole(VERIFIER_ROLE, verifier);
     }
 
+    /// @inheritdoc ISlashingManager
     function removeVerifier(
         address verifier
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -162,6 +196,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // Slashing Functions
     // ======================
 
+    /// @inheritdoc ISlashingManager
     function proposeSlash(
         address operator,
         bytes32 reason,
@@ -214,6 +249,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         totalProposals = proposalId + 1;
     }
 
+    /// @inheritdoc ISlashingManager
     function executeSlash(uint256 proposalId) external onlySlasher {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
@@ -271,6 +307,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // Appeal Functions
     // ======================
 
+    /// @inheritdoc ISlashingManager
     function fileAppeal(uint256 proposalId, string calldata evidence) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
@@ -287,6 +324,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         emit AppealFiled(proposalId, p.operator, p.reason, evidence);
     }
 
+    /// @inheritdoc ISlashingManager
     function resolveAppeal(
         uint256 proposalId,
         bool appealUpheld,
@@ -314,6 +352,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // Ban Management
     // ======================
 
+    /// @inheritdoc ISlashingManager
     function banNode(address node, bytes32 reason) external onlyGovernance {
         require(node != address(0), ZeroAddress());
 
@@ -321,6 +360,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
         emit NodeBanned(node, reason, msg.sender);
     }
 
+    /// @inheritdoc ISlashingManager
     function unbanNode(address node) external onlyGovernance {
         require(node != address(0), ZeroAddress());
 

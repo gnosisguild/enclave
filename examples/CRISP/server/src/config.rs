@@ -20,6 +20,7 @@ pub struct Config {
     pub e3_program_address: String,
     pub ciphernode_registry_address: String,
     pub naive_registry_filter_address: String,
+    pub fee_token_address: String,
     pub chain_id: u64,
     pub cron_api_key: String,
     // E3 parameters

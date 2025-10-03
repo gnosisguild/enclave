@@ -23,7 +23,8 @@ import { EnclaveTicketToken } from "../token/EnclaveTicketToken.sol";
 
 /**
  * @title BondingRegistry
- * @notice Main registry for operator balance and license bonds
+ * @notice Implementation of the bonding registry managing operator ticket balances and license bonds
+ * @dev Handles deposits, withdrawals, slashing, exits, and integrates with registry and slashing manager
  */
 contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     using SafeERC20 for IERC20;
@@ -33,45 +34,62 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // Constants
     // ======================
 
+    /// @dev Reason code for ticket balance deposits
     bytes32 private constant REASON_DEPOSIT = bytes32("DEPOSIT");
+
+    /// @dev Reason code for ticket balance withdrawals
     bytes32 private constant REASON_WITHDRAW = bytes32("WITHDRAW");
+
+    /// @dev Reason code for license bond operations
     bytes32 private constant REASON_BOND = bytes32("BOND");
+
+    /// @dev Reason code for license unbond operations
     bytes32 private constant REASON_UNBOND = bytes32("UNBOND");
 
     // ======================
     // Storage
     // ======================
 
-    /// @notice ticket token (ETK (Underlying USDC))
+    /// @notice Ticket token (ETK with underlying USDC) used for collateral
     EnclaveTicketToken public ticketToken;
 
-    /// @notice License token (ENCL)
+    /// @notice License token (ENCL) required for operator registration
     IERC20 public licenseToken;
 
-    /// @notice Registry contract for committee membership checks
+    /// @notice Registry contract for managing committee membership
     ICiphernodeRegistry public registry;
 
-    /// @notice Authorized slashing manager
+    /// @notice Address authorized to perform slashing operations
     address public slashingManager;
 
-    /// @notice Authorized reward distributor
+    /// @notice Address authorized to distribute rewards to operators
     address public rewardDistributor;
 
-    /// @notice Treasury address for slashed funds
+    /// @notice Treasury address that receives slashed funds
     address public slashedFundsTreasury;
 
-    // Configuration
+    /// @notice Price per ticket in ticket token units
     uint256 public ticketPrice;
+
+    /// @notice Minimum license bond required for initial registration
     uint256 public licenseRequiredBond;
+
+    /// @notice Minimum number of tickets required to maintain active status
     uint256 public minTicketBalance;
+
+    /// @notice Time delay in seconds before exits can be claimed
     uint64 public exitDelay;
 
-    // TODO: There's a scenario where a node can bond the required license bond,
-    // then register and immediately withdraw 20% of the license bond. And still be a part of
-    // the protocol. Is this correct?
-    uint256 public licenseActiveBps = 8_000; // 80%
+    /// @notice Percentage (in basis points) of license bond that must remain bonded to stay active
+    /// @dev Default 8000 = 80%. Allows operators to unbond up to 20% while remaining active
+    uint256 public licenseActiveBps = 8_000;
 
-    // Operator data structure
+    /// @notice Operator state data structure
+    /// @param licenseBond Amount of license tokens currently bonded
+    /// @param exitUnlocksAt Timestamp when pending exit can be claimed
+    /// @param registered Whether operator is registered in the protocol
+    /// @param exitRequested Whether operator has requested to exit
+    /// @param active Whether operator meets all requirements for active status
     struct Operator {
         uint256 licenseBond;
         uint64 exitUnlocksAt;
@@ -80,27 +98,34 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         bool active;
     }
 
-    // Operator data
+    /// @notice Maps operator address to their state data
     mapping(address operator => Operator data) internal operators;
 
-    // Total slashed funds available for treasury withdrawal
+    /// @notice Total slashed ticket balance available for treasury withdrawal
     uint256 public slashedTicketBalance;
+
+    /// @notice Total slashed license bond available for treasury withdrawal
     uint256 public slashedLicenseBond;
 
     // ======================
     // Exit Queue library state
     // ======================
+
+    /// @dev Internal state for managing exit queue of tickets and licenses
     ExitQueueLib.ExitQueueState private _exits;
 
     // ======================
     // Modifiers
     // ======================
 
+    /// @dev Restricts function access to only the slashing manager
     modifier onlySlashingManager() {
         if (msg.sender != slashingManager) revert Unauthorized();
         _;
     }
 
+    /// @dev Reverts if operator has an exit in progress that hasn't unlocked yet
+    /// @param operator Address of the operator to check
     modifier noExitInProgress(address operator) {
         Operator storage op = operators[operator];
         if (op.exitRequested && block.timestamp < op.exitUnlocksAt)
@@ -114,6 +139,16 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @notice Constructor that initializes the bonding registry
+    /// @param _owner Address that will own the contract
+    /// @param _ticketToken Ticket token contract for collateral
+    /// @param _licenseToken License token contract for bonding
+    /// @param _registry Ciphernode registry contract
+    /// @param _slashedFundsTreasury Address to receive slashed funds
+    /// @param _ticketPrice Initial price per ticket
+    /// @param _licenseRequiredBond Initial required license bond for registration
+    /// @param _minTicketBalance Initial minimum ticket balance for activation
+    /// @param _exitDelay Initial exit delay period in seconds
     constructor(
         address _owner,
         EnclaveTicketToken _ticketToken,
@@ -138,6 +173,17 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         );
     }
 
+    /// @notice Initializes the bonding registry contract
+    /// @dev Can only be called once due to initializer modifier
+    /// @param _owner Address that will own the contract
+    /// @param _ticketToken Ticket token contract for collateral
+    /// @param _licenseToken License token contract for bonding
+    /// @param _registry Ciphernode registry contract
+    /// @param _slashedFundsTreasury Address to receive slashed funds
+    /// @param _ticketPrice Initial price per ticket
+    /// @param _licenseRequiredBond Initial required license bond for registration
+    /// @param _minTicketBalance Initial minimum ticket balance for activation
+    /// @param _exitDelay Initial exit delay period in seconds
     function initialize(
         address _owner,
         EnclaveTicketToken _ticketToken,
@@ -165,16 +211,19 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // View Functions
     // ======================
 
+    /// @inheritdoc IBondingRegistry
     function getTicketBalance(
         address operator
     ) external view returns (uint256) {
         return ticketToken.balanceOf(operator);
     }
 
+    /// @inheritdoc IBondingRegistry
     function getLicenseBond(address operator) external view returns (uint256) {
         return operators[operator].licenseBond;
     }
 
+    /// @inheritdoc IBondingRegistry
     function availableTickets(
         address operator
     ) external view returns (uint256) {
@@ -182,6 +231,11 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         return ticketToken.balanceOf(operator) / ticketPrice;
     }
 
+    /// @notice Get operator's ticket balance at a specific block
+    /// @dev Uses checkpoint mechanism from ticket token
+    /// @param operator Address of the operator
+    /// @param blockNumber Block number to query
+    /// @return Ticket balance at the specified block
     function getTicketBalanceAtBlock(
         address operator,
         uint256 blockNumber
@@ -189,30 +243,42 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         return ticketToken.getPastVotes(operator, blockNumber);
     }
 
+    /// @notice Get operator's total pending exit amounts
+    /// @param operator Address of the operator
+    /// @return ticket Total pending ticket balance in exit queue
+    /// @return license Total pending license bond in exit queue
     function pendingExits(
         address operator
     ) external view returns (uint256 ticket, uint256 license) {
         return _exits.getPendingAmounts(operator);
     }
 
+    /// @notice Preview how much an operator can currently claim
+    /// @param operator Address of the operator
+    /// @return ticket Claimable ticket balance
+    /// @return license Claimable license bond
     function previewClaimable(
         address operator
     ) external view returns (uint256 ticket, uint256 license) {
         return _exits.previewClaimableAmounts(operator);
     }
 
+    /// @inheritdoc IBondingRegistry
     function isLicensed(address operator) external view returns (bool) {
         return operators[operator].licenseBond >= _minLicenseBond();
     }
 
+    /// @inheritdoc IBondingRegistry
     function isRegistered(address operator) external view returns (bool) {
         return operators[operator].registered;
     }
 
+    /// @inheritdoc IBondingRegistry
     function isActive(address operator) external view returns (bool) {
         return operators[operator].active;
     }
 
+    /// @inheritdoc IBondingRegistry
     function hasExitInProgress(address operator) external view returns (bool) {
         Operator storage op = operators[operator];
         return op.exitRequested && block.timestamp < op.exitUnlocksAt;
@@ -222,6 +288,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // Operator Functions
     // ======================
 
+    /// @inheritdoc IBondingRegistry
     function registerOperator() external noExitInProgress(msg.sender) {
         // Clear previous exit request
         if (operators[msg.sender].exitRequested) {
@@ -249,6 +316,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         _updateOperatorStatus(msg.sender);
     }
 
+    /// @inheritdoc IBondingRegistry
     function deregisterOperator(
         uint256[] calldata siblingNodes
     ) external noExitInProgress(msg.sender) {
@@ -298,6 +366,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         _updateOperatorStatus(msg.sender);
     }
 
+    /// @inheritdoc IBondingRegistry
     function addTicketBalance(
         uint256 amount
     ) external noExitInProgress(msg.sender) {
@@ -316,6 +385,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         _updateOperatorStatus(msg.sender);
     }
 
+    /// @inheritdoc IBondingRegistry
     function removeTicketBalance(
         uint256 amount
     ) external noExitInProgress(msg.sender) {
@@ -339,6 +409,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         _updateOperatorStatus(msg.sender);
     }
 
+    /// @inheritdoc IBondingRegistry
     function bondLicense(uint256 amount) external noExitInProgress(msg.sender) {
         require(amount != 0, ZeroAmount());
 
@@ -359,6 +430,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         _updateOperatorStatus(msg.sender);
     }
 
+    /// @inheritdoc IBondingRegistry
     function unbondLicense(
         uint256 amount
     ) external noExitInProgress(msg.sender) {
@@ -385,6 +457,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // Claim Functions
     // ======================
 
+    /// @inheritdoc IBondingRegistry
     function claimExits(
         uint256 maxTicketAmount,
         uint256 maxLicenseAmount
@@ -405,6 +478,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // Slashing Functions
     // ======================
 
+    /// @inheritdoc IBondingRegistry
     function slashTicketBalance(
         address operator,
         uint256 requestedSlashAmount,
@@ -456,6 +530,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         _updateOperatorStatus(operator);
     }
 
+    /// @inheritdoc IBondingRegistry
     function slashLicenseBond(
         address operator,
         uint256 requestedSlashAmount,
@@ -509,6 +584,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // Reward Distribution Functions
     // ======================
 
+    /// @inheritdoc IBondingRegistry
     function distributeRewards(
         IERC20 rewardToken,
         address[] calldata recipients,
@@ -532,6 +608,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // Admin Functions
     // ======================
 
+    /// @inheritdoc IBondingRegistry
     function setTicketPrice(uint256 newTicketPrice) public onlyOwner {
         require(newTicketPrice != 0, InvalidConfiguration());
 
@@ -541,6 +618,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         emit ConfigurationUpdated("ticketPrice", oldValue, newTicketPrice);
     }
 
+    /// @inheritdoc IBondingRegistry
     function setLicenseRequiredBond(
         uint256 newLicenseRequiredBond
     ) public onlyOwner {
@@ -556,6 +634,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         );
     }
 
+    /// @inheritdoc IBondingRegistry
     function setLicenseActiveBps(uint256 newBps) public onlyOwner {
         require(newBps > 0 && newBps <= 10_000, InvalidConfiguration());
 
@@ -565,6 +644,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         emit ConfigurationUpdated("licenseActiveBps", oldValue, newBps);
     }
 
+    /// @inheritdoc IBondingRegistry
     function setMinTicketBalance(uint256 newMinTicketBalance) public onlyOwner {
         uint256 oldValue = minTicketBalance;
         minTicketBalance = newMinTicketBalance;
@@ -576,6 +656,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         );
     }
 
+    /// @inheritdoc IBondingRegistry
     function setExitDelay(uint64 newExitDelay) public onlyOwner {
         uint256 oldValue = uint256(exitDelay);
         exitDelay = newExitDelay;
@@ -583,6 +664,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         emit ConfigurationUpdated("exitDelay", oldValue, uint256(newExitDelay));
     }
 
+    /// @inheritdoc IBondingRegistry
     function setSlashedFundsTreasury(
         address newSlashedFundsTreasury
     ) public onlyOwner {
@@ -590,30 +672,38 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         slashedFundsTreasury = newSlashedFundsTreasury;
     }
 
+    /// @inheritdoc IBondingRegistry
     function setTicketToken(
         EnclaveTicketToken newTicketToken
     ) public onlyOwner {
         ticketToken = newTicketToken;
     }
 
+    /// @inheritdoc IBondingRegistry
     function setLicenseToken(IERC20 newLicenseToken) public onlyOwner {
         licenseToken = newLicenseToken;
     }
 
+    /// @inheritdoc IBondingRegistry
     function setRegistry(ICiphernodeRegistry newRegistry) public onlyOwner {
         registry = newRegistry;
     }
 
+    /// @inheritdoc IBondingRegistry
     function setSlashingManager(address newSlashingManager) public onlyOwner {
         slashingManager = newSlashingManager;
     }
 
+    /// @notice Sets the reward distributor address
+    /// @dev Only callable by owner
+    /// @param newRewardDistributor Address of the reward distributor
     function setRewardDistributor(
         address newRewardDistributor
     ) public onlyOwner {
         rewardDistributor = newRewardDistributor;
     }
 
+    /// @inheritdoc IBondingRegistry
     function withdrawSlashedFunds(
         uint256 ticketAmount,
         uint256 licenseAmount
@@ -642,6 +732,9 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     // Internal Functions
     // ======================
 
+    /// @dev Updates operator's active status based on current conditions
+    /// @dev Operator is active if: registered, has minimum license bond, and has minimum tickets
+    /// @param operator Address of the operator to update
     function _updateOperatorStatus(address operator) internal {
         Operator storage op = operators[operator];
         bool newActiveStatus = op.registered &&
@@ -656,6 +749,8 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         }
     }
 
+    /// @dev Calculates the minimum license bond required to maintain active status
+    /// @return Minimum license bond (licenseRequiredBond * licenseActiveBps / 10000)
     function _minLicenseBond() internal view returns (uint256) {
         return (licenseRequiredBond * licenseActiveBps) / 10_000;
     }

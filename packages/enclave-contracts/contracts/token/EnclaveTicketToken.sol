@@ -24,7 +24,12 @@ import { Nonces } from "@openzeppelin/contracts/utils/Nonces.sol";
 
 /**
  * @title EnclaveTicketToken (ETK)
- * @notice Non-transferable non-delegatable ERC20Votes wrapper over a Stable token (USDC, DAI etc.) for operator staking
+ * @notice Non-transferable, non-delegatable ERC20Votes wrapper over a stablecoin for operator staking
+ * @dev ERC20 wrapper token that represents staked stablecoins (e.g., USDC, DAI) used for operator
+ *      bonding in the Enclave protocol. Implements voting power tracking through ERC20Votes but
+ *      prevents transfers between users and manual delegation. Deposits automatically delegate to
+ *      self to enable voting power tracking. Only the designated registry contract can mint
+ *      (deposit) and burn (withdraw) tokens.
  */
 contract EnclaveTicketToken is
     ERC20,
@@ -35,24 +40,37 @@ contract EnclaveTicketToken is
 {
     using SafeERC20 for IERC20;
     // Custom errors
+
+    /// @notice Thrown when a function is called by an address other than the registry
     error NotRegistry();
+
+    /// @notice Thrown when attempting to transfer tokens between non-zero addresses
     error TransferNotAllowed();
+
+    /// @notice Thrown when a zero address is provided where a valid address is required
     error ZeroAddress();
+
+    /// @notice Thrown when attempting to manually delegate voting power
     error DelegationLocked();
 
-    /// @dev Address of the registry contract that manages deposits and withdrawals.
+    /// @notice Address of the registry contract authorized to mint, burn, and manage ticket tokens
+    /// @dev Only this contract can call restricted functions like depositFor, withdrawTo, burnTickets, and payout
     address public registry;
 
+    /// @notice Restricts function access to only the registry contract
+    /// @dev Reverts with NotRegistry if caller is not the registry address
     modifier onlyRegistry() {
         if (msg.sender != registry) revert NotRegistry();
         _;
     }
 
     /**
-     * @notice Deploy the Enclave Ticket Token.
-     * @param baseToken The underlying ERC20 token to wrap (e.g., USDC, DAI).
-     * @param registry_ The address of the registry contract.
-     * @param initialOwner_ The address that will own the contract.
+     * @notice Initializes the Enclave Ticket Token with name "Enclave Ticket Token" and symbol "ETK"
+     * @dev Sets up the token as an ERC20 wrapper around the provided base token (stablecoin).
+     *      Initializes voting and permit functionality. The decimals will match the base token.
+     * @param baseToken The underlying ERC20 stablecoin to wrap (e.g., USDC, DAI)
+     * @param registry_ Address of the registry contract that will manage deposits and withdrawals
+     * @param initialOwner_ Address that will own the contract and can update the registry
      */
     constructor(
         IERC20 baseToken,
@@ -68,9 +86,10 @@ contract EnclaveTicketToken is
     }
 
     /**
-     * @notice Set a new registry contract address.
-     * @dev Only callable by the contract owner.
-     * @param newRegistry The address of the new registry contract.
+     * @notice Updates the registry contract address
+     * @dev Only callable by the contract owner. The new registry address cannot be zero.
+     *      This function grants the new registry exclusive rights to mint, burn, and manage tokens.
+     * @param newRegistry Address of the new registry contract (must not be zero address)
      */
     function setRegistry(address newRegistry) public onlyOwner {
         require(newRegistry != address(0), ZeroAddress());
@@ -78,11 +97,13 @@ contract EnclaveTicketToken is
     }
 
     /**
-     * @notice Deposit Base token and mint ticket tokens to operator.
-     * @dev Only callable by the registry contract. Auto-delegates on first deposit.
-     * @param operator Address to receive the ticket tokens.
-     * @param amount Amount of tokens to deposit.
-     * @return success True if successful.
+     * @notice Deposits underlying tokens from the registry and mints ticket tokens to an operator
+     * @dev Only callable by the registry contract. Transfers underlying tokens from the registry to
+     *      this contract and mints an equivalent amount of ticket tokens. Automatically delegates
+     *      voting power to the operator on their first deposit to enable voting power tracking.
+     * @param operator Address to receive the minted ticket tokens
+     * @param amount Number of underlying tokens to deposit and ticket tokens to mint
+     * @return success True if the deposit and minting succeeded
      */
     function depositFor(
         address operator,
@@ -97,12 +118,15 @@ contract EnclaveTicketToken is
     }
 
     /**
-     * @notice Deposit Base token from an account and mint ticket tokens to an account.
-     * @dev Only callable by the registry contract. Auto-delegates on first deposit.
-     * @param from Address to deposit from.
-     * @param to Address to mint to.
-     * @param amount Amount of tokens to deposit.
-     * @return True if successful.
+     * @notice Deposits underlying tokens from a specified account and mints ticket tokens to another account
+     * @dev Only callable by the registry contract. Transfers underlying tokens from the 'from' address
+     *      to this contract and mints ticket tokens to the 'to' address. Useful for scenarios where
+     *      the source and destination differ. Automatically delegates voting power to recipient on
+     *      their first deposit.
+     * @param from Address to transfer underlying tokens from (must have approved this contract)
+     * @param to Address to receive the minted ticket tokens
+     * @param amount Number of underlying tokens to deposit and ticket tokens to mint
+     * @return bool True if the deposit and minting succeeded
      */
     function depositFrom(
         address from,
@@ -121,11 +145,13 @@ contract EnclaveTicketToken is
     }
 
     /**
-     * @notice Burn ticket tokens and transfer Base token to receiver.
-     * @dev Only callable by the registry contract.
-     * @param receiver Address to receive the Underlying token.
-     * @param amount Amount of ticket tokens to burn.
-     * @return success True if successful.
+     * @notice Burns ticket tokens from the registry and transfers underlying tokens to a receiver
+     * @dev Only callable by the registry contract. Burns ticket tokens from the registry's balance
+     *      and transfers an equivalent amount of underlying tokens to the receiver address. Used
+     *      when operators unstake their tokens.
+     * @param receiver Address to receive the underlying tokens
+     * @param amount Number of ticket tokens to burn and underlying tokens to transfer
+     * @return success True if the burn and transfer succeeded
      */
     function withdrawTo(
         address receiver,
@@ -135,10 +161,12 @@ contract EnclaveTicketToken is
     }
 
     /**
-     * @notice Burn ticket tokens from an operator.
-     * @dev Only callable by the registry contract.
-     * @param operator Address to burn from.
-     * @param amount Amount of ticket tokens to burn.
+     * @notice Burns ticket tokens from an operator's balance without transferring underlying tokens
+     * @dev Only callable by the registry contract. Used for slashing or penalizing operators where
+     *      the underlying tokens should remain in the contract or be handled separately. Does not
+     *      return underlying tokens to the operator.
+     * @param operator Address whose ticket tokens will be burned
+     * @param amount Number of ticket tokens to burn from the operator's balance
      */
     function burnTickets(
         address operator,

@@ -21,6 +21,11 @@ import {
 
 /**
  * @title EnclaveToken
+ * @notice The governance and utility token for the Enclave protocol
+ * @dev ERC20 token with voting capabilities, permit functionality, and controlled minting.
+ *      Implements transfer restrictions that can be toggled by the owner to control token
+ *      transferability during early phases. Supports a maximum supply cap and role-based
+ *      minting through the MINTER_ROLE.
  */
 contract EnclaveToken is
     ERC20,
@@ -30,43 +35,66 @@ contract EnclaveToken is
     AccessControl
 {
     // Custom errors
+
+    /// @notice Thrown when a zero address is provided where a valid address is required
     error ZeroAddress();
+
+    /// @notice Thrown when attempting to mint zero tokens
     error ZeroAmount();
+
+    /// @notice Thrown when minting would exceed the maximum token supply
     error ExceedsTotalSupply();
+
+    /// @notice Thrown when array parameters have mismatched lengths
     error ArrayLengthMismatch();
+
+    /// @notice Thrown when a transfer is attempted while restrictions are active and neither party is whitelisted
     error TransferNotAllowed();
 
-    /// @dev Maximum supply of the token (18 decimals).
+    /// @notice Maximum supply of the token: 1.2 billion tokens with 18 decimals
+    /// @dev Hard cap on total token supply that cannot be exceeded through minting
     uint256 public constant MAX_SUPPLY = 1_200_000_000e18;
 
-    /// @dev Role allowing accounts to mint new tokens.
+    /// @notice Role identifier for accounts authorized to mint new tokens
+    /// @dev Keccak256 hash of "MINTER_ROLE" used in AccessControl
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    /// @dev Tracks the amount of tokens minted so far.
+    /// @notice Tracks the cumulative amount of tokens minted since deployment
+    /// @dev Incremented with each mint operation to enforce MAX_SUPPLY cap
     uint256 public totalMinted;
 
-    /// @dev Mapping of addresses allowed to transfer when restrictions are active.
+    /// @notice Mapping of addresses permitted to transfer tokens when restrictions are active
+    /// @dev When transfersRestricted is true, only whitelisted addresses can send or receive tokens
     mapping(address account => bool allowed) public transferWhitelisted;
 
-    /// @dev Whether transfers are currently restricted.
+    /// @notice Indicates whether token transfers are currently restricted
+    /// @dev When true, only whitelisted addresses can transfer tokens
     bool public transfersRestricted;
 
-    /// @dev Emitted when tokens are minted as part of an allocation.
+    /// @notice Emitted when tokens are minted as part of a named allocation
+    /// @param recipient Address receiving the minted tokens
+    /// @param amount Number of tokens minted (18 decimals)
+    /// @param allocation Description of the allocation for tracking purposes
     event AllocationMinted(
         address indexed recipient,
         uint256 amount,
         string allocation
     );
 
-    /// @dev Emitted whenever the transfer restriction flag is updated.
+    /// @notice Emitted when the transfer restriction setting is changed
+    /// @param restricted New state of transfer restrictions (true = restricted, false = unrestricted)
     event TransferRestrictionUpdated(bool restricted);
 
-    /// @dev Emitted when an address is added to or removed from the whitelist.
+    /// @notice Emitted when an address is added to or removed from the transfer whitelist
+    /// @param account Address whose whitelist status changed
+    /// @param whitelisted New whitelist status (true = whitelisted, false = not whitelisted)
     event TransferWhitelistUpdated(address indexed account, bool whitelisted);
 
     /**
-     * @notice Deploy the Enclave token.
-     * @param _owner Address that will initially own the contract and have admin rights.
+     * @notice Initializes the Enclave token with name "Enclave" and symbol "ENCL"
+     * @dev Sets up the token with voting and permit functionality. Grants admin and minter
+     *      roles to the owner, enables transfer restrictions, and whitelists the owner.
+     * @param _owner Address that will own the contract and receive DEFAULT_ADMIN_ROLE and MINTER_ROLE
      */
     constructor(
         address _owner
@@ -84,11 +112,12 @@ contract EnclaveToken is
     }
 
     /**
-     * @notice Mint an allocation of tokens to a recipient.
-     * @dev Only accounts with the MINTER_ROLE may call this function.
-     * @param recipient Address to receive the minted tokens.
-     * @param amount Amount of tokens to mint (18 decimals).
-     * @param allocation Description of the allocation for off-chain bookkeeping.
+     * @notice Mints a named allocation of tokens to a specified recipient
+     * @dev Only callable by accounts with MINTER_ROLE. Reverts if recipient is zero address,
+     *      amount is zero, or minting would exceed MAX_SUPPLY. Updates totalMinted tracker.
+     * @param recipient Address to receive the minted tokens (cannot be zero address)
+     * @param amount Number of tokens to mint in wei (18 decimals, must be greater than zero)
+     * @param allocation Human-readable description of this allocation for tracking and auditing purposes
      */
     function mintAllocation(
         address recipient,
@@ -106,11 +135,13 @@ contract EnclaveToken is
     }
 
     /**
-     * @notice Mint multiple allocations in a batch.
-     * @dev Only accounts with the MINTER_ROLE may call this function.
-     * @param recipients Array of addresses to receive tokens.
-     * @param amounts Corresponding array of amounts to mint.
-     * @param allocations Array of allocation descriptions.
+     * @notice Mints multiple named allocations to different recipients in a single transaction
+     * @dev Only callable by accounts with MINTER_ROLE. All arrays must have the same length.
+     *      Reverts if any amount is zero or if the cumulative minting would exceed MAX_SUPPLY.
+     *      Gas-efficient for distributing tokens to multiple addresses.
+     * @param recipients Array of addresses to receive minted tokens
+     * @param amounts Array of token amounts to mint (18 decimals, must match recipients length)
+     * @param allocations Array of allocation descriptions (must match recipients length)
      */
     function batchMintAllocations(
         address[] calldata recipients,
@@ -137,9 +168,11 @@ contract EnclaveToken is
     }
 
     /**
-     * @notice Enable or disable transfer restrictions.
-     * @dev Only the owner can toggle this flag.
-     * @param restricted Whether transfers should be restricted.
+     * @notice Enables or disables transfer restrictions for the token
+     * @dev Only callable by the contract owner. When restrictions are enabled, only whitelisted
+     *      addresses can send or receive tokens. Useful for controlling token circulation during
+     *      early phases before public trading.
+     * @param restricted True to enable restrictions, false to allow unrestricted transfers
      */
     function setTransferRestriction(bool restricted) external onlyOwner {
         transfersRestricted = restricted;
@@ -147,9 +180,11 @@ contract EnclaveToken is
     }
 
     /**
-     * @notice Toggle an account's whitelist status.
-     * @dev Only the owner may call this.
-     * @param account Address whose whitelist status should be toggled.
+     * @notice Toggles an account's transfer whitelist status between enabled and disabled
+     * @dev Only callable by the contract owner. Flips the current whitelist state for the given
+     *      account. Whitelisted accounts can send and receive tokens even when transfer restrictions
+     *      are active.
+     * @param account Address whose whitelist status will be toggled
      */
     function toggleTransferWhitelist(address account) external onlyOwner {
         bool newStatus = !transferWhitelisted[account];
@@ -158,10 +193,12 @@ contract EnclaveToken is
     }
 
     /**
-     * @notice Whitelist contracts that are allowed to transfer while restricted.
-     * @dev Convenience function for whitelisting middleware contracts.
-     * @param bondingManager BondingManager contract to whitelist.
-     * @param vestingEscrow VestingEscrow contract to whitelist.
+     * @notice Whitelists key protocol contracts to allow them to transfer tokens during restricted periods
+     * @dev Only callable by the contract owner. Convenience function for whitelisting multiple protocol
+     *      contracts in a single transaction. Zero addresses are safely ignored. Typically used to whitelist
+     *      contracts like bonding managers and vesting escrows that need to handle tokens on behalf of users.
+     * @param bondingManager Address of the BondingManager contract (zero address skipped)
+     * @param vestingEscrow Address of the VestingEscrow contract (zero address skipped)
      */
     function whitelistContracts(
         address bondingManager,
@@ -178,7 +215,13 @@ contract EnclaveToken is
     }
 
     /**
-     * @dev Override ERC20Votes update hook to enforce transfer restrictions.
+     * @notice Internal hook that enforces transfer restrictions and updates voting power
+     * @dev Overrides ERC20 and ERC20Votes to add transfer restriction logic. Reverts if transfers
+     *      are restricted and neither sender nor receiver is whitelisted. Minting (from == 0) and
+     *      burning (to == 0) are always allowed regardless of restrictions.
+     * @param from Address sending tokens (zero address for minting)
+     * @param to Address receiving tokens (zero address for burning)
+     * @param value Amount of tokens being transferred
      */
     function _update(
         address from,
@@ -194,7 +237,10 @@ contract EnclaveToken is
     }
 
     /**
-     * @dev Expose ERC165 interface support via AccessControl.
+     * @notice Checks if this contract implements a given interface
+     * @dev Implements ERC165 interface detection via AccessControl
+     * @param interfaceId The interface identifier to check, as specified in ERC-165
+     * @return bool True if the contract implements the interface, false otherwise
      */
     function supportsInterface(
         bytes4 interfaceId
@@ -203,7 +249,11 @@ contract EnclaveToken is
     }
 
     /**
-     * @dev Expose permit nonces via both ERC20Permit and OpenZeppelin Nonces.
+     * @notice Returns the current nonce for an address, used for permit signatures
+     * @dev Resolves the override conflict between ERC20Permit and Nonces by calling the parent
+     *      implementation. Nonces are incremented with each permit to prevent replay attacks.
+     * @param owner Address to query the nonce for
+     * @return uint256 The current nonce value for the given address
      */
     function nonces(
         address owner

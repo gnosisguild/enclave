@@ -9,21 +9,26 @@ import { IInputValidator } from "./IInputValidator.sol";
 import { IE3Program } from "./IE3Program.sol";
 import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 
-/// @title E3 struct
-/// @notice This struct represents an E3 computation.
-/// @param threshold M/N threshold for the committee.
-/// @param requestBlock Block number when the E3 was requested.
-/// @param startWindow Start window for the computation: index zero is minimum, index 1 is the maxium.
-/// @param duration Duration of the E3.
-/// @param expiration Timestamp when committee duties expire.
-/// @param e3Program Address of the E3 Program contract.
-/// @param e3ProgramParams ABI encoded computation parameters.
-/// @param computeProvider Address of the compute provider contract.
-/// @param inputValidator Address of the input validator contract.
-/// @param decryptionVerifier Address of the output verifier contract.
-/// @param committeeId ID of the selected committee.
-/// @param ciphertextOutput Encrypted output data.
-/// @param plaintextOutput Decrypted output data.
+/**
+ * @title E3
+ * @notice Represents a complete E3 (Encrypted Execution Environment) computation request and its lifecycle
+ * @dev This struct tracks all parameters, state, and results of an encrypted computation
+ *      from request through completion
+ * @param seed Random seed for committee selection and computation initialization
+ * @param threshold M/N threshold for the committee (M required out of N total members)
+ * @param requestBlock Block number when the E3 computation was requested
+ * @param startWindow Start window for the computation: index 0 is minimum block, index 1 is the maximum block
+ * @param duration Duration of the E3 computation in blocks or time units
+ * @param expiration Timestamp when committee duties expire and computation is considered failed
+ * @param encryptionSchemeId Identifier for the encryption scheme used in this computation
+ * @param e3Program Address of the E3 Program contract that validates and verifies the computation
+ * @param e3ProgramParams ABI encoded computation parameters specific to the E3 program
+ * @param inputValidator Address of the input validator contract for input verification
+ * @param decryptionVerifier Address of the output verifier contract for decryption verification
+ * @param committeePublicKey The public key of the selected committee for this computation
+ * @param ciphertextOutput Hash of the encrypted output data produced by the computation
+ * @param plaintextOutput Decrypted output data after committee decryption
+ */
 struct E3 {
     uint256 seed;
     uint32[2] threshold;
