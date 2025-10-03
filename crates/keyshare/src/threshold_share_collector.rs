@@ -16,14 +16,14 @@ pub enum CollectorState {
     Finished,
 }
 
-pub struct DecryptionKeyCollector {
+pub struct ThresholdShareCollector {
     todo: HashSet<PartyId>,
     parent: Addr<ThresholdKeyshare>,
     state: CollectorState,
     shares: HashMap<PartyId, Arc<ThresholdShare>>,
 }
 
-impl DecryptionKeyCollector {
+impl ThresholdShareCollector {
     pub fn setup(parent: Addr<ThresholdKeyshare>, total: u64) -> Addr<Self> {
         let addr = Self {
             todo: (0..total).collect(),
@@ -36,22 +36,22 @@ impl DecryptionKeyCollector {
     }
 }
 
-impl Actor for DecryptionKeyCollector {
+impl Actor for ThresholdShareCollector {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<ThresholdShareCreated> for DecryptionKeyCollector {
+impl Handler<ThresholdShareCreated> for ThresholdShareCollector {
     type Result = ();
     fn handle(&mut self, msg: ThresholdShareCreated, _: &mut Self::Context) -> Self::Result {
         let start = Instant::now();
-        info!("DecryptionKeyCollector: ThresholdShareCreated received by collector");
+        info!("ThresholdShareCollector: ThresholdShareCreated received by collector");
         if let CollectorState::Finished = self.state {
-            info!("DecryptionKeyCollector is finished so ignoring!");
+            info!("ThresholdShareCollector is finished so ignoring!");
             return;
         };
 
         let pid = msg.share.party_id;
-        info!("DecryptionKeyCollector party id: {}", pid);
+        info!("ThresholdShareCollector party id: {}", pid);
         let Some(_) = self.todo.take(&pid) else {
             info!(
                 "Error: {} was not in decryption key collectors ID list",

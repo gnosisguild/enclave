@@ -36,7 +36,7 @@ use std::{
 };
 use tracing::{error, info};
 
-use crate::decryption_key_collector::DecryptionKeyCollector;
+use crate::threshold_share_collector::ThresholdShareCollector;
 
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "Result<()>")]
@@ -278,7 +278,7 @@ pub struct ThresholdKeyshareParams {
 pub struct ThresholdKeyshare {
     bus: Addr<EventBus<EnclaveEvent>>,
     cipher: Arc<Cipher>,
-    decryption_key_collector: Option<Addr<DecryptionKeyCollector>>,
+    decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     multithread: Addr<Multithread>,
     state: Persistable<ThresholdKeyshareState>,
 }
@@ -303,7 +303,7 @@ impl ThresholdKeyshare {
     pub fn ensure_collector(
         &mut self,
         self_addr: Addr<Self>,
-    ) -> Result<Addr<DecryptionKeyCollector>> {
+    ) -> Result<Addr<ThresholdShareCollector>> {
         let Some(state) = self.state.get() else {
             bail!("State not found on threshold keyshare. This should not happen.");
         };
@@ -314,7 +314,7 @@ impl ThresholdKeyshare {
         );
         let addr = self
             .decryption_key_collector
-            .get_or_insert_with(|| DecryptionKeyCollector::setup(self_addr, state.threshold_n));
+            .get_or_insert_with(|| ThresholdShareCollector::setup(self_addr, state.threshold_n));
         Ok(addr.clone())
     }
 
@@ -547,7 +547,8 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// 5. AllThresholdSharesCollected
+    /// 5. AllThresholdSharesCollected. This is fired after the ThresholdShareCreated events are
+    ///    aggregateed in the decryption_key_collector::ThresholdShareCollector
     pub fn handle_all_threshold_shares_collected(
         &self,
         msg: AllThresholdSharesCollected,
