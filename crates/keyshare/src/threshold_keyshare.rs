@@ -349,7 +349,8 @@ impl ThresholdKeyshare {
             ))
         })?;
 
-        address.do_send(GenEsiSss(msg));
+        address.do_send(GenEsiSss(msg.clone()));
+        address.do_send(GenPkShareAndSkSss(msg));
         Ok(())
     }
 
@@ -386,12 +387,7 @@ impl ThresholdKeyshare {
     }
 
     /// 2a. GenEsiSss result
-    pub fn handle_gen_esi_sss_response(
-        &mut self,
-        res: ComputeResponse,
-        ciphernode_selected_event: CiphernodeSelected,
-        address: Addr<Self>,
-    ) -> Result<()> {
+    pub fn handle_gen_esi_sss_response(&mut self, res: ComputeResponse) -> Result<()> {
         let output: GenEsiSssResponse = res.try_into()?;
 
         let esi_sss = output.esi_sss;
@@ -433,7 +429,6 @@ impl ThresholdKeyshare {
         {
             self.handle_shares_generated()?;
         }
-        address.do_send(GenPkShareAndSkSss(ciphernode_selected_event));
         Ok(())
     }
 
@@ -731,7 +726,10 @@ impl ThresholdKeyshare {
         R: FnOnce(&mut Self, ComputeResponse, &mut <Self as Actor>::Context) -> Result<()>
             + 'static,
     {
+        // When handling futures in actix you need a pinned box
+        // This is so that the future stays in the same spot in memory
         Box::pin(
+            // Run the request function and print if there is an error
             match request_fn(self) {
                 Ok(evt) => self.multithread.send(evt),
                 Err(e) => {
@@ -741,6 +739,7 @@ impl ThresholdKeyshare {
             }
             .into_actor(self)
             .map(move |res, act, ctx| {
+                // Run the response function and print if there is an error
                 match (|| -> Result<()> { response_fn(act, res??, ctx) })() {
                     Ok(_) => (),
                     Err(e) => error!("{e}"),
@@ -778,12 +777,9 @@ impl Handler<CiphernodeSelected> for ThresholdKeyshare {
 impl Handler<GenEsiSss> for ThresholdKeyshare {
     type Result = ResponseActFuture<Self, ()>;
     fn handle(&mut self, msg: GenEsiSss, _: &mut Self::Context) -> Self::Result {
-        let ciphernode_selected_event = msg.0.clone();
         self.handle_compute_request(
             |act| act.handle_gen_esi_sss_requested(msg),
-            |act, res, ctx| {
-                act.handle_gen_esi_sss_response(res, ciphernode_selected_event, ctx.address())
-            },
+            |act, res, _| act.handle_gen_esi_sss_response(res),
         )
     }
 }
