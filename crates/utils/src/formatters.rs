@@ -23,7 +23,7 @@ pub fn hexf(data: &[u8], f: &mut fmt::Formatter) -> fmt::Result {
 }
 
 /// truncate a string
-fn truncate(s: String) -> String {
+pub fn truncate(s: String) -> String {
     let threshold = 100; // will leave it
     let limit = 50;
     let cutoff = limit / 2;

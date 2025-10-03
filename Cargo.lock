@@ -2836,12 +2836,14 @@ dependencies = [
  "e3-data",
  "e3-events",
  "e3-request",
+ "e3-trbfv",
  "fhe",
  "fhe-traits",
  "fhe-util",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "serde",
+ "tracing",
 ]
 
 [[package]]

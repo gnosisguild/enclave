@@ -12,13 +12,14 @@ use e3_events::{
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
+use e3_trbfv::helpers::hash_bytes;
 use std::sync::Arc;
 use tracing::{error, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
     Collecting {
-        threshold_m: usize,
+        threshold_n: usize,
         keyshares: OrderedSet<Vec<u8>>,
         seed: Seed,
     },
@@ -32,9 +33,9 @@ pub enum PublicKeyAggregatorState {
 }
 
 impl PublicKeyAggregatorState {
-    pub fn init(threshold_m: usize, seed: Seed) -> Self {
+    pub fn init(threshold_n: usize, seed: Seed) -> Self {
         PublicKeyAggregatorState::Collecting {
-            threshold_m,
+            threshold_n,
             keyshares: OrderedSet::new(),
             seed,
         }
@@ -93,15 +94,21 @@ impl PublicKeyAggregator {
     pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<()> {
         self.state.try_mutate(|mut state| {
             let PublicKeyAggregatorState::Collecting {
-                threshold_m,
+                threshold_n,
                 keyshares,
                 ..
             } = &mut state
             else {
                 return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
             };
+
             keyshares.insert(keyshare);
-            if keyshares.len() == *threshold_m {
+            println!("SEED: added keyshare len = {}", keyshares.len());
+            if keyshares.len() == *threshold_n {
+                println!(
+                    "SEED: COMPUTING! keyshares.len == threshold_n == {}",
+                    threshold_n
+                );
                 return Ok(PublicKeyAggregatorState::Computing {
                     keyshares: keyshares.clone(),
                 });
@@ -147,14 +154,14 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
     fn handle(&mut self, event: KeyshareCreated, _: &mut Self::Context) -> Self::Result {
         let Some(PublicKeyAggregatorState::Collecting {
-            threshold_m, seed, ..
+            threshold_n, seed, ..
         }) = self.state.get()
         else {
             error!(state=?self.state, "Aggregator has been closed for collecting keyshares.");
             return Box::pin(fut::ready(Ok(())));
         };
 
-        let size = threshold_m;
+        let size = threshold_n;
         let address = event.node;
         let chain_id = event.e3_id.chain_id();
         let e3_id = event.e3_id.clone();
@@ -209,6 +216,7 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
         let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
             keyshares: msg.keyshares.clone(),
         })?;
+        println!("pubkey before NotifyNetwork:      {}", hash_bytes(&pubkey));
 
         // Update the local state
         self.set_pubkey(pubkey.clone())?;
@@ -232,8 +240,15 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                 .into_actor(self)
                 .map(move |res, act, _| {
                     let nodes = res?;
+
+                    let pubkey = msg.pubkey.clone();
+
+                    println!(
+                        "pubkey before PublicKeyAggregated:      {}",
+                        hash_bytes(&pubkey)
+                    );
                     let event = EnclaveEvent::from(PublicKeyAggregated {
-                        pubkey: msg.pubkey.clone(),
+                        pubkey,
                         e3_id: msg.e3_id.clone(),
                         nodes: OrderedSet::from(nodes),
                     });

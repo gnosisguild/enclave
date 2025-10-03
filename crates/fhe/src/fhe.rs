@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
 use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
+use e3_trbfv::helpers::{hash_bytes, print_public_key_share};
 use fhe::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
@@ -102,11 +103,29 @@ impl Fhe {
     }
 
     pub fn get_aggregate_public_key(&self, msg: GetAggregatePublicKey) -> Result<Vec<u8>> {
+        println!("$$$$$$");
+        println!(
+            "$$$$$$   moduli: 
+            {:?}",
+            self.params.moduli()
+        );
+        println!("$$$$$$   degree: {:?}", self.params.degree());
+        println!("$$$$$$   plaintext: {:?}", self.params.plaintext());
+        println!("$$$$$$");
+        let vec = msg
+            .keyshares
+            .iter()
+            .map(|k| PublicKeyShare::deserialize(k, &self.params, self.crp.clone()).context(""))
+            .collect::<Result<Vec<PublicKeyShare>>>()?;
+        println!("in aggregator keyshares");
+        vec.iter().for_each(|s| print_public_key_share("->", s));
+
         let public_key: PublicKey = msg
             .keyshares
             .iter()
             .map(|k| PublicKeyShare::deserialize(k, &self.params, self.crp.clone()))
             .aggregate()?;
+        println!("pubkey:      {}", hash_bytes(&public_key.to_bytes()));
 
         Ok(public_key.to_bytes())
     }

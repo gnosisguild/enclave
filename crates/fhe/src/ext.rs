@@ -12,6 +12,7 @@ use e3_data::{FromSnapshotWithParams, RepositoriesFactory, Snapshot};
 use e3_events::{BusError, E3Requested, EnclaveErrorType, EnclaveEvent, EventBus};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, TypedKey};
 use std::sync::Arc;
+use tracing::info;
 
 pub const FHE_KEY: TypedKey<Arc<Fhe>> = TypedKey::new("fhe");
 
@@ -46,7 +47,7 @@ impl E3Extension for FheExtension {
             e3_id,
             ..
         } = data.clone();
-
+        info!("SEED: {}", seed);
         let Ok(fhe_inner) = Fhe::from_encoded(&params, seed, self.rng.clone()) else {
             self.bus.err(
                 EnclaveErrorType::KeyGeneration,

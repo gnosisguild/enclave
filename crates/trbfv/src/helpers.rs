@@ -9,6 +9,7 @@ use crate::shares::ShamirShareArrayExt;
 use crate::shares::SharedSecret;
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
+use fhe::mbfv::PublicKeyShare;
 use fhe::{
     bfv::{self, BfvParameters},
     trbfv::{SmudgingBoundCalculator, SmudgingBoundCalculatorConfig},
@@ -67,6 +68,10 @@ pub fn print_shared_secret(name: &str, secret: &SharedSecret) {
     println!("{}", stringify_shared_secret(name, secret));
 }
 
+pub fn print_public_key_share(name: &str, pubkey: &PublicKeyShare) {
+    println!("{}", stringify_public_key_share(name, pubkey));
+}
+
 pub fn print_shamir_share(name: &str, share: &ShamirShare) {
     println!("ShamirShare({})", stringify_shamir_share(name, share));
 }
@@ -96,7 +101,7 @@ fn hash_to_petname(hash: u64) -> String {
     format!("{}-{}", adjectives[adj_idx], nouns[noun_idx])
 }
 
-fn hash_to_colored_petname(hash: u64) -> String {
+pub fn hash_to_colored_petname(hash: u64) -> String {
     let petname = hash_to_petname(hash);
     format!("{}  {}  {}", hash_to_bg_color(hash), petname, reset_color())
 }
@@ -105,7 +110,7 @@ fn hash_poly(poly: &Poly) -> u64 {
     hash_bytes(&poly.to_bytes())
 }
 
-fn hash_bytes(data: &[u8]) -> u64 {
+pub fn hash_bytes(data: &[u8]) -> u64 {
     let mut hasher = DefaultHasher::new();
     data.hash(&mut hasher);
     hasher.finish()
@@ -116,6 +121,14 @@ fn stringify_shamir_share(name: &str, share: &ShamirShare) -> String {
         "{}{}",
         name,
         hash_to_colored_petname(hash_share(share).unwrap())
+    )
+}
+
+fn stringify_public_key_share(name: &str, share: &PublicKeyShare) -> String {
+    format!(
+        "{}{}",
+        name,
+        hash_to_colored_petname(hash_pubkey_share(share).unwrap())
     )
 }
 
@@ -136,6 +149,11 @@ fn hash_shared_secret(secret: &SharedSecret) -> Result<u64> {
 
 fn hash_share(share: &ShamirShare) -> Result<u64> {
     let bytes = bincode::serialize(share)?;
+    Ok(hash_bytes(&bytes))
+}
+
+fn hash_pubkey_share(share: &PublicKeyShare) -> Result<u64> {
+    let bytes = share.to_bytes();
     Ok(hash_bytes(&bytes))
 }
 
