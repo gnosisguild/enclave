@@ -12,7 +12,6 @@ use e3_events::{
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
-use e3_trbfv::helpers::hash_bytes;
 use std::sync::Arc;
 use tracing::{error, trace};
 
@@ -103,12 +102,7 @@ impl PublicKeyAggregator {
             };
 
             keyshares.insert(keyshare);
-            println!("SEED: added keyshare len = {}", keyshares.len());
             if keyshares.len() == *threshold_n {
-                println!(
-                    "SEED: COMPUTING! keyshares.len == threshold_n == {}",
-                    threshold_n
-                );
                 return Ok(PublicKeyAggregatorState::Computing {
                     keyshares: keyshares.clone(),
                 });
@@ -216,7 +210,6 @@ impl Handler<ComputeAggregate> for PublicKeyAggregator {
         let pubkey = self.fhe.get_aggregate_public_key(GetAggregatePublicKey {
             keyshares: msg.keyshares.clone(),
         })?;
-        println!("pubkey before NotifyNetwork:      {}", hash_bytes(&pubkey));
 
         // Update the local state
         self.set_pubkey(pubkey.clone())?;
@@ -243,10 +236,6 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
 
                     let pubkey = msg.pubkey.clone();
 
-                    println!(
-                        "pubkey before PublicKeyAggregated:      {}",
-                        hash_bytes(&pubkey)
-                    );
                     let event = EnclaveEvent::from(PublicKeyAggregated {
                         pubkey,
                         e3_id: msg.e3_id.clone(),

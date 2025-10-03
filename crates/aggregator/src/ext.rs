@@ -181,7 +181,6 @@ impl E3Extension for PublicKeyAggregatorExtension {
             );
             return;
         };
-        println!("{:?}", meta);
         let e3_id = data.e3_id.clone();
         let repo = ctx.repositories().publickey(&e3_id);
         let sync_state = repo.send(Some(PublicKeyAggregatorState::init(

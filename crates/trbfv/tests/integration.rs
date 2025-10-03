@@ -166,10 +166,3 @@ async fn test_trbfv_isolation() -> Result<()> {
     }
     Ok(())
 }
-// sleep(Duration::from_millis(3000)).await;
-//
-// let rest = nodes.get_history(1).await?;
-//
-// println!("rest {:?}", rest.event_types());
-
-// TMP using this to get a hash for the poly for tracing
