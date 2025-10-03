@@ -467,12 +467,10 @@ impl ThresholdKeyshare {
 
     /// 3a. GenPkShareAndSkSss
     pub fn handle_gen_pk_share_and_sk_sss_response(&mut self, res: ComputeResponse) -> Result<()> {
-        info!("\nRECEIVED GEN PK SHARE AND SK SSS");
         let ComputeResponse::TrBFV(TrBFVResponse::GenPkShareAndSkSss(output)) = res else {
             bail!("Error extracting data from compute process")
         };
 
-        info!("\nSTORING GEN PK SHARE AND SK SSS...");
         let (pk_share, sk_sss) = (output.pk_share, output.sk_sss);
 
         self.state.try_mutate(|s| {
@@ -533,7 +531,6 @@ impl ThresholdKeyshare {
             .map(|s| PvwEncrypted::new(s.decrypt(&self.cipher)?))
             .collect::<Result<_>>()?;
 
-        info!(">>>> THRESHOLD SHARE ABOUT TO BE CREATED FOR {}!", party_id);
         self.bus.do_send(EnclaveEvent::from(ThresholdShareCreated {
             e3_id,
             share: Arc::new(ThresholdShare {
@@ -554,11 +551,8 @@ impl ThresholdKeyshare {
         msg: AllThresholdSharesCollected,
     ) -> Result<ComputeRequest> {
         info!("AllThresholdSharesCollected");
-
         let cipher = self.cipher.clone();
-        let Some(state) = self.state.get() else {
-            bail!("No state found");
-        };
+        let state = self.state.get().ok_or(anyhow!("No state found"))?;
         let party_id = state.party_id as usize;
         let trbfv_config = state.get_trbfv_config();
 
@@ -616,8 +610,6 @@ impl ThresholdKeyshare {
             bail!("Error extracting data from compute process")
         };
 
-        info!("\nSTORING DECRYPTION KEY...");
-
         let (sk_poly_sum, es_poly_sum) = (output.sk_poly_sum, output.es_poly_sum);
 
         self.state.try_mutate(|s| {
@@ -637,7 +629,7 @@ impl ThresholdKeyshare {
             s.new_state(next)
         })?;
 
-        let state = self.state.get().ok_or(anyhow!("state not set"))?;
+        let state = self.state.get().ok_or(anyhow!("No state found"))?;
         let e3_id = state.get_e3_id().clone();
         let address = state.get_address().to_owned();
         let current: ReadyForDecryption = state.clone().try_into()?;
@@ -660,7 +652,6 @@ impl ThresholdKeyshare {
         self.state.try_mutate(|s| {
             use KeyshareState as K;
 
-            info!("TRY STORE ESI");
             let current: ReadyForDecryption = s.clone().try_into()?;
 
             let next = K::Decrypting(Decrypting {
@@ -673,7 +664,7 @@ impl ThresholdKeyshare {
         })?;
 
         let ciphertext_output = msg.ciphertext_output;
-        let state = self.state.get().ok_or(anyhow!("State not set."))?;
+        let state = self.state.get().ok_or(anyhow!("No state found"))?;
         let decrypting: Decrypting = state.clone().try_into()?;
         let trbfv_config = state.get_trbfv_config();
         let event = ComputeRequest::TrBFV(TrBFVRequest::CalculateDecryptionShare(
@@ -696,7 +687,7 @@ impl ThresholdKeyshare {
         res: ComputeResponse,
     ) -> Result<()> {
         let msg: CalculateDecryptionShareResponse = res.try_into()?;
-        let state = self.state.get().ok_or(anyhow!("Failed to get state"))?;
+        let state = self.state.get().ok_or(anyhow!("No state found"))?;
         let party_id = state.party_id;
         let node = state.address;
         let e3_id = state.e3_id;
