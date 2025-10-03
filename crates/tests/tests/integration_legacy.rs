@@ -64,46 +64,6 @@ async fn setup_local_ciphernode(
     let node = builder.build().await?;
 
     Ok(node)
-    // // create data actor for saving data
-    // let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-    // // Pipe all source events to the local bus
-    // let history = EventBus::<EnclaveEvent>::history(&local_bus);
-    // let errors = EventBus::<EnclaveEvent>::error(&local_bus);
-    // EventBus::pipe(bus, &local_bus);
-    // let data_actor = data.unwrap_or_else(|| InMemStore::new(logging).start());
-    // let store = DataStore::from(&data_actor);
-    // let repositories = store.repositories();
-    //
-    // // create ciphernode actor for managing ciphernode flow
-    // let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
-    // CiphernodeSelector::attach(&local_bus, &sortition, addr);
-    //
-    // E3Router::builder(&local_bus, store)
-    //     .with(FheExtension::create(&local_bus, &rng))
-    //     .with(PublicKeyAggregatorExtension::create(&local_bus, &sortition))
-    //     .with(PlaintextAggregatorExtension::create(&local_bus, &sortition))
-    //     .with(KeyshareExtension::create(&local_bus, addr, &cipher))
-    //     .build()
-    //     .await?;
-    //
-    // SimpleLogger::<EnclaveEvent>::attach(addr, local_bus.clone());
-    // // Ok((
-    // //     addr.to_owned(),
-    // //     data_actor.clone(),
-    // //     sortition,
-    // //     router,
-    // //     logger,
-    // //     local_bus,
-    // //     history,
-    // //     error,
-    // // ))
-    // Ok(CiphernodeSimulated {
-    //     bus: local_bus,
-    //     history,
-    //     store: data_actor.clone(),
-    //     address: addr.to_owned(),
-    //     errors,
-    // })
 }
 
 fn generate_pk_share(
@@ -164,7 +124,6 @@ async fn add_ciphernodes(
 
 // Type for our tests to test against
 type PkSkShareTuple = (PublicKeyShare, SecretKey, String);
-// type DecryptionShareTuple = (Vec<u8>, String);
 
 fn aggregate_public_key(shares: &Vec<PkSkShareTuple>) -> Result<PublicKey> {
     Ok(shares
@@ -173,50 +132,6 @@ fn aggregate_public_key(shares: &Vec<PkSkShareTuple>) -> Result<PublicKey> {
         .map(|(pk, _, _)| pk)
         .aggregate()?)
 }
-
-// fn to_decryption_shares(
-//     shares: &Vec<PkSkShareTuple>,
-//     ciphertext: &Arc<Ciphertext>,
-//     rng: &SharedRng,
-// ) -> Result<Vec<DecryptionShareTuple>> {
-//     let mut results = vec![];
-//     for (_, sk, addr) in shares {
-//         results.push((
-//             DecryptionShare::new(&sk, &ciphertext, &mut *rng.lock().unwrap())?.to_bytes(),
-//             addr.to_owned(),
-//         ));
-//     }
-//
-//     Ok(results)
-// }
-//
-// /// Helper to create keyshare events from eth addresses and generated shares
-// fn to_keyshare_events(shares: &Vec<PkSkShareTuple>, e3_id: &E3id) -> Vec<EnclaveEvent> {
-//     let mut result = Vec::new();
-//     for i in 0..shares.len() {
-//         result.push(EnclaveEvent::from(KeyshareCreated {
-//             pubkey: shares[i].0.to_bytes(),
-//             e3_id: e3_id.clone(),
-//             node: shares[i].2.clone(),
-//         }));
-//     }
-//     result
-// }
-
-// fn to_decryptionshare_events(
-//     decryption_shares: &Vec<DecryptionShareTuple>,
-//     e3_id: &E3id,
-// ) -> Vec<EnclaveEvent> {
-//     let mut result = Vec::new();
-//     for i in 0..decryption_shares.len() {
-//         result.push(EnclaveEvent::from(DecryptionshareCreated {
-//             decryption_share: decryption_shares[i].0.clone(),
-//             e3_id: e3_id.clone(),
-//             node: decryption_shares[i].1.clone(),
-//         }));
-//     }
-//     result
-// }
 
 #[actix::test]
 async fn test_public_key_aggregation_and_decryption() -> Result<()> {

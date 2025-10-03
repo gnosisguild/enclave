@@ -113,9 +113,6 @@ pub fn calculate_decryption_key(
 
     let req: InnerRequest = (cipher, req).try_into()?;
 
-    print_shamir_share_vec("# sk_sss_collected", req.sk_sss_collected.clone());
-    print_shamir_share_vec_vec("# esi_sss_collected", req.esi_sss_collected.clone());
-
     let params = req.trbfv_config.params();
     let threshold = req.trbfv_config.threshold() as usize;
     let num_ciphernodes = req.trbfv_config.num_parties() as usize;

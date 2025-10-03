@@ -6,7 +6,6 @@
 
 use std::sync::Arc;
 
-use crate::helpers::print_poly;
 /// This module defines event payloads that will dcrypt a ciphertext with a threshold quorum of decryption shares
 use crate::{helpers::try_poly_from_bytes, PartyId, TrBFVConfig};
 use anyhow::*;
@@ -139,13 +138,6 @@ pub fn calculate_threshold_decryption(
     // NOTE: party_ids must be 1 based not 0 based
     let reconstructing_parties: Vec<usize> =
         req.reconstructing_parties.iter().map(|n| n + 1).collect();
-
-    info!("Decryption share party_ids: {:?}", reconstructing_parties);
-    println!(">> d_share_polys:");
-    d_share_polys.iter().enumerate().for_each(|(i, pols)| {
-        println!("   Row {}:", i);
-        pols.iter().for_each(|pol| print_poly("    ->", pol))
-    });
 
     let plaintext = req
         .ciphertexts

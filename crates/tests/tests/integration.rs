@@ -9,7 +9,7 @@ use anyhow::{bail, Context, Result};
 use e3_crypto::Cipher;
 use e3_events::{
     CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus, EventBusConfig,
-    PlaintextAggregated, ThresholdShare,
+    PlaintextAggregated,
 };
 use e3_multithread::Multithread;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
@@ -17,10 +17,9 @@ use e3_test_helpers::ciphernode_builder::CiphernodeBuilder;
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
 use e3_test_helpers::{
     create_crp_from_seed, create_seed_from_u64, create_shared_rng_from_u64, rand_eth_addr,
-    usecase_helpers, AddToCommittee,
+    AddToCommittee,
 };
 use e3_trbfv::helpers::{calculate_error_size, hash_bytes, print_public_key_share};
-use e3_trbfv::TrBFVConfig;
 use e3_utils::utility_types::ArcBytes;
 use fhe::bfv::PublicKey;
 use fhe::mbfv::{AggregateIter, PublicKeyShare};
@@ -28,7 +27,6 @@ use fhe_traits::{DeserializeParametrized, Serialize};
 use num_bigint::BigUint;
 use std::time::Duration;
 use std::{fs, sync::Arc};
-use tracing::info;
 
 pub fn save_snapshot(file_name: &str, bytes: &[u8]) {
     println!("### WRITING SNAPSHOT TO `{file_name}` ###");
@@ -64,9 +62,6 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Create rng
     let rng = create_shared_rng_from_u64(42);
-
-    // Create test rng for testing
-    let test_rng = create_shared_rng_from_u64(42);
 
     // Create "trigger" bus
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
@@ -163,8 +158,6 @@ async fn test_trbfv_actor() -> Result<()> {
 
     // Prepare round
 
-    // Calculate Error Size for E3Program (this will be done by the E3Program implementor)
-
     // Trigger actor DKG
     let e3_id = E3id::new("0", 1);
 
@@ -177,8 +170,6 @@ async fn test_trbfv_actor() -> Result<()> {
         esi_per_ct: esi_per_ct as usize,
         params,
     };
-
-    let test_crp = create_crp_from_seed(&params_raw, &seed)?;
 
     let event = EnclaveEvent::from(e3_requested);
 
@@ -207,39 +198,6 @@ async fn test_trbfv_actor() -> Result<()> {
 
     assert_eq!(h.event_types(), expected);
 
-    // let threshold_events: Vec<Arc<ThresholdShare>> = h
-    //     .iter()
-    //     .cloned()
-    //     .filter_map(|e| match e {
-    //         EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.share),
-    //         _ => None,
-    //     })
-    //     .collect();
-
-    let keyshares: Vec<PublicKeyShare> = h
-        .iter()
-        .cloned()
-        .filter_map(|e| match e {
-            EnclaveEvent::KeyshareCreated { data, .. } => Some(data.pubkey),
-            _ => None,
-        })
-        .map(|data| PublicKeyShare::deserialize(&data, &params_raw, test_crp.clone()).context(""))
-        .collect::<Result<Vec<PublicKeyShare>>>()?;
-
-    println!("in test keyshares: \n");
-    keyshares
-        .iter()
-        .for_each(|s| print_public_key_share("->", s));
-
-    let test_pubkey: PublicKey = keyshares.iter().cloned().aggregate()?;
-    // println!(
-    //     "{:?}",
-    //     threshold_events
-    //         .iter()
-    //         .map(|d| d.party_id)
-    //         .collect::<Vec<u64>>()
-    // );
-    //
     // Aggregate decryption
 
     // First we get the public key
@@ -253,22 +211,7 @@ async fn test_trbfv_actor() -> Result<()> {
 
     let pubkey_bytes = pubkey_event.pubkey.clone();
 
-    println!("$$$$$$");
-    println!(
-        "$$$$$$   moduli: 
-            {:?}",
-        params_raw.moduli()
-    );
-    println!("$$$$$$   degree: {:?}", params_raw.degree());
-    println!("$$$$$$   plaintext: {:?}", params_raw.plaintext());
-    println!("$$$$$$");
-
     let pubkey = PublicKey::from_bytes(&pubkey_bytes, &params_raw)?;
-
-    println!("test_pubkey: {}", hash_bytes(&test_pubkey.to_bytes()));
-    println!("pubkey_bytes: {}", hash_bytes(&pubkey_bytes));
-
-    // assert_eq!(pubkey, test_pubkey, "Pubkeys were not equal");
 
     println!("Generating inputs this takes some time...");
 

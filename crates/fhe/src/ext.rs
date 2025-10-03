@@ -47,7 +47,7 @@ impl E3Extension for FheExtension {
             e3_id,
             ..
         } = data.clone();
-        info!("SEED: {}", seed);
+
         let Ok(fhe_inner) = Fhe::from_encoded(&params, seed, self.rng.clone()) else {
             self.bus.err(
                 EnclaveErrorType::KeyGeneration,

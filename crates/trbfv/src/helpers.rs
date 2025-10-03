@@ -60,13 +60,13 @@ pub fn stringify_poly(name: &str, poly: &Poly) -> String {
     format!("{}=Poly({})", name, hash_to_petname(hash_poly(poly)))
 }
 
-pub fn print_poly(name: &str, poly: &Poly) {
-    println!("{}", stringify_poly(name, poly));
-}
+// pub fn print_poly(name: &str, poly: &Poly) {
+//     println!("{}", stringify_poly(name, poly));
+// }
 
-pub fn print_shared_secret(name: &str, secret: &SharedSecret) {
-    println!("{}", stringify_shared_secret(name, secret));
-}
+// pub fn print_shared_secret(name: &str, secret: &SharedSecret) {
+//     println!("{}", stringify_shared_secret(name, secret));
+// }
 
 pub fn print_public_key_share(name: &str, pubkey: &PublicKeyShare) {
     println!("{}", stringify_public_key_share(name, pubkey));

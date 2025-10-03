@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    helpers::print_shared_secret,
     shares::{Encrypted, SharedSecret},
     SharedRng, TrBFVConfig,
 };
@@ -104,10 +103,6 @@ pub fn gen_esi_sss(
         .collect::<Result<_>>()?;
 
     info!("gen_esi_sss:returning...");
-
-    // temp debugging
-    println!("gen_esi_sss:");
-    esi_sss.iter().for_each(|s| print_shared_secret(" >>", s));
 
     (InnerResponse { esi_sss }, cipher).try_into()
 }
