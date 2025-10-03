@@ -104,7 +104,7 @@ impl BitqueryClient {
     ) -> Result<Vec<TokenHolder>, Box<dyn std::error::Error>> {
         let network = Self::get_network_name(chain_id)?;
 
-        // Build GraphQL query to fetch token holders with non-zero balances
+        // Build GraphQL query to fetch token holders.
         let query = format!(
             r#"
             {{
@@ -113,14 +113,14 @@ impl BitqueryClient {
                         where: {{
                             Block: {{ Number: {{ le: "{}" }} }}
                             Currency: {{ SmartContract: {{ is: "{}" }} }}
-                            BalanceUpdate: {{ Amount: {{ gt: "0" }} }}
                         }}
+                        orderBy: {{ descendingByField: "Balance" }}
                         limit: {{ count: {} }}
                     ) {{
                         BalanceUpdate {{
                             Address
                         }}
-                        Balance: sum(of: BalanceUpdate_Amount, selectWhere: {{ gt: "0" }})
+                        Balance: sum(of: BalanceUpdate_Amount)
                     }}
                 }}
             }}
@@ -154,6 +154,11 @@ impl BitqueryClient {
             .map(|update| TokenHolder {
                 address: update.balance_update.address.clone(),
                 balance: update.balance.clone(),
+            })
+            .filter(|h| {
+                h.balance
+                    .parse::<bigdecimal::BigDecimal>()
+                    .map_or(false, |b| b > 0.into())
             })
             .collect();
 

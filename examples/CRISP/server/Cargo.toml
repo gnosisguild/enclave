@@ -54,6 +54,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 # Utility libraries
+bigdecimal = "=0.4.3"
 chrono = "=0.4.41"
 eyre = "=0.6.12"
 hex = "=0.4.3"
