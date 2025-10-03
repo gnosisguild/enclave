@@ -72,7 +72,8 @@ pub async fn register_e3_requested(
                             &token_address.to_string(),
                             event.e3.requestBlock.to::<u64>(),
                             CONFIG.chain_id,
-                            100,
+                            10000, // TODO: this is fine for now, but we need pagination or chunking strategies
+                            // to retrieve large datasets efficiently.
                         )
                         .await
                         .map_err(|e| eyre::eyre!("Bitquery error: {}", e))?
