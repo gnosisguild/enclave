@@ -42,8 +42,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const enclaveAddress = await enclave.getAddress();
 
-  console.log("Enclave deployed to: ", enclaveAddress);
-
   const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
     enclaveAddress: enclaveAddress,
     owner: ownerAddress,
@@ -52,8 +50,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
 
-  console.log("CiphernodeRegistry deployed to: ", ciphernodeRegistryAddress);
-
   const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
     ciphernodeRegistryAddress: ciphernodeRegistryAddress,
     owner: ownerAddress,
@@ -61,8 +57,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
   });
 
   const naiveRegistryFilterAddress = await naiveRegistryFilter.getAddress();
-
-  console.log("NaiveRegistryFilter deployed to: ", naiveRegistryFilterAddress);
 
   const registryAddress = await enclave.ciphernodeRegistry();
 
@@ -74,6 +68,14 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
     console.log(`Enclave contract updated with registry`);
   }
+
+  console.log(`
+        Deployments:
+        ----------------------------------------------------------------------
+        Enclave: ${enclaveAddress}
+        CiphernodeRegistry: ${ciphernodeRegistryAddress}
+        NaiveRegistryFilter: ${naiveRegistryFilterAddress}
+        `);
 
   // Deploy mocks only if specified
   const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
