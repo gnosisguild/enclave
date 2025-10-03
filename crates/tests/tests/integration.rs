@@ -15,6 +15,7 @@ use e3_multithread::Multithread;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
 use e3_test_helpers::ciphernode_builder::CiphernodeBuilder;
 use e3_test_helpers::ciphernode_system::CiphernodeSystemBuilder;
+use e3_test_helpers::reporters::SizeReporter;
 use e3_test_helpers::{
     create_crp_from_seed, create_seed_from_u64, create_shared_rng_from_u64, rand_eth_addr,
     usecase_helpers, AddToCommittee,
@@ -165,6 +166,7 @@ async fn test_trbfv_actor() -> Result<()> {
         &test_crp,
         &test_rng,
         &cipher,
+        &mut SizeReporter::new(), // dont really need this
     )?;
 
     let test_pubkey =

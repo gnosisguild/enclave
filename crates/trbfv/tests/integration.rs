@@ -6,13 +6,17 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result};
+use bytesize::ByteSize;
 use e3_bfv_helpers::{build_bfv_params_arc, encode_bfv_params};
 use e3_crypto::Cipher;
 use e3_fhe::create_crp;
-use e3_test_helpers::{create_seed_from_u64, create_shared_rng_from_u64, usecase_helpers};
+use e3_test_helpers::{
+    create_seed_from_u64, create_shared_rng_from_u64, reporters::SizeReporter, usecase_helpers,
+};
 use e3_trbfv::{
     calculate_decryption_share::{
         calculate_decryption_share, CalculateDecryptionShareRequest,
@@ -33,6 +37,9 @@ use rand_chacha::ChaCha20Rng;
 
 #[tokio::test]
 async fn test_trbfv_isolation() -> Result<()> {
+    let start = Instant::now();
+    let mut reporter = SizeReporter::new();
+
     use tracing_subscriber::{fmt, EnvFilter};
 
     let subscriber = fmt()
@@ -45,38 +52,40 @@ async fn test_trbfv_isolation() -> Result<()> {
 
     let (degree, plaintext_modulus, moduli) = (
         8192usize,
-        16384u64,
+        1000u64,
         &[
-            0x1FFFFFFEA0001u64, // 562949951979521
-            0x1FFFFFFE88001u64, // 562949951881217
-            0x1FFFFFFE48001u64, // 562949951619073
-            0xfffffebc001u64,   //
-        ] as &[u64],
+            36028797055270913u64,
+            36028797054222337u64,
+            36028797053698049u64,
+            36028797051863041u64,
+        ],
     );
+
+    // BFV result: BfvParameters { polynomial_degree: 8192, plaintext_modulus: 1000, moduli: [36028797055270913, 36028797054222337, 36028797053698049, 36028797051863041] }
 
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
     let params = ArcBytes::from_bytes(encode_bfv_params(&params_raw.clone()));
 
-    let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
-    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
-        params_raw.clone(),
-        5,
-        3,
-    )?));
+    reporter.log("BfvParameters", &params.extract_bytes());
 
     // E3Parameters
-    let threshold_m = 2;
-    let threshold_n = 5;
+    let threshold_m = 24;
+    let threshold_n = 50;
     let esi_per_ct = 3;
     let seed = create_seed_from_u64(123);
-
+    let cipher = Arc::new(Cipher::from_password("I am the music man.").await?);
     let trbfv_config = TrBFVConfig::new(params, threshold_n, threshold_m);
+    let error_size = ArcBytes::from_bytes(BigUint::to_bytes_be(&calculate_error_size(
+        params_raw.clone(),
+        threshold_n as usize,
+        threshold_m as usize,
+    )?));
+
     let crp_raw = create_crp(
         trbfv_config.params(),
         Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
     );
 
-    // let crp = ArcBytes::from_bytes(crp_raw.to_bytes());
     let shares_hash_map = usecase_helpers::generate_shares_hash_map(
         &trbfv_config,
         esi_per_ct,
@@ -84,12 +93,31 @@ async fn test_trbfv_isolation() -> Result<()> {
         &crp_raw,
         &rng,
         &cipher,
+        &mut reporter,
     )?;
+
+    for share in shares_hash_map.iter() {
+        let share = bincode::serialize(&share.1)?;
+        reporter.log("ThresholdShare", &share);
+    }
 
     let pubkey =
         usecase_helpers::get_public_key(&shares_hash_map, trbfv_config.params(), &crp_raw)?;
+
+    reporter.log("PublicKey", &pubkey.to_bytes());
+
     let shares = to_ordered_vec(shares_hash_map);
-    let decryption_keys = usecase_helpers::get_decryption_keys(shares, &cipher, &trbfv_config)?;
+    let decryption_keys =
+        usecase_helpers::get_decryption_keys(shares, &cipher, &trbfv_config, &mut reporter)?;
+
+    for (_, (es_poly_sum, sk_poly_sum)) in decryption_keys.iter() {
+        let es_poly_sum = bincode::serialize(&es_poly_sum)?;
+        let sk_poly_sum = bincode::serialize(&sk_poly_sum)?;
+        reporter.log("es_poly_sum", &es_poly_sum);
+        reporter.log("sk_poly_sum", &sk_poly_sum);
+        reporter.log("decryption_key", &[es_poly_sum, sk_poly_sum].concat())
+    }
+
     // Create the inputs
     let num_votes_per_voter = 3;
     let num_voters = 30;
@@ -109,9 +137,18 @@ async fn test_trbfv_isolation() -> Result<()> {
         .map(|ct| ArcBytes::from_bytes((*ct).clone().to_bytes()))
         .collect::<Vec<ArcBytes>>();
 
+    let joined_ciphertext = ciphertexts
+        .clone()
+        .iter()
+        .map(|ct| ct.extract_bytes())
+        .collect::<Vec<_>>()
+        .concat();
+
+    reporter.log("Encrypted output from application", &joined_ciphertext);
+
     let mut decryption_shares = HashMap::new();
-    // for party_id in 0..=threshold_m as usize {
-    for party_id in [1, 4, 2] {
+    for party_id in 0..=threshold_m as usize {
+        // for party_id in [1, 4, 2] {
         let (es_poly_sum, sk_poly_sum) = decryption_keys.get(&party_id).unwrap();
         println!("calculate_decryption_share for party_id={}", party_id);
         let CalculateDecryptionShareResponse { d_share_poly } = calculate_decryption_share(
@@ -124,7 +161,15 @@ async fn test_trbfv_isolation() -> Result<()> {
                 ciphertexts: ciphertexts.clone(),
             },
         )?;
-
+        reporter.log(
+            "Single decryption Share",
+            &d_share_poly
+                .clone()
+                .iter()
+                .map(|bb| bb.extract_bytes())
+                .collect::<Vec<_>>()
+                .concat(),
+        );
         // store the decryption shares in a hash map indexed by party_id
         decryption_shares.insert(party_id as u64, d_share_poly);
     }
@@ -164,12 +209,8 @@ async fn test_trbfv_isolation() -> Result<()> {
         println!("Tally {i} result = {res} / {exp}");
         assert_eq!(res, exp);
     }
+    reporter.log_time("Entire test", start.elapsed());
+    println!("{}", reporter.to_size_table());
+    println!("{}", reporter.to_timing_table());
     Ok(())
 }
-// sleep(Duration::from_millis(3000)).await;
-//
-// let rest = nodes.get_history(1).await?;
-//
-// println!("rest {:?}", rest.event_types());
-
-// TMP using this to get a hash for the poly for tracing

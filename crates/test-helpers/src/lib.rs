@@ -9,6 +9,7 @@ pub mod ciphernode_builder;
 pub mod ciphernode_system;
 mod plaintext_writer;
 mod public_key_writer;
+pub mod reporters;
 pub mod usecase_helpers;
 mod utils;
 use actix::prelude::*;

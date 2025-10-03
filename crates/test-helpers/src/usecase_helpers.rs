@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use anyhow::{Context, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
@@ -26,6 +26,8 @@ use fhe::{
 };
 use fhe_traits::Serialize;
 
+use crate::reporters::SizeReporter;
+
 // The following functions are designed to aid testing our usecases
 
 pub fn generate_shares_hash_map(
@@ -35,11 +37,13 @@ pub fn generate_shares_hash_map(
     crp: &CommonRandomPoly,
     rng: &SharedRng,
     cipher: &Cipher,
+    reporter: &mut SizeReporter,
 ) -> Result<HashMap<u64, ThresholdShare>> {
     let threshold_n = trbfv_config.num_parties();
 
     let mut shares_hash_map = HashMap::new();
     for party_id in 0u64..threshold_n {
+        let start = Instant::now();
         let GenEsiSssResponse { esi_sss } = gen_esi_sss(
             &rng,
             &cipher,
@@ -75,6 +79,7 @@ pub fn generate_shares_hash_map(
                 pk_share,
             },
         );
+        reporter.log_time("gen all shamir material", start.elapsed());
     }
     Ok(shares_hash_map)
 }
@@ -101,6 +106,7 @@ pub fn get_decryption_keys(
     shares: Vec<ThresholdShare>,
     cipher: &Cipher,
     trbfv_config: &TrBFVConfig,
+    reporter: &mut SizeReporter,
 ) -> Result<HashMap<usize, (Vec<SensitiveBytes>, SensitiveBytes)>> {
     let threshold_n = trbfv_config.num_parties();
     let received_sss = shares
@@ -116,6 +122,7 @@ pub fn get_decryption_keys(
     // Individualize based on node
     let mut decryption_keys = HashMap::new();
     for party_id in 0..threshold_n as usize {
+        let start = Instant::now();
         let sk_sss_collected = received_sss
             .clone()
             .into_iter()
@@ -147,6 +154,7 @@ pub fn get_decryption_keys(
             },
         )?;
         decryption_keys.insert(party_id, (es_poly_sum, sk_poly_sum));
+        reporter.log_time("calculate decryption key", start.elapsed());
     }
     Ok(decryption_keys)
 }

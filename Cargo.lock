@@ -1888,6 +1888,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesize"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5c434ae3cf0089ca203e9019ebe529c47ff45cefe8af7c85ecb734ef541822f"
+
+[[package]]
 name = "bytestring"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3070,6 +3076,7 @@ dependencies = [
  "alloy",
  "anyhow",
  "bincode",
+ "bytesize",
  "clap",
  "e3-aggregator",
  "e3-crypto",
@@ -3138,6 +3145,7 @@ version = "0.0.1-test"
 dependencies = [
  "anyhow",
  "bincode",
+ "bytesize",
  "derivative",
  "e3-bfv-helpers",
  "e3-crypto",
