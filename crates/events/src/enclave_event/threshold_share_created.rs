@@ -7,7 +7,7 @@
 use crate::E3id;
 use actix::Message;
 use derivative::Derivative;
-use e3_trbfv::shares::{PvwEncrypted, ShamirShare, SharedSecret};
+use e3_trbfv::shares::{PvwEncrypted, SharedSecret};
 use e3_utils::utility_types::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::{

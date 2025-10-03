@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{
-    helpers::{print_shamir_share_vec, print_shamir_share_vec_vec},
     shares::{DecryptVec, Encrypted, ShamirShare, ShamirShareSliceExt},
     TrBFVConfig,
 };

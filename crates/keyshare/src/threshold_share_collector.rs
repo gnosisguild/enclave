@@ -12,7 +12,7 @@ use tracing::info;
 use crate::{AllThresholdSharesCollected, ThresholdKeyshare};
 
 pub enum CollectorState {
-    Collecting { total: u64 },
+    Collecting,
     Finished,
 }
 
@@ -28,7 +28,7 @@ impl ThresholdShareCollector {
         let addr = Self {
             todo: (0..total).collect(),
             parent,
-            state: CollectorState::Collecting { total },
+            state: CollectorState::Collecting,
             shares: HashMap::new(),
         }
         .start();

@@ -81,7 +81,7 @@ static COMPLETED_TASKS: AtomicUsize = AtomicUsize::new(0);
 
 impl Handler<ComputeRequest> for Multithread {
     type Result = ResponseFuture<Result<ComputeResponse, ComputeRequestError>>;
-    fn handle(&mut self, msg: ComputeRequest, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: ComputeRequest, _: &mut Self::Context) -> Self::Result {
         let cipher = self.cipher.clone();
         let rng = self.rng.clone();
         let thread_pool = self.thread_pool.clone();

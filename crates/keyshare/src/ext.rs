@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use e3_crypto::Cipher;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
-use e3_fhe::{ext::FHE_KEY, SharedRng};
+use e3_fhe::ext::FHE_KEY;
 use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use std::sync::Arc;

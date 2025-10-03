@@ -60,14 +60,6 @@ pub fn stringify_poly(name: &str, poly: &Poly) -> String {
     format!("{}=Poly({})", name, hash_to_petname(hash_poly(poly)))
 }
 
-// pub fn print_poly(name: &str, poly: &Poly) {
-//     println!("{}", stringify_poly(name, poly));
-// }
-
-// pub fn print_shared_secret(name: &str, secret: &SharedSecret) {
-//     println!("{}", stringify_shared_secret(name, secret));
-// }
-
 pub fn print_public_key_share(name: &str, pubkey: &PublicKeyShare) {
     println!("{}", stringify_public_key_share(name, pubkey));
 }
@@ -130,21 +122,6 @@ fn stringify_public_key_share(name: &str, share: &PublicKeyShare) -> String {
         name,
         hash_to_colored_petname(hash_pubkey_share(share).unwrap())
     )
-}
-
-fn stringify_shared_secret(name: &str, secret: &SharedSecret) -> String {
-    let shares = secret.clone().to_vec_shamir_share();
-    let mut out: Vec<String> = vec![];
-    out.push(format!("{}=SharedSecret", name));
-    shares.iter().for_each(|sh| {
-        out.push(stringify_shamir_share("  party", sh));
-    });
-    out.join("\n")
-}
-
-fn hash_shared_secret(secret: &SharedSecret) -> Result<u64> {
-    let bytes = bincode::serialize(secret)?;
-    Ok(hash_bytes(&bytes))
 }
 
 fn hash_share(share: &ShamirShare) -> Result<u64> {

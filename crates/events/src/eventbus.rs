@@ -5,13 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::prelude::*;
-use anyhow::{anyhow, Result};
 use bloom::{BloomFilter, ASMS};
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
-use tokio::sync::oneshot;
 use tracing::info;
 
 //////////////////////////////////////////////////////////////////////////////
