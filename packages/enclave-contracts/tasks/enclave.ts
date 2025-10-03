@@ -83,11 +83,24 @@ export const requestCommittee = task(
       },
       hre,
     ) => {
+      const connection = await hre.network.connect();
+      const { ethers } = connection;
+
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );
+      const { deployAndSaveMockStableToken } = await import(
+        "../scripts/deployAndSave/mockStableToken"
+      );
 
       const { enclave } = await deployAndSaveEnclave({ hre });
+      const { mockStableToken: mockUSDC } = await deployAndSaveMockStableToken({
+        hre,
+      });
+
+      const [signer] = await ethers.getSigners();
+      const enclaveContract = enclave.connect(signer);
+      const mockUSDCContract = mockUSDC.connect(signer);
 
       const enclaveArgs = readDeploymentArgs(
         "Enclave",
@@ -151,29 +164,42 @@ export const requestCommittee = task(
         );
       }
 
-      console.log({
+      const requestParams = {
         filter: filter === ZeroAddress ? filterArgs.address : filter,
-        threshold: [thresholdQuorum, thresholdTotal],
-        startWindow: [windowStart, windowEnd],
+        threshold: [thresholdQuorum, thresholdTotal] as [number, number],
+        startWindow: [windowStart, windowEnd] as [number, number],
         duration: duration,
         e3Program:
           e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
         e3ProgramParams,
         computeProviderParams,
-      });
-      const tx = await enclave.request(
-        {
-          filter: filter === ZeroAddress ? filterArgs.address : filter,
-          threshold: [thresholdQuorum, thresholdTotal],
-          startWindow: [windowStart, windowEnd],
-          duration: duration,
-          e3Program:
-            e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
-          e3ProgramParams,
-          computeProviderParams,
-        },
-        { value: "1000000000000000000" },
+      };
+
+      console.log("Request parameters:", requestParams);
+
+      const fee = await enclaveContract.getE3Quote(requestParams);
+      console.log(`E3 fee: ${ethers.formatUnits(fee, 6)} USDC`);
+
+      const usdcBalance = await mockUSDCContract.balanceOf(signer.address);
+      console.log(`USDC balance: ${ethers.formatUnits(usdcBalance, 6)} USDC`);
+
+      if (usdcBalance < fee) {
+        const mintAmount = fee - usdcBalance + ethers.parseUnits("1000", 6);
+        console.log(`Minting ${ethers.formatUnits(mintAmount, 6)} USDC...`);
+        const mintTx = await mockUSDCContract.mint(signer.address, mintAmount);
+        await mintTx.wait();
+        console.log("USDC minted");
+      }
+
+      console.log("Approving USDC spending...");
+      const approveTx = await mockUSDCContract.approve(
+        await enclaveContract.getAddress(),
+        fee,
       );
+      await approveTx.wait();
+      console.log("USDC approved");
+
+      const tx = await enclaveContract.request(requestParams);
 
       console.log("Requesting committee... ", tx.hash);
       await tx.wait();

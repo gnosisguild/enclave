@@ -19,12 +19,6 @@ interface IRegistry {
 }
 
 contract MockNaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
-    struct Committee {
-        address[] nodes;
-        uint32[2] threshold;
-        bytes publicKey;
-    }
-
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //
@@ -33,7 +27,8 @@ contract MockNaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     address public registry;
 
-    mapping(uint256 e3 => Committee committee) public committees;
+    mapping(uint256 e3 => IRegistryFilter.Committee committee)
+        public committees;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -84,7 +79,7 @@ contract MockNaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         uint256 e3Id,
         uint32[2] calldata threshold
     ) external onlyRegistry returns (bool success) {
-        Committee storage committee = committees[e3Id];
+        IRegistryFilter.Committee storage committee = committees[e3Id];
         require(committee.threshold.length == 0, CommitteeAlreadyExists());
         committee.threshold = threshold;
         success = true;
@@ -95,13 +90,10 @@ contract MockNaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
         address[] memory nodes,
         bytes memory publicKey
     ) external onlyOwner {
-        Committee storage committee = committees[e3Id];
-        require(
-            keccak256(committee.publicKey) == keccak256(hex""),
-            CommitteeAlreadyPublished()
-        );
+        IRegistryFilter.Committee storage committee = committees[e3Id];
+        require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
         committee.nodes = nodes;
-        committee.publicKey = publicKey;
+        committee.publicKey = keccak256(publicKey);
         IRegistry(registry).publishCommittee(e3Id, nodes, publicKey);
     }
 
@@ -113,5 +105,19 @@ contract MockNaiveRegistryFilter is IRegistryFilter, OwnableUpgradeable {
 
     function setRegistry(address _registry) public onlyOwner {
         registry = _registry;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Get Functions                        //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    function getCommittee(
+        uint256 e3Id
+    ) external view returns (IRegistryFilter.Committee memory) {
+        IRegistryFilter.Committee memory committee = committees[e3Id];
+        require(committee.publicKey != bytes32(0), CommitteeNotPublished());
+        return committee;
     }
 }

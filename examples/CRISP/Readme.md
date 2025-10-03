@@ -22,7 +22,7 @@ To start the development environment, run the following commands from inside the
 ```sh
 pnpm install # install dependencies
 pnpm dev:setup # build the project
-pnpm dev:up # run the services 
+pnpm dev:up # run the services
 ```
 
 The two commands above will start everything you need to run the CRISP protocol. You can then interact with it using the web application at `http://localhost:3000`. Please ensure you follow the prerequisites installation for running the protocol locally.
@@ -102,6 +102,7 @@ To set up the CRISP dApp in your local environment, follow these steps:
    ```sh
    cd examples/CRISP/client
    ```
+
 2. Start the development server:
 
    ```sh
@@ -164,9 +165,9 @@ After deployment, you will see the addresses for the following contracts:
 
 Note down the first four addresses as they will be needed to configure `risc0`, `local_testnet` and the `server`.
 
-### Step 3: Deploy the RISC Zero Contracts 
+### Step 3: Deploy the RISC Zero Contracts
 
-> Please note that this step is optional for development only. You can run the program server in dev mode which does not use Risc0. 
+> Please note that this step is optional for development only. You can run the program server in dev mode which does not use Risc0.
 
 1. Navigate to the `CRISP/lib/risc0-ethereum` directory.
 
@@ -234,10 +235,10 @@ CHAIN_ID=31337
 CRON_API_KEY=1234567890
 
 # Based on Default Anvil Deployments (Only for testing)
-ENCLAVE_ADDRESS="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-CIPHERNODE_REGISTRY_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-NAIVE_REGISTRY_FILTER_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-E3_PROGRAM_ADDRESS="0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1" # CRISPProgram Contract Address
+ENCLAVE_ADDRESS="0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+CIPHERNODE_REGISTRY_ADDRESS="0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+NAIVE_REGISTRY_FILTER_ADDRESS="0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
+E3_PROGRAM_ADDRESS="0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8" # CRISPProgram Contract Address
 
 # E3 Config
 E3_WINDOW_SIZE=600

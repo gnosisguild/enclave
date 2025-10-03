@@ -8,18 +8,30 @@ pragma solidity >=0.8.27;
 import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
+import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
+import { IRegistryFilter } from "./interfaces/IRegistryFilter.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     InternalLeanIMT,
     LeanIMTData,
     PoseidonT3
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
+/**
+ * @title Enclave
+ * @notice Main contract for managing Encrypted Execution Environments (E3)
+ * @dev Coordinates E3 lifecycle including request, activation, input publishing, and output verification
+ */
 contract Enclave is IEnclave, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
+    using SafeERC20 for IERC20;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -27,28 +39,54 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    ICiphernodeRegistry public ciphernodeRegistry; // address of the Ciphernode registry.
-    uint256 public maxDuration; // maximum duration of a computation in seconds.
-    uint256 public nexte3Id; // ID of the next E3.
+    /// @notice Address of the Ciphernode Registry contract.
+    /// @dev Manages the pool of ciphernodes and committee selection.
+    ICiphernodeRegistry public ciphernodeRegistry;
 
-    // Mapping of allowed E3 Programs.
+    /// @notice Address of the Bonding Registry contract.
+    /// @dev Handles staking and reward distribution for ciphernodes.
+    IBondingRegistry public bondingRegistry;
+
+    /// @notice Address of the ERC20 token used for E3 fees.
+    /// @dev All E3 request fees must be paid in this token.
+    IERC20 public feeToken;
+
+    /// @notice Maximum allowed duration for an E3 computation in seconds.
+    /// @dev Requests with duration exceeding this value will be rejected.
+    uint256 public maxDuration;
+
+    /// @notice ID counter for the next E3 to be created.
+    /// @dev Incremented after each successful E3 request.
+    uint256 public nexte3Id;
+
+    /// @notice Mapping of allowed E3 Programs.
+    /// @dev Only enabled E3 Programs can be used in computation requests.
     mapping(IE3Program e3Program => bool allowed) public e3Programs;
 
-    // Mapping of E3s.
+    /// @notice Mapping storing all E3 instances by their ID.
+    /// @dev Contains the full state and configuration of each E3.
     mapping(uint256 e3Id => E3 e3) public e3s;
 
-    // Mapping of input merkle trees.
+    /// @notice Mapping of input merkle trees for each E3.
+    /// @dev Uses Lean IMT for efficient incremental merkle tree operations.
     mapping(uint256 e3Id => LeanIMTData imt) public inputs;
 
-    // Mapping counting the number of inputs for each E3.
+    /// @notice Counter tracking the number of inputs published for each E3.
+    /// @dev Used as the index when inserting new inputs into the merkle tree.
     mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
 
-    // Mapping of enabled encryption schemes.
+    /// @notice Mapping of enabled encryption schemes to their decryption verifiers.
+    /// @dev Each encryption scheme ID maps to a contract that can verify decrypted outputs.
     mapping(bytes32 encryptionSchemeId => IDecryptionVerifier decryptionVerifier)
         public decryptionVerifiers;
 
-    /// Mapping that stores the valid E3 program ABI encoded parameter sets (e.g., BFV).
+    /// @notice Mapping storing valid E3 program ABI encoded parameter sets.
+    /// @dev Stores allowed encryption scheme parameters (e.g., BFV parameters).
     mapping(bytes e3ProgramParams => bool allowed) public e3ProgramsParams;
+
+    /// @notice Mapping tracking fee payments for each E3.
+    /// @dev Stores the amount paid for an E3, distributed to committee upon completion.
+    mapping(uint256 e3Id => uint256 e3Payment) public e3Payments;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -56,29 +94,108 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @notice Thrown when committee selection fails during E3 request or activation.
     error CommitteeSelectionFailed();
+
+    /// @notice Thrown when an E3 request uses a program that is not enabled.
+    /// @param e3Program The E3 program address that is not allowed.
     error E3ProgramNotAllowed(IE3Program e3Program);
+
+    /// @notice Thrown when attempting to activate an E3 that is already activated.
+    /// @param e3Id The ID of the E3 that is already activated.
     error E3AlreadyActivated(uint256 e3Id);
+
+    /// @notice Thrown when the E3 start window or computation period has expired.
     error E3Expired();
+
+    /// @notice Thrown when attempting operations on an E3 that has not been activated yet.
+    /// @param e3Id The ID of the E3 that is not activated.
     error E3NotActivated(uint256 e3Id);
+
+    /// @notice Thrown when attempting to activate an E3 before its start window begins.
     error E3NotReady();
+
+    /// @notice Thrown when attempting to access an E3 that does not exist.
+    /// @param e3Id The ID of the non-existent E3.
     error E3DoesNotExist(uint256 e3Id);
+
+    /// @notice Thrown when attempting to enable a module or program that is already enabled.
+    /// @param module The address of the module that is already enabled.
     error ModuleAlreadyEnabled(address module);
+
+    /// @notice Thrown when attempting to disable a module or program that is not enabled.
+    /// @param module The address of the module that is not enabled.
     error ModuleNotEnabled(address module);
+
+    /// @notice Thrown when an invalid or disabled encryption scheme is used.
+    /// @param encryptionSchemeId The ID of the invalid encryption scheme.
     error InvalidEncryptionScheme(bytes32 encryptionSchemeId);
+
+    /// @notice Thrown when attempting to publish input after the computation deadline has passed.
+    /// @param e3Id The ID of the E3.
+    /// @param expiration The expiration timestamp that has passed.
     error InputDeadlinePassed(uint256 e3Id, uint256 expiration);
+
+    /// @notice Thrown when attempting to publish output before the input deadline has passed.
+    /// @param e3Id The ID of the E3.
+    /// @param expiration The expiration timestamp that has not yet passed.
     error InputDeadlineNotPassed(uint256 e3Id, uint256 expiration);
+
+    /// @notice Thrown when the input validator in the computation request is invalid.
+    /// @param inputValidator The address of the invalid input validator.
     error InvalidComputationRequest(IInputValidator inputValidator);
+
+    /// @notice Thrown when attempting to set an invalid ciphernode registry address.
+    /// @param ciphernodeRegistry The invalid ciphernode registry address.
     error InvalidCiphernodeRegistry(ICiphernodeRegistry ciphernodeRegistry);
+
+    /// @notice Thrown when the requested duration exceeds maxDuration or is zero.
+    /// @param duration The invalid duration value.
     error InvalidDuration(uint256 duration);
+
+    /// @notice Thrown when output verification fails.
+    /// @param output The invalid output data.
     error InvalidOutput(bytes output);
+
+    /// @notice Thrown when input data is invalid.
     error InvalidInput();
+
+    /// @notice Thrown when the start window parameters are invalid.
     error InvalidStartWindow();
+
+    /// @notice Thrown when the threshold parameters are invalid (e.g., M > N or M = 0).
+    /// @param threshold The invalid threshold array [M, N].
     error InvalidThreshold(uint32[2] threshold);
+
+    /// @notice Thrown when attempting to publish ciphertext output that has already been published.
+    /// @param e3Id The ID of the E3.
     error CiphertextOutputAlreadyPublished(uint256 e3Id);
+
+    /// @notice Thrown when attempting to publish plaintext output before ciphertext output.
+    /// @param e3Id The ID of the E3.
     error CiphertextOutputNotPublished(uint256 e3Id);
+
+    /// @notice Thrown when payment is required but not provided or insufficient.
+    /// @param value The required payment amount.
     error PaymentRequired(uint256 value);
+
+    /// @notice Thrown when attempting to publish plaintext output that has already been published.
+    /// @param e3Id The ID of the E3.
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
+
+    /// @notice Thrown when the caller has insufficient token balance.
+    error InsufficientBalance();
+
+    /// @notice Thrown when the contract has insufficient token allowance.
+    error InsufficientAllowance();
+
+    /// @notice Thrown when attempting to set an invalid bonding registry address.
+    /// @param bondingRegistry The invalid bonding registry address.
+    error InvalidBondingRegistry(IBondingRegistry bondingRegistry);
+
+    /// @notice Thrown when attempting to set an invalid fee token address.
+    /// @param feeToken The invalid fee token address.
+    error InvalidFeeToken(IERC20 feeToken);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -86,36 +203,53 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @param _owner The owner of this contract
-    /// @param _maxDuration The maximum duration of a computation in seconds
-    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV)
+    /// @notice Constructs the Enclave contract.
+    /// @dev Calls initialize() to set up the contract state. Can be used for non-proxy deployments.
+    /// @param _owner The owner address of this contract.
+    /// @param _ciphernodeRegistry The address of the Ciphernode Registry contract.
+    /// @param _bondingRegistry The address of the Bonding Registry contract.
+    /// @param _feeToken The address of the ERC20 token used for E3 fees.
+    /// @param _maxDuration The maximum duration of a computation in seconds.
+    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
     constructor(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
+        IBondingRegistry _bondingRegistry,
+        IERC20 _feeToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
     ) {
         initialize(
             _owner,
             _ciphernodeRegistry,
+            _bondingRegistry,
+            _feeToken,
             _maxDuration,
             _e3ProgramsParams
         );
     }
 
-    /// @param _owner The owner of this contract
-    /// @param _ciphernodeRegistry The address of the ciphernode registry
-    /// @param _maxDuration The maximum duration of a computation in seconds
-    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV)
+    /// @notice Initializes the Enclave contract with initial configuration.
+    /// @dev This function can only be called once due to the initializer modifier. Sets up core dependencies.
+    /// @param _owner The owner address of this contract.
+    /// @param _ciphernodeRegistry The address of the Ciphernode Registry contract.
+    /// @param _bondingRegistry The address of the Bonding Registry contract.
+    /// @param _feeToken The address of the ERC20 token used for E3 fees.
+    /// @param _maxDuration The maximum duration of a computation in seconds.
+    /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
     function initialize(
         address _owner,
         ICiphernodeRegistry _ciphernodeRegistry,
+        IBondingRegistry _bondingRegistry,
+        IERC20 _feeToken,
         uint256 _maxDuration,
         bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
         setMaxDuration(_maxDuration);
         setCiphernodeRegistry(_ciphernodeRegistry);
+        setBondingRegistry(_bondingRegistry);
+        setFeeToken(_feeToken);
         setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
@@ -126,12 +260,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @inheritdoc IEnclave
     function request(
         E3RequestParams calldata requestParams
-    ) external payable returns (uint256 e3Id, E3 memory e3) {
-        // TODO: allow for other payment methods or only native tokens?
-        // TODO: should payment checks be somewhere else? Perhaps in the E3 Program or ciphernode registry?
-        require(msg.value > 0, PaymentRequired(msg.value));
+    ) external returns (uint256 e3Id, E3 memory e3) {
+        uint256 e3Fee = getE3Quote(requestParams);
+        require(e3Fee > 0, PaymentRequired(e3Fee));
         require(
             requestParams.threshold[1] >= requestParams.threshold[0] &&
                 requestParams.threshold[0] > 0,
@@ -197,6 +331,9 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.decryptionVerifier = decryptionVerifier;
 
         e3s[e3Id] = e3;
+        e3Payments[e3Id] = e3Fee;
+
+        feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         require(
             ciphernodeRegistry.requestCommittee(
@@ -215,6 +352,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
     }
 
+    /// @inheritdoc IEnclave
     function activate(
         uint256 e3Id,
         bytes calldata publicKey
@@ -240,6 +378,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         return true;
     }
 
+    /// @inheritdoc IEnclave
     function publishInput(
         uint256 e3Id,
         bytes calldata data
@@ -268,6 +407,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit InputPublished(e3Id, input, inputHash, inputIndex);
     }
 
+    /// @inheritdoc IEnclave
     function publishCiphertextOutput(
         uint256 e3Id,
         bytes calldata ciphertextOutput,
@@ -297,6 +437,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit CiphertextOutputPublished(e3Id, ciphertextOutput);
     }
 
+    /// @inheritdoc IEnclave
     function publishPlaintextOutput(
         uint256 e3Id,
         bytes calldata plaintextOutput,
@@ -324,7 +465,44 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         );
         require(success, InvalidOutput(plaintextOutput));
 
+        _distributeRewards(e3Id);
+
         emit PlaintextOutputPublished(e3Id, plaintextOutput);
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Internal Functions                   //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Distributes rewards to committee members after successful E3 completion.
+    /// @dev Divides the E3 payment equally among all committee members and transfers via bonding registry.
+    /// @dev Emits RewardsDistributed event upon successful distribution.
+    /// @param e3Id The ID of the E3 for which to distribute rewards.
+    function _distributeRewards(uint256 e3Id) internal {
+        IRegistryFilter.Committee memory committee = ciphernodeRegistry
+            .getCommittee(e3Id);
+        uint256[] memory amounts = new uint256[](committee.nodes.length);
+
+        // TODO: do we need to pay different amounts to different nodes?
+        // For now, we'll pay the same amount to all nodes.
+        uint256 amount = e3Payments[e3Id] / committee.nodes.length;
+        for (uint256 i = 0; i < committee.nodes.length; i++) {
+            amounts[i] = amount;
+        }
+
+        uint256 totalAmount = e3Payments[e3Id];
+        e3Payments[e3Id] = 0;
+
+        feeToken.approve(address(bondingRegistry), totalAmount);
+
+        bondingRegistry.distributeRewards(feeToken, committee.nodes, amounts);
+
+        // TODO: decide where does dust go? Treasury maybe?
+        feeToken.approve(address(bondingRegistry), 0);
+
+        emit RewardsDistributed(e3Id, committee.nodes, amounts);
     }
 
     ////////////////////////////////////////////////////////////
@@ -333,6 +511,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @inheritdoc IEnclave
     function setMaxDuration(
         uint256 _maxDuration
     ) public onlyOwner returns (bool success) {
@@ -341,6 +520,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit MaxDurationSet(_maxDuration);
     }
 
+    /// @inheritdoc IEnclave
     function setCiphernodeRegistry(
         ICiphernodeRegistry _ciphernodeRegistry
     ) public onlyOwner returns (bool success) {
@@ -354,6 +534,34 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit CiphernodeRegistrySet(address(_ciphernodeRegistry));
     }
 
+    /// @inheritdoc IEnclave
+    function setBondingRegistry(
+        IBondingRegistry _bondingRegistry
+    ) public onlyOwner returns (bool success) {
+        require(
+            address(_bondingRegistry) != address(0) &&
+                _bondingRegistry != bondingRegistry,
+            InvalidBondingRegistry(_bondingRegistry)
+        );
+        bondingRegistry = _bondingRegistry;
+        success = true;
+        emit BondingRegistrySet(address(_bondingRegistry));
+    }
+
+    /// @inheritdoc IEnclave
+    function setFeeToken(
+        IERC20 _feeToken
+    ) public onlyOwner returns (bool success) {
+        require(
+            address(_feeToken) != address(0) && _feeToken != feeToken,
+            InvalidFeeToken(_feeToken)
+        );
+        feeToken = _feeToken;
+        success = true;
+        emit FeeTokenSet(address(_feeToken));
+    }
+
+    /// @inheritdoc IEnclave
     function enableE3Program(
         IE3Program e3Program
     ) public onlyOwner returns (bool success) {
@@ -366,6 +574,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3ProgramEnabled(e3Program);
     }
 
+    /// @inheritdoc IEnclave
     function disableE3Program(
         IE3Program e3Program
     ) public onlyOwner returns (bool success) {
@@ -375,6 +584,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit E3ProgramDisabled(e3Program);
     }
 
+    /// @inheritdoc IEnclave
     function setDecryptionVerifier(
         bytes32 encryptionSchemeId,
         IDecryptionVerifier decryptionVerifier
@@ -389,6 +599,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit EncryptionSchemeEnabled(encryptionSchemeId);
     }
 
+    /// @inheritdoc IEnclave
     function disableEncryptionScheme(
         bytes32 encryptionSchemeId
     ) public onlyOwner returns (bool success) {
@@ -404,6 +615,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         emit EncryptionSchemeDisabled(encryptionSchemeId);
     }
 
+    /// @inheritdoc IEnclave
     function setE3ProgramsParams(
         bytes[] memory _e3ProgramsParams
     ) public onlyOwner returns (bool success) {
@@ -424,11 +636,13 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @inheritdoc IEnclave
     function getE3(uint256 e3Id) public view returns (E3 memory e3) {
         e3 = e3s[e3Id];
         require(e3.e3Program != IE3Program(address(0)), E3DoesNotExist(e3Id));
     }
 
+    /// @inheritdoc IEnclave
     function getInputRoot(uint256 e3Id) public view returns (uint256) {
         require(
             e3s[e3Id].e3Program != IE3Program(address(0)),
@@ -437,6 +651,14 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         return InternalLeanIMT._root(inputs[e3Id]);
     }
 
+    /// @inheritdoc IEnclave
+    function getE3Quote(
+        E3RequestParams calldata
+    ) public pure returns (uint256 fee) {
+        fee = 1 * 10 ** 6;
+    }
+
+    /// @inheritdoc IEnclave
     function getDecryptionVerifier(
         bytes32 encryptionSchemeId
     ) public view returns (IDecryptionVerifier) {
