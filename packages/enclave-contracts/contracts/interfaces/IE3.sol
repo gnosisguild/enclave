@@ -18,6 +18,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
 /// @param expiration Timestamp when committee duties expire.
 /// @param e3Program Address of the E3 Program contract.
 /// @param e3ProgramParams ABI encoded computation parameters.
+/// @param customParams Arbitrary ABI-encoded application-defined parameters.
 /// @param computeProvider Address of the compute provider contract.
 /// @param inputValidator Address of the input validator contract.
 /// @param decryptionVerifier Address of the output verifier contract.
@@ -34,6 +35,7 @@ struct E3 {
     bytes32 encryptionSchemeId;
     IE3Program e3Program;
     bytes e3ProgramParams;
+    bytes customParams;
     IInputValidator inputValidator;
     IDecryptionVerifier decryptionVerifier;
     bytes32 committeePublicKey;

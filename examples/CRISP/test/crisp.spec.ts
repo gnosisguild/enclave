@@ -13,7 +13,10 @@ import { execSync } from "child_process";
 async function runCliInit() {
   try {
     // Execute the command and wait for it to complete
-    const output = execSync("pnpm cli init", { encoding: "utf-8" });
+    const output = execSync(
+      "pnpm cli init --token-address 0x3F2A1C7C5eE6c88e94a7A314d86Dcb09E5F3E0c2",
+      { encoding: "utf-8" }
+    );
     console.log("Command output:", output);
     return output;
   } catch (error) {
@@ -27,7 +30,7 @@ const { expect } = test;
 
 async function ensureHomePageLoaded(page: Page) {
   return await expect(page.locator("h4")).toHaveText(
-    "Coercion-Resistant Impartial Selection Protocol",
+    "Coercion-Resistant Impartial Selection Protocol"
   );
 }
 
@@ -41,7 +44,7 @@ test("CRISP smoke test", async ({
     context,
     metamaskPage,
     basicSetup.walletPassword,
-    extensionId,
+    extensionId
   );
 
   await runCliInit();
@@ -63,9 +66,9 @@ test("CRISP smoke test", async ({
   await page.locator('a:has-text("Historic polls")').click();
   await expect(page.locator("h1")).toHaveText("Historic polls");
   await expect(
-    page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3"),
+    page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-0'] h3")
   ).toHaveText("100%");
   await expect(
-    page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-1'] h3"),
+    page.locator("[data-test-id='poll-0-0'] [data-test-id='poll-result-1'] h3")
   ).toHaveText("0%");
 });

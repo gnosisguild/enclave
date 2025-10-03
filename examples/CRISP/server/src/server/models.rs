@@ -89,8 +89,9 @@ pub struct ComputeProviderParams {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CronRequestE3 {
+pub struct RoundRequest {
     pub cron_api_key: String,
+    pub token_address: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

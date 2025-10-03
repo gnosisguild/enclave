@@ -6,7 +6,7 @@
 
 mod commands;
 
-use dialoguer::{theme::ColorfulTheme, FuzzySelect};
+use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
 use reqwest::Client;
 
 use commands::initialize_crisp_round;
@@ -38,14 +38,18 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Initialize new E3 round
-    Init,
+    Init {
+        /// Token contract address for the voting round
+        #[arg(short, long)]
+        token_address: String,
+    },
 }
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     init_logger();
 
-    let client = Client::new();
+    let _client = Client::new();
     let cli = Cli::parse();
 
     if cli.environment != 0 {
@@ -54,15 +58,16 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     match cli.command {
-        Some(Commands::Init) => {
-            initialize_crisp_round().await?;
+        Some(Commands::Init { token_address }) => {
+            initialize_crisp_round(&token_address).await?;
         }
         None => {
             // Fall back to interactive mode if no command was specified
             let action = select_action()?;
             match action {
                 0 => {
-                    initialize_crisp_round().await?;
+                    let token_address = get_token_address()?;
+                    initialize_crisp_round(&token_address).await?;
                 }
                 _ => unreachable!(),
             }
@@ -93,4 +98,10 @@ fn select_action() -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
         .default(0)
         .items(&selections[..])
         .interact()?)
+}
+
+fn get_token_address() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    Ok(Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter the token contract address for the voting round")
+        .interact_text()?)
 }

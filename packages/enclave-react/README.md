@@ -19,7 +19,7 @@ pnpm add @enclave-e3/react @enclave-e3/contracts
 A React hook for interacting with the Enclave SDK. This hook provides a clean interface for managing SDK state, handling contract interactions, and listening to events.
 
 ```tsx
-import { useEnclaveSDK } from '@enclave-e3/react';
+import { useEnclaveSDK } from "@enclave-e3/react";
 
 function MyComponent() {
   const {
@@ -32,14 +32,14 @@ function MyComponent() {
     onEnclaveEvent,
     off,
     EnclaveEventType,
-    RegistryEventType
+    RegistryEventType,
   } = useEnclaveSDK({
     autoConnect: true,
     contracts: {
-      enclave: '0x...',
-      ciphernodeRegistry: '0x...'
+      enclave: "0x...",
+      ciphernodeRegistry: "0x...",
     },
-    chainId: 1
+    chainId: 1,
   });
 
   // Listen to events
@@ -47,7 +47,7 @@ function MyComponent() {
     if (!isInitialized) return;
 
     const handleE3Requested = (event) => {
-      console.log('E3 requested:', event.data);
+      console.log("E3 requested:", event.data);
     };
 
     onEnclaveEvent(EnclaveEventType.E3_REQUESTED, handleE3Requested);
@@ -61,18 +61,19 @@ function MyComponent() {
   const handleRequest = async () => {
     try {
       const hash = await requestE3({
-        filter: '0x...',
+        filter: "0x...",
         threshold: [2, 3],
         startWindow: [BigInt(Date.now()), BigInt(Date.now() + 300000)],
         duration: BigInt(1800),
-        e3Program: '0x...',
-        e3ProgramParams: '0x...',
-        computeProviderParams: '0x...',
-        value: BigInt('1000000000000000') // 0.001 ETH
+        e3Program: "0x...",
+        e3ProgramParams: "0x...",
+        computeProviderParams: "0x...",
+        customParams: "0x...",
+        value: BigInt("1000000000000000"), // 0.001 ETH
       });
-      console.log('E3 requested with hash:', hash);
+      console.log("E3 requested with hash:", hash);
     } catch (error) {
-      console.error('Failed to request E3:', error);
+      console.error("Failed to request E3:", error);
     }
   };
 
@@ -86,9 +87,7 @@ function MyComponent() {
 
   return (
     <div>
-      <button onClick={handleRequest}>
-        Request E3 Computation
-      </button>
+      <button onClick={handleRequest}>Request E3 Computation</button>
     </div>
   );
 }
@@ -133,4 +132,4 @@ function MyComponent() {
 
 ## License
 
-MIT 
+MIT
