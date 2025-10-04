@@ -51,6 +51,15 @@ impl PlaintextAggregatorState {
             ciphertext_output,
         }
     }
+
+    pub fn get_name(&self) -> String {
+        match self {
+            PlaintextAggregatorState::Collecting { .. } => "Collecting",
+            PlaintextAggregatorState::Computing { .. } => "Computing",
+            PlaintextAggregatorState::Complete { .. } => "Complete",
+        }
+        .to_string()
+    }
 }
 
 #[derive(Message)]
@@ -60,6 +69,7 @@ struct ComputeAggregate {
     pub ciphertext_output: Vec<u8>,
 }
 
+#[deprecated = "To be replaced by ThresholdPlaintextAggregator"]
 pub struct PlaintextAggregator {
     fhe: Arc<Fhe>,
     bus: Addr<EventBus<EnclaveEvent>>,
@@ -92,7 +102,9 @@ impl PlaintextAggregator {
     pub fn add_share(&mut self, share: Vec<u8>) -> Result<()> {
         self.state.try_mutate(|mut state| {
             let PlaintextAggregatorState::Collecting {
-                threshold_m,
+                // NOTE: In the deprecated PlaintextAggregator we need all shares to
+                // decrypt so here we set threshold_n
+                threshold_n,
                 shares,
                 ciphertext_output,
                 ..
@@ -103,7 +115,7 @@ impl PlaintextAggregator {
 
             shares.insert(share);
 
-            if shares.len() == *threshold_m {
+            if shares.len() == *threshold_n {
                 return Ok(PlaintextAggregatorState::Computing {
                     shares: shares.clone(),
                     ciphertext_output: ciphertext_output.clone(),
@@ -149,7 +161,11 @@ impl Handler<DecryptionshareCreated> for PlaintextAggregator {
             threshold_n, seed, ..
         }) = self.state.get()
         else {
-            error!(state=?self.state, "Aggregator has been closed for collecting.");
+            let name = self.state.get().map(|s| s.get_name());
+            error!(
+                "Aggregator has been closed for collecting. {}",
+                name.unwrap_or("Unknown".to_string())
+            );
             return Box::pin(fut::ready(Ok(())));
         };
 
