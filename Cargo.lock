@@ -2643,6 +2643,7 @@ dependencies = [
  "opentelemetry_sdk",
  "petname",
  "rand 0.8.5",
+ "serde",
  "tokio",
  "tracing",
  "tracing-opentelemetry",

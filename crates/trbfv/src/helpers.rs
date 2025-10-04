@@ -5,8 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::shares::ShamirShare;
-use crate::shares::ShamirShareArrayExt;
-use crate::shares::SharedSecret;
 use anyhow::Result;
 use e3_crypto::{Cipher, SensitiveBytes};
 use fhe::mbfv::PublicKeyShare;
