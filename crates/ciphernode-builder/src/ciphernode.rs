@@ -1,3 +1,9 @@
+// spdx-license-identifier: lgpl-3.0-only
+//
+// this file is provided without any warranty;
+// without even the implied warranty of merchantability
+// or fitness for a particular purpose.;
+
 use actix::Addr;
 use e3_data::InMemStore;
 use e3_events::{EnclaveEvent, ErrorCollector, EventBus, HistoryCollector};
