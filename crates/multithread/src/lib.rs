@@ -104,6 +104,7 @@ impl Handler<ComputeRequest> for Multithread {
 
                     let _ = tx.send(res);
                 });
+                // TODO: handle recv error
                 rx.await.unwrap()
             } else {
                 // If not using the thread pool simply call inline
