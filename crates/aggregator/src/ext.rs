@@ -7,7 +7,9 @@
 use crate::{
     PlaintextAggregator, PlaintextAggregatorParams, PlaintextAggregatorState,
     PlaintextRepositoryFactory, PublicKeyAggregator, PublicKeyAggregatorParams,
-    PublicKeyAggregatorState, PublicKeyRepositoryFactory,
+    PublicKeyAggregatorState, PublicKeyRepositoryFactory, ThresholdPlaintextAggregator,
+    ThresholdPlaintextAggregatorParams, ThresholdPlaintextAggregatorState,
+    TrBfvPlaintextRepositoryFactory,
 };
 use actix::{Actor, Addr};
 use anyhow::{anyhow, Result};
@@ -15,13 +17,16 @@ use async_trait::async_trait;
 use e3_data::{AutoPersist, RepositoriesFactory};
 use e3_events::{BusError, EnclaveErrorType, EnclaveEvent, EventBus};
 use e3_fhe::ext::FHE_KEY;
+use e3_multithread::Multithread;
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use e3_sortition::Sortition;
 
+#[deprecated = "In favour of ThresholdPlaintextAggregatorExtension"]
 pub struct PlaintextAggregatorExtension {
     bus: Addr<EventBus<EnclaveEvent>>,
     sortition: Addr<Sortition>,
 }
+
 impl PlaintextAggregatorExtension {
     pub fn create(bus: &Addr<EventBus<EnclaveEvent>>, sortition: &Addr<Sortition>) -> Box<Self> {
         Box::new(Self {
@@ -60,10 +65,21 @@ impl E3Extension for PlaintextAggregatorExtension {
 
         let e3_id = data.e3_id.clone();
         let repo = ctx.repositories().plaintext(&e3_id);
+
+        // This is a single ciphertext for the legacy PlaintextAggregator
+        let Some(single_ciphertext) = data.ciphertext_output.first() else {
+            self.bus.err(
+                EnclaveErrorType::PlaintextAggregation,
+                anyhow!("Could not extract ciphertext from array"),
+            );
+            return;
+        };
+
         let sync_state = repo.send(Some(PlaintextAggregatorState::init(
             meta.threshold_m,
+            meta.threshold_n,
             meta.seed,
-            data.ciphertext_output.clone(),
+            single_ciphertext.clone(),
         )));
 
         ctx.set_event_recipient(
@@ -165,11 +181,10 @@ impl E3Extension for PublicKeyAggregatorExtension {
             );
             return;
         };
-
         let e3_id = data.e3_id.clone();
         let repo = ctx.repositories().publickey(&e3_id);
         let sync_state = repo.send(Some(PublicKeyAggregatorState::init(
-            meta.threshold_m,
+            meta.threshold_n,
             meta.seed,
         )));
         ctx.set_event_recipient(
@@ -228,6 +243,105 @@ impl E3Extension for PublicKeyAggregatorExtension {
 
         // send to context
         ctx.set_event_recipient("publickey", Some(value));
+
+        Ok(())
+    }
+}
+
+pub struct ThresholdPlaintextAggregatorExtension {
+    bus: Addr<EventBus<EnclaveEvent>>,
+    sortition: Addr<Sortition>,
+    multithread: Addr<Multithread>,
+}
+
+impl ThresholdPlaintextAggregatorExtension {
+    pub fn create(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        sortition: &Addr<Sortition>,
+        multithread: &Addr<Multithread>,
+    ) -> Box<Self> {
+        Box::new(Self {
+            bus: bus.clone(),
+            sortition: sortition.clone(),
+            multithread: multithread.clone(),
+        })
+    }
+}
+
+const ERROR_TRBFV_PLAINTEXT_META_MISSING:&str = "Could not create ThresholdPlaintextAggregator because the meta instance it depends on was not set on the context.";
+
+#[async_trait]
+impl E3Extension for ThresholdPlaintextAggregatorExtension {
+    fn on_event(&self, ctx: &mut E3Context, evt: &EnclaveEvent) {
+        // Save plaintext aggregator
+        let EnclaveEvent::CiphertextOutputPublished { data, .. } = evt else {
+            return;
+        };
+
+        let Some(ref meta) = ctx.get_dependency(META_KEY) else {
+            self.bus.err(
+                EnclaveErrorType::PlaintextAggregation,
+                anyhow!(ERROR_TRBFV_PLAINTEXT_META_MISSING),
+            );
+            return;
+        };
+
+        let e3_id = data.e3_id.clone();
+        let repo = ctx.repositories().trbfv_plaintext(&e3_id);
+        let sync_state = repo.send(Some(ThresholdPlaintextAggregatorState::init(
+            meta.threshold_m as u64,
+            meta.threshold_n as u64,
+            meta.seed,
+            data.ciphertext_output.clone(),
+            meta.params.clone(),
+        )));
+
+        ctx.set_event_recipient(
+            "plaintext",
+            Some(
+                ThresholdPlaintextAggregator::new(
+                    ThresholdPlaintextAggregatorParams {
+                        bus: self.bus.clone(),
+                        sortition: self.sortition.clone(),
+                        e3_id: e3_id.clone(),
+                        multithread: self.multithread.clone(),
+                    },
+                    sync_state,
+                )
+                .start()
+                .into(),
+            ),
+        );
+    }
+
+    async fn hydrate(&self, ctx: &mut E3Context, snapshot: &E3ContextSnapshot) -> Result<()> {
+        // No ID on the snapshot -> bail
+        if !snapshot.contains("plaintext") {
+            return Ok(());
+        }
+
+        let repo = ctx.repositories().trbfv_plaintext(&snapshot.e3_id);
+        let sync_state = repo.load().await?;
+
+        // No Snapshot returned from the store -> bail
+        if !sync_state.has() {
+            return Ok(());
+        };
+
+        let value = ThresholdPlaintextAggregator::new(
+            ThresholdPlaintextAggregatorParams {
+                bus: self.bus.clone(),
+                sortition: self.sortition.clone(),
+                e3_id: ctx.e3_id.clone(),
+                multithread: self.multithread.clone(),
+            },
+            sync_state,
+        )
+        .start()
+        .into();
+
+        // send to context
+        ctx.set_event_recipient("plaintext", Some(value));
 
         Ok(())
     }

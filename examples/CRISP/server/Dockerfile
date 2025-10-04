@@ -8,8 +8,13 @@ ENV CARGO_HOME=/usr/local/cargo
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev curl ca-certificates && \
+    jq pkg-config libssl-dev curl wget ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+
+RUN wget https://github.com/argotorg/solidity/releases/download/v0.8.27/solc-static-linux \
+    && chmod +x solc-static-linux \
+    && mv solc-static-linux /usr/local/bin/solc \
+    && solc --version
 
 RUN curl -sSfL https://risczero.com/install | bash
 
@@ -53,6 +58,7 @@ COPY Cargo.toml ./Cargo.toml
 # find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n"
 COPY crates/aggregator/Cargo.toml crates/aggregator/Cargo.toml
 COPY crates/bfv-helpers/Cargo.toml crates/bfv-helpers/Cargo.toml
+COPY crates/ciphernode-builder/Cargo.toml crates/ciphernode-builder/Cargo.toml
 COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
 COPY crates/compute-provider/Cargo.toml crates/compute-provider/Cargo.toml
 COPY crates/config/Cargo.toml crates/config/Cargo.toml
@@ -68,6 +74,7 @@ COPY crates/indexer/Cargo.toml crates/indexer/Cargo.toml
 COPY crates/init/Cargo.toml crates/init/Cargo.toml
 COPY crates/keyshare/Cargo.toml crates/keyshare/Cargo.toml
 COPY crates/logger/Cargo.toml crates/logger/Cargo.toml
+COPY crates/multithread/Cargo.toml crates/multithread/Cargo.toml
 COPY crates/net/Cargo.toml crates/net/Cargo.toml
 COPY crates/program-server/Cargo.toml crates/program-server/Cargo.toml
 COPY crates/request/Cargo.toml crates/request/Cargo.toml
@@ -76,6 +83,8 @@ COPY crates/sortition/Cargo.toml crates/sortition/Cargo.toml
 COPY crates/support-scripts/Cargo.toml crates/support-scripts/Cargo.toml
 COPY crates/test-helpers/Cargo.toml crates/test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml crates/tests/Cargo.toml
+COPY crates/trbfv/Cargo.toml crates/trbfv/Cargo.toml
+COPY crates/utils/Cargo.toml crates/utils/Cargo.toml
 COPY crates/wasm/Cargo.toml crates/wasm/Cargo.toml
 
 RUN set -eux; \

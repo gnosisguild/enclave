@@ -51,7 +51,10 @@ impl EventLogging for EnclaveEvent {
         match self {
             EnclaveEvent::EnclaveError { .. } => error!(event=%self, "ERROR!"),
             _ => match self.get_e3_id() {
-                Some(e3_id) => info!(me=logger_name, evt=%self, e3_id=%e3_id, "Event Broadcasted"),
+                Some(e3_id) => {
+                    println!("{logger_name}: {e3_id} Event Broadcasted");
+                    info!(me=logger_name, evt=%self, e3_id=%e3_id, "Event Broadcasted")
+                }
                 None => info!(me=logger_name, evt=%self, "Event Broadcasted"),
             },
         };

@@ -158,7 +158,7 @@ impl Handler<EnclaveEvent> for E3Router {
             return;
         };
 
-        // If this e3_id has already been completed then we are not going to do anything here
+        // If this e3 round has already been completed then we are not going to do anything here
         if self.completed.contains(&e3_id) {
             error!("Received the following event to E3Id({}) despite already being completed:\n\n{:?}\n\n", e3_id, msg);
             return;
