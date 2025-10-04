@@ -21,7 +21,7 @@ use e3_utils::{rand_eth_addr, SharedRng};
 use std::sync::Arc;
 use tracing::info;
 
-use crate::CiphernodeSimulated;
+use crate::CiphernodeHandle;
 
 /// Build a ciphernode configuration.
 pub struct CiphernodeBuilder {
@@ -121,7 +121,7 @@ impl CiphernodeBuilder {
         self
     }
 
-    pub async fn build(mut self) -> anyhow::Result<CiphernodeSimulated> {
+    pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
         // Local bus for ciphernode events
         let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
 
@@ -216,7 +216,7 @@ impl CiphernodeBuilder {
         info!("building...");
         e3_builder.build().await?;
 
-        Ok(CiphernodeSimulated::new(
+        Ok(CiphernodeHandle::new(
             addr.to_owned(),
             data_actor.clone(),
             local_bus,

@@ -13,7 +13,7 @@ mod utils;
 use actix::prelude::*;
 use alloy::primitives::Address;
 use anyhow::*;
-use e3_ciphernode_builder::CiphernodeSimulated;
+use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{
     CiphernodeAdded, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector,
     Seed, Subscribe,
@@ -124,7 +124,7 @@ pub fn get_common_setup(
 ///                    │ FIL │───────────────┘                 
 ///                    └─────┘
 /// ```
-pub fn simulate_libp2p_net(nodes: &[CiphernodeSimulated]) {
+pub fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) {
     for node in nodes.iter() {
         let source = &node.bus();
         for (_, node) in nodes.iter().enumerate() {

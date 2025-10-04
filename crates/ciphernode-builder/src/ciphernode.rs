@@ -9,7 +9,7 @@ use e3_data::InMemStore;
 use e3_events::{EnclaveEvent, ErrorCollector, EventBus, HistoryCollector};
 
 #[derive(Clone, Debug)]
-pub struct CiphernodeSimulated {
+pub struct CiphernodeHandle {
     pub address: String,
     pub store: Addr<InMemStore>,
     pub bus: Addr<EventBus<EnclaveEvent>>,
@@ -17,7 +17,7 @@ pub struct CiphernodeSimulated {
     pub errors: Option<Addr<ErrorCollector<EnclaveEvent>>>,
 }
 
-impl CiphernodeSimulated {
+impl CiphernodeHandle {
     pub fn new(
         address: String,
         store: Addr<InMemStore>,

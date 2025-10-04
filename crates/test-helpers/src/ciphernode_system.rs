@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::*;
-use e3_ciphernode_builder::CiphernodeSimulated;
+use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{EnclaveEvent, GetHistory, ResetHistory, TakeHistory};
 use tokio::time::timeout;
 
@@ -15,9 +15,9 @@ use crate::simulate_libp2p_net;
 
 // This type allows us to store various dynamic async callbacks
 type SetupFn<'a> =
-    Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<CiphernodeSimulated>> + 'a>> + 'a>;
+    Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<CiphernodeHandle>> + 'a>> + 'a>;
 type ThenFn<'a> =
-    Box<dyn Fn(CiphernodeSimulated) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> + 'a>;
+    Box<dyn Fn(CiphernodeHandle) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> + 'a>;
 
 /// This builds a ciphernode system using the actor model only. This helps us simulate the network
 /// in tests that we can run in the /crates/tests crate
@@ -53,10 +53,10 @@ impl<'a> CiphernodeSystemBuilder<'a> {
     pub fn add_group<F, Fut>(mut self, count: u32, setup_fn: F) -> Self
     where
         F: Fn() -> Fut + 'a,
-        Fut: Future<Output = Result<CiphernodeSimulated>> + 'a,
+        Fut: Future<Output = Result<CiphernodeHandle>> + 'a,
     {
         let wrapped_fn = Box::new(
-            move || -> Pin<Box<dyn Future<Output = Result<CiphernodeSimulated>> + 'a>> {
+            move || -> Pin<Box<dyn Future<Output = Result<CiphernodeHandle>> + 'a>> {
                 Box::pin(setup_fn())
             },
         );
@@ -97,7 +97,7 @@ impl<'a> CiphernodeSystemBuilder<'a> {
     }
 }
 
-pub struct CiphernodeSystem(Vec<CiphernodeSimulated>);
+pub struct CiphernodeSystem(Vec<CiphernodeHandle>);
 
 impl CiphernodeSystem {
     pub async fn get_history(&self, index: usize) -> Result<CiphernodeHistory> {
@@ -163,7 +163,7 @@ impl CiphernodeSystem {
 }
 
 impl Deref for CiphernodeSystem {
-    type Target = Vec<CiphernodeSimulated>;
+    type Target = Vec<CiphernodeHandle>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -202,14 +202,14 @@ mod tests {
     use e3_data::InMemStore;
     use e3_events::{EventBus, EventBusConfig};
 
-    async fn mock_setup_node(address: String) -> Result<CiphernodeSimulated> {
+    async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
         // Create mock actors for the test
         let store = InMemStore::new(true).start();
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let history = EventBus::<EnclaveEvent>::history(&bus);
         let errors = EventBus::<EnclaveEvent>::error(&bus);
 
-        Ok(CiphernodeSimulated {
+        Ok(CiphernodeHandle {
             address,
             store,
             bus,

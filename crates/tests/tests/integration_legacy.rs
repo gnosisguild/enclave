@@ -7,7 +7,7 @@
 use actix::prelude::*;
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeBuilder;
-use e3_ciphernode_builder::CiphernodeSimulated;
+use e3_ciphernode_builder::CiphernodeHandle;
 use e3_crypto::Cipher;
 use e3_data::GetDump;
 use e3_data::InMemStore;
@@ -44,7 +44,7 @@ async fn setup_local_ciphernode(
     addr: &str,
     data: Option<Addr<InMemStore>>,
     cipher: &Arc<Cipher>,
-) -> Result<CiphernodeSimulated> {
+) -> Result<CiphernodeHandle> {
     let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_address(addr)
         .with_source_bus(bus)
@@ -95,7 +95,7 @@ async fn create_local_ciphernodes(
     rng: &SharedRng,
     count: u32,
     cipher: &Arc<Cipher>,
-) -> Result<Vec<CiphernodeSimulated>> {
+) -> Result<Vec<CiphernodeHandle>> {
     let eth_addrs = create_random_eth_addrs(count);
     let mut result = vec![];
     for addr in &eth_addrs {
