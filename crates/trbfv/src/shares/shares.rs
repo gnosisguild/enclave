@@ -21,7 +21,8 @@ impl SharedSecret {
         Self { moduli_data }
     }
 
-    /// Extract one party's complete share across all moduli
+    /// Extract one party's complete share across all moduli.
+    /// **Panics** if `party_id` is not valid.
     pub fn extract_party_share(&self, party_id: usize) -> Result<ShamirShare> {
         let Some(first) = self.moduli_data.get(0) else {
             return Err(anyhow!(
