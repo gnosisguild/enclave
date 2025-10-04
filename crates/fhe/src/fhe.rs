@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
 use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
+use e3_utils::SharedRng;
 use fhe::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
@@ -32,8 +33,6 @@ pub struct DecryptCiphertext {
     pub unsafe_secret: Vec<u8>,
     pub ciphertext: Vec<u8>,
 }
-
-pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 
 /// Fhe library adaptor.
 #[derive(Clone)]

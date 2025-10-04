@@ -4,8 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use super::SharedRng;
 use e3_bfv_helpers::build_bfv_params_arc;
+use e3_utils::SharedRng;
 use fhe::bfv::BfvParameters;
 use fhe::mbfv::CommonRandomPoly;
 use fhe_traits::Serialize;

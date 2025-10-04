@@ -8,11 +8,11 @@
 /// This has been separated from the esi setup in order to be able to take advantage of parallelism
 use crate::{
     shares::{Encrypted, SharedSecret},
-    SharedRng, TrBFVConfig,
+    TrBFVConfig,
 };
 use anyhow::Result;
 use e3_crypto::Cipher;
-use e3_utils::utility_types::ArcBytes;
+use e3_utils::{utility_types::ArcBytes, SharedRng};
 use fhe::{
     bfv::SecretKey,
     mbfv::{CommonRandomPoly, PublicKeyShare},

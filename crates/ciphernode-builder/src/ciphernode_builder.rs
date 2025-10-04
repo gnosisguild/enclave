@@ -12,15 +12,16 @@ use e3_aggregator::ext::{
 use e3_crypto::Cipher;
 use e3_data::{DataStore, InMemStore, RepositoriesFactory};
 use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
-use e3_fhe::{ext::FheExtension, SharedRng};
+use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sortition::{CiphernodeSelector, Sortition, SortitionRepositoryFactory};
+use e3_utils::{rand_eth_addr, SharedRng};
 use std::sync::Arc;
 use tracing::info;
 
-use crate::{ciphernode_system::CiphernodeSimulated, rand_eth_addr};
+use crate::CiphernodeSimulated;
 
 /// Build a ciphernode configuration.
 pub struct CiphernodeBuilder {
@@ -149,6 +150,7 @@ impl CiphernodeBuilder {
             addr
         } else {
             info!("Using random eth address");
+            // TODO: This is for testing and should not be used for production if we use this to create ciphernodes in production
             rand_eth_addr(&self.rng)
         };
 

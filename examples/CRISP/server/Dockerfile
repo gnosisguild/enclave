@@ -58,6 +58,7 @@ COPY Cargo.toml ./Cargo.toml
 # find crates/* -name "Cargo.toml" -not -path "*/support/*" -printf "COPY %p %p\n"
 COPY crates/aggregator/Cargo.toml crates/aggregator/Cargo.toml
 COPY crates/bfv-helpers/Cargo.toml crates/bfv-helpers/Cargo.toml
+COPY crates/ciphernode-builder/Cargo.toml crates/ciphernode-builder/Cargo.toml
 COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
 COPY crates/compute-provider/Cargo.toml crates/compute-provider/Cargo.toml
 COPY crates/config/Cargo.toml crates/config/Cargo.toml

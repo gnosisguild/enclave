@@ -6,11 +6,11 @@
 
 use crate::{
     shares::{Encrypted, SharedSecret},
-    SharedRng, TrBFVConfig,
+    TrBFVConfig,
 };
 use anyhow::{Context, Result};
 use e3_crypto::Cipher;
-use e3_utils::utility_types::ArcBytes;
+use e3_utils::{utility_types::ArcBytes, SharedRng};
 use fhe::trbfv::{smudging::SmudgingNoiseGenerator, ShareManager};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};

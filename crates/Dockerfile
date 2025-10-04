@@ -45,6 +45,7 @@ COPY --from=evm-builder /build/packages/enclave-contracts/deployed_contracts.jso
 COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
 COPY crates/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
 COPY crates/cli/Cargo.toml ./cli/Cargo.toml
+COPY crates/ciphernode-builder/Cargo.toml ./ciphernode-builder/Cargo.toml
 COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
 COPY crates/config/Cargo.toml ./config/Cargo.toml
 COPY crates/crypto/Cargo.toml ./crypto/Cargo.toml

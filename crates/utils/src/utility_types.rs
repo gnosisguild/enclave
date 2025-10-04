@@ -5,11 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use core::fmt;
-use std::{ops::Deref, sync::Arc};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 
+use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::formatters::hexf;
+
+pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ArcBytes(Arc<Vec<u8>>);

@@ -2622,6 +2622,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-ciphernode-builder"
+version = "0.1.3"
+dependencies = [
+ "actix",
+ "anyhow",
+ "e3-aggregator",
+ "e3-crypto",
+ "e3-data",
+ "e3-events",
+ "e3-fhe",
+ "e3-keyshare",
+ "e3-multithread",
+ "e3-request",
+ "e3-sortition",
+ "e3-utils",
+ "tracing",
+]
+
+[[package]]
 name = "e3-cli"
 version = "0.1.3"
 dependencies = [
@@ -2838,6 +2857,7 @@ dependencies = [
  "e3-events",
  "e3-request",
  "e3-trbfv",
+ "e3-utils",
  "fhe",
  "fhe-traits",
  "fhe-util",
@@ -2969,6 +2989,7 @@ dependencies = [
  "e3-data",
  "e3-events",
  "e3-trbfv",
+ "e3-utils",
  "rand 0.8.5",
  "rayon",
  "tokio",
@@ -3075,6 +3096,7 @@ dependencies = [
  "bincode",
  "clap",
  "e3-aggregator",
+ "e3-ciphernode-builder",
  "e3-crypto",
  "e3-data",
  "e3-events",
@@ -3107,6 +3129,7 @@ dependencies = [
  "bincode",
  "clap",
  "e3-aggregator",
+ "e3-ciphernode-builder",
  "e3-crypto",
  "e3-data",
  "e3-events",
@@ -3168,8 +3191,11 @@ name = "e3-utils"
 version = "0.1.3"
 dependencies = [
  "actix",
+ "alloy",
  "anyhow",
  "derivative",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "serde",
 ]
 

@@ -17,9 +17,9 @@ use e3_trbfv::{
         gen_pk_share_and_sk_sss, GenPkShareAndSkSssRequest, GenPkShareAndSkSssResponse,
     },
     shares::{EncryptableVec, PvwEncrypted, PvwEncryptedVecExt, ShamirShare, SharedSecret},
-    SharedRng, TrBFVConfig,
+    TrBFVConfig,
 };
-use e3_utils::ArcBytes;
+use e3_utils::{ArcBytes, SharedRng};
 use fhe::{
     bfv::{BfvParameters, PublicKey},
     mbfv::{AggregateIter, CommonRandomPoly, PublicKeyShare},
