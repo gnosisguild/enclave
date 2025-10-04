@@ -92,7 +92,7 @@ pub fn gen_esi_sss(
                     .context("Failed to generate smudging error")?
             };
             let mut share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone());
-            let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).unwrap();
+            let esi_poly = share_manager.bigints_to_poly(&esi_coeffs)?;
             info!("gen_esi_sss:generate_secret_shares_from_poly...");
             Ok(SharedSecret::from({
                 share_manager
