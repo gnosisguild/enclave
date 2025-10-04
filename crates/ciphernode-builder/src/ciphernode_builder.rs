@@ -2,7 +2,7 @@
 //
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
-// or FITNESS FOR A PARTICULAR PURPOSE.;
+// or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr};
 use e3_aggregator::ext::{

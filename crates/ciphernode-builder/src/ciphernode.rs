@@ -1,8 +1,8 @@
-// spdx-license-identifier: lgpl-3.0-only
+// SPDX-License-Identifier: LGPL-3.0-only
 //
-// this file is provided without any warranty;
-// without even the implied warranty of merchantability
-// or fitness for a particular purpose.;
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Addr;
 use e3_data::InMemStore;
