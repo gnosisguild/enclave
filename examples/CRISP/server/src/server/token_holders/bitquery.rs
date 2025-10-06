@@ -86,10 +86,10 @@ impl BitqueryClient {
         }
     }
 
-    /// Retrieves token holders for a specific contract at a given block.
+    /// Retrieves token holders for a specific token at a given block.
     ///
     /// # Arguments
-    /// * `token_contract` - The token contract address
+    /// * `token_address` - The token address
     /// * `block_number` - The block number to query
     /// * `chain_id` - The blockchain network ID
     /// * `limit` - Maximum number of holders to return
@@ -98,7 +98,7 @@ impl BitqueryClient {
     /// A vector of `TokenHolder` structs, or an error if the request fails.
     pub async fn get_token_holders(
         &self,
-        token_contract: &str,
+        token_address: &str,
         block_number: u64,
         chain_id: u64,
         limit: u32,
@@ -129,7 +129,7 @@ impl BitqueryClient {
                 }}
             }}
             "#,
-            network, block_number, token_contract, limit
+            network, block_number, token_address, limit
         );
 
         let request = GraphQLRequest {
