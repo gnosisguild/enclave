@@ -6,6 +6,7 @@
 
 use ark_bn254::Fr;
 use ark_ff::{BigInt, BigInteger, PrimeField};
+use eyre::Result;
 use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use std::str::FromStr;
@@ -18,34 +19,22 @@ use super::TokenHolder;
 /// * `token_holders` - A vector of TokenHolder structs containing address and balance.
 ///
 /// # Returns
-/// A Result containing either a vector of hex-encoded Poseidon hashes or an error string.
+/// A Result containing either a vector of hex-encoded Poseidon hashes or an error.
 /// Returns an error if any token holder has invalid address or balance data.
-pub fn compute_token_holder_hashes(token_holders: &[TokenHolder]) -> Result<Vec<String>, String> {
+pub fn compute_token_holder_hashes(token_holders: &[TokenHolder]) -> Result<Vec<String>> {
     let mut hashes = Vec::new();
 
-    for (i, holder) in token_holders.iter().enumerate() {
+    for holder in token_holders.iter() {
         // Convert address directly to field element.
         let address_hex = holder.address.trim_start_matches("0x");
-        let address_bigint = BigUint::parse_bytes(address_hex.as_bytes(), 16).ok_or_else(|| {
-            format!(
-                "Invalid address format at index {}: '{}'",
-                i, holder.address
-            )
-        })?;
-        let address_fr = Fr::from_str(&address_bigint.to_string()).map_err(|_| {
-            format!(
-                "Failed to convert address to field element at index {}: invalid format",
-                i
-            )
-        })?;
+        let address_bigint = BigUint::parse_bytes(address_hex.as_bytes(), 16)
+            .ok_or_else(|| eyre::eyre!("Invalid address format"))?;
+        let address_fr = Fr::from_str(&address_bigint.to_string())
+            .map_err(|_| eyre::eyre!("Failed to convert address to field element"))?;
 
         // Convert balance to field element safely, reducing modulo field order if necessary.
-        let balance_bigint = BigUint::from_str(&holder.balance).map_err(|e| {
-            format!(
-                "Invalid balance format at index {}: '{}' - {}",
-                i, holder.balance, e
-            )
-        })?;
+        let balance_bigint = BigUint::from_str(&holder.balance)
+            .map_err(|e| eyre::eyre!("Invalid balance format: {}", e))?;
         let balance_bytes = balance_bigint.to_bytes_be();
         let mut padded_bytes = [0u8; 32];
         let start = 32usize.saturating_sub(balance_bytes.len());
@@ -53,12 +42,8 @@ pub fn compute_token_holder_hashes(token_holders: &[TokenHolder]) -> Result<Vec<
         let balance_fr = Fr::from_be_bytes_mod_order(&padded_bytes);
 
         // Compute Poseidon hash of address + balance.
-        let mut poseidon = Poseidon::<Fr>::new_circom(2)
-            .map_err(|e| format!("Failed to create Poseidon instance at index {}: {}", i, e))?;
-        let hash_bigint: BigInt<4> = poseidon
-            .hash(&[address_fr, balance_fr])
-            .map_err(|e| format!("Failed to compute Poseidon hash at index {}: {}", i, e))?
-            .into();
+        let mut poseidon = Poseidon::<Fr>::new_circom(2).unwrap();
+        let hash_bigint: BigInt<4> = poseidon.hash(&[address_fr, balance_fr]).unwrap().into();
         let hash = hex::encode(hash_bigint.to_bytes_be());
 
         hashes.push(hash);
@@ -138,7 +123,10 @@ mod tests {
 
         let result = compute_token_holder_hashes(&token_holders);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Invalid address format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid address format"));
     }
 
     #[test]
@@ -150,7 +138,10 @@ mod tests {
 
         let result = compute_token_holder_hashes(&token_holders);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Invalid balance format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid balance format"));
     }
 
     #[test]
@@ -162,7 +153,10 @@ mod tests {
 
         let result = compute_token_holder_hashes(&token_holders);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Invalid balance format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid balance format"));
     }
 
     #[test]

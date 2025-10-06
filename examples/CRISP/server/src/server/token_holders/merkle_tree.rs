@@ -6,6 +6,7 @@
 
 use ark_bn254::Fr;
 use ark_ff::{BigInt, BigInteger};
+use eyre::Result;
 use lean_imt::LeanIMT;
 use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
@@ -18,14 +19,28 @@ use std::str::FromStr;
 ///
 /// # Returns
 /// A Result containing either a LeanIMT instance with the provided hashes as leaves,
-/// or a String error message if construction fails.
-pub fn build_tree(poseidon_hashes: Vec<String>) -> Result<LeanIMT, String> {
-    let mut tree = LeanIMT::new(|nodes| poseidon_hash(nodes).unwrap_or_else(|_| "".to_string()));
+/// or an error if construction fails.
+pub fn build_tree(poseidon_hashes: Vec<String>) -> Result<LeanIMT> {
+    // Pre‑validate leaves (must be 32‑byte hex).
+    for (i, h) in poseidon_hashes.iter().enumerate() {
+        let bytes =
+            hex::decode(h).map_err(|_| eyre::eyre!("Invalid hex at index {}: '{}'", i, h))?;
 
-    // Only insert if we have hashes to avoid empty tree issues
+        if bytes.len() != 32 {
+            return Err(eyre::eyre!(
+                "Invalid leaf length at index {}: expected 32 bytes, got {}",
+                i,
+                bytes.len()
+            ));
+        }
+    }
+
+    let mut tree = LeanIMT::new(|nodes| poseidon_hash(nodes));
+
+    // Only insert if we have hashes to avoid empty tree issues.
     if !poseidon_hashes.is_empty() {
         tree.insert_many(poseidon_hashes)
-            .map_err(|e| format!("Failed to insert hashes into tree: {}", e))?;
+            .map_err(|e| eyre::eyre!("Failed to insert hashes into tree: {}", e))?;
     }
 
     Ok(tree)
@@ -37,26 +52,21 @@ pub fn build_tree(poseidon_hashes: Vec<String>) -> Result<LeanIMT, String> {
 /// * `nodes` - A vector of hex-encoded hash strings to hash together.
 ///
 /// # Returns
-/// A Result containing either a hex-encoded hash string representing the combined hash,
-/// or a String error message if hashing fails.
-fn poseidon_hash(nodes: Vec<String>) -> Result<String, String> {
-    let mut poseidon = Poseidon::<Fr>::new_circom(2)
-        .map_err(|e| format!("Failed to create Poseidon hasher: {}", e))?;
+/// A hex-encoded hash string representing the combined hash.
+fn poseidon_hash(nodes: Vec<String>) -> String {
+    let mut poseidon = Poseidon::<Fr>::new_circom(2).unwrap();
     let mut field_elements = Vec::new();
 
     for node in nodes {
-        let bigint = BigUint::parse_bytes(node.as_bytes(), 16)
-            .ok_or_else(|| format!("Failed to parse hex string '{}': Invalid hex format", node))?;
-        let field_repr = Fr::from_str(&bigint.to_string())
-            .map_err(|e| format!("Failed to convert to field element: {:?}", e))?;
+        let bigint = BigUint::parse_bytes(node.as_bytes(), 16).unwrap();
+        let field_repr = Fr::from_str(&bigint.to_string()).unwrap();
+
         field_elements.push(field_repr);
     }
 
-    let result_hash: BigInt<4> = poseidon
-        .hash(&field_elements)
-        .map_err(|e| format!("Failed to hash field elements: {}", e))?
-        .into();
-    Ok(hex::encode(result_hash.to_bytes_be()))
+    let result_hash: BigInt<4> = poseidon.hash(&field_elements).unwrap().into();
+
+    hex::encode(result_hash.to_bytes_be())
 }
 
 #[cfg(test)]

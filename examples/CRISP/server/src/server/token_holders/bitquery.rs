@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use eyre::Result;
 use serde::{Deserialize, Serialize};
 
 /// Represents a token holder with their address and balance.
@@ -71,7 +72,7 @@ impl BitqueryClient {
 
     /// Maps chain IDs to Bitquery network names.
     /// Returns an error for unsupported chains.
-    fn get_network_name(chain_id: u64) -> Result<&'static str, String> {
+    fn get_network_name(chain_id: u64) -> Result<&'static str> {
         match chain_id {
             1 => Ok("eth"),
             11155111 => Ok("sepolia"),
@@ -81,7 +82,7 @@ impl BitqueryClient {
             43114 => Ok("avalanche"),
             42161 => Ok("arbitrum"),
             10 => Ok("optimism"),
-            _ => Err(format!("unsupported chain id: {}", chain_id)),
+            _ => Err(eyre::eyre!("unsupported chain id: {}", chain_id)),
         }
     }
 
@@ -101,7 +102,7 @@ impl BitqueryClient {
         block_number: u64,
         chain_id: u64,
         limit: u32,
-    ) -> Result<Vec<TokenHolder>, String> {
+    ) -> Result<Vec<TokenHolder>> {
         let network = Self::get_network_name(chain_id)?;
 
         // Build GraphQL query to fetch token holders.
@@ -145,19 +146,19 @@ impl BitqueryClient {
             .json(&request)
             .send()
             .await
-            .map_err(|e| format!("Failed to send request to Bitquery: {}", e))?;
+            .map_err(|e| eyre::eyre!("Failed to send request to Bitquery: {}", e))?;
 
         let status = response.status();
         let response_text = response
             .text()
             .await
-            .map_err(|e| format!("Failed to read response from Bitquery: {}", e))?;
+            .map_err(|e| eyre::eyre!("Failed to read response from Bitquery: {}", e))?;
         if !status.is_success() {
-            return Err(format!("Bitquery HTTP {}: {}", status, response_text));
+            return Err(eyre::eyre!("Bitquery HTTP {}: {}", status, response_text));
         }
 
         let graphql_response: GraphQLResponse = serde_json::from_str(&response_text)
-            .map_err(|e| format!("Failed to parse Bitquery response: {}", e))?;
+            .map_err(|e| eyre::eyre!("Failed to parse Bitquery response: {}", e))?;
         let token_holders: Vec<TokenHolder> = graphql_response
             .data
             .evm

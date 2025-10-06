@@ -26,6 +26,7 @@ use e3_sdk::{
     },
     indexer::{DataStore, EnclaveIndexer},
 };
+use eyre::Context;
 use log::{info};
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -81,31 +82,28 @@ pub async fn register_e3_requested(
                             // to retrieve large datasets efficiently.
                         )
                         .await
-                        .map_err(|e| eyre::eyre!("Bitquery error: {}", e))?
+                        .with_context(|| "Bitquery error")?
                 };
 
                 if token_holders.is_empty() {
                     return Err(eyre::eyre!(
-                        "No eligible token holders found for token address {}. Cannot build Merkle tree.",
+                        "No eligible token holders found for token address {}.",
                         token_address
                     ).into());
                 }
 
                 // Compute Poseidon hashes for token holder address + balance pairs.
-                let token_holder_hashes = match compute_token_holder_hashes(&token_holders) {
-                    Ok(hashes) => hashes,
-                    Err(e) => {
-                        return Err(eyre::eyre!("Failed to compute token holder hashes: {}", e));
-                    }
-                };
+                let token_holder_hashes = compute_token_holder_hashes(&token_holders)
+                    .with_context(|| "Failed to compute token holder hashes")?;
 
                 repo.set_token_holder_hashes(token_holder_hashes.clone()).await?;
                 
                 let tree = build_tree(token_holder_hashes)
-                    .map_err(|e| eyre::eyre!("Failed to build tree: {}", e))?;
+                    .with_context(|| "Failed to build tree")?;
                 let merkle_root = tree.root().ok_or_else(|| {
                     eyre::eyre!("Failed to get merkle root from tree")
                 })?;
+
                 info!("Merkle root: {}", merkle_root);
 
                 // TODO: Publish merkle root on-chain (inputValidator contract).
