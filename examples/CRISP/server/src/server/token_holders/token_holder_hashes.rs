@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use ark_bn254::Fr;
-use ark_ff::{BigInt, BigInteger};
+use ark_ff::{BigInt, BigInteger, PrimeField};
 use light_poseidon::{Poseidon, PoseidonHasher};
 use num_bigint::BigUint;
 use std::str::FromStr;
@@ -28,8 +28,13 @@ pub fn compute_token_holder_hashes(token_holders: &[TokenHolder]) -> Vec<String>
         let address_bigint = BigUint::parse_bytes(address_hex.as_bytes(), 16).unwrap();
         let address_fr = Fr::from_str(&address_bigint.to_string()).unwrap();
 
-        // Convert balance to field element.
-        let balance_fr = Fr::from_str(&holder.balance).unwrap();
+        // Convert balance to field element safely, reducing modulo field order if necessary.
+        let balance_bigint = BigUint::from_str(&holder.balance).unwrap();
+        let balance_bytes = balance_bigint.to_bytes_be();
+        let mut padded_bytes = [0u8; 32];
+        let start = 32usize.saturating_sub(balance_bytes.len());
+        padded_bytes[start..].copy_from_slice(&balance_bytes);
+        let balance_fr = Fr::from_be_bytes_mod_order(&padded_bytes);
 
         // Compute Poseidon hash of address + balance.
         let mut poseidon_instance = Poseidon::<Fr>::new_circom(2).unwrap();
@@ -83,5 +88,25 @@ mod tests {
         for hash in &hashes {
             assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
         }
+    }
+
+    #[test]
+    fn test_balance_modulo_reduction() {
+        // Test that balances larger than the field modulus are properly reduced
+        // BN254 field modulus + 1 should reduce to 1
+        let field_modulus_plus_one =
+            "21888242871839275222246405745257275088548364400416034343698204186575808495618";
+
+        let token_holders = vec![TokenHolder {
+            address: "0x1234567890123456789012345678901234567890".to_string(),
+            balance: field_modulus_plus_one.to_string(),
+        }];
+
+        // This should not panic and should reduce the balance to 1 (mod field_modulus)
+        let hashes = compute_token_holder_hashes(&token_holders);
+
+        assert_eq!(hashes.len(), 1);
+        assert!(!hashes[0].is_empty());
+        assert!(hashes[0].chars().all(|c| c.is_ascii_hexdigit()));
     }
 }
