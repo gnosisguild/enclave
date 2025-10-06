@@ -3,7 +3,7 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use ndarray::{Array, Array2};
 use std::ops::Deref;
 
@@ -22,20 +22,24 @@ impl SharedSecret {
     }
 
     /// Extract one party's complete share across all moduli.
-    /// **Panics** if `party_id` is not valid.
     pub fn extract_party_share(&self, party_id: usize) -> Result<ShamirShare> {
         let Some(first) = self.moduli_data.get(0) else {
-            return Err(anyhow!(
-                "Secret must have at least one modulus in order to extract share"
-            ));
+            bail!("Secret must have at least one modulus in order to extract share");
         };
 
         let (_, degree) = first.dim();
         let mut share_data = Array::zeros((0, degree));
 
         for modulus_poly in &self.moduli_data {
+            if modulus_poly.nrows() <= party_id {
+                bail!(
+                    "party_id {} exceeds available rows ({})",
+                    party_id,
+                    modulus_poly.nrows()
+                );
+            }
             let party_row = modulus_poly.row(party_id);
-            share_data.push_row(party_row).unwrap();
+            share_data.push_row(party_row)?;
         }
 
         Ok(ShamirShare::new(share_data))
