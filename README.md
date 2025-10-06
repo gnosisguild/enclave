@@ -94,10 +94,10 @@ pnpm clean
 		</tr>
 		<tr>
             <td align="center">
-                <a href="https://github.com/ctrlc03">
-                    <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
+                <a href="https://github.com/nginnever">
+                    <img src="https://avatars.githubusercontent.com/u/7103153?v=4" width="100;" alt="nginnever"/>
                     <br />
-                    <sub><b>ctrlc03</b></sub>
+                    <sub><b>Nathan Ginnever</b></sub>
                 </a>
             </td>
 		</tr>
@@ -135,6 +135,13 @@ pnpm clean
                     <img src="https://avatars.githubusercontent.com/u/92573882?v=4" width="100;" alt="Subhasish-Behera"/>
                     <br />
                     <sub><b>SUBHASISH BEHERA</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/ozgurarmanc">
+                    <img src="https://avatars.githubusercontent.com/u/94117770?v=4" width="100;" alt="ozgurarmanc"/>
+                    <br />
+                    <sub><b>Armanc</b></sub>
                 </a>
             </td>
 		</tr>
