@@ -21,7 +21,7 @@ use std::str::FromStr;
 ///
 /// # Example
 /// ```rust
-/// use crisp::server::utils::build_lean_imt;
+/// use crisp::server::token_holders::build_lean_imt;
 ///
 /// let hashes = vec![
 ///     "1234567890123456789012345678901234567890123456789012345678901234".to_string(),

@@ -4,12 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::server::utils::{get_mock_token_holders, BitqueryClient};
+use crate::server::token_holders::{get_mock_token_holders, BitqueryClient};
 use crate::server::{
     models::CurrentRound,
     program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
-    utils::{build_lean_imt, compute_token_holder_hashes},
+    token_holders::{build_lean_imt, compute_token_holder_hashes},
     CONFIG,
 };
 use alloy_primitives::Address;

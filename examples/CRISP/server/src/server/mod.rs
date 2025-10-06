@@ -11,7 +11,7 @@ mod models;
 mod program_server_request;
 mod repo;
 mod routes;
-pub mod utils;
+pub mod token_holders;
 
 use std::sync::Arc;
 
