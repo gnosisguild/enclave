@@ -6,7 +6,7 @@
 
 use crate::server::token_holders::{get_mock_token_holders, BitqueryClient};
 use crate::server::{
-    models::CurrentRound,
+    models::{CurrentRound, CustomParams},
     program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
     token_holders::{build_tree, compute_token_holder_hashes},
@@ -27,8 +27,9 @@ use e3_sdk::{
     indexer::{DataStore, EnclaveIndexer},
 };
 use eyre::Context;
-use log::{info};
+use log::info;
 use std::error::Error;
+use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
 
@@ -46,17 +47,16 @@ pub async fn register_e3_requested(
             info!("E3Requested: {:?}", event);
 
             async move {
-                // Validate custom params length before converting to address.
-                if event.e3.customParams.len() != 20 {
-                    return Err(eyre::eyre!(
-                        "Invalid customParams length: expected 20 bytes, got {} bytes. Skipping E3 request.",
-                        event.e3.customParams.len()
-                    )
-                    .into());
-                }
+                // Convert custom params bytes back to token address and balance threshold.
+                let custom_params: CustomParams =
+                    serde_json::from_slice(&event.e3.customParams).unwrap();
 
-                // Convert custom params bytes back to token address.
-                let token_address: Address = Address::from_slice(&event.e3.customParams);
+                let token_address: Address = custom_params
+                    .token_address
+                    .parse()
+                    .with_context(|| "Failed to parse token address")?;
+
+                let balance_threshold = custom_params.balance_threshold;
 
                 // Get token holders from Bitquery API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
@@ -64,7 +64,7 @@ pub async fn register_e3_requested(
                         "Using mocked token holders for local network (chain_id: {})",
                         CONFIG.chain_id
                     );
-                    
+
                     get_mock_token_holders()
                 } else {
                     info!(
@@ -76,10 +76,11 @@ pub async fn register_e3_requested(
                     bitquery_client
                         .get_token_holders(
                             &token_address.to_string(),
+                            balance_threshold,
                             event.e3.requestBlock.to::<u64>(),
                             CONFIG.chain_id,
                             10000, // TODO: this is fine for now, but we need pagination or chunking strategies
-                            // to retrieve large datasets efficiently.
+                                   // to retrieve large datasets efficiently.
                         )
                         .await
                         .with_context(|| "Bitquery error")?
@@ -89,20 +90,22 @@ pub async fn register_e3_requested(
                     return Err(eyre::eyre!(
                         "No eligible token holders found for token address {}.",
                         token_address
-                    ).into());
+                    )
+                    .into());
                 }
 
                 // Compute Poseidon hashes for token holder address + balance pairs.
                 let token_holder_hashes = compute_token_holder_hashes(&token_holders)
                     .with_context(|| "Failed to compute token holder hashes")?;
 
-                repo.set_token_holder_hashes(token_holder_hashes.clone()).await?;
-                
-                let tree = build_tree(token_holder_hashes)
-                    .with_context(|| "Failed to build tree")?;
-                let merkle_root = tree.root().ok_or_else(|| {
-                    eyre::eyre!("Failed to get merkle root from tree")
-                })?;
+                repo.set_token_holder_hashes(token_holder_hashes.clone())
+                    .await?;
+
+                let tree =
+                    build_tree(token_holder_hashes).with_context(|| "Failed to build tree")?;
+                let merkle_root = tree
+                    .root()
+                    .ok_or_else(|| eyre::eyre!("Failed to get merkle root from tree"))?;
 
                 info!("Merkle root: {}", merkle_root);
 

@@ -90,6 +90,7 @@ impl BitqueryClient {
     ///
     /// # Arguments
     /// * `token_address` - The token address
+    /// * `balance_threshold` - The balance threshold
     /// * `block_number` - The block number to query
     /// * `chain_id` - The blockchain network ID
     /// * `limit` - Maximum number of holders to return
@@ -99,6 +100,7 @@ impl BitqueryClient {
     pub async fn get_token_holders(
         &self,
         token_address: &str,
+        balance_threshold: u64,
         block_number: u64,
         chain_id: u64,
         limit: u32,
@@ -171,7 +173,9 @@ impl BitqueryClient {
             .filter(|h| {
                 h.balance
                     .parse::<bigdecimal::BigDecimal>()
-                    .map_or(false, |b| b > 0.into())
+                    .map_or(false, |b| {
+                        b >= bigdecimal::BigDecimal::from(balance_threshold)
+                    })
             })
             .collect();
 
@@ -250,10 +254,12 @@ mod tests {
     /// Returns a known‑good tuple commonly used in examples:
     /// - USDT contract on Ethereum mainnet.
     /// - A historical block chosen to be well after deployment.
-    fn example_params() -> (&'static str, u64, u64, u32) {
+    fn example_params() -> (&'static str, u64, u64, u64, u32) {
         (
             // Token contract
             "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            // Balance threshold
+            1000,
             // Historical block height (Ethereum)
             18_500_000,
             // Chain id (Ethereum mainnet)
@@ -285,10 +291,10 @@ mod tests {
             env::var("BITQUERY_API_KEY").expect("Set BITQUERY_API_KEY to run this live test");
 
         let client = BitqueryClient::new(api_key);
-        let (token, block, chain_id, limit) = example_params();
+        let (token, balance_threshold, block, chain_id, limit) = example_params();
 
         let res = client
-            .get_token_holders(token, block, chain_id, limit)
+            .get_token_holders(token, balance_threshold, block, chain_id, limit)
             .await;
         assert!(res.is_ok(), "Live call failed: {res:?}");
 
@@ -344,10 +350,10 @@ mod tests {
     async fn get_token_holders_fails_with_invalid_key() {
         // Use a clearly invalid key; do not rely on any env configuration.
         let client = BitqueryClient::new("invalid_key_for_test_purposes".to_string());
-        let (token, block, chain_id, limit) = example_params();
+        let (token, balance_threshold, block, chain_id, limit) = example_params();
 
         let res = client
-            .get_token_holders(token, block, chain_id, limit)
+            .get_token_holders(token, balance_threshold, block, chain_id, limit)
             .await;
 
         assert!(

@@ -39,9 +39,10 @@ struct Cli {
 enum Commands {
     /// Initialize new E3 round
     Init {
-        /// Token contract address for the voting round
         #[arg(short, long)]
         token_address: String,
+        #[arg(short, long)]
+        balance_threshold: u64,
     },
 }
 
@@ -58,8 +59,11 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     match cli.command {
-        Some(Commands::Init { token_address }) => {
-            initialize_crisp_round(&token_address).await?;
+        Some(Commands::Init {
+            token_address,
+            balance_threshold,
+        }) => {
+            initialize_crisp_round(&token_address, balance_threshold).await?;
         }
         None => {
             // Fall back to interactive mode if no command was specified
@@ -67,7 +71,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             match action {
                 0 => {
                     let token_address = get_token_address()?;
-                    initialize_crisp_round(&token_address).await?;
+                    let balance_threshold = get_balance_threshold()?;
+                    initialize_crisp_round(&token_address, balance_threshold).await?;
                 }
                 _ => unreachable!(),
             }
@@ -103,5 +108,11 @@ fn select_action() -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
 fn get_token_address() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     Ok(Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter the token contract address for the voting round")
+        .interact_text()?)
+}
+
+fn get_balance_threshold() -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    Ok(Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter the balance threshold for the voting round")
         .interact_text()?)
 }

@@ -88,10 +88,17 @@ pub struct ComputeProviderParams {
     pub batch_size: u32,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CustomParams {
+    pub token_address: String,
+    pub balance_threshold: u64,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RoundRequest {
     pub cron_api_key: String,
     pub token_address: String,
+    pub balance_threshold: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

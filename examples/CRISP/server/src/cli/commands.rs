@@ -38,6 +38,12 @@ struct ComputeProviderParams {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+struct CustomParams {
+    token_address: String,
+    balance_threshold: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct PKRequest {
     round_id: u64,
     pk_bytes: Vec<u8>,
@@ -51,11 +57,13 @@ struct CTRequest {
 
 pub async fn initialize_crisp_round(
     token_address: &str,
+    balance_threshold: u64,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!(
-        "Starting new CRISP round with token address: {}",
-        token_address
+        "Starting new CRISP round with token address: {} and balance threshold: {}",
+        token_address, balance_threshold
     );
+
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
@@ -79,9 +87,12 @@ pub async fn initialize_crisp_round(
         Err(e) => info!("Error checking E3 Program enabled: {:?}", e),
     }
 
-    // Convert the token address from hex string to bytes.
-    let token_address: Address = token_address.parse()?;
-    let custom_params = Bytes::from(token_address.as_slice().to_vec());
+    let custom_params = CustomParams {
+        token_address: token_address.to_string(),
+        balance_threshold: balance_threshold,
+    };
+    // Serialize the custom parameters to bytes.
+    let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
 
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
@@ -107,7 +118,7 @@ pub async fn initialize_crisp_round(
             e3_program,
             e3_params,
             compute_provider_params_bytes,
-            custom_params,
+            custom_params_bytes,
         )
         .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);

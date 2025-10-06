@@ -14,7 +14,7 @@ async function runCliInit() {
   try {
     // Execute the command and wait for it to complete
     const output = execSync(
-      "pnpm cli init --token-address 0x3F2A1C7C5eE6c88e94a7A314d86Dcb09E5F3E0c2",
+      "pnpm cli init --token-address 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512 --balance-threshold 1000",
       { encoding: "utf-8" }
     );
     console.log("Command output:", output);

@@ -7,7 +7,7 @@
 use crate::config::CONFIG;
 use crate::server::app_data::AppData;
 use crate::server::models::{
-    CTRequest, ComputeProviderParams, JsonResponse, PKRequest, RoundRequest,
+    CTRequest, ComputeProviderParams, CustomParams, JsonResponse, PKRequest, RoundRequest,
 };
 
 use actix_web::{web, HttpResponse, Responder};
@@ -49,7 +49,13 @@ async fn request_new_round(data: web::Json<RoundRequest>) -> impl Responder {
         });
     }
 
-    let result = initialize_crisp_round(&data.token_address).await;
+    if data.balance_threshold == 0 {
+        return HttpResponse::BadRequest().json(JsonResponse {
+            response: "Balance threshold is required".to_string(),
+        });
+    }
+
+    let result = initialize_crisp_round(&data.token_address, data.balance_threshold).await;
 
     match result {
         Ok(_) => HttpResponse::Ok().json(JsonResponse {
@@ -132,16 +138,18 @@ async fn get_public_key(data: web::Json<PKRequest>, store: web::Data<AppData>) -
 /// # Arguments
 ///
 /// * `token_address` - The token contract address
+/// * `balance_threshold` - The balance threshold
 ///
 /// # Returns
 ///
 /// * A result indicating the success of the operation
 pub async fn initialize_crisp_round(
     token_address: &str,
+    balance_threshold: u64,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!(
-        "Starting new CRISP round with token address: {}",
-        token_address
+        "Starting new CRISP round with token address: {} and balance threshold: {}",
+        token_address, balance_threshold
     );
 
     // Continue with the existing E3 initialization
@@ -173,9 +181,12 @@ pub async fn initialize_crisp_round(
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
     let params = encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli));
 
-    // Convert the token address from hex string to bytes.
-    let token_address: Address = token_address.parse()?;
-    let custom_params = Bytes::from(token_address.as_slice().to_vec());
+    let custom_params = CustomParams {
+        token_address: token_address.to_string(),
+        balance_threshold: balance_threshold,
+    };
+    // Serialize the custom parameters to bytes.
+    let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
 
     info!("Requesting E3...");
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
@@ -201,7 +212,7 @@ pub async fn initialize_crisp_round(
             e3_program,
             e3_params,
             compute_provider_params,
-            custom_params,
+            custom_params_bytes,
         )
         .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);
