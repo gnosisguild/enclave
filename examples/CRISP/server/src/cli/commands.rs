@@ -7,6 +7,7 @@
 use chrono::Utc;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
 use log::info;
+use num_bigint::BigUint;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +41,7 @@ struct ComputeProviderParams {
 #[derive(Debug, Deserialize, Serialize)]
 struct CustomParams {
     token_address: String,
-    balance_threshold: u64,
+    balance_threshold: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -57,7 +58,7 @@ struct CTRequest {
 
 pub async fn initialize_crisp_round(
     token_address: &str,
-    balance_threshold: u64,
+    balance_threshold: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!(
         "Starting new CRISP round with token address: {} and balance threshold: {}",
@@ -87,9 +88,13 @@ pub async fn initialize_crisp_round(
         Err(e) => info!("Error checking E3 Program enabled: {:?}", e),
     }
 
+    let token_address: Address = token_address.parse()?;
+    let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)
+        .ok_or("Invalid balance threshold")?;
+
     let custom_params = CustomParams {
         token_address: token_address.to_string(),
-        balance_threshold: balance_threshold,
+        balance_threshold: balance_threshold.to_string(),
     };
     // Serialize the custom parameters to bytes.
     let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);

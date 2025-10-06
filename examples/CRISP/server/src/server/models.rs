@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::primitives::Address;
 use anyhow::Result;
+use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Deserialize, Debug)]
@@ -91,14 +93,14 @@ pub struct ComputeProviderParams {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CustomParams {
     pub token_address: String,
-    pub balance_threshold: u64,
+    pub balance_threshold: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RoundRequest {
     pub cron_api_key: String,
     pub token_address: String,
-    pub balance_threshold: u64,
+    pub balance_threshold: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

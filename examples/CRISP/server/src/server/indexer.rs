@@ -28,8 +28,8 @@ use e3_sdk::{
 };
 use eyre::Context;
 use log::info;
+use num_bigint::BigUint;
 use std::error::Error;
-use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
 
@@ -56,7 +56,9 @@ pub async fn register_e3_requested(
                     .parse()
                     .with_context(|| "Failed to parse token address")?;
 
-                let balance_threshold = custom_params.balance_threshold;
+                let balance_threshold =
+                    BigUint::parse_bytes(custom_params.balance_threshold.as_bytes(), 10)
+                        .ok_or_else(|| eyre::eyre!("Invalid balance threshold"))?;
 
                 // Get token holders from Bitquery API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
@@ -75,7 +77,7 @@ pub async fn register_e3_requested(
                     let bitquery_client = BitqueryClient::new(CONFIG.bitquery_api_key.clone());
                     bitquery_client
                         .get_token_holders(
-                            &token_address.to_string(),
+                            token_address,
                             balance_threshold,
                             event.e3.requestBlock.to::<u64>(),
                             CONFIG.chain_id,

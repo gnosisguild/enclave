@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::primitives::Address;
 use eyre::Result;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 /// Represents a token holder with their address and balance.
@@ -99,8 +101,8 @@ impl BitqueryClient {
     /// A vector of `TokenHolder` structs, or an error if the request fails.
     pub async fn get_token_holders(
         &self,
-        token_address: &str,
-        balance_threshold: u64,
+        token_address: Address,
+        balance_threshold: BigUint,
         block_number: u64,
         chain_id: u64,
         limit: u32,
@@ -172,10 +174,8 @@ impl BitqueryClient {
             })
             .filter(|h| {
                 h.balance
-                    .parse::<bigdecimal::BigDecimal>()
-                    .map_or(false, |b| {
-                        b >= bigdecimal::BigDecimal::from(balance_threshold)
-                    })
+                    .parse::<BigUint>()
+                    .map_or(false, |b| b >= balance_threshold)
             })
             .collect();
 
@@ -254,12 +254,14 @@ mod tests {
     /// Returns a known‑good tuple commonly used in examples:
     /// - USDT contract on Ethereum mainnet.
     /// - A historical block chosen to be well after deployment.
-    fn example_params() -> (&'static str, u64, u64, u64, u32) {
+    fn example_params() -> (Address, BigUint, u64, u64, u32) {
         (
             // Token contract
-            "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+                .parse()
+                .unwrap(),
             // Balance threshold
-            1000,
+            BigUint::from(1000u64),
             // Historical block height (Ethereum)
             18_500_000,
             // Chain id (Ethereum mainnet)

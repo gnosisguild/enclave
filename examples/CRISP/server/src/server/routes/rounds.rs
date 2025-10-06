@@ -16,6 +16,7 @@ use chrono::Utc;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
+use num_bigint::BigUint;
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -49,13 +50,13 @@ async fn request_new_round(data: web::Json<RoundRequest>) -> impl Responder {
         });
     }
 
-    if data.balance_threshold == 0 {
+    if data.balance_threshold.is_empty() {
         return HttpResponse::BadRequest().json(JsonResponse {
             response: "Balance threshold is required".to_string(),
         });
     }
 
-    let result = initialize_crisp_round(&data.token_address, data.balance_threshold).await;
+    let result = initialize_crisp_round(&data.token_address, &data.balance_threshold).await;
 
     match result {
         Ok(_) => HttpResponse::Ok().json(JsonResponse {
@@ -145,7 +146,7 @@ async fn get_public_key(data: web::Json<PKRequest>, store: web::Data<AppData>) -
 /// * A result indicating the success of the operation
 pub async fn initialize_crisp_round(
     token_address: &str,
-    balance_threshold: u64,
+    balance_threshold: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!(
         "Starting new CRISP round with token address: {} and balance threshold: {}",
@@ -181,10 +182,15 @@ pub async fn initialize_crisp_round(
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
     let params = encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli));
 
+    let token_address: Address = token_address.parse()?;
+    let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)
+        .ok_or("Invalid balance threshold")?;
+
     let custom_params = CustomParams {
         token_address: token_address.to_string(),
-        balance_threshold: balance_threshold,
+        balance_threshold: balance_threshold.to_string(),
     };
+
     // Serialize the custom parameters to bytes.
     let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
 

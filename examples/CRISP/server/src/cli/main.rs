@@ -42,7 +42,7 @@ enum Commands {
         #[arg(short, long)]
         token_address: String,
         #[arg(short, long)]
-        balance_threshold: u64,
+        balance_threshold: String,
     },
 }
 
@@ -63,7 +63,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             token_address,
             balance_threshold,
         }) => {
-            initialize_crisp_round(&token_address, balance_threshold).await?;
+            initialize_crisp_round(&token_address, &balance_threshold).await?;
         }
         None => {
             // Fall back to interactive mode if no command was specified
@@ -72,7 +72,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 0 => {
                     let token_address = get_token_address()?;
                     let balance_threshold = get_balance_threshold()?;
-                    initialize_crisp_round(&token_address, balance_threshold).await?;
+                    initialize_crisp_round(&token_address, &balance_threshold).await?;
                 }
                 _ => unreachable!(),
             }
@@ -111,7 +111,7 @@ fn get_token_address() -> Result<String, Box<dyn std::error::Error + Send + Sync
         .interact_text()?)
 }
 
-fn get_balance_threshold() -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+fn get_balance_threshold() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     Ok(Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter the balance threshold for the voting round")
         .interact_text()?)
