@@ -30,11 +30,11 @@ env_logger = "=0.11.8"
 hex = { version = "=0.4.3" }
 log = { version = "=0.4.27" }
 reqwest = { version = "=0.12.22", features = ["json"] }
-risc0-build = { version = "=3.0.0", features = ["docker"] }
+risc0-build = { version = "=3.0.3", features = ["docker"] }
 risc0-build-ethereum = { git = "https://github.com/risc0/risc0-ethereum", tag = "v3.0.0" }
 risc0-ethereum-contracts = { git = "https://github.com/risc0/risc0-ethereum", tag = "v3.0.0" }
-risc0-zkvm = { version = "=3.0.0" }
-risc0-zkp = { version = "=3.0.0", default-features = false }
+risc0-zkvm = { version = "=3.0.3" }
+risc0-zkp = { version = "=3.0.2", default-features = false }
 serde = { version = "=1.0.219", features = ["derive", "std"] }
 serde_json = "=1.0.141"
 fhe_rs = { package = "fhe", git = "https://github.com/gnosisguild/fhe.rs" }
