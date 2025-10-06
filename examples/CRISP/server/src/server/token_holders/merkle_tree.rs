@@ -17,28 +17,18 @@ use std::str::FromStr;
 /// * `poseidon_hashes` - A vector of hex-encoded Poseidon hashes to use as leaves.
 ///
 /// # Returns
-/// A LeanIMT instance with the provided hashes as leaves.
-///
-/// # Example
-/// ```rust
-/// use crisp::server::token_holders::build_lean_imt;
-///
-/// let hashes = vec![
-///     "1234567890123456789012345678901234567890123456789012345678901234".to_string(),
-///     "5678901234567890123456789012345678901234567890123456789012345678".to_string(),
-/// ];
-/// let tree = build_lean_imt(hashes);
-/// let root = tree.root().unwrap();
-/// ```
-pub fn build_lean_imt(poseidon_hashes: Vec<String>) -> LeanIMT {
-    let mut tree = LeanIMT::new(poseidon_hash);
+/// A Result containing either a LeanIMT instance with the provided hashes as leaves,
+/// or a String error message if construction fails.
+pub fn build_tree(poseidon_hashes: Vec<String>) -> Result<LeanIMT, String> {
+    let mut tree = LeanIMT::new(|nodes| poseidon_hash(nodes).unwrap_or_else(|_| "".to_string()));
 
     // Only insert if we have hashes to avoid empty tree issues
     if !poseidon_hashes.is_empty() {
-        tree.insert_many(poseidon_hashes).unwrap();
+        tree.insert_many(poseidon_hashes)
+            .map_err(|e| format!("Failed to insert hashes into tree: {}", e))?;
     }
 
-    tree
+    Ok(tree)
 }
 
 /// Poseidon hash function for LeanIMT internal nodes.
@@ -47,22 +37,26 @@ pub fn build_lean_imt(poseidon_hashes: Vec<String>) -> LeanIMT {
 /// * `nodes` - A vector of hex-encoded hash strings to hash together.
 ///
 /// # Returns
-/// A hex-encoded hash string representing the combined hash.
-fn poseidon_hash(nodes: Vec<String>) -> String {
-    let mut poseidon = Poseidon::<Fr>::new_circom(2).unwrap();
+/// A Result containing either a hex-encoded hash string representing the combined hash,
+/// or a String error message if hashing fails.
+fn poseidon_hash(nodes: Vec<String>) -> Result<String, String> {
+    let mut poseidon = Poseidon::<Fr>::new_circom(2)
+        .map_err(|e| format!("Failed to create Poseidon hasher: {}", e))?;
     let mut field_elements = Vec::new();
 
-    for mut node in nodes {
-        if let Some(stripped) = node.strip_prefix("0x") {
-            node = stripped.to_string();
-        }
-        let bigint = BigUint::parse_bytes(node.as_bytes(), 16).unwrap();
-        let field_repr = Fr::from_str(&bigint.to_string()).unwrap();
+    for node in nodes {
+        let bigint = BigUint::parse_bytes(node.as_bytes(), 16)
+            .ok_or_else(|| format!("Failed to parse hex string '{}': Invalid hex format", node))?;
+        let field_repr = Fr::from_str(&bigint.to_string())
+            .map_err(|e| format!("Failed to convert to field element: {:?}", e))?;
         field_elements.push(field_repr);
     }
 
-    let result_hash: BigInt<4> = poseidon.hash(&field_elements).unwrap().into();
-    hex::encode(result_hash.to_bytes_be())
+    let result_hash: BigInt<4> = poseidon
+        .hash(&field_elements)
+        .map_err(|e| format!("Failed to hash field elements: {}", e))?
+        .into();
+    Ok(hex::encode(result_hash.to_bytes_be()))
 }
 
 #[cfg(test)]
@@ -76,8 +70,8 @@ mod tests {
             "2345678901234567890123456789012345678901234567890123456789012345".to_string(),
         ];
 
-        let tree = build_lean_imt(hashes);
-        let root = tree.root().unwrap();
+        let tree = build_tree(hashes).expect("Failed to build LeanIMT");
+        let root = tree.root().expect("Failed to get tree root");
 
         assert!(!root.is_empty());
         assert!(root.chars().all(|c| c.is_ascii_hexdigit()));
@@ -86,7 +80,7 @@ mod tests {
     #[test]
     fn test_build_lean_imt_empty() {
         let hashes = vec![];
-        let _tree = build_lean_imt(hashes);
+        let _tree = build_tree(hashes).expect("Failed to build empty LeanIMT");
 
         // For empty tree, we expect it to be valid but may not have a root.
         // This test just ensures it doesn't panic when creating the tree.

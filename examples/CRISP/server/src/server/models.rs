@@ -166,6 +166,7 @@ pub struct E3Crisp {
     pub status: String,
     pub votes_option_1: u64,
     pub votes_option_2: u64,
+    pub token_holder_hashes: Vec<String>,
 }
 
 impl From<E3> for WebResultRequest {

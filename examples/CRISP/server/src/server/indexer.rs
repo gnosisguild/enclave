@@ -9,7 +9,7 @@ use crate::server::{
     models::CurrentRound,
     program_server_request::run_compute,
     repo::{CrispE3Repository, CurrentRoundRepository},
-    token_holders::{build_lean_imt, compute_token_holder_hashes},
+    token_holders::{build_tree, compute_token_holder_hashes},
     CONFIG,
 };
 use alloy_primitives::Address;
@@ -26,7 +26,7 @@ use e3_sdk::{
     },
     indexer::{DataStore, EnclaveIndexer},
 };
-use log::{info, warn};
+use log::{info};
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
@@ -38,7 +38,10 @@ pub async fn register_e3_requested(
 ) -> Result<EnclaveIndexer<impl DataStore>> {
     // E3Requested
     indexer
-        .add_event_handler(move |event: E3Requested, _store| {
+        .add_event_handler(move |event: E3Requested, store| {
+            let e3_id = event.e3Id.to::<u64>();
+            let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+
             info!("E3Requested: {:?}", event);
 
             async move {
@@ -60,12 +63,14 @@ pub async fn register_e3_requested(
                         "Using mocked token holders for local network (chain_id: {})",
                         CONFIG.chain_id
                     );
+                    
                     get_mock_token_holders()
                 } else {
                     info!(
                         "Using Bitquery API for network (chain_id: {})",
                         CONFIG.chain_id
                     );
+
                     let bitquery_client = BitqueryClient::new(CONFIG.bitquery_api_key.clone());
                     bitquery_client
                         .get_token_holders(
@@ -80,36 +85,30 @@ pub async fn register_e3_requested(
                 };
 
                 if token_holders.is_empty() {
-                    warn!("No eligible token holders found");
-
                     return Err(eyre::eyre!(
                         "No eligible token holders found for token address {}. Cannot build Merkle tree.",
                         token_address
                     ).into());
                 }
 
-                info!("Token holders: {:?}", token_holders);
-
                 // Compute Poseidon hashes for token holder address + balance pairs.
-                let poseidon_hashes = compute_token_holder_hashes(&token_holders);
+                let token_holder_hashes = match compute_token_holder_hashes(&token_holders) {
+                    Ok(hashes) => hashes,
+                    Err(e) => {
+                        return Err(eyre::eyre!("Failed to compute token holder hashes: {}", e));
+                    }
+                };
 
-                info!(
-                    "Computed {} Poseidon hashes for token holders",
-                    poseidon_hashes.len()
-                );
-                for (i, hash) in poseidon_hashes.iter().enumerate() {
-                    info!(
-                        "Hash {}: {} (address: {}, balance: {})",
-                        i, hash, token_holders[i].address, token_holders[i].balance
-                    );
-                }
-
-                let lean_imt = build_lean_imt(poseidon_hashes);
-                let merkle_root = lean_imt.root().unwrap();
+                repo.set_token_holder_hashes(token_holder_hashes.clone()).await?;
+                
+                let tree = build_tree(token_holder_hashes)
+                    .map_err(|e| eyre::eyre!("Failed to build tree: {}", e))?;
+                let merkle_root = tree.root().ok_or_else(|| {
+                    eyre::eyre!("Failed to get merkle root from tree")
+                })?;
                 info!("Merkle root: {}", merkle_root);
 
-                // TODO: Save poseidon hashes and merkle root to store.
-                // TODO: Publish merkle root on-chain.
+                // TODO: Publish merkle root on-chain (inputValidator contract).
 
                 Ok(())
             }

@@ -4,10 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-pub mod get_token_holders;
-pub mod lean_imt_builder;
-pub mod token_holder_hashes;
+pub mod bitquery;
+pub mod hashes;
+pub mod merkle_tree;
 
-pub use get_token_holders::*;
-pub use lean_imt_builder::*;
-pub use token_holder_hashes::*;
+pub use bitquery::*;
+pub use hashes::*;
+pub use merkle_tree::*;
