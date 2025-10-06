@@ -119,6 +119,13 @@ See [CONTRIBUTING.md][contributing].
                     <sub><b>SUBHASISH BEHERA</b></sub>
                 </a>
             </td>
+            <td align="center">
+                <a href="https://github.com/ozgurarmanc">
+                    <img src="https://avatars.githubusercontent.com/u/94117770?v=4" width="100;" alt="ozgurarmanc"/>
+                    <br />
+                    <sub><b>Armanc</b></sub>
+                </a>
+            </td>
 		</tr>
 	<tbody>
 </table>
