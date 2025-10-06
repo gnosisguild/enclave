@@ -66,14 +66,16 @@ async fn test_trbfv_actor() -> Result<()> {
     // Parameteres
     let (degree, plaintext_modulus, moduli) = (
         8192usize,
-        16384u64,
+        1000u64,
         &[
-            0x1FFFFFFEA0001u64, // 562949951979521
-            0x1FFFFFFE88001u64, // 562949951881217
-            0x1FFFFFFE48001u64, // 562949951619073
-            0xfffffebc001u64,   //
-        ] as &[u64],
+            36028797055270913u64,
+            36028797054222337,
+            36028797053698049,
+            36028797051863041,
+        ],
     );
+
+    // BfvParameters { polynomial_degree: 8192, plaintext_modulus: 1000, moduli: [36028797055270913, 36028797054222337, 36028797053698049, 36028797051863041] }
     // Params for BFV
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
 
