@@ -7,6 +7,9 @@
 use greco::{Greco, Params};
 use polynomial::Polynomial;
 
+mod ecdsa;
+use ecdsa::{derive_address, verify_signature};
+
 fn main(
     params: pub Params<2048, 1>,
     pk0is: pub [Polynomial<2048>; 1],
@@ -21,7 +24,18 @@ fn main(
     r2is: [Polynomial<2047>; 1],
     p1is: [Polynomial<4095>; 1],
     p2is: [Polynomial<2047>; 1],
+    public_key_x: [u8; 32],
+    public_key_y: [u8; 32],
+    signature: [u8; 64],
+    hashed_message: [u8; 32],
 ) {
+    // first verify the signature
+    verify_signature(hashed_message, public_key_x, public_key_y, signature);
+
+    // then derive the address
+    let address = derive_address(public_key_x, public_key_y);
+
+    // then verify that the vote was encrypted correctly
     let circuit: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
         params,
         pk0is,
