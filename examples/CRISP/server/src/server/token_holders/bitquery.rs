@@ -101,7 +101,7 @@ impl BitqueryClient {
         block_number: u64,
         chain_id: u64,
         limit: u32,
-    ) -> Result<Vec<TokenHolder>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<TokenHolder>, String> {
         let network = Self::get_network_name(chain_id)?;
 
         // Build GraphQL query to fetch token holders.
@@ -114,7 +114,10 @@ impl BitqueryClient {
                             Block: {{ Number: {{ le: "{}" }} }}
                             Currency: {{ SmartContract: {{ is: "{}" }} }}
                         }}
-                        orderBy: {{ descendingByField: "Balance" }}
+                        orderBy: [
+                            {{ descendingByField: "Balance" }},
+                            {{ ascending: BalanceUpdate_Address }}
+                        ]
                         limit: {{ count: {} }}
                     ) {{
                         BalanceUpdate {{
@@ -141,11 +144,20 @@ impl BitqueryClient {
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
-            .await?;
+            .await
+            .map_err(|e| format!("Failed to send request to Bitquery: {}", e))?;
 
-        // Parse response and transform to our data structure.
-        let response_text = response.text().await?;
-        let graphql_response: GraphQLResponse = serde_json::from_str(&response_text)?;
+        let status = response.status();
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| format!("Failed to read response from Bitquery: {}", e))?;
+        if !status.is_success() {
+            return Err(format!("Bitquery HTTP {}: {}", status, response_text));
+        }
+
+        let graphql_response: GraphQLResponse = serde_json::from_str(&response_text)
+            .map_err(|e| format!("Failed to parse Bitquery response: {}", e))?;
         let token_holders: Vec<TokenHolder> = graphql_response
             .data
             .evm
