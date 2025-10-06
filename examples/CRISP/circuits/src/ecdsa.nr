@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+use keccak256::keccak256;
+
+/// Given a public key, signature, and hashed message, verify the signature
+pub fn verify_signature(
+    hashed_message: [u8; 32],
+    pub_key_x: [u8; 32],
+    pub_key_y: [u8; 32],
+    signature: [u8; 64],
+) {
+    let valid_signature =
+        std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message);
+    assert(valid_signature);
+}
+
+/// Given a public key, derive the Ethereum address
+pub fn derive_address(pub_key_x: [u8; 32], pub_key_y: [u8; 32]) -> [u8; 20] {
+    let mut pub_key_bytes = [0; 64];
+    for i in 0..32 {
+        pub_key_bytes[i] = pub_key_x[i];
+        pub_key_bytes[i + 32] = pub_key_y[i];
+    }
+
+    // Hash the concatenated public key
+    let hash = keccak256(pub_key_bytes, 64);
+
+    // Extract last 20 bytes as the Ethereum address
+    let mut derived_address = [0; 20];
+    for i in 0..20 {
+        derived_address[i] = hash[i + 12];
+    }
+
+    derived_address
+}
+
+#[test]
+fn test_derive_address() {
+    let pub_key_x = [
+        131, 24, 83, 91, 84, 16, 93, 74, 122, 174, 96, 192, 143, 196, 95, 150, 135, 24, 27, 79, 223,
+        198, 37, 189, 26, 117, 63, 167, 57, 127, 237, 117,
+    ];
+    let pub_key_y = [
+        53, 71, 241, 28, 168, 105, 102, 70, 242, 243, 172, 176, 142, 49, 1, 106, 250, 194, 62, 99,
+        12, 93, 17, 245, 159, 97, 254, 245, 123, 13, 42, 165,
+    ];
+    let address = derive_address(pub_key_x, pub_key_y);
+    assert(
+        address
+            == [
+                243, 159, 214, 229, 26, 173, 136, 246, 244, 206, 106, 184, 130, 114, 121, 207, 255,
+                185, 34, 102,
+            ],
+    );
+}
+
+#[test]
+fn test_verify_signature() {
+    let hashed_message = [
+        67, 126, 157, 164, 162, 165, 56, 242, 155, 214, 113, 196, 83, 198, 228, 36, 174, 104, 152,
+        87, 167, 108, 64, 34, 234, 161, 122, 55, 44, 62, 151, 55,
+    ];
+    let pub_key_x = [
+        131, 24, 83, 91, 84, 16, 93, 74, 122, 174, 96, 192, 143, 196, 95, 150, 135, 24, 27, 79, 223,
+        198, 37, 189, 26, 117, 63, 167, 57, 127, 237, 117,
+    ];
+    let pub_key_y = [
+        53, 71, 241, 28, 168, 105, 102, 70, 242, 243, 172, 176, 142, 49, 1, 106, 250, 194, 62, 99,
+        12, 93, 17, 245, 159, 97, 254, 245, 123, 13, 42, 165,
+    ];
+    let signature = [
+        78, 219, 63, 96, 214, 92, 16, 36, 108, 207, 133, 108, 3, 248, 122, 23, 192, 236, 210, 253,
+        206, 125, 83, 124, 163, 54, 106, 125, 188, 223, 192, 39, 44, 76, 228, 107, 188, 221, 183,
+        124, 118, 143, 228, 126, 216, 173, 160, 231, 62, 52, 188, 154, 110, 230, 183, 71, 36, 161,
+        171, 163, 213, 62, 223, 152,
+    ];
+    verify_signature(hashed_message, pub_key_x, pub_key_y, signature);
+}
+
+#[test]
+fn test_fail_verify_signature() {
+    let hashed_message = [
+        67, 126, 157, 164, 162, 165, 56, 242, 155, 214, 113, 196, 83, 198, 228, 36, 174, 104, 152,
+        87, 167, 108, 64, 34, 234, 161, 122, 55, 44, 62, 151, 55,
+    ];
+    let pub_key_x = [
+        131, 24, 83, 91, 84, 16, 93, 74, 122, 174, 96, 192, 143, 196, 95, 150, 135, 24, 27, 79, 223,
+        198, 37, 189, 26, 117, 63, 167, 57, 127, 237, 117,
+    ];
+    let pub_key_y = [
+        53, 71, 241, 28, 168, 105, 102, 70, 242, 243, 172, 176, 142, 49, 1, 106, 250, 194, 62, 99,
+        12, 93, 17, 245, 159, 97, 254, 245, 123, 13, 42, 165,
+    ];
+    let signature = [
+        78, 219, 63, 96, 214, 92, 16, 36, 108, 207, 133, 108, 3, 248, 122, 23, 192, 236, 210, 253,
+        206, 125, 83, 124, 163, 54, 106, 125, 188, 223, 192, 39, 44, 76, 228, 107, 188, 221, 183,
+        124, 118, 143, 228, 126, 216, 173, 160, 231, 62, 52, 188, 154, 110, 230, 183, 71, 36, 161,
+        171, 163, 213, 62, 223, 151,
+    ];
+    let valid_signature =
+        std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message);
+    assert(!valid_signature);
+}
