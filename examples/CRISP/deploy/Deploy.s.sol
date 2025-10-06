@@ -193,7 +193,9 @@ contract CRISPProgramDeploy is Script {
 
         console2.log("Deployed InputValidator to: ", inputValidatorAddress);
 
-        CRISPInputValidatorFactory inputValidatorFactory = new CRISPInputValidatorFactory(inputValidatorAddress);
+        CRISPInputValidatorFactory inputValidatorFactory = new CRISPInputValidatorFactory(
+                inputValidatorAddress
+            );
         console2.log(
             "Deployed CRISPInputValidatorFactory to",
             address(inputValidatorFactory)
@@ -210,7 +212,7 @@ contract CRISPProgramDeploy is Script {
             policyFactory,
             inputValidatorFactory,
             honkVerifier,
-            ImageID.VOTING_ID
+            ImageID.PROGRAM_ID
         );
         console2.log("Deployed CRISPProgram to", address(crisp));
 
