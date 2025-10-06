@@ -43,7 +43,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const enclaveAddress = await enclave.getAddress();
 
-  console.log("Deploying CiphernodeRegistry");
   const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
     enclaveAddress: enclaveAddress,
     owner: ownerAddress,
@@ -52,7 +51,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
 
-  console.log("Deploying NaiveRegistryFilter");
   const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
     ciphernodeRegistryAddress: ciphernodeRegistryAddress,
     owner: ownerAddress,
