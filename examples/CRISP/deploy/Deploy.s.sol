@@ -32,6 +32,8 @@ import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
+import {CRISPInputValidator} from "../contracts/CRISPInputValidator.sol";
+import {MockCRISPInputValidator} from "../contracts/Mocks/MockCRISPInputValidator.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
 import {HonkVerifier} from "../contracts/CRISPVerifier.sol";
 import {MockRISC0Verifier} from "../contracts/Mocks/MockRISC0Verifier.sol";

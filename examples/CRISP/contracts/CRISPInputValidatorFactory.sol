@@ -12,7 +12,7 @@ import {CRISPInputValidator} from "./CRISPInputValidator.sol";
 /// @notice Factory for deploying minimal proxy instances of CRISPInputValidator.
 contract CRISPInputValidatorFactory is Factory {
     /// @notice Initializes the factory with the CRISPInputValidator implementation.
-    constructor() Factory(address(new CRISPInputValidator())) {}
+    constructor(address inputValidator) Factory(inputValidator) {}
 
     /// @notice Deploys a new CRISPInputValidator clone.
     /// @param _policyAddr Address of the associated policy contract.
