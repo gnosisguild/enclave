@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::primitives::Address;
 use anyhow::Result;
+use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Deserialize, Debug)]
@@ -181,8 +183,11 @@ pub struct E3Crisp {
     pub votes_option_1: u64,
     pub votes_option_2: u64,
     pub token_holder_hashes: Vec<String>,
+<<<<<<< HEAD
     pub token_address: String,
     pub balance_threshold: String,
+=======
+>>>>>>> 1828b57a (feat: census tree on CRISP (#763))
 }
 
 impl From<E3> for WebResultRequest {

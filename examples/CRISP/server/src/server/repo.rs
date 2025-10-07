@@ -244,7 +244,6 @@ impl<S: DataStore> CrispE3Repository<S> {
 
     pub async fn set_token_holder_hashes(&mut self, hashes: Vec<String>) -> Result<()> {
         let key = self.crisp_key();
-
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
