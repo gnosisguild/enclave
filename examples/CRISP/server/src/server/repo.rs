@@ -95,6 +95,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             votes_option_1: 0,
             votes_option_2: 0,
             emojis: generate_emoji(),
+            token_holder_hashes: vec![],
         })
         .await
     }
@@ -231,6 +232,25 @@ impl<S: DataStore> CrispE3Repository<S> {
     pub async fn is_finished(&self) -> Result<bool> {
         let e3 = self.get_crisp().await?;
         Ok(e3.status == "Finished")
+    }
+
+    pub async fn set_token_holder_hashes(&mut self, hashes: Vec<String>) -> Result<()> {
+        let key = self.crisp_key();
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.token_holder_hashes = hashes.clone();
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not set token_holder_hashes for '{key}'"))?;
+        Ok(())
+    }
+
+    pub async fn get_token_holder_hashes(&self) -> Result<Vec<String>> {
+        let e3_crisp = self.get_crisp().await?;
+        Ok(e3_crisp.token_holder_hashes)
     }
 
     fn crisp_key(&self) -> String {

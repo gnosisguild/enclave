@@ -34,6 +34,13 @@ async-trait = { version = "=0.1.88" }
 fhe_rs.workspace = true
 fhe-traits.workspace = true
 
+# Poseidon hashing dependencies
+ark-bn254 = "=0.4.0"
+ark-ff = "=0.4.2"
+light-poseidon = "=0.1.0"
+num-bigint = "=0.4.6"
+lean-imt = "=0.1.2"
+
 # Local dependencies
 e3-compute-provider = { path = "../../../crates/compute-provider" }
 e3-sdk = { path = "../../../crates/sdk" }
@@ -47,6 +54,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 # Utility libraries
+bigdecimal = "=0.4.3"
 chrono = "=0.4.41"
 eyre = "=0.6.12"
 hex = "=0.4.3"

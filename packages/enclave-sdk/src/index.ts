@@ -39,7 +39,12 @@ export type {
 } from "./types";
 
 // enums and constants
-export { EnclaveEventType, RegistryEventType, FheProtocol, BfvProtocolParams } from "./types";
+export {
+  EnclaveEventType,
+  RegistryEventType,
+  FheProtocol,
+  BfvProtocolParams,
+} from "./types";
 
 // Export utilities
 export {
@@ -59,6 +64,7 @@ export {
   DEFAULT_E3_CONFIG,
   encodeBfvParams,
   encodeComputeProviderParams,
+  encodeCustomParams,
   calculateStartWindow,
   decodePlaintextOutput,
   type ComputeProviderParams,

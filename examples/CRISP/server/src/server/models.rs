@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use alloy::primitives::Address;
 use anyhow::Result;
+use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Deserialize, Debug)]
@@ -88,9 +90,17 @@ pub struct ComputeProviderParams {
     pub batch_size: u32,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CustomParams {
+    pub token_address: String,
+    pub balance_threshold: String,
+}
+
 #[derive(Debug, Deserialize)]
-pub struct CronRequestE3 {
+pub struct RoundRequest {
     pub cron_api_key: String,
+    pub token_address: String,
+    pub balance_threshold: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -165,6 +175,7 @@ pub struct E3Crisp {
     pub status: String,
     pub votes_option_1: u64,
     pub votes_option_2: u64,
+    pub token_holder_hashes: Vec<String>,
 }
 
 impl From<E3> for WebResultRequest {

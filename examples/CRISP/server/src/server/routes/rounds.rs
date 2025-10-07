@@ -4,11 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::config::CONFIG;
 use crate::server::app_data::AppData;
 use crate::server::models::{
-    CTRequest, ComputeProviderParams, CronRequestE3, JsonResponse, PKRequest,
+    CTRequest, ComputeProviderParams, CustomParams, JsonResponse, PKRequest, RoundRequest,
 };
-use crate::config::CONFIG;
 
 use actix_web::{web, HttpResponse, Responder};
 use alloy::primitives::{Address, Bytes, U256};
@@ -16,6 +16,7 @@ use chrono::Utc;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use log::{error, info};
+use num_bigint::BigUint;
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -31,19 +32,33 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
 ///
 /// # Arguments
 ///
-/// * `data` - The request data containing the cron API key
+/// * `data` - The request data containing the cron API key and token address
 ///
 /// # Returns
 ///
 /// * A JSON response indicating the success of the operation
-async fn request_new_round(data: web::Json<CronRequestE3>) -> impl Responder {
+async fn request_new_round(data: web::Json<RoundRequest>) -> impl Responder {
     if data.cron_api_key != CONFIG.cron_api_key {
         return HttpResponse::Unauthorized().json(JsonResponse {
             response: "Invalid API key".to_string(),
         });
     }
 
-    match initialize_crisp_round().await {
+    if data.token_address.is_empty() {
+        return HttpResponse::BadRequest().json(JsonResponse {
+            response: "Token address is required".to_string(),
+        });
+    }
+
+    if data.balance_threshold.is_empty() {
+        return HttpResponse::BadRequest().json(JsonResponse {
+            response: "Balance threshold is required".to_string(),
+        });
+    }
+
+    let result = initialize_crisp_round(&data.token_address, &data.balance_threshold).await;
+
+    match result {
         Ok(_) => HttpResponse::Ok().json(JsonResponse {
             response: "New E3 round requested successfully".to_string(),
         }),
@@ -118,13 +133,27 @@ async fn get_public_key(data: web::Json<PKRequest>, store: web::Data<AppData>) -
 
 /// Initialize a new CRISP round
 ///
-/// Creates a new CRISP round by enabling the E3 program, generating the necessary parameters, and requesting E3.
+/// Creates a new CRISP round by enabling the E3 program, generating the necessary parameters,
+/// and requesting E3.
+///
+/// # Arguments
+///
+/// * `token_address` - The token contract address
+/// * `balance_threshold` - The balance threshold
 ///
 /// # Returns
 ///
 /// * A result indicating the success of the operation
-pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("Starting new CRISP round!");
+pub async fn initialize_crisp_round(
+    token_address: &str,
+    balance_threshold: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    info!(
+        "Starting new CRISP round with token address: {} and balance threshold: {}",
+        token_address, balance_threshold
+    );
+
+    // Continue with the existing E3 initialization
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
@@ -153,6 +182,18 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
     let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
     let params = encode_bfv_params(&build_bfv_params_arc(degree, plaintext_modulus, &moduli));
 
+    let token_address: Address = token_address.parse()?;
+    let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)
+        .ok_or("Invalid balance threshold")?;
+
+    let custom_params = CustomParams {
+        token_address: token_address.to_string(),
+        balance_threshold: balance_threshold.to_string(),
+    };
+
+    // Serialize the custom parameters to bytes.
+    let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
+
     info!("Requesting E3...");
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
@@ -177,6 +218,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
             e3_program,
             e3_params,
             compute_provider_params,
+            custom_params_bytes,
         )
         .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);
