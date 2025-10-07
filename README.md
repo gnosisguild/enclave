@@ -243,6 +243,8 @@ This command automatically:
 - ✅ Pushes commits and tag to GitHub
 - ✅ **Triggers automated release workflow**
 
+Please ensure you are in release branch before running the command. For example, `git checkout -b chore/release-v1.0.0-beta.1`.
+
 #### 3. Alternative: Manual Review Before Push
 
 If you prefer to review changes before pushing:
@@ -330,6 +332,8 @@ cargo build --release
 - **`main`** - Primary development branch
 - **`v*.*.*`** - Version tags for releases
 - **`stable`** - Always points to the latest stable release
+- **`testnet`** - Stable branch for testnet deployment
+- **`mainnet`** - Stable branch for mainnet deployment
 
 ### Installation Sources
 
