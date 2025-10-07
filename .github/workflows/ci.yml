@@ -366,6 +366,11 @@ jobs:
           && sudo apt-get update -y \
           && sudo apt-get install -y solc
 
+      - name: Install Nargo
+        uses: noir-lang/noirup@v0.1.4
+        with:
+          toolchain: v1.0.0-beta.11
+
       - name: Install wasm-pack
         uses: ./.github/actions/install-wasm-pack
 
@@ -420,6 +425,11 @@ jobs:
           name: playwright-report
           path: ./examples/CRISP/playwright-report/
           retention-days: 30
+
+      - name: Test Noir circuits
+        working-directory: ./examples/CRISP
+        run: |
+          pnpm test:circuits
 
   test_enclave_circuits:
     runs-on: ubuntu-latest
@@ -602,7 +612,7 @@ jobs:
           chmod 755 contracts tests
           chmod 644 contracts/ImageID.sol
           pnpm test:integration
-
+  
   test_enclave_init:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_e3_support_dev]
