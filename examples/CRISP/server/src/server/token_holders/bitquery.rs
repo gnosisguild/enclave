@@ -5,6 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::primitives::Address;
+use alloy::primitives::{
+    utils::{parse_units, ParseUnits},
+    U256,
+};
+
 use eyre::Result;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
@@ -17,12 +22,16 @@ pub struct TokenHolder {
     pub balance: String,
 }
 
-/// Internal structure for deserializing Bitquery API response.
-/// Uses serde rename to match the API's field naming convention.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BalanceUpdate {
     #[serde(rename = "Address")]
     pub address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Currency {
+    #[serde(rename = "Decimals")]
+    pub decimals: u8,
 }
 
 /// Internal structure for deserializing Bitquery API response.
@@ -33,6 +42,8 @@ pub struct BalanceUpdateResponse {
     pub balance: String,
     #[serde(rename = "BalanceUpdate")]
     pub balance_update: BalanceUpdate,
+    #[serde(rename = "Currency")]
+    pub currency: Currency,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -129,6 +140,9 @@ impl BitqueryClient {
                             Address
                         }}
                         Balance: sum(of: BalanceUpdate_Amount)
+                        Currency {{ 
+                            Decimals
+                        }}
                     }}
                 }}
             }}
@@ -152,6 +166,7 @@ impl BitqueryClient {
             .await
             .map_err(|e| eyre::eyre!("Failed to send request to Bitquery: {}", e))?;
 
+        // Check if the response is successful.
         let status = response.status();
         let response_text = response
             .text()
@@ -163,21 +178,51 @@ impl BitqueryClient {
 
         let graphql_response: GraphQLResponse = serde_json::from_str(&response_text)
             .map_err(|e| eyre::eyre!("Failed to parse Bitquery response: {}", e))?;
-        let token_holders: Vec<TokenHolder> = graphql_response
-            .data
-            .evm
-            .balance_updates
-            .iter()
-            .map(|update| TokenHolder {
-                address: update.balance_update.address.clone(),
-                balance: update.balance.clone(),
-            })
-            .filter(|h| {
-                h.balance
-                    .parse::<BigUint>()
-                    .map_or(false, |b| b >= balance_threshold)
-            })
-            .collect();
+
+        let balance_updates = graphql_response.data.evm.balance_updates;
+
+        // Check if there are any balance updates.
+        if balance_updates.is_empty() {
+            return Err(eyre::eyre!("No balance updates found"));
+        }
+
+        let decimals = balance_updates[0].currency.decimals;
+        let mut token_holders = Vec::new();
+
+        for token_holder in balance_updates {
+            // Parse Bitquery's string balance -> big int. The balance is a string with the decimals.
+            let balance_bigint: U256 = match parse_units(token_holder.balance.trim(), decimals) {
+                Ok(ParseUnits::U256(x)) => x,
+                Ok(ParseUnits::I256(x)) if x.is_negative() => {
+                    return Err(eyre::eyre!(
+                        "Negative balance found for address {}: {}",
+                        token_holder.balance_update.address,
+                        token_holder.balance
+                    ));
+                }
+                Ok(ParseUnits::I256(x)) => x.unsigned_abs(),
+                Err(e) => {
+                    return Err(eyre::eyre!(
+                        "Failed to parse balance '{}' for address {}: {}",
+                        token_holder.balance,
+                        token_holder.balance_update.address,
+                        e
+                    ));
+                }
+            };
+
+            // Convert U256 to BigUint for comparison.
+            let balance_bigint = BigUint::from_bytes_be(&balance_bigint.to_be_bytes::<32>());
+
+            if balance_bigint >= balance_threshold {
+                token_holders.push(TokenHolder {
+                    address: token_holder.balance_update.address.clone(),
+                    balance: balance_bigint.to_string(),
+                });
+            }
+        }
+
+        println!("Token holders: {:#?}", token_holders);
 
         Ok(token_holders)
     }
@@ -261,13 +306,13 @@ mod tests {
                 .parse()
                 .unwrap(),
             // Balance threshold
-            BigUint::from(1000u64),
+            BigUint::from(64707696530000u64),
             // Historical block height (Ethereum)
             18_500_000,
             // Chain id (Ethereum mainnet)
             1,
             // Limit
-            5,
+            100,
         )
     }
 
@@ -296,18 +341,18 @@ mod tests {
         let (token, balance_threshold, block, chain_id, limit) = example_params();
 
         let res = client
-            .get_token_holders(token, balance_threshold, block, chain_id, limit)
+            .get_token_holders(token, balance_threshold.clone(), block, chain_id, limit)
             .await;
         assert!(res.is_ok(), "Live call failed: {res:?}");
 
         // Check shape: accessing the vector ensures deserialization happened.
         let holders = res.unwrap();
 
-        // Verify the number of holders matches the expected limit.
+        // Verify the number of holders after filtering.
         assert_eq!(
             holders.len(),
-            5,
-            "Expected exactly 5 holders, got {}",
+            46,
+            "Expected exactly 46 holders, got {}",
             holders.len()
         );
 
@@ -333,9 +378,52 @@ mod tests {
             );
             // Verify balance is a valid number string.
             assert!(
-                holder.balance.parse::<u64>().is_ok() || holder.balance.parse::<f64>().is_ok(),
+                holder.balance.parse::<BigUint>().is_ok(),
                 "Balance should be a valid number: {}",
                 holder.balance
+            );
+        }
+
+        // Verify sorting: holders should be sorted by balance in descending order
+        // (highest balance first), then by address in ascending order for ties.
+        for i in 1..holders.len() {
+            let prev_balance: BigUint = holders[i - 1].balance.parse().expect("Valid balance");
+            let curr_balance: BigUint = holders[i].balance.parse().expect("Valid balance");
+
+            if prev_balance == curr_balance {
+                // For equal balances, addresses should be in ascending order.
+                assert!(
+                    holders[i - 1].address < holders[i].address,
+                    "For equal balances, addresses should be sorted in ascending order. \
+                     Found {} >= {} for balances of {}",
+                    holders[i - 1].address,
+                    holders[i].address,
+                    prev_balance
+                );
+            } else {
+                // Balances should be in descending order.
+                assert!(
+                    prev_balance > curr_balance,
+                    "Holders should be sorted by balance in descending order. \
+                     Found {} <= {} at positions {} and {}",
+                    prev_balance,
+                    curr_balance,
+                    i - 1,
+                    i
+                );
+            }
+        }
+
+        // Verify filtering: all holders should meet the balance threshold.
+        for holder in &holders {
+            let holder_balance: BigUint = holder.balance.parse().expect("Valid balance");
+            assert!(
+                holder_balance >= balance_threshold,
+                "All holders should meet the balance threshold. \
+                 Found holder {} with balance {} below threshold {}",
+                holder.address,
+                holder_balance,
+                balance_threshold
             );
         }
     }
