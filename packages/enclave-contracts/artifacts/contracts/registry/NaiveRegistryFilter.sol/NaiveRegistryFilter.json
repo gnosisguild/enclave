@@ -305,5 +305,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/registry/NaiveRegistryFilter.sol",
-  "buildInfoId": "solc-0_8_27-9aea5e3f6e25811e781e96c22e8edaf1eb1a01c5"
+  "buildInfoId": "solc-0_8_27-5798467012d959a2cc08a145d9fd1c6bf5d530bb"
 }

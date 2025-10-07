@@ -7,10 +7,7 @@
 import { type Address, type Hash, type Log, encodeAbiParameters } from "viem";
 
 export class SDKError extends Error {
-  constructor(
-    message: string,
-    public readonly code?: string,
-  ) {
+  constructor(message: string, public readonly code?: string) {
     super(message);
     this.name = "SDKError";
   }
@@ -26,7 +23,7 @@ export function isValidHash(hash: string): hash is Hash {
 
 export function formatEventName(
   contractName: string,
-  eventName: string,
+  eventName: string
 ): string {
   return `${contractName}.${eventName}`;
 }
@@ -98,7 +95,7 @@ export const DEFAULT_E3_CONFIG = {
 export function encodeBfvParams(
   degree: number = BFV_PARAMS_SET.degree,
   plaintext_modulus: number = BFV_PARAMS_SET.plaintext_modulus,
-  moduli: readonly bigint[] = BFV_PARAMS_SET.moduli,
+  moduli: readonly bigint[] = BFV_PARAMS_SET.moduli
 ): `0x${string}` {
   return encodeAbiParameters(
     [
@@ -118,7 +115,7 @@ export function encodeBfvParams(
         plaintext_modulus: BigInt(plaintext_modulus),
         moduli: [...moduli],
       },
-    ],
+    ]
   );
 }
 
@@ -126,20 +123,37 @@ export function encodeBfvParams(
  * Encode compute provider parameters for the smart contract
  */
 export function encodeComputeProviderParams(
-  params: ComputeProviderParams,
+  params: ComputeProviderParams
 ): `0x${string}` {
   const jsonString = JSON.stringify(params);
   const encoder = new TextEncoder();
   const bytes = encoder.encode(jsonString);
 
-  return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  return `0x${Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("")}`;
+}
+
+/**
+ * Encode custom parameters for the smart contract.
+ */
+export function encodeCustomParams(
+  params: Record<string, unknown>
+): `0x${string}` {
+  const jsonString = JSON.stringify(params);
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(jsonString);
+
+  return `0x${Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("")}`;
 }
 
 /**
  * Calculate start window for E3 request
  */
 export function calculateStartWindow(
-  windowSize: number = DEFAULT_E3_CONFIG.window_size,
+  windowSize: number = DEFAULT_E3_CONFIG.window_size
 ): [bigint, bigint] {
   const now = getCurrentTimestamp();
   return [BigInt(now), BigInt(now + windowSize)];
@@ -157,7 +171,7 @@ export function decodePlaintextOutput(plaintextOutput: string): number | null {
 
     // Convert hex to bytes
     const bytes = new Uint8Array(
-      hex.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || [],
+      hex.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || []
     );
 
     if (bytes.length < 8) {

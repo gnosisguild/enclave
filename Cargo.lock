@@ -3070,6 +3070,7 @@ dependencies = [
  "e3-data",
  "e3-events",
  "num",
+ "num-bigint",
  "rand 0.8.5",
  "serde",
  "tracing",

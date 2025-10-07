@@ -4,30 +4,122 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::server::token_holders::{get_mock_token_holders, BitqueryClient};
 use crate::server::{
-    models::CurrentRound,
-    repo::{CrispE3Repository, CurrentRoundRepository},
-    CONFIG,
+    models::{CurrentRound, CustomParams},
     program_server_request::run_compute,
+    repo::{CrispE3Repository, CurrentRoundRepository},
+    token_holders::{build_tree, compute_token_holder_hashes},
+    CONFIG,
 };
+use alloy_primitives::Address;
 use e3_sdk::{
     evm_helpers::{
         contracts::{
             EnclaveContract, EnclaveContractFactory, EnclaveRead, EnclaveWrite, ReadWrite,
         },
         events::{
-            CiphertextOutputPublished, CommitteePublished, E3Activated, PlaintextOutputPublished,
+            CiphertextOutputPublished, CommitteePublished, E3Activated, E3Requested,
+            PlaintextOutputPublished,
         },
         listener::EventListener,
     },
     indexer::{DataStore, EnclaveIndexer},
 };
+use eyre::Context;
 use log::info;
+use num_bigint::BigUint;
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep_until, Instant};
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
+
+pub async fn register_e3_requested(
+    mut indexer: EnclaveIndexer<impl DataStore>,
+) -> Result<EnclaveIndexer<impl DataStore>> {
+    // E3Requested
+    indexer
+        .add_event_handler(move |event: E3Requested, store| {
+            let e3_id = event.e3Id.to::<u64>();
+            let mut repo = CrispE3Repository::new(store.clone(), e3_id);
+
+            info!("E3Requested: {:?}", event);
+
+            async move {
+                // Convert custom params bytes back to token address and balance threshold.
+                let custom_params: CustomParams =
+                    serde_json::from_slice(&event.e3.customParams)
+                        .with_context(|| "Failed to parse custom params from E3 event")?;
+
+                let token_address: Address = custom_params
+                    .token_address
+                    .parse()
+                    .with_context(|| "Failed to parse token address")?;
+
+                let balance_threshold =
+                    BigUint::parse_bytes(custom_params.balance_threshold.as_bytes(), 10)
+                        .ok_or_else(|| eyre::eyre!("Invalid balance threshold"))?;
+
+                // Get token holders from Bitquery API or mocked data.
+                let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
+                    info!(
+                        "Using mocked token holders for local network (chain_id: {})",
+                        CONFIG.chain_id
+                    );
+
+                    get_mock_token_holders()
+                } else {
+                    info!(
+                        "Using Bitquery API for network (chain_id: {})",
+                        CONFIG.chain_id
+                    );
+
+                    let bitquery_client = BitqueryClient::new(CONFIG.bitquery_api_key.clone());
+                    bitquery_client
+                        .get_token_holders(
+                            token_address,
+                            balance_threshold,
+                            event.e3.requestBlock.to::<u64>(),
+                            CONFIG.chain_id,
+                            10000, // TODO: this is fine for now, but we need pagination or chunking strategies
+                                   // to retrieve large datasets efficiently.
+                        )
+                        .await
+                        .with_context(|| "Bitquery error")?
+                };
+
+                if token_holders.is_empty() {
+                    return Err(eyre::eyre!(
+                        "No eligible token holders found for token address {}.",
+                        token_address
+                    )
+                    .into());
+                }
+
+                // Compute Poseidon hashes for token holder address + balance pairs.
+                let token_holder_hashes = compute_token_holder_hashes(&token_holders)
+                    .with_context(|| "Failed to compute token holder hashes")?;
+
+                repo.set_token_holder_hashes(token_holder_hashes.clone())
+                    .await?;
+
+                let tree =
+                    build_tree(token_holder_hashes).with_context(|| "Failed to build tree")?;
+                let merkle_root = tree
+                    .root()
+                    .ok_or_else(|| eyre::eyre!("Failed to get merkle root from tree"))?;
+
+                info!("Merkle root: {}", merkle_root);
+
+                // TODO: Publish merkle root on-chain (inputValidator contract).
+
+                Ok(())
+            }
+        })
+        .await;
+    Ok(indexer)
+}
 
 pub async fn register_e3_activated(
     mut indexer: EnclaveIndexer<impl DataStore>,
@@ -39,7 +131,7 @@ pub async fn register_e3_activated(
             let mut repo = CrispE3Repository::new(store.clone(), e3_id);
             let mut current_round_repo = CurrentRoundRepository::new(store);
             let expiration = event.expiration.to::<u64>();
-            
+
             info!("Handling E3 request with id {}", e3_id);
             async move {
                 repo.initialize_round().await?;
@@ -56,24 +148,37 @@ pub async fn register_e3_activated(
 
                 sleep_until(expiration).await;
 
-                let e3 = repo.get_e3().await?;
+                let e3: e3_sdk::indexer::models::E3 = repo.get_e3().await?;
                 repo.update_status("Expired").await?;
 
                 if repo.get_vote_count().await? > 0 {
                     info!("Starting computation for E3: {}", e3_id);
                     repo.update_status("Computing").await?;
 
-                    let (id, status) =
-                        run_compute(e3_id, e3.e3_params, e3.ciphertext_inputs, format!("{}/state/add-result", CONFIG.enclave_server_url))
-                            .await
-                            .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
+                    let (id, status) = run_compute(
+                        e3_id,
+                        e3.e3_params,
+                        e3.ciphertext_inputs,
+                        format!("{}/state/add-result", CONFIG.enclave_server_url),
+                    )
+                    .await
+                    .map_err(|e| eyre::eyre!("Error sending run compute request: {e}"))?;
 
                     if id != e3_id {
-                        return Err(eyre::eyre!("Computation request returned unexpected E3 ID: expected {}, got {}", e3_id, id).into());
+                        return Err(eyre::eyre!(
+                            "Computation request returned unexpected E3 ID: expected {}, got {}",
+                            e3_id,
+                            id
+                        )
+                        .into());
                     }
 
                     if status != "processing" {
-                        return Err(eyre::eyre!("Computation request failed with status: {}", status).into());
+                        return Err(eyre::eyre!(
+                            "Computation request failed with status: {}",
+                            status
+                        )
+                        .into());
                     }
 
                     info!("Request Computation for E3: {}", e3_id);
@@ -201,6 +306,7 @@ pub async fn start_indexer(
     // CRISP indexer
     let crisp_indexer =
         EnclaveIndexer::new(enclave_contract_listener, readonly_contract, store).await?;
+    let crisp_indexer = register_e3_requested(crisp_indexer).await?;
     let crisp_indexer = register_e3_activated(crisp_indexer).await?;
     let crisp_indexer = register_ciphertext_output_published(crisp_indexer).await?;
     let crisp_indexer = register_plaintext_output_published(crisp_indexer).await?;
