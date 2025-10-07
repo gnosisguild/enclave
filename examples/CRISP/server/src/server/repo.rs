@@ -244,7 +244,10 @@ impl<S: DataStore> CrispE3Repository<S> {
 
     pub async fn set_token_holder_hashes(&mut self, hashes: Vec<String>) -> Result<()> {
         let key = self.crisp_key();
+<<<<<<< HEAD
 
+=======
+>>>>>>> ecd0ac23 (feat: census tree on CRISP (#763))
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
@@ -254,7 +257,10 @@ impl<S: DataStore> CrispE3Repository<S> {
             })
             .await
             .map_err(|_| eyre::eyre!("Could not set token_holder_hashes for '{key}'"))?;
+<<<<<<< HEAD
         
+=======
+>>>>>>> ecd0ac23 (feat: census tree on CRISP (#763))
         Ok(())
     }
 
