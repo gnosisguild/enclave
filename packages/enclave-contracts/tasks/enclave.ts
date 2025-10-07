@@ -68,6 +68,12 @@ export const requestCommittee = task(
     defaultValue: ZeroAddress,
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "customParams",
+    description: "parameters for the custom params",
+    defaultValue: ZeroAddress,
+    type: ArgumentType.STRING,
+  })
   .setAction(async () => ({
     default: async (
       {
@@ -80,6 +86,7 @@ export const requestCommittee = task(
         e3Address,
         e3Params,
         computeParams,
+        customParams,
       },
       hre,
     ) => {
@@ -160,6 +167,7 @@ export const requestCommittee = task(
           e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
         e3ProgramParams,
         computeProviderParams,
+        customParams,
       });
       const tx = await enclave.request(
         {
@@ -171,6 +179,7 @@ export const requestCommittee = task(
             e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
           e3ProgramParams,
           computeProviderParams,
+          customParams,
         },
         { value: "1000000000000000000" },
       );
