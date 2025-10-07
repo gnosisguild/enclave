@@ -505,7 +505,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
     let event_rx = event_tx.subscribe();
     // Pas cmd and event channels to NetEventTranslator
-    NetEventTranslator::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
+    NetEventTranslator::setup(bus.clone(), &cmd_tx, event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
     let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
@@ -663,7 +663,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
 
-    NetEventTranslator::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
+    NetEventTranslator::setup(bus.clone(), &cmd_tx, event_rx, "mytopic");
 
     // Capture messages from output on msgs vec
     let event = EnclaveEvent::from(E3Requested {
