@@ -6,7 +6,6 @@
 
 mod ciphernode_selector;
 mod distance;
-mod index;
 mod repo;
 mod sortition;
 mod ticket;

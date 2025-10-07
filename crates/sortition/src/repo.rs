@@ -6,17 +6,16 @@
 
 use std::collections::HashMap;
 
+use crate::SortitionBackend;
 use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
 
-use crate::SortitionModule;
-
 pub trait SortitionRepositoryFactory {
-    fn sortition(&self) -> Repository<HashMap<u64, SortitionModule>>;
+    fn sortition(&self) -> Repository<HashMap<u64, SortitionBackend>>;
 }
 
 impl SortitionRepositoryFactory for Repositories {
-    fn sortition(&self) -> Repository<HashMap<u64, SortitionModule>> {
+    fn sortition(&self) -> Repository<HashMap<u64, SortitionBackend>> {
         Repository::new(self.store.scope(StoreKeys::sortition()))
     }
 }

@@ -34,22 +34,14 @@ pub struct GetNodes {
     pub chain_id: u64,
 }
 
-/// Set the algorithm used by a chain (Distance or Score).
-#[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "bool")]
-pub struct SetSortitionType {
-    pub chain_id: u64,
-    pub sort_type: SortitionType,
-}
-
-/// Which sortition algorithm a chain uses.
+/// Which sortition algorithm to use.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SortitionType {
     Distance,
     Score,
 }
 
-/// Unified list behavior for sortition backends.
+/// Common operations required by sortition backends.
 pub trait SortitionList<T> {
     fn contains(&self, seed: Seed, size: usize, address: T) -> Result<bool>;
     fn add(&mut self, address: T);
@@ -57,70 +49,30 @@ pub trait SortitionList<T> {
     fn nodes(&self) -> Vec<String>;
 }
 
-/// Backend for a single chain: either Distance or Score variant.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum SortitionBackend {
-    Distance { nodes: HashSet<String> },
-    Score { registered: Vec<RegisteredNode> },
+pub struct DistanceBackend {
+    nodes: HashSet<String>,
 }
 
-impl Default for SortitionBackend {
+impl Default for DistanceBackend {
     fn default() -> Self {
-        SortitionBackend::Distance {
+        Self {
             nodes: HashSet::new(),
         }
     }
 }
 
-impl SortitionBackend {
-    fn _sortition_type(&self) -> SortitionType {
-        match self {
-            SortitionBackend::Distance { .. } => SortitionType::Distance,
-            SortitionBackend::Score { .. } => SortitionType::Score,
-        }
-    }
-
-    fn _as_distance_mut(&mut self) -> &mut HashSet<String> {
-        match self {
-            SortitionBackend::Distance { nodes } => nodes,
-            SortitionBackend::Score { .. } => {
-                panic!("attempted to mutate Distance nodes on Score backend")
-            }
-        }
-    }
-
-    fn _as_score_mut(&mut self) -> &mut Vec<RegisteredNode> {
-        match self {
-            SortitionBackend::Score { registered } => registered,
-            SortitionBackend::Distance { .. } => {
-                panic!("attempted to mutate Score registered on Distance backend")
-            }
-        }
-    }
-
-    fn nodes_view(&self) -> Vec<String> {
-        match self {
-            SortitionBackend::Distance { nodes } => nodes.iter().cloned().collect(),
-            SortitionBackend::Score { registered } => {
-                registered.iter().map(|n| n.address.to_string()).collect()
-            }
-        }
-    }
-
-    fn contains_distance(&self, seed: Seed, size: usize, address: &str) -> Result<bool> {
-        let nodes = match self {
-            SortitionBackend::Distance { nodes } => nodes,
-            _ => return Err(anyhow!("wrong backend for distance contains")),
-        };
-
-        if nodes.is_empty() || size == 0 {
+impl SortitionList<String> for DistanceBackend {
+    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
+        if self.nodes.is_empty() || size == 0 {
             return Ok(false);
         }
 
-        let registered_nodes: Vec<Address> = nodes
+        let registered_nodes: Vec<Address> = self
+            .nodes
             .iter()
             .cloned()
-            .map(|b| b.parse::<Address>())
+            .map(|s| s.parse::<Address>())
             .collect::<Result<_, _>>()?;
 
         let committee =
@@ -131,140 +83,135 @@ impl SortitionBackend {
             .any(|(_, addr)| addr.to_string() == address))
     }
 
-    fn contains_score(&self, seed: Seed, size: usize, address: &str) -> Result<bool> {
-        let registered = match self {
-            SortitionBackend::Score { registered } => registered,
-            _ => return Err(anyhow!("wrong backend for score contains")),
-        };
+    fn add(&mut self, address: String) {
+        self.nodes.insert(address);
+    }
 
-        if registered.is_empty() || size == 0 {
+    fn remove(&mut self, address: String) {
+        self.nodes.remove(&address);
+    }
+
+    fn nodes(&self) -> Vec<String> {
+        self.nodes.iter().cloned().collect()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ScoreBackend {
+    registered: Vec<RegisteredNode>,
+}
+
+impl Default for ScoreBackend {
+    fn default() -> Self {
+        Self {
+            registered: Vec::new(),
+        }
+    }
+}
+
+impl SortitionList<String> for ScoreBackend {
+    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
+        if self.registered.is_empty() || size == 0 {
             return Ok(false);
         }
 
-        let committee = ScoreSortition::new(size).get_committee(seed.into(), registered)?;
+        let winners = ScoreSortition::new(size).get_committee(seed.into(), &self.registered)?;
         let want: Address = address.parse()?;
-        Ok(committee.iter().any(|w| w.address == want))
-    }
-}
-
-/// Per-chain module: stores the chosen algorithm and its backend storage.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SortitionModule {
-    sortition: SortitionType,
-    backend: SortitionBackend,
-}
-
-impl Default for SortitionModule {
-    fn default() -> Self {
-        Self {
-            sortition: SortitionType::Distance,
-            backend: SortitionBackend::default(),
-        }
-    }
-}
-
-impl SortitionModule {
-    /// Create a module with a specific algorithm.
-    pub fn new(sortition: SortitionType) -> Self {
-        let backend = match sortition {
-            SortitionType::Distance => SortitionBackend::Distance {
-                nodes: HashSet::new(),
-            },
-            SortitionType::Score => SortitionBackend::Score {
-                registered: Vec::new(),
-            },
-        };
-        Self { sortition, backend }
-    }
-
-    pub fn sort_type(&self) -> SortitionType {
-        self.sortition
-    }
-
-    /// Switch algorithm and migrate storage shape.
-    pub fn set_sort_type(&mut self, sort_type: SortitionType) {
-        if self.sortition == sort_type {
-            return;
-        }
-        self.backend = match sort_type {
-            SortitionType::Distance => SortitionBackend::Distance {
-                nodes: self.backend.nodes_view().into_iter().collect(),
-            },
-            SortitionType::Score => SortitionBackend::Score {
-                registered: self
-                    .backend
-                    .nodes_view()
-                    .into_iter()
-                    .filter_map(|s| s.parse::<Address>().ok())
-                    .map(|address| RegisteredNode {
-                        address,
-                        tickets: Vec::new(),
-                    })
-                    .collect(),
-            },
-        };
-        self.sortition = sort_type;
-    }
-}
-
-impl SortitionList<String> for SortitionModule {
-    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
-        match self.sortition {
-            SortitionType::Distance => self.backend.contains_distance(seed, size, &address),
-            SortitionType::Score => self.backend.contains_score(seed, size, &address),
-        }
+        Ok(winners.iter().any(|w| w.address == want))
     }
 
     fn add(&mut self, address: String) {
-        match (&mut self.backend, self.sortition) {
-            (SortitionBackend::Distance { nodes }, SortitionType::Distance) => {
-                nodes.insert(address);
+        if let Ok(addr) = address.parse::<Address>() {
+            if !self.registered.iter().any(|n| n.address == addr) {
+                self.registered.push(RegisteredNode {
+                    address: addr,
+                    tickets: Vec::new(),
+                });
             }
-            (SortitionBackend::Score { registered }, SortitionType::Score) => {
-                if let Ok(addr) = address.parse::<Address>() {
-                    if !registered.iter().any(|n| n.address == addr) {
-                        registered.push(RegisteredNode {
-                            address: addr,
-                            tickets: Vec::new(),
-                        });
-                    }
-                }
-            }
-            _ => {}
         }
     }
 
     fn remove(&mut self, address: String) {
-        match (&mut self.backend, self.sortition) {
-            (SortitionBackend::Distance { nodes }, SortitionType::Distance) => {
-                nodes.remove(&address);
+        if let Ok(addr) = address.parse::<Address>() {
+            if let Some(i) = self.registered.iter().position(|n| n.address == addr) {
+                self.registered.swap_remove(i);
             }
-            (SortitionBackend::Score { registered }, SortitionType::Score) => {
-                if let Ok(addr) = address.parse::<Address>() {
-                    if let Some(i) = registered.iter().position(|n| n.address == addr) {
-                        registered.swap_remove(i);
-                    }
-                }
-            }
-            _ => {}
         }
     }
 
     fn nodes(&self) -> Vec<String> {
-        self.backend.nodes_view()
+        self.registered
+            .iter()
+            .map(|n| n.address.to_string())
+            .collect()
     }
 }
 
-/// Actor holding per-chain sortition modules.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SortitionBackend {
+    Distance(DistanceBackend),
+    Score(ScoreBackend),
+}
+
+impl SortitionBackend {
+    pub fn default_for(kind: SortitionType) -> Self {
+        match kind {
+            SortitionType::Distance => SortitionBackend::Distance(DistanceBackend::default()),
+            SortitionType::Score => SortitionBackend::Score(ScoreBackend::default()),
+        }
+    }
+
+    pub fn kind(&self) -> SortitionType {
+        match self {
+            SortitionBackend::Distance(_) => SortitionType::Distance,
+            SortitionBackend::Score(_) => SortitionType::Score,
+        }
+    }
+}
+
+impl SortitionList<String> for SortitionBackend {
+    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
+        match self {
+            SortitionBackend::Distance(backend) => backend.contains(seed, size, address),
+            SortitionBackend::Score(backend) => backend.contains(seed, size, address),
+        }
+    }
+
+    fn add(&mut self, address: String) {
+        match self {
+            SortitionBackend::Distance(backend) => backend.add(address),
+            SortitionBackend::Score(backend) => backend.add(address),
+        }
+    }
+
+    fn remove(&mut self, address: String) {
+        match self {
+            SortitionBackend::Distance(backend) => backend.remove(address),
+            SortitionBackend::Score(backend) => backend.remove(address),
+        }
+    }
+
+    fn nodes(&self) -> Vec<String> {
+        match self {
+            SortitionBackend::Distance(backend) => backend.nodes(),
+            SortitionBackend::Score(backend) => backend.nodes(),
+        }
+    }
+}
+
+/// Actor holding per-chain sortition backends.
+/// New chains use `default_sort` to choose which backend to initialize.
 pub struct Sortition {
-    list: Persistable<HashMap<u64, SortitionModule>>,
+    list: Persistable<HashMap<u64, SortitionBackend>>,
     bus: Addr<EventBus<EnclaveEvent>>,
+    sort_type: SortitionType,
 }
 
 #[derive(Debug)]
 pub struct SortitionParams {
     pub bus: Addr<EventBus<EnclaveEvent>>,
-    pub list: Persistable<HashMap<u64, SortitionModule>>,
+    pub list: Persistable<HashMap<u64, SortitionBackend>>,
+    pub sort_type: SortitionType,
 }
 
 impl Sortition {
@@ -272,19 +219,22 @@ impl Sortition {
         Self {
             list: params.list,
             bus: params.bus,
+            sort_type: params.sort_type,
         }
     }
 
-    /// Start the actor and subscribe to events.
+    /// Start the actor and subscribe to add/remove events.
     #[instrument(name = "sortition", skip_all)]
     pub async fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
-        store: Repository<HashMap<u64, SortitionModule>>,
+        store: Repository<HashMap<u64, SortitionBackend>>,
+        sort_type: SortitionType,
     ) -> Result<Addr<Sortition>> {
         let list = store.load_or_default(HashMap::new()).await?;
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
+            sort_type,
         })
         .start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
@@ -296,20 +246,10 @@ impl Sortition {
         let list_by_chain_id = self.list.get().ok_or(anyhow!(
             "Could not get sortition's list cache. This should not happen."
         ))?;
-        let list = list_by_chain_id
+        let backend = list_by_chain_id
             .get(&chain_id)
             .ok_or(anyhow!("No list found for chain_id {}", chain_id))?;
-        Ok(list.nodes())
-    }
-
-    /// Set the algorithm for a chain.
-    pub fn set_sort_type(&mut self, chain_id: u64, sort_type: SortitionType) -> Result<()> {
-        self.list.try_mutate(|mut map| {
-            map.entry(chain_id)
-                .and_modify(|m| m.set_sort_type(sort_type))
-                .or_insert_with(|| SortitionModule::new(sort_type));
-            Ok(map)
-        })
+        Ok(backend.nodes())
     }
 }
 
@@ -319,6 +259,7 @@ impl Actor for Sortition {
 
 impl Handler<EnclaveEvent> for Sortition {
     type Result = ();
+
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             EnclaveEvent::CiphernodeAdded { data, .. } => ctx.notify(data.clone()),
@@ -331,56 +272,56 @@ impl Handler<EnclaveEvent> for Sortition {
 impl Handler<CiphernodeAdded> for Sortition {
     type Result = ();
 
-    /// Add a node to the chain’s backend.
     #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
         trace!("Adding node: {}", msg.address);
-        match self.list.try_mutate(|mut list_map| {
+        let sort_type = self.sort_type;
+        let chain_id = msg.chain_id;
+        let addr = msg.address.clone();
+
+        if let Err(err) = self.list.try_mutate(move |mut list_map| {
             list_map
-                .entry(msg.chain_id)
-                .or_insert_with(SortitionModule::default)
-                .add(msg.address);
+                .entry(chain_id)
+                .or_insert_with(|| SortitionBackend::default_for(sort_type))
+                .add(addr);
             Ok(list_map)
         }) {
-            Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
-            _ => (),
-        };
+            self.bus.err(EnclaveErrorType::Sortition, err);
+        }
     }
 }
 
 impl Handler<CiphernodeRemoved> for Sortition {
     type Result = ();
 
-    /// Remove a node from the chain’s backend.
     #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
         info!("Removing node: {}", msg.address);
-        match self.list.try_mutate(|mut list_map| {
+        let sort_type = self.sort_type;
+        let chain_id = msg.chain_id;
+        let addr = msg.address.clone();
+
+        if let Err(err) = self.list.try_mutate(move |mut list_map| {
             list_map
-                .get_mut(&msg.chain_id)
-                .ok_or(anyhow!(
-                    "Cannot remove a node from list that does not exist. It appears that the list for chain_id '{}' has not yet been created.",
-                    &msg.chain_id
-                ))?
-                .remove(msg.address);
+                .entry(chain_id)
+                .or_insert_with(|| SortitionBackend::default_for(sort_type))
+                .remove(addr);
             Ok(list_map)
         }) {
-            Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
-            _ => (),
-        };
+            self.bus.err(EnclaveErrorType::Sortition, err);
+        }
     }
 }
 
 impl Handler<GetHasNode> for Sortition {
     type Result = bool;
 
-    /// Check committee membership for a node.
     #[instrument(name = "sortition", skip_all)]
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
         self.list
             .try_with(|list_map| {
-                if let Some(entry) = list_map.get(&msg.chain_id) {
-                    return entry.contains(msg.seed, msg.size, msg.address);
+                if let Some(backend) = list_map.get(&msg.chain_id) {
+                    return backend.contains(msg.seed, msg.size, msg.address);
                 }
                 Ok(false)
             })
@@ -396,18 +337,5 @@ impl Handler<GetNodes> for Sortition {
 
     fn handle(&mut self, msg: GetNodes, _ctx: &mut Self::Context) -> Self::Result {
         self.get_nodes(msg.chain_id).unwrap_or_default()
-    }
-}
-
-impl Handler<SetSortitionType> for Sortition {
-    type Result = bool;
-
-    fn handle(&mut self, msg: SetSortitionType, _ctx: &mut Self::Context) -> Self::Result {
-        self.set_sort_type(msg.chain_id, msg.sort_type)
-            .map(|_| true)
-            .unwrap_or_else(|err| {
-                self.bus.err(EnclaveErrorType::Sortition, err);
-                false
-            })
     }
 }
