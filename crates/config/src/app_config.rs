@@ -586,19 +586,23 @@ nodes:
                 .into_scoped("_default")
                 .map_err(|e| e.to_string())?;
 
+            // Use the actual platform directories instead of hardcoded paths.
+            let expected_config_dir = OsDirs::config_dir();
+            let expected_data_dir = OsDirs::data_dir();
+
             assert_eq!(
                 config.key_file(),
-                PathBuf::from(format!("{}/.config/enclave/_default/key", home))
+                expected_config_dir.join("_default").join("key")
             );
 
             assert_eq!(
                 config.db_file(),
-                PathBuf::from(format!("{}/.local/share/enclave/_default/db", home))
+                expected_data_dir.join("_default").join("db")
             );
 
             assert_eq!(
                 config.config_file(),
-                PathBuf::from(format!("{}/.config/enclave/enclave.config.yaml", home))
+                expected_config_dir.join("enclave.config.yaml")
             );
 
             assert_eq!(config.role(), NodeRole::Ciphernode);
@@ -626,10 +630,10 @@ nodes:
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
-            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
-            let filename = format!("{}/.config/enclave/enclave.config.yaml", home);
-            let filedir = format!("{}/.config/enclave", home);
-            jail.create_dir(filedir)?;
+
+            let expected_config_dir = OsDirs::config_dir();
+            let filename = expected_config_dir.join("enclave.config.yaml");
+            jail.create_dir(&expected_config_dir)?;
             jail.create_file(
                 filename.clone(),
                 r#"
@@ -727,7 +731,6 @@ chains:
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
-            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
             jail.set_env("TEST_RPC_URL_PORT", "8545");
             jail.set_env("TEST_USERNAME", "envUser");
             jail.set_env("TEST_PASSWORD", "envPassword");
@@ -736,9 +739,9 @@ chains:
                 "0x1234567890123456789012345678901234567890",
             );
 
-            let filename = format!("{}/.config/enclave/enclave.config.yaml", home);
-            let filedir = format!("{}/.config/enclave", home);
-            jail.create_dir(filedir)?;
+            let expected_config_dir = OsDirs::config_dir();
+            let filename = expected_config_dir.join("enclave.config.yaml");
+            jail.create_dir(&expected_config_dir)?;
             jail.create_file(
                 filename,
                 r#"
