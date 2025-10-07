@@ -1,3 +1,32 @@
+## [0.1.4](https://github.com/gnosisguild/enclave/compare/v0.1.2...v0.1.4) (2025-10-07)
+
+
+### Bug Fixes
+
+* contracts exports ([#732](https://github.com/gnosisguild/enclave/issues/732)) ([c0686c6](https://github.com/gnosisguild/enclave/commit/c0686c6b42b351c07adf400c47d8cc5b2573f8e6))
+* ensure we don't have uncommited files ([#676](https://github.com/gnosisguild/enclave/issues/676)) ([a46e707](https://github.com/gnosisguild/enclave/commit/a46e70795655b8ff3a9896651f09f5ccee2592c7))
+* ensure we push to the correct branch ([#770](https://github.com/gnosisguild/enclave/issues/770)) ([9d630a6](https://github.com/gnosisguild/enclave/commit/9d630a6eab7c2329eb4603e1bebe48a82b35adcc))
+* fix reentrancy issue in enclave contracts ([#752](https://github.com/gnosisguild/enclave/issues/752)) ([3806a87](https://github.com/gnosisguild/enclave/commit/3806a870b39fa47a1b4b77f9484c0a1d74bfbaa4))
+* release rust crates error ([#689](https://github.com/gnosisguild/enclave/issues/689)) ([3c25929](https://github.com/gnosisguild/enclave/commit/3c25929f2317003c81d3a21d6b4fc9b1e44573cc))
+* remove already published files from gitignore ([#680](https://github.com/gnosisguild/enclave/issues/680)) ([283205d](https://github.com/gnosisguild/enclave/commit/283205dffc665d83cc741c07f697c1ecaf2d1d84))
+* remove ci artifacts deep clean ([#681](https://github.com/gnosisguild/enclave/issues/681)) ([242aac9](https://github.com/gnosisguild/enclave/commit/242aac96b9800043b0d24b5716b3262baefd4472))
+* remove mac intel build and allow crates publishing to fail ([#777](https://github.com/gnosisguild/enclave/issues/777)) ([8025c27](https://github.com/gnosisguild/enclave/commit/8025c277d5c4aa1005ab93d84d34158266458800))
+* rust crate release error ([#694](https://github.com/gnosisguild/enclave/issues/694)) ([56e9b12](https://github.com/gnosisguild/enclave/commit/56e9b12c2b319d1ea1081df4577b6b0cd0ccfc7d))
+* rust crates release workflow ([#715](https://github.com/gnosisguild/enclave/issues/715)) ([fc330c6](https://github.com/gnosisguild/enclave/commit/fc330c625742bce01def98ef3ccec5ae15fbdb96))
+* rust releases ([#774](https://github.com/gnosisguild/enclave/issues/774)) ([16870a4](https://github.com/gnosisguild/enclave/commit/16870a42973fccae7a376ccbc4b952f9e971fffa))
+* update relative paths to use git ([#708](https://github.com/gnosisguild/enclave/issues/708)) ([e0bd2bc](https://github.com/gnosisguild/enclave/commit/e0bd2bc7a5e2515013188fc7e40927630d1f6d58))
+* wasm init ([#740](https://github.com/gnosisguild/enclave/issues/740)) ([58f7905](https://github.com/gnosisguild/enclave/commit/58f7905dd5bd33070be84b0bd5d88b5f44d98267))
+
+
+### Features
+
+* add a function to get an e3 public key ([#760](https://github.com/gnosisguild/enclave/issues/760)) ([4db5dac](https://github.com/gnosisguild/enclave/commit/4db5dacf2f60872cfbafa16728b3da4f9244c248))
+* add version flag ([#800](https://github.com/gnosisguild/enclave/issues/800)) ([fe95d8c](https://github.com/gnosisguild/enclave/commit/fe95d8ccbeec828a0c4952a1111811bf6e7c2ef1))
+* optimization by concatenating coefficients ([#734](https://github.com/gnosisguild/enclave/issues/734)) ([00e2f6d](https://github.com/gnosisguild/enclave/commit/00e2f6d5eaaf2089488f414dc57675f7120cf2a0))
+* upgrade to hardhat v3 and configure repo ([#677](https://github.com/gnosisguild/enclave/issues/677)) ([7ccf6fa](https://github.com/gnosisguild/enclave/commit/7ccf6fa4d62a972a4d2336bd436d71bbc9b54535))
+
+
+
 ## [0.1.3](https://github.com/gnosisguild/enclave/compare/v0.1.2...v0.1.3) (2025-10-02)
 
 
