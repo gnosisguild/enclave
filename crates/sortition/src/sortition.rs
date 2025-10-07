@@ -103,8 +103,12 @@ impl SortitionList<String> for DistanceBackend {
     ///
     /// Returns `Ok(false)` if there are no nodes or `size == 0`.
     fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
-        if self.nodes.is_empty() || size == 0 {
-            return Ok(false);
+        if size == 0 {
+            return Err(anyhow!("Size cannot be 0"));
+        }
+
+        if self.nodes.len() == 0 {
+            return Err(anyhow!("No nodes registered!"));
         }
 
         let committee = get_committee(seed, size, self.nodes.clone())?;
@@ -115,6 +119,10 @@ impl SortitionList<String> for DistanceBackend {
     }
 
     fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>> {
+        if size == 0 {
+            return Err(anyhow!("Size cannot be 0"));
+        }
+
         if self.nodes.len() == 0 {
             return Err(anyhow!("No nodes registered!"));
         }
