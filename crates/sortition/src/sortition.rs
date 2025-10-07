@@ -176,7 +176,6 @@ impl SortitionList<String> for ScoreBackend {
         if self.registered.is_empty() || size == 0 {
             return Ok(false);
         }
-
         let winners = ScoreSortition::new(size).get_committee(seed.into(), &self.registered)?;
         let want: Address = address.parse()?;
         Ok(winners.iter().any(|w| w.address == want))
@@ -238,7 +237,7 @@ pub enum SortitionBackend {
 
 impl SortitionBackend {
     /// Construct a backend preconfigured with a default `DistanceBackend`.
-    pub fn default_distance() -> Self {
+    pub fn default() -> Self {
         SortitionBackend::Distance(DistanceBackend::default())
     }
 
@@ -391,7 +390,7 @@ impl Handler<CiphernodeAdded> for Sortition {
         if let Err(err) = self.list.try_mutate(move |mut list_map| {
             list_map
                 .entry(chain_id)
-                .or_insert_with(SortitionBackend::default_distance)
+                .or_insert_with(SortitionBackend::default)
                 .add(addr);
             Ok(list_map)
         }) {
