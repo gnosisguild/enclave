@@ -4,11 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::collections::HashMap;
-
 use crate::SortitionBackend;
 use e3_config::StoreKeys;
 use e3_data::{Repositories, Repository};
+use std::collections::HashMap;
 
 pub trait SortitionRepositoryFactory {
     fn sortition(&self) -> Repository<HashMap<u64, SortitionBackend>>;
