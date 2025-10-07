@@ -345,7 +345,7 @@ cargo build --release
 
 ### Current Setup
 
-- **`main`** - Stable branch 
+- **`main`** - Stable branch
 - **`v*.*.*`** - Version tags for releases
 - **`stable`** - Always points to the latest stable release
 - **`dev`** - Branch for ongoing development
