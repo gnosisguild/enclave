@@ -9,7 +9,7 @@ use crate::ticket::{RegisteredNode, Ticket};
 use crate::ticket_sortition::ScoreSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
@@ -19,50 +19,66 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tracing::{info, instrument, trace};
 
-/// Ask the `Sortition` actor whether `address` is in the committee
-/// of size `size` for randomness `seed` on the given `chain_id`.
+/// Message: ask the `Sortition` actor whether `address` would be in the
+/// committee of size `size` for randomness `seed` on `chain_id`.
+///
+/// Membership semantics depend on the backend for that chain:
+/// - **Distance backend**: computes a committee using address distance.
+/// - **Score backend**: computes each node’s best ticket score and sorts globally.
+///
+/// Returns `true` if `address` appears in the resulting top-`size` selection.
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
 #[rtype(result = "bool")]
 pub struct GetHasNode {
     /// Round seed / randomness used by the sortition algorithm.
     pub seed: Seed,
-    /// Hex-encoded node address (e.g., "0x...").
+    /// Hex-encoded node address (e.g., `"0x..."`).
     pub address: String,
-    /// Committee size to consider (top-N).
+    /// Committee size (top-N).
     pub size: usize,
-    /// Chain for which to check membership.
+    /// Target chain.
     pub chain_id: u64,
 }
 
-/// Ask the `Sortition` actor for the current set of registered node
-/// addresses for a `chain_id`.
+/// Message: request the current set of registered node addresses for `chain_id`.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "Vec<String>")]
 pub struct GetNodes {
-    /// Chain identifier.
+    /// Target chain.
     pub chain_id: u64,
 }
 
-/// Minimal interface a sortition backend must implement. Backends can
-/// store their data however they like (e.g., simple address sets for
-/// distance sortition or richer `RegisteredNode` values for score sortition).
+/// Minimal interface that all sortition backends must implement.
+///
+/// Backends can store their own shapes (e.g., a `HashSet<String>` of addresses
+/// for Distance, or a `Vec<RegisteredNode>` for Score), but they must be able to:
+/// - Check committee membership (`contains`)
+/// - Add and remove nodes
+/// - List all registered node addresses
 pub trait SortitionList<T> {
-    /// Return `true` if `address` is in the size-`size` committee under `seed`.
+    /// Return `true` if `address` appears in the size-`size` committee under `seed`.
+    ///
+    /// Implementations should return `Ok(false)` if the backend has no nodes
+    /// or if `size == 0`.
     fn contains(&self, seed: Seed, size: usize, address: T) -> Result<bool>;
-    /// Add a node to the backend.
+
+    /// Add a node to the backend. Backends should be idempotent on duplicates.
     fn add(&mut self, address: T);
-    /// Remove a node from the backend.
+
+    /// Remove a node from the backend. Removing a non-existent node is a no-op.
     fn remove(&mut self, address: T);
-    /// Return all node addresses (hex) for diagnostics / UI.
+
+    /// Return all registered node addresses as hex strings.
     fn nodes(&self) -> Vec<String>;
 }
 
-/// Backend for *distance* sortition:
-/// stores a set of hex string addresses and delegates committee selection
+/// Distance-sortition backend.
+///
+/// Stores a set of hex-encoded addresses and delegates committee selection
 /// to `DistanceSortition`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DistanceBackend {
-    /// Registered node addresses as hex strings.
+    /// Registered node addresses (hex).
     nodes: HashSet<String>,
 }
 
@@ -75,7 +91,10 @@ impl Default for DistanceBackend {
 }
 
 impl SortitionList<String> for DistanceBackend {
-    /// Build the address list, run `DistanceSortition`, and check membership.
+    /// Build the address list, run `DistanceSortition(seed, nodes, size)`,
+    /// then check whether `address` is in the result.
+    ///
+    /// Returns `Ok(false)` if there are no nodes or `size == 0`.
     fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
         if self.nodes.is_empty() || size == 0 {
             return Ok(false);
@@ -96,12 +115,12 @@ impl SortitionList<String> for DistanceBackend {
             .any(|(_, addr)| addr.to_string() == address))
     }
 
-    /// Insert a node address (hex string). Idempotent for duplicates.
+    /// Insert a node address (hex). Duplicate inserts are harmless.
     fn add(&mut self, address: String) {
         self.nodes.insert(address);
     }
 
-    /// Remove a node address (hex string).
+    /// Remove a node address (hex). Missing entries are ignored.
     fn remove(&mut self, address: String) {
         self.nodes.remove(&address);
     }
@@ -112,14 +131,18 @@ impl SortitionList<String> for DistanceBackend {
     }
 }
 
-/// Backend for *score* sortition:
-/// stores `RegisteredNode` entries (address + tickets), and enforces
-/// global ticket_id uniqueness via `used_ticket_ids`.
+/// Score-sortition backend.
+///
+/// Stores richer `RegisteredNode` entries (address + per-node ticket set).
+/// Tickets use **local, per-node** IDs in the range `1..=k`, assigned by
+/// [`ScoreBackend::set_ticket_count_addr`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScoreBackend {
     /// Nodes with their ticket sets (used by score-based committee selection).
     registered: Vec<RegisteredNode>,
-    /// Guardrail: prevents duplicate `ticket_id`s across the whole backend.
+    /// Legacy/unused guard from an earlier version that enforced global uniqueness.
+    /// With per-node ticket IDs, this set has no effect on selection and is kept
+    /// only for backward compatibility of serialized state.
     used_ticket_ids: HashSet<u64>,
 }
 
@@ -133,52 +156,27 @@ impl Default for ScoreBackend {
 }
 
 impl ScoreBackend {
-    /// Add or replace the tickets for a given `address` (as an `Address` type).
+    /// Set (or replace) a node’s ticket *count* using local IDs `1..=count`.
     ///
-    /// This method:
-    /// - Sorts and deduplicates incoming `tickets` by `ticket_id`.
-    /// - If the node already exists, frees its current `ticket_id`s from
-    ///   `used_ticket_ids` and then inserts the new set.
-    /// - If the node does not exist, creates it with the provided tickets.
-    /// - Enforces global uniqueness of `ticket_id`s; returns an error if any
-    ///   incoming `ticket_id` already exists elsewhere.
-    pub fn add_with_tickets_addr(
-        &mut self,
-        address: Address,
-        tickets: Option<Vec<Ticket>>,
-    ) -> Result<()> {
-        let mut tickets = tickets.unwrap_or_default();
-        tickets.sort_unstable_by_key(|t| t.ticket_id);
-        tickets.dedup_by_key(|t| t.ticket_id);
-
-        // Node exists: reclaim its ticket ids, then set the new tickets.
+    /// - If the node already exists, its entire ticket vector is replaced.
+    /// - If the node doesn’t exist, a new `RegisteredNode` is created.
+    /// - Passing `count == 0` clears the ticket vector for that node.
+    ///
+    /// This does **not** attempt to deduplicate across nodes; IDs are local.
+    pub fn set_ticket_count_addr(&mut self, address: Address, count: u64) {
+        let tickets: Vec<Ticket> = (1..=count).map(|i| Ticket { ticket_id: i }).collect();
         if let Some(existing) = self.registered.iter_mut().find(|n| n.address == address) {
-            for ticket in &existing.tickets {
-                self.used_ticket_ids.remove(&ticket.ticket_id);
-            }
-            for ticket in &tickets {
-                if !self.used_ticket_ids.insert(ticket.ticket_id) {
-                    bail!("duplicate ticket id detected: {}", ticket.ticket_id);
-                }
-            }
             existing.tickets = tickets;
-            return Ok(());
+        } else {
+            self.registered.push(RegisteredNode { address, tickets });
         }
-
-        // New node: just enforce uniqueness and push.
-        for ticket in &tickets {
-            if !self.used_ticket_ids.insert(ticket.ticket_id) {
-                bail!("duplicate ticket id detected: {}", ticket.ticket_id);
-            }
-        }
-
-        self.registered.push(RegisteredNode { address, tickets });
-        Ok(())
     }
 }
 
 impl SortitionList<String> for ScoreBackend {
-    /// Compute score-based winners and check if `address` is included.
+    /// Compute score-based winners (`ScoreSortition`) and check if `address` is included.
+    ///
+    /// Returns `Ok(false)` if there are no nodes or `size == 0`.
     fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
         if self.registered.is_empty() || size == 0 {
             return Ok(false);
@@ -189,8 +187,10 @@ impl SortitionList<String> for ScoreBackend {
         Ok(winners.iter().any(|w| w.address == want))
     }
 
-    /// Add a node with an empty ticket set if it doesn't exist.
-    /// (Use `add_with_tickets_addr` to set tickets explicitly.)
+    /// Add a node, creating an empty ticket set when first seen.
+    ///
+    /// To set tickets, call [`ScoreBackend::set_ticket_count_addr`] (or another
+    /// initialization path) after the node is added.
     fn add(&mut self, address: String) {
         match address.parse::<Address>() {
             Ok(addr) => {
@@ -207,7 +207,10 @@ impl SortitionList<String> for ScoreBackend {
         }
     }
 
-    /// Remove the node and free its `ticket_id`s from the global guard.
+    /// Remove the node (if present).
+    ///
+    /// Note: `used_ticket_ids` is a legacy field and clearing it here has
+    /// no effect on current per-node ticket ID semantics.
     fn remove(&mut self, address: String) {
         if let Ok(addr) = address.parse::<Address>() {
             if let Some(i) = self.registered.iter().position(|n| n.address == addr) {
@@ -228,8 +231,11 @@ impl SortitionList<String> for ScoreBackend {
     }
 }
 
-/// An enum wrapper around the two supported backends.
-/// New chains should default to `Distance`.
+/// Enum wrapper around the two supported backends.
+///
+/// New chains should default to `Distance`. If a chain is intended to
+/// use score selection, construct it as `SortitionBackend::Score(ScoreBackend::default())`
+/// and then populate tickets explicitly.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SortitionBackend {
     /// Distance-based selection (stores a simple set of addresses).
@@ -239,22 +245,23 @@ pub enum SortitionBackend {
 }
 
 impl SortitionBackend {
-    /// Construct a `SortitionBackend` preconfigured with a default `DistanceBackend`.
+    /// Construct a backend preconfigured with a default `DistanceBackend`.
     pub fn default_distance() -> Self {
         SortitionBackend::Distance(DistanceBackend::default())
     }
 
-    /// Convenience: for Score backends, add/replace tickets for a node by `Address`.
-    /// Returns an error if the backend is `Distance`.
-    pub fn add_with_tickets_addr(
-        &mut self,
-        address: Address,
-        tickets: Option<Vec<Ticket>>,
-    ) -> Result<()> {
+    /// Helper for Score backends: assign local ticket IDs `1..=count` for `address`.
+    ///
+    /// # Errors
+    /// Returns an error if called on a `Distance` backend.
+    pub fn set_ticket_count_addr(&mut self, address: Address, count: u64) -> Result<()> {
         match self {
-            SortitionBackend::Score(b) => b.add_with_tickets_addr(address, tickets),
+            SortitionBackend::Score(b) => {
+                b.set_ticket_count_addr(address, count);
+                Ok(())
+            }
             SortitionBackend::Distance(_) => {
-                bail!("add_with_tickets is only valid for Score backend")
+                anyhow::bail!("set_ticket_count_addr is only valid for Score backend")
             }
         }
     }
@@ -290,11 +297,13 @@ impl SortitionList<String> for SortitionBackend {
     }
 }
 
-/// `Sortition` is an Actix actor that owns the per-chain backends and
-/// exposes message handlers to add/remove nodes, list nodes, and check
-/// committee membership.
+/// `Sortition` is an Actix actor that owns per-chain backends and exposes
+/// message handlers to:
+/// - add/remove nodes from a chain,
+/// - list nodes for a chain,
+/// - check committee membership for a chain.
 ///
-/// Persistence is handled via `Persistable<HashMap<u64, SortitionBackend>>`,
+/// Backends are persisted using `Persistable<HashMap<u64, SortitionBackend>>`
 /// keyed by `chain_id`.
 pub struct Sortition {
     /// Persistent map of `chain_id -> SortitionBackend`.
@@ -322,6 +331,8 @@ impl Sortition {
     }
 
     /// Load persisted state, start the actor, and subscribe to `CiphernodeAdded/Removed`.
+    ///
+    /// The store is initialized with an empty `HashMap` if nothing is present.
     #[instrument(name = "sortition_attach", skip_all)]
     pub async fn attach(
         bus: &Addr<EventBus<EnclaveEvent>>,
@@ -339,6 +350,10 @@ impl Sortition {
     }
 
     /// Return the current node addresses (hex) for `chain_id`.
+    ///
+    /// # Errors
+    /// - Returns an error if the persisted map cannot be loaded from memory.
+    /// - Returns an error if the given `chain_id` has no backend entry.
     pub fn get_nodes(&self, chain_id: u64) -> Result<Vec<String>> {
         let map = self
             .list
@@ -370,8 +385,11 @@ impl Handler<EnclaveEvent> for Sortition {
 impl Handler<CiphernodeAdded> for Sortition {
     type Result = ();
 
-    /// Add a node to the target chain. If the chain does not exist yet,
-    /// initialize it with the default `Distance` backend.
+    /// Add a node to the target chain.
+    ///
+    /// If the chain does not exist yet, its backend is initialized to `Distance`.
+    /// For score-based chains, switch construction time to `SortitionBackend::Score`
+    /// and call the ticket setters separately (this handler only adds the address).
     #[instrument(name = "sortition_add_node", skip_all)]
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
         trace!("Adding node: {}", msg.address);
@@ -393,8 +411,9 @@ impl Handler<CiphernodeAdded> for Sortition {
 impl Handler<CiphernodeRemoved> for Sortition {
     type Result = ();
 
-    /// Remove a node from the target chain, initializing the chain entry
-    /// with a default `Distance` backend if it was missing.
+    /// Remove a node from the target chain.
+    ///
+    /// If the chain entry is missing, nothing is created or removed.
     #[instrument(name = "sortition_remove_node", skip_all)]
     fn handle(&mut self, msg: CiphernodeRemoved, _ctx: &mut Self::Context) -> Self::Result {
         info!("Removing node: {}", msg.address);
@@ -417,6 +436,9 @@ impl Handler<GetHasNode> for Sortition {
 
     /// Return whether `address` is in the size-`size` committee for `seed`
     /// on `chain_id`. If the chain has not been initialized, returns `false`.
+    ///
+    /// Errors while accessing persisted state or parsing the address are
+    /// reported on the event bus and surfaced here as `false`.
     #[instrument(name = "sortition_contains", skip_all)]
     fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
         self.list
