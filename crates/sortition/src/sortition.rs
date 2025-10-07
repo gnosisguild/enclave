@@ -140,17 +140,12 @@ impl SortitionList<String> for DistanceBackend {
 pub struct ScoreBackend {
     /// Nodes with their ticket sets (used by score-based committee selection).
     registered: Vec<RegisteredNode>,
-    /// Legacy/unused guard from an earlier version that enforced global uniqueness.
-    /// With per-node ticket IDs, this set has no effect on selection and is kept
-    /// only for backward compatibility of serialized state.
-    used_ticket_ids: HashSet<u64>,
 }
 
 impl Default for ScoreBackend {
     fn default() -> Self {
         Self {
             registered: Vec::new(),
-            used_ticket_ids: HashSet::new(),
         }
     }
 }
@@ -214,9 +209,6 @@ impl SortitionList<String> for ScoreBackend {
     fn remove(&mut self, address: String) {
         if let Ok(addr) = address.parse::<Address>() {
             if let Some(i) = self.registered.iter().position(|n| n.address == addr) {
-                for t in &self.registered[i].tickets {
-                    self.used_ticket_ids.remove(&t.ticket_id);
-                }
                 self.registered.swap_remove(i);
             }
         }
