@@ -402,10 +402,9 @@ impl Handler<CiphernodeRemoved> for Sortition {
         let addr = msg.address.clone();
 
         if let Err(err) = self.list.try_mutate(move |mut list_map| {
-            list_map
-                .entry(chain_id)
-                .or_insert_with(SortitionBackend::default_distance)
-                .remove(addr);
+            if let Some(backend) = list_map.get_mut(&chain_id) {
+                backend.remove(addr);
+            }
             Ok(list_map)
         }) {
             self.bus.err(EnclaveErrorType::Sortition, err);
