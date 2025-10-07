@@ -482,11 +482,11 @@ impl Handler<CiphernodeRemoved> for Sortition {
 impl Handler<GetNodeIndex> for Sortition {
     type Result = Option<u64>;
 
-    /// Return whether `address` is in the size-`size` committee for `seed`
-    /// on `chain_id`. If the chain has not been initialized, returns `false`.
+    /// Return the index of `address` in the size-`size` committee for `seed`
+    /// on `chain_id`. If the chain has not been initialized, returns `None`.
     ///
     /// Errors while accessing persisted state or parsing the address are
-    /// reported on the event bus and surfaced here as `false`.
+    /// reported on the event bus and surfaced here as `None`.
     #[instrument(name = "sortition_contains", skip_all)]
     fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
         self.list
