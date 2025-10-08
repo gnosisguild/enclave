@@ -20,6 +20,8 @@ pub async fn shallow_clone(
         "clone",
         "--depth",
         "1",
+        "-c",
+        "advice.detachedHead=false",
         "--branch",
         branch,
         git_repo,
