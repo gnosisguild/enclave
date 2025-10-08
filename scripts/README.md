@@ -141,11 +141,11 @@ pnpm clean --dry-run
 # Clean everything except crates and contracts
 pnpm clean --skip-crates --skip-contracts
 
-# Interactive cleaning with verbose output
-pnpm clean --interactive --verbose
+# Interactive cleaning
+pnpm clean --interactive
 
-# Clean only node_modules and target directories
-pnpm clean --skip-crates --skip-contracts --skip-crisp --skip-template
+# Clean only node artifacts
+pnpm clean --skip-crates --skip-contracts
 ```
 
 ### What it does
@@ -172,20 +172,14 @@ The script uses predefined patterns to safely clean:
 ### Options
 
 - `--dry-run, -n` - Show what would be deleted without actually deleting
-- `--skip-crates` - Skip cleaning the `crates/` directory
-- `--skip-contracts` - Skip cleaning the `packages/enclave-contracts/` directory
-- `--skip-crisp` - Skip cleaning the `examples/CRISP/` directory
-- `--skip-template` - Skip cleaning the `templates/` directory
-- `--skip-node-modules` - Skip cleaning `node_modules` directories
-- `--skip-target` - Skip cleaning `target` directories (Rust build artifacts)
-- `--skip-pnpm-store` - Skip cleaning `.pnpm-store` directories
+- `--skip-node` - Skip Node/JS artefacts (node_modules, dist, .pnpm-store)
+- `--skip-crates` - Skip Rust artefacts (target, fixtures)
+- `--skip-contracts` - Skip contract artefacts (artifacts, cache, out, broadcast, ignition, types)
 - `--interactive, -i` - Ask for confirmation before cleaning
-- `--verbose, -v` - Show detailed output
 - `--help, -h` - Show help message
 
 ### Safety Features
 
-- **Git verification**: Only removes files that are confirmed untracked by git
 - **Interactive mode**: Asks for confirmation before cleaning
 - **Dry run mode**: Preview what would be cleaned without making changes
 - **Skip patterns**: Granular control over what directories to clean
@@ -196,14 +190,14 @@ The script uses predefined patterns to safely clean:
 
 ```bash
 # Quick cleanup of build artifacts
-pnpm clean --skip-crates --skip-contracts --skip-crisp --skip-template
+pnpm clean --skip-crates --skip-contracts
 
 # Clean everything except important directories
 pnpm clean --skip-crates --skip-contracts
 
 # Safe cleanup with confirmation
-pnpm clean --interactive --verbose
+pnpm clean --interactive
 
 # Preview what would be cleaned
-pnpm clean --dry-run --verbose
+pnpm clean --dry-run
 ```
