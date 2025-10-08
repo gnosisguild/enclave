@@ -6,6 +6,7 @@
 
 use core::fmt;
 use std::{
+    cmp::Ordering,
     ops::Deref,
     sync::{Arc, Mutex},
 };
@@ -60,5 +61,17 @@ impl<'de> Deserialize<'de> for ArcBytes {
     {
         let vec: Vec<u8> = Vec::deserialize(deserializer)?;
         Ok(ArcBytes(Arc::new(vec)))
+    }
+}
+
+impl PartialOrd for ArcBytes {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ArcBytes {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.as_slice().cmp(other.0.as_slice())
     }
 }

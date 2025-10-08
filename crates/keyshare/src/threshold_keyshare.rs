@@ -630,7 +630,7 @@ impl ThresholdKeyshare {
         let current: ReadyForDecryption = state.clone().try_into()?;
 
         self.bus.do_send(EnclaveEvent::from(KeyshareCreated {
-            pubkey: current.pk_share.extract_bytes(), // TODO: change KeyshareCreated to accept ArcBytes
+            pubkey: current.pk_share,
             e3_id,
             node: address,
         }));

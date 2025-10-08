@@ -7,6 +7,7 @@
 use crate::E3id;
 use actix::Message;
 use derivative::Derivative;
+use e3_utils::ArcBytes;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fmt::Display;
@@ -15,8 +16,7 @@ use std::fmt::Display;
 #[derivative(Debug)]
 #[rtype(result = "anyhow::Result<()>")]
 pub struct KeyshareCreated {
-    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
-    pub pubkey: Vec<u8>, // TODO: Make this ArcBytes
+    pub pubkey: ArcBytes,
     pub e3_id: E3id,
     pub node: String,
 }

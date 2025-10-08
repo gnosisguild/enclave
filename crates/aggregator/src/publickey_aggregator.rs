@@ -12,6 +12,7 @@ use e3_events::{
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
+use e3_utils::ArcBytes;
 use std::sync::Arc;
 use tracing::{error, trace};
 
@@ -19,15 +20,15 @@ use tracing::{error, trace};
 pub enum PublicKeyAggregatorState {
     Collecting {
         threshold_n: usize,
-        keyshares: OrderedSet<Vec<u8>>,
+        keyshares: OrderedSet<ArcBytes>,
         seed: Seed,
     },
     Computing {
-        keyshares: OrderedSet<Vec<u8>>,
+        keyshares: OrderedSet<ArcBytes>,
     },
     Complete {
         public_key: Vec<u8>,
-        keyshares: OrderedSet<Vec<u8>>,
+        keyshares: OrderedSet<ArcBytes>,
     },
 }
 
@@ -44,7 +45,7 @@ impl PublicKeyAggregatorState {
 #[derive(Message)]
 #[rtype(result = "anyhow::Result<()>")]
 struct ComputeAggregate {
-    pub keyshares: OrderedSet<Vec<u8>>,
+    pub keyshares: OrderedSet<ArcBytes>,
     pub e3_id: E3id,
 }
 
@@ -90,7 +91,7 @@ impl PublicKeyAggregator {
         }
     }
 
-    pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<()> {
+    pub fn add_keyshare(&mut self, keyshare: ArcBytes) -> Result<()> {
         self.state.try_mutate(|mut state| {
             let PublicKeyAggregatorState::Collecting {
                 threshold_n,

@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
 use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
-use e3_utils::SharedRng;
+use e3_utils::{ArcBytes, SharedRng};
 use fhe::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
@@ -21,7 +21,7 @@ use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
 
 pub struct GetAggregatePublicKey {
-    pub keyshares: OrderedSet<Vec<u8>>,
+    pub keyshares: OrderedSet<ArcBytes>,
 }
 
 pub struct GetAggregatePlaintext {
@@ -73,14 +73,14 @@ impl Fhe {
         ))
     }
 
-    pub fn generate_keyshare(&self) -> Result<(Vec<u8>, Vec<u8>)> {
+    pub fn generate_keyshare(&self) -> Result<(Vec<u8>, ArcBytes)> {
         let sk_share = { SecretKey::random(&self.params, &mut *self.rng.lock().unwrap()) };
         let pk_share =
             { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut *self.rng.lock().unwrap())? };
 
         Ok((
             SecretKeySerializer::to_bytes(sk_share)?,
-            pk_share.to_bytes(),
+            ArcBytes::from_bytes(pk_share.to_bytes()),
         ))
     }
 
