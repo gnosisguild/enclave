@@ -60,26 +60,26 @@ See [CONTRIBUTING.md][contributing].
                 </a>
             </td>
             <td align="center">
+                <a href="https://github.com/ctrlc03">
+                    <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
+                    <br />
+                    <sub><b>ctrlc03</b></sub>
+                </a>
+            </td>
+            <td align="center">
                 <a href="https://github.com/cristovaoth">
                     <img src="https://avatars.githubusercontent.com/u/12870300?v=4" width="100;" alt="cristovaoth"/>
                     <br />
                     <sub><b>Cristóvão</b></sub>
                 </a>
             </td>
+		</tr>
+		<tr>
             <td align="center">
                 <a href="https://github.com/nginnever">
                     <img src="https://avatars.githubusercontent.com/u/7103153?v=4" width="100;" alt="nginnever"/>
                     <br />
                     <sub><b>Nathan Ginnever</b></sub>
-                </a>
-            </td>
-		</tr>
-		<tr>
-            <td align="center">
-                <a href="https://github.com/ctrlc03">
-                    <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
-                    <br />
-                    <sub><b>ctrlc03</b></sub>
                 </a>
             </td>
             <td align="center">
@@ -94,6 +94,13 @@ See [CONTRIBUTING.md][contributing].
                     <img src="https://avatars.githubusercontent.com/u/11427903?v=4" width="100;" alt="cedoor"/>
                     <br />
                     <sub><b>Cedoor</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/ozgurarmanc">
+                    <img src="https://avatars.githubusercontent.com/u/94117770?v=4" width="100;" alt="ozgurarmanc"/>
+                    <br />
+                    <sub><b>Armanc</b></sub>
                 </a>
             </td>
             <td align="center">
