@@ -630,6 +630,7 @@ nodes:
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
+            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
 
             let expected_config_dir = OsDirs::config_dir();
             let filename = expected_config_dir.join("enclave.config.yaml");
@@ -731,6 +732,7 @@ chains:
         Jail::expect_with(|jail| {
             let home = format!("{}", jail.directory().to_string_lossy());
             jail.set_env("HOME", &home);
+            jail.set_env("XDG_CONFIG_HOME", &format!("{}/.config", home));
             jail.set_env("TEST_RPC_URL_PORT", "8545");
             jail.set_env("TEST_USERNAME", "envUser");
             jail.set_env("TEST_PASSWORD", "envPassword");
