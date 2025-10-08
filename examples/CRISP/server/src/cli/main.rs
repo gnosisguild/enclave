@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod approve;
 mod commands;
 
 use dialoguer::{theme::ColorfulTheme, FuzzySelect};

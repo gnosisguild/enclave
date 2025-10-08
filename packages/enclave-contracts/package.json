@@ -150,6 +150,8 @@
     "e3:activate": "hardhat e3:activate",
     "e3:enable": "hardhat e3:enable",
     "ciphernode:add": "hardhat ciphernode:add",
+    "ciphernode:admin-add": "hardhat ciphernode:admin-add",
+    "ciphernode:mint-tokens": "hardhat ciphernode:mint-tokens",
     "ciphernode:remove": "hardhat ciphernode:remove",
     "ciphernode:siblings": "hardhat ciphernode:siblings",
     "committee:new": "hardhat committee:new",

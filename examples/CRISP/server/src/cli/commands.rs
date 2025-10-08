@@ -10,9 +10,10 @@ use log::info;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use super::{CLI_DB};
+use super::approve;
+use super::CLI_DB;
 use alloy::primitives::{Address, Bytes, U256};
-use crisp::config::CONFIG; 
+use crisp::config::CONFIG;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use fhe_rs::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -88,6 +89,30 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         batch_size: CONFIG.e3_compute_provider_batch_size,
     };
     let compute_provider_params_bytes = Bytes::from(serde_json::to_vec(&compute_provider_params)?);
+
+    info!("Getting fee quote...");
+    let fee_amount = contract
+        .get_e3_quote(
+            filter,
+            threshold,
+            start_window,
+            duration,
+            e3_program,
+            e3_params.clone(),
+            compute_provider_params_bytes.clone(),
+        )
+        .await?;
+    info!("Fee required: {} tokens", fee_amount);
+
+    info!("Approving fee token...");
+    approve::approve_token(
+        &CONFIG.http_rpc_url,
+        &CONFIG.private_key,
+        &CONFIG.fee_token_address,
+        &CONFIG.enclave_address,
+        fee_amount,
+    )
+    .await?;
 
     let res = contract
         .request_e3(

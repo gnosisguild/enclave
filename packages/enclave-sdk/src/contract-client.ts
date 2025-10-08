@@ -32,9 +32,9 @@ export class ContractClient {
       enclave: `0x${string}`;
       ciphernodeRegistry: `0x${string}`;
     } = {
-        enclave: "0x0000000000000000000000000000000000000000",
-        ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
-      },
+      enclave: "0x0000000000000000000000000000000000000000",
+      ciphernodeRegistry: "0x0000000000000000000000000000000000000000",
+    }
   ) {
     if (!isValidAddress(addresses.enclave)) {
       throw new SDKError("Invalid Enclave contract address", "INVALID_ADDRESS");
@@ -42,7 +42,7 @@ export class ContractClient {
     if (!isValidAddress(addresses.ciphernodeRegistry)) {
       throw new SDKError(
         "Invalid CiphernodeRegistry contract address",
-        "INVALID_ADDRESS",
+        "INVALID_ADDRESS"
       );
     }
   }
@@ -65,7 +65,7 @@ export class ContractClient {
     } catch (error) {
       throw new SDKError(
         `Failed to initialize contracts: ${error}`,
-        "INITIALIZATION_FAILED",
+        "INITIALIZATION_FAILED"
       );
     }
   }
@@ -82,13 +82,12 @@ export class ContractClient {
     e3Program: `0x${string}`,
     e3ProgramParams: `0x${string}`,
     computeProviderParams: `0x${string}`,
-    value?: bigint,
-    gasLimit?: bigint,
+    gasLimit?: bigint
   ): Promise<Hash> {
     if (!this.walletClient) {
       throw new SDKError(
         "Wallet client required for write operations",
-        "NO_WALLET",
+        "NO_WALLET"
       );
     }
 
@@ -107,17 +106,18 @@ export class ContractClient {
         address: this.addresses.enclave,
         abi: Enclave__factory.abi,
         functionName: "request",
-        args: [{
-          filter,
-          threshold,
-          startWindow,
-          duration,
-          e3Program,
-          e3ProgramParams,
-          computeProviderParams,
-        }],
+        args: [
+          {
+            filter,
+            threshold,
+            startWindow,
+            duration,
+            e3Program,
+            e3ProgramParams,
+            computeProviderParams,
+          },
+        ],
         account,
-        value: value || BigInt(0),
         gas: gasLimit,
       });
 
@@ -137,12 +137,12 @@ export class ContractClient {
   public async activateE3(
     e3Id: bigint,
     publicKey: `0x${string}`,
-    gasLimit?: bigint,
+    gasLimit?: bigint
   ): Promise<Hash> {
     if (!this.walletClient) {
       throw new SDKError(
         "Wallet client required for write operations",
-        "NO_WALLET",
+        "NO_WALLET"
       );
     }
 
@@ -171,7 +171,7 @@ export class ContractClient {
     } catch (error) {
       throw new SDKError(
         `Failed to activate E3: ${error}`,
-        "ACTIVATE_E3_FAILED",
+        "ACTIVATE_E3_FAILED"
       );
     }
   }
@@ -183,12 +183,12 @@ export class ContractClient {
   public async publishInput(
     e3Id: bigint,
     data: `0x${string}`,
-    gasLimit?: bigint,
+    gasLimit?: bigint
   ): Promise<Hash> {
     if (!this.walletClient) {
       throw new SDKError(
         "Wallet client required for write operations",
-        "NO_WALLET",
+        "NO_WALLET"
       );
     }
 
@@ -217,7 +217,7 @@ export class ContractClient {
     } catch (error) {
       throw new SDKError(
         `Failed to publish input: ${error}`,
-        "PUBLISH_INPUT_FAILED",
+        "PUBLISH_INPUT_FAILED"
       );
     }
   }
@@ -230,12 +230,12 @@ export class ContractClient {
     e3Id: bigint,
     ciphertextOutput: `0x${string}`,
     proof: `0x${string}`,
-    gasLimit?: bigint,
+    gasLimit?: bigint
   ): Promise<Hash> {
     if (!this.walletClient) {
       throw new SDKError(
         "Wallet client required for write operations",
-        "NO_WALLET",
+        "NO_WALLET"
       );
     }
 
@@ -266,7 +266,7 @@ export class ContractClient {
     } catch (error) {
       throw new SDKError(
         `Failed to publish ciphertext output: ${error}`,
-        "PUBLISH_CIPHERTEXT_OUTPUT_FAILED",
+        "PUBLISH_CIPHERTEXT_OUTPUT_FAILED"
       );
     }
   }
@@ -297,7 +297,7 @@ export class ContractClient {
   /**
    * Get the public key for an E3 computation
    * Based on the contract: committeePublicKey(uint256 e3Id) returns (bytes32 publicKeyHash)
-   * @param e3Id 
+   * @param e3Id
    * @returns The public key
    */
   public async getE3PublicKey(e3Id: bigint): Promise<`0x${string}`> {
@@ -315,7 +315,10 @@ export class ContractClient {
 
       return result;
     } catch (error) {
-      throw new SDKError(`Failed to get E3 public key: ${error}`, "GET_E3_PUBLIC_KEY_FAILED");
+      throw new SDKError(
+        `Failed to get E3 public key: ${error}`,
+        "GET_E3_PUBLIC_KEY_FAILED"
+      );
     }
   }
 
@@ -327,12 +330,12 @@ export class ContractClient {
     args: readonly unknown[],
     contractAddress: `0x${string}`,
     abi: Abi,
-    value?: bigint,
+    value?: bigint
   ): Promise<bigint> {
     if (!this.walletClient) {
       throw new SDKError(
         "Wallet client required for gas estimation",
-        "NO_WALLET",
+        "NO_WALLET"
       );
     }
 
@@ -357,7 +360,7 @@ export class ContractClient {
     } catch (error) {
       throw new SDKError(
         `Failed to estimate gas: ${error}`,
-        "GAS_ESTIMATION_FAILED",
+        "GAS_ESTIMATION_FAILED"
       );
     }
   }
@@ -376,7 +379,7 @@ export class ContractClient {
     } catch (error) {
       throw new SDKError(
         `Failed to wait for transaction: ${error}`,
-        "TRANSACTION_WAIT_FAILED",
+        "TRANSACTION_WAIT_FAILED"
       );
     }
   }

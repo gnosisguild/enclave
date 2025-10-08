@@ -5,6 +5,14 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity >=0.8.27;
 
+import { IRegistryFilter } from "./IRegistryFilter.sol";
+
+/**
+ * @title ICiphernodeRegistry
+ * @notice Interface for managing ciphernode registration and committee selection
+ * @dev This registry maintains an Incremental Merkle Tree (IMT) of registered ciphernodes
+ * and coordinates committee selection for E3 computations through registry filters
+ */
 interface ICiphernodeRegistry {
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
@@ -20,6 +28,11 @@ interface ICiphernodeRegistry {
     /// @param e3Id ID of the E3 for which the committee was selected.
     /// @param publicKey Public key of the committee.
     event CommitteePublished(uint256 indexed e3Id, bytes publicKey);
+
+    /// @notice This event MUST be emitted when a committee's active status changes.
+    /// @param e3Id ID of the E3 for which the committee status changed.
+    /// @param active True if committee is now active, false if completed.
+    event CommitteeActivationChanged(uint256 indexed e3Id, bool active);
 
     /// @notice This event MUST be emitted when `enclave` is set.
     /// @param enclave Address of the enclave contract.
@@ -49,7 +62,28 @@ interface ICiphernodeRegistry {
         uint256 size
     );
 
+    /// @notice Check if a ciphernode is eligible for committee selection
+    /// @dev A ciphernode is eligible if it is enabled in the registry and meets bonding requirements
+    /// @param ciphernode Address of the ciphernode to check
+    /// @return eligible Whether the ciphernode is eligible for committee selection
     function isCiphernodeEligible(address ciphernode) external returns (bool);
+
+    /// @notice Check if a ciphernode is enabled in the registry
+    /// @param node Address of the ciphernode
+    /// @return enabled Whether the ciphernode is enabled
+    function isEnabled(address node) external view returns (bool enabled);
+
+    /// @notice Add a ciphernode to the registry
+    /// @param node Address of the ciphernode to add
+    function addCiphernode(address node) external;
+
+    /// @notice Remove a ciphernode from the registry
+    /// @param node Address of the ciphernode to remove
+    /// @param siblingNodes Array of sibling node indices for tree operations
+    function removeCiphernode(
+        address node,
+        uint256[] calldata siblingNodes
+    ) external;
 
     /// @notice Initiates the committee selection process for a specified E3.
     /// @dev This function MUST revert when not called by the Enclave contract.
@@ -81,4 +115,45 @@ interface ICiphernodeRegistry {
     function committeePublicKey(
         uint256 e3Id
     ) external view returns (bytes32 publicKeyHash);
+
+    /// @notice This function should be called by the Enclave contract to get the filter for a given E3.
+    /// @dev This function MUST revert if no filter has been requested for the given E3.
+    /// @param e3Id ID of the E3 for which to get the filter.
+    /// @return filter The filter for the given E3.
+    function getFilter(uint256 e3Id) external view returns (address filter);
+
+    /// @notice This function should be called by the Enclave contract to get the committee for a given E3.
+    /// @dev This function MUST revert if no committee has been requested for the given E3.
+    /// @param e3Id ID of the E3 for which to get the committee.
+    /// @return committee The committee for the given E3.
+    function getCommittee(
+        uint256 e3Id
+    ) external view returns (IRegistryFilter.Committee memory committee);
+
+    /// @notice Returns the current root of the ciphernode IMT
+    /// @return Current IMT root
+    function root() external view returns (uint256);
+
+    /// @notice Returns the IMT root at the time a committee was requested
+    /// @param e3Id ID of the E3
+    /// @return IMT root at time of committee request
+    function rootAt(uint256 e3Id) external view returns (uint256);
+
+    /// @notice Returns the current size of the ciphernode IMT
+    /// @return Size of the IMT
+    function treeSize() external view returns (uint256);
+
+    /// @notice Returns the address of the bonding registry
+    /// @return Address of the bonding registry contract
+    function getBondingRegistry() external view returns (address);
+
+    /// @notice Sets the Enclave contract address
+    /// @dev Only callable by owner
+    /// @param _enclave Address of the Enclave contract
+    function setEnclave(address _enclave) external;
+
+    /// @notice Sets the bonding registry contract address
+    /// @dev Only callable by owner
+    /// @param _bondingRegistry Address of the bonding registry contract
+    function setBondingRegistry(address _bondingRegistry) external;
 }
