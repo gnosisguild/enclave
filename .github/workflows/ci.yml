@@ -9,9 +9,11 @@ on:
   pull_request:
     branches:
       - main
+      - dev
   push:
     branches:
       - main
+      - dev 
 env:
   DOCKERFILE_PATH: crates/support/Dockerfile
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support

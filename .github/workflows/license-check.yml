@@ -2,9 +2,9 @@ name: License Header Check
 
 on:
   push:
-    branches: [main, develop, hacknet]
+    branches: [main, dev]
   pull_request:
-    branches: [main, develop]
+    branches: [main, dev]
 
 jobs:
   license-check:
