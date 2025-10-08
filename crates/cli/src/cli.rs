@@ -24,6 +24,7 @@ use tracing::{info, instrument, Level};
 #[derive(Parser, Debug)]
 #[command(name = "enclave")]
 #[command(about = "A CLI for interacting with Enclave the open-source protocol for Encrypted Execution Environments (E3)", long_about = None)]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
     /// Path to config file
     #[arg(short, long, global = true)]

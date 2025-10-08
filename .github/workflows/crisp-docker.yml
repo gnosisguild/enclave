@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - release
       - main
+      - dev 
     paths:
       - "examples/CRISP/server/**"
   pull_request:
     branches:
-      - release
+      - dev
       - main
     paths:
       - "examples/CRISP/server/**"

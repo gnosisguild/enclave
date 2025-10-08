@@ -53,12 +53,16 @@ impl ComputeProvider for Risc0Provider {
 
         let decoded_journal = receipt.journal.decode().unwrap();
 
-        let seal = if !std::env::var("RISC0_DEV_MODE")
-            .unwrap_or_default()
-            .is_empty()
-        {
+        // Check if RISC0_DEV_MODE is set to "1" (dev mode)
+        // If dev mode: return empty seal (fake proof)
+        // Otherwise: return real groth16 proof
+        let is_dev_mode = std::env::var("RISC0_DEV_MODE").unwrap_or_default() == "1";
+
+        let seal = if is_dev_mode {
+            println!("RISC0_DEV_MODE=1: Using fake proof (empty seal)");
             vec![]
         } else {
+            println!("RISC0_DEV_MODE=0 or unset: Generating real Groth16 proof");
             groth16::encode(receipt.inner.groth16().unwrap().seal.clone()).unwrap()
         };
 
