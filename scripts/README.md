@@ -79,6 +79,7 @@ pnpm bump:versions --skip-git 1.2.3
 ### After Running
 
 Once you run `pnpm bump:versions X.Y.Z` and the tag is pushed, GitHub Actions automatically:
+
 - Builds binaries for all platforms (Linux, macOS)
 - Publishes to npm (with `latest` or `next` tag)
 - Publishes to crates.io
@@ -120,5 +121,89 @@ Once you run `pnpm bump:versions X.Y.Z` and the tag is pushed, GitHub Actions au
 ### CI/CD Integration
 
 This script is automatically run in GitHub Actions:
+
 - On pull requests: checks headers and comments if any are missing
 - On pushes to main/develop: automatically fixes missing headers and commits changes
+
+## Clean Script
+
+`clean.ts` - Removes build artifacts and temporary files from the repository using predefined safe patterns while providing options to skip specific parts of the codebase.
+
+### Usage
+
+```bash
+# Clean build artifacts (interactive mode)
+pnpm clean
+
+# Dry run to see what would be cleaned
+pnpm clean --dry-run
+
+# Clean everything except crates and contracts
+pnpm clean --skip-crates --skip-contracts
+
+# Interactive cleaning with verbose output
+pnpm clean --interactive --verbose
+
+# Clean only node_modules and target directories
+pnpm clean --skip-crates --skip-contracts --skip-crisp --skip-template
+```
+
+### What it does
+
+- **Uses predefined patterns** to identify safe-to-clean build artifacts and temporary files
+- **Safely removes** only files matching known safe patterns (node_modules, dist, target, etc.)
+- **Provides granular control** over what gets cleaned via skip options
+- **Shows detailed statistics** about what was removed and space freed
+- **Prevents accidental deletion** of important files by using a whitelist approach
+
+### What gets cleaned
+
+The script uses predefined patterns to safely clean:
+
+- **Node.js artifacts**: `node_modules/`, `dist/`, `.pnpm-store/`
+- **Rust artifacts**: `target/` directories
+- **Hardhat/Foundry artifacts**: `artifacts/`, `cache/`, `out/`, `broadcast/`, `ignition/deployments/`, `types/`
+- **Test artifacts**: `coverage/`, `test-results/`, `playwright-report/`, `.cache-synpress/`
+- **Environment files**: `.env`, `.env.local`, `.env.development`, `.env.test`
+- **IDE/OS files**: `.DS_Store`, `Thumbs.db`
+- **Temporary files**: `.enclave/data/`, `.enclave/config/`, `database/`
+- **Build outputs**: `build/`, `coverage.json`
+
+### Options
+
+- `--dry-run, -n` - Show what would be deleted without actually deleting
+- `--skip-crates` - Skip cleaning the `crates/` directory
+- `--skip-contracts` - Skip cleaning the `packages/enclave-contracts/` directory
+- `--skip-crisp` - Skip cleaning the `examples/CRISP/` directory
+- `--skip-template` - Skip cleaning the `templates/` directory
+- `--skip-node-modules` - Skip cleaning `node_modules` directories
+- `--skip-target` - Skip cleaning `target` directories (Rust build artifacts)
+- `--skip-pnpm-store` - Skip cleaning `.pnpm-store` directories
+- `--interactive, -i` - Ask for confirmation before cleaning
+- `--verbose, -v` - Show detailed output
+- `--help, -h` - Show help message
+
+### Safety Features
+
+- **Git verification**: Only removes files that are confirmed untracked by git
+- **Interactive mode**: Asks for confirmation before cleaning
+- **Dry run mode**: Preview what would be cleaned without making changes
+- **Skip patterns**: Granular control over what directories to clean
+- **Error handling**: Continues cleaning even if some files fail to be removed
+- **Statistics**: Shows exactly what was removed and how much space was freed
+
+### Common Use Cases
+
+```bash
+# Quick cleanup of build artifacts
+pnpm clean --skip-crates --skip-contracts --skip-crisp --skip-template
+
+# Clean everything except important directories
+pnpm clean --skip-crates --skip-contracts
+
+# Safe cleanup with confirmation
+pnpm clean --interactive --verbose
+
+# Preview what would be cleaned
+pnpm clean --dry-run --verbose
+```
