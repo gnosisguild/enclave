@@ -4,7 +4,6 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy::primitives::Address;
 use anyhow::Result;
 use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -130,6 +129,9 @@ pub struct E3StateLite {
 
     pub committee_public_key: Vec<u8>,
     pub emojis: [String; 2],
+
+    pub token_address: String,
+    pub balance_threshold: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -165,6 +167,9 @@ pub struct E3 {
 
     // Emojis
     pub emojis: [String; 2],
+
+    // Custom Parameters
+    pub custom_params: CustomParams,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -176,6 +181,8 @@ pub struct E3Crisp {
     pub votes_option_1: u64,
     pub votes_option_2: u64,
     pub token_holder_hashes: Vec<String>,
+    pub token_address: String,
+    pub balance_threshold: String,
 }
 
 impl From<E3> for WebResultRequest {
@@ -206,6 +213,8 @@ impl From<E3> for E3StateLite {
             expiration: e3.expiration,
             committee_public_key: e3.committee_public_key,
             emojis: e3.emojis,
+            token_address: e3.custom_params.token_address,
+            balance_threshold: e3.custom_params.balance_threshold,
         }
     }
 }
