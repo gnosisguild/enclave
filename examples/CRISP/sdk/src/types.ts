@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+import type { LeanIMTMerkleProof } from '@zk-kit/lean-imt'
+
 /**
  * Interface representing the details of a specific round returned by the CRISP server
  */
@@ -49,4 +51,13 @@ export interface ITokenDetails {
   tokenAddress: string
   threshold: bigint
   snapshotBlock: bigint
+}
+
+/**
+ * Interface representing a Merkle proof
+ */
+export interface MerkleProof {
+  leaf: bigint
+  index: number
+  proof: LeanIMTMerkleProof<bigint>
 }
