@@ -47,6 +47,8 @@ pub async fn register_e3_requested(
             info!("E3Requested: {:?}", event);
 
             async move {
+                repo.initialize_round().await?;
+
                 // Convert custom params bytes back to token address and balance threshold.
                 let custom_params: CustomParams =
                     serde_json::from_slice(&event.e3.customParams)
@@ -134,7 +136,7 @@ pub async fn register_e3_activated(
 
             info!("Handling E3 request with id {}", e3_id);
             async move {
-                repo.initialize_round().await?;
+                repo.start_round().await?;
 
                 current_round_repo
                     .set_current_round(CurrentRound { id: e3_id })

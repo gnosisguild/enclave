@@ -172,10 +172,6 @@ async fn get_token_holders_hashes(
     store: web::Data<AppData>,
 ) -> impl Responder {
     let incoming = data.into_inner();
-    let e3_store = store.e3(incoming.round_id);
-    let data = e3_store.get_token_holder_hashes().await.unwrap();
-    info!("got data");
-    info!("Data: {:?}", data);
 
     match store.e3(incoming.round_id).get_token_holder_hashes().await {
         Ok(hashes) => HttpResponse::Ok().json(hashes),

@@ -8,7 +8,6 @@ use super::{
     database::generate_emoji,
     models::{CurrentRound, E3Crisp, E3StateLite, WebResultRequest},
 };
-use chrono::Utc;
 use e3_sdk::indexer::{models::E3 as EnclaveE3, DataStore, E3Repository, SharedStore};
 use eyre::Result;
 use log::info;
@@ -85,13 +84,38 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(e3_crisp)
     }
 
-    pub async fn initialize_round(&mut self) -> Result<()> {
-        let start_time = Utc::now().timestamp() as u64;
+    pub async fn start_round(&mut self) -> Result<()> {
+        let start_time = chrono::Utc::now().timestamp() as u64;
+        let key = self.crisp_key();
 
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.start_time = start_time;
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not update start_time for '{key}'"))?;
+
+        self.store
+            .modify(&key, |e3_obj: Option<E3Crisp>| {
+                e3_obj.map(|mut e| {
+                    e.status = "Active".to_string();
+                    e
+                })
+            })
+            .await
+            .map_err(|_| eyre::eyre!("Could not update status for '{key}'"))?;
+        
+        Ok(())
+    }
+
+    pub async fn initialize_round(&mut self) -> Result<()> {
         self.set_crisp(E3Crisp {
             has_voted: vec![],
-            start_time,
-            status: "Active".to_string(),
+            start_time: 0u64,
+            status: "Requested".to_string(),
             votes_option_1: 0,
             votes_option_2: 0,
             emojis: generate_emoji(),
@@ -236,6 +260,10 @@ impl<S: DataStore> CrispE3Repository<S> {
 
     pub async fn set_token_holder_hashes(&mut self, hashes: Vec<String>) -> Result<()> {
         let key = self.crisp_key();
+        info!("Setting token holder hashes");
+        for hash in &hashes {
+            info!("Hash: {}", hash);
+        }
         self.store
             .modify(&key, |e3_obj: Option<E3Crisp>| {
                 e3_obj.map(|mut e| {
@@ -245,11 +273,19 @@ impl<S: DataStore> CrispE3Repository<S> {
             })
             .await
             .map_err(|_| eyre::eyre!("Could not set token_holder_hashes for '{key}'"))?;
+        let verify = self.get_token_holder_hashes().await?;
+        info!("Verification after set: {:?}", verify);
         Ok(())
     }
 
     pub async fn get_token_holder_hashes(&self) -> Result<Vec<String>> {
+        
+        let key = self.crisp_key();
+        info!("Getting token holder hashes for key: {}", key);
+
         let e3_crisp = self.get_crisp().await?;
+        info!("Retrieved E3Crisp: {:?}", e3_crisp);
+    info!("Token holder hashes: {:?}", e3_crisp.token_holder_hashes);
         Ok(e3_crisp.token_holder_hashes)
     }
 
