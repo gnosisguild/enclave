@@ -81,7 +81,7 @@ sol! {
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
         function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
         function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
-        function publishPlaintextOutput(uint256 e3Id, bytes calldata data, bytes calldata proof) external returns (bool success);
+        function publishPlaintextOutput(uint256 e3Id, bytes calldata data) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
         function getInputRoot(uint256 e3Id) public view returns (uint256);
     }
