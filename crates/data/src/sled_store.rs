@@ -147,6 +147,7 @@ fn canonical_key(path: &PathBuf) -> String {
 }
 
 // Opens or retrieves a cached sled database for the given path.
+// Prevents conflicts by ensuring only a single connection was open to a db file at once per process. 
 // Ensures the directory exists and stabilizes the canonical key across OSes.
 fn get_or_open_db(path: &PathBuf) -> Result<Db> {
     let _ = std::fs::create_dir_all(path);
