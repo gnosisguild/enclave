@@ -2,7 +2,7 @@ name: Build and Deploy Ciphernode
 on:
   push:
     branches:
-      - release
+      - dev
       - main
     paths:
       - "Cargo.*"
@@ -10,7 +10,7 @@ on:
       - "packages/enclave-contracts/contracts/**"
   pull_request:
     branches:
-      - release
+      - dev
       - main
     paths:
       - "Cargo.*"
