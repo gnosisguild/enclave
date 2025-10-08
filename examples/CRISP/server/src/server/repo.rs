@@ -11,6 +11,7 @@ use super::{
 use e3_sdk::indexer::{models::E3 as EnclaveE3, DataStore, E3Repository, SharedStore};
 use eyre::Result;
 use log::info;
+use num_bigint::BigUint;
 
 pub struct CurrentRoundRepository<S: DataStore> {
     store: SharedStore<S>,
