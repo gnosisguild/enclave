@@ -63,19 +63,18 @@ async fn test_trbfv_actor() -> Result<()> {
     // Create "trigger" bus
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
 
-    // Parameteres
+    // Parameters (128bits of security)
     let (degree, plaintext_modulus, moduli) = (
-        8192usize,
-        1000u64,
+        8192,
+        1000,
         &[
-            36028797055270913u64,
+            36028797055270913,
             36028797054222337,
             36028797053698049,
             36028797051863041,
         ],
     );
 
-    // BfvParameters { polynomial_degree: 8192, plaintext_modulus: 1000, moduli: [36028797055270913, 36028797054222337, 36028797053698049, 36028797051863041] }
     // Params for BFV
     let params_raw = build_bfv_params_arc(degree, plaintext_modulus, moduli);
 
