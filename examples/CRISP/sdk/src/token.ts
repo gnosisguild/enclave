@@ -6,6 +6,8 @@
 
 import { CRISP_SERVER_TOKEN_TREE_ENDPOINT } from './constants'
 
+import { LeanIMT } from '@zk-kit/lean-imt'
+
 /**
  * Get the merkle tree data from the CRISP server
  * @param serverUrl - The base URL of the CRISP server
@@ -25,12 +27,26 @@ export const getTreeData = async (serverUrl: string, e3Id: number) => {
   return hashes
 }
 
+export const hashLeaf = (address: string, balance: number) => {
+
+}
+
 /**
  * Generate a Merkle proof for a given address to prove inclusion in the voters' list
  */
-export const generateMerkleProof = () => {}
+export const generateMerkleProof = (threshold: number, balance: number, address: string) => {
+  if (balance < threshold) {
+    throw new Error('Balance is below the threshold')
+  }
+
+
+
+
+}
 
 /**
  * Get the token balance at a specific block for a given address
  */
-export const getBalanceAt = () => {}
+export const getBalanceAt = (tokenAddress: string, snapshotBlock: number) => {
+
+}
