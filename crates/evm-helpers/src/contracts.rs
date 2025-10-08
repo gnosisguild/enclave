@@ -75,13 +75,13 @@ sol! {
         mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
         function request(E3RequestParams memory request) external payable returns (uint256 e3Id, E3 memory e3);
-        function activate(uint256 e3Id,bytes memory publicKey) external returns (bool success);
+        function activate(uint256 e3Id,bytes calldata publicKey) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
-        function publishInput(uint256 e3Id, bytes memory data) external returns (bool success);
-        function publishCiphertextOutput(uint256 e3Id, bytes memory ciphertextOutput, bytes memory proof) external returns (bool success);
-        function publishPlaintextOutput(uint256 e3Id, bytes memory data) external returns (bool success);
+        function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
+        function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
+        function publishPlaintextOutput(uint256 e3Id, bytes calldata data) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
-        function getRoot(uint256 id) public view returns (uint256);
+        function getInputRoot(uint256 e3Id) public view returns (uint256);
     }
 }
 
@@ -101,7 +101,7 @@ pub trait EnclaveRead {
     async fn get_latest_block(&self) -> Result<u64>;
 
     /// Get the root for a specific ID
-    async fn get_root(&self, id: U256) -> Result<U256>;
+    async fn get_input_root(&self, id: U256) -> Result<U256>;
 
     /// Get E3 parameters for a specific E3 ID
     async fn get_e3_params(&self, e3_id: U256) -> Result<Bytes>;
@@ -313,9 +313,9 @@ where
         Ok(block)
     }
 
-    async fn get_root(&self, id: U256) -> Result<U256> {
+    async fn get_input_root(&self, id: U256) -> Result<U256> {
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let root = contract.getRoot(id).call().await?;
+        let root = contract.getInputRoot(id).call().await?;
         Ok(root)
     }
 
