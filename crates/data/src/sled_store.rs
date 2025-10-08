@@ -127,6 +127,8 @@ pub struct SledDb {
 pub static SLED_CACHE: Lazy<Arc<Mutex<HashMap<String, Db>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
+// Returns a stable canonical string path used as a cache key.
+// Canonicalizes the parent directory if the target path does not yet exist.
 fn canonical_key(path: &PathBuf) -> String {
     use std::path::{Path, PathBuf};
     if path.exists() {
@@ -144,6 +146,8 @@ fn canonical_key(path: &PathBuf) -> String {
     base.join(tail).to_string_lossy().into_owned()
 }
 
+// Opens or retrieves a cached sled database for the given path.
+// Ensures the directory exists and stabilizes the canonical key across OSes.
 fn get_or_open_db(path: &PathBuf) -> Result<Db> {
     let _ = std::fs::create_dir_all(path);
     let key = canonical_key(path);
