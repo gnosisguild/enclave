@@ -60,17 +60,17 @@ See [CONTRIBUTING.md][contributing].
                 </a>
             </td>
             <td align="center">
-                <a href="https://github.com/cristovaoth">
-                    <img src="https://avatars.githubusercontent.com/u/12870300?v=4" width="100;" alt="cristovaoth"/>
-                    <br />
-                    <sub><b>Cristóvão</b></sub>
-                </a>
-            </td>
-            <td align="center">
                 <a href="https://github.com/ctrlc03">
                     <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
                     <br />
                     <sub><b>ctrlc03</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/cristovaoth">
+                    <img src="https://avatars.githubusercontent.com/u/12870300?v=4" width="100;" alt="cristovaoth"/>
+                    <br />
+                    <sub><b>Cristóvão</b></sub>
                 </a>
             </td>
 		</tr>
