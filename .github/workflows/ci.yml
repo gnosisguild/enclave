@@ -20,6 +20,7 @@ env:
   HARDHAT_VAR_MNEMONIC: "test test test test test test test test test test test junk"
   HARDHAT_VAR_INFURA_API_KEY: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
   PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+  RUST_BACKTRACE: 1
 
 permissions:
   contents: read
@@ -328,7 +329,7 @@ jobs:
           path: ~/.cargo/bin/enclave
           retention-days: 1
 
-  crisp_e2e: 
+  crisp_e2e:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli]
 
@@ -614,7 +615,7 @@ jobs:
           chmod 755 contracts tests
           chmod 644 contracts/ImageID.sol
           pnpm test:integration
-  
+
   test_enclave_init:
     runs-on: ubuntu-latest
     needs: [build_enclave_cli, build_e3_support_dev]
