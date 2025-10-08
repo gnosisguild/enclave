@@ -5,14 +5,14 @@ chains:
       enclave: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
       ciphernode_registry: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
       filter_registry: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-      
+
 program:
   dev: true
   # risc0:
-  #   risc0_dev_mode: 1
+  #   risc0_dev_mode: 1 # 0 = real groth16 proofs, 1 = fake proofs (dev mode)
   #   bonsai_api_key: xxxxxxxxxxxxxxxx
   #   bonsai_api_url: xxxxxxxxxxxxxxxx
-  
+
 nodes:
   cn1:
     address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
