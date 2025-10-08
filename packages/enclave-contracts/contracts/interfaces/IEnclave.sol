@@ -141,7 +141,7 @@ interface IEnclave {
     /// @return success True if the E3 was successfully activated.
     function activate(
         uint256 e3Id,
-        bytes memory publicKey
+        bytes calldata publicKey
     ) external returns (bool success);
 
     /// @notice This function should be called to publish input data for Encrypted Execution Environment (E3).
@@ -163,8 +163,8 @@ interface IEnclave {
     /// @return success True if the output was successfully published.
     function publishCiphertextOutput(
         uint256 e3Id,
-        bytes memory ciphertextOutput,
-        bytes memory proof
+        bytes calldata ciphertextOutput,
+        bytes calldata proof
     ) external returns (bool success);
 
     /// @notice This function publishes the plaintext output of an Encrypted Execution Environment (E3).
@@ -175,8 +175,8 @@ interface IEnclave {
     /// @param proof ABI encoded data to verify the plaintextOutput.
     function publishPlaintextOutput(
         uint256 e3Id,
-        bytes memory plaintextOutput,
-        bytes memory proof
+        bytes calldata plaintextOutput,
+        bytes calldata proof
     ) external returns (bool success);
 
     ////////////////////////////////////////////////////////////
