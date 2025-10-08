@@ -269,15 +269,13 @@ impl<S: DataStore> CrispE3Repository<S> {
             })
             .await
             .map_err(|_| eyre::eyre!("Could not set token_holder_hashes for '{key}'"))?;
+        
         Ok(())
     }
 
     pub async fn get_token_holder_hashes(&self) -> Result<Vec<String>> {
-        
-        let key = self.crisp_key();
-        info!("Getting token holder hashes for key: {}", key);
-
         let e3_crisp = self.get_crisp().await?;
+
         Ok(e3_crisp.token_holder_hashes)
     }
 
