@@ -128,13 +128,24 @@ pub static SLED_CACHE: Lazy<Arc<Mutex<HashMap<String, Db>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 fn canonical_key(path: &PathBuf) -> String {
-    path.canonicalize()
-        .unwrap_or_else(|_| path.clone())
-        .to_string_lossy()
-        .into_owned()
+    use std::path::{Path, PathBuf};
+    if path.exists() {
+        return path
+            .canonicalize()
+            .unwrap_or_else(|_| path.clone())
+            .to_string_lossy()
+            .into_owned();
+    }
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let base: PathBuf = parent
+        .canonicalize()
+        .unwrap_or_else(|_| parent.to_path_buf());
+    let tail = path.file_name().map(|s| s.to_owned()).unwrap_or_default();
+    base.join(tail).to_string_lossy().into_owned()
 }
 
 fn get_or_open_db(path: &PathBuf) -> Result<Db> {
+    let _ = std::fs::create_dir_all(path);
     let key = canonical_key(path);
     let mut cache = SLED_CACHE.lock().unwrap();
     if let Some(db) = cache.get(&key) {
