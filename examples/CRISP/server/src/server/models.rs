@@ -4,9 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use alloy::primitives::Address;
 use anyhow::Result;
-use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Deserialize, Debug)]
@@ -130,7 +128,11 @@ pub struct E3StateLite {
 
     pub committee_public_key: Vec<u8>,
     pub emojis: [String; 2],
+
+    pub token_address: String,
+    pub balance_threshold: String,
 }
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct E3 {
@@ -165,6 +167,9 @@ pub struct E3 {
 
     // Emojis
     pub emojis: [String; 2],
+
+    // Custom Parameters
+    pub custom_params: CustomParams,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -176,6 +181,8 @@ pub struct E3Crisp {
     pub votes_option_1: u64,
     pub votes_option_2: u64,
     pub token_holder_hashes: Vec<String>,
+    pub token_address: String,
+    pub balance_threshold: String,
 }
 
 impl From<E3> for WebResultRequest {
@@ -188,24 +195,6 @@ impl From<E3> for WebResultRequest {
             option_1_emoji: e3.emojis[0].clone(),
             option_2_emoji: e3.emojis[1].clone(),
             end_time: e3.expiration,
-        }
-    }
-}
-
-impl From<E3> for E3StateLite {
-    fn from(e3: E3) -> Self {
-        E3StateLite {
-            id: e3.id,
-            chain_id: e3.chain_id,
-            enclave_address: e3.enclave_address,
-            status: e3.status,
-            vote_count: e3.vote_count,
-            start_time: e3.start_time,
-            start_block: e3.block_start,
-            duration: e3.duration,
-            expiration: e3.expiration,
-            committee_public_key: e3.committee_public_key,
-            emojis: e3.emojis,
         }
     }
 }

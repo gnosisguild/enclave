@@ -47,12 +47,10 @@ pub async fn register_e3_requested(
             info!("E3Requested: {:?}", event);
 
             async move {
-                repo.initialize_round().await?;
-
-                // Convert custom params bytes back to token address and balance threshold.
-                let custom_params: CustomParams =
-                    serde_json::from_slice(&event.e3.customParams)
-                        .with_context(|| "Failed to parse custom params from E3 event")?;
+                 // Convert custom params bytes back to token address and balance threshold.
+                 let custom_params: CustomParams =
+                 serde_json::from_slice(&event.e3.customParams)
+                     .with_context(|| "Failed to parse custom params from E3 event")?;
 
                 let token_address: Address = custom_params
                     .token_address
@@ -62,6 +60,9 @@ pub async fn register_e3_requested(
                 let balance_threshold =
                     BigUint::parse_bytes(custom_params.balance_threshold.as_bytes(), 10)
                         .ok_or_else(|| eyre::eyre!("Invalid balance threshold"))?;
+
+                // save the e3 details
+                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold).await?;
 
                 // Get token holders from Bitquery API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
