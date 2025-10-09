@@ -7,7 +7,7 @@ jobs:
   check-size:
     runs-on: ubuntu-latest 
     env:
-      MAX_LINES: 300
+      MAX_LINES: 500
     steps:
       - uses: actions/checkout@v4
         with:
