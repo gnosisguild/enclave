@@ -144,9 +144,6 @@ pnpm clean --skip-crates --skip-contracts
 # Interactive cleaning
 pnpm clean --interactive
 
-# Clean only node artifacts
-pnpm clean --skip-crates --skip-contracts
-
 # Show help message
 pnpm clean --help
 ```
