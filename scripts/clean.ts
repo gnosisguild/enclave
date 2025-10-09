@@ -21,11 +21,11 @@ const PATTERN_GROUPS = {
     "**/ignition/deployments/**",
     "**/*contracts/**/types/**",
   ],
-  env: ["**/.env", "**/.env.local", "**/.env.development", "**/.env.test"],
   enclaveTemp: [
     "**/.enclave/data/**",
     "**/.enclave/config/**",
     "**/database/**",
+  ],
   ],
 } as const;
 
