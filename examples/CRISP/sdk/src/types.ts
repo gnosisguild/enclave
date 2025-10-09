@@ -21,7 +21,6 @@ export interface IRoundDetailsResponse {
   emojis: [string, string]
   token_address: string
   balance_threshold: string
-  block_number_requested: string
 }
 
 /**
@@ -41,7 +40,6 @@ export interface IRoundDetails {
   emojis: [string, string]
   tokenAddress: string
   balanceThreshold: bigint
-  snapshotBlock: bigint
 }
 
 /**

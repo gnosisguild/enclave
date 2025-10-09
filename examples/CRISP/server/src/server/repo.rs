@@ -193,7 +193,6 @@ impl<S: DataStore> CrispE3Repository<S> {
             committee_public_key: e3.committee_public_key,
             token_address: e3_crisp.token_address,
             balance_threshold: e3_crisp.balance_threshold,
-            block_number_requested: e3_crisp.block_number_requested,
         })
     }
 

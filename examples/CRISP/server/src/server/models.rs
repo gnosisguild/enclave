@@ -131,7 +131,6 @@ pub struct E3StateLite {
 
     pub token_address: String,
     pub balance_threshold: String,
-    pub block_number_requested: u64, 
 }
 
 
