@@ -5,15 +5,15 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 // TODO: Create DocumentPublisher actor
-// 1. Accept EnclaveEvent::CiphernodeSelected and store selected e3_ids in a blume filter
-// 1. Accept EnclaveEvent::PublishDocumentRequested
-//    Take the payload and convert to NetCommand::PublishDocument
-// 1. Accept NetEvent::DocumentPublishedNotification from NetInterface
-//    Determine if we are keeping track of the given e3_id based on DocumentMeta
-//    and the e3_id blume filter if so then issue a NetCommand::FetchDocument
-// 1. Receive the document from NetEvent::FetchDocumentSucceeded and convert to
-//    EnclaveEvent::DocumentReceived
-// 1. Accept NetEvent::FetchDocumentFailed and attempt to retry
+// - [ ] Accept EnclaveEvent::CiphernodeSelected and store selected e3_ids in a blume filter
+// - [x] Accept EnclaveEvent::PublishDocumentRequested
+// - [x] Take the payload and convert to NetCommand::DhtPutRecord
+// - [-] Accept NetEvent::GossipData(GossipData::DocumentPublishedNotification) from NetInterface
+//       Determine if we are keeping track of the given e3_id based on DocumentMeta
+//       and the e3_id blume filter if so then issue a NetCommand::DhtGetRecord
+// - [ ] Receive the document from NetEvent::FetchDocumentSucceeded and convert to
+//        EnclaveEvent::DocumentReceived
+// - [ ] Accept NetEvent::DhtGetRecordError and attempt to retry with exponential backoff
 
 #![allow(dead_code)]
 
@@ -24,17 +24,25 @@ use crate::{
 use actix::prelude::*;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use e3_events::{
-    CorrelationId, DocumentMeta, EnclaveEvent, EventBus, PublishDocumentRequested, Subscribe,
-};
+use e3_events::{CorrelationId, EnclaveEvent, EventBus, PublishDocumentRequested, Subscribe};
 use std::{sync::Arc, time::Instant};
 use tokio::sync::{broadcast, mpsc};
 use tracing::error;
 
+/// DocumentPublisher is an actor that monitors events from both the NetInterface and the Enclave
+/// EventBus in order to manage document publishing interactions. In particular this involves the
+/// interactions of publishing a document and listening for notifications, determining if the node
+/// is interested in a specific document and fetching the document to broadcast on the local event
+/// bus
 pub struct DocumentPublisher {
+    /// Enclave EventBus
     bus: Addr<EventBus<EnclaveEvent>>,
+    /// NetCommand sender to forward commands to the NetInterface
     tx: mpsc::Sender<NetCommand>,
+    /// NetEvent receiver to resubscribe for events from the NetInterface. This is in an Arc so
+    /// that we do not do excessive resubscribes without actually listening for events.
     rx: Arc<broadcast::Receiver<NetEvent>>,
+    /// The gossipsub broadcast topic
     topic: String,
 }
 
@@ -63,6 +71,7 @@ impl DocumentPublisher {
         }
     }
 
+    /// Setup the DocumentPublisher and start listening for GossipEvents
     pub fn setup(
         bus: &Addr<EventBus<EnclaveEvent>>,
         tx: &mpsc::Sender<NetCommand>,
@@ -129,9 +138,10 @@ impl Handler<DocumentPublishedNotification> for DocumentPublisher {
     type Result = ();
     fn handle(
         &mut self,
-        msg: DocumentPublishedNotification,
-        ctx: &mut Self::Context,
+        _msg: DocumentPublishedNotification,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
+        // tbc...
     }
 }
 
@@ -175,7 +185,8 @@ pub async fn handle_publish_document_requested(
 }
 
 /// Called when we receive a notification from the net_interface
-pub fn handle_document_published_notification(event: DocumentPublishedNotification) -> Result<()> {
+pub fn handle_document_published_notification(_: DocumentPublishedNotification) -> Result<()> {
+    // tbc..
     Ok(())
 }
 
@@ -197,6 +208,8 @@ async fn put_record(
         .await?;
 
     let mut rx = net_events.resubscribe();
+
+    // NOTE: The following pattern we should generalize
     loop {
         match rx.recv().await {
             Ok(NetEvent::DhtPutRecordSucceeded { correlation_id, .. }) if correlation_id == id => {
@@ -231,6 +244,8 @@ async fn broadcast_document_published_notification(
         })
         .await?;
     let mut rx = net_events.resubscribe();
+
+    // NOTE: The following pattern we should generalize
     loop {
         match rx.recv().await {
             Ok(NetEvent::GossipPublished { correlation_id, .. }) if correlation_id == id => {
