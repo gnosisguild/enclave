@@ -183,7 +183,6 @@ pub struct E3Crisp {
     pub token_holder_hashes: Vec<String>,
     pub token_address: String,
     pub balance_threshold: String,
-    pub block_number_requested: u64, 
 }
 
 impl From<E3> for WebResultRequest {
