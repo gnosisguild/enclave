@@ -21,28 +21,27 @@ export interface IRoundDetailsResponse {
   emojis: [string, string]
   token_address: string
   balance_threshold: string
-  tokenAddress: string
-  snapshotBlock: string
+  block_number_requested: string
 }
 
 /**
  * Interface representing the details of a specific round in a more convenient format
  */
 export interface IRoundDetails {
-  e3Id: number
-  chainId: number
+  e3Id: bigint
+  chainId: bigint
   enclaveAddress: string
   status: string
-  voteCount: number
-  startTime: number
-  duration: number
-  expiration: number
-  startBlock: number
+  voteCount: bigint
+  startTime: bigint
+  duration: bigint
+  expiration: bigint
+  startBlock: bigint
   committeePublicKey: string[]
   emojis: [string, string]
   tokenAddress: string
-  balanceThreshold: string
-  snapshotBlock: number
+  balanceThreshold: bigint
+  snapshotBlock: bigint
 }
 
 /**
@@ -50,5 +49,6 @@ export interface IRoundDetails {
  */
 export interface ITokenDetails {
   tokenAddress: string
-  threshold: string
+  threshold: bigint
+  snapshotBlock: bigint
 }

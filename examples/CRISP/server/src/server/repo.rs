@@ -11,7 +11,6 @@ use super::{
 use e3_sdk::indexer::{models::E3 as EnclaveE3, DataStore, E3Repository, SharedStore};
 use eyre::Result;
 use log::info;
-use num_bigint::BigUint;
 
 pub struct CurrentRoundRepository<S: DataStore> {
     store: SharedStore<S>,
@@ -112,7 +111,7 @@ impl<S: DataStore> CrispE3Repository<S> {
         Ok(())
     }
 
-    pub async fn initialize_round(&mut self, token_address: String, balance_threshold: String) -> Result<()> {
+    pub async fn initialize_round(&mut self, token_address: String, balance_threshold: String, block_number: u64) -> Result<()> {
         self.set_crisp(E3Crisp {
             has_voted: vec![],
             start_time: 0u64,
@@ -122,7 +121,8 @@ impl<S: DataStore> CrispE3Repository<S> {
             emojis: generate_emoji(),
             token_holder_hashes: vec![],
             token_address,
-            balance_threshold
+            balance_threshold,
+            block_number_requested: block_number,
         })
         .await
     }
@@ -213,6 +213,7 @@ impl<S: DataStore> CrispE3Repository<S> {
             committee_public_key: e3.committee_public_key,
             token_address: e3_crisp.token_address,
             balance_threshold: e3_crisp.balance_threshold,
+            block_number_requested: e3_crisp.block_number_requested,
         })
     }
 

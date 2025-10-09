@@ -62,7 +62,8 @@ pub async fn register_e3_requested(
                         .ok_or_else(|| eyre::eyre!("Invalid balance threshold"))?;
 
                 // save the e3 details
-                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold).await?;
+                let block_number = event.e3.requestBlock.to::<u64>();
+                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold, block_number).await?;
 
                 // Get token holders from Bitquery API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
@@ -83,7 +84,7 @@ pub async fn register_e3_requested(
                         .get_token_holders(
                             token_address,
                             balance_threshold,
-                            event.e3.requestBlock.to::<u64>(),
+                            block_number,
                             CONFIG.chain_id,
                             10000, // TODO: this is fine for now, but we need pagination or chunking strategies
                                    // to retrieve large datasets efficiently.

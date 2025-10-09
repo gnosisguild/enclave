@@ -23,33 +23,34 @@ export const getRoundDetails = async (serverUrl: string, e3Id: number): Promise<
   const data = (await response.json()) as IRoundDetailsResponse
 
   return {
-    e3Id: Number(data.id),
+    e3Id: BigInt(data.id),
     tokenAddress: data.token_address,
-    balanceThreshold: data.balance_threshold,
-    chainId: Number(data.chain_id),
+    balanceThreshold: BigInt(data.balance_threshold),
+    chainId: BigInt(data.chain_id),
     enclaveAddress: data.enclave_address,
     status: data.status,
-    voteCount: Number(data.vote_count),
-    startTime: Number(data.start_time),
-    duration: Number(data.duration),
-    expiration: Number(data.expiration),
-    startBlock: Number(data.start_block),
+    voteCount: BigInt(data.vote_count),
+    startTime: BigInt(data.start_time),
+    duration: BigInt(data.duration),
+    expiration: BigInt(data.expiration),
+    startBlock: BigInt(data.start_block),
     committeePublicKey: data.committee_public_key,
     emojis: data.emojis,
-    snapshotBlock: Number(data.start_block),
+    snapshotBlock: BigInt(data.block_number_requested),
   }
 }
 
 /**
- * Get the token address and balance threshold for a specific round
+ * Get the token address, balance threshold and snapshot block for a specific round
  * @param serverUrl - The base URL of the CRISP server
  * @param e3Id - The e3Id of the round
- * @returns The token address and balance threshold
+ * @returns The token address, balance threshold and snapshot block
  */
-export const getRoundTokenAndThreshold = async (serverUrl: string, e3Id: number): Promise<ITokenDetails> => {
+export const getRoundTokenDetails = async (serverUrl: string, e3Id: number): Promise<ITokenDetails> => {
   const roundDetails = await getRoundDetails(serverUrl, e3Id)
   return {
     tokenAddress: roundDetails.tokenAddress,
     threshold: roundDetails.balanceThreshold,
+    snapshotBlock: roundDetails.snapshotBlock,
   }
 }
