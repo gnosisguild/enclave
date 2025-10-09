@@ -26,7 +26,6 @@ const PATTERN_GROUPS = {
     "**/.enclave/config/**",
     "**/database/**",
   ],
-  ],
 } as const;
 
 interface CleanOptions {
@@ -61,8 +60,8 @@ class Cleaner {
     if (!this.options.skipNode) patterns.push(...PATTERN_GROUPS.node);
     if (!this.options.skipCrates) patterns.push(...PATTERN_GROUPS.crates);
     if (!this.options.skipContracts) patterns.push(...PATTERN_GROUPS.contracts);
-    // env and enclaveTemp are always included
-    patterns.push(...PATTERN_GROUPS.env, ...PATTERN_GROUPS.enclaveTemp);
+    // EnclaveTemp is always included.
+    patterns.push(...PATTERN_GROUPS.enclaveTemp);
     return patterns;
   }
 
