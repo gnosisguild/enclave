@@ -10,9 +10,9 @@ use log::info;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use super::{CLI_DB};
+use super::CLI_DB;
 use alloy::primitives::{Address, Bytes, U256};
-use crisp::config::CONFIG; 
+use crisp::config::CONFIG;
 use e3_sdk::bfv_helpers::{build_bfv_params_arc, encode_bfv_params, params::SET_2048_1032193_1};
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveRead, EnclaveWrite};
 use fhe_rs::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey};
@@ -209,6 +209,8 @@ pub async fn decrypt_and_publish_result(
     let votes = Vec::<u64>::try_decode(&pt, Encoding::poly())?[0];
     info!("Vote count: {:?}", votes);
 
+    let proof = Bytes::from(vec![0]);
+
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
@@ -216,7 +218,11 @@ pub async fn decrypt_and_publish_result(
     )
     .await?;
     let res = contract
-        .publish_plaintext_output(U256::from(input_crisp_id), Bytes::from(votes.to_be_bytes()))
+        .publish_plaintext_output(
+            U256::from(input_crisp_id),
+            Bytes::from(votes.to_be_bytes()),
+            proof,
+        )
         .await?;
     info!("Vote broadcast. TxHash: {:?}", res.transaction_hash);
 
