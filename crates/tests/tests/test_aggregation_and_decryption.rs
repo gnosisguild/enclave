@@ -21,6 +21,7 @@ use e3_fhe::ext::FheExtension;
 use e3_fhe::{setup_crp_params, ParamsWithCrp, SharedRng};
 use e3_keyshare::ext::KeyshareExtension;
 use e3_logger::SimpleLogger;
+use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
 use e3_request::E3Router;
 use e3_sdk::bfv_helpers::{encode_bfv_params, params::SET_2048_1032193_1};
@@ -508,7 +509,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     NetEventTranslator::setup(bus.clone(), &cmd_tx, event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
-    let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
+    let msgs: Arc<Mutex<Vec<GossipData>>> = Arc::new(Mutex::new(Vec::new()));
     let msgs_loop = msgs.clone();
 
     tokio::spawn(async move {
@@ -559,7 +560,10 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     assert_eq!(
         *msgs.lock().await,
-        vec![evt_1.to_bytes()?, evt_2.to_bytes()?], // notice no local events
+        vec![
+            GossipData::GossipBytes(evt_1.to_bytes()?),
+            GossipData::GossipBytes(evt_2.to_bytes()?)
+        ], // notice no local events
         "NetEventTranslator did not transmit correct events to the network"
     );
 
@@ -674,7 +678,9 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     });
 
     // lets send an event from the network
-    let _ = event_tx.send(NetEvent::GossipData(event.to_bytes()?));
+    let _ = event_tx.send(NetEvent::GossipData(GossipData::GossipBytes(
+        event.to_bytes()?,
+    )));
 
     sleep(Duration::from_millis(1)).await; // need to push to next tick
 

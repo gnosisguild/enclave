@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::{hash::Hash, sync::Arc, time::Instant};
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum GossipData {
     GossipBytes(Vec<u8>), // Serialized EnclaveEvent
     DocumentPublishedNotification(DocumentPublishedNotification),
