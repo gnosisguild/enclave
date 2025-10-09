@@ -59,6 +59,10 @@ impl<let N: u32> Polynomial<N> {
     /// 2. Checks that shifted coefficients are in [0, 2*upper_bound]
     /// 3. This ensures original coefficients are in [-upper_bound, upper_bound]
     ///
+    /// Set `BIT` to the bit-length of `upper_bound` (i.e., choose `BIT` so `upper_bound < 2^BIT`).
+    /// Because all checked values lie in `[0, 2*upper_bound]`, they cannot exceed `BIT + 1` bits; hence the
+    /// `assert_max_bit_size::<BIT + 1>()` checks.
+    ///
     /// # Arguments
     /// * `upper_bound` - The symmetric bound for coefficient range checking
     ///                   Coefficients must satisfy: -upper_bound <= c <= upper_bound
@@ -80,6 +84,11 @@ impl<let N: u32> Polynomial<N> {
     /// 1. Shifts each coefficient by adding -lower_bound: c' = c - lower_bound
     /// 2. Checks that shifted coefficients are in [0, upper_bound - lower_bound]
     /// 3. This ensures original coefficients are in [lower_bound, upper_bound]
+    ///
+    /// Set `BIT` to the bit-length of the total range `upper_bound - lower_bound`
+    /// (choose `BIT` so `upper_bound - lower_bound < 2^BIT`). Since all checked values lie in
+    /// `[0, upper_bound - lower_bound]`, they cannot exceed `BIT + 1` bits, which is
+    /// why we use `assert_max_bit_size::<BIT + 1>()`.
     ///
     /// # Arguments
     /// * `upper_bound` - The upper bound for coefficient range checking
