@@ -15,8 +15,7 @@ jobs:
       - name: Check PR size
         run: |
           git fetch origin ${{ github.base_ref }}
-          CHANGED_LINES=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | \
-            awk '{print $4+$6}')
+          CHANGED_LINES=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | awk '{print $4+$6}')
           echo "Changed lines: ${CHANGED_LINES:-0}"
           echo "Maximum allowed: $MAX_LINES"
           if [ "${CHANGED_LINES:-0}" -gt "$MAX_LINES" ]; then
