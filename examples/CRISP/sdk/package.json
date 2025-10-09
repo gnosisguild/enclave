@@ -1,5 +1,5 @@
 {
-  "name": "crisp-sdk",
+  "name": "@enclave/crisp-sdk",
   "version": "0.0.1",
   "type": "module",
   "files": [
@@ -22,7 +22,8 @@
     "build": "tsc",
     "test": "vitest --run",
     "prettier:fix": "pnpm prettier --write .",
-    "prettier:check": "pnpm prettier --check ."
+    "prettier:check": "pnpm prettier --check .",
+    "release": "pnpm build && pnpm publish --access public"
   },
   "publishConfig": {
     "access": "public"
