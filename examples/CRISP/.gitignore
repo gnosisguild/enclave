@@ -46,4 +46,5 @@ playwright-report/
 .cache-synpress/
 .enclave/data/ 
 .enclave/config/ 
+.enclave/caches/
 cache_hardhat/
