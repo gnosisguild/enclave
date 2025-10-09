@@ -9,10 +9,12 @@ use crate::server::{
     models::{GetRoundRequest, WebhookPayload},
     CONFIG,
 };
-use alloy::primitives::{U256, Bytes};
 use actix_web::{web, HttpResponse, Responder};
+use alloy::primitives::{Bytes, U256};
+use e3_sdk::evm_helpers::contracts::{
+    EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite,
+};
 use log::{error, info};
-use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveContractFactory, EnclaveWrite, ReadWrite};
 
 pub fn setup_routes(config: &mut web::ServiceConfig) {
     config.service(
@@ -20,30 +22,37 @@ pub fn setup_routes(config: &mut web::ServiceConfig) {
             .route("/result", web::post().to(get_round_result))
             .route("/all", web::get().to(get_all_round_results))
             .route("/lite", web::post().to(get_round_state_lite))
-            // Do we need protection on this endpoint? technically they would need to send a valid proof for it to 
-            // be included on chain 
-            .route("/add-result", web::post().to(handle_program_server_result)),
+            // Do we need protection on this endpoint? technically they would need to send a valid proof for it to
+            // be included on chain
+            .route("/add-result", web::post().to(handle_program_server_result))
+            // Get the token holders hashes for a given round
+            .route("/token-holders", web::post().to(get_token_holders_hashes)),
     );
 }
 
 /// Webhook callback from program server
-/// 
+///
 /// # Arguments
 /// * `data` - The request data containing the result from the program server
-/// 
+///
 /// # Returns
 /// * A JSON response indicating the success of the operation
 async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl Responder {
     let incoming = data.into_inner();
 
-    info!("Received program server result for E3 ID: {:?}", incoming.e3_id);
+    info!(
+        "Received program server result for E3 ID: {:?}",
+        incoming.e3_id
+    );
 
     // Create the contract
     let contract: EnclaveContract<ReadWrite> = match EnclaveContractFactory::create_write(
         &CONFIG.http_rpc_url,
         &CONFIG.enclave_address,
         &CONFIG.private_key,
-    ).await {
+    )
+    .await
+    {
         Ok(contract) => contract,
         Err(e) => {
             info!("Failed to create contract: {:?}", e);
@@ -70,14 +79,16 @@ async fn handle_program_server_result(data: web::Json<WebhookPayload>) -> impl R
         }
     };
 
-    info!("Ciphertext output published successfully for E3 ID: {} with tx: {}", incoming.e3_id, pending_tx.transaction_hash);
-    
+    info!(
+        "Ciphertext output published successfully for E3 ID: {} with tx: {}",
+        incoming.e3_id, pending_tx.transaction_hash
+    );
+
     HttpResponse::Ok().json(format!(
         "Ciphertext output published successfully for E3 ID: {}",
         incoming.e3_id
     ))
 }
-
 
 /// Get the result for a given round
 ///
@@ -147,5 +158,26 @@ async fn get_round_state_lite(
     match store.e3(incoming.round_id).get_e3_state_lite().await {
         Ok(state_lite) => HttpResponse::Ok().json(state_lite),
         Err(_) => HttpResponse::InternalServerError().body("Failed to get E3 state"),
+    }
+}
+
+/// Get the hashes of token holders for a given round
+/// The hash is hash(address, token balance)
+/// # Arguments
+/// * `GetRoundRequest` - The request data containing the round ID
+/// # Returns
+/// * A JSON response containing the list of token holder hashes
+async fn get_token_holders_hashes(
+    data: web::Json<GetRoundRequest>,
+    store: web::Data<AppData>,
+) -> impl Responder {
+    let incoming = data.into_inner();
+
+    match store.e3(incoming.round_id).get_token_holder_hashes().await {
+        Ok(hashes) => HttpResponse::Ok().json(hashes),
+        Err(e) => {
+            error!("Error getting token holders hashes: {:?}", e);
+            HttpResponse::InternalServerError().body("Failed to get token holders hashes")
+        }
     }
 }
