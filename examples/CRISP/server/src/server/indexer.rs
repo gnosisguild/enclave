@@ -47,6 +47,8 @@ pub async fn register_e3_requested(
             info!("E3Requested: {:?}", event);
 
             async move {
+                repo.initialize_round().await?;
+
                 // Convert custom params bytes back to token address and balance threshold.
                 let custom_params: CustomParams = serde_json::from_slice(&event.e3.customParams)
                     .with_context(|| "Failed to parse custom params from E3 event")?;

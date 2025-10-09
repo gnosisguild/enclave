@@ -9,7 +9,6 @@ import { CRISP_SERVER_TOKEN_TREE_ENDPOINT } from './constants'
 import ERC20Votes from './artifacts/ERC20Votes.json'
 import { createPublicClient, http } from 'viem'
 import { localhost, sepolia } from 'viem/chains'
-
 /**
  * Get the merkle tree data from the CRISP server
  * @param serverUrl - The base URL of the CRISP server
