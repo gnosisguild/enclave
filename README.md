@@ -60,17 +60,17 @@ See [CONTRIBUTING.md][contributing].
                 </a>
             </td>
             <td align="center">
-                <a href="https://github.com/ctrlc03">
-                    <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
-                    <br />
-                    <sub><b>ctrlc03</b></sub>
-                </a>
-            </td>
-            <td align="center">
                 <a href="https://github.com/cristovaoth">
                     <img src="https://avatars.githubusercontent.com/u/12870300?v=4" width="100;" alt="cristovaoth"/>
                     <br />
                     <sub><b>Cristóvão</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/ctrlc03">
+                    <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
+                    <br />
+                    <sub><b>ctrlc03</b></sub>
                 </a>
             </td>
 		</tr>
@@ -97,17 +97,17 @@ See [CONTRIBUTING.md][contributing].
                 </a>
             </td>
             <td align="center">
-                <a href="https://github.com/ozgurarmanc">
-                    <img src="https://avatars.githubusercontent.com/u/94117770?v=4" width="100;" alt="ozgurarmanc"/>
-                    <br />
-                    <sub><b>Armanc</b></sub>
-                </a>
-            </td>
-            <td align="center">
                 <a href="https://github.com/Subhasish-Behera">
                     <img src="https://avatars.githubusercontent.com/u/92573882?v=4" width="100;" alt="Subhasish-Behera"/>
                     <br />
                     <sub><b>SUBHASISH BEHERA</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/ozgurarmanc">
+                    <img src="https://avatars.githubusercontent.com/u/94117770?v=4" width="100;" alt="ozgurarmanc"/>
+                    <br />
+                    <sub><b>Armanc</b></sub>
                 </a>
             </td>
 		</tr>
