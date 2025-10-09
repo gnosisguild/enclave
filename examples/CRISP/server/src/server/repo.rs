@@ -85,30 +85,10 @@ impl<S: DataStore> CrispE3Repository<S> {
     }
 
     pub async fn start_round(&mut self) -> Result<()> {
-        let start_time = chrono::Utc::now().timestamp() as u64;
-        let key = self.crisp_key();
-
-        self.store
-            .modify(&key, |e3_obj: Option<E3Crisp>| {
-                e3_obj.map(|mut e| {
-                    e.start_time = start_time;
-                    e
-                })
-            })
-            .await
-            .map_err(|_| eyre::eyre!("Could not update start_time for '{key}'"))?;
-
-        self.store
-            .modify(&key, |e3_obj: Option<E3Crisp>| {
-                e3_obj.map(|mut e| {
-                    e.status = "Active".to_string();
-                    e
-                })
-            })
-            .await
-            .map_err(|_| eyre::eyre!("Could not update status for '{key}'"))?;
-        
-        Ok(())
+        let mut e3_crisp = self.get_crisp().await?;
+        e3_crisp.start_time = chrono::Utc::now().timestamp() as u64;
+        e3_crisp.status = "Active".to_string();
+        self.set_crisp(e3_crisp).await
     }
 
     pub async fn initialize_round(&mut self, token_address: String, balance_threshold: String, block_number: u64) -> Result<()> {

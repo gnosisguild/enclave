@@ -2,6 +2,7 @@
 //
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
 
 import { describe, expect, it } from 'vitest'
 
@@ -9,7 +10,6 @@ import { getRoundDetails, getRoundTokenDetails } from '../src/state'
 import { CRISP_SERVER_URL } from './constants'
 import { zeroAddress } from 'viem'
 
-// or FITNESS FOR A PARTICULAR PURPOSE.
 describe('State', () => {
   describe('getRoundDetails', () => {
     it('should get the state for a given e3Id from the CRISP server', async () => {
