@@ -188,6 +188,7 @@ function parseArgs(): CleanOptions {
       case "-h":
         printHelp();
         process.exit(0);
+        break;
       default:
         if (a.startsWith("-")) {
           console.error(`Unknown option: ${a}`);
