@@ -79,6 +79,7 @@ pnpm bump:versions --skip-git 1.2.3
 ### After Running
 
 Once you run `pnpm bump:versions X.Y.Z` and the tag is pushed, GitHub Actions automatically:
+
 - Builds binaries for all platforms (Linux, macOS)
 - Publishes to npm (with `latest` or `next` tag)
 - Publishes to crates.io
@@ -120,5 +121,37 @@ Once you run `pnpm bump:versions X.Y.Z` and the tag is pushed, GitHub Actions au
 ### CI/CD Integration
 
 This script is automatically run in GitHub Actions:
+
 - On pull requests: checks headers and comments if any are missing
 - On pushes to main/develop: automatically fixes missing headers and commits changes
+
+## Clean Script
+
+`clean.ts` - Removes build artifacts and temporary files from the repository using predefined safe patterns while providing options to skip specific parts of the codebase.
+
+### Usage
+
+```bash
+# Clean build artifacts
+pnpm clean
+
+# Dry run to see what would be cleaned
+pnpm clean --dry-run
+
+# Clean everything except crates and contracts
+pnpm clean --skip-crates --skip-contracts
+
+# Interactive cleaning
+pnpm clean --interactive
+
+# Show help message
+pnpm clean --help
+```
+
+### What it does
+
+- **Uses predefined patterns** to identify safe-to-clean build artifacts and temporary files
+- **Safely removes** only files matching known safe patterns (node_modules, dist, target, etc.)
+- **Provides granular control** over what gets cleaned via skip options
+- **Shows detailed statistics** about what was removed and space freed
+- **Prevents accidental deletion** of important files by using a whitelist approach
