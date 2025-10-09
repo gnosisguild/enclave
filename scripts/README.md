@@ -132,7 +132,7 @@ This script is automatically run in GitHub Actions:
 ### Usage
 
 ```bash
-# Clean build artifacts (interactive mode)
+# Clean build artifacts
 pnpm clean
 
 # Dry run to see what would be cleaned
