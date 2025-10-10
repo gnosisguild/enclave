@@ -19,8 +19,6 @@ CRISP/
 
 You can have an extended explanation of the single folders in the dedicated [documentation](https://docs.enclave.gg/CRISP/introduction#project-structure).
 
-# Usage
-
 ## Prerequisites
 
 Before getting started, ensure you have installed:
@@ -122,7 +120,7 @@ These address will be displayed after successfully running the `pnpm dev:up` com
 
 If you find any inconsistency with the addresses on the environment, you must update them and run the script again (they must match).
 
-## Quick Start
+## Quick Start
 
 The fastest way to get CRISP running is using the scripts provided in the `scripts/` directory:
 
@@ -171,14 +169,6 @@ Once everything is running, you can:
 4. Switch to `Anvil` local network (this will be handled automatically by the app. You just need to press on the connected account on the frontend and select the network. Then, complete the configuration on MetaMask pop-up).
 5. Open a new terminal, run `pnpm cli` and start a new E3 Round.
 6. Refresh and interact with the round following the Client interface.
-
-Before getting started, make sure you have the following tools installed:
-
-- **Rust**
-- **RISC Zero toolchain** (not needed for development only)
-- **Foundry** and **Anvil** (for local testnet)
-- **Node.js** (for client-side dependencies)
-- **Pnpm** (as Node package manager)
 
 ## Manual Start
 
