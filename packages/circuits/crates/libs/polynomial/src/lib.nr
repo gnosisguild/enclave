@@ -59,17 +59,21 @@ impl<let N: u32> Polynomial<N> {
     /// 2. Checks that shifted coefficients are in [0, 2*upper_bound]
     /// 3. This ensures original coefficients are in [-upper_bound, upper_bound]
     ///
+    /// Set `BIT` to the bit-length of `upper_bound` (i.e., choose `BIT` so `upper_bound < 2^BIT`).
+    /// Because all checked values lie in `[0, 2*upper_bound]`, they cannot exceed `BIT + 1` bits; hence the
+    /// `assert_max_bit_size::<BIT + 1>()` checks.
+    ///
     /// # Arguments
     /// * `upper_bound` - The symmetric bound for coefficient range checking
     ///                   Coefficients must satisfy: -upper_bound <= c <= upper_bound
-    pub fn range_check_1bound(self, upper_bound: u64) {
+    pub fn range_check_1bound<let BIT: u32>(self, upper_bound: u64) {
         let shifted_bound = (upper_bound as Field) + (upper_bound as Field);
 
         for i in 0..self.coefficients.len() {
             let shifted_coefficient = self.coefficients[i] + upper_bound as Field;
 
-            shifted_coefficient.assert_max_bit_size::<66>();
-            (shifted_bound - shifted_coefficient).assert_max_bit_size::<66>();
+            shifted_coefficient.assert_max_bit_size::<BIT + 1>();
+            (shifted_bound - shifted_coefficient).assert_max_bit_size::<BIT + 1>();
         }
     }
 
@@ -81,19 +85,24 @@ impl<let N: u32> Polynomial<N> {
     /// 2. Checks that shifted coefficients are in [0, upper_bound - lower_bound]
     /// 3. This ensures original coefficients are in [lower_bound, upper_bound]
     ///
+    /// Set `BIT` to the bit-length of the total range `upper_bound - lower_bound`
+    /// (choose `BIT` so `upper_bound - lower_bound < 2^BIT`). Since all checked values lie in
+    /// `[0, upper_bound - lower_bound]`, they cannot exceed `BIT + 1` bits, which is
+    /// why we use `assert_max_bit_size::<BIT + 1>()`.
+    ///
     /// # Arguments
     /// * `upper_bound` - The upper bound for coefficient range checking
     /// * `lower_bound` - The lower bound for coefficient range checking (can be negative)
     ///                   Coefficients must satisfy: lower_bound <= c <= upper_bound
-    pub fn range_check_2bounds(self, upper_bound: u64, lower_bound: i64) {
+    pub fn range_check_2bounds<let BIT: u32>(self, upper_bound: u64, lower_bound: i64) {
         let shifted_amount = (lower_bound * -1) as u64 as Field;
         let range_size = shifted_amount + upper_bound as Field;
 
         for i in 0..self.coefficients.len() {
             let shifted_coefficient = self.coefficients[i] + shifted_amount;
 
-            shifted_coefficient.assert_max_bit_size::<66>();
-            (range_size - shifted_coefficient).assert_max_bit_size::<66>();
+            shifted_coefficient.assert_max_bit_size::<BIT + 1>();
+            (range_size - shifted_coefficient).assert_max_bit_size::<BIT + 1>();
         }
     }
 }
@@ -259,10 +268,10 @@ fn test_polynomial_bounds() {
     let poly = Polynomial::new(coeffs);
 
     // Test single bound check - constrains to [-242, 242]
-    poly.range_check_1bound(242);
+    poly.range_check_1bound::<8>(242);
 
-    // Test double bounds check - constrains to [-16, 242]
-    poly.range_check_2bounds(242, -16);
+    // Test double bounds check - constrains to [-240, 242]
+    poly.range_check_2bounds::<8>(242, -240);
 }
 
 #[test(should_fail_with = "assert_max_bit_size")]
@@ -272,11 +281,11 @@ fn test_polynomial_out_of_bounds_coefficients() {
 
     // Test single bound check - constrains to [-99, 99]
     // Should fail because -100 is out of bounds.
-    poly.range_check_1bound(99);
+    poly.range_check_1bound::<7>(99);
 
-    // Test double bounds check - constrains to [-9, 99]
+    // Test double bounds check - constrains to [-98, 99]
     // Should fail because -100 is out of bounds.
-    poly.range_check_2bounds(99, -9);
+    poly.range_check_2bounds::<7>(99, -98);
 }
 
 #[test]
