@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use e3_events::CorrelationId;
-use e3_net::events::{NetCommand, NetEvent};
+use e3_net::events::{GossipData, NetCommand, NetEvent};
 use e3_net::NetInterface;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
     tx.send(NetCommand::GossipPublish {
         correlation_id: CorrelationId::new(),
         topic: topic.to_string(),
-        data: name.as_bytes().to_vec(),
+        data: GossipData::GossipBytes(name.as_bytes().to_vec()),
     })
     .await?;
     println!("{} message sent", name);
@@ -88,15 +88,17 @@ async fn main() -> Result<()> {
     let receive_result = timeout(Duration::from_secs(10), async {
         while received != expected {
             match rx.recv().await? {
-                NetEvent::GossipData(msg) => match String::from_utf8(msg) {
-                    Ok(msg) => {
-                        if !received.contains(&msg) {
-                            println!("{} received '{}'", name, msg);
-                            received.insert(msg);
+                NetEvent::GossipData(GossipData::GossipBytes(msg)) => {
+                    match String::from_utf8(msg) {
+                        Ok(msg) => {
+                            if !received.contains(&msg) {
+                                println!("{} received '{}'", name, msg);
+                                received.insert(msg);
+                            }
                         }
+                        Err(e) => println!("{} received invalid UTF8: {}", name, e),
                     }
-                    Err(e) => println!("{} received invalid UTF8: {}", name, e),
-                },
+                }
                 _ => (),
             }
         }

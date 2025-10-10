@@ -20,6 +20,8 @@
     "test:contracts": "hardhat test tests/crisp.contracts.test.ts --network localhost",
     "test:circuits:inputs": "hardhat test test/governanceCircuit.test.ts",
     "test:circuits": "cd circuits && nargo test",
+    "test:sdk": "cd sdk && pnpm test",
+    "release:sdk": "cd sdk && pnpm release",
     "report": "playwright show-report"
   },
   "dependencies": {

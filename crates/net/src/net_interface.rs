@@ -22,8 +22,8 @@ use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, info, trace, warn};
 
 use crate::dialer::dial_peers;
-use crate::events::NetCommand;
 use crate::events::NetEvent;
+use crate::events::{GossipData, NetCommand};
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -127,9 +127,10 @@ impl NetInterface {
                 Some(command) = cmd_rx.recv() => {
                     match command {
                         NetCommand::GossipPublish { data, topic, correlation_id } => {
+                            // let serialized = data.to_bytes()
                             let gossipsub_behaviour = &mut self.swarm.behaviour_mut().gossipsub;
                             match gossipsub_behaviour
-                                .publish(gossipsub::IdentTopic::new(topic), data) {
+                                .publish(gossipsub::IdentTopic::new(topic), data.to_bytes()?) {
                                 Ok(message_id) => {
                                     event_tx.send(NetEvent::GossipPublished { correlation_id, message_id })?;
                                 },
@@ -149,8 +150,8 @@ impl NetInterface {
                                 }
                             }
                         },
-                        NetCommand::PublishDocument { meta:_, value:_, cid:_ } => todo!(),
-                        NetCommand::FetchDocument { correlation_id:_, cid:_ } => todo!(),
+                        NetCommand::DhtPutRecord { .. } => todo!(),
+                        NetCommand::DhtGetRecord { .. } => todo!(),
 
                     }
                 }
@@ -254,10 +255,8 @@ async fn process_swarm_event(
             message,
         })) => {
             trace!("Got message with id: {id} from peer: {peer_id}");
-            // TODO: attempt to deserialize a DocumentPublishedPayload from the message.data if
-            // that works then send NetEvent::DocumentPublishedNotification over the event_tx otherwise send
-            // GossipData
-            event_tx.send(NetEvent::GossipData(message.data))?;
+            let gossip_data = GossipData::from_bytes(&message.data)?;
+            event_tx.send(NetEvent::GossipData(gossip_data))?;
         }
         SwarmEvent::NewListenAddr { address, .. } => {
             trace!("Local node is listening on {address}");
