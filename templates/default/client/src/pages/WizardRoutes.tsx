@@ -27,6 +27,7 @@ import SDKErrorDisplay from './components/SDKErrorDisplay'
 import StepIndicator from './components/StepIndicator'
 import { useWizard, WizardStep } from '../context/WizardContext'
 import { MISSING_ENV_VARS } from '@/utils/env-config'
+import Navbar from './components/Navbar'
 
 interface StepConfig {
   step: WizardStep
@@ -71,13 +72,10 @@ const WizardRoutes: React.FC = () => {
   }
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-slate-900'>
-      <div className='container mx-auto px-4 py-8'>
-        <div className='mb-8 text-center'>
-          <h1 className='mb-2 text-4xl font-bold text-slate-800'>Enclave E3</h1>
-          <p className='text-lg text-slate-600'>Confidential computation with Enclave Encrypted Execution Environments.</p>
-        </div>
+    <div className='min-h-screen bg-white/80 text-slate-900 backdrop-blur-sm'>
+      <Navbar />
 
+      <div className='container mx-auto px-4 py-8'>
         <StepIndicator currentStep={currentStep} steps={STEPS} />
 
         <div className='mx-auto max-w-2xl'>
@@ -86,6 +84,8 @@ const WizardRoutes: React.FC = () => {
             {STEPS.map(({ step, path, component: Component }) => (
               <Route key={path} path={path} element={currentStep === step ? <Component /> : <Navigate to={currentStepPath} replace />} />
             ))}
+            {/* Catch-all route for any unknown paths */}
+            <Route path='*' element={<Navigate to={currentStepPath} replace />} />
           </Routes>
         </div>
       </div>
