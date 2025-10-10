@@ -89,6 +89,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: PlaintextAggregated,
     },
+    PublishDocumentRequested {
+        id: EventId,
+        data: PublishDocumentRequested,
+    },
     CiphernodeSelected {
         id: EventId,
         data: CiphernodeSelected,
@@ -136,19 +140,6 @@ impl EnclaveEvent {
     pub fn get_id(&self) -> EventId {
         self.clone().into()
     }
-
-    pub fn is_local_only(&self) -> bool {
-        // Add a list of local events
-        match self {
-            EnclaveEvent::CiphernodeSelected { .. } => true,
-            EnclaveEvent::E3Requested { .. } => true,
-            EnclaveEvent::CiphernodeAdded { .. } => true,
-            EnclaveEvent::CiphernodeRemoved { .. } => true,
-            EnclaveEvent::E3RequestComplete { .. } => true,
-            EnclaveEvent::Shutdown { .. } => true,
-            _ => false,
-        }
-    }
 }
 
 impl Event for EnclaveEvent {
@@ -188,6 +179,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphertextOutputPublished { id, .. } => id,
             EnclaveEvent::DecryptionshareCreated { id, .. } => id,
             EnclaveEvent::PlaintextAggregated { id, .. } => id,
+            EnclaveEvent::PublishDocumentRequested { id, .. } => id,
             EnclaveEvent::CiphernodeSelected { id, .. } => id,
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
@@ -220,6 +212,7 @@ impl EnclaveEvent {
             EnclaveEvent::CiphertextOutputPublished { data, .. } => format!("{}", data),
             EnclaveEvent::DecryptionshareCreated { data, .. } => format!("{}", data),
             EnclaveEvent::PlaintextAggregated { data, .. } => format!("{}", data),
+            EnclaveEvent::PublishDocumentRequested { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeSelected { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeAdded { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeRemoved { data, .. } => format!("{}", data),
@@ -239,6 +232,7 @@ impl_from_event!(
     CiphertextOutputPublished,
     DecryptionshareCreated,
     PlaintextAggregated,
+    PublishDocumentRequested,
     E3RequestComplete,
     CiphernodeSelected,
     CiphernodeAdded,
