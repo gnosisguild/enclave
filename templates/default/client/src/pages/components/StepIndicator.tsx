@@ -28,8 +28,8 @@ const StepIndicator: React.FC<StepIndicatorProps> = React.memo(({ currentStep, s
           return (
             <div key={step} className='flex items-center'>
               <div
-                className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-200 ${
-                  isActive ? 'border-enclave-400 bg-enclave-100 text-enclave-600' : 'border-slate-300 bg-slate-100 text-slate-400'
+                className={`flex h-10 w-10 items-center justify-center rounded-full border transition-all duration-200 ${
+                  isActive ? 'border-enclave-400 bg-white/80 text-enclave-600' : 'border-slate-400 bg-white/80 text-slate-400'
                 }`}
               >
                 <IconComponent size={24} className={isActive ? 'text-enclave-500' : 'text-slate-400'} />
