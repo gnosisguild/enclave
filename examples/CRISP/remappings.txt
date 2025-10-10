@@ -5,6 +5,5 @@ risc0/=lib/risc0-ethereum/contracts/src/
 @enclave-e3/contracts/=node_modules/@enclave-e3/contracts/
 @excubiae/contracts/=node_modules/@excubiae/contracts/
 solady/=node_modules/solady/
-@hashcloak/semaphore-contracts-noir/=node_modules/@hashcloak/semaphore-contracts-noir/
 @zk-kit/lean-imt.sol=node_modules/@zk-kit/lean-imt.sol
 poseidon-solidity/=node_modules/poseidon-solidity/

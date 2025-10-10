@@ -16,7 +16,6 @@ export const useVoteCasting = () => {
         user,
         roundState,
         votingRound,
-        semaphoreIdentity,
         encryptVote,
         broadcastVote,
         setTxUrl,
@@ -40,8 +39,8 @@ export const useVoteCasting = () => {
             showToast({ type: 'danger', message: 'Please select a poll option first.' });
             return;
         }
-        if (!user || !roundState || !semaphoreIdentity) {
-            console.error("Cannot cast vote: Missing user, round state, or identity.");
+        if (!user || !roundState) {
+            console.error("Cannot cast vote: Missing user or round state.");
             showToast({ type: 'danger', message: 'Cannot cast vote. Ensure you are connected, and the round is active.' });
             return;
         }
@@ -110,7 +109,6 @@ export const useVoteCasting = () => {
         user,
         roundState,
         votingRound,
-        semaphoreIdentity,
         encryptVote,
         broadcastVote,
         setTxUrl,

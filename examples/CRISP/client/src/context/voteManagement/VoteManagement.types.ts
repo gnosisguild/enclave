@@ -7,12 +7,10 @@
 import { ReactNode } from 'react'
 import { BroadcastVoteRequest, BroadcastVoteResponse, VoteStateLite, VotingRound, EncryptedVote } from '@/model/vote.model'
 import { Poll, PollRequestResult, PollResult } from '@/model/poll.model'
-import { Identity } from '@semaphore-protocol/identity'
 
 export type VoteManagementContextType = {
   isLoading: boolean
   user: { address: string } | null
-  semaphoreIdentity: Identity | null
   votingRound: VotingRound | null
   roundEndDate: Date | null
   pollOptions: Poll[]
