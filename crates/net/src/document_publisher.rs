@@ -367,7 +367,7 @@ mod tests {
 
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
         bus.do_send(EnclaveEvent::from(CiphernodeSelected {
-            e3_id,
+            e3_id: e3_id.clone(),
             threshold_m: 5, // TODO: this will change with the merging of #660
         }));
 
@@ -375,7 +375,7 @@ mod tests {
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: Cid::from_content(&b"wrong document".to_vec()),
-                meta: DocumentMeta::new(e3_id, vec![], expires_at),
+                meta: DocumentMeta::new(e3_id.clone(), vec![], expires_at),
             }),
         ))?;
 
@@ -387,7 +387,7 @@ mod tests {
         //    in was published
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
-                key: cid,
+                key: cid.clone(),
                 meta: DocumentMeta::new(e3_id, vec![], expires_at),
             }),
         ))?;
@@ -402,6 +402,8 @@ mod tests {
         else {
             bail!("msg not as expected");
         };
+
+        assert_eq!(key, cid);
 
         // 6. Forward the document
         net_evt_tx.send(NetEvent::DhtGetRecordSucceeded {
