@@ -139,13 +139,13 @@ pnpm dev:up
 pnpm clean
 ```
 
-This will:
+This will start all CRISP components:
 
-- Start Anvil (local blockchain)
+- Anvil (local blockchain)
 - Deploy all contracts
 - Compile all ZK circuits
-- Start the ciphernode network
-- Launch all CRISP applications
+- Ciphernodes network
+- CRISP applications (server, client)
 
 ```bash
 # Build the development containers
@@ -237,7 +237,7 @@ Keep Anvil running in the terminal, and open a new terminal for the next steps.
 4. Delete any previous local deployment (if any):
 
    ```sh
-   rm -rf deployments/localhost/
+   pnpm clean:ignition:deployments
    ```
 
 5. Deploy the contracts on the local testnet:
