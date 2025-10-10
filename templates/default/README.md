@@ -19,7 +19,7 @@ As system requirements:
 
 ## Quick Start
 
-### Install RISC Zero Toolchain
+### (optional) Install RISC Zero Toolchain
 
 Next, install `rzup` for the `cargo-risczero` toolchain.
 
@@ -44,6 +44,7 @@ At this point, you should have all the tools required to develop and deploy an a
 
 You can add Metamask as an extension to your browser following the official
 [documentation](https://metamask.io).
+
 ### Install the Enclave CLI
 
 The easiest way to install the Enclave CLI is using our installer script:
@@ -98,6 +99,12 @@ enclave program compile
 ```
 
 This builds the Risc0 zkvm image that will be deployed on the blockchain and used for verification of the final proof.
+
+If you want to avoid the proof or you have trouble with Risc0 zkvm installation, you can run it in dev mode (no proof).
+
+```bash
+enclave program start --dev true
+```
 
 ### Start the Development Environment
 
@@ -154,6 +161,7 @@ You successfully ran a **Fully Homomorphic Encryption** computation where:
 ## Manual Start
 
 If you prefer to install the Enclave CLI manually, please visit the dedicated section in the [documentation](https://docs.enclave.gg/installation#manual-installation).
+
 ## Next Steps
 
 Now that you have a working E3 program:
