@@ -58,6 +58,9 @@ const STEPS: StepConfig[] = [
 const WizardRoutes: React.FC = () => {
   const { currentStep, sdk } = useWizard()
 
+  // Memoize the current step path to avoid unnecessary recalculations.
+  const currentStepPath = useMemo(() => `/step${currentStep}`, [currentStep])
+
   // Early returns for error states.
   if (MISSING_ENV_VARS.length > 0) {
     return <EnvironmentError missingVars={MISSING_ENV_VARS} />
@@ -66,9 +69,6 @@ const WizardRoutes: React.FC = () => {
   if (sdk.error) {
     return <SDKErrorDisplay error={sdk.error} />
   }
-
-  // Memoize the current step path to avoid unnecessary recalculations.
-  const currentStepPath = useMemo(() => `/step${currentStep}`, [currentStep])
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-slate-900'>
