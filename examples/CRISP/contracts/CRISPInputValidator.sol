@@ -36,7 +36,7 @@ contract CRISPInputValidator is IInputValidator, Clone, Ownable(msg.sender) {
     /// @notice The error emitted when the Noir proof is invalid.
     error InvalidNoirProof();
     /// @notice The error emitted when the round data is not set.
-    error RounDataNotSet();
+    error RoundDataNotSet();
     /// @notice The error emitted when trying to set the round data more than once.
     error RoundDataAlreadySet();
 
@@ -74,7 +74,7 @@ contract CRISPInputValidator is IInputValidator, Clone, Ownable(msg.sender) {
     ) external returns (bytes memory input) {
         // we need to ensure that the CRISP admin set the merkle root of the census
         // @todo update this once we have all components working
-        // if (!isDataSet) revert RounDataNotSet();
+        // if (!isDataSet) revert RoundDataNotSet();
 
         if (data.length == 0) revert EmptyInputData();
 
