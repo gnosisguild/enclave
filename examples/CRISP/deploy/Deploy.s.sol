@@ -23,7 +23,6 @@ import {RiscZeroGroth16Verifier} from "risc0/groth16/RiscZeroGroth16Verifier.sol
 import {ControlID} from "risc0/groth16/ControlID.sol";
 
 import {CRISPProgram} from "../contracts/CRISPProgram.sol";
-import {IVerifier} from "@hashcloak/semaphore-contracts-noir/interfaces/ISemaphoreNoirVerifier.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
 import {CRISPInputValidator} from "../contracts/CRISPInputValidator.sol";

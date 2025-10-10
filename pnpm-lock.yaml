@@ -88,9 +88,6 @@ importers:
       '@excubiae/contracts':
         specifier: ^0.4.0
         version: 0.4.0
-      '@hashcloak/semaphore-contracts-noir':
-        specifier: 1.0.1
-        version: 1.0.1
       '@zk-kit/lean-imt.sol':
         specifier: 2.0.0
         version: 2.0.0
@@ -2112,9 +2109,6 @@ packages:
 
   '@hapi/topo@5.1.0':
     resolution: {integrity: sha512-foQZKJig7Ob0BMAYBfcJk8d77QtOe7Wo4ox7ff1lQYoNNAb6jwcY1ncdoy2e9wQZzvNy7ODZCYJkK8kzmcAnAg==}
-
-  '@hashcloak/semaphore-contracts-noir@1.0.1':
-    resolution: {integrity: sha512-ZPDAzlBXit/HLfP/KeuXfzOg0SP2Lc8t8cx/UZ7HF1M0RSDmp1nDn6Mq9s2lLwzeP1IQRb6IYqye+BrLTXXE/A==}
 
   '@headlessui/react@1.7.19':
     resolution: {integrity: sha512-Ll+8q3OlMJfJbAKM/+/Y2q6PPYbryqNTXDbryx7SXLIDamkF6iQFbriYHga0dY44PvDhvvBWCx1Xj4U5+G4hOw==}
@@ -11204,10 +11198,6 @@ snapshots:
   '@hapi/topo@5.1.0':
     dependencies:
       '@hapi/hoek': 9.3.0
-
-  '@hashcloak/semaphore-contracts-noir@1.0.1':
-    dependencies:
-      '@zk-kit/lean-imt.sol': 2.0.0
 
   '@headlessui/react@1.7.19(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
