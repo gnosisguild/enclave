@@ -22,6 +22,7 @@ e3-keyshare = { workspace = true }
 e3-multithread = { workspace = true }
 e3-request = { workspace = true }
 e3-sdk = { workspace = true }
+e3-net = { workspace = true }
 e3-trbfv = { workspace = true }
 e3-utils = { workspace = true }
 e3-sortition = { workspace = true }

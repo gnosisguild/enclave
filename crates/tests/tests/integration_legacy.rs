@@ -16,6 +16,7 @@ use e3_events::{
     EventBusConfig, GetErrors, HistoryCollector, OrderedSet, PlaintextAggregated,
     PublicKeyAggregated, Seed, Shutdown, Subscribe, TakeHistory,
 };
+use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
 use e3_sdk::bfv_helpers::encode_bfv_params;
 use e3_test_helpers::encrypt_ciphertext;
@@ -367,10 +368,11 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
     let event_rx = event_tx.subscribe();
     // Pas cmd and event channels to NetEventTranslator
-    NetEventTranslator::setup(bus.clone(), cmd_tx.clone(), event_rx, "my-topic");
+    NetEventTranslator::setup(bus.clone(), &cmd_tx, event_rx, "my-topic");
 
     // Capture messages from output on msgs vec
-    let msgs: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
+    let msgs: Arc<Mutex<Vec<GossipData>>> = Arc::new(Mutex::new(Vec::new()));
+
     let msgs_loop = msgs.clone();
 
     tokio::spawn(async move {
@@ -421,7 +423,10 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     assert_eq!(
         *msgs.lock().await,
-        vec![evt_1.to_bytes()?, evt_2.to_bytes()?], // notice no local events
+        vec![
+            GossipData::GossipBytes(evt_1.to_bytes()?),
+            GossipData::GossipBytes(evt_2.to_bytes()?)
+        ], // notice no local events
         "NetEventTranslator did not transmit correct events to the network"
     );
 
@@ -520,7 +525,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     let history_collector = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history_collector.clone().recipient()));
 
-    NetEventTranslator::setup(bus.clone(), cmd_tx.clone(), event_rx, "mytopic");
+    NetEventTranslator::setup(bus.clone(), &cmd_tx, event_rx, "mytopic");
 
     // Capture messages from output on msgs vec
     let event = EnclaveEvent::from(E3Requested {
@@ -533,7 +538,9 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
     });
 
     // lets send an event from the network
-    let _ = event_tx.send(NetEvent::GossipData(event.to_bytes()?));
+    let _ = event_tx.send(NetEvent::GossipData(GossipData::GossipBytes(
+        event.to_bytes()?,
+    )));
 
     // check the history of the event bus
     let history = history_collector

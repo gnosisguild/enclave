@@ -3106,6 +3106,7 @@ dependencies = [
  "e3-fhe",
  "e3-keyshare",
  "e3-multithread",
+ "e3-net",
  "e3-request",
  "e3-sdk",
  "e3-sortition",
