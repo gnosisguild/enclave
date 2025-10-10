@@ -153,8 +153,7 @@ You successfully ran a **Fully Homomorphic Encryption** computation where:
 
 ## Manual Start
 
-If you prefer to install manually the Enclave CLI, please visit the dedicated section in the [documentation](https://docs.enclave.gg/installation#manual-installation).
-
+If you prefer to install the Enclave CLI manually, please visit the dedicated section in the [documentation](https://docs.enclave.gg/installation#manual-installation).
 ## Next Steps
 
 Now that you have a working E3 program:
