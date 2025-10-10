@@ -272,7 +272,8 @@ mod tests {
     use crate::events::NetCommand;
     use anyhow::{bail, Result};
     use e3_events::{
-        DocumentMeta, E3id, EnclaveEvent, EventBus, EventBusConfig, PublishDocumentRequested,
+        CiphernodeSelected, DocumentMeta, E3id, EnclaveEvent, EventBus, EventBusConfig,
+        PublishDocumentRequested,
     };
     use tokio::{
         sync::{broadcast, mpsc},
@@ -290,12 +291,15 @@ mod tests {
 
         let value = b"I am a special document".to_vec();
         let expires_at = Utc::now() + chrono::Duration::days(1);
+        let e3_id = E3id::new("1243", 1);
 
+        // 1. Send a request to publish
         bus.do_send(EnclaveEvent::from(PublishDocumentRequested {
-            meta: DocumentMeta::new(E3id::new("1243", 1), vec![], expires_at),
+            meta: DocumentMeta::new(e3_id, vec![], expires_at),
             value: value.clone(),
         }));
 
+        // 2. Document publisher should have asked the NetInterface to put the doc on Kademlia
         let Some(NetCommand::DhtPutRecord {
             correlation_id,
             expires,
@@ -312,13 +316,13 @@ mod tests {
         let mut mykad: HashMap<Cid, Vec<u8>> = HashMap::new();
         mykad.insert(key.clone(), msg_value.clone());
 
-        // Everything went well
+        // 3. Report that everything went well
         net_evt_tx.send(NetEvent::DhtPutRecordSucceeded {
             correlation_id,
             key,
         })?;
 
-        // Expect a DocumentPublishedNotification
+        // 4. Expect a DocumentPublishedNotification to have been emitted
         let Some(NetCommand::GossipPublish {
             topic,
             data: GossipData::DocumentPublishedNotification(notification),
@@ -333,20 +337,80 @@ mod tests {
         assert_eq!(topic, "topic");
         assert_eq!(notification.meta.e3_id, E3id::new("1243", 1));
 
-        // put together enclave event -> DocumentPublished
-        //
-        // DocumentPublished holds DocumentMeta and Cid
-        // Nodes can then use the DocumentMeta to deternmine if they want to request the document
-        // assert_eq enclave_event.to_bytes()
         assert_eq!(
             mykad.get(&notification.key),
             Some(&b"I am a special document".to_vec()),
             "value was not correct"
         );
+
         assert!(
             is_between(expires.unwrap(), days_from_now(0), days_from_now(1)),
             "Expiry was not set"
         );
+
+        Ok(())
+    }
+
+    #[actix::test]
+    async fn test_notified_of_document() -> Result<()> {
+        let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+        let (net_cmd_tx, mut net_cmd_rx) = mpsc::channel(100);
+        let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
+        let net_evt_rx = Arc::new(net_evt_rx);
+
+        DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
+
+        let value = b"I am a special document".to_vec();
+        let expires_at = Utc::now() + chrono::Duration::days(1);
+        let e3_id = E3id::new("1243", 1);
+        let cid = Cid::from_content(&value);
+
+        // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
+        bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+            e3_id,
+            threshold_m: 5, // TODO: this will change with the merging of #660
+        }));
+
+        // 2. Dispatch a NetEvent from the NetInterface signaling that a document was published
+        net_evt_tx.send(NetEvent::GossipData(
+            GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
+                key: Cid::from_content(&b"wrong document".to_vec()),
+                meta: DocumentMeta::new(e3_id, vec![], expires_at),
+            }),
+        ))?;
+
+        // 3. Nothing happens...
+        let result = timeout(Duration::from_secs(1), net_cmd_rx.recv()).await;
+        assert!(result.is_err(), "Expected timeout but received a message");
+
+        // 4. Dispatch a NetEvent from the NetInterface signaling that a document we ARE interested
+        //    in was published
+        net_evt_tx.send(NetEvent::GossipData(
+            GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
+                key: cid,
+                meta: DocumentMeta::new(e3_id, vec![], expires_at),
+            }),
+        ))?;
+
+        // 5. Expect that DocumentPublisher will make a DhtGetRecord request
+        let Some(NetCommand::DhtGetRecord {
+            key,
+            correlation_id,
+        }) = timeout(Duration::from_secs(1), net_cmd_rx.recv())
+            .await
+            .expect("did not receive DhtGetRecord")
+        else {
+            bail!("msg not as expected");
+        };
+
+        // 6. Forward the document
+        net_evt_tx.send(NetEvent::DhtGetRecordSucceeded {
+            key: cid,
+            correlation_id, // same correlation_id
+            value,
+        })?;
+
+        // XXX: Need some of the testing tools from #660 to wait for the bus event
 
         Ok(())
     }
