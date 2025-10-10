@@ -18,7 +18,7 @@
 #![allow(dead_code)]
 
 use crate::{
-    events::{DocumentPublishedNotification, GossipData, NetCommand, NetEvent},
+    events::{await_response, DocumentPublishedNotification, GossipData, NetCommand, NetEvent},
     Cid,
 };
 use actix::prelude::*;
@@ -116,6 +116,98 @@ impl DocumentPublisher {
         self.ids.remove(&event.e3_id);
         Ok(())
     }
+
+    /// Called when we receive a PublishDocumentRequested event
+    pub async fn handle_publish_document_requested(
+        tx: mpsc::Sender<NetCommand>,
+        rx: Arc<broadcast::Receiver<NetEvent>>,
+        event: PublishDocumentRequested,
+        topic: impl Into<String>,
+    ) -> Result<()> {
+        let value = event.value;
+        let key = Cid::from_content(&value);
+        let expires = datetime_to_instant_from_now(event.meta.expires_at);
+
+        Self::put_record(tx.clone(), rx.clone(), expires, value, key.clone()).await?;
+
+        Self::broadcast_document_published_notification(
+            tx,
+            rx,
+            DocumentPublishedNotification {
+                meta: event.meta,
+                key,
+            },
+            topic,
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    /// Called when we receive a notification from the net_interface
+    pub fn handle_document_published_notification(_: DocumentPublishedNotification) -> Result<()> {
+        // tbc..
+        Ok(())
+    }
+
+    /// Call DhtPutRecord Command on the NetInterface and handle the results
+    async fn put_record(
+        net_cmds: mpsc::Sender<NetCommand>,
+        net_events: Arc<broadcast::Receiver<NetEvent>>,
+        expires: Option<Instant>,
+        value: Vec<u8>,
+        key: Cid,
+    ) -> Result<()> {
+        let id = CorrelationId::new();
+        net_cmds
+            .send(NetCommand::DhtPutRecord {
+                correlation_id: id,
+                expires,
+                value,
+                key,
+            })
+            .await?;
+
+        await_response(net_events, id, |event| {
+            match event {
+                NetEvent::DhtPutRecordSucceeded { .. } => Some(Ok(())),
+                NetEvent::DhtPutRecordError { error, .. } => {
+                    Some(Err(anyhow::anyhow!("DHT put record failed: {:?}", error)))
+                }
+                _ => None, // Unexpected event type, keep waiting
+            }
+        })
+        .await
+    }
+
+    /// Broadcasts document published notification on NetInterface
+    async fn broadcast_document_published_notification(
+        net_cmds: mpsc::Sender<NetCommand>,
+        net_events: Arc<broadcast::Receiver<NetEvent>>,
+        payload: DocumentPublishedNotification,
+        topic: impl Into<String>,
+    ) -> Result<()> {
+        let id = CorrelationId::new();
+
+        net_cmds
+            .send(NetCommand::GossipPublish {
+                topic: topic.into(),
+                correlation_id: id,
+                data: GossipData::DocumentPublishedNotification(payload),
+            })
+            .await?;
+
+        await_response(net_events, id, |event| {
+            match event {
+                NetEvent::GossipPublished { .. } => Some(Ok(())),
+                NetEvent::GossipPublishError { error, .. } => {
+                    Some(Err(anyhow::anyhow!("GossipPublished failed: {:?}", error)))
+                }
+                _ => None, // Unexpected event type, keep waiting
+            }
+        })
+        .await
+    }
 }
 
 impl Actor for DocumentPublisher {
@@ -142,7 +234,7 @@ impl Handler<PublishDocumentRequested> for DocumentPublisher {
         let rx = self.rx.clone();
         let topic = self.topic.clone();
         Box::pin(async move {
-            match handle_publish_document_requested(tx, rx, msg, topic).await {
+            match Self::handle_publish_document_requested(tx, rx, msg, topic).await {
                 Ok(_) => (),
                 Err(e) => {
                     error!(error=?e, "Could not handle publish document requested");
@@ -183,7 +275,7 @@ impl Handler<DocumentPublishedNotification> for DocumentPublisher {
         msg: DocumentPublishedNotification,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        match handle_document_published_notification(msg) {
+        match Self::handle_document_published_notification(msg) {
             Ok(_) => (),
             Err(e) => {
                 error!("{e}")
@@ -203,112 +295,6 @@ pub fn datetime_to_instant_from_now(target: DateTime<Utc>) -> Option<Instant> {
     let duration = target.signed_duration_since(now_datetime);
     let std_duration = duration.to_std().ok()?;
     now_instant.checked_add(std_duration)
-}
-
-/// Called when we receive a PublishDocumentRequested event
-pub async fn handle_publish_document_requested(
-    tx: mpsc::Sender<NetCommand>,
-    rx: Arc<broadcast::Receiver<NetEvent>>,
-    event: PublishDocumentRequested,
-    topic: impl Into<String>,
-) -> Result<()> {
-    let value = event.value;
-    let key = Cid::from_content(&value);
-    let expires = datetime_to_instant_from_now(event.meta.expires_at);
-    put_record(tx.clone(), rx.clone(), expires, value, key.clone()).await?;
-
-    broadcast_document_published_notification(
-        tx,
-        rx,
-        DocumentPublishedNotification {
-            meta: event.meta,
-            key,
-        },
-        topic,
-    )
-    .await?;
-
-    Ok(())
-}
-
-/// Called when we receive a notification from the net_interface
-pub fn handle_document_published_notification(_: DocumentPublishedNotification) -> Result<()> {
-    // tbc..
-    Ok(())
-}
-
-async fn put_record(
-    net_cmds: mpsc::Sender<NetCommand>,
-    net_events: Arc<broadcast::Receiver<NetEvent>>,
-    expires: Option<Instant>,
-    value: Vec<u8>,
-    key: Cid,
-) -> Result<()> {
-    let id = CorrelationId::new();
-    net_cmds
-        .send(NetCommand::DhtPutRecord {
-            correlation_id: id,
-            expires,
-            value,
-            key,
-        })
-        .await?;
-
-    let mut rx = net_events.resubscribe();
-
-    // NOTE: The following pattern we should generalize
-    loop {
-        match rx.recv().await {
-            Ok(NetEvent::DhtPutRecordSucceeded { correlation_id, .. }) if correlation_id == id => {
-                return Ok(());
-            }
-            Ok(NetEvent::DhtPutRecordError {
-                correlation_id,
-                error,
-            }) if correlation_id == id => {
-                return Err(anyhow::anyhow!("DHT put record failed: {:?}", error));
-            }
-            Ok(_) => continue, // Ignore events with non-matching IDs or other events
-            Err(broadcast::error::RecvError::Lagged(_)) => continue, // Receiver fell behind, keep trying
-            Err(e) => return Err(e.into()), // Channel closed or other error
-        }
-    }
-}
-
-async fn broadcast_document_published_notification(
-    net_cmds: mpsc::Sender<NetCommand>,
-    net_events: Arc<broadcast::Receiver<NetEvent>>,
-    payload: DocumentPublishedNotification,
-    topic: impl Into<String>,
-) -> Result<()> {
-    let id = CorrelationId::new();
-
-    net_cmds
-        .send(NetCommand::GossipPublish {
-            topic: topic.into(),
-            correlation_id: id,
-            data: GossipData::DocumentPublishedNotification(payload),
-        })
-        .await?;
-    let mut rx = net_events.resubscribe();
-
-    // NOTE: The following pattern we should generalize
-    loop {
-        match rx.recv().await {
-            Ok(NetEvent::GossipPublished { correlation_id, .. }) if correlation_id == id => {
-                return Ok(());
-            }
-            Ok(NetEvent::GossipPublishError {
-                correlation_id,
-                error,
-            }) if correlation_id == id => {
-                return Err(anyhow::anyhow!("GossipPublished failed: {:?}", error));
-            }
-            Ok(_) => continue, // Ignore events with non-matching IDs or other events
-            Err(broadcast::error::RecvError::Lagged(_)) => continue, // Receiver fell behind, keep trying
-            Err(e) => return Err(e.into()), // Channel closed or other error
-        }
-    }
 }
 
 #[cfg(test)]
@@ -398,6 +384,7 @@ mod tests {
         Ok(())
     }
 
+    // #[ignore]
     #[actix::test]
     async fn test_notified_of_document() -> Result<()> {
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();

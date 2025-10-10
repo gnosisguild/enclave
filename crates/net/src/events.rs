@@ -14,6 +14,7 @@ use libp2p::{
 };
 use serde::{Deserialize, Serialize};
 use std::{hash::Hash, sync::Arc, time::Instant};
+use tokio::sync::broadcast;
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -104,6 +105,19 @@ pub enum NetEvent {
     },
 }
 
+impl NetEvent {
+    pub fn correlation_id(&self) -> Option<CorrelationId> {
+        use NetEvent as N;
+        match self {
+            N::DhtGetRecordError { correlation_id, .. } => Some(*correlation_id),
+            N::DhtGetRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
+            N::DhtPutRecordError { correlation_id, .. } => Some(*correlation_id),
+            N::DhtPutRecordSucceeded { correlation_id, .. } => Some(*correlation_id),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum DhtGetRecordError {
     NotFound,
@@ -133,5 +147,34 @@ impl DocumentPublishedNotification {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).context("Could not deserialize DocumentPublishedNotification")
+    }
+}
+
+/// Generic helper for the command-response pattern with correlation IDs
+pub async fn await_response<F>(
+    net_events: Arc<broadcast::Receiver<NetEvent>>,
+    id: CorrelationId,
+    matcher: F,
+) -> Result<()>
+where
+    F: Fn(&NetEvent) -> Option<Result<()>>,
+{
+    let mut rx = net_events.resubscribe();
+
+    loop {
+        match rx.recv().await {
+            Ok(event) => {
+                // Only process events matching our correlation ID
+                if event.correlation_id() == Some(id) {
+                    if let Some(result) = matcher(&event) {
+                        return result;
+                    }
+                    // None means unexpected event type, keep waiting
+                }
+                // Ignore events with non-matching IDs
+            }
+            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(e) => return Err(e.into()),
+        }
     }
 }
