@@ -48,3 +48,5 @@ playwright-report/
 .enclave/config/ 
 .enclave/caches/
 cache_hardhat/
+
+!sdk/src/artifacts/ERC20Votes.json 

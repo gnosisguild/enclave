@@ -73,7 +73,6 @@ pub struct EncryptedVote {
     pub proof: Vec<u8>,
     pub public_inputs: Vec<[u8; 32]>,
     pub address: String,
-    pub proof_sem: Vec<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
