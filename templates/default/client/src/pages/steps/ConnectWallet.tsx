@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import React from 'react'
-import { ConnectKitButton } from 'connectkit'
 import { WalletIcon } from '@phosphor-icons/react'
 import CardContent from '../components/CardContent'
 
@@ -39,9 +38,6 @@ const ConnectWallet: React.FC = () => {
               committee.
             </p>
           </div>
-        </div>
-        <div className='flex justify-center pt-4'>
-          <ConnectKitButton />
         </div>
       </div>
     </CardContent>
