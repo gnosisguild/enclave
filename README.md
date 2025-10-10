@@ -25,6 +25,24 @@ Join the Enclave [Telegram group][telegram].
 
 See [CONTRIBUTING.md][contributing].
 
+## Development
+
+This section covers the essential commands for setting up and working with the Enclave codebase locally.
+
+```bash
+# Install dependencies
+pnpm i
+
+# Build the project
+pnpm build
+
+# Run tests
+pnpm test
+
+# Clean build artifacts
+pnpm clean
+```
+
 ### Contributors
 
 <!-- readme: contributors -start -->
@@ -214,6 +232,7 @@ pnpm bump:versions 1.0.0-beta.1
 ```
 
 This command automatically:
+
 - ✅ Validates working directory is clean
 - ✅ Updates version in `Cargo.toml` (workspace version)
 - ✅ Updates version in all npm `package.json` files
@@ -250,12 +269,12 @@ Once the tag is pushed, GitHub Actions automatically:
    - macOS (x86_64, aarch64)
 3. **Runs** all tests
 4. **Publishes** packages:
-    * All versions (stable and pre-release):
-        * ✅ Publishes to crates.io
-        * ✅ Publishes to npm
-    * Tag differences:
-        * Stable (`v1.0.0`): npm `latest` tag, updates `stable` git tag
-        * Pre-release (`v1.0.0-beta.1`): npm `next` tag, no `stable` tag update
+   - All versions (stable and pre-release):
+     - ✅ Publishes to crates.io
+     - ✅ Publishes to npm
+   - Tag differences:
+     - Stable (`v1.0.0`): npm `latest` tag, updates `stable` git tag
+     - Pre-release (`v1.0.0-beta.1`): npm `next` tag, no `stable` tag update
 5. **Creates** GitHub Release with:
    - Binary downloads for all platforms
    - Release notes from CHANGELOG.md
@@ -277,21 +296,27 @@ Enclave follows [Semantic Versioning](https://semver.org/):
 ### Which Version Should I Use?
 
 #### For Production (Mainnet)
+
 Use stable versions only:
+
 ```bash
 enclaveup install              # Latest stable
 enclaveup install v1.0.0       # Specific stable version
 ```
 
 #### For Testing (Testnet)
+
 You can use pre-release versions:
+
 ```bash
 enclaveup install --pre-release # Latest pre-release
 enclaveup install v1.0.0-beta.1 # Specific pre-release
 ```
 
 #### For Development
+
 Build from source:
+
 ```bash
 git clone https://github.com/gnosisguild/enclave.git
 cd enclave
@@ -363,11 +388,13 @@ pnpm bump:versions --help
 If a release has issues:
 
 1. **Mark as deprecated on npm**:
+
    ```bash
    npm deprecate @enclave/sdk@1.0.0 "Critical bug, use 1.0.1"
    ```
 
 2. **Yank from crates.io** (if critical):
+
    ```bash
    cargo yank --version 1.0.0 enclave
    ```
@@ -401,4 +428,3 @@ This repo created under the [LGPL-3.0+ license](LICENSE).
 [crisp]: https://docs.enclave.gg/CRISP/introduction
 [telegram]: https://t.me/+raYAZgrwgOw2ODJh
 [contributing]: CONTRIBUTING.md
-
