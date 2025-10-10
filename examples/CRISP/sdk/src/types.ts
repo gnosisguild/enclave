@@ -56,7 +56,7 @@ export interface ITokenDetails {
 /**
  * Interface representing a Merkle proof
  */
-export interface MerkleProof {
+export interface IMerkleProof {
   leaf: bigint
   index: number
   proof: LeanIMTMerkleProof<bigint>

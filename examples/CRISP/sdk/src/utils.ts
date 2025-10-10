@@ -7,7 +7,7 @@
 import { poseidon2 } from 'poseidon-lite'
 import { LeanIMT } from '@zk-kit/lean-imt'
 
-import type { MerkleProof } from './types'
+import type { IMerkleProof } from './types'
 
 /**
  * Hash a leaf node for the Merkle tree
@@ -30,8 +30,12 @@ export const generateMerkleTree = (leaves: bigint[]): LeanIMT => {
 
 /**
  * Generate a Merkle proof for a given address to prove inclusion in the voters' list
+ * @param threshold The minimum balance required to be eligible
+ * @param balance The voter's balance
+ * @param address The voter's address
+ * @param leaves The leaves of the Merkle tree
  */
-export const generateMerkleProof = (threshold: number, balance: number, address: string, leaves: bigint[]): MerkleProof => {
+export const generateMerkleProof = (threshold: number, balance: number, address: string, leaves: bigint[]): IMerkleProof => {
   if (balance < threshold) {
     throw new Error('Balance is below the threshold')
   }

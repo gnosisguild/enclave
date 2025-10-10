@@ -9,14 +9,13 @@ import { CRISP_SERVER_TOKEN_TREE_ENDPOINT } from './constants'
 import ERC20Votes from './artifacts/ERC20Votes.json'
 import { createPublicClient, http } from 'viem'
 import { localhost, sepolia } from 'viem/chains'
-import { MerkleProof } from './types'
 
 /**
  * Get the merkle tree data from the CRISP server
  * @param serverUrl - The base URL of the CRISP server
  * @param e3Id - The e3Id of the round
  */
-export const getTreeData = async (serverUrl: string, e3Id: number) => {
+export const getTreeData = async (serverUrl: string, e3Id: number): Promise<bigint[]> => {
   const response = await fetch(`${serverUrl}/${CRISP_SERVER_TOKEN_TREE_ENDPOINT}`, {
     method: 'POST',
     headers: {
@@ -25,9 +24,16 @@ export const getTreeData = async (serverUrl: string, e3Id: number) => {
     body: JSON.stringify({ round_id: e3Id }),
   })
 
-  const hashes = await response.json()
+  const hashes = (await response.json()) as string[]
 
-  return hashes
+  // Convert hex strings to BigInts
+  return hashes.map((hash) => {
+    // Ensure the hash is treated as a hex string
+    if (!hash.startsWith('0x')) {
+      return BigInt('0x' + hash)
+    }
+    return BigInt(hash)
+  })
 }
 
 /**

@@ -7,5 +7,6 @@
 export * from './token'
 export * from './state'
 export * from './constants'
+export * from './utils'
 
-export type { IRoundDetails, ITokenDetails } from './types'
+export type { IRoundDetails, IRoundDetailsResponse, ITokenDetails, IMerkleProof } from './types'
