@@ -10,7 +10,7 @@
 // - [x] Take the payload and convert to NetCommand::DhtPutRecord
 // - [-] Accept NetEvent::GossipData(GossipData::DocumentPublishedNotification) from NetInterface
 //       Determine if we are keeping track of the given e3_id based on DocumentMeta
-//       and the e3_id blume filter if so then issue a NetCommand::DhtGetRecord
+//       and the e3_id hashset if so then issue a NetCommand::DhtGetRecord
 // - [ ] Receive the document from NetEvent::FetchDocumentSucceeded and convert to
 //        EnclaveEvent::DocumentReceived
 // - [ ] Accept NetEvent::DhtGetRecordError and attempt to retry with exponential backoff
@@ -24,8 +24,11 @@ use crate::{
 use actix::prelude::*;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use e3_events::{CorrelationId, EnclaveEvent, EventBus, PublishDocumentRequested, Subscribe};
-use std::{sync::Arc, time::Instant};
+use e3_events::{
+    CiphernodeSelected, CorrelationId, E3RequestComplete, E3id, EnclaveEvent, EventBus,
+    PublishDocumentRequested, Subscribe,
+};
+use std::{collections::HashSet, sync::Arc, time::Instant};
 use tokio::sync::{broadcast, mpsc};
 use tracing::error;
 
@@ -44,6 +47,8 @@ pub struct DocumentPublisher {
     rx: Arc<broadcast::Receiver<NetEvent>>,
     /// The gossipsub broadcast topic
     topic: String,
+    /// Set of E3ids we are interested in
+    ids: HashSet<E3id>,
 }
 
 impl DocumentPublisher {
@@ -59,6 +64,7 @@ impl DocumentPublisher {
             tx: tx.clone(),
             rx: rx.clone(),
             topic: topic.into(),
+            ids: HashSet::new(),
         }
     }
 
@@ -100,6 +106,16 @@ impl DocumentPublisher {
 
         addr
     }
+
+    fn handle_ciphernode_selected(&mut self, event: CiphernodeSelected) -> Result<()> {
+        self.ids.insert(event.e3_id);
+        Ok(())
+    }
+
+    fn handle_e3_request_complete(&mut self, event: E3RequestComplete) -> Result<()> {
+        self.ids.remove(&event.e3_id);
+        Ok(())
+    }
 }
 
 impl Actor for DocumentPublisher {
@@ -111,6 +127,8 @@ impl Handler<EnclaveEvent> for DocumentPublisher {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             EnclaveEvent::PublishDocumentRequested { data, .. } => ctx.notify(data),
+            EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
+            EnclaveEvent::E3RequestComplete { data, .. } => ctx.notify(data),
             _ => (),
         }
     }
@@ -134,14 +152,43 @@ impl Handler<PublishDocumentRequested> for DocumentPublisher {
     }
 }
 
+impl Handler<CiphernodeSelected> for DocumentPublisher {
+    type Result = ();
+    fn handle(&mut self, msg: CiphernodeSelected, _ctx: &mut Self::Context) -> Self::Result {
+        match self.handle_ciphernode_selected(msg) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("{e}")
+            }
+        }
+    }
+}
+
+impl Handler<E3RequestComplete> for DocumentPublisher {
+    type Result = ();
+    fn handle(&mut self, msg: E3RequestComplete, _ctx: &mut Self::Context) -> Self::Result {
+        match self.handle_e3_request_complete(msg) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("{e}")
+            }
+        }
+    }
+}
+
 impl Handler<DocumentPublishedNotification> for DocumentPublisher {
     type Result = ();
     fn handle(
         &mut self,
-        _msg: DocumentPublishedNotification,
+        msg: DocumentPublishedNotification,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        // tbc...
+        match handle_document_published_notification(msg) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("{e}")
+            }
+        }
     }
 }
 
