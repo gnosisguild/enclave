@@ -42,9 +42,8 @@ At this point, you should have all the tools required to develop and deploy an a
 
 ### Install Metamask
 
-You can add Metamask as extension to your browser following the official
+You can add Metamask as an extension to your browser following the official
 [documentation](https://metamask.io).
-
 ### Install the Enclave CLI
 
 The easiest way to install the Enclave CLI is using our installer script:
