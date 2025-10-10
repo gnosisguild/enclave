@@ -8,12 +8,8 @@ pragma solidity >=0.8.27;
 import {IRiscZeroVerifier} from "risc0/IRiscZeroVerifier.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
-import {IBasePolicy} from "@excubiae/contracts/interfaces/IBasePolicy.sol";
-import {ISemaphore} from "@hashcloak/semaphore-contracts-noir/interfaces/ISemaphoreNoir.sol";
 import {IInputValidator} from "@enclave-e3/contracts/contracts/interfaces/IInputValidator.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
-import {CRISPCheckerFactory} from "./CRISPCheckerFactory.sol";
-import {CRISPPolicyFactory} from "./CRISPPolicyFactory.sol";
 import {CRISPInputValidatorFactory} from "./CRISPInputValidatorFactory.sol";
 import {HonkVerifier} from "./CRISPVerifier.sol";
 
@@ -24,20 +20,13 @@ contract CRISPProgram is IE3Program, Ownable {
     // State variables
     IEnclave public enclave;
     IRiscZeroVerifier public verifier;
-    ISemaphore public semaphore;
-    CRISPCheckerFactory private immutable CHECKER_FACTORY;
-    CRISPPolicyFactory private immutable POLICY_FACTORY;
     CRISPInputValidatorFactory private immutable INPUT_VALIDATOR_FACTORY;
     HonkVerifier private immutable HONK_VERIFIER;
-    uint8 public constant INPUT_LIMIT = 100;
     bytes32 public imageId;
 
     // Mappings
     mapping(address => bool) public authorizedContracts;
     mapping(uint256 e3Id => bytes32 paramsHash) public paramsHashes;
-    mapping(uint256 e3Id => uint256 groupId) public groupIds;
-    mapping(uint256 groupId => mapping(uint256 identityCommitment => bool))
-        public committed;
 
     // Events
     event InputValidatorUpdated(address indexed newValidator);
@@ -48,41 +37,24 @@ contract CRISPProgram is IE3Program, Ownable {
     error E3DoesNotExist();
     error EnclaveAddressZero();
     error VerifierAddressZero();
-    error SemaphoreAddressZero();
-    error InvalidPolicyFactory();
-    error InvalidCheckerFactory();
     error InvalidInputValidatorFactory();
     error InvalidHonkVerifier();
-    error GroupDoesNotExist();
-    error AlreadyRegistered();
 
     /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
     /// @param _enclave The enclave address
     /// @param _verifier The RISC Zero verifier address
-    /// @param _semaphore The Semaphore address
-    /// @param _checkerFactory The checker factory address
-    /// @param _policyFactory The policy factory address
     /// @param _inputValidatorFactory The input validator factory address
     /// @param _honkVerifier The honk verifier address
     /// @param _imageId The image ID for the guest program
     constructor(
         IEnclave _enclave,
         IRiscZeroVerifier _verifier,
-        ISemaphore _semaphore,
-        CRISPCheckerFactory _checkerFactory,
-        CRISPPolicyFactory _policyFactory,
         CRISPInputValidatorFactory _inputValidatorFactory,
         HonkVerifier _honkVerifier,
         bytes32 _imageId
     ) Ownable(msg.sender) {
         require(address(_enclave) != address(0), EnclaveAddressZero());
         require(address(_verifier) != address(0), VerifierAddressZero());
-        require(address(_semaphore) != address(0), SemaphoreAddressZero());
-        require(
-            address(_checkerFactory) != address(0),
-            InvalidCheckerFactory()
-        );
-        require(address(_policyFactory) != address(0), InvalidPolicyFactory());
         require(
             address(_inputValidatorFactory) != address(0),
             InvalidInputValidatorFactory()
@@ -91,9 +63,6 @@ contract CRISPProgram is IE3Program, Ownable {
 
         enclave = _enclave;
         verifier = _verifier;
-        semaphore = _semaphore;
-        CHECKER_FACTORY = _checkerFactory;
-        POLICY_FACTORY = _policyFactory;
         INPUT_VALIDATOR_FACTORY = _inputValidatorFactory;
         HONK_VERIFIER = _honkVerifier;
         authorizedContracts[address(_enclave)] = true;
@@ -110,19 +79,6 @@ contract CRISPProgram is IE3Program, Ownable {
     /// @param _verifier The new RISC Zero verifier address
     function setVerifier(IRiscZeroVerifier _verifier) external onlyOwner {
         verifier = _verifier;
-    }
-
-    /// @notice Register a Member to the semaphore group
-    /// @param e3Id The E3 program ID
-    /// @param identityCommitment The identity commitment
-    function registerMember(uint256 e3Id, uint256 identityCommitment) external {
-        require(paramsHashes[e3Id] != bytes32(0), GroupDoesNotExist());
-        uint256 groupId = groupIds[e3Id];
-
-        require(!committed[groupId][identityCommitment], AlreadyRegistered());
-        committed[groupId][identityCommitment] = true;
-
-        semaphore.addMember(groupId, identityCommitment);
     }
 
     /// @notice Get the params hash for an E3 program
@@ -148,27 +104,14 @@ contract CRISPProgram is IE3Program, Ownable {
         require(paramsHashes[e3Id] == bytes32(0), E3AlreadyInitialized());
         paramsHashes[e3Id] = keccak256(e3ProgramParams);
 
-        // Create a new group
-        uint256 groupId = semaphore.createGroup(address(this));
-        groupIds[e3Id] = groupId;
-
-        // Deploy a new checker
-        address checker = CHECKER_FACTORY.deploy(address(semaphore), groupId);
-
-        // Deploy a new policy
-        IBasePolicy policy = IBasePolicy(
-            POLICY_FACTORY.deploy(checker, INPUT_LIMIT)
-        );
-
         // Deploy a new input validator
         inputValidator = IInputValidator(
             INPUT_VALIDATOR_FACTORY.deploy(
-                address(policy),
-                address(HONK_VERIFIER)
+                address(HONK_VERIFIER),
+                owner()
             )
         );
-        policy.setTarget(address(inputValidator));
-
+       
         return (ENCRYPTION_SCHEME_ID, inputValidator);
     }
 

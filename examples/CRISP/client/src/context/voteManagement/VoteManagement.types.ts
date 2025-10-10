@@ -13,11 +13,6 @@ export type VoteManagementContextType = {
   isLoading: boolean
   user: { address: string } | null
   semaphoreIdentity: Identity | null
-  isRegistering: boolean
-  isRegisteredForCurrentRound: boolean
-  fetchingMembers: boolean
-  currentGroupMembers: string[]
-  currentSemaphoreGroupId: bigint | null
   votingRound: VotingRound | null
   roundEndDate: Date | null
   pollOptions: Poll[]
@@ -35,7 +30,6 @@ export type VoteManagementContextType = {
   setVotingRound: React.Dispatch<React.SetStateAction<VotingRound | null>>
   setUser: React.Dispatch<React.SetStateAction<{ address: string } | null>>
   encryptVote: (voteId: bigint, publicKey: Uint8Array) => Promise<EncryptedVote | undefined>
-  registerIdentityOnContract: () => void
   broadcastVote: (vote: BroadcastVoteRequest) => Promise<BroadcastVoteResponse | undefined>
   getRoundStateLite: (roundCount: number) => Promise<void>
   setPastPolls: React.Dispatch<React.SetStateAction<PollResult[]>>

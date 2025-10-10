@@ -16,7 +16,6 @@ import { convertPollData, convertTimestampToDate } from '@/utils/methods'
 import { Poll, PollResult } from '@/model/poll.model'
 import { generatePoll } from '@/utils/generate-random-poll'
 import { handleGenericError } from '@/utils/handle-generic-error'
-import { useSemaphoreGroupManagement } from '@/hooks/semaphore/useSemaphoreGroupManagement'
 
 const [useVoteManagementContext, VoteManagementContextProvider] = createGenericContext<VoteManagementContextType>()
 
@@ -52,15 +51,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
     getCurrentRound,
     broadcastVote,
   } = useEnclaveServer()
-
-  const {
-    groupId: currentSemaphoreGroupId,
-    groupMembers: currentGroupMembers,
-    isFetchingMembers: fetchingMembers,
-    isRegistering,
-    isCommitted: isRegisteredForCurrentRound,
-    registerIdentity: registerIdentityOnContract,
-  } = useSemaphoreGroupManagement(roundState?.id, roundState?.start_block, semaphoreIdentity)
 
   const initialLoad = async () => {
     console.log('Loading wasm')
@@ -149,11 +139,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
         user,
         semaphoreIdentity,
         votingRound,
-        isRegistering,
-        fetchingMembers,
-        currentSemaphoreGroupId,
-        currentGroupMembers,
-        isRegisteredForCurrentRound,
         roundEndDate,
         pollOptions,
         roundState,
@@ -171,7 +156,6 @@ const VoteManagementProvider = ({ children }: VoteManagementProviderProps) => {
         setPollOptions,
         initialLoad,
         broadcastVote,
-        registerIdentityOnContract,
         setVotingRound,
         setUser,
         encryptVote,
