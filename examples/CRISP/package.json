@@ -14,7 +14,6 @@
     "dev:setup": "bash ./scripts/setup.sh",
     "dev:build": "bash ./scripts/build.sh",
     "dev:up": "bash ./scripts/dev.sh",
-    "dev:down": "bash ./scripts/clean.sh",
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "test": "pnpm test:e2e",
     "test:contracts": "hardhat test tests/crisp.contracts.test.ts --network localhost",
