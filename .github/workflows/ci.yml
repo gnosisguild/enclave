@@ -67,8 +67,51 @@ jobs:
       - name: Checking code format ciphernode
         run: pnpm ciphernode:lint
 
-      - name: Run tests
-        run: "pnpm ciphernode:test"
+      - name: Run Unit Tests
+        run: "cargo test --lib && cargo test --doc"
+
+  rust_integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.86.0
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.86.0
+
+        # We must install foundry in order to be able to test anvil
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
+
+        # We need to setup node in order to compile the hardhat contracts to get the artifacts
+      - name: "Setup node"
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+
+      - name: pnpm-setup
+        uses: pnpm/action-setup@v4
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: "Install the dependencies"
+        run: "pnpm install"
+
+      - name: Checking code format ciphernode
+        run: pnpm ciphernode:lint
+
+      - name: Run Integration Tests
+        run: "cargo test --test integration -- --nocapture && cargo test --test integration_legacy -- --nocapture"
 
   build_e3_support_risc0:
     runs-on: ubuntu-latest
@@ -205,6 +248,11 @@ jobs:
         with:
           path: "**/node_modules"
           key: ${{ runner.os }}-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
       - name: "Install the dependencies"
         run: "pnpm install"
       - name: "Lint the code"
@@ -320,6 +368,11 @@ jobs:
             target/
           key: rust-deps-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: rust-deps-
+      - name: Install solc
+        run: |
+          sudo add-apt-repository ppa:ethereum/ethereum \
+          && sudo apt-get update -y \
+          && sudo apt-get install -y solc
       - name: Build enclave CLI
         run: cargo install --locked --path crates/cli --bin enclave
       - name: Upload enclave binary

@@ -3,7 +3,8 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-use std::sync::Arc;
 
-/// Reference count bytes so event can be cloned and shared between threads
-pub type Bytes = Arc<Vec<u8>>;
+mod ciphernode;
+mod ciphernode_builder;
+pub use ciphernode::*;
+pub use ciphernode_builder::*;

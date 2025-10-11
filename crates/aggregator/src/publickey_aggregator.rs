@@ -11,30 +11,31 @@ use e3_events::{
     Die, E3id, EnclaveEvent, EventBus, KeyshareCreated, OrderedSet, PublicKeyAggregated, Seed,
 };
 use e3_fhe::{Fhe, GetAggregatePublicKey};
-use e3_sortition::{GetHasNode, GetNodes, Sortition};
+use e3_sortition::{GetNodeIndex, GetNodes, Sortition};
+use e3_utils::ArcBytes;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, trace};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublicKeyAggregatorState {
     Collecting {
-        threshold_m: usize,
-        keyshares: OrderedSet<Vec<u8>>,
+        threshold_n: usize,
+        keyshares: OrderedSet<ArcBytes>,
         seed: Seed,
     },
     Computing {
-        keyshares: OrderedSet<Vec<u8>>,
+        keyshares: OrderedSet<ArcBytes>,
     },
     Complete {
         public_key: Vec<u8>,
-        keyshares: OrderedSet<Vec<u8>>,
+        keyshares: OrderedSet<ArcBytes>,
     },
 }
 
 impl PublicKeyAggregatorState {
-    pub fn init(threshold_m: usize, seed: Seed) -> Self {
+    pub fn init(threshold_n: usize, seed: Seed) -> Self {
         PublicKeyAggregatorState::Collecting {
-            threshold_m,
+            threshold_n,
             keyshares: OrderedSet::new(),
             seed,
         }
@@ -44,7 +45,7 @@ impl PublicKeyAggregatorState {
 #[derive(Message)]
 #[rtype(result = "anyhow::Result<()>")]
 struct ComputeAggregate {
-    pub keyshares: OrderedSet<Vec<u8>>,
+    pub keyshares: OrderedSet<ArcBytes>,
     pub e3_id: E3id,
 }
 
@@ -90,18 +91,19 @@ impl PublicKeyAggregator {
         }
     }
 
-    pub fn add_keyshare(&mut self, keyshare: Vec<u8>) -> Result<()> {
+    pub fn add_keyshare(&mut self, keyshare: ArcBytes) -> Result<()> {
         self.state.try_mutate(|mut state| {
             let PublicKeyAggregatorState::Collecting {
-                threshold_m,
+                threshold_n,
                 keyshares,
                 ..
             } = &mut state
             else {
                 return Err(anyhow::anyhow!("Can only add keyshare in Collecting state"));
             };
+
             keyshares.insert(keyshare);
-            if keyshares.len() == *threshold_m {
+            if keyshares.len() == *threshold_n {
                 return Ok(PublicKeyAggregatorState::Computing {
                     keyshares: keyshares.clone(),
                 });
@@ -147,14 +149,14 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
     fn handle(&mut self, event: KeyshareCreated, _: &mut Self::Context) -> Self::Result {
         let Some(PublicKeyAggregatorState::Collecting {
-            threshold_m, seed, ..
+            threshold_n, seed, ..
         }) = self.state.get()
         else {
             error!(state=?self.state, "Aggregator has been closed for collecting keyshares.");
             return Box::pin(fut::ready(Ok(())));
         };
 
-        let size = threshold_m;
+        let size = threshold_n;
         let address = event.node;
         let chain_id = event.e3_id.chain_id();
         let e3_id = event.e3_id.clone();
@@ -162,7 +164,7 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
 
         Box::pin(
             self.sortition
-                .send(GetHasNode {
+                .send(GetNodeIndex {
                     chain_id,
                     address,
                     size,
@@ -172,11 +174,11 @@ impl Handler<KeyshareCreated> for PublicKeyAggregator {
                 .map(move |res, act, ctx| {
                     // NOTE: Returning Ok(()) on errors as we probably dont need a result type here since
                     // we will not be doing a send
-                    let has_node = res?;
-                    if !has_node {
-                        error!("Node not found in committee");
+                    let maybe_found_index = res?;
+                    let Some(_) = maybe_found_index else {
+                        trace!("Node not found in committee");
                         return Ok(());
-                    }
+                    };
 
                     if e3_id != act.e3_id {
                         error!("Wrong e3_id sent to aggregator. This should not happen.");
@@ -233,8 +235,10 @@ impl Handler<NotifyNetwork> for PublicKeyAggregator {
                 .map(move |res, act, _| {
                     let nodes = res?;
 
+                    let pubkey = msg.pubkey.clone();
+
                     let event = EnclaveEvent::from(PublicKeyAggregated {
-                        pubkey: msg.pubkey.clone(),
+                        pubkey,
                         e3_id: msg.e3_id.clone(),
                         nodes: OrderedSet::from(nodes),
                     });

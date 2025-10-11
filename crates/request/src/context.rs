@@ -21,6 +21,7 @@ use std::{collections::HashMap, sync::Arc};
 fn init_recipients() -> HashMap<String, Option<Recipient<EnclaveEvent>>> {
     HashMap::from([
         ("keyshare".to_owned(), None),
+        ("threshold_keyshare".to_owned(), None),
         ("plaintext".to_owned(), None),
         ("publickey".to_owned(), None),
     ])

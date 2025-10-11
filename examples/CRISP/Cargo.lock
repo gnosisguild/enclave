@@ -2475,7 +2475,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -2500,7 +2500,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -2522,7 +2522,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -2530,7 +2530,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",

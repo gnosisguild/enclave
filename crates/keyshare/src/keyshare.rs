@@ -13,6 +13,7 @@ use e3_events::{
     E3RequestComplete, EnclaveErrorType, EnclaveEvent, EventBus, FromError, KeyshareCreated,
 };
 use e3_fhe::{DecryptCiphertext, Fhe};
+use e3_utils::utility_types::ArcBytes;
 use std::sync::Arc;
 use tracing::warn;
 
@@ -138,8 +139,16 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
             return;
         };
 
+        let Some(ciphertext) = ciphertext_output.first() else {
+            self.bus.err(
+                EnclaveErrorType::Decryption,
+                anyhow!("Ciphernode output array is empty!"),
+            );
+            return;
+        };
+
         let Ok(decryption_share) = self.fhe.decrypt_ciphertext(DecryptCiphertext {
-            ciphertext: ciphertext_output.clone(),
+            ciphertext: ciphertext.extract_bytes(),
             unsafe_secret: secret,
         }) else {
             self.bus.err(
@@ -150,8 +159,9 @@ impl Handler<CiphertextOutputPublished> for Keyshare {
         };
 
         self.bus.do_send(EnclaveEvent::from(DecryptionshareCreated {
+            party_id: 0, // Not used
             e3_id,
-            decryption_share,
+            decryption_share: vec![ArcBytes::from_bytes(decryption_share)],
             node: self.address.clone(),
         }));
     }
