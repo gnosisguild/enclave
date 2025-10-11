@@ -17,10 +17,18 @@ use crate::E3id;
 
 pub type PartyId = u64;
 
+/// Diambiguates the kind of document we are looking for
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DocumentKind {
+    TrBFV,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DocumentMeta {
     /// We will only be interested in e3_ids we are included within
     pub e3_id: E3id,
+    /// The kind of document we are looking for
+    pub kind: DocumentKind,
     /// Filter based on specific ids or a range of ids who might be interested in the document.
     /// Empty Vector means there is no filter
     /// We need this to denote when payloads are too big and must be split between DHT documents
@@ -33,13 +41,15 @@ pub struct DocumentMeta {
 impl DocumentMeta {
     pub fn new(
         e3_id: E3id,
+        kind: DocumentKind,
         filter: Vec<Filter<PartyId>>,
         expires_at: DateTime<Utc>,
     ) -> DocumentMeta {
         Self {
             e3_id,
-            filter,
             expires_at,
+            filter,
+            kind,
         }
     }
 }

@@ -311,8 +311,8 @@ mod tests {
     use crate::events::NetCommand;
     use anyhow::{bail, Result};
     use e3_events::{
-        CiphernodeSelected, DocumentMeta, E3id, EnclaveEvent, EventBus, EventBusConfig,
-        PublishDocumentRequested,
+        CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveEvent, EventBus,
+        EventBusConfig, PublishDocumentRequested,
     };
     use tokio::{
         sync::{broadcast, mpsc},
@@ -334,7 +334,7 @@ mod tests {
 
         // 1. Send a request to publish
         bus.do_send(EnclaveEvent::from(PublishDocumentRequested {
-            meta: DocumentMeta::new(e3_id, vec![], expires_at),
+            meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
         }));
 
@@ -415,7 +415,7 @@ mod tests {
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: Cid::from_content(&b"wrong document".to_vec()),
-                meta: DocumentMeta::new(e3_id.clone(), vec![], expires_at),
+                meta: DocumentMeta::new(e3_id.clone(), DocumentKind::TrBFV, vec![], expires_at),
             }),
         ))?;
 
@@ -428,7 +428,7 @@ mod tests {
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: cid.clone(),
-                meta: DocumentMeta::new(e3_id, vec![], expires_at),
+                meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             }),
         ))?;
 
