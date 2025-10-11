@@ -14,7 +14,7 @@ use libp2p::{
 };
 use serde::{Deserialize, Serialize};
 use std::{hash::Hash, sync::Arc, time::Instant};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -34,6 +34,7 @@ impl GossipData {
 }
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
+#[derive(Clone, Debug)]
 pub enum NetCommand {
     /// Publish message to gossipsub
     GossipPublish {
@@ -55,6 +56,17 @@ pub enum NetCommand {
         correlation_id: CorrelationId,
         key: Cid,
     },
+}
+
+impl NetCommand {
+    pub fn correlation_id(&self) -> Option<CorrelationId> {
+        use NetCommand as N;
+        match self {
+            N::DhtPutRecord { correlation_id, .. } => Some(*correlation_id),
+            N::DhtGetRecord { correlation_id, .. } => Some(*correlation_id),
+            _ => None,
+        }
+    }
 }
 
 /// NetEvents are broadcast over a broadcast channel to whom ever wishes to listen
@@ -151,15 +163,27 @@ impl DocumentPublishedNotification {
 }
 
 /// Generic helper for the command-response pattern with correlation IDs
-pub async fn await_response<F>(
+/// TODO: The loop is fine as a "wait for my correlation id" gate, but there’s a race since we resubscribe after send so if the publish ack is emitted immediately we can miss it and loop forever.
+pub async fn call_and_await_response<F>(
+    net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
-    id: CorrelationId,
+    command: NetCommand,
     matcher: F,
 ) -> Result<()>
 where
     F: Fn(&NetEvent) -> Option<Result<()>>,
 {
+    // Resubscribe first to avoid missing events
     let mut rx = net_events.resubscribe();
+
+    let Some(id) = command.correlation_id() else {
+        return Err(anyhow::anyhow!(format!(
+            "Command must have a correlation_id but {:?} this does not",
+            command
+        )));
+    };
+
+    net_cmds.send(command).await?;
 
     loop {
         match rx.recv().await {

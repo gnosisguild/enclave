@@ -18,7 +18,9 @@
 #![allow(dead_code)]
 
 use crate::{
-    events::{await_response, DocumentPublishedNotification, GossipData, NetCommand, NetEvent},
+    events::{
+        call_and_await_response, DocumentPublishedNotification, GossipData, NetCommand, NetEvent,
+    },
     Cid,
 };
 use actix::prelude::*;
@@ -159,24 +161,25 @@ impl DocumentPublisher {
         key: Cid,
     ) -> Result<()> {
         let id = CorrelationId::new();
-        net_cmds
-            .send(NetCommand::DhtPutRecord {
+        call_and_await_response(
+            net_cmds,
+            net_events,
+            NetCommand::DhtPutRecord {
                 correlation_id: id,
                 expires,
                 value,
                 key,
-            })
-            .await?;
-
-        await_response(net_events, id, |event| {
-            match event {
-                NetEvent::DhtPutRecordSucceeded { .. } => Some(Ok(())),
-                NetEvent::DhtPutRecordError { error, .. } => {
-                    Some(Err(anyhow::anyhow!("DHT put record failed: {:?}", error)))
+            },
+            |event| {
+                match event {
+                    NetEvent::DhtPutRecordSucceeded { .. } => Some(Ok(())),
+                    NetEvent::DhtPutRecordError { error, .. } => {
+                        Some(Err(anyhow::anyhow!("DHT put record failed: {:?}", error)))
+                    }
+                    _ => None, // Unexpected event type, keep waiting
                 }
-                _ => None, // Unexpected event type, keep waiting
-            }
-        })
+            },
+        )
         .await
     }
 
@@ -189,23 +192,24 @@ impl DocumentPublisher {
     ) -> Result<()> {
         let id = CorrelationId::new();
 
-        net_cmds
-            .send(NetCommand::GossipPublish {
+        call_and_await_response(
+            net_cmds,
+            net_events,
+            NetCommand::GossipPublish {
                 topic: topic.into(),
                 correlation_id: id,
                 data: GossipData::DocumentPublishedNotification(payload),
-            })
-            .await?;
-
-        await_response(net_events, id, |event| {
-            match event {
-                NetEvent::GossipPublished { .. } => Some(Ok(())),
-                NetEvent::GossipPublishError { error, .. } => {
-                    Some(Err(anyhow::anyhow!("GossipPublished failed: {:?}", error)))
+            },
+            |event| {
+                match event {
+                    NetEvent::GossipPublished { .. } => Some(Ok(())),
+                    NetEvent::GossipPublishError { error, .. } => {
+                        Some(Err(anyhow::anyhow!("GossipPublished failed: {:?}", error)))
+                    }
+                    _ => None, // Unexpected event type, keep waiting
                 }
-                _ => None, // Unexpected event type, keep waiting
-            }
-        })
+            },
+        )
         .await
     }
 }
