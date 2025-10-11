@@ -207,23 +207,18 @@ interface ISlashingManager {
     );
 
     /**
-     * @notice Emitted when a node is banned from the network
-     * @param node Address of the banned node
-     * @param reason Hash of the reason for banning
-     * @param banner Address that executed the ban (governance or contract)
+     * @notice Emitted when a node is banned or unbanned from the network
+     * @param node Address of the node
+     * @param status Whether the node is banned
+     * @param reason Hash of the reason for banning or unbanning
+     * @param updater Address that executed the ban (governance or contract)
      */
-    event NodeBanned(
+    event NodeBanUpdated(
         address indexed node,
+        bool status,
         bytes32 indexed reason,
-        address banner
+        address updater
     );
-
-    /**
-     * @notice Emitted when a previously banned node is unbanned
-     * @param node Address of the unbanned node
-     * @param unbanner Address of the governance account that unbanned the node
-     */
-    event NodeUnbanned(address indexed node, address unbanner);
 
     // ======================
     // View Functions
@@ -410,29 +405,22 @@ interface ISlashingManager {
     // ======================
 
     /**
-     * @notice Bans a node from the network
+     * @notice Bans or unbans a node from the network
      * @dev Only callable by GOVERNANCE_ROLE. Bans can also occur automatically via executeSlash
      * @param node Address of the node to ban (must be non-zero)
+     * @param status Whether to ban the node
      * @param reason Hash of the reason for banning
      * Requirements:
      * - node must not be zero address
      * - Caller must have GOVERNANCE_ROLE
      * Effects:
-     * - Sets banned[node] to true
-     * - Emits NodeBanned event
+     * - Sets banned[node] to status
+     * - Emits NodeBanned event if status is true
+     * - Emits NodeUnbanned event if status is false
      */
-    function banNode(address node, bytes32 reason) external;
-
-    /**
-     * @notice Removes a ban from a previously banned node
-     * @dev Only callable by GOVERNANCE_ROLE
-     * @param node Address of the node to unban (must be non-zero)
-     * Requirements:
-     * - node must not be zero address
-     * - Caller must have GOVERNANCE_ROLE
-     * Effects:
-     * - Sets banned[node] to false
-     * - Emits NodeUnbanned event
-     */
-    function unbanNode(address node) external;
+    function updateBanStatus(
+        address node,
+        bool status,
+        bytes32 reason
+    ) external;
 }

@@ -183,12 +183,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param e3Id The ID of the E3.
     error PlaintextOutputAlreadyPublished(uint256 e3Id);
 
-    /// @notice Thrown when the caller has insufficient token balance.
-    error InsufficientBalance();
-
-    /// @notice Thrown when the contract has insufficient token allowance.
-    error InsufficientAllowance();
-
     /// @notice Thrown when attempting to set an invalid bonding registry address.
     /// @param bondingRegistry The invalid bonding registry address.
     error InvalidBondingRegistry(IBondingRegistry bondingRegistry);
@@ -265,7 +259,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         E3RequestParams calldata requestParams
     ) external returns (uint256 e3Id, E3 memory e3) {
         uint256 e3Fee = getE3Quote(requestParams);
-        require(e3Fee > 0, PaymentRequired(e3Fee));
         require(
             requestParams.threshold[1] >= requestParams.threshold[0] &&
                 requestParams.threshold[0] > 0,
@@ -657,6 +650,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         E3RequestParams calldata
     ) public pure returns (uint256 fee) {
         fee = 1 * 10 ** 6;
+        require(fee > 0, PaymentRequired(fee));
     }
 
     /// @inheritdoc IEnclave

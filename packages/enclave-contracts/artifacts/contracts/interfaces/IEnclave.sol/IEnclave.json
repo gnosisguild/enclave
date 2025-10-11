@@ -581,6 +581,11 @@
               "internalType": "bytes",
               "name": "computeProviderParams",
               "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "customParams",
+              "type": "bytes"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -969,9 +974,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
-<<<<<<< HEAD
-  "buildInfoId": "solc-0_8_27-5dc5e83b3f2c44cf8644ab0f2ffb318134b8c5b4"
-=======
-  "buildInfoId": "solc-0_8_27-fceb9ac806c7c7b60cbad1945c3a7e17a11c588b"
->>>>>>> dev
+  "buildInfoId": "solc-0_8_27-905ad4d81abe02c455b9927aa66f20cea780e518"
 }

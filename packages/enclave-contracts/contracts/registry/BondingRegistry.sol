@@ -127,7 +127,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     /// @dev Reverts if operator has an exit in progress that hasn't unlocked yet
     /// @param operator Address of the operator to check
     modifier noExitInProgress(address operator) {
-        Operator storage op = operators[operator];
+        Operator memory op = operators[operator];
         if (op.exitRequested && block.timestamp < op.exitUnlocksAt)
             revert ExitInProgress();
         _;
@@ -227,7 +227,6 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
     function availableTickets(
         address operator
     ) external view returns (uint256) {
-        if (ticketPrice == 0) return 0;
         return ticketToken.balanceOf(operator) / ticketPrice;
     }
 
@@ -280,7 +279,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
     /// @inheritdoc IBondingRegistry
     function hasExitInProgress(address operator) external view returns (bool) {
-        Operator storage op = operators[operator];
+        Operator memory op = operators[operator];
         return op.exitRequested && block.timestamp < op.exitUnlocksAt;
     }
 
@@ -308,10 +307,8 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
 
         operators[msg.sender].registered = true;
 
-        if (address(registry) != address(0)) {
-            // CiphernodeRegistry already emits an event when a ciphernode is added
-            registry.addCiphernode(msg.sender);
-        }
+        // CiphernodeRegistry already emits an event when a ciphernode is added
+        registry.addCiphernode(msg.sender);
 
         _updateOperatorStatus(msg.sender);
     }
@@ -357,10 +354,8 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
             );
         }
 
-        if (address(registry) != address(0)) {
-            // CiphernodeRegistry already emits an event when a ciphernode is removed
-            registry.removeCiphernode(msg.sender, siblingNodes);
-        }
+        // CiphernodeRegistry already emits an event when a ciphernode is removed
+        registry.removeCiphernode(msg.sender, siblingNodes);
 
         emit CiphernodeDeregistrationRequested(msg.sender, op.exitUnlocksAt);
         _updateOperatorStatus(msg.sender);
@@ -593,7 +588,8 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         require(msg.sender == rewardDistributor, OnlyRewardDistributor());
         require(recipients.length == amounts.length, ArrayLengthMismatch());
 
-        for (uint256 i = 0; i < recipients.length; i++) {
+        uint256 len = recipients.length;
+        for (uint256 i = 0; i < len; i++) {
             if (amounts[i] > 0 && operators[recipients[i]].registered) {
                 rewardToken.safeTransferFrom(
                     rewardDistributor,
@@ -739,9 +735,7 @@ contract BondingRegistry is IBondingRegistry, OwnableUpgradeable {
         Operator storage op = operators[operator];
         bool newActiveStatus = op.registered &&
             op.licenseBond >= _minLicenseBond() &&
-            (ticketPrice == 0 ||
-                ticketToken.balanceOf(operator) / ticketPrice >=
-                minTicketBalance);
+            (ticketToken.balanceOf(operator) / ticketPrice >= minTicketBalance);
 
         if (op.active != newActiveStatus) {
             op.active = newActiveStatus;

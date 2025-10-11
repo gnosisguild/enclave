@@ -271,6 +271,10 @@ describe("Enclave", function () {
         ["address"],
         [await decryptionVerifier.mockDecryptionVerifier.getAddress()],
       ),
+      customParams: abiCoder.encode(
+        ["address"],
+        ["0x1234567890123456789012345678901234567890"], // arbitrary address.
+      ),
     };
 
     await usdcToken.mint(ownerAddress, ethers.parseUnits("1000000", 6));
@@ -756,6 +760,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
       await usdcToken.approve(await enclave.getAddress(), fee);
       await expect(
@@ -1112,6 +1117,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       const e3Id = 0;

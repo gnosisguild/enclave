@@ -214,6 +214,8 @@ contract SlashingManager is ISlashingManager, AccessControl {
         require(policy.enabled, SlashReasonDisabled());
 
         proposalId = totalProposals;
+        totalProposals = proposalId + 1;
+
         uint256 executableAt = block.timestamp + policy.appealWindow;
         SlashProposal storage p = _proposals[proposalId];
 
@@ -245,12 +247,10 @@ contract SlashingManager is ISlashingManager, AccessControl {
             executableAt,
             msg.sender
         );
-
-        totalProposals = proposalId + 1;
     }
 
     /// @inheritdoc ISlashingManager
-    function executeSlash(uint256 proposalId) external onlySlasher {
+    function executeSlash(uint256 proposalId) external {
         require(proposalId < totalProposals, InvalidProposal());
         SlashProposal storage p = _proposals[proposalId];
 
@@ -290,7 +290,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
 
         if (policy.banNode) {
             banned[p.operator] = true;
-            emit NodeBanned(p.operator, p.reason, address(this));
+            emit NodeBanUpdated(p.operator, true, p.reason, msg.sender);
         }
 
         emit SlashExecuted(
@@ -310,6 +310,7 @@ contract SlashingManager is ISlashingManager, AccessControl {
     /// @inheritdoc ISlashingManager
     function fileAppeal(uint256 proposalId, string calldata evidence) external {
         require(proposalId < totalProposals, InvalidProposal());
+        // TODO: Should we reject the appeal if the proposal has a cryptographic proof?
         SlashProposal storage p = _proposals[proposalId];
 
         // Only the accused can appeal
@@ -353,18 +354,14 @@ contract SlashingManager is ISlashingManager, AccessControl {
     // ======================
 
     /// @inheritdoc ISlashingManager
-    function banNode(address node, bytes32 reason) external onlyGovernance {
+    function updateBanStatus(
+        address node,
+        bool status,
+        bytes32 reason
+    ) external onlyGovernance {
         require(node != address(0), ZeroAddress());
 
-        banned[node] = true;
-        emit NodeBanned(node, reason, msg.sender);
-    }
-
-    /// @inheritdoc ISlashingManager
-    function unbanNode(address node) external onlyGovernance {
-        require(node != address(0), ZeroAddress());
-
-        banned[node] = false;
-        emit NodeUnbanned(node, msg.sender);
+        banned[node] = status;
+        emit NodeBanUpdated(node, status, reason, msg.sender);
     }
 }

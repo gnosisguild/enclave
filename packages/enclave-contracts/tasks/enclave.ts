@@ -180,6 +180,7 @@ export const requestCommittee = task(
           e3Address === ZeroAddress ? mockE3ProgramArgs!.address : e3Address,
         e3ProgramParams,
         computeProviderParams,
+        customParams,
       };
 
       console.log("Request parameters:", requestParams);

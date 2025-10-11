@@ -152,7 +152,7 @@ contract EnclaveToken is
         if (amounts.length != len || allocations.length != len)
             revert ArrayLengthMismatch();
 
-        uint256 minted = totalSupply();
+        uint256 minted = totalMinted;
 
         for (uint256 i = 0; i < len; i++) {
             address recipient = recipients[i];
@@ -165,6 +165,8 @@ contract EnclaveToken is
             _mint(recipient, amount);
             emit AllocationMinted(recipient, amount, allocations[i]);
         }
+
+        totalMinted = minted;
     }
 
     /**

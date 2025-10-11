@@ -38,6 +38,8 @@ describe("SlashingManager", function () {
   );
   const DEFAULT_ADMIN_ROLE = ethers.ZeroHash;
 
+  const APPEAL_WINDOW = 7 * 24 * 60 * 60;
+
   async function setupPolicies(
     slashingManager: SlashingManager,
     mockVerifier: MockSlashingVerifier,
@@ -58,7 +60,7 @@ describe("SlashingManager", function () {
       requiresProof: false,
       proofVerifier: ethers.ZeroAddress,
       banNode: false,
-      appealWindow: 7 * 24 * 60 * 60,
+      appealWindow: APPEAL_WINDOW,
       enabled: true,
     };
 
@@ -142,7 +144,7 @@ describe("SlashingManager", function () {
             ticketPrice: ethers.parseUnits("10", 6),
             licenseRequiredBond: ethers.parseEther("1000"),
             minTicketBalance: 5,
-            exitDelay: 7 * 24 * 60 * 60,
+            exitDelay: APPEAL_WINDOW,
           },
         },
       },
@@ -283,7 +285,7 @@ describe("SlashingManager", function () {
         requiresProof: false,
         proofVerifier: ethers.ZeroAddress,
         banNode: false,
-        appealWindow: 7 * 24 * 60 * 60,
+        appealWindow: APPEAL_WINDOW,
         enabled: true,
       };
 
@@ -301,7 +303,7 @@ describe("SlashingManager", function () {
         requiresProof: false,
         proofVerifier: ethers.ZeroAddress,
         banNode: false,
-        appealWindow: 7 * 24 * 60 * 60,
+        appealWindow: APPEAL_WINDOW,
         enabled: true,
       };
 
@@ -324,7 +326,7 @@ describe("SlashingManager", function () {
         requiresProof: false,
         proofVerifier: ethers.ZeroAddress,
         banNode: false,
-        appealWindow: 7 * 24 * 60 * 60,
+        appealWindow: APPEAL_WINDOW,
         enabled: true,
       };
 
@@ -342,7 +344,7 @@ describe("SlashingManager", function () {
         requiresProof: false,
         proofVerifier: ethers.ZeroAddress,
         banNode: false,
-        appealWindow: 7 * 24 * 60 * 60,
+        appealWindow: APPEAL_WINDOW,
         enabled: false,
       };
 
@@ -360,7 +362,7 @@ describe("SlashingManager", function () {
         requiresProof: false,
         proofVerifier: ethers.ZeroAddress,
         banNode: false,
-        appealWindow: 7 * 24 * 60 * 60,
+        appealWindow: APPEAL_WINDOW,
         enabled: true,
       };
 
@@ -396,7 +398,7 @@ describe("SlashingManager", function () {
         requiresProof: true,
         proofVerifier: await mockVerifier.getAddress(),
         banNode: false,
-        appealWindow: 7 * 24 * 60 * 60,
+        appealWindow: APPEAL_WINDOW,
         enabled: true,
       };
 
@@ -536,14 +538,13 @@ describe("SlashingManager", function () {
         requiresProof: false,
         proofVerifier: ethers.ZeroAddress,
         banNode: false,
-        appealWindow: 7 * 24 * 60 * 60,
+        appealWindow: APPEAL_WINDOW,
         enabled: true,
       };
       await slashingManager.setSlashPolicy(REASON_INACTIVITY, evidencePolicy);
 
       const proof = ethers.toUtf8Bytes("");
       const currentTime = await time.latest();
-      const appealWindow = 7 * 24 * 60 * 60;
 
       await expect(
         slashingManager
@@ -557,14 +558,14 @@ describe("SlashingManager", function () {
           REASON_INACTIVITY,
           ethers.parseUnits("20", 6),
           ethers.parseEther("50"),
-          currentTime + appealWindow + 1,
+          currentTime + APPEAL_WINDOW + 1,
           await slasher.getAddress(),
         );
 
       const proposal = await slashingManager.getSlashProposal(0);
       expect(proposal.proofVerified).to.be.false;
       expect(proposal.executableAt).to.be.greaterThan(
-        currentTime + appealWindow,
+        currentTime + APPEAL_WINDOW,
       );
     });
 
@@ -649,7 +650,7 @@ describe("SlashingManager", function () {
         requiresProof: false,
         proofVerifier: ethers.ZeroAddress,
         banNode: false,
-        appealWindow: 7 * 24 * 60 * 60,
+        appealWindow: APPEAL_WINDOW,
         enabled: true,
       };
       await slashingManager.setSlashPolicy(REASON_MISBEHAVIOR, proofPolicy);
@@ -730,7 +731,7 @@ describe("SlashingManager", function () {
         slashingManager.connect(slasher).executeSlash(0),
       ).to.be.revertedWithCustomError(slashingManager, "AppealWindowActive");
 
-      await time.increase(7 * 24 * 60 * 60 + 1);
+      await time.increase(APPEAL_WINDOW + 1);
 
       await expect(slashingManager.connect(slasher).executeSlash(0)).to.emit(
         slashingManager,
@@ -752,12 +753,8 @@ describe("SlashingManager", function () {
       expect(await slashingManager.isBanned(operatorAddress)).to.be.false;
 
       await expect(slashingManager.connect(slasher).executeSlash(0))
-        .to.emit(slashingManager, "NodeBanned")
-        .withArgs(
-          operatorAddress,
-          REASON_DOUBLE_SIGN,
-          await slashingManager.getAddress(),
-        );
+        .to.emit(slashingManager, "NodeBanUpdated")
+        .withArgs(operatorAddress, true, REASON_DOUBLE_SIGN, slasher);
 
       expect(await slashingManager.isBanned(operatorAddress)).to.be.true;
     });
@@ -785,27 +782,6 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager.connect(slasher).executeSlash(0),
       ).to.be.revertedWithCustomError(slashingManager, "AlreadyExecuted");
-    });
-
-    it("should revert if caller is not slasher", async function () {
-      const {
-        slashingManager,
-        slasher,
-        notTheOwner,
-        operatorAddress,
-        mockVerifier,
-      } = await loadFixture(setup);
-
-      await setupPolicies(slashingManager, mockVerifier);
-
-      const proof = ethers.toUtf8Bytes("Valid proof");
-      await slashingManager
-        .connect(slasher)
-        .proposeSlash(operatorAddress, REASON_MISBEHAVIOR, proof);
-
-      await expect(
-        slashingManager.connect(notTheOwner).executeSlash(0),
-      ).to.be.revertedWithCustomError(slashingManager, "Unauthorized");
     });
   });
 
@@ -882,7 +858,7 @@ describe("SlashingManager", function () {
           ethers.toUtf8Bytes(""),
         );
 
-      await time.increase(7 * 24 * 60 * 60 + 1);
+      await time.increase(APPEAL_WINDOW + 1);
 
       await expect(
         slashingManager.connect(operator).fileAppeal(0, "Too late"),
@@ -1005,7 +981,7 @@ describe("SlashingManager", function () {
         );
       await slashingManager.connect(operator).fileAppeal(0, "Evidence");
 
-      await time.increase(7 * 24 * 60 * 60 + 1);
+      await time.increase(APPEAL_WINDOW + 1);
 
       await expect(
         slashingManager.connect(slasher).executeSlash(0),
@@ -1034,7 +1010,7 @@ describe("SlashingManager", function () {
       await slashingManager.connect(operator).fileAppeal(0, "Evidence");
       await slashingManager.connect(owner).resolveAppeal(0, true, "Approved");
 
-      await time.increase(7 * 24 * 60 * 60 + 1);
+      await time.increase(APPEAL_WINDOW + 1);
 
       await expect(
         slashingManager.connect(slasher).executeSlash(0),
@@ -1063,7 +1039,7 @@ describe("SlashingManager", function () {
       await slashingManager.connect(operator).fileAppeal(0, "Evidence");
       await slashingManager.connect(owner).resolveAppeal(0, false, "Denied");
 
-      await time.increase(7 * 24 * 60 * 60 + 1);
+      await time.increase(APPEAL_WINDOW + 1);
 
       await expect(slashingManager.connect(slasher).executeSlash(0)).to.emit(
         slashingManager,
@@ -1080,10 +1056,12 @@ describe("SlashingManager", function () {
       const reason = ethers.encodeBytes32String("manual_ban");
 
       await expect(
-        slashingManager.connect(owner).banNode(operatorAddress, reason),
+        slashingManager
+          .connect(owner)
+          .updateBanStatus(operatorAddress, true, reason),
       )
-        .to.emit(slashingManager, "NodeBanned")
-        .withArgs(operatorAddress, reason, await owner.getAddress());
+        .to.emit(slashingManager, "NodeBanUpdated")
+        .withArgs(operatorAddress, true, reason, await owner.getAddress());
 
       expect(await slashingManager.isBanned(operatorAddress)).to.be.true;
     });
@@ -1094,12 +1072,29 @@ describe("SlashingManager", function () {
 
       await slashingManager
         .connect(owner)
-        .banNode(operatorAddress, ethers.encodeBytes32String("test"));
+        .updateBanStatus(
+          operatorAddress,
+          true,
+          ethers.encodeBytes32String("test"),
+        );
       expect(await slashingManager.isBanned(operatorAddress)).to.be.true;
 
-      await expect(slashingManager.connect(owner).unbanNode(operatorAddress))
-        .to.emit(slashingManager, "NodeUnbanned")
-        .withArgs(operatorAddress, await owner.getAddress());
+      await expect(
+        slashingManager
+          .connect(owner)
+          .updateBanStatus(
+            operatorAddress,
+            false,
+            ethers.encodeBytes32String("test"),
+          ),
+      )
+        .to.emit(slashingManager, "NodeBanUpdated")
+        .withArgs(
+          operatorAddress,
+          false,
+          ethers.encodeBytes32String("test"),
+          await owner.getAddress(),
+        );
 
       expect(await slashingManager.isBanned(operatorAddress)).to.be.false;
     });
@@ -1111,7 +1106,11 @@ describe("SlashingManager", function () {
       await expect(
         slashingManager
           .connect(notTheOwner)
-          .banNode(operatorAddress, ethers.encodeBytes32String("test")),
+          .updateBanStatus(
+            operatorAddress,
+            false,
+            ethers.encodeBytes32String("test"),
+          ),
       ).to.be.revertedWithCustomError(slashingManager, "Unauthorized");
     });
   });
