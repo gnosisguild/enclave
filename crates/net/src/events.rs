@@ -38,7 +38,7 @@ impl GossipData {
 }
 
 /// NetInterface Commands are sent to the network peer over a mspc channel
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum NetCommand {
     /// Publish message to gossipsub
     GossipPublish {
@@ -180,14 +180,19 @@ where
     // Resubscribe first to avoid missing events
     let mut rx = net_events.resubscribe();
 
+    // Extract correlation_id
     let Some(id) = command.correlation_id() else {
         return Err(anyhow::anyhow!(format!(
-            "Command must have a correlation_id but {:?} this does not",
+            "Command must have a correlation_id but this does not: {:?}",
             command
         )));
     };
 
-    net_cmds.send(command.clone()).await?;
+    // We don't have access to this later and we cannot clone command
+    let debug_cmd = format!("{:?}", command);
+
+    // Send the command
+    net_cmds.send(command).await?;
 
     let result = tokio::time::timeout(timeout, async {
         loop {
@@ -208,7 +213,7 @@ where
         }
     })
     .await
-    .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for response from {:?}", command)))?;
+    .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for response from {}", debug_cmd)))?;
 
     result
 }
