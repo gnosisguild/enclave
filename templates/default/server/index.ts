@@ -15,8 +15,6 @@ import {
 import { handleTestInteraction } from "./testHandler";
 import { getCheckedEnvVars } from "./utils";
 import { callFheRunner } from "./runner";
-import { createPublicClient, http } from "viem";
-import { hardhat } from "viem/chains";
 
 interface E3Session {
   e3Id: bigint;
@@ -66,7 +64,7 @@ async function runProgram(e3Id: bigint): Promise<void> {
   }
 
   console.log(
-    `📊 Processing E3 session ${e3Id} with ${session.inputs.length} inputs`,
+    `📊 Processing E3 session ${e3Id} with ${session.inputs.length} inputs`
   );
 
   try {
@@ -74,7 +72,7 @@ async function runProgram(e3Id: bigint): Promise<void> {
 
     if (session.inputs.length <= 1) {
       console.log(
-        `⏭️  Skipping E3 ${e3Id}: not enough inputs (${session.inputs.length})`,
+        `⏭️  Skipping E3 ${e3Id}: not enough inputs (${session.inputs.length})`
       );
       session.isCompleted = true;
       return;
@@ -89,7 +87,7 @@ async function runProgram(e3Id: bigint): Promise<void> {
     }
 
     const ciphertextInputs: Array<[string, number]> = session.inputs.map(
-      (input) => [input.data, Number(input.index)],
+      (input) => [input.data, Number(input.index)]
     );
 
     console.log(`🔄 Calling FHE runner for E3 ${e3Id}...`);
@@ -168,7 +166,7 @@ async function handleE3ActivatedEvent(event: any) {
 
   if (sleepSeconds > 0) {
     console.log(
-      `⏰ Scheduling E3 ${e3Id} processing in ${sleepSeconds} seconds...`,
+      `⏰ Scheduling E3 ${e3Id} processing in ${sleepSeconds} seconds...`
     );
     setTimeout(async () => {
       await runProgram(e3Id);
@@ -211,7 +209,7 @@ async function setupEventListeners() {
   sdk.onEnclaveEvent(EnclaveEventType.E3_ACTIVATED, handleE3ActivatedEvent);
   sdk.onEnclaveEvent(
     EnclaveEventType.INPUT_PUBLISHED,
-    handleInputPublishedEvent,
+    handleInputPublishedEvent
   );
 
   console.log("✅ Event listeners set up successfully");
@@ -248,22 +246,6 @@ async function handleWebhookRequest(req: Request, res: Response) {
     }
 
     console.log(`🔄 Publishing output for E3 ${e3_id}...`);
-    if (process.env.TEST_MODE) {
-      const client = createPublicClient({
-        transport: http("http://127.0.0.1:8545"), // your Hardhat node URL
-        chain: hardhat,
-      });
-      // The following ensures that if we are in test mode using hardhat
-      // We make sure we are past the input window
-      await client.request({
-        method: "evm_increaseTime" as any,
-        params: [60] as any, // seconds
-      });
-      await client.request({
-        method: "evm_mine" as any,
-        params: [] as any,
-      });
-    }
 
     const sdk = await createPrivateSDK();
     await sdk.publishCiphertextOutput(BigInt(e3_id), ciphertext, proof);
