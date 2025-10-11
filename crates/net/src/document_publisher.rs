@@ -164,9 +164,11 @@ impl DocumentPublisher {
         // TODO: We will need to check for party_id here too if the doc spans multiple partys. We
         // don't need this yet however
         if ids.contains(&event.meta.e3_id) {
+            debug!("I am interested!");
             // if so get_record!
             let value = Self::get_record(net_cmds, net_events, event.key).await?;
             // And forward it!
+            debug!("Sending event...");
             bus.do_send(EnclaveEvent::from(DocumentReceived {
                 meta: event.meta,
                 value,
@@ -362,7 +364,7 @@ mod tests {
     use anyhow::{bail, Result};
     use e3_events::{
         CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveEvent, EventBus,
-        EventBusConfig, PublishDocumentRequested,
+        EventBusConfig, GetHistory, HistoryCollector, PublishDocumentRequested,
     };
     use tokio::{
         sync::{broadcast, mpsc},
@@ -469,6 +471,9 @@ mod tests {
         let _guard = tracing::subscriber::set_default(subscriber);
 
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
+        let history = HistoryCollector::<EnclaveEvent>::new().start();
+        bus.do_send(Subscribe::new("*", history.clone().recipient()));
+
         let (net_cmd_tx, mut net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
@@ -532,7 +537,20 @@ mod tests {
             value,
         })?;
 
-        // XXX: Need some of the testing tools from #660 to wait for the bus event
+        // wait for events to settle
+        sleep(Duration::from_millis(100)).await;
+
+        // Check event was dispatched
+        let events = history.send(GetHistory::<EnclaveEvent>::new()).await?;
+        let Some(EnclaveEvent::DocumentReceived {
+            data: DocumentReceived { value: doc, .. },
+            ..
+        }) = events.last()
+        else {
+            bail!("No event sent");
+        };
+
+        assert_eq!(doc, b"I am a special document", "document did not match");
 
         Ok(())
     }
