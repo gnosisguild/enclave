@@ -371,7 +371,14 @@ mod tests {
 
     #[actix::test]
     async fn test_publishes_document() -> Result<()> {
-        tracing_subscriber::fmt::init();
+        use tracing_subscriber::{fmt, EnvFilter};
+
+        let subscriber = fmt()
+            .with_env_filter(EnvFilter::new("debug"))
+            .with_test_writer()
+            .finish();
+
+        let _guard = tracing::subscriber::set_default(subscriber);
 
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let (net_cmd_tx, mut net_cmd_rx) = mpsc::channel(100);
@@ -452,9 +459,14 @@ mod tests {
     // #[ignore]
     #[actix::test]
     async fn test_notified_of_document() -> Result<()> {
-        tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::DEBUG) // Set log level
-            .init();
+        use tracing_subscriber::{fmt, EnvFilter};
+
+        let subscriber = fmt()
+            .with_env_filter(EnvFilter::new("debug"))
+            .with_test_writer()
+            .finish();
+
+        let _guard = tracing::subscriber::set_default(subscriber);
 
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let (net_cmd_tx, mut net_cmd_rx) = mpsc::channel(100);
