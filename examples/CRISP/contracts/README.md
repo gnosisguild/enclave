@@ -18,6 +18,6 @@ It exposes two main functions:
 
 The input validator contract is used to validate the input data that is submitted to the E3 instance. It is called by the Enclave contract when a new input is published (`Enclave.publishInput`). In CRISP, the data providers (the ones submitting the inputs) are the voters, and the input submitted is the vote itself. 
 
-The validator checks that gating conditions are satisfied (uses [Semaphore](https://semaphore.pse.dev/) by default) and that the ciphertext is constructed correctly using [Greco](https://github.com/gnosisguild/enclave/tree/main/packages/circuits/crates/libs/greco). See the Greco [paper](https://eprint.iacr.org/2024/594).
+The validator checks that gating conditions are satisfied and that the ciphertext is constructed correctly using [Greco](https://github.com/gnosisguild/enclave/tree/main/packages/circuits/crates/libs/greco). See the Greco [paper](https://eprint.iacr.org/2024/594).
 
 

@@ -27,7 +27,6 @@ export interface BroadcastVoteRequest {
   proof: number[];
   public_inputs: string[];
   address: string;
-  proof_sem: number[];
 }
 
 export type VoteResponseStatus = 'success' | 'user_already_voted' | 'failed_broadcast';

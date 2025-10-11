@@ -10,19 +10,12 @@ import { useVoteManagementContext } from '@/context/voteManagement';
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx';
 import { Poll } from '@/model/poll.model';
 import { BroadcastVoteRequest } from '@/model/vote.model';
-import { Group } from '@semaphore-protocol/group';
-import { generateNoirProof, SemaphoreNoirProof, initSemaphoreNoirBackend } from '@hashcloak/semaphore-noir-proof';
-import { encodeSemaphoreProof } from '@/utils/proof-encoding';
 
 export const useVoteCasting = () => {
     const {
         user,
         roundState,
         votingRound,
-        semaphoreIdentity,
-        currentGroupMembers,
-        fetchingMembers,
-        isRegisteredForCurrentRound,
         encryptVote,
         broadcastVote,
         setTxUrl,
@@ -46,19 +39,9 @@ export const useVoteCasting = () => {
             showToast({ type: 'danger', message: 'Please select a poll option first.' });
             return;
         }
-        if (!user || !isRegisteredForCurrentRound || !roundState || !semaphoreIdentity) {
-            console.error("Cannot cast vote: Missing user, registration, round state, or identity.");
-            showToast({ type: 'danger', message: 'Cannot cast vote. Ensure you are connected, registered, and the round is active.' });
-            return;
-        }
-        if (fetchingMembers) {
-            console.log("Cannot cast vote: Still fetching group members.");
-            showToast({ type: 'danger', message: 'Group members are still loading. Please wait.' });
-            return;
-        }
-        if (!currentGroupMembers || currentGroupMembers.length === 0) {
-            console.error("Cannot cast vote: No group members found for this round.");
-            showToast({ type: 'danger', message: 'Could not load group members for this round.' });
+        if (!user || !roundState) {
+            console.error("Cannot cast vote: Missing user or round state.");
+            showToast({ type: 'danger', message: 'Cannot cast vote. Ensure you are connected, and the round is active.' });
             return;
         }
 
@@ -71,22 +54,12 @@ export const useVoteCasting = () => {
                 throw new Error("Failed to encrypt vote.");
             }
 
-            const group = new Group(currentGroupMembers);
-            const scope = String(roundState.id);
-            // the message does not matter 
-            const message = "e3";
-            const merkleTreeDepth = 10;
-            const noirBackend = await initSemaphoreNoirBackend(merkleTreeDepth);
-            const fullProof: SemaphoreNoirProof = await generateNoirProof(semaphoreIdentity, group, message, scope, noirBackend, true);
-            const proofBytes = encodeSemaphoreProof(fullProof);
-
             const voteRequest: BroadcastVoteRequest = {
                 round_id: roundState.id,
                 enc_vote_bytes: Array.from(voteEncrypted.vote),
                 proof: Array.from(voteEncrypted.proof),
                 public_inputs: voteEncrypted.public_inputs,
                 address: user.address,
-                proof_sem: Array.from(proofBytes)
             };
 
             const broadcastVoteResponse = await broadcastVote(voteRequest);
@@ -136,10 +109,6 @@ export const useVoteCasting = () => {
         user,
         roundState,
         votingRound,
-        semaphoreIdentity,
-        currentGroupMembers,
-        fetchingMembers,
-        isRegisteredForCurrentRound,
         encryptVote,
         broadcastVote,
         setTxUrl,
