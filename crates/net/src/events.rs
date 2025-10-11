@@ -191,7 +191,7 @@ where
     // We don't have access to this later and we cannot clone command
     let debug_cmd = format!("{:?}", command);
 
-    // Send the command
+    // Send the command to NetInterface
     net_cmds.send(command).await?;
 
     let result = tokio::time::timeout(timeout, async {
