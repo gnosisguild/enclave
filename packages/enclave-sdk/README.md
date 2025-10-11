@@ -73,6 +73,7 @@ const hash = await sdk.requestE3({
   e3Program: "0x...",
   e3ProgramParams: "0x...",
   computeProviderParams: "0x...",
+  customParams: "0x...",
 });
 ```
 
@@ -218,6 +219,7 @@ await sdk.requestE3({
   e3Program: `0x${string}`,
   e3ProgramParams: `0x${string}`,
   computeProviderParams: `0x${string}`,
+  customParams?: `0x${string}`,
   gasLimit?: bigint
 });
 

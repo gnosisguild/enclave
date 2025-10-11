@@ -1409,6 +1409,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
+name = "bigdecimal"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9324c8014cd04590682b34f1e9448d38f0674d0f7b2dc553331016ef0e4e9ebc"
+dependencies = [
+ "autocfg",
+ "libm",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1843,21 +1856,27 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "anyhow",
+ "ark-bn254",
+ "ark-ff 0.4.2",
  "async-trait",
+ "bigdecimal",
  "bincode",
  "chrono",
  "clap",
  "config",
  "dialoguer",
  "dotenvy",
- "e3-compute-provider 0.0.14-test",
+ "e3-compute-provider 0.1.4",
  "e3-sdk",
  "env_logger",
  "eyre",
  "fhe",
  "fhe-traits",
  "hex",
+ "lean-imt",
+ "light-poseidon 0.1.0",
  "log",
+ "num-bigint",
  "once_cell",
  "rand 0.8.5",
  "reqwest",
@@ -2151,7 +2170,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "e3-bfv-helpers"
-version = "0.0.14-test"
+version = "0.1.4"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -2167,13 +2186,14 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.0.14-test"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/enclave?rev=2ca0aa5f47dd962add5d1d0f74900d9bceb957e5#2ca0aa5f47dd962add5d1d0f74900d9bceb957e5"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
  "hex",
  "lean-imt",
- "light-poseidon",
+ "light-poseidon 0.2.0",
  "num-bigint",
  "num-traits",
  "rayon",
@@ -2183,14 +2203,13 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/enclave?rev=2ca0aa5f47dd962add5d1d0f74900d9bceb957e5#2ca0aa5f47dd962add5d1d0f74900d9bceb957e5"
+version = "0.1.4"
 dependencies = [
  "ark-bn254",
  "ark-ff 0.4.2",
  "hex",
  "lean-imt",
- "light-poseidon",
+ "light-poseidon 0.2.0",
  "num-bigint",
  "num-traits",
  "rayon",
@@ -2200,7 +2219,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm-helpers"
-version = "0.0.14-test"
+version = "0.1.4"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2244,7 +2263,7 @@ dependencies = [
 
 [[package]]
 name = "e3-indexer"
-version = "0.0.14-test"
+version = "0.1.4"
 dependencies = [
  "alloy",
  "async-trait",
@@ -2273,7 +2292,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sdk"
-version = "0.0.14-test"
+version = "0.1.4"
 dependencies = [
  "e3-bfv-helpers",
  "e3-evm-helpers",
@@ -3429,6 +3448,17 @@ name = "libm"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
+
+[[package]]
+name = "light-poseidon"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f1dc4be3ca47e5f9ca5d5a3fc839f9006d3a7e059fe6f7690ef10405c2be723"
+dependencies = [
+ "ark-bn254",
+ "ark-ff 0.4.2",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "light-poseidon"

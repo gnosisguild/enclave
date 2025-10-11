@@ -7,6 +7,7 @@
 use chrono::Utc;
 use dialoguer::{theme::ColorfulTheme, FuzzySelect, Input};
 use log::info;
+use num_bigint::BigUint;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +40,12 @@ struct ComputeProviderParams {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+struct CustomParams {
+    token_address: String,
+    balance_threshold: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct PKRequest {
     round_id: u64,
     pk_bytes: Vec<u8>,
@@ -50,8 +57,15 @@ struct CTRequest {
     ct_bytes: Vec<u8>,
 }
 
-pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    info!("Starting new CRISP round!");
+pub async fn initialize_crisp_round(
+    token_address: &str,
+    balance_threshold: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    info!(
+        "Starting new CRISP round with token address: {} and balance threshold: {}",
+        token_address, balance_threshold
+    );
+
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
@@ -74,6 +88,17 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
         }
         Err(e) => info!("Error checking E3 Program enabled: {:?}", e),
     }
+
+    let token_address: Address = token_address.parse()?;
+    let balance_threshold = BigUint::parse_bytes(balance_threshold.as_bytes(), 10)
+        .ok_or("Invalid balance threshold")?;
+
+    let custom_params = CustomParams {
+        token_address: token_address.to_string(),
+        balance_threshold: balance_threshold.to_string(),
+    };
+    // Serialize the custom parameters to bytes.
+    let custom_params_bytes = Bytes::from(serde_json::to_vec(&custom_params)?);
 
     let filter: Address = CONFIG.naive_registry_filter_address.parse()?;
     let threshold: [u32; 2] = [CONFIG.e3_threshold_min, CONFIG.e3_threshold_max];
@@ -123,6 +148,7 @@ pub async fn initialize_crisp_round() -> Result<(), Box<dyn std::error::Error + 
             e3_program,
             e3_params,
             compute_provider_params_bytes,
+            custom_params_bytes,
         )
         .await?;
     info!("E3 request sent. TxHash: {:?}", res.transaction_hash);

@@ -25,7 +25,7 @@ use tokio::fs;
 use crate::logging::TaskSpinner;
 
 const DEFAULT_TEMPLATE_URL: &str =
-    "https://github.com/gnosisguild/enclave.git#main:templates/default";
+    "https://github.com/gnosisguild/enclave.git#v{{VERSION}}:templates/default";
 const TEMP_DIR: &str = "/tmp/__enclave-tmp-folder.1";
 const DEFAULT_TEMPLATE_PATH: &str = ".";
 const DEFAULT_BRANCH: &str = "main";
@@ -35,7 +35,15 @@ async fn install_enclave(cwd: &PathBuf, template: Option<String>, verbose: bool)
 
     spinner.update("Downloading template...".to_string()).await;
 
-    let repo = parse_git_url(template.unwrap_or(DEFAULT_TEMPLATE_URL.to_string()))?;
+    let template_url = if let Some(template) = template {
+        template
+    } else {
+        let version = env!("CARGO_PKG_VERSION").to_string();
+
+        DEFAULT_TEMPLATE_URL.replace("{{VERSION}}", &version)
+    };
+
+    let repo = parse_git_url(template_url)?;
     let base_url = repo.base_url;
     let branch = repo.branch.unwrap_or(DEFAULT_BRANCH.to_string());
     let template_path = repo.path.unwrap_or(DEFAULT_TEMPLATE_PATH.to_string());

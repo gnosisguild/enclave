@@ -72,7 +72,7 @@ export class ContractClient {
 
   /**
    * Request a new E3 computation
-   * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams)
+   * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams, bytes customParams)
    */
   public async requestE3(
     filter: `0x${string}`,
@@ -82,6 +82,7 @@ export class ContractClient {
     e3Program: `0x${string}`,
     e3ProgramParams: `0x${string}`,
     computeProviderParams: `0x${string}`,
+    customParams?: `0x${string}`,
     gasLimit?: bigint
   ): Promise<Hash> {
     if (!this.walletClient) {

@@ -169,6 +169,11 @@
               "type": "bytes"
             },
             {
+              "internalType": "bytes",
+              "name": "customParams",
+              "type": "bytes"
+            },
+            {
               "internalType": "contract IInputValidator",
               "name": "inputValidator",
               "type": "address"
@@ -500,6 +505,11 @@
               "type": "bytes"
             },
             {
+              "internalType": "bytes",
+              "name": "customParams",
+              "type": "bytes"
+            },
+            {
               "internalType": "contract IInputValidator",
               "name": "inputValidator",
               "type": "address"
@@ -728,6 +738,11 @@
               "internalType": "bytes",
               "name": "computeProviderParams",
               "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "customParams",
+              "type": "bytes"
             }
           ],
           "internalType": "struct IEnclave.E3RequestParams",
@@ -787,6 +802,11 @@
             {
               "internalType": "bytes",
               "name": "e3ProgramParams",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes",
+              "name": "customParams",
               "type": "bytes"
             },
             {
@@ -949,5 +969,9 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/IEnclave.sol",
+<<<<<<< HEAD
   "buildInfoId": "solc-0_8_27-5dc5e83b3f2c44cf8644ab0f2ffb318134b8c5b4"
+=======
+  "buildInfoId": "solc-0_8_27-fceb9ac806c7c7b60cbad1945c3a7e17a11c588b"
+>>>>>>> dev
 }

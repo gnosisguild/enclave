@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::events::GossipData;
 use crate::events::NetCommand;
 use crate::events::NetEvent;
 use crate::NetInterface;
@@ -46,12 +47,12 @@ impl NetEventTranslator {
     /// Create a new NetEventTranslator actor
     pub fn new(
         bus: Addr<EventBus<EnclaveEvent>>,
-        tx: mpsc::Sender<NetCommand>,
+        tx: &mpsc::Sender<NetCommand>,
         topic: &str,
     ) -> Self {
         Self {
             bus,
-            tx,
+            tx: tx.clone(),
             sent_events: HashSet::new(),
             topic: topic.to_string(),
         }
@@ -59,7 +60,7 @@ impl NetEventTranslator {
 
     pub fn setup(
         bus: Addr<EventBus<EnclaveEvent>>,
-        tx: mpsc::Sender<NetCommand>,
+        tx: &mpsc::Sender<NetCommand>,
         mut rx: broadcast::Receiver<NetEvent>,
         topic: &str,
     ) -> Addr<Self> {
@@ -76,7 +77,11 @@ impl NetEventTranslator {
             async move {
                 while let Ok(event) = rx.recv().await {
                     match event {
-                        NetEvent::GossipData(data) => addr.do_send(LibP2pEvent(data)),
+                        NetEvent::GossipData(data) => {
+                            if let GossipData::GossipBytes(payload) = data {
+                                addr.do_send(LibP2pEvent(payload));
+                            }
+                        }
                         _ => (),
                     }
                 }
@@ -84,6 +89,20 @@ impl NetEventTranslator {
         });
 
         addr
+    }
+
+    /// Function to determine which events are allowed to be automatically
+    /// broadcast to the network by the NetEventTranslator. Having this function
+    /// as static means we can keep this maintained here but use this rule elsewhere
+    pub fn is_forwardable_event(event: &EnclaveEvent) -> bool {
+        // Add a list of events allowed to be forwarded to libp2p
+        match event {
+            EnclaveEvent::KeyshareCreated { .. } => true,
+            EnclaveEvent::PublicKeyAggregated { .. } => true,
+            EnclaveEvent::DecryptionshareCreated { .. } => true,
+            EnclaveEvent::PlaintextAggregated { .. } => true,
+            _ => false,
+        }
     }
 
     /// Spawn a Libp2p interface and hook it up to this actor
@@ -112,7 +131,7 @@ impl NetEventTranslator {
 
         // Setup and start net event translator
         let rx = interface.rx();
-        let addr = NetEventTranslator::setup(bus, interface.tx(), rx, topic);
+        let addr = NetEventTranslator::setup(bus, &interface.tx(), rx, topic);
         let handle = tokio::spawn(async move { Ok(interface.start().await?) });
 
         Ok((addr, handle, keypair.public().to_peer_id().to_string()))
@@ -144,15 +163,15 @@ impl Handler<EnclaveEvent> for NetEventTranslator {
         Box::pin(async move {
             let id: EventId = evt.clone().into();
 
-            // if we have seen this event before dont rebroadcast
-            if sent_events.contains(&id) {
-                trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
+            // Ignore events that should be considered local
+            if !Self::is_forwardable_event(&evt) {
+                trace!(evt_id=%id,"Local events should not be rebroadcast so ignoring");
                 return;
             }
 
-            // Ignore events that should be considered local
-            if evt.is_local_only() {
-                trace!(evt_id=%id,"Local events should not be rebroadcast so ignoring");
+            // if we have seen this event before dont rebroadcast
+            if sent_events.contains(&id) {
+                trace!(evt_id=%id,"Have seen event before not rebroadcasting!");
                 return;
             }
 
@@ -161,7 +180,7 @@ impl Handler<EnclaveEvent> for NetEventTranslator {
                     if let Err(e) = tx
                         .send(NetCommand::GossipPublish {
                             topic,
-                            data,
+                            data: GossipData::GossipBytes(data),
                             correlation_id: CorrelationId::new(),
                         })
                         .await

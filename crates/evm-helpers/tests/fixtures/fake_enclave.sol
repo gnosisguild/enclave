@@ -81,6 +81,7 @@ contract FakeEnclave {
             inputValidator: 0xA51D5E87c0C82dDEBfa4E7E515B2D8Eea8f3e4f2,
             decryptionVerifier: 0x4B0D8c2E5f7a6c832f8b16d3aB0e7F5d9E9B24b1,
             e3ProgramParams: abi.encode(42, "testParams"),
+            customParams: abi.encode("custom_params"),
             committeePublicKey: bytes32(keccak256("committee_public_key")),
             ciphertextOutput: bytes32(keccak256("encrypted_data")),
             plaintextOutput: abi.encode("decrypted_result")
@@ -98,6 +99,7 @@ struct E3 {
     bytes32 encryptionSchemeId;
     address e3Program;
     bytes e3ProgramParams;
+    bytes customParams;
     address inputValidator;
     address decryptionVerifier;
     bytes32 committeePublicKey;

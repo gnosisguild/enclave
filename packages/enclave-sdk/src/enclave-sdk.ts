@@ -184,6 +184,7 @@ export class EnclaveSDK {
     e3Program: `0x${string}`;
     e3ProgramParams: `0x${string}`;
     computeProviderParams: `0x${string}`;
+    customParams?: `0x${string}`;
     gasLimit?: bigint;
   }): Promise<Hash> {
     console.log(">>> REQUEST");
@@ -200,6 +201,7 @@ export class EnclaveSDK {
       params.e3Program,
       params.e3ProgramParams,
       params.computeProviderParams,
+      params.value,
       params.gasLimit
     );
   }

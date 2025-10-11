@@ -68,6 +68,12 @@ export const requestCommittee = task(
     defaultValue: ZeroAddress,
     type: ArgumentType.STRING,
   })
+  .addOption({
+    name: "customParams",
+    description: "parameters for the custom params",
+    defaultValue: ZeroAddress,
+    type: ArgumentType.STRING,
+  })
   .setAction(async () => ({
     default: async (
       {
@@ -80,6 +86,7 @@ export const requestCommittee = task(
         e3Address,
         e3Params,
         computeParams,
+        customParams,
       },
       hre,
     ) => {

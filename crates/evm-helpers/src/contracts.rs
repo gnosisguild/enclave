@@ -49,6 +49,7 @@ sol! {
         bytes32 encryptionSchemeId;
         address e3Program;
         bytes e3ProgramParams;
+        bytes customParams;
         address inputValidator;
         address decryptionVerifier;
         bytes32 committeePublicKey;
@@ -65,6 +66,7 @@ sol! {
         address e3Program;
         bytes e3ProgramParams;
         bytes computeProviderParams;
+        bytes customParams;
     }
 
     #[derive(Debug)]
@@ -74,14 +76,14 @@ sol! {
         mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
         mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
-        function request(E3RequestParams memory request) external returns (uint256 e3Id, E3 memory e3);
-        function activate(uint256 e3Id,bytes memory publicKey) external returns (bool success);
+        function request(E3RequestParams memory request) external payable returns (uint256 e3Id, E3 memory e3);
+        function activate(uint256 e3Id,bytes calldata publicKey) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
-        function publishInput(uint256 e3Id, bytes memory data) external returns (bool success);
-        function publishCiphertextOutput(uint256 e3Id, bytes memory ciphertextOutput, bytes memory proof) external returns (bool success);
-        function publishPlaintextOutput(uint256 e3Id, bytes memory data) external returns (bool success);
+        function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
+        function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
+        function publishPlaintextOutput(uint256 e3Id, bytes calldata data) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
-        function getRoot(uint256 id) public view returns (uint256);
+        function getInputRoot(uint256 e3Id) public view returns (uint256);
         function getE3Quote(E3RequestParams memory request) external view returns (uint256 fee);
     }
 }
@@ -102,7 +104,7 @@ pub trait EnclaveRead {
     async fn get_latest_block(&self) -> Result<u64>;
 
     /// Get the root for a specific ID
-    async fn get_root(&self, id: U256) -> Result<U256>;
+    async fn get_input_root(&self, id: U256) -> Result<U256>;
 
     /// Get E3 parameters for a specific E3 ID
     async fn get_e3_params(&self, e3_id: U256) -> Result<Bytes>;
@@ -136,6 +138,7 @@ pub trait EnclaveWrite {
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
+        custom_params: Bytes,
     ) -> Result<TransactionReceipt>;
 
     /// Activate an E3 with a public key
@@ -326,9 +329,9 @@ where
         Ok(block)
     }
 
-    async fn get_root(&self, id: U256) -> Result<U256> {
+    async fn get_input_root(&self, id: U256) -> Result<U256> {
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let root = contract.getRoot(id).call().await?;
+        let root = contract.getInputRoot(id).call().await?;
         Ok(root)
     }
 
@@ -382,6 +385,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         e3_program: Address,
         e3_params: Bytes,
         compute_provider_params: Bytes,
+        custom_params: Bytes,
     ) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
         let nonce = next_pending_nonce(&*self.provider).await?;
@@ -394,6 +398,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
             e3Program: e3_program,
             e3ProgramParams: e3_params.clone(),
             computeProviderParams: compute_provider_params.clone(),
+            customParams: custom_params.clone(),
         };
 
         let contract = Enclave::new(self.contract_address, &self.provider);

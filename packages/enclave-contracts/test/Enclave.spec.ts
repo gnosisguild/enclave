@@ -493,6 +493,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       const e3 = await enclave.getE3(0);
@@ -741,6 +742,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         }),
       ).to.be.revertedWithCustomError(usdcToken, "ERC20InsufficientAllowance");
     });
@@ -765,6 +767,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidThreshold")
@@ -783,6 +786,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidThreshold")
@@ -801,6 +805,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidDuration")
@@ -819,6 +824,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidDuration")
@@ -837,6 +843,7 @@ describe("Enclave", function () {
           e3Program: ethers.ZeroAddress,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "E3ProgramNotAllowed")
@@ -855,6 +862,7 @@ describe("Enclave", function () {
           e3Program: request.e3Program,
           e3ProgramParams: request.e3ProgramParams,
           computeProviderParams: request.computeProviderParams,
+          customParams: request.customParams,
         }),
       )
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
@@ -884,6 +892,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       const e3 = await enclave.getE3(0);
@@ -913,6 +922,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
       const e3 = await enclave.getE3(0);
 
@@ -942,6 +952,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await naiveRegistryFilterContract.publishCommittee(
@@ -971,6 +982,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await expect(
@@ -1020,6 +1032,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await expect(
@@ -1132,6 +1145,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       const e3Id = 0;
@@ -1156,6 +1170,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       const e3Id = 0;
@@ -1193,6 +1208,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       const inputData = abiCoder.encode(["bytes32"], [ethers.ZeroHash]);
@@ -1215,6 +1231,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await naiveRegistryFilterContract.publishCommittee(
@@ -1240,6 +1257,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await naiveRegistryFilterContract.publishCommittee(
@@ -1271,6 +1289,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await naiveRegistryFilterContract.publishCommittee(
@@ -1289,6 +1308,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await naiveRegistryFilterContract.publishCommittee(
@@ -1312,6 +1332,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await naiveRegistryFilterContract.publishCommittee(
@@ -1341,6 +1362,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       const e3Id = 0;
@@ -1374,6 +1396,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       const e3Id = 0;
@@ -1413,6 +1436,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
       await expect(enclave.publishCiphertextOutput(e3Id, "0x", "0x"))
         .to.be.revertedWithCustomError(enclave, "E3NotActivated")
@@ -1452,6 +1476,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await naiveRegistryFilterContract.publishCommittee(
@@ -1482,6 +1507,7 @@ describe("Enclave", function () {
         e3Program: request.e3Program,
         e3ProgramParams: request.e3ProgramParams,
         computeProviderParams: request.computeProviderParams,
+        customParams: request.customParams,
       });
 
       await naiveRegistryFilterContract.publishCommittee(

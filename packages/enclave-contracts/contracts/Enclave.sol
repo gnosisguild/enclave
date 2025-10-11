@@ -299,6 +299,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         e3.expiration = 0;
         e3.e3Program = requestParams.e3Program;
         e3.e3ProgramParams = requestParams.e3ProgramParams;
+        e3.customParams = requestParams.customParams;
         e3.committeePublicKey = hex"";
         e3.ciphertextOutput = hex"";
         e3.plaintextOutput = hex"";

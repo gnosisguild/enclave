@@ -80,11 +80,11 @@ importers:
   examples/CRISP:
     dependencies:
       '@enclave-e3/contracts':
-        specifier: ^0.0.14-test
-        version: 0.0.14-test(@openzeppelin/contracts@5.3.0)
+        specifier: ^0.1.3
+        version: 0.1.3(@openzeppelin/contracts@5.3.0)
       '@enclave-e3/sdk':
-        specifier: ^0.0.14-test
-        version: 0.0.14-test(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
+        specifier: ^0.1.3
+        version: 0.1.3(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
       '@excubiae/contracts':
         specifier: ^0.4.0
         version: 0.4.0
@@ -101,9 +101,15 @@ importers:
         specifier: ^0.1.13
         version: 0.1.26
     devDependencies:
+      '@aztec/bb.js':
+        specifier: ^0.82.2
+        version: 0.82.3
       '@enclave-e3/config':
-        specifier: ^0.0.14-test
-        version: 0.0.14-test(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))
+        specifier: ^0.1.3
+        version: 0.1.3(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))
+      '@noir-lang/noir_js':
+        specifier: 1.0.0-beta.3
+        version: 1.0.0-beta.3
       '@nomicfoundation/hardhat-ethers':
         specifier: ^3.0.0
         version: 3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
@@ -112,7 +118,7 @@ importers:
         version: 3.0.2(@nomicfoundation/hardhat-verify@3.0.1(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)
       '@nomicfoundation/hardhat-toolbox':
         specifier: ^5.0.0
-        version: 5.0.0(a2c664a2c86c3ae5dd9cd312b280c590)
+        version: 5.0.0(9456a2560cd4b23b39399d823783d224)
       '@nomicfoundation/hardhat-toolbox-viem':
         specifier: ^5.0.0
         version: 5.0.0(57ef2920aa19fe9eb07b2e80a48eb774)
@@ -195,8 +201,8 @@ importers:
         specifier: ^11.11.4
         version: 11.14.0(@types/react@18.3.24)(react@18.3.1)
       '@enclave-e3/sdk':
-        specifier: ^0.0.13-test
-        version: 0.0.13-test(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)
+        specifier: ^0.1.3
+        version: 0.1.3(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)
       '@hashcloak/semaphore-noir-proof':
         specifier: 1.0.0
         version: 1.0.0(@semaphore-protocol/group@4.13.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@semaphore-protocol/identity@4.13.0)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
@@ -324,6 +330,37 @@ importers:
       vite-plugin-wasm:
         specifier: ^3.3.0
         version: 3.5.0(vite@5.4.19(@types/node@22.7.5))
+
+  examples/CRISP/sdk:
+    dependencies:
+      '@zk-kit/lean-imt':
+        specifier: ^2.2.4
+        version: 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      poseidon-lite:
+        specifier: ^0.3.0
+        version: 0.3.0
+      viem:
+        specifier: 2.30.6
+        version: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+    devDependencies:
+      '@types/chai':
+        specifier: ^5.2.2
+        version: 5.2.2
+      '@types/node':
+        specifier: 22.7.5
+        version: 22.7.5
+      chai:
+        specifier: ^6.2.0
+        version: 6.2.0
+      prettier:
+        specifier: ^3.2.5
+        version: 3.6.2
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@22.7.5)
 
   packages/enclave-config:
     dependencies:
@@ -600,7 +637,7 @@ importers:
         version: 5.3.0
       '@risc0/ethereum':
         specifier: file:lib/risc0-ethereum
-        version: file:templates/default/lib/risc0-ethereum
+        version: risc0-ethereum@file:templates/default/lib/risc0-ethereum
       '@types/chai':
         specifier: ^4.2.0
         version: 4.3.20
@@ -1506,28 +1543,19 @@ packages:
   '@emotion/weak-memoize@0.4.0':
     resolution: {integrity: sha512-snKqtPW01tN0ui7yu9rGv69aJXr/a/Ywvl11sUjNtEcRc+ng/mQriFL0wLXMef74iHa/EkftbDzU9F8iFbH+zg==}
 
-  '@enclave-e3/config@0.0.14-test':
-    resolution: {integrity: sha512-pJbYEfYqyEindgqBBxZEtKJuC8HDGi75hDAP5Hv6nF1PZVO0Zca9+ZJpP/f8JnfDT2cDpc+8tOX901J6gUG0zA==}
+  '@enclave-e3/config@0.1.3':
+    resolution: {integrity: sha512-Sh+yTbXR5U4aI1+GyPyo5mE0BBsN8HzpSh5BfdTV4L7BqjG/lkJ9DX1TaD1Bzdt7xe6vM0np0qfdIqDhMbptow==}
     peerDependencies:
       tsup: 8.5.0
 
-  '@enclave-e3/contracts@0.0.13-test':
-    resolution: {integrity: sha512-ZPtVGQd1zT8V+VsKBRb3u+2ywd8YmqYFa/TOjfh86uxrFkcQrnvUL9D49xbfJakNM34HDNV8ayUYwHvnhLAyEw==}
+  '@enclave-e3/contracts@0.1.3':
+    resolution: {integrity: sha512-A1EPfAX2fcZzqHZ6v02P/c6OJStyMrCsEZURSOlKHUOBUnCS/o0o67TcJ0/LNoi/yamI4UH+cGAzS/kW2i4QfQ==}
 
-  '@enclave-e3/contracts@0.0.14-test':
-    resolution: {integrity: sha512-L6O+VI1BN3nKaXST8LyGdAXAj/RxvJFcZoLTeTwRIuK+bgd/l+8sUv4k38S0bXyGY7AUbnPyBF5tEAy31LeYJA==}
+  '@enclave-e3/sdk@0.1.3':
+    resolution: {integrity: sha512-MtCP2HX/GVMR8efiunKqYOeTkfKV/0biwb3dTJ2gylJfqV1Z8c9cHymj+Ivd1ZI+tbYPHvLoSs4PUMsdA/cLZA==}
 
-  '@enclave-e3/sdk@0.0.13-test':
-    resolution: {integrity: sha512-bk9TlqGKzpzGogAn22X/CcsNW06NX0q1VhoaEAoxtmN0eHPHYNhz5nJbtDTC+S7M/zANQfxjpFQFw9OTrUIszA==}
-
-  '@enclave-e3/sdk@0.0.14-test':
-    resolution: {integrity: sha512-QefYvo3hqNTcxUDukqM+czo74rZ+35I5ej7MXDBMvsT9WdhrwOEyOCZcIjsPBE54UFJQGwbGlk8r6oBRP+cjxQ==}
-
-  '@enclave-e3/wasm@0.0.13-test':
-    resolution: {integrity: sha512-taZ0l8/Fg1C7HapCnLHBJlbUjSWxRRVjkamlSMvz7U5CkZTGHprEolYMAwrR1ihv2BWL2k5ik3M7VMZuXmaylA==}
-
-  '@enclave-e3/wasm@0.0.14-test':
-    resolution: {integrity: sha512-MeIozUOb6Gi8W3ZEZHQ15+YvxbTyTLbaI/C+wJ8rm6GcYcOOvzeRXM8C5HtfLh1xo+BQayxpLIul1ruE2RRY5w==}
+  '@enclave-e3/wasm@0.1.3':
+    resolution: {integrity: sha512-pKssAhrIjZJPF6N32JMA44MMOUU2Xrxxh4zx0/+qGx7MsSOFNXEg67or45C1OOewCzWrsuYdMWfyR7UibddiGA==}
 
   '@esbuild/aix-ppc64@0.20.0':
     resolution: {integrity: sha512-fGFDEctNh0CcSwsiRPxiaqX0P5rq+AqE0SRhYGZ4PX46Lg1FNR6oCxJghf8YgY0WQEgQuh3lErUFE4KxLeRmmw==}
@@ -3013,9 +3041,6 @@ packages:
   '@reown/appkit@1.7.8':
     resolution: {integrity: sha512-51kTleozhA618T1UvMghkhKfaPcc9JlKwLJ5uV+riHyvSoWPKPRIa5A6M1Wano5puNyW0s3fwywhyqTHSilkaA==}
 
-  '@risc0/ethereum@file:templates/default/lib/risc0-ethereum':
-    resolution: {directory: templates/default/lib/risc0-ethereum, type: directory}
-
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
 
@@ -3556,6 +3581,9 @@ packages:
   '@types/chai@4.3.20':
     resolution: {integrity: sha512-/pC9HAB5I/xMlc5FP77qjCnI16ChlJfW0tGa0IUcFn38VJrTV6DeZ60NU5KZBtaOZqjdpwTWohz5HU1RrhiYxQ==}
 
+  '@types/chai@5.2.2':
+    resolution: {integrity: sha512-8kB30R7Hwqf40JPiKhVzodJs2Qc1ZJ5zuT3uzw5Hq/dhNCl3G3l83jfpdI1e20BP348+fV7VIL/+FxaXkqBmWg==}
+
   '@types/concat-stream@1.6.1':
     resolution: {integrity: sha512-eHE4cQPoj6ngxBZMvVf6Hw7Mh4jMW4U9lpGmS5GBPB9RYxlFg+CHaVN7ErNY4W9XfLIEn20b4VDYaIrbq0q4uA==}
 
@@ -3573,6 +3601,9 @@ packages:
 
   '@types/debug@4.1.12':
     resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
+
+  '@types/deep-eql@4.0.2':
+    resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
   '@types/estree-jsx@1.0.5':
     resolution: {integrity: sha512-52CcUVNFyfb1A2ALocQw/Dd1BQFNmSdkuC3BkZ6iqhdMfQz7JWOFRuJFloOzjk+6WijU56m9oKXFAXc7o3Towg==}
@@ -4505,6 +4536,10 @@ packages:
 
   chai@5.3.3:
     resolution: {integrity: sha512-4zNhdJD/iOjSH0A05ea+Ke6MU5mmpQcbQsSOkgdaUMJ9zTlDTD/GYlwohmIE2u0gaxHYiVHEn1Fw9mZ/ktJWgw==}
+    engines: {node: '>=18'}
+
+  chai@6.2.0:
+    resolution: {integrity: sha512-aUTnJc/JipRzJrNADXVvpVqi6CO0dn3nx4EVPxijri+fj3LUUDyZQOgVeW54Ob3Y1Xh9Iz8f+CgaCl8v0mn9bA==}
     engines: {node: '>=18'}
 
   chainsaw@0.1.0:
@@ -8318,6 +8353,9 @@ packages:
   ripemd160@2.0.2:
     resolution: {integrity: sha512-ii4iagi25WusVoiC4B4lq7pbXfAp3D9v5CwfkY33vffw2+pkDjY1D8GaN7spsxvCSx8dkPqOZCEZyfxcmJG2IA==}
 
+  risc0-ethereum@file:templates/default/lib/risc0-ethereum:
+    resolution: {directory: templates/default/lib/risc0-ethereum, type: directory}
+
   robust-predicates@3.0.2:
     resolution: {integrity: sha512-IXgzBWvWQwE6PrDI05OvmXUIruQTcoMDzRsOd5CDvHCVLcLHMTSYvOK5Cm46kWqlV3yAbuSpBZdJ5oP5OUoStg==}
 
@@ -10862,11 +10900,11 @@ snapshots:
 
   '@emotion/weak-memoize@0.4.0': {}
 
-  '@enclave-e3/config@0.0.14-test(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))':
+  '@enclave-e3/config@0.1.3(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))':
     dependencies:
       tsup: 8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)
 
-  '@enclave-e3/contracts@0.0.13-test(@openzeppelin/contracts@5.3.0)':
+  '@enclave-e3/contracts@0.1.3(@openzeppelin/contracts@5.3.0)':
     dependencies:
       '@openzeppelin/contracts-upgradeable': 5.4.0(@openzeppelin/contracts@5.3.0)
       '@zk-kit/lean-imt.sol': 2.0.1
@@ -10874,55 +10912,11 @@ snapshots:
     transitivePeerDependencies:
       - '@openzeppelin/contracts'
 
-  '@enclave-e3/contracts@0.0.14-test(@openzeppelin/contracts@5.3.0)':
-    dependencies:
-      '@openzeppelin/contracts-upgradeable': 5.4.0(@openzeppelin/contracts@5.3.0)
-      '@zk-kit/lean-imt.sol': 2.0.1
-      poseidon-solidity: 0.0.5
-    transitivePeerDependencies:
-      - '@openzeppelin/contracts'
-
-  '@enclave-e3/sdk@0.0.13-test(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)':
+  '@enclave-e3/sdk@0.1.3(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)':
     dependencies:
       '@aztec/bb.js': 0.82.3
-      '@enclave-e3/contracts': 0.0.13-test(@openzeppelin/contracts@5.3.0)
-      '@enclave-e3/wasm': 0.0.13-test
-      '@noir-lang/noir_js': 1.0.0-beta.3
-      comlink: 4.4.2
-      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
-      vite-plugin-top-level-await: 1.6.0(rollup@4.49.0)(vite@5.4.19(@types/node@22.7.5))
-      vite-plugin-wasm: 3.5.0(vite@5.4.19(@types/node@22.7.5))
-      vitest: 1.6.1(@types/node@22.7.5)
-      web-worker: 1.5.0
-    transitivePeerDependencies:
-      - '@edge-runtime/vm'
-      - '@openzeppelin/contracts'
-      - '@swc/helpers'
-      - '@types/node'
-      - '@vitest/browser'
-      - '@vitest/ui'
-      - bufferutil
-      - happy-dom
-      - jsdom
-      - less
-      - lightningcss
-      - rollup
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-      - typescript
-      - utf-8-validate
-      - vite
-      - zod
-
-  '@enclave-e3/sdk@0.0.14-test(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)':
-    dependencies:
-      '@aztec/bb.js': 0.82.3
-      '@enclave-e3/contracts': 0.0.14-test(@openzeppelin/contracts@5.3.0)
-      '@enclave-e3/wasm': 0.0.14-test
+      '@enclave-e3/contracts': 0.1.3(@openzeppelin/contracts@5.3.0)
+      '@enclave-e3/wasm': 0.1.3
       '@noir-lang/noir_js': 1.0.0-beta.3
       comlink: 4.4.2
       viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
@@ -10954,9 +10948,43 @@ snapshots:
       - vite
       - zod
 
-  '@enclave-e3/wasm@0.0.13-test': {}
+  '@enclave-e3/sdk@0.1.3(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)':
+    dependencies:
+      '@aztec/bb.js': 0.82.3
+      '@enclave-e3/contracts': 0.1.3(@openzeppelin/contracts@5.3.0)
+      '@enclave-e3/wasm': 0.1.3
+      '@noir-lang/noir_js': 1.0.0-beta.3
+      comlink: 4.4.2
+      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+      vite-plugin-top-level-await: 1.6.0(rollup@4.49.0)(vite@5.4.19(@types/node@22.7.5))
+      vite-plugin-wasm: 3.5.0(vite@5.4.19(@types/node@22.7.5))
+      vitest: 1.6.1(@types/node@22.7.5)
+      web-worker: 1.5.0
+    transitivePeerDependencies:
+      - '@edge-runtime/vm'
+      - '@openzeppelin/contracts'
+      - '@swc/helpers'
+      - '@types/node'
+      - '@vitest/browser'
+      - '@vitest/ui'
+      - bufferutil
+      - happy-dom
+      - jsdom
+      - less
+      - lightningcss
+      - rollup
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+      - typescript
+      - utf-8-validate
+      - vite
+      - zod
 
-  '@enclave-e3/wasm@0.0.14-test': {}
+  '@enclave-e3/wasm@0.1.3': {}
 
   '@esbuild/aix-ppc64@0.20.0':
     optional: true
@@ -12219,12 +12247,12 @@ snapshots:
       '@nomicfoundation/edr-linux-x64-musl': 0.12.0-next.5
       '@nomicfoundation/edr-win32-x64-msvc': 0.12.0-next.5
 
-  '@nomicfoundation/hardhat-chai-matchers@2.1.0(@nomicfoundation/hardhat-ethers@3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(chai@5.3.3)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))':
+  '@nomicfoundation/hardhat-chai-matchers@2.1.0(@nomicfoundation/hardhat-ethers@3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(chai@6.2.0)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))':
     dependencies:
       '@nomicfoundation/hardhat-ethers': 3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       '@types/chai-as-promised': 7.1.8
-      chai: 5.3.3
-      chai-as-promised: 7.1.2(chai@5.3.3)
+      chai: 6.2.0
+      chai-as-promised: 7.1.2(chai@6.2.0)
       deep-eql: 4.1.4
       ethers: 6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       hardhat: 3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -12438,9 +12466,9 @@ snapshots:
       hardhat: 3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
 
-  '@nomicfoundation/hardhat-toolbox@5.0.0(a2c664a2c86c3ae5dd9cd312b280c590)':
+  '@nomicfoundation/hardhat-toolbox@5.0.0(9456a2560cd4b23b39399d823783d224)':
     dependencies:
-      '@nomicfoundation/hardhat-chai-matchers': 2.1.0(@nomicfoundation/hardhat-ethers@3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(chai@5.3.3)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
+      '@nomicfoundation/hardhat-chai-matchers': 2.1.0(@nomicfoundation/hardhat-ethers@3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(chai@6.2.0)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       '@nomicfoundation/hardhat-ethers': 3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       '@nomicfoundation/hardhat-ignition-ethers': 3.0.2(@nomicfoundation/hardhat-ethers@3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(@nomicfoundation/hardhat-ignition@3.0.2(@nomicfoundation/hardhat-verify@3.0.1(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10))(@nomicfoundation/hardhat-verify@3.0.1(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)))(@nomicfoundation/ignition-core@3.0.2(bufferutil@4.0.9)(utf-8-validate@5.0.10))(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       '@nomicfoundation/hardhat-verify': 3.0.1(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
@@ -12449,7 +12477,7 @@ snapshots:
       '@types/chai': 4.3.20
       '@types/mocha': 10.0.10
       '@types/node': 22.7.5
-      chai: 5.3.3
+      chai: 6.2.0
       ethers: 6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       hardhat: 3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       hardhat-gas-reporter: 1.0.10(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)
@@ -12878,8 +12906,6 @@ snapshots:
       - uploadthing
       - utf-8-validate
       - zod
-
-  '@risc0/ethereum@file:templates/default/lib/risc0-ethereum': {}
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
@@ -13549,6 +13575,10 @@ snapshots:
 
   '@types/chai@4.3.20': {}
 
+  '@types/chai@5.2.2':
+    dependencies:
+      '@types/deep-eql': 4.0.2
+
   '@types/concat-stream@1.6.1':
     dependencies:
       '@types/node': 22.7.5
@@ -13568,6 +13598,8 @@ snapshots:
   '@types/debug@4.1.12':
     dependencies:
       '@types/ms': 2.1.0
+
+  '@types/deep-eql@4.0.2': {}
 
   '@types/estree-jsx@1.0.5':
     dependencies:
@@ -15088,9 +15120,9 @@ snapshots:
 
   ccount@2.0.1: {}
 
-  chai-as-promised@7.1.2(chai@5.3.3):
+  chai-as-promised@7.1.2(chai@6.2.0):
     dependencies:
-      chai: 5.3.3
+      chai: 6.2.0
       check-error: 1.0.3
 
   chai-as-promised@8.0.2(chai@4.5.0):
@@ -15120,6 +15152,8 @@ snapshots:
       deep-eql: 5.0.2
       loupe: 3.2.1
       pathval: 2.0.1
+
+  chai@6.2.0: {}
 
   chainsaw@0.1.0:
     dependencies:
@@ -19897,6 +19931,8 @@ snapshots:
     dependencies:
       hash-base: 3.1.0
       inherits: 2.0.4
+
+  risc0-ethereum@file:templates/default/lib/risc0-ethereum: {}
 
   robust-predicates@3.0.2: {}
 

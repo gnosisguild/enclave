@@ -60,17 +60,17 @@ See [CONTRIBUTING.md][contributing].
                 </a>
             </td>
             <td align="center">
+                <a href="https://github.com/ctrlc03">
+                    <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
+                    <br />
+                    <sub><b>ctrlc03</b></sub>
+                </a>
+            </td>
+            <td align="center">
                 <a href="https://github.com/cristovaoth">
                     <img src="https://avatars.githubusercontent.com/u/12870300?v=4" width="100;" alt="cristovaoth"/>
                     <br />
                     <sub><b>Cristóvão</b></sub>
-                </a>
-            </td>
-            <td align="center">
-                <a href="https://github.com/nginnever">
-                    <img src="https://avatars.githubusercontent.com/u/7103153?v=4" width="100;" alt="nginnever"/>
-                    <br />
-                    <sub><b>Nathan Ginnever</b></sub>
                 </a>
             </td>
 		</tr>
@@ -80,6 +80,15 @@ See [CONTRIBUTING.md][contributing].
                     <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
                     <br />
                     <sub><b>ctrlc03</b></sub>
+                </a>
+            </td>
+		</tr>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/nginnever">
+                    <img src="https://avatars.githubusercontent.com/u/7103153?v=4" width="100;" alt="nginnever"/>
+                    <br />
+                    <sub><b>Nathan Ginnever</b></sub>
                 </a>
             </td>
             <td align="center">
@@ -94,6 +103,13 @@ See [CONTRIBUTING.md][contributing].
                     <img src="https://avatars.githubusercontent.com/u/11427903?v=4" width="100;" alt="cedoor"/>
                     <br />
                     <sub><b>Cedoor</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/ozgurarmanc">
+                    <img src="https://avatars.githubusercontent.com/u/94117770?v=4" width="100;" alt="ozgurarmanc"/>
+                    <br />
+                    <sub><b>Armanc</b></sub>
                 </a>
             </td>
             <td align="center">
@@ -217,6 +233,8 @@ This command automatically:
 - ✅ Pushes commits and tag to GitHub
 - ✅ **Triggers automated release workflow**
 
+Please ensure you are in release branch before running the command. For example, `git checkout -b chore/release-v1.0.0-beta.1`.
+
 #### 3. Alternative: Manual Review Before Push
 
 If you prefer to review changes before pushing:
@@ -295,9 +313,10 @@ cargo build --release
 
 ### Current Setup
 
-- **`main`** - Primary development branch
+- **`main`** - Stable branch 
 - **`v*.*.*`** - Version tags for releases
 - **`stable`** - Always points to the latest stable release
+- **`dev`** - Branch for ongoing development
 
 ### Installation Sources
 
@@ -394,4 +413,3 @@ This repo created under the [LGPL-3.0+ license](LICENSE).
 [crisp]: https://docs.enclave.gg/CRISP/introduction
 [telegram]: https://t.me/+raYAZgrwgOw2ODJh
 [contributing]: CONTRIBUTING.md
-

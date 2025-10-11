@@ -23,6 +23,7 @@ import { IDecryptionVerifier } from "./IDecryptionVerifier.sol";
  * @param encryptionSchemeId Identifier for the encryption scheme used in this computation
  * @param e3Program Address of the E3 Program contract that validates and verifies the computation
  * @param e3ProgramParams ABI encoded computation parameters specific to the E3 program
+ * @param customParams Arbitrary ABI-encoded application-defined parameters.
  * @param inputValidator Address of the input validator contract for input verification
  * @param decryptionVerifier Address of the output verifier contract for decryption verification
  * @param committeePublicKey The public key of the selected committee for this computation
@@ -39,6 +40,7 @@ struct E3 {
     bytes32 encryptionSchemeId;
     IE3Program e3Program;
     bytes e3ProgramParams;
+    bytes customParams;
     IInputValidator inputValidator;
     IDecryptionVerifier decryptionVerifier;
     bytes32 committeePublicKey;

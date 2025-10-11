@@ -68,6 +68,7 @@ function MyComponent() {
         e3Program: "0x...",
         e3ProgramParams: "0x...",
         computeProviderParams: "0x...",
+        customParams: "0x...",
       });
       console.log("E3 requested with hash:", hash);
     } catch (error) {
