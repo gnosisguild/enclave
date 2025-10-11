@@ -180,7 +180,7 @@ where
     // Resubscribe first to avoid missing events
     let mut rx = net_events.resubscribe();
 
-    // Extract correlation_id
+    // Extract correlation_id from command
     let Some(id) = command.correlation_id() else {
         return Err(anyhow::anyhow!(format!(
             "Command must have a correlation_id but this does not: {:?}",
