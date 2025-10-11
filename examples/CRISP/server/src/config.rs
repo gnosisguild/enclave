@@ -35,7 +35,12 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
-        dotenv().ok();
+        let server_env_path = std::path::Path::new("server/.env");
+        if server_env_path.exists() {
+            dotenvy::from_path(server_env_path).ok();
+        } else {
+            dotenv().ok();
+        }
         ConfigManager::builder()
             .add_source(config::Environment::default())
             .build()?

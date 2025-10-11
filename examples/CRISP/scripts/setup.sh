@@ -9,7 +9,7 @@ echo "pnpm install"
 echo "evm"
 (cd ../../packages/enclave-contracts && pnpm compile)
 echo "server"
-(cd ./server && [[ ! -f .env ]] && cp .env.example .env; [[ ! -f ../.env ]] && cp .env.example ../.env; cargo build --locked --bin cli && cargo build --locked --bin server)
+(cd ./server && [[ ! -f .env ]] && cp .env.example .env; cargo build --locked --bin cli && cargo build --locked --bin server)
 echo "client"
 (cd ./client && if [[ ! -f .env ]]; then cp .env.example .env; fi)
 echo "ciphernode"
