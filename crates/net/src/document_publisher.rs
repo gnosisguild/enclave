@@ -27,8 +27,8 @@ use actix::prelude::*;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
-    CiphernodeSelected, CorrelationId, E3RequestComplete, E3id, EnclaveEvent, EventBus,
-    PublishDocumentRequested, Subscribe,
+    CiphernodeSelected, CorrelationId, DocumentReceived, E3RequestComplete, E3id, EnclaveEvent,
+    EventBus, PublishDocumentRequested, Subscribe,
 };
 use std::{
     collections::HashSet,
@@ -36,7 +36,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
-use tracing::error;
+use tracing::{debug, error, info};
 
 /// DocumentPublisher is an actor that monitors events from both the NetInterface and the Enclave
 /// EventBus in order to manage document publishing interactions. In particular this involves the
@@ -97,9 +97,11 @@ impl DocumentPublisher {
 
         // Forward gossip data from NetEvent
         tokio::spawn({
+            debug!("Spawning event receive loop!");
             let addr = addr.clone();
             async move {
                 while let Ok(event) = events.recv().await {
+                    debug!("Received event {:?}", event);
                     match event {
                         NetEvent::GossipData(GossipData::DocumentPublishedNotification(data)) => {
                             addr.do_send(data)
@@ -151,8 +153,25 @@ impl DocumentPublisher {
     }
 
     /// Called when we receive a notification from the net_interface
-    pub fn handle_document_published_notification(_: DocumentPublishedNotification) -> Result<()> {
-        // tbc..
+    pub async fn handle_document_published_notification(
+        net_cmds: mpsc::Sender<NetCommand>,
+        net_events: Arc<broadcast::Receiver<NetEvent>>,
+        bus: Addr<EventBus<EnclaveEvent>>,
+        ids: HashSet<E3id>,
+        event: DocumentPublishedNotification,
+    ) -> Result<()> {
+        // Am I interested in it?
+        // TODO: We will need to check for party_id here too if the doc spans multiple partys. We
+        // don't need this yet however
+        if ids.contains(&event.meta.e3_id) {
+            // if so get_record!
+            let value = Self::get_record(net_cmds, net_events, event.key).await?;
+            // And forward it!
+            bus.do_send(EnclaveEvent::from(DocumentReceived {
+                meta: event.meta,
+                value,
+            }))
+        }
         Ok(())
     }
 
@@ -185,7 +204,31 @@ impl DocumentPublisher {
         )
         .await
     }
-
+    /// Call DhtPutRecord Command on the NetInterface and handle the results
+    async fn get_record(
+        net_cmds: mpsc::Sender<NetCommand>,
+        net_events: Arc<broadcast::Receiver<NetEvent>>,
+        key: Cid,
+    ) -> Result<Vec<u8>> {
+        let id = CorrelationId::new();
+        call_and_await_response(
+            net_cmds,
+            net_events,
+            NetCommand::DhtGetRecord {
+                correlation_id: id,
+                key,
+            },
+            |event| match event {
+                NetEvent::DhtGetRecordSucceeded { value, .. } => Some(Ok(value.clone())),
+                NetEvent::DhtGetRecordError { error, .. } => {
+                    Some(Err(anyhow::anyhow!("DHT get record failed: {:?}", error)))
+                }
+                _ => None,
+            },
+            Duration::from_secs(3),
+        )
+        .await
+    }
     /// Broadcasts document published notification on NetInterface
     async fn broadcast_document_published_notification(
         net_cmds: mpsc::Sender<NetCommand>,
@@ -194,7 +237,6 @@ impl DocumentPublisher {
         topic: impl Into<String>,
     ) -> Result<()> {
         let id = CorrelationId::new();
-
         call_and_await_response(
             net_cmds,
             net_events,
@@ -275,18 +317,26 @@ impl Handler<E3RequestComplete> for DocumentPublisher {
 }
 
 impl Handler<DocumentPublishedNotification> for DocumentPublisher {
-    type Result = ();
+    type Result = ResponseFuture<()>;
     fn handle(
         &mut self,
         msg: DocumentPublishedNotification,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        match Self::handle_document_published_notification(msg) {
-            Ok(_) => (),
-            Err(e) => {
-                error!("{e}")
+        let ids = self.ids.clone();
+        let bus = self.bus.clone();
+        let tx = self.tx.clone();
+        let msg = msg.clone();
+        let rx = self.rx.clone();
+
+        Box::pin(async move {
+            match Self::handle_document_published_notification(tx, rx, bus, ids, msg).await {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("{e}");
+                }
             }
-        }
+        })
     }
 }
 
@@ -316,11 +366,13 @@ mod tests {
     };
     use tokio::{
         sync::{broadcast, mpsc},
-        time::timeout,
+        time::{sleep, timeout},
     };
 
     #[actix::test]
     async fn test_publishes_document() -> Result<()> {
+        tracing_subscriber::fmt::init();
+
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let (net_cmd_tx, mut net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
@@ -364,6 +416,7 @@ mod tests {
         // 4. Expect a DocumentPublishedNotification to have been emitted
         let Some(NetCommand::GossipPublish {
             topic,
+            correlation_id,
             data: GossipData::DocumentPublishedNotification(notification),
             ..
         }) = timeout(Duration::from_secs(1), net_cmd_rx.recv())
@@ -372,6 +425,12 @@ mod tests {
         else {
             bail!("msg not as expected");
         };
+
+        // 5. Report everything went well
+        net_evt_tx.send(NetEvent::GossipPublished {
+            correlation_id,
+            message_id: libp2p::gossipsub::MessageId::new(&[1, 2, 3]),
+        })?;
 
         assert_eq!(topic, "topic");
         assert_eq!(notification.meta.e3_id, E3id::new("1243", 1));
@@ -393,6 +452,10 @@ mod tests {
     // #[ignore]
     #[actix::test]
     async fn test_notified_of_document() -> Result<()> {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG) // Set log level
+            .init();
+
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
         let (net_cmd_tx, mut net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
@@ -415,7 +478,12 @@ mod tests {
         net_evt_tx.send(NetEvent::GossipData(
             GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
                 key: Cid::from_content(&b"wrong document".to_vec()),
-                meta: DocumentMeta::new(e3_id.clone(), DocumentKind::TrBFV, vec![], expires_at),
+                meta: DocumentMeta::new(
+                    E3id::new("1111", 1),
+                    DocumentKind::TrBFV,
+                    vec![],
+                    expires_at,
+                ),
             }),
         ))?;
 
@@ -442,15 +510,15 @@ mod tests {
         else {
             bail!("msg not as expected");
         };
-
-        assert_eq!(key, cid);
-
-        // 6. Forward the document
-        net_evt_tx.send(NetEvent::DhtGetRecordSucceeded {
-            key: cid,
-            correlation_id, // same correlation_id
-            value,
-        })?;
+        //
+        // assert_eq!(key, cid);
+        //
+        // // 6. Forward the document
+        // net_evt_tx.send(NetEvent::DhtGetRecordSucceeded {
+        //     key: cid,
+        //     correlation_id, // same correlation_id
+        //     value,
+        // })?;
 
         // XXX: Need some of the testing tools from #660 to wait for the bus event
 

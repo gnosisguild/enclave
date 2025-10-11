@@ -117,6 +117,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: Shutdown,
     },
+    DocumentReceived {
+        id: EventId,
+        data: DocumentReceived,
+    },
     /// This is a test event to use in testing
     TestEvent {
         id: EventId,
@@ -187,6 +191,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
             EnclaveEvent::TestEvent { id, .. } => id,
+            EnclaveEvent::DocumentReceived { id, .. } => id,
         }
     }
 }
@@ -220,6 +225,7 @@ impl EnclaveEvent {
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
+            EnclaveEvent::DocumentReceived { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
     }
@@ -239,7 +245,8 @@ impl_from_event!(
     CiphernodeRemoved,
     EnclaveError,
     Shutdown,
-    TestEvent
+    TestEvent,
+    DocumentReceived
 );
 
 impl FromError for EnclaveEvent {

@@ -68,6 +68,7 @@ impl NetCommand {
         match self {
             N::DhtPutRecord { correlation_id, .. } => Some(*correlation_id),
             N::DhtGetRecord { correlation_id, .. } => Some(*correlation_id),
+            N::GossipPublish { correlation_id, .. } => Some(*correlation_id),
             _ => None,
         }
     }
@@ -167,15 +168,15 @@ impl DocumentPublishedNotification {
 }
 
 /// Generic helper for the command-response pattern with correlation IDs
-pub async fn call_and_await_response<F>(
+pub async fn call_and_await_response<F, R>(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     command: NetCommand,
     matcher: F,
     timeout: Duration,
-) -> Result<()>
+) -> Result<R>
 where
-    F: Fn(&NetEvent) -> Option<Result<()>>,
+    F: Fn(&NetEvent) -> Option<Result<R>>,
 {
     // Resubscribe first to avoid missing events
     let mut rx = net_events.resubscribe();

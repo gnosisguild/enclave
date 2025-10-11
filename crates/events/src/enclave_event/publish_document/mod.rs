@@ -74,7 +74,7 @@ impl Display for PublishDocumentRequested {
 #[rtype(result = "()")]
 pub struct DocumentReceived {
     /// Document metadata
-    meta: DocumentMeta,
+    pub meta: DocumentMeta,
     /// Document value from kademlia
-    value: Vec<u8>, // TODO: ArcBytes
+    pub value: Vec<u8>, // TODO: ArcBytes
 }
