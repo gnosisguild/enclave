@@ -522,15 +522,15 @@ mod tests {
         else {
             bail!("msg not as expected");
         };
-        //
-        // assert_eq!(key, cid);
-        //
-        // // 6. Forward the document
-        // net_evt_tx.send(NetEvent::DhtGetRecordSucceeded {
-        //     key: cid,
-        //     correlation_id, // same correlation_id
-        //     value,
-        // })?;
+
+        assert_eq!(key, cid);
+
+        // 6. Forward the document
+        net_evt_tx.send(NetEvent::DhtGetRecordSucceeded {
+            key: cid,
+            correlation_id,
+            value,
+        })?;
 
         // XXX: Need some of the testing tools from #660 to wait for the bus event
 
