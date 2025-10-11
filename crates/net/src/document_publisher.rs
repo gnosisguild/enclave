@@ -30,7 +30,11 @@ use e3_events::{
     CiphernodeSelected, CorrelationId, E3RequestComplete, E3id, EnclaveEvent, EventBus,
     PublishDocumentRequested, Subscribe,
 };
-use std::{collections::HashSet, sync::Arc, time::Instant};
+use std::{
+    collections::HashSet,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{broadcast, mpsc};
 use tracing::error;
 
@@ -170,15 +174,14 @@ impl DocumentPublisher {
                 value,
                 key,
             },
-            |event| {
-                match event {
-                    NetEvent::DhtPutRecordSucceeded { .. } => Some(Ok(())),
-                    NetEvent::DhtPutRecordError { error, .. } => {
-                        Some(Err(anyhow::anyhow!("DHT put record failed: {:?}", error)))
-                    }
-                    _ => None, // Unexpected event type, keep waiting
+            |event| match event {
+                NetEvent::DhtPutRecordSucceeded { .. } => Some(Ok(())),
+                NetEvent::DhtPutRecordError { error, .. } => {
+                    Some(Err(anyhow::anyhow!("DHT put record failed: {:?}", error)))
                 }
+                _ => None,
             },
+            Duration::from_secs(3),
         )
         .await
     }
@@ -200,15 +203,14 @@ impl DocumentPublisher {
                 correlation_id: id,
                 data: GossipData::DocumentPublishedNotification(payload),
             },
-            |event| {
-                match event {
-                    NetEvent::GossipPublished { .. } => Some(Ok(())),
-                    NetEvent::GossipPublishError { error, .. } => {
-                        Some(Err(anyhow::anyhow!("GossipPublished failed: {:?}", error)))
-                    }
-                    _ => None, // Unexpected event type, keep waiting
+            |event| match event {
+                NetEvent::GossipPublished { .. } => Some(Ok(())),
+                NetEvent::GossipPublishError { error, .. } => {
+                    Some(Err(anyhow::anyhow!("GossipPublished failed: {:?}", error)))
                 }
+                _ => None,
             },
+            Duration::from_secs(3),
         )
         .await
     }

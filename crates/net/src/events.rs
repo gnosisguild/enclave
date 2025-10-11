@@ -13,7 +13,11 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
-use std::{hash::Hash, sync::Arc, time::Instant};
+use std::{
+    hash::Hash,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{broadcast, mpsc};
 
 /// Incoming/Outgoing GossipData. We disambiguate on concerns relative to the net package.
@@ -163,12 +167,12 @@ impl DocumentPublishedNotification {
 }
 
 /// Generic helper for the command-response pattern with correlation IDs
-/// TODO: The loop is fine as a "wait for my correlation id" gate, but there’s a race since we resubscribe after send so if the publish ack is emitted immediately we can miss it and loop forever.
 pub async fn call_and_await_response<F>(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     command: NetCommand,
     matcher: F,
+    timeout: Duration,
 ) -> Result<()>
 where
     F: Fn(&NetEvent) -> Option<Result<()>>,
@@ -183,22 +187,28 @@ where
         )));
     };
 
-    net_cmds.send(command).await?;
+    net_cmds.send(command.clone()).await?;
 
-    loop {
-        match rx.recv().await {
-            Ok(event) => {
-                // Only process events matching our correlation ID
-                if event.correlation_id() == Some(id) {
-                    if let Some(result) = matcher(&event) {
-                        return result;
+    let result = tokio::time::timeout(timeout, async {
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    // Only process events matching our correlation ID
+                    if event.correlation_id() == Some(id) {
+                        if let Some(result) = matcher(&event) {
+                            return result;
+                        }
+                        // None means unexpected event type, keep waiting
                     }
-                    // None means unexpected event type, keep waiting
+                    // Ignore events with non-matching IDs
                 }
-                // Ignore events with non-matching IDs
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(e) => return Err(e.into()),
             }
-            Err(broadcast::error::RecvError::Lagged(_)) => continue,
-            Err(e) => return Err(e.into()),
         }
-    }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!(format!("Timed out waiting for response from {:?}", command)))?;
+
+    result
 }
