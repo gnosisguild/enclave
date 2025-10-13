@@ -4,39 +4,28 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-// TODO: Create DocumentPublisher actor
-// - [ ] Accept EnclaveEvent::CiphernodeSelected and store selected e3_ids in a blume filter
-// - [x] Accept EnclaveEvent::PublishDocumentRequested
-// - [x] Take the payload and convert to NetCommand::DhtPutRecord
-// - [-] Accept NetEvent::GossipData(GossipData::DocumentPublishedNotification) from NetInterface
-//       Determine if we are keeping track of the given e3_id based on DocumentMeta
-//       and the e3_id hashset if so then issue a NetCommand::DhtGetRecord
-// - [ ] Receive the document from NetEvent::FetchDocumentSucceeded and convert to
-//        EnclaveEvent::DocumentReceived
-// - [ ] Accept NetEvent::DhtGetRecordError and attempt to retry with exponential backoff
-
-#![allow(dead_code)]
-
 use crate::{
     events::{
         call_and_await_response, DocumentPublishedNotification, GossipData, NetCommand, NetEvent,
     },
+    retry::{retry_with_backoff, to_retry, BACKOFF_DELAY},
     Cid,
 };
 use actix::prelude::*;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use e3_events::{
-    CiphernodeSelected, CorrelationId, DocumentReceived, E3RequestComplete, E3id, EnclaveEvent,
-    EventBus, PublishDocumentRequested, Subscribe,
+    BusError, CiphernodeSelected, CorrelationId, DocumentReceived, E3RequestComplete, E3id,
+    EnclaveErrorType, EnclaveEvent, EventBus, PublishDocumentRequested, Subscribe,
 };
+use futures::TryFutureExt;
 use std::{
     collections::HashSet,
     sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::sync::{broadcast, mpsc};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 /// DocumentPublisher is an actor that monitors events from both the NetInterface and the Enclave
 /// EventBus in order to manage document publishing interactions. In particular this involves the
@@ -138,7 +127,15 @@ impl DocumentPublisher {
         let key = Cid::from_content(&value);
         let expires = datetime_to_instant_from_now(event.meta.expires_at);
 
-        Self::put_record(tx.clone(), rx.clone(), expires, value, key.clone()).await?;
+        retry_with_backoff(
+            || {
+                Self::put_record(tx.clone(), rx.clone(), expires, value.clone(), key.clone())
+                    .map_err(to_retry)
+            },
+            4,
+            1000,
+        )
+        .await?;
 
         Self::broadcast_document_published_notification(
             tx,
@@ -284,12 +281,14 @@ impl Handler<PublishDocumentRequested> for DocumentPublisher {
         let tx = self.tx.clone();
         let msg = msg.clone();
         let rx = self.rx.clone();
+        let bus = self.bus.clone();
         let topic = self.topic.clone();
         Box::pin(async move {
             match Self::handle_publish_document_requested(tx, rx, msg, topic).await {
                 Ok(_) => (),
                 Err(e) => {
                     error!(error=?e, "Could not handle publish document requested");
+                    bus.err(EnclaveErrorType::IO, e)
                 }
             }
         })
@@ -363,18 +362,30 @@ mod tests {
 
     use super::*;
     use crate::events::NetCommand;
+    use actix::Addr;
     use anyhow::{bail, Result};
     use e3_events::{
-        CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveEvent, EventBus,
-        EventBusConfig, GetHistory, HistoryCollector, PublishDocumentRequested,
+        CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveEvent, ErrorCollector,
+        EventBus, EventBusConfig, GetErrors, GetHistory, HistoryCollector,
+        PublishDocumentRequested,
     };
     use tokio::{
         sync::{broadcast, mpsc},
         time::{sleep, timeout},
     };
+    use tracing::subscriber::DefaultGuard;
 
-    #[actix::test]
-    async fn test_publishes_document() -> Result<()> {
+    fn setup_test() -> (
+        DefaultGuard,
+        Addr<EventBus<EnclaveEvent>>,
+        mpsc::Sender<NetCommand>,
+        mpsc::Receiver<NetCommand>,
+        broadcast::Sender<NetEvent>,
+        Arc<broadcast::Receiver<NetEvent>>,
+        Addr<HistoryCollector<EnclaveEvent>>,
+        Addr<ErrorCollector<EnclaveEvent>>,
+        Addr<DocumentPublisher>,
+    ) {
         use tracing_subscriber::{fmt, EnvFilter};
 
         let subscriber = fmt()
@@ -382,15 +393,28 @@ mod tests {
             .with_test_writer()
             .finish();
 
-        let _guard = tracing::subscriber::set_default(subscriber);
+        let guard = tracing::subscriber::set_default(subscriber);
 
         let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-        let (net_cmd_tx, mut net_cmd_rx) = mpsc::channel(100);
+        let (net_cmd_tx, net_cmd_rx) = mpsc::channel(100);
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
+        let history = HistoryCollector::<EnclaveEvent>::new().start();
+        let error = ErrorCollector::<EnclaveEvent>::new().start();
+        bus.do_send(Subscribe::new("*", history.clone().recipient()));
+        bus.do_send(Subscribe::new("*", error.clone().recipient()));
 
-        DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
+        let publisher = DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
 
+        (
+            guard, bus, net_cmd_tx, net_cmd_rx, net_evt_tx, net_evt_rx, history, error, publisher,
+        )
+    }
+
+    #[actix::test]
+    async fn test_publishes_document() -> Result<()> {
+        let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, _, _, _) =
+            setup_test();
         let value = b"I am a special document".to_vec();
         let expires_at = Utc::now() + chrono::Duration::days(1);
         let e3_id = E3id::new("1243", 1);
@@ -460,27 +484,103 @@ mod tests {
         Ok(())
     }
 
+    #[actix::test]
+    async fn test_publishes_document_fails_with_exponential_backoff() -> Result<()> {
+        let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, history, errors, _) =
+            setup_test();
+        let value = b"I am a special document".to_vec();
+        let expires_at = Utc::now() + chrono::Duration::days(1);
+        let e3_id = E3id::new("1243", 1);
+
+        // 1. Send a request to publish
+        bus.do_send(EnclaveEvent::from(PublishDocumentRequested {
+            meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
+            value: value.clone(),
+        }));
+
+        // 2. Document publisher should have asked the NetInterface to put the doc on Kademlia
+        let Some(NetCommand::DhtPutRecord {
+            correlation_id,
+            value: msg_value,
+            key,
+            ..
+        }) = timeout(Duration::from_secs(10), net_cmd_rx.recv())
+            .await
+            .expect("did not receive DhtPutRecord")
+        else {
+            bail!("msg not as expected");
+        };
+
+        // Fake DHT put the record
+        let mut mykad: HashMap<Cid, Vec<u8>> = HashMap::new();
+        mykad.insert(key.clone(), msg_value.clone());
+
+        // 3. Report failure #1
+        net_evt_tx.send(NetEvent::DhtPutRecordError {
+            correlation_id,
+            error: crate::events::DhtPutRecordError::Timeout,
+        })?;
+
+        // 4. Expect retry
+        let Some(NetCommand::DhtPutRecord { .. }) =
+            timeout(Duration::from_secs(10), net_cmd_rx.recv())
+                .await
+                .expect("did not receive DhtPutRecord")
+        else {
+            bail!("msg not as expected");
+        };
+
+        // 5. Report failure #2
+        net_evt_tx.send(NetEvent::DhtPutRecordError {
+            correlation_id,
+            error: crate::events::DhtPutRecordError::Timeout,
+        })?;
+
+        // 6. Expect retry
+        let Some(NetCommand::DhtPutRecord { .. }) =
+            timeout(Duration::from_secs(10), net_cmd_rx.recv())
+                .await
+                .expect("did not receive DhtPutRecord")
+        else {
+            bail!("msg not as expected");
+        };
+
+        // 7. Report failure #3
+        net_evt_tx.send(NetEvent::DhtPutRecordError {
+            correlation_id,
+            error: crate::events::DhtPutRecordError::Timeout,
+        })?;
+
+        // 8. Expect retry
+        let Some(NetCommand::DhtPutRecord { .. }) =
+            timeout(Duration::from_secs(15), net_cmd_rx.recv())
+                .await
+                .expect("did not receive DhtPutRecord")
+        else {
+            bail!("msg not as expected");
+        };
+
+        // 9. Report failure #4
+        net_evt_tx.send(NetEvent::DhtPutRecordError {
+            correlation_id,
+            error: crate::events::DhtPutRecordError::Timeout,
+        })?;
+
+        // 10. Expect error to exist
+        // TODO: Setup TakeErrors from #660
+        sleep(Duration::from_secs(5)).await;
+        let errors = errors.send(GetErrors::new()).await?;
+
+        assert_eq!(errors.len(), 1);
+
+        Ok(())
+    }
+
     // #[ignore]
     #[actix::test]
     async fn test_notified_of_document() -> Result<()> {
-        use tracing_subscriber::{fmt, EnvFilter};
-
-        let subscriber = fmt()
-            .with_env_filter(EnvFilter::new("debug"))
-            .with_test_writer()
-            .finish();
-
-        let _guard = tracing::subscriber::set_default(subscriber);
-
-        let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-        let history = HistoryCollector::<EnclaveEvent>::new().start();
-        bus.do_send(Subscribe::new("*", history.clone().recipient()));
-
-        let (net_cmd_tx, mut net_cmd_rx) = mpsc::channel(100);
-        let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
-        let net_evt_rx = Arc::new(net_evt_rx);
-
-        DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
+        let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, history, _, _) =
+            setup_test();
 
         let value = b"I am a special document".to_vec();
         let expires_at = Utc::now() + chrono::Duration::days(1);

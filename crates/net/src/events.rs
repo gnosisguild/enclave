@@ -14,6 +14,7 @@ use libp2p::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    future::Future,
     hash::Hash,
     sync::Arc,
     time::{Duration, Instant},
