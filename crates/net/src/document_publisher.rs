@@ -361,7 +361,7 @@ mod tests {
     use std::{collections::HashMap, time::Duration};
 
     use super::*;
-    use crate::events::NetCommand;
+    use crate::events::{DhtPutRecordError, NetCommand};
     use actix::Addr;
     use anyhow::{bail, Result};
     use e3_events::{
@@ -492,81 +492,30 @@ mod tests {
         let expires_at = Utc::now() + chrono::Duration::days(1);
         let e3_id = E3id::new("1243", 1);
 
-        // 1. Send a request to publish
+        // Send a request to publish
         bus.do_send(EnclaveEvent::from(PublishDocumentRequested {
             meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
             value: value.clone(),
         }));
 
-        // 2. Document publisher should have asked the NetInterface to put the doc on Kademlia
-        let Some(NetCommand::DhtPutRecord {
-            correlation_id,
-            value: msg_value,
-            key,
-            ..
-        }) = timeout(Duration::from_secs(10), net_cmd_rx.recv())
-            .await
-            .expect("did not receive DhtPutRecord")
-        else {
-            bail!("msg not as expected");
-        };
+        for _ in 0..4 {
+            // Expect retry
+            let Some(NetCommand::DhtPutRecord { correlation_id, .. }) =
+                timeout(Duration::from_secs(15), net_cmd_rx.recv())
+                    .await
+                    .expect("did not receive DhtPutRecord")
+            else {
+                bail!("msg not as expected");
+            };
 
-        // Fake DHT put the record
-        let mut mykad: HashMap<Cid, Vec<u8>> = HashMap::new();
-        mykad.insert(key.clone(), msg_value.clone());
+            // Report failure
+            net_evt_tx.send(NetEvent::DhtPutRecordError {
+                correlation_id,
+                error: DhtPutRecordError::Timeout,
+            })?;
+        }
 
-        // 3. Report failure #1
-        net_evt_tx.send(NetEvent::DhtPutRecordError {
-            correlation_id,
-            error: crate::events::DhtPutRecordError::Timeout,
-        })?;
-
-        // 4. Expect retry
-        let Some(NetCommand::DhtPutRecord { .. }) =
-            timeout(Duration::from_secs(10), net_cmd_rx.recv())
-                .await
-                .expect("did not receive DhtPutRecord")
-        else {
-            bail!("msg not as expected");
-        };
-
-        // 5. Report failure #2
-        net_evt_tx.send(NetEvent::DhtPutRecordError {
-            correlation_id,
-            error: crate::events::DhtPutRecordError::Timeout,
-        })?;
-
-        // 6. Expect retry
-        let Some(NetCommand::DhtPutRecord { .. }) =
-            timeout(Duration::from_secs(10), net_cmd_rx.recv())
-                .await
-                .expect("did not receive DhtPutRecord")
-        else {
-            bail!("msg not as expected");
-        };
-
-        // 7. Report failure #3
-        net_evt_tx.send(NetEvent::DhtPutRecordError {
-            correlation_id,
-            error: crate::events::DhtPutRecordError::Timeout,
-        })?;
-
-        // 8. Expect retry
-        let Some(NetCommand::DhtPutRecord { .. }) =
-            timeout(Duration::from_secs(15), net_cmd_rx.recv())
-                .await
-                .expect("did not receive DhtPutRecord")
-        else {
-            bail!("msg not as expected");
-        };
-
-        // 9. Report failure #4
-        net_evt_tx.send(NetEvent::DhtPutRecordError {
-            correlation_id,
-            error: crate::events::DhtPutRecordError::Timeout,
-        })?;
-
-        // 10. Expect error to exist
+        // Expect error to exist
         // TODO: Setup TakeErrors from #660
         sleep(Duration::from_secs(5)).await;
         let errors = errors.send(GetErrors::new()).await?;
