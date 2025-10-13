@@ -86,11 +86,11 @@ importers:
   examples/CRISP:
     dependencies:
       '@enclave-e3/contracts':
-        specifier: ^0.1.3
-        version: 0.1.3(@openzeppelin/contracts@5.3.0)
+        specifier: ^0.1.5
+        version: 0.1.5(@openzeppelin/contracts@5.3.0)
       '@enclave-e3/sdk':
-        specifier: ^0.1.3
-        version: 0.1.3(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
+        specifier: ^0.1.5
+        version: 0.1.5(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)
       '@excubiae/contracts':
         specifier: ^0.4.0
         version: 0.4.0
@@ -108,8 +108,8 @@ importers:
         version: 0.1.26
     devDependencies:
       '@enclave-e3/config':
-        specifier: ^0.1.3
-        version: 0.1.3(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))
+        specifier: ^0.1.5
+        version: 0.1.5(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))
       '@nomicfoundation/hardhat-ethers':
         specifier: ^3.0.0
         version: 3.1.0(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))
@@ -201,8 +201,8 @@ importers:
         specifier: ^11.11.4
         version: 11.14.0(@types/react@18.3.24)(react@18.3.1)
       '@enclave-e3/sdk':
-        specifier: ^0.1.3
-        version: 0.1.3(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)
+        specifier: ^0.1.5
+        version: 0.1.5(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)
       '@hashcloak/semaphore-noir-proof':
         specifier: 1.0.0
         version: 1.0.0(@semaphore-protocol/group@4.13.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(@semaphore-protocol/identity@4.13.0)(@types/snarkjs@0.7.9)(bufferutil@4.0.9)(commander@13.1.0)(utf-8-validate@5.0.10)
@@ -1515,19 +1515,19 @@ packages:
   '@emotion/weak-memoize@0.4.0':
     resolution: {integrity: sha512-snKqtPW01tN0ui7yu9rGv69aJXr/a/Ywvl11sUjNtEcRc+ng/mQriFL0wLXMef74iHa/EkftbDzU9F8iFbH+zg==}
 
-  '@enclave-e3/config@0.1.3':
-    resolution: {integrity: sha512-Sh+yTbXR5U4aI1+GyPyo5mE0BBsN8HzpSh5BfdTV4L7BqjG/lkJ9DX1TaD1Bzdt7xe6vM0np0qfdIqDhMbptow==}
+  '@enclave-e3/config@0.1.5':
+    resolution: {integrity: sha512-wH8IIboPTWHa48O/i8VwSNXUO47HHdYHXwYnUGi9QvrjqdkkesanLcpWWlC3zo1UNFIFdf3BPpaoZrIuv5DOeA==}
     peerDependencies:
       tsup: 8.5.0
 
-  '@enclave-e3/contracts@0.1.3':
-    resolution: {integrity: sha512-A1EPfAX2fcZzqHZ6v02P/c6OJStyMrCsEZURSOlKHUOBUnCS/o0o67TcJ0/LNoi/yamI4UH+cGAzS/kW2i4QfQ==}
+  '@enclave-e3/contracts@0.1.5':
+    resolution: {integrity: sha512-C1Mo9z2JG6netDhpOsk0kZV8DBjVd4ftE5oqhpXDDbK+HHD4XHozjKMqmlUYTooSzzT3INGYNS/IEDUHxYOqTA==}
 
-  '@enclave-e3/sdk@0.1.3':
-    resolution: {integrity: sha512-MtCP2HX/GVMR8efiunKqYOeTkfKV/0biwb3dTJ2gylJfqV1Z8c9cHymj+Ivd1ZI+tbYPHvLoSs4PUMsdA/cLZA==}
+  '@enclave-e3/sdk@0.1.5':
+    resolution: {integrity: sha512-AZGIYrlJZ6FeK6DIQWqNKZDwvDpw+l1zCd7hc97giFX2LrNbSAzf/UJmNewAXFfaGtlnOePSVsuixk/ZQd1TVw==}
 
-  '@enclave-e3/wasm@0.1.3':
-    resolution: {integrity: sha512-pKssAhrIjZJPF6N32JMA44MMOUU2Xrxxh4zx0/+qGx7MsSOFNXEg67or45C1OOewCzWrsuYdMWfyR7UibddiGA==}
+  '@enclave-e3/wasm@0.1.5':
+    resolution: {integrity: sha512-PZ/TpABK/PAAzO0d2+q17i3plzCs/E3chihc4yOi9DqCxdGFhm76hTueY/lDXusDnM+LUrEuaD11YR/2kBRvTg==}
 
   '@esbuild/aix-ppc64@0.20.0':
     resolution: {integrity: sha512-fGFDEctNh0CcSwsiRPxiaqX0P5rq+AqE0SRhYGZ4PX46Lg1FNR6oCxJghf8YgY0WQEgQuh3lErUFE4KxLeRmmw==}
@@ -10879,11 +10879,11 @@ snapshots:
 
   '@emotion/weak-memoize@0.4.0': {}
 
-  '@enclave-e3/config@0.1.3(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))':
+  '@enclave-e3/config@0.1.5(tsup@8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1))':
     dependencies:
       tsup: 8.5.0(@microsoft/api-extractor@7.52.11(@types/node@22.7.5))(@swc/core@1.13.5)(jiti@1.21.7)(postcss@8.5.6)(tsx@4.20.5)(typescript@5.8.3)(yaml@2.8.1)
 
-  '@enclave-e3/contracts@0.1.3(@openzeppelin/contracts@5.3.0)':
+  '@enclave-e3/contracts@0.1.5(@openzeppelin/contracts@5.3.0)':
     dependencies:
       '@openzeppelin/contracts-upgradeable': 5.4.0(@openzeppelin/contracts@5.3.0)
       '@zk-kit/lean-imt.sol': 2.0.1
@@ -10891,11 +10891,11 @@ snapshots:
     transitivePeerDependencies:
       - '@openzeppelin/contracts'
 
-  '@enclave-e3/sdk@0.1.3(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)':
+  '@enclave-e3/sdk@0.1.5(@openzeppelin/contracts@5.3.0)(@types/node@22.7.5)(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@6.3.5(@types/node@22.7.5)(jiti@1.21.7)(tsx@4.20.5)(yaml@2.8.1))(zod@3.25.76)':
     dependencies:
       '@aztec/bb.js': 0.82.3
-      '@enclave-e3/contracts': 0.1.3(@openzeppelin/contracts@5.3.0)
-      '@enclave-e3/wasm': 0.1.3
+      '@enclave-e3/contracts': 0.1.5(@openzeppelin/contracts@5.3.0)
+      '@enclave-e3/wasm': 0.1.5
       '@noir-lang/noir_js': 1.0.0-beta.3
       comlink: 4.4.2
       viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
@@ -10927,11 +10927,11 @@ snapshots:
       - vite
       - zod
 
-  '@enclave-e3/sdk@0.1.3(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)':
+  '@enclave-e3/sdk@0.1.5(@types/node@22.7.5)(bufferutil@4.0.9)(rollup@4.49.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(vite@5.4.19(@types/node@22.7.5))(zod@3.25.76)':
     dependencies:
       '@aztec/bb.js': 0.82.3
-      '@enclave-e3/contracts': 0.1.3(@openzeppelin/contracts@5.3.0)
-      '@enclave-e3/wasm': 0.1.3
+      '@enclave-e3/contracts': 0.1.5(@openzeppelin/contracts@5.3.0)
+      '@enclave-e3/wasm': 0.1.5
       '@noir-lang/noir_js': 1.0.0-beta.3
       comlink: 4.4.2
       viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
@@ -10963,7 +10963,7 @@ snapshots:
       - vite
       - zod
 
-  '@enclave-e3/wasm@0.1.3': {}
+  '@enclave-e3/wasm@0.1.5': {}
 
   '@esbuild/aix-ppc64@0.20.0':
     optional: true
