@@ -107,7 +107,12 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     Ok(receipt) => {
                         info!(tx=%receipt.transaction_hash, "Published plaintext output");
                     }
-                    Err(err) => bus.err(EnclaveErrorType::Evm, err),
+                    Err(err) => {
+                        bus.err(
+                            EnclaveErrorType::Evm,
+                            anyhow::anyhow!("Error publishing plaintext output: {:?}", err),
+                        );
+                    }
                 }
             }
         })

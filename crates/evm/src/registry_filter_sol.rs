@@ -105,7 +105,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                     Ok(receipt) => {
                         info!(tx=%receipt.transaction_hash, "Transaction published");
                     }
-                    Err(err) => bus.err(EnclaveErrorType::Evm, err),
+                    Err(err) => bus.err(
+                        EnclaveErrorType::Evm,
+                        anyhow::anyhow!("Error publishing committee output: {:?}", err),
+                    ),
                 }
             }
         })
