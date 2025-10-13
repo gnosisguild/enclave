@@ -116,6 +116,8 @@ impl DocumentPublisher {
     }
 
     fn handle_ciphernode_selected(&mut self, event: CiphernodeSelected) -> Result<()> {
+        // XXX: blocked on ry/599-multithread as we need to extract the party_id from this event to
+        // select for party_ids on the published documents
         self.ids.insert(event.e3_id);
         Ok(())
     }
@@ -161,8 +163,8 @@ impl DocumentPublisher {
         event: DocumentPublishedNotification,
     ) -> Result<()> {
         // Am I interested in it?
-        // TODO: We will need to check for party_id here too if the doc spans multiple partys. We
-        // don't need this yet however
+        // XXX: We will need to check for party_id here too if the doc spans multiple partys. We
+        // need to wait for ry/599-multithread to be merged first
         if ids.contains(&event.meta.e3_id) {
             debug!("I am interested!");
             // if so get_record!

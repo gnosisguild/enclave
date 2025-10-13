@@ -60,7 +60,7 @@ impl DocumentMeta {
 pub struct PublishDocumentRequested {
     pub meta: DocumentMeta,
     /// Key will be a simple hash eg. Sha256Hash of the value so we need not put it here
-    pub value: Vec<u8>, // TODO: ArcBytes
+    pub value: Vec<u8>, // TODO: ArcBytes from ry/599-multithread
 }
 
 impl Display for PublishDocumentRequested {
