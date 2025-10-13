@@ -142,6 +142,10 @@ pub async fn publish_committee<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
     let contract = NaiveRegistryFilter::new(contract_address, provider.provider());
+    info!(
+        "publishCommittee called. e3_id={:?}, nodes={:?}",
+        e3_id, nodes
+    );
     let builder = contract
         .publishCommittee(e3_id, nodes, public_key)
         .nonce(current_nonce);

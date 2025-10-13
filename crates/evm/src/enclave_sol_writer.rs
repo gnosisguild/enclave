@@ -139,6 +139,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .await?;
 
     let contract = IEnclave::new(contract_address, provider.provider());
+    info!("publishPlaintextOutput() e3_id={:?}", e3_id);
     let builder = contract
         .publishPlaintextOutput(e3_id, decrypted_output, proof)
         .nonce(current_nonce);
