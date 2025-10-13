@@ -29,6 +29,10 @@ contract CRISPInputValidator is IInputValidator, Clone, Ownable(msg.sender) {
     /// @notice Indicates if the the round data has been set.
     bool public isDataSet;
 
+    /// @notice Mapping to store votes. Each elegible voter has their own slot 
+    /// to store their vote. 
+    mapping (address => bytes) public voteSlots;
+
     /// @notice The error emitted when the input data is empty.
     error EmptyInputData();
     /// @notice The error emitted when the input data is invalid.
@@ -81,13 +85,18 @@ contract CRISPInputValidator is IInputValidator, Clone, Ownable(msg.sender) {
         (
             bytes memory noirProof,
             bytes32[] memory noirPublicInputs,
-            bytes memory vote
-        ) = abi.decode(data, (bytes, bytes32[], bytes));
+            bytes memory vote,
+            address slot
+        ) = abi.decode(data, (bytes, bytes32[], bytes, address));
 
         // Check if the ciphertext was encrypted correctly
         if (!noirVerifier.verify(noirProof, noirPublicInputs))
             revert InvalidNoirProof();
 
+        /// @notice Store the vote in the correct slot.
+        voteSlots[slot] = vote;
+
+        // return the vote so that it can be stored in Enclave's input merkle tree
         input = vote;
     }
 }
