@@ -107,7 +107,12 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PlaintextAggregated
                     Ok(receipt) => {
                         info!(tx=%receipt.transaction_hash, "Published plaintext output");
                     }
-                    Err(err) => bus.err(EnclaveErrorType::Evm, err),
+                    Err(err) => {
+                        bus.err(
+                            EnclaveErrorType::Evm,
+                            anyhow::anyhow!("Error publishing plaintext output: {:?}", err),
+                        );
+                    }
                 }
             }
         })
@@ -139,6 +144,7 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
         .await?;
 
     let contract = IEnclave::new(contract_address, provider.provider());
+    info!("publishPlaintextOutput() e3_id={:?}", e3_id);
     let builder = contract
         .publishPlaintextOutput(e3_id, decrypted_output, proof)
         .nonce(current_nonce);
