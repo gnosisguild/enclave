@@ -26,7 +26,7 @@ pub struct CiphernodeSelected {
 impl Default for CiphernodeSelected {
     fn default() -> Self {
         CiphernodeSelected {
-            e3_id: E3id::new("99", 0),
+            e3_id: E3id::new("0", 0),
             error_size: ArcBytes::from_bytes(vec![]),
             esi_per_ct: 0,
             params: ArcBytes::from_bytes(vec![]),
