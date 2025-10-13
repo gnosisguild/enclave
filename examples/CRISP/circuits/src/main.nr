@@ -8,7 +8,9 @@ use greco::{Greco, Params};
 use polynomial::Polynomial;
 
 mod ecdsa;
-use ecdsa::{derive_address, verify_signature};
+use ecdsa::{address_to_field, derive_address, verify_signature};
+mod merkle_tree;
+use merkle_tree::get_merkle_root;
 
 fn main(
     params: pub Params<2048, 1>,
@@ -28,12 +30,25 @@ fn main(
     public_key_y: [u8; 32],
     signature: [u8; 64],
     hashed_message: [u8; 32],
+    balance: Field,
+    merkle_proof_length: u32,
+    merkle_proof_indices: [u1; 20],
+    merkle_proof_siblings: [Field; 20],
 ) {
-    // first verify the signature
+    // First verify the signature.
     verify_signature(hashed_message, public_key_x, public_key_y, signature);
 
-    // then derive the address
-    let address = derive_address(public_key_x, public_key_y);
+    // Then derive the address.
+    let address = address_to_field(derive_address(public_key_x, public_key_y));
+
+    // Then get Merkle root.
+    let merkle_root = get_merkle_root(
+        address,
+        balance,
+        merkle_proof_length,
+        merkle_proof_indices,
+        merkle_proof_siblings,
+    );
 
     // then verify that the vote was encrypted correctly
     let circuit: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
