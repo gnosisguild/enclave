@@ -6,6 +6,8 @@
 
 mod filter;
 
+use std::fmt::{self, Display};
+
 use actix::Message;
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use filter::Filter;
@@ -15,30 +17,46 @@ use crate::E3id;
 
 pub type PartyId = u64;
 
-/// Metadata for a published document
-/// This is used by components to test interest in a published document
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum DocumentMeta {
-    TrBFVShares {
-        /// We will only be interested in e3_ids we are included within
+pub struct DocumentMeta {
+    /// We will only be interested in e3_ids we are included within
+    pub e3_id: E3id,
+    /// Filter based on specific ids or a range of ids who might be interested in the document.
+    /// Empty Vector means there is no filter
+    /// We need this to denote when payloads are too big and must be split between DHT documents
+    pub filter: Vec<Filter<PartyId>>,
+    /// Unix timestamp for purging
+    #[serde(with = "ts_seconds")]
+    pub expires_at: DateTime<Utc>,
+}
+
+impl DocumentMeta {
+    pub fn new(
         e3_id: E3id,
-        /// Filter based on specific ids or a range of ids who might be interested in the document.
-        /// Empty Vector means there is no filter
         filter: Vec<Filter<PartyId>>,
-        /// Unix timestamp for purging
-        #[serde(with = "ts_seconds")]
         expires_at: DateTime<Utc>,
-    },
-    // TFHEShares ...
+    ) -> DocumentMeta {
+        Self {
+            e3_id,
+            filter,
+            expires_at,
+        }
+    }
 }
 
 /// EnclaveEvent for signaling that a document be published
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct PublishDocumentRequested {
-    meta: DocumentMeta,
+    pub meta: DocumentMeta,
     /// Key will be a simple hash eg. Sha256Hash of the value so we need not put it here
-    value: Vec<u8>,
+    pub value: Vec<u8>, // TODO: ArcBytes
+}
+
+impl Display for PublishDocumentRequested {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.meta) // XXX:: apply ArcBytes and rely on debug once trbfv is merged
+    }
 }
 
 /// EnclaveEvent for receiving a document
@@ -48,5 +66,5 @@ pub struct DocumentReceived {
     /// Document metadata
     meta: DocumentMeta,
     /// Document value from kademlia
-    value: Vec<u8>,
+    value: Vec<u8>, // TODO: ArcBytes
 }

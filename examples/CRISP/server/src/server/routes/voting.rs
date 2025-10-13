@@ -14,7 +14,7 @@ use crate::server::{
 use actix_web::{web, HttpResponse, Responder};
 use alloy::{
     dyn_abi::DynSolValue,
-    primitives::{Bytes, U256},
+    primitives::{Bytes, U256, Address},
 };
 use e3_sdk::evm_helpers::contracts::{EnclaveContract, EnclaveWrite};
 use eyre::Error;
@@ -81,12 +81,14 @@ async fn broadcast_encrypted_vote(
         )
     };
 
+    let address: Address = vote.address.parse().expect("Invalid address");
+
     let e3_id = U256::from(vote.round_id);
     let params_value = DynSolValue::Tuple(vec![
-        DynSolValue::Bytes(vote.proof_sem),
         DynSolValue::Bytes(vote.proof),
         public_inputs_array,
         DynSolValue::Bytes(vote.enc_vote_bytes),
+        DynSolValue::Address(address),
     ]);
 
     let encoded_params = Bytes::from(params_value.abi_encode_params());
