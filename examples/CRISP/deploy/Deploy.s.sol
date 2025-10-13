@@ -23,15 +23,8 @@ import {RiscZeroGroth16Verifier} from "risc0/groth16/RiscZeroGroth16Verifier.sol
 import {ControlID} from "risc0/groth16/ControlID.sol";
 
 import {CRISPProgram} from "../contracts/CRISPProgram.sol";
-import {CRISPPolicy} from "../contracts/CRISPPolicy.sol";
-import {CRISPChecker} from "../contracts/CRISPChecker.sol";
-import {SemaphoreNoir} from "@hashcloak/semaphore-contracts-noir/SemaphoreNoir.sol";
-import {SemaphoreNoirVerifier} from "@hashcloak/semaphore-contracts-noir/base/SemaphoreNoirVerifier.sol";
-import {IVerifier} from "@hashcloak/semaphore-contracts-noir/interfaces/ISemaphoreNoirVerifier.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
-import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
-import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
 import {CRISPInputValidator} from "../contracts/CRISPInputValidator.sol";
 import {MockCRISPInputValidator} from "../contracts/Mocks/MockCRISPInputValidator.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
@@ -161,26 +154,6 @@ contract CRISPProgramDeploy is Script {
         console2.log("Enclave Address: ", address(enclave));
         console2.log("Verifier Address: ", address(verifier));
 
-        SemaphoreNoirVerifier semaphoreVerifier = new SemaphoreNoirVerifier();
-        console2.log(
-            "Deployed SemaphoreNoirVerifier to",
-            address(semaphoreVerifier)
-        );
-
-        SemaphoreNoir semaphore = new SemaphoreNoir(
-            IVerifier(address(semaphoreVerifier))
-        );
-        console2.log("Deployed Semaphore to", address(semaphore));
-
-        CRISPCheckerFactory checkerFactory = new CRISPCheckerFactory();
-        console2.log(
-            "Deployed CRISPCheckerFactory to",
-            address(checkerFactory)
-        );
-
-        CRISPPolicyFactory policyFactory = new CRISPPolicyFactory();
-        console2.log("Deployed CRISPPolicyFactory to", address(policyFactory));
-
         bool useMockIV = vm.envOr("USE_MOCK_INPUT_VALIDATOR", false);
         address inputValidatorAddress;
         if (useMockIV) {
@@ -207,9 +180,6 @@ contract CRISPProgramDeploy is Script {
         CRISPProgram crisp = new CRISPProgram(
             enclave,
             verifier,
-            semaphore,
-            checkerFactory,
-            policyFactory,
             inputValidatorFactory,
             honkVerifier,
             ImageID.PROGRAM_ID
