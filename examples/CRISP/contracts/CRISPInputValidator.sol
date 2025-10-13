@@ -29,7 +29,8 @@ contract CRISPInputValidator is IInputValidator, Clone, Ownable(msg.sender) {
     /// @notice Indicates if the the round data has been set.
     bool public isDataSet;
 
-    /// @notice Mapping to store votes. Each elegible voter has 
+    /// @notice Mapping to store votes. Each elegible voter has their own slot 
+    /// to store their vote. 
     mapping (address => bytes) public voteSlots;
 
     /// @notice The error emitted when the input data is empty.
