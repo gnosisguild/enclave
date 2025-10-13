@@ -8,7 +8,7 @@ use crate::{
     events::{
         call_and_await_response, DocumentPublishedNotification, GossipData, NetCommand, NetEvent,
     },
-    retry::{retry_with_backoff, to_retry, BACKOFF_DELAY},
+    retry::{retry_with_backoff, to_retry},
     Cid,
 };
 use actix::prelude::*;
@@ -159,14 +159,20 @@ impl DocumentPublisher {
         ids: HashSet<E3id>,
         event: DocumentPublishedNotification,
     ) -> Result<()> {
-        // Am I interested in it?
         // XXX: We will need to check for party_id here too if the doc spans multiple partys. We
         // need to wait for ry/599-multithread to be merged first
         if ids.contains(&event.meta.e3_id) {
-            debug!("I am interested!");
-            // if so get_record!
-            let value = Self::get_record(net_cmds, net_events, event.key).await?;
-            // And forward it!
+            debug!("interested in event {:?}", event);
+            let value = retry_with_backoff(
+                || {
+                    Self::get_record(net_cmds.clone(), net_events.clone(), event.key.clone())
+                        .map_err(to_retry)
+                },
+                4,
+                1000,
+            )
+            .await?;
+
             debug!("Sending event...");
             bus.do_send(EnclaveEvent::from(DocumentReceived {
                 meta: event.meta,
@@ -324,7 +330,7 @@ impl Handler<DocumentPublishedNotification> for DocumentPublisher {
     fn handle(
         &mut self,
         msg: DocumentPublishedNotification,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let ids = self.ids.clone();
         let bus = self.bus.clone();
@@ -333,10 +339,12 @@ impl Handler<DocumentPublishedNotification> for DocumentPublisher {
         let rx = self.rx.clone();
 
         Box::pin(async move {
-            match Self::handle_document_published_notification(tx, rx, bus, ids, msg).await {
+            match Self::handle_document_published_notification(tx, rx, bus.clone(), ids, msg).await
+            {
                 Ok(_) => (),
                 Err(e) => {
-                    error!("{e}");
+                    error!(error=?e, "Could not handle document published notification");
+                    bus.err(EnclaveErrorType::IO, e);
                 }
             }
         })
@@ -361,7 +369,7 @@ mod tests {
     use std::{collections::HashMap, time::Duration};
 
     use super::*;
-    use crate::events::{DhtPutRecordError, NetCommand};
+    use crate::events::{DhtGetRecordError, DhtPutRecordError, NetCommand};
     use actix::Addr;
     use anyhow::{bail, Result};
     use e3_events::{
@@ -483,6 +491,56 @@ mod tests {
 
         Ok(())
     }
+    #[actix::test]
+    async fn test_get_document_fails_with_exponential_backoff() -> Result<()> {
+        let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, _, errors, _) =
+            setup_test();
+
+        let value = b"I am a special document".to_vec();
+        let expires_at = Utc::now() + chrono::Duration::days(1);
+        let e3_id = E3id::new("1243", 1);
+        let cid = Cid::from_content(&value);
+
+        // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
+        bus.do_send(EnclaveEvent::from(CiphernodeSelected {
+            e3_id: e3_id.clone(),
+            threshold_m: 5, // TODO: this will change with the merging of #660
+        }));
+
+        net_evt_tx.send(NetEvent::GossipData(
+            GossipData::DocumentPublishedNotification(DocumentPublishedNotification {
+                key: cid.clone(),
+                meta: DocumentMeta::new(e3_id, DocumentKind::TrBFV, vec![], expires_at),
+            }),
+        ))?;
+
+        for _ in 0..4 {
+            // Expect retry
+            let Some(NetCommand::DhtGetRecord { correlation_id, .. }) =
+                timeout(Duration::from_secs(15), net_cmd_rx.recv())
+                    .await
+                    .expect("did not receive DhtGetRecord")
+            else {
+                bail!("msg not as expected");
+            };
+
+            // Report failure
+            net_evt_tx.send(NetEvent::DhtGetRecordError {
+                correlation_id,
+                error: DhtGetRecordError::Timeout,
+            })?;
+        }
+
+        // wait for events to settle
+        // Expect error to exist
+        // TODO: Setup TakeErrors from #660
+        sleep(Duration::from_secs(8)).await;
+        let errors = errors.send(GetErrors::new()).await?;
+
+        assert_eq!(errors.len(), 1);
+
+        Ok(())
+    }
 
     #[actix::test]
     async fn test_publishes_document_fails_with_exponential_backoff() -> Result<()> {
@@ -525,7 +583,6 @@ mod tests {
         Ok(())
     }
 
-    // #[ignore]
     #[actix::test]
     async fn test_notified_of_document() -> Result<()> {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, history, _, _) =

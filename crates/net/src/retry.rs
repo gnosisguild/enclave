@@ -30,21 +30,21 @@ pub const BACKOFF_MAX_RETRIES: u32 = 10;
 ///
 /// # Returns
 /// * `Result<()>` - Ok if the operation succeeded, Err if all retries failed
-pub async fn retry_with_backoff<F, Fut>(
+pub async fn retry_with_backoff<F, Fut, T>(
     operation: F,
     max_attempts: u32,
     initial_delay_ms: u64,
-) -> Result<()>
+) -> Result<T>
 where
     F: Fn() -> Fut,
-    Fut: Future<Output = Result<(), RetryError>>,
+    Fut: Future<Output = Result<T, RetryError>>,
 {
     let mut current_attempt = 1;
     let mut delay_ms = initial_delay_ms;
 
     loop {
         match operation().await {
-            Ok(_) => return Ok(()),
+            Ok(t) => return Ok(t),
             Err(re) => {
                 match re {
                     RetryError::Retry(e) => {
