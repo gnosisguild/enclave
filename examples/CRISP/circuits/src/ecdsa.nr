@@ -38,6 +38,17 @@ pub fn derive_address(pub_key_x: [u8; 32], pub_key_y: [u8; 32]) -> [u8; 20] {
     derived_address
 }
 
+// Convert a 20-byte address to a field element.
+pub fn address_to_field(addr: [u8; 20]) -> Field {
+    let mut acc: Field = 0;
+
+    for i in 0..20 {
+        acc = acc * 256 + (addr[i] as Field);
+    }
+
+    acc
+}
+
 #[test]
 fn test_derive_address() {
     let pub_key_x = [
@@ -104,4 +115,15 @@ fn test_fail_verify_signature() {
     let valid_signature =
         std::ecdsa_secp256k1::verify_signature(pub_key_x, pub_key_y, signature, hashed_message);
     assert(!valid_signature);
+}
+
+#[test]
+fn test_address_to_field() {
+    let address: [u8; 20] = [
+        243, 159, 214, 229, 26, 173, 136, 246, 244, 206, 106, 184, 130, 114, 121, 207, 255, 185, 34,
+        102,
+    ];
+    let field = address_to_field(address);
+
+    assert(field == 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266);
 }
