@@ -11,10 +11,11 @@ use e3_ciphernode_builder::CiphernodeHandle;
 use e3_crypto::Cipher;
 use e3_data::GetDump;
 use e3_data::InMemStore;
+use e3_events::GetHistory;
 use e3_events::{
     CiphernodeSelected, CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus,
-    EventBusConfig, GetErrors, HistoryCollector, OrderedSet, PlaintextAggregated,
-    PublicKeyAggregated, Seed, Shutdown, Subscribe, TakeHistory,
+    EventBusConfig, HistoryCollector, OrderedSet, PlaintextAggregated, PublicKeyAggregated, Seed,
+    Shutdown, Subscribe, TakeHistory,
 };
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
@@ -263,9 +264,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         let history = history_collector
             .send(TakeHistory::<EnclaveEvent>::new(7))
             .await?;
-        let errors = error_collector
-            .send(GetErrors::<EnclaveEvent>::new())
-            .await?;
+        let errors = error_collector.send(GetHistory::new()).await?;
 
         assert_eq!(errors.len(), 0);
 
