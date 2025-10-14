@@ -30,6 +30,7 @@ opentelemetry-stdout = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 petname = { workspace = true }
 rand = { workspace = true }
+serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true } 

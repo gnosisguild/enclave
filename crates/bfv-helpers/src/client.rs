@@ -6,7 +6,7 @@
 
 use crate::build_bfv_params_arc;
 use anyhow::{anyhow, Result};
-use fhe_rs::bfv::{Encoding, Plaintext, PublicKey};
+use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use greco::InputValidationVectors;
 use num_bigint::BigInt;
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_bfv_encrypt_u64() {
-        use fhe_rs::bfv::{Ciphertext, PublicKey, SecretKey};
+        use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_bfv_verifiable_encrypt_u64() {
-        use fhe_rs::bfv::{Ciphertext, PublicKey, SecretKey};
+        use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
         let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;

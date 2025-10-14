@@ -20,6 +20,7 @@ mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
 mod test_event;
+mod threshold_share_created;
 
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
@@ -37,6 +38,7 @@ pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
 pub use test_event::*;
+pub use threshold_share_created::*;
 
 use crate::{E3id, ErrorEvent, Event, EventId};
 use actix::Message;
@@ -117,15 +119,15 @@ pub enum EnclaveEvent {
         id: EventId,
         data: Shutdown,
     },
+    ThresholdShareCreated {
+        id: EventId,
+        data: ThresholdShareCreated,
+    },
     /// This is a test event to use in testing
     TestEvent {
         id: EventId,
         data: TestEvent,
     },
-    // CommitteeSelected,
-    // OutputDecrypted,
-    // CiphernodeRegistered,
-    // CiphernodeDeregistered,
 }
 
 impl EnclaveEvent {
@@ -187,6 +189,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
             EnclaveEvent::TestEvent { id, .. } => id,
+            EnclaveEvent::ThresholdShareCreated { id, .. } => id,
         }
     }
 }
@@ -201,6 +204,7 @@ impl EnclaveEvent {
             EnclaveEvent::DecryptionshareCreated { data, .. } => Some(data.e3_id),
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
+            EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.e3_id),
             _ => None,
         }
     }
@@ -219,6 +223,7 @@ impl EnclaveEvent {
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
+            EnclaveEvent::ThresholdShareCreated { data, .. } => format!("{:?}", data),
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
@@ -239,7 +244,8 @@ impl_from_event!(
     CiphernodeRemoved,
     EnclaveError,
     Shutdown,
-    TestEvent
+    TestEvent,
+    ThresholdShareCreated
 );
 
 impl FromError for EnclaveEvent {

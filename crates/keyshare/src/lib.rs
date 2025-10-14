@@ -7,5 +7,8 @@
 pub mod ext;
 mod keyshare;
 mod repo;
+mod threshold_keyshare;
+mod threshold_share_collector;
 pub use keyshare::*;
 pub use repo::*;
+pub use threshold_keyshare::*;

@@ -13,6 +13,10 @@ impl StoreKeys {
         format!("//keyshare/{e3_id}")
     }
 
+    pub fn threshold_keyshare(e3_id: &E3id) -> String {
+        format!("//threshold_keyshare/{e3_id}")
+    }
+
     pub fn plaintext(e3_id: &E3id) -> String {
         format!("//plaintext/{e3_id}")
     }

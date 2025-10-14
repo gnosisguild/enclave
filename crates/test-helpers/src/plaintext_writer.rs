@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use super::write_file_with_dirs;
 use actix::{Actor, Addr, Context, Handler};
 use e3_events::{EnclaveEvent, EventBus, Subscribe};
-use tracing::info;
+use tracing::{error, info};
 
 pub struct PlaintextWriter {
     path: PathBuf,
@@ -37,8 +37,13 @@ impl Handler<EnclaveEvent> for PlaintextWriter {
     type Result = ();
     fn handle(&mut self, msg: EnclaveEvent, _: &mut Self::Context) -> Self::Result {
         if let EnclaveEvent::PlaintextAggregated { data, .. } = msg.clone() {
-            let output: Vec<u64> = data
-                .decrypted_output
+            // HACK: decrypted output will be an array of ArcBytes and we will use this moving forward. For now
+            // only having the plaintext writer compatible with legacy tests and extracting the first value
+            let Some(decrypted) = data.decrypted_output.first() else {
+                error!("Decrypted output must not be empty!");
+                return;
+            };
+            let output: Vec<u64> = decrypted
                 .chunks_exact(8)
                 .map(|chunk| u64::from_le_bytes(chunk.try_into().unwrap()))
                 .collect();
