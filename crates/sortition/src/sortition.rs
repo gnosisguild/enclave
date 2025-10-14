@@ -9,12 +9,13 @@ use crate::ticket::{RegisteredNode, Ticket};
 use crate::ticket_sortition::ScoreSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     BusError, CiphernodeAdded, CiphernodeRemoved, EnclaveErrorType, EnclaveEvent, EventBus, Seed,
     Subscribe,
 };
+use num::BigInt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tracing::{info, instrument, trace};
@@ -28,8 +29,8 @@ use tracing::{info, instrument, trace};
 ///
 /// Returns `true` if `address` appears in the resulting top-`size` selection.
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "bool")]
-pub struct GetHasNode {
+#[rtype(result = "Option<u64>")]
+pub struct GetNodeIndex {
     /// Round seed / randomness used by the sortition algorithm.
     pub seed: Seed,
     /// Hex-encoded node address (e.g., `"0x..."`).
@@ -61,6 +62,12 @@ pub trait SortitionList<T> {
     /// Implementations should return `Ok(false)` if the backend has no nodes
     /// or if `size == 0`.
     fn contains(&self, seed: Seed, size: usize, address: T) -> Result<bool>;
+
+    /// Return an index if `address` appears in the committee under `seed`.
+    ///
+    /// Implementations should return `Ok(None)` if the backend has no nodes
+    /// or if `size == 0`.
+    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>>;
 
     /// Add a node to the backend. Backends should be idempotent on duplicates.
     fn add(&mut self, address: T);
@@ -96,23 +103,40 @@ impl SortitionList<String> for DistanceBackend {
     ///
     /// Returns `Ok(false)` if there are no nodes or `size == 0`.
     fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
-        if self.nodes.is_empty() || size == 0 {
-            return Ok(false);
+        if size == 0 {
+            return Err(anyhow!("Size cannot be 0"));
         }
 
-        let registered_nodes: Vec<Address> = self
-            .nodes
-            .iter()
-            .cloned()
-            .map(|s| s.parse::<Address>())
-            .collect::<Result<_, _>>()?;
+        if self.nodes.len() == 0 {
+            return Err(anyhow!("No nodes registered!"));
+        }
 
-        let committee =
-            DistanceSortition::new(seed.into(), registered_nodes, size).get_committee()?;
+        let committee = get_committee(seed, size, self.nodes.clone())?;
 
         Ok(committee
             .iter()
             .any(|(_, addr)| addr.to_string() == address))
+    }
+
+    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>> {
+        if size == 0 {
+            return Err(anyhow!("Size cannot be 0"));
+        }
+
+        if self.nodes.len() == 0 {
+            return Err(anyhow!("No nodes registered!"));
+        }
+
+        let committee = get_committee(seed, size, self.nodes.clone())?;
+
+        let maybe_index = committee.iter().enumerate().find_map(|(index, (_, addr))| {
+            if addr.to_string() == address {
+                return Some(index as u64);
+            }
+            None
+        });
+
+        Ok(maybe_index)
     }
 
     /// Insert a node address (hex). Duplicate inserts are harmless.
@@ -129,6 +153,21 @@ impl SortitionList<String> for DistanceBackend {
     fn nodes(&self) -> Vec<String> {
         self.nodes.iter().cloned().collect()
     }
+}
+
+fn get_committee(
+    seed: Seed,
+    size: usize,
+    nodes: HashSet<String>,
+) -> Result<Vec<(BigInt, Address)>> {
+    let registered_nodes: Vec<Address> = nodes
+        .into_iter()
+        .map(|b| b.parse().context(format!("Error parsing address {}", b)))
+        .collect::<Result<_>>()?;
+
+    DistanceSortition::new(seed.into(), registered_nodes, size)
+        .get_committee()
+        .context("Could not get committee!")
 }
 
 /// Score-sortition backend.
@@ -179,6 +218,26 @@ impl SortitionList<String> for ScoreBackend {
         let winners = ScoreSortition::new(size).get_committee(seed.into(), &self.registered)?;
         let want: Address = address.parse()?;
         Ok(winners.iter().any(|w| w.address == want))
+    }
+
+    /// Compute score-based winners (`ScoreSortition`) and check if `address` is included.
+    ///
+    /// Returns `Ok(false)` if there are no nodes or `size == 0`.
+    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>> {
+        if self.registered.is_empty() || size == 0 {
+            return Ok(None);
+        }
+        let winners = ScoreSortition::new(size).get_committee(seed.into(), &self.registered)?;
+        let want: Address = address.parse()?;
+
+        let maybe_index = winners.iter().enumerate().find_map(|(index, w)| {
+            if w.address == want {
+                return Some(index as u64);
+            }
+            None
+        });
+
+        Ok(maybe_index)
     }
 
     /// Add a node, creating an empty ticket set when first seen.
@@ -266,6 +325,12 @@ impl SortitionList<String> for SortitionBackend {
         }
     }
 
+    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>> {
+        match self {
+            SortitionBackend::Distance(backend) => backend.get_index(seed, size, address),
+            SortitionBackend::Score(backend) => backend.get_index(seed, size, address),
+        }
+    }
     fn add(&mut self, address: String) {
         match self {
             SortitionBackend::Distance(backend) => backend.add(address),
@@ -358,7 +423,7 @@ impl Sortition {
 }
 
 impl Actor for Sortition {
-    type Context = Context<Self>;
+    type Context = actix::Context<Self>;
 }
 
 impl Handler<EnclaveEvent> for Sortition {
@@ -422,27 +487,27 @@ impl Handler<CiphernodeRemoved> for Sortition {
     }
 }
 
-impl Handler<GetHasNode> for Sortition {
-    type Result = bool;
+impl Handler<GetNodeIndex> for Sortition {
+    type Result = Option<u64>;
 
-    /// Return whether `address` is in the size-`size` committee for `seed`
-    /// on `chain_id`. If the chain has not been initialized, returns `false`.
+    /// Return the index of `address` in the size-`size` committee for `seed`
+    /// on `chain_id`. If the chain has not been initialized, returns `None`.
     ///
     /// Errors while accessing persisted state or parsing the address are
-    /// reported on the event bus and surfaced here as `false`.
+    /// reported on the event bus and surfaced here as `None`.
     #[instrument(name = "sortition_contains", skip_all)]
-    fn handle(&mut self, msg: GetHasNode, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
         self.list
             .try_with(|map| {
                 if let Some(backend) = map.get(&msg.chain_id) {
-                    backend.contains(msg.seed, msg.size, msg.address.clone())
+                    backend.get_index(msg.seed, msg.size, msg.address.clone())
                 } else {
-                    Ok(false)
+                    Ok(None)
                 }
             })
             .unwrap_or_else(|err| {
                 self.bus.err(EnclaveErrorType::Sortition, err);
-                false
+                None
             })
     }
 }

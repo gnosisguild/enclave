@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 //! Utility functions
 
-use fhe_rs::bfv;
+use fhe::bfv;
 use fhe_traits::FheEncoder;
 use fhe_util::transcode_from_bytes;
 use std::{cmp::min, fmt, sync::Arc, time::Duration};

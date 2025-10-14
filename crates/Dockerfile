@@ -23,6 +23,13 @@ ENV CARGO_INCREMENTAL=1
 ENV RUSTC_FORCE_INCREMENTAL=1
 ENV CARGO_BUILD_JOBS=8
 
+# Install deps
+RUN apt-get update && apt-get install -y --no-install-recommends jq
+RUN wget https://github.com/argotorg/solidity/releases/download/v0.8.27/solc-static-linux \
+    && chmod +x solc-static-linux \
+    && mv solc-static-linux /usr/local/bin/solc \
+    && solc --version
+
 # Create build directory
 
 WORKDIR /build
@@ -38,6 +45,7 @@ COPY --from=evm-builder /build/packages/enclave-contracts/deployed_contracts.jso
 COPY crates/aggregator/Cargo.toml ./aggregator/Cargo.toml
 COPY crates/bfv-helpers/Cargo.toml ./bfv-helpers/Cargo.toml
 COPY crates/cli/Cargo.toml ./cli/Cargo.toml
+COPY crates/ciphernode-builder/Cargo.toml ./ciphernode-builder/Cargo.toml
 COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
 COPY crates/config/Cargo.toml ./config/Cargo.toml
 COPY crates/crypto/Cargo.toml ./crypto/Cargo.toml
@@ -45,14 +53,15 @@ COPY crates/data/Cargo.toml ./data/Cargo.toml
 COPY crates/enclaveup/Cargo.toml ./enclaveup/Cargo.toml
 COPY crates/entrypoint/Cargo.toml ./entrypoint/Cargo.toml
 COPY crates/events/Cargo.toml ./events/Cargo.toml
-COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY crates/evm/Cargo.toml ./evm/Cargo.toml
+COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
 COPY crates/fhe/Cargo.toml ./fhe/Cargo.toml
 COPY crates/fs/Cargo.toml ./fs/Cargo.toml
 COPY crates/indexer/Cargo.toml ./indexer/Cargo.toml
 COPY crates/init/Cargo.toml ./init/Cargo.toml
 COPY crates/keyshare/Cargo.toml ./keyshare/Cargo.toml
 COPY crates/logger/Cargo.toml ./logger/Cargo.toml
+COPY crates/multithread/Cargo.toml ./multithread/Cargo.toml
 COPY crates/net/Cargo.toml ./net/Cargo.toml
 COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
@@ -61,6 +70,8 @@ COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
+COPY crates/trbfv/Cargo.toml ./trbfv/Cargo.toml
+COPY crates/utils/Cargo.toml ./utils/Cargo.toml
 COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
 
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs

@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::path::Path;
+use std::{path::Path, time::Instant};
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -13,6 +13,7 @@ use aes_gcm::{
 use anyhow::{anyhow, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
 use rand::{rngs::OsRng, RngCore};
+use tracing::trace;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::{
@@ -30,8 +31,11 @@ const ARGON2_ALGORITHM: Algorithm = Algorithm::Argon2id;
 const ARGON2_VERSION: Version = Version::V0x13;
 
 // AES PARAMS
-const AES_SALT_LEN: usize = 32;
+// const AES_SALT_LEN: usize = 32;
 const AES_NONCE_LEN: usize = 12;
+
+// TODO: Currently using a fixed salt to make encryption faster. Was ~300ms now ~30ms This should be revised.
+const APP_SALT: [u8; 32] = *b">>ENCLAVE_SYSTEMS_SALT_2025_V1<<";
 
 fn argon2_derive_key(
     password_bytes: &Zeroizing<Vec<u8>>,
@@ -52,21 +56,17 @@ fn argon2_derive_key(
     Ok(derived_key)
 }
 
-fn encrypt_data(password_bytes: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Result<Vec<u8>> {
-    // Generate a random salt for Argon2
-    let mut salt = [0u8; AES_SALT_LEN];
-    OsRng.fill_bytes(&mut salt);
+fn encrypt_data(derived_key: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Result<Vec<u8>> {
+    let start = Instant::now();
 
     // Generate a random nonce for AES-GCM
     let mut nonce_bytes = [0u8; AES_NONCE_LEN];
     OsRng.fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    // Derive key using Argon2
-    let derived_key = argon2_derive_key(password_bytes, &salt)?;
-
     // Create AES-GCM cipher
-    let cipher = Aes256Gcm::new_from_slice(&derived_key)?;
+    let cipher = Aes256Gcm::new_from_slice(&derived_key)
+        .map_err(|e| anyhow!("Failed to create cipher: {:?}", e))?;
 
     // Encrypt the data
     let ciphertext = cipher
@@ -76,30 +76,27 @@ fn encrypt_data(password_bytes: &Zeroizing<Vec<u8>>, data: &mut Vec<u8>) -> Resu
     data.zeroize(); // Zeroize sensitive input data
 
     // Pack data
-    let mut output = Vec::with_capacity(salt.len() + nonce_bytes.len() + ciphertext.len());
-    output.extend_from_slice(&salt);
+    let mut output = Vec::with_capacity(nonce_bytes.len() + ciphertext.len());
     output.extend_from_slice(&nonce_bytes);
     output.extend_from_slice(&ciphertext);
-
+    trace!("Encryption took {:?}", start.elapsed());
     Ok(output)
 }
 
-fn decrypt_data(password_bytes: &Zeroizing<Vec<u8>>, encrypted_data: &[u8]) -> Result<Vec<u8>> {
-    const AES_HEADER_LEN: usize = AES_SALT_LEN + AES_NONCE_LEN;
+fn decrypt_data(derived_key: &Zeroizing<Vec<u8>>, encrypted_data: &[u8]) -> Result<Vec<u8>> {
+    const AES_HEADER_LEN: usize = AES_NONCE_LEN;
     if encrypted_data.len() < AES_HEADER_LEN {
         return Err(anyhow!("Invalid encrypted data length"));
     }
 
     // Extract salt and nonce
-    let salt = &encrypted_data[..AES_SALT_LEN];
-    let nonce = Nonce::from_slice(&encrypted_data[AES_SALT_LEN..AES_HEADER_LEN]);
+    // let salt = &encrypted_data[..AES_SALT_LEN];
+    let nonce = Nonce::from_slice(&encrypted_data[..AES_HEADER_LEN]);
     let ciphertext = &encrypted_data[AES_HEADER_LEN..];
 
-    // Derive key using Argon2
-    let derived_key = argon2_derive_key(password_bytes, &salt)?;
-
     // Create cipher and decrypt
-    let cipher = Aes256Gcm::new_from_slice(&derived_key)?;
+    let cipher = Aes256Gcm::new_from_slice(&derived_key)
+        .map_err(|e| anyhow!("Failed to create cipher: {:?}", e))?;
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
         .map_err(|_| anyhow!("Could not decrypt data"))?;
@@ -118,6 +115,8 @@ impl Cipher {
     {
         // Get the key from the password manager when created
         let key = pm.get_key().await?;
+        // Derive key using Argon2
+        let key = argon2_derive_key(&key, &APP_SALT)?;
         Ok(Self { key })
     }
 
@@ -281,7 +280,7 @@ mod tests {
         let mut encrypted = cipher.encrypt_data(&mut data.to_vec()).unwrap();
 
         // Corrupt the ciphertext portion (after salt and nonce)
-        if let Some(byte) = encrypted.get_mut(AES_SALT_LEN + AES_NONCE_LEN) {
+        if let Some(byte) = encrypted.get_mut(AES_NONCE_LEN) {
             *byte ^= 0xFF;
         }
 

@@ -4,6 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -11,8 +12,9 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct EventId(pub [u8; 32]);
+#[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
+pub struct EventId(#[derivative(Debug(format_with = "e3_utils::formatters::hexf"))] pub [u8; 32]);
 
 impl EventId {
     pub fn hash<T: Hash>(value: T) -> Self {
@@ -29,5 +31,17 @@ impl fmt::Display for EventId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let base58_string = bs58::encode(&self.0).into_string();
         write!(f, "evt:{}", &base58_string[0..8])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_debug_format() {
+        let event_id = EventId::hash("test");
+        println!("{:?}", event_id);
+        // This will now print: EventId("0x124abccd...")
     }
 }
