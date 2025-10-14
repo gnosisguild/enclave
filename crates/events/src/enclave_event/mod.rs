@@ -251,7 +251,7 @@ impl_from_event!(
     EnclaveError,
     Shutdown,
     TestEvent,
-    DocumentReceived
+    DocumentReceived,
     ThresholdShareCreated
 );
 
