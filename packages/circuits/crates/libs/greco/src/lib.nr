@@ -302,27 +302,27 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let bound_params = self.params.bound_params();
 
         // Common polynomials (used across all CRT bases)
-        self.u.range_check_1bound(bound_params.u_bound);
-        self.e0.range_check_1bound(bound_params.e_bound);
-        self.e1.range_check_1bound(bound_params.e_bound);
-        self.k1.range_check_2bounds(bound_params.k1_up_bound, bound_params.k1_low_bound);
+        self.u.range_check_1bound::<BIT_U>(bound_params.u_bound);
+        self.e0.range_check_1bound::<BIT_E>(bound_params.e_bound);
+        self.e1.range_check_1bound::<BIT_E>(bound_params.e_bound);
+        self.k1.range_check_2bounds::<BIT_K>(bound_params.k1_up_bound, bound_params.k1_low_bound);
 
         // CRT basis-specific polynomials
         for i in 0..L {
             // Public key polynomials must be within bounds for each CRT basis
-            self.pk0is[i].range_check_1bound(bound_params.pk_bounds[i]);
-            self.pk1is[i].range_check_1bound(bound_params.pk_bounds[i]);
+            self.pk0is[i].range_check_1bound::<BIT_PK>(bound_params.pk_bounds[i]);
+            self.pk1is[i].range_check_1bound::<BIT_PK>(bound_params.pk_bounds[i]);
 
             // Randomness polynomials for ct0 computation
-            self.r1is[i].range_check_2bounds(
+            self.r1is[i].range_check_2bounds::<BIT_R1>(
                 bound_params.r1_up_bounds[i],
                 bound_params.r1_low_bounds[i],
             );
-            self.r2is[i].range_check_1bound(bound_params.r2_bounds[i]);
+            self.r2is[i].range_check_1bound::<BIT_R2>(bound_params.r2_bounds[i]);
 
             // Randomness polynomials for ct1 computation
-            self.p1is[i].range_check_1bound(bound_params.p1_bounds[i]);
-            self.p2is[i].range_check_1bound(bound_params.p2_bounds[i]);
+            self.p1is[i].range_check_1bound::<BIT_P1>(bound_params.p1_bounds[i]);
+            self.p2is[i].range_check_1bound::<BIT_P2>(bound_params.p2_bounds[i]);
         }
     }
 
@@ -391,22 +391,22 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         let u_at_gamma = self.u.eval(gamma);
         let e0_at_gamma = self.e0.eval(gamma);
         let k1_at_gamma = self.k1.eval(gamma);
-        let pk0is_at_gamma = self.pk0is.map(|pk| pk.eval(gamma));
-        let r1i_at_gamma = self.r1is.map(|r1| r1.eval(gamma));
-        let r2i_at_gamma = self.r2is.map(|r2| r2.eval(gamma));
+        let pk0is_at_gamma = self.pk0is[i].eval(gamma);
+        let r1i_at_gamma = self.r1is[i].eval(gamma);
+        let r2i_at_gamma = self.r2is[i].eval(gamma);
 
         // Compute right-hand side step by step
         // Step 1: pk0_u = pk0i(gamma) * u(gamma) + e0(gamma)
-        let pk0_u = (pk0is_at_gamma[i] * u_at_gamma) + e0_at_gamma;
+        let pk0_u = (pk0is_at_gamma * u_at_gamma) + e0_at_gamma;
 
         // Step 2: rhs = pk0_u + k1(gamma) * k0i
         let rhs = pk0_u + (k1_at_gamma * crypto_params.k0is[i]);
 
         // Step 3: rhs = rhs + r1i(gamma) * qi
-        let rhs = rhs + (r1i_at_gamma[i] * crypto_params.qis[i]);
+        let rhs = rhs + (r1i_at_gamma * crypto_params.qis[i]);
 
         // Step 4: rhs = rhs + r2i(gamma) * cyclo(gamma)
-        let rhs = rhs + r2i_at_gamma[i] * cyclo_at_gamma;
+        let rhs = rhs + r2i_at_gamma * cyclo_at_gamma;
 
         // Left-hand side: ct0i(gamma)
         let lhs = self.ct0is[i].eval(gamma);
@@ -430,19 +430,19 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         // Evaluate all polynomials at gamma
         let u_at_gamma = self.u.eval(gamma);
         let e1_at_gamma = self.e1.eval(gamma);
-        let pk1is_at_gamma = self.pk1is.map(|pk| pk.eval(gamma));
-        let p1is_at_gamma = self.p1is.map(|p1| p1.eval(gamma));
-        let p2is_at_gamma = self.p2is.map(|p2| p2.eval(gamma));
+        let pk1is_at_gamma = self.pk1is[i].eval(gamma);
+        let p1is_at_gamma = self.p1is[i].eval(gamma);
+        let p2is_at_gamma = self.p2is[i].eval(gamma);
 
         // Compute right-hand side step by step
         // Step 1: pk1_u = pk1i(gamma) * u(gamma) + e1(gamma)
-        let pk1_u = (pk1is_at_gamma[i] * u_at_gamma) + e1_at_gamma;
+        let pk1_u = (pk1is_at_gamma * u_at_gamma) + e1_at_gamma;
 
         // Step 2: rhs = pk1_u + p2i(gamma) * cyclo(gamma)
-        let rhs = pk1_u + p2is_at_gamma[i] * cyclo_at_gamma;
+        let rhs = pk1_u + p2is_at_gamma * cyclo_at_gamma;
 
         // Step 3: rhs = rhs + p1i(gamma) * qi
-        let rhs = rhs + (p1is_at_gamma[i] * crypto_params.qis[i]);
+        let rhs = rhs + (p1is_at_gamma * crypto_params.qis[i]);
 
         // Left-hand side: ct1i(gamma)
         let lhs = self.ct1is[i].eval(gamma);
