@@ -458,8 +458,7 @@ describe("Enclave", function () {
     });
 
     it("returns correct E3 details", async function () {
-      const { enclave, request, mocks, ciphernodeRegistryContract, usdcToken } =
-        await loadFixture(setup);
+      const { enclave, request, mocks, usdcToken } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
         threshold: request.threshold,
@@ -747,8 +746,7 @@ describe("Enclave", function () {
         .withArgs([0, 2]);
     });
     it("reverts if threshold is greater than number", async function () {
-      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
-        await loadFixture(setup);
+      const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
@@ -765,8 +763,7 @@ describe("Enclave", function () {
         .withArgs([3, 2]);
     });
     it("reverts if duration is 0", async function () {
-      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
-        await loadFixture(setup);
+      const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
@@ -783,8 +780,7 @@ describe("Enclave", function () {
         .withArgs(0);
     });
     it("reverts if duration is greater than maxDuration", async function () {
-      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
-        await loadFixture(setup);
+      const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
@@ -801,8 +797,7 @@ describe("Enclave", function () {
         .withArgs(time.duration.days(31));
     });
     it("reverts if E3 Program is not enabled", async function () {
-      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
-        await loadFixture(setup);
+      const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
@@ -819,8 +814,7 @@ describe("Enclave", function () {
         .withArgs(ethers.ZeroAddress);
     });
     it("reverts if given encryption scheme is not enabled", async function () {
-      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
-        await loadFixture(setup);
+      const { enclave, request, usdcToken } = await loadFixture(setup);
       await enclave.disableEncryptionScheme(encryptionSchemeId);
       await expect(
         makeRequest(enclave, usdcToken, {
