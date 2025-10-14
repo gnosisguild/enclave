@@ -2595,8 +2595,11 @@ dependencies = [
  "e3-data",
  "e3-events",
  "e3-fhe",
+ "e3-multithread",
  "e3-request",
  "e3-sortition",
+ "e3-trbfv",
+ "e3-utils",
  "serde",
  "tracing",
 ]
@@ -2616,6 +2619,25 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "rand 0.8.5",
+]
+
+[[package]]
+name = "e3-ciphernode-builder"
+version = "0.1.4"
+dependencies = [
+ "actix",
+ "anyhow",
+ "e3-aggregator",
+ "e3-crypto",
+ "e3-data",
+ "e3-events",
+ "e3-fhe",
+ "e3-keyshare",
+ "e3-multithread",
+ "e3-request",
+ "e3-sortition",
+ "e3-utils",
+ "tracing",
 ]
 
 [[package]]
@@ -2640,6 +2662,7 @@ dependencies = [
  "opentelemetry_sdk",
  "petname",
  "rand 0.8.5",
+ "serde",
  "tokio",
  "tracing",
  "tracing-opentelemetry",
@@ -2692,9 +2715,13 @@ dependencies = [
  "anyhow",
  "argon2",
  "async-trait",
+ "bincode",
+ "e3-utils",
  "rand 0.8.5",
  "serde",
  "tokio",
+ "tracing",
+ "tracing-test",
  "zeroize",
 ]
 
@@ -2765,11 +2792,15 @@ dependencies = [
  "bloom",
  "bs58",
  "chrono",
+ "derivative",
  "e3-crypto",
+ "e3-trbfv",
+ "e3-utils",
  "futures-util",
  "once_cell",
  "serde",
  "sha2",
+ "tokio",
  "tracing",
 ]
 
@@ -2789,7 +2820,9 @@ dependencies = [
  "e3-entrypoint",
  "e3-events",
  "e3-sortition",
+ "e3-utils",
  "futures-util",
+ "num-bigint",
  "serde",
  "tokio",
  "tracing",
@@ -2823,12 +2856,15 @@ dependencies = [
  "e3-data",
  "e3-events",
  "e3-request",
+ "e3-trbfv",
+ "e3-utils",
  "fhe",
  "fhe-traits",
  "fhe-util",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "serde",
+ "tracing",
 ]
 
 [[package]]
@@ -2914,14 +2950,23 @@ dependencies = [
  "actix",
  "anyhow",
  "async-trait",
+ "bincode",
  "e3-config",
  "e3-crypto",
  "e3-data",
  "e3-events",
  "e3-fhe",
+ "e3-multithread",
  "e3-request",
+ "e3-trbfv",
+ "e3-utils",
+ "fhe-traits",
+ "ndarray",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "serde",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -2932,6 +2977,24 @@ dependencies = [
  "base64",
  "e3-events",
  "tracing",
+]
+
+[[package]]
+name = "e3-multithread"
+version = "0.1.4"
+dependencies = [
+ "actix",
+ "anyhow",
+ "e3-crypto",
+ "e3-data",
+ "e3-events",
+ "e3-trbfv",
+ "e3-utils",
+ "rand 0.8.5",
+ "rayon",
+ "tokio",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -2983,6 +3046,7 @@ dependencies = [
  "e3-config",
  "e3-data",
  "e3-events",
+ "e3-utils",
  "serde",
  "tracing",
 ]
@@ -3030,15 +3094,29 @@ name = "e3-test-helpers"
 version = "0.1.4"
 dependencies = [
  "actix",
+ "alloy",
+ "anyhow",
  "bincode",
  "clap",
+ "e3-aggregator",
+ "e3-ciphernode-builder",
+ "e3-crypto",
+ "e3-data",
  "e3-events",
  "e3-fhe",
+ "e3-keyshare",
+ "e3-multithread",
+ "e3-net",
+ "e3-request",
  "e3-sdk",
+ "e3-sortition",
+ "e3-trbfv",
+ "e3-utils",
  "fhe",
  "fhe-traits",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "tokio",
  "tracing",
 ]
 
@@ -3055,6 +3133,7 @@ dependencies = [
  "bincode",
  "clap",
  "e3-aggregator",
+ "e3-ciphernode-builder",
  "e3-crypto",
  "e3-data",
  "e3-events",
@@ -3062,17 +3141,66 @@ dependencies = [
  "e3-fhe",
  "e3-keyshare",
  "e3-logger",
+ "e3-multithread",
  "e3-net",
  "e3-request",
  "e3-sdk",
  "e3-sortition",
  "e3-test-helpers",
+ "e3-trbfv",
+ "e3-utils",
  "fhe",
  "fhe-traits",
  "fhe-util",
+ "num-bigint",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "serial_test",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "zeroize",
+]
+
+[[package]]
+name = "e3-trbfv"
+version = "0.1.4"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "derivative",
+ "e3-bfv-helpers",
+ "e3-crypto",
+ "e3-events",
+ "e3-fhe",
+ "e3-test-helpers",
+ "e3-utils",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "ndarray",
+ "num-bigint",
+ "petname",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "zeroize",
+]
+
+[[package]]
+name = "e3-utils"
+version = "0.1.4"
+dependencies = [
+ "actix",
+ "alloy",
+ "anyhow",
+ "derivative",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "serde",
 ]
 
 [[package]]
@@ -3296,7 +3424,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -3321,7 +3449,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3343,7 +3471,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3351,7 +3479,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -5247,6 +5375,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "rawpointer",
+ "serde",
 ]
 
 [[package]]
@@ -6827,6 +6956,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
+name = "scc"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46e6f046b7fef48e2660c57ed794263155d713de679057f2d0c169bfc6e756cc"
+dependencies = [
+ "sdd",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6864,6 +7002,12 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "sdd"
+version = "3.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490dcfcbfef26be6800d11870ff2df8774fa6e86d047e3e8c8a76b25655e41ca"
 
 [[package]]
 name = "sec1"
@@ -7060,6 +7204,31 @@ checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
 dependencies = [
  "base16ct",
  "serde",
+]
+
+[[package]]
+name = "serial_test"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b258109f244e1d6891bf1053a55d63a5cd4f8f4c30cf9a1280989f80e7a1fa9"
+dependencies = [
+ "futures",
+ "log",
+ "once_cell",
+ "parking_lot 0.12.4",
+ "scc",
+ "serial_test_derive",
+]
+
+[[package]]
+name = "serial_test_derive"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d69265a08751de7844521fd15003ae0a888e035773ba05695c5c759a6f89eef"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
 ]
 
 [[package]]
@@ -7845,6 +8014,27 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
+]
+
+[[package]]
+name = "tracing-test"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "557b891436fe0d5e0e363427fc7f217abf9ccd510d5136549847bdcbcd011d68"
+dependencies = [
+ "tracing-core",
+ "tracing-subscriber",
+ "tracing-test-macro",
+]
+
+[[package]]
+name = "tracing-test-macro"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04659ddb06c87d233c566112c1c9c5b9e98256d9af50ec3bc9c8327f873a7568"
+dependencies = [
+ "quote",
+ "syn 2.0.106",
 ]
 
 [[package]]
