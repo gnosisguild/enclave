@@ -25,11 +25,8 @@ import {ControlID} from "risc0/groth16/ControlID.sol";
 import {CRISPProgram} from "../contracts/CRISPProgram.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
-<<<<<<< HEAD
-=======
 import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
 import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
->>>>>>> main
 import {CRISPInputValidator} from "../contracts/CRISPInputValidator.sol";
 import {MockCRISPInputValidator} from "../contracts/Mocks/MockCRISPInputValidator.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
