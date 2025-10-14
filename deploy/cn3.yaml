@@ -11,4 +11,4 @@ chains:
     contracts:
       enclave: "${SEPOLIA_ENCLAVE_ADDRESS}"
       ciphernode_registry: "${SEPOLIA_CIPHERNODE_REGISTRY_ADDRESS}"
-      bonding_registry: "${SEPOLIA_FILTER_REGISTRY}"
+      bonding_registry: "${SEPOLIA_BONDING_REGISTRY}"

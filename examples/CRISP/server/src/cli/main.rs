@@ -40,9 +40,13 @@ struct Cli {
 enum Commands {
     /// Initialize new E3 round
     Init {
-        #[arg(short, long)]
+        #[arg(
+            short,
+            long,
+            default_value = "0x0000000000000000000000000000000000000000"
+        )]
         token_address: String,
-        #[arg(short, long)]
+        #[arg(short, long, default_value = "1000000000000000000")]
         balance_threshold: String,
     },
 }
@@ -109,11 +113,13 @@ fn select_action() -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
 fn get_token_address() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     Ok(Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter the token contract address for the voting round")
+        .default("0x0000000000000000000000000000000000000000".to_string())
         .interact_text()?)
 }
 
 fn get_balance_threshold() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     Ok(Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter the balance threshold for the voting round")
+        .default("1000000000000000000".to_string())
         .interact_text()?)
 }

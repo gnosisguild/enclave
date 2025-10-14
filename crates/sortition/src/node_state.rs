@@ -10,19 +10,31 @@ use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
     BusError, CommitteePublished, EnclaveErrorType, EnclaveEvent, EventBus,
-    PlaintextOutputPublished, Subscribe, TicketBalanceUpdated,
+    OperatorActivationChanged, PlaintextOutputPublished, Subscribe, TicketBalanceUpdated,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{info, trace};
+use tracing::info;
 
 /// State for a single ciphernode
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeState {
     /// Current ticket balance for this node
     pub ticket_balance: U256,
     /// Number of active E3 jobs this node is currently participating in
     pub active_jobs: u64,
+    /// Whether this node is active (has met minimum requirements)
+    pub active: bool,
+}
+
+impl Default for NodeState {
+    fn default() -> Self {
+        Self {
+            ticket_balance: U256::ZERO,
+            active_jobs: 0,
+            active: false,
+        }
+    }
 }
 
 /// State for all nodes across all chains
@@ -64,10 +76,11 @@ impl NodeStateStore {
     }
 
     /// Get all nodes for a chain with their available tickets
+    /// Only includes active nodes
     pub fn get_nodes_with_tickets(&self, chain_id: u64) -> Vec<(String, u64)> {
         self.nodes
             .iter()
-            .filter(|((cid, _), _)| *cid == chain_id)
+            .filter(|((cid, _), node_state)| *cid == chain_id && node_state.active)
             .map(|((_, addr), _)| (addr.clone(), self.available_tickets(chain_id, addr)))
             .filter(|(_, tickets)| *tickets > 0)
             .collect()
@@ -98,6 +111,11 @@ impl NodeStateManager {
 
         bus.send(Subscribe::new("TicketBalanceUpdated", addr.clone().into()))
             .await?;
+        bus.send(Subscribe::new(
+            "OperatorActivationChanged",
+            addr.clone().into(),
+        ))
+        .await?;
         bus.send(Subscribe::new("CommitteePublished", addr.clone().into()))
             .await?;
         bus.send(Subscribe::new(
@@ -150,6 +168,9 @@ impl Handler<EnclaveEvent> for NodeStateManager {
             EnclaveEvent::TicketBalanceUpdated { data, .. } => {
                 ctx.notify(data);
             }
+            EnclaveEvent::OperatorActivationChanged { data, .. } => {
+                ctx.notify(data);
+            }
             EnclaveEvent::CommitteePublished { data, .. } => {
                 ctx.notify(data);
             }
@@ -179,6 +200,31 @@ impl Handler<TicketBalanceUpdated> for NodeStateManager {
                 "Updated ticket balance"
             );
 
+            Ok(state)
+        }) {
+            Ok(_) => (),
+            Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
+        }
+    }
+}
+
+impl Handler<OperatorActivationChanged> for NodeStateManager {
+    type Result = ();
+
+    fn handle(&mut self, msg: OperatorActivationChanged, _: &mut Self::Context) -> Self::Result {
+        match self.state.try_mutate(|mut state| {
+            // We don't have chain_id in this event, so we need to update all entries for this operator
+            // In practice, an operator should only be registered on one chain, but we handle all just in case
+            for ((_, addr), node) in state.nodes.iter_mut() {
+                if addr == &msg.operator {
+                    node.active = msg.active;
+                    info!(
+                        operator = %msg.operator,
+                        active = msg.active,
+                        "Updated operator active status"
+                    );
+                }
+            }
             Ok(state)
         }) {
             Ok(_) => (),

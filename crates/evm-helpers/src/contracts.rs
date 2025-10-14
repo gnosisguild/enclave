@@ -59,7 +59,6 @@ sol! {
 
     #[derive(Debug)]
     struct E3RequestParams {
-        address filter;
         uint32[2] threshold;
         uint256[2] startWindow;
         uint256 duration;
@@ -115,7 +114,6 @@ pub trait EnclaveRead {
     /// Get the fee quote for an E3 request
     async fn get_e3_quote(
         &self,
-        filter: Address,
         threshold: [u32; 2],
         start_window: [U256; 2],
         duration: U256,
@@ -131,7 +129,6 @@ pub trait EnclaveWrite {
     /// Request a new E3
     async fn request_e3(
         &self,
-        filter: Address,
         threshold: [u32; 2],
         start_window: [U256; 2],
         duration: U256,
@@ -349,7 +346,6 @@ where
 
     async fn get_e3_quote(
         &self,
-        filter: Address,
         threshold: [u32; 2],
         start_window: [U256; 2],
         duration: U256,
@@ -358,7 +354,6 @@ where
         compute_provider_params: Bytes,
     ) -> Result<U256> {
         let e3_request = E3RequestParams {
-            filter,
             threshold,
             startWindow: start_window,
             duration,
@@ -379,7 +374,6 @@ where
 impl EnclaveWrite for EnclaveContract<ReadWrite> {
     async fn request_e3(
         &self,
-        filter: Address,
         threshold: [u32; 2],
         start_window: [U256; 2],
         duration: U256,
@@ -392,7 +386,6 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         let nonce = next_pending_nonce(&*self.provider).await?;
 
         let e3_request = E3RequestParams {
-            filter,
             threshold,
             startWindow: start_window,
             duration,
@@ -403,10 +396,7 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         };
 
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract
-            .request(e3_request)
-            .value(U256::from(1))
-            .nonce(nonce);
+        let builder = contract.request(e3_request).nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
 
         Ok(receipt)

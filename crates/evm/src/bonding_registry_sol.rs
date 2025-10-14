@@ -45,6 +45,22 @@ impl From<TicketBalanceUpdatedWithChainId> for EnclaveEvent {
     }
 }
 
+impl From<IBondingRegistry::OperatorActivationChanged> for e3_events::OperatorActivationChanged {
+    fn from(value: IBondingRegistry::OperatorActivationChanged) -> Self {
+        e3_events::OperatorActivationChanged {
+            operator: value.operator.to_string(),
+            active: value.active,
+        }
+    }
+}
+
+impl From<IBondingRegistry::OperatorActivationChanged> for EnclaveEvent {
+    fn from(value: IBondingRegistry::OperatorActivationChanged) -> Self {
+        let payload: e3_events::OperatorActivationChanged = value.into();
+        EnclaveEvent::from(payload)
+    }
+}
+
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&IBondingRegistry::TicketBalanceUpdated::SIGNATURE_HASH) => {
@@ -55,6 +71,14 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
             Some(EnclaveEvent::from(TicketBalanceUpdatedWithChainId(
                 event, chain_id,
             )))
+        }
+        Some(&IBondingRegistry::OperatorActivationChanged::SIGNATURE_HASH) => {
+            let Ok(event) = IBondingRegistry::OperatorActivationChanged::decode_log_data(data)
+            else {
+                error!("Error parsing event OperatorActivationChanged after topic was matched!");
+                return None;
+            };
+            Some(EnclaveEvent::from(event))
         }
         _topic => {
             trace!(

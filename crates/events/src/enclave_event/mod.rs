@@ -16,6 +16,7 @@ mod e3_request_complete;
 mod e3_requested;
 mod enclave_error;
 mod keyshare_created;
+mod operator_activation_changed;
 mod plaintext_aggregated;
 mod plaintext_output_published;
 mod publickey_aggregated;
@@ -36,6 +37,7 @@ pub use e3_request_complete::*;
 pub use e3_requested::*;
 pub use enclave_error::*;
 pub use keyshare_created::*;
+pub use operator_activation_changed::*;
 pub use plaintext_aggregated::*;
 pub use plaintext_output_published::*;
 pub use publickey_aggregated::*;
@@ -114,6 +116,10 @@ pub enum EnclaveEvent {
     TicketBalanceUpdated {
         id: EventId,
         data: TicketBalanceUpdated,
+    },
+    OperatorActivationChanged {
+        id: EventId,
+        data: OperatorActivationChanged,
     },
     CommitteePublished {
         id: EventId,
@@ -202,6 +208,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
             EnclaveEvent::TicketBalanceUpdated { id, .. } => id,
+            EnclaveEvent::OperatorActivationChanged { id, .. } => id,
             EnclaveEvent::CommitteePublished { id, .. } => id,
             EnclaveEvent::PlaintextOutputPublished { id, .. } => id,
             EnclaveEvent::EnclaveError { id, .. } => id,
@@ -240,6 +247,7 @@ impl EnclaveEvent {
             EnclaveEvent::CiphernodeAdded { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeRemoved { data, .. } => format!("{}", data),
             EnclaveEvent::TicketBalanceUpdated { data, .. } => format!("{:?}", data),
+            EnclaveEvent::OperatorActivationChanged { data, .. } => format!("{:?}", data),
             EnclaveEvent::CommitteePublished { data, .. } => format!("{:?}", data),
             EnclaveEvent::PlaintextOutputPublished { data, .. } => format!("{:?}", data),
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
@@ -264,6 +272,7 @@ impl_from_event!(
     CiphernodeAdded,
     CiphernodeRemoved,
     TicketBalanceUpdated,
+    OperatorActivationChanged,
     CommitteePublished,
     PlaintextOutputPublished,
     EnclaveError,

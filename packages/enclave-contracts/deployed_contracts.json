@@ -26,5 +26,108 @@
       "blockNumber": 9181753,
       "address": "0x58708A1bf1AEdf8e75755FDa1882F8dc46985009"
     }
+  },
+  "hardhat": {
+    "MockUSDC": {
+      "constructorArgs": {
+        "initialSupply": "1000000"
+      },
+      "blockNumber": 1,
+      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    },
+    "EnclaveToken": {
+      "constructorArgs": {
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      },
+      "blockNumber": 1,
+      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    }
+  },
+  "localhost": {
+    "MockUSDC": {
+      "constructorArgs": {
+        "initialSupply": "1000000"
+      },
+      "blockNumber": 1,
+      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    },
+    "EnclaveToken": {
+      "constructorArgs": {
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      },
+      "blockNumber": 2,
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    },
+    "EnclaveTicketToken": {
+      "constructorArgs": {
+        "baseToken": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "registry": "0x0000000000000000000000000000000000000001",
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      },
+      "blockNumber": 4,
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+    },
+    "SlashingManager": {
+      "constructorArgs": {
+        "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "bondingRegistry": "0x0000000000000000000000000000000000000001"
+      },
+      "blockNumber": 5,
+      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+    },
+    "BondingRegistry": {
+      "constructorArgs": {
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "ticketToken": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+        "licenseToken": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "registry": "0x0000000000000000000000000000000000000001",
+        "slashedFundsTreasury": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "ticketPrice": "10000000",
+        "licenseRequiredBond": "100000000000000000000",
+        "minTicketBalance": "1",
+        "exitDelay": "604800"
+      },
+      "blockNumber": 6,
+      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+    },
+    "CiphernodeRegistry": {
+      "constructorArgs": {
+        "enclaveAddress": "0x0000000000000000000000000000000000000001",
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+      },
+      "blockNumber": 8,
+      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
+    },
+    "Enclave": {
+      "constructorArgs": {
+        "params": "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001",
+        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "maxDuration": "2592000",
+        "registry": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+        "bondingRegistry": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+        "feeToken": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      },
+      "blockNumber": 10,
+      "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+    },
+    "MockComputeProvider": {
+      "blockNumber": 18,
+      "address": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
+    },
+    "MockDecryptionVerifier": {
+      "blockNumber": 19,
+      "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
+    },
+    "MockInputValidator": {
+      "blockNumber": 20,
+      "address": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
+    },
+    "MockE3Program": {
+      "constructorArgs": {
+        "mockInputValidator": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
+      },
+      "blockNumber": 21,
+      "address": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
+    }
   }
 }
