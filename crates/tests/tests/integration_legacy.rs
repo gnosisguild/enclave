@@ -11,11 +11,11 @@ use e3_ciphernode_builder::CiphernodeHandle;
 use e3_crypto::Cipher;
 use e3_data::GetDump;
 use e3_data::InMemStore;
-use e3_events::GetHistory;
+use e3_events::GetEvents;
 use e3_events::{
     CiphernodeSelected, CiphertextOutputPublished, E3Requested, E3id, EnclaveEvent, EventBus,
     EventBusConfig, HistoryCollector, OrderedSet, PlaintextAggregated, PublicKeyAggregated, Seed,
-    Shutdown, Subscribe, TakeHistory,
+    Shutdown, Subscribe, TakeEvents,
 };
 use e3_net::events::GossipData;
 use e3_net::{events::NetEvent, NetEventTranslator};
@@ -181,7 +181,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
 
     let history_collector = ciphernodes.get(2).unwrap().history().unwrap();
     let history = history_collector
-        .send(TakeHistory::<EnclaveEvent>::new(9))
+        .send(TakeEvents::<EnclaveEvent>::new(9))
         .await?;
 
     let aggregated_event: Vec<_> = history
@@ -215,7 +215,7 @@ async fn test_public_key_aggregation_and_decryption() -> Result<()> {
     };
 
     let history = history_collector
-        .send(TakeHistory::<EnclaveEvent>::new(6))
+        .send(TakeEvents::<EnclaveEvent>::new(6))
         .await?;
 
     let aggregated_event = history
@@ -262,9 +262,9 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         let history_collector = cn1.history().unwrap();
         let error_collector = cn1.errors().unwrap();
         let history = history_collector
-            .send(TakeHistory::<EnclaveEvent>::new(7))
+            .send(TakeEvents::<EnclaveEvent>::new(7))
             .await?;
-        let errors = error_collector.send(GetHistory::new()).await?;
+        let errors = error_collector.send(GetEvents::new()).await?;
 
         assert_eq!(errors.len(), 0);
 
@@ -345,7 +345,7 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
     .await?;
 
     let history = history_collector
-        .send(TakeHistory::<EnclaveEvent>::new(4))
+        .send(TakeEvents::<EnclaveEvent>::new(4))
         .await?;
 
     let actual = history.iter().find_map(|evt| match evt {
@@ -417,7 +417,7 @@ async fn test_p2p_actor_forwards_events_to_network() -> Result<()> {
 
     // check the history of the event bus
     let history = history_collector
-        .send(TakeHistory::<EnclaveEvent>::new(3))
+        .send(TakeEvents::<EnclaveEvent>::new(3))
         .await?;
 
     assert_eq!(
@@ -470,7 +470,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
 
     let history_collector = ciphernodes.last().unwrap().history().unwrap();
     let history = history_collector
-        .send(TakeHistory::<EnclaveEvent>::new(12))
+        .send(TakeEvents::<EnclaveEvent>::new(12))
         .await?;
 
     assert_eq!(
@@ -498,7 +498,7 @@ async fn test_duplicate_e3_id_with_different_chain_id() -> Result<()> {
     )?)?;
 
     let history = history_collector
-        .send(TakeHistory::<EnclaveEvent>::new(6))
+        .send(TakeEvents::<EnclaveEvent>::new(6))
         .await?;
 
     assert_eq!(
@@ -543,7 +543,7 @@ async fn test_p2p_actor_forwards_events_to_bus() -> Result<()> {
 
     // check the history of the event bus
     let history = history_collector
-        .send(TakeHistory::<EnclaveEvent>::new(1))
+        .send(TakeEvents::<EnclaveEvent>::new(1))
         .await?;
 
     assert_eq!(history, vec![event]);
