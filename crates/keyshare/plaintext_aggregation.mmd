@@ -1,0 +1,20 @@
+sequenceDiagram
+  participant E as EVM
+  participant L as LibP2p
+  participant P as PlaintextAggregator
+  participant M as Multithread(1)
+
+  rect rgb(230, 245, 255)
+    Note over P, M: Plaintext Aggregation
+    L --) P: DecryptionShareCreated
+    L --) P: DecryptionShareCreated
+    L --) P: DecryptionShareCreated
+    P ->> M: ComputeRequest(TrBFV::ThresholdDecrypt)
+    M ->> M: trbfv::calculate_threshold_decryption()
+    M ->> P: ComputeResponse(TrBFV::ThresholdDecrypt)
+    P ->> E: PlaintextAggregated
+  end
+  autonumber
+
+
+

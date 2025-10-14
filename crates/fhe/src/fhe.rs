@@ -4,13 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use super::set_up_crp;
+use super::create_crp;
 use anyhow::*;
 use async_trait::async_trait;
 use e3_bfv_helpers::{build_bfv_params_arc, decode_bfv_params_arc};
 use e3_data::{FromSnapshotWithParams, Snapshot};
 use e3_events::{OrderedSet, Seed};
-use fhe_rs::{
+use e3_utils::{ArcBytes, SharedRng};
+use fhe::{
     bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey, SecretKey},
     mbfv::{AggregateIter, CommonRandomPoly, DecryptionShare, PublicKeyShare},
 };
@@ -20,7 +21,7 @@ use rand_chacha::ChaCha20Rng;
 use std::sync::{Arc, Mutex};
 
 pub struct GetAggregatePublicKey {
-    pub keyshares: OrderedSet<Vec<u8>>,
+    pub keyshares: OrderedSet<ArcBytes>,
 }
 
 pub struct GetAggregatePlaintext {
@@ -32,8 +33,6 @@ pub struct DecryptCiphertext {
     pub unsafe_secret: Vec<u8>,
     pub ciphertext: Vec<u8>,
 }
-
-pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 
 /// Fhe library adaptor.
 #[derive(Clone)]
@@ -50,10 +49,11 @@ impl Fhe {
 
     pub fn from_encoded(bytes: &[u8], seed: Seed, rng: SharedRng) -> Result<Self> {
         let params = decode_bfv_params_arc(bytes);
-        let crp = set_up_crp(
+        let crp = create_crp(
             params.clone(),
             Arc::new(Mutex::new(ChaCha20Rng::from_seed(seed.into()))),
         );
+
         Ok(Fhe::new(params, crp, rng))
     }
 
@@ -73,13 +73,14 @@ impl Fhe {
         ))
     }
 
-    pub fn generate_keyshare(&self) -> Result<(Vec<u8>, Vec<u8>)> {
+    pub fn generate_keyshare(&self) -> Result<(Vec<u8>, ArcBytes)> {
         let sk_share = { SecretKey::random(&self.params, &mut *self.rng.lock().unwrap()) };
         let pk_share =
             { PublicKeyShare::new(&sk_share, self.crp.clone(), &mut *self.rng.lock().unwrap())? };
+
         Ok((
             SecretKeySerializer::to_bytes(sk_share)?,
-            pk_share.to_bytes(),
+            ArcBytes::from_bytes(pk_share.to_bytes()),
         ))
     }
 

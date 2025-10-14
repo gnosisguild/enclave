@@ -6,12 +6,15 @@
 
 use crate::{E3id, OrderedSet};
 use actix::Message;
+use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Derivative, Message, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derivative(Debug)]
 #[rtype(result = "()")]
 pub struct PublicKeyAggregated {
+    #[derivative(Debug(format_with = "e3_utils::formatters::hexf"))]
     pub pubkey: Vec<u8>,
     pub e3_id: E3id,
     pub nodes: OrderedSet<String>,
@@ -19,10 +22,6 @@ pub struct PublicKeyAggregated {
 
 impl Display for PublicKeyAggregated {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "e3_id: {}, nodes: <omitted>, pubkey: <omitted>",
-            self.e3_id,
-        )
+        write!(f, "{:?}", self)
     }
 }

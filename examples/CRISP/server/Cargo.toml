@@ -31,7 +31,7 @@ alloy = { version = "=1.0.23", features = ["full", "rpc-types-eth"] }
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 async-trait = { version = "=0.1.88" }
-fhe_rs.workspace = true
+fhe.workspace = true
 fhe-traits.workspace = true
 
 # Poseidon hashing dependencies

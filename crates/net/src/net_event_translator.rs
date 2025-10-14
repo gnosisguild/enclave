@@ -97,10 +97,11 @@ impl NetEventTranslator {
     pub fn is_forwardable_event(event: &EnclaveEvent) -> bool {
         // Add a list of events allowed to be forwarded to libp2p
         match event {
-            EnclaveEvent::KeyshareCreated { .. } => true,
-            EnclaveEvent::PublicKeyAggregated { .. } => true,
             EnclaveEvent::DecryptionshareCreated { .. } => true,
+            EnclaveEvent::KeyshareCreated { .. } => true,
             EnclaveEvent::PlaintextAggregated { .. } => true,
+            EnclaveEvent::PublicKeyAggregated { .. } => true,
+            EnclaveEvent::ThresholdShareCreated { .. } => true,
             _ => false,
         }
     }

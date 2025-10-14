@@ -51,7 +51,7 @@ The heart of your E3 program is in `./program/src/lib.rs`. Let's examine the def
 ```rust
 use e3_bfv_helpers::decode_bfv_params_arc;
 use e3_compute_provider::FHEInputs;
-use fhe_rs::bfv::Ciphertext;
+use fhe::bfv::Ciphertext;
 use fhe_traits::{DeserializeParametrized, Serialize};
 
 /// Implementation of the CiphertextProcessor function
@@ -87,7 +87,7 @@ Let's create a more interesting computation. Replace the content of `./program/s
 ```rust
 use e3_bfv_helpers::decode_bfv_params_arc;
 use e3_compute_provider::FHEInputs;
-use fhe_rs::bfv::Ciphertext;
+use fhe::bfv::Ciphertext;
 use fhe_traits::{DeserializeParametrized, Serialize};
 
 /// Compute: (a + b) * 2

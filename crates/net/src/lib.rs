@@ -14,6 +14,7 @@ mod repo;
 mod retry;
 
 pub use cid::Cid;
+pub use document_publisher::*;
 pub use net_event_translator::*;
 pub use net_interface::*;
 pub use repo::*;
