@@ -383,6 +383,17 @@ impl SortitionList<String> for BondingBackend {
         Ok(false)
     }
 
+    /// Get index using bonding-based sortition.
+    ///
+    /// Note: This implementation cannot access NodeStateStore directly,
+    /// so it returns None. For proper bonding sortition, use the
+    /// `Sortition` actor's `GetNodeIndex` message which has access to state.
+    fn get_index(&self, _seed: Seed, _size: usize, _address: String) -> Result<Option<u64>> {
+        // BondingBackend requires NodeStateStore which isn't available here
+        // The Sortition actor will handle this by querying the node state
+        Ok(None)
+    }
+
     fn add(&mut self, address: String) {
         self.nodes.insert(address);
     }
@@ -409,6 +420,7 @@ impl SortitionList<String> for SortitionBackend {
         match self {
             SortitionBackend::Distance(backend) => backend.get_index(seed, size, address),
             SortitionBackend::Score(backend) => backend.get_index(seed, size, address),
+            SortitionBackend::Bonding(backend) => backend.get_index(seed, size, address),
         }
     }
     fn add(&mut self, address: String) {
@@ -608,7 +620,7 @@ impl Handler<GetNodeIndex> for Sortition {
     ///
     /// Errors while accessing persisted state or parsing the address are
     /// reported on the event bus and surfaced here as `None`.
-    #[instrument(name = "sortition_contains", skip_all)]
+    #[instrument(name = "sortition_get_index", skip_all)]
     fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
         self.list
             .try_with(|map| {
@@ -625,20 +637,30 @@ impl Handler<GetNodeIndex> for Sortition {
                                 let sortition = TicketBondingSortition::new(msg.size);
                                 let target_addr: Address = msg.address.parse()?;
 
-                                // Get committee and check if address is included
+                                // Get committee and find the index of the address
                                 let committee = sortition.get_committee(
                                     &nodes_with_tickets,
                                     msg.chain_id,
                                     msg.seed.into(),
                                 )?;
 
-                                Ok(committee.contains(&target_addr))
+                                // Find the index of the target address in the committee
+                                let maybe_index =
+                                    committee.iter().enumerate().find_map(|(index, addr)| {
+                                        if addr == &target_addr {
+                                            Some(index as u64)
+                                        } else {
+                                            None
+                                        }
+                                    });
+
+                                Ok(maybe_index)
                             });
                         }
                     }
 
-                    // For other backends, use their native contains method
-                    backend.contains(msg.seed, msg.size, msg.address.clone())
+                    // For other backends, use their native get_index method
+                    backend.get_index(msg.seed, msg.size, msg.address.clone())
                 } else {
                     Ok(None)
                 }

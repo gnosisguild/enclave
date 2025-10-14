@@ -45,6 +45,8 @@ pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
 pub use test_event::*;
+pub use threshold_share_created::*;
+pub use ticket_balance_updated::*;
 
 use crate::{E3id, ErrorEvent, Event, EventId};
 use actix::Message;
