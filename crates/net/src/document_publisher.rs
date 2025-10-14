@@ -12,15 +12,15 @@ use crate::{
     Cid,
 };
 use actix::prelude::*;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use e3_events::{
     BusError, CiphernodeSelected, CorrelationId, DocumentReceived, E3RequestComplete, E3id,
-    EnclaveErrorType, EnclaveEvent, EventBus, PublishDocumentRequested, Subscribe,
+    EnclaveErrorType, EnclaveEvent, EventBus, PartyId, PublishDocumentRequested, Subscribe,
 };
 use futures::TryFutureExt;
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -43,7 +43,7 @@ pub struct DocumentPublisher {
     /// The gossipsub broadcast topic
     topic: String,
     /// Set of E3ids we are interested in
-    ids: HashSet<E3id>,
+    ids: HashMap<E3id, PartyId>,
 }
 
 impl DocumentPublisher {
@@ -59,7 +59,7 @@ impl DocumentPublisher {
             tx: tx.clone(),
             rx: rx.clone(),
             topic: topic.into(),
-            ids: HashSet::new(),
+            ids: HashMap::new(),
         }
     }
 
@@ -105,9 +105,10 @@ impl DocumentPublisher {
     }
 
     fn handle_ciphernode_selected(&mut self, event: CiphernodeSelected) -> Result<()> {
-        // XXX: blocked on ry/599-multithread as we need to extract the party_id from this event to
-        // select for party_ids on the published documents
-        self.ids.insert(event.e3_id);
+        let CiphernodeSelected {
+            e3_id, party_id, ..
+        } = event;
+        self.ids.insert(e3_id, party_id);
         Ok(())
     }
 
@@ -156,29 +157,40 @@ impl DocumentPublisher {
         net_cmds: mpsc::Sender<NetCommand>,
         net_events: Arc<broadcast::Receiver<NetEvent>>,
         bus: Addr<EventBus<EnclaveEvent>>,
-        ids: HashSet<E3id>,
+        ids: HashMap<E3id, PartyId>,
         event: DocumentPublishedNotification,
     ) -> Result<()> {
-        // XXX: We will need to check for party_id here too if the doc spans multiple partys. We
-        // need to wait for ry/599-multithread to be merged first
-        if ids.contains(&event.meta.e3_id) {
-            debug!("interested in event {:?}", event);
-            let value = retry_with_backoff(
-                || {
-                    Self::get_record(net_cmds.clone(), net_events.clone(), event.key.clone())
-                        .map_err(to_retry)
-                },
-                4,
-                1000,
-            )
-            .await?;
+        let e3_id = &event.meta.e3_id;
+        let Some(party_id) = ids.get(e3_id) else {
+            debug!("Node not interested in id {}", e3_id);
+            return Ok(());
+        };
 
-            debug!("Sending event...");
-            bus.do_send(EnclaveEvent::from(DocumentReceived {
-                meta: event.meta,
-                value,
-            }))
+        if !event.meta.matches(party_id) {
+            return Ok(());
         }
+
+        debug!(
+            "interested in document {:?} with party_id={:?}",
+            event, party_id
+        );
+
+        let value = retry_with_backoff(
+            || {
+                Self::get_record(net_cmds.clone(), net_events.clone(), event.key.clone())
+                    .map_err(to_retry)
+            },
+            4,
+            1000,
+        )
+        .await?;
+
+        debug!("Sending received event...");
+        bus.do_send(EnclaveEvent::from(DocumentReceived {
+            meta: event.meta,
+            value,
+        }));
+
         Ok(())
     }
 
