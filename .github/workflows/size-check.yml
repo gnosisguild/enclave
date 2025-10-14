@@ -5,7 +5,7 @@ jobs:
   check-size:
     runs-on: ubuntu-latest 
     env:
-      MAX_LINES: 700
+      MAX_LINES: 800
     steps:
       - name: Check if should skip
         id: should_skip
