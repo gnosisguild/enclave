@@ -41,7 +41,10 @@ pub fn extract_env_vars(config: &AppConfig, chain: &str) -> String {
         env_vars.push(format!("ENCLAVE_ADDRESS={}", enclave_addr.address()));
         env_vars.push(format!("RPC_URL={}", chain.rpc_url));
         env_vars.push(format!("REGISTRY_ADDRESS={}", registry_addr.address()));
-        env_vars.push(format!("BONDING_REGISTRY_ADDRESS={}", bonding_registry_addr.address()));
+        env_vars.push(format!(
+            "BONDING_REGISTRY_ADDRESS={}",
+            bonding_registry_addr.address()
+        ));
         if let Some(e3_program) = &chain.contracts.e3_program {
             env_vars.push(format!("E3_PROGRAM_ADDRESS={}", e3_program.address()));
         }

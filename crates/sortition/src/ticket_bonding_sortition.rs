@@ -56,7 +56,7 @@ impl TicketBondingSortition {
         message.extend_from_slice(&ticket_number.to_be_bytes());
         message.extend_from_slice(&e3_id.to_be_bytes());
         message.extend_from_slice(&seed.to_be_bytes());
-        
+
         let hash = keccak256(&message);
         BigUint::from_bytes_be(&hash.0)
     }
@@ -274,4 +274,3 @@ mod tests {
         // Both have same available tickets, result is deterministic based on scores
     }
 }
-
