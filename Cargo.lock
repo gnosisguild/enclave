@@ -2623,7 +2623,7 @@ dependencies = [
 
 [[package]]
 name = "e3-ciphernode-builder"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "actix",
  "anyhow",
@@ -2981,7 +2981,7 @@ dependencies = [
 
 [[package]]
 name = "e3-multithread"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "actix",
  "anyhow",
@@ -3164,7 +3164,7 @@ dependencies = [
 
 [[package]]
 name = "e3-trbfv"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "bincode",
@@ -3192,7 +3192,7 @@ dependencies = [
 
 [[package]]
 name = "e3-utils"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "actix",
  "alloy",
