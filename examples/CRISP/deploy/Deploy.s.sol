@@ -25,6 +25,11 @@ import {ControlID} from "risc0/groth16/ControlID.sol";
 import {CRISPProgram} from "../contracts/CRISPProgram.sol";
 import {IE3Program} from "@enclave-e3/contracts/contracts/interfaces/IE3Program.sol";
 import {IEnclave} from "@enclave-e3/contracts/contracts/interfaces/IEnclave.sol";
+<<<<<<< HEAD
+=======
+import {CRISPCheckerFactory} from "../contracts/CRISPCheckerFactory.sol";
+import {CRISPPolicyFactory} from "../contracts/CRISPPolicyFactory.sol";
+>>>>>>> main
 import {CRISPInputValidator} from "../contracts/CRISPInputValidator.sol";
 import {MockCRISPInputValidator} from "../contracts/Mocks/MockCRISPInputValidator.sol";
 import {CRISPInputValidatorFactory} from "../contracts/CRISPInputValidatorFactory.sol";
@@ -153,6 +158,27 @@ contract CRISPProgramDeploy is Script {
     function deployCrispProgram() private {
         console2.log("Enclave Address: ", address(enclave));
         console2.log("Verifier Address: ", address(verifier));
+
+        bool useMockIV = vm.envOr("USE_MOCK_INPUT_VALIDATOR", false);
+        address inputValidatorAddress;
+        if (useMockIV) {
+            console2.log("Using MockCRISPInputValidator");
+            inputValidatorAddress = address(new MockCRISPInputValidator());
+        } else {
+            console2.log("Using CRISPInputValidator");
+            inputValidatorAddress = address(new CRISPInputValidator());
+        }
+
+        console2.log("Deployed InputValidator to: ", inputValidatorAddress);
+
+        CRISPCheckerFactory checkerFactory = new CRISPCheckerFactory();
+        console2.log(
+            "Deployed CRISPCheckerFactory to",
+            address(checkerFactory)
+        );
+
+        CRISPPolicyFactory policyFactory = new CRISPPolicyFactory();
+        console2.log("Deployed CRISPPolicyFactory to", address(policyFactory));
 
         bool useMockIV = vm.envOr("USE_MOCK_INPUT_VALIDATOR", false);
         address inputValidatorAddress;

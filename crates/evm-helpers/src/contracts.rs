@@ -25,13 +25,13 @@ use tokio::sync::Mutex;
 
 static NONCE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
-pub async fn next_pending_nonce<P>(provider: &P) -> eyre::Result<u64>
+/// Get the next pending nonce for a given address from the provider
+async fn get_next_nonce<P>(provider: &P, address: Address) -> eyre::Result<u64>
 where
     P: Provider<Ethereum> + Send + Sync,
 {
-    let from = provider.get_accounts().await?[0];
     provider
-        .get_transaction_count(from)
+        .get_transaction_count(address)
         .pending()
         .await
         .map_err(Into::into)
@@ -81,7 +81,7 @@ sol! {
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
         function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);
         function publishCiphertextOutput(uint256 e3Id, bytes calldata ciphertextOutput, bytes calldata proof) external returns (bool success);
-        function publishPlaintextOutput(uint256 e3Id, bytes calldata data) external returns (bool success);
+        function publishPlaintextOutput(uint256 e3Id, bytes calldata data, bytes calldata proof) external returns (bool success);
         function getE3(uint256 e3Id) external view returns (E3 memory e3);
         function getInputRoot(uint256 e3Id) public view returns (uint256);
     }
@@ -150,6 +150,7 @@ pub trait EnclaveWrite {
         &self,
         e3_id: U256,
         data: Bytes,
+        proof: Bytes,
     ) -> Result<TransactionReceipt>;
 }
 
@@ -176,6 +177,7 @@ impl ProviderType for ReadWrite {
 pub struct EnclaveContract<T: ProviderType> {
     pub provider: Arc<T::Provider>,
     pub contract_address: Address,
+    pub wallet_address: Option<Address>,
     _marker: PhantomData<T>,
 }
 
@@ -227,13 +229,10 @@ pub type EnclaveReadOnlyProvider = FillProvider<
 pub type EnclaveWriteProvider = FillProvider<
     JoinFill<
         JoinFill<
-            JoinFill<
-                Identity,
-                JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
-            >,
-            WalletFiller<EthereumWallet>,
+            Identity,
+            JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
         >,
-        NonceFiller,
+        WalletFiller<EthereumWallet>,
     >,
     RootProvider<Ethereum>,
     Ethereum,
@@ -256,16 +255,17 @@ impl EnclaveContractFactory {
         let contract_address = contract_address.parse()?;
 
         let signer: PrivateKeySigner = private_key.parse()?;
+        let wallet_address = signer.address();
         let wallet = EthereumWallet::from(signer);
         let provider = ProviderBuilder::new()
             .wallet(wallet)
-            .with_cached_nonce_management()
             .connect(http_rpc_url)
             .await?;
 
         Ok(EnclaveContract::<ReadWrite> {
             provider: Arc::new(provider),
             contract_address,
+            wallet_address: Some(wallet_address),
             _marker: PhantomData,
         })
     }
@@ -282,6 +282,7 @@ impl EnclaveContractFactory {
         Ok(EnclaveContract::<ReadOnly> {
             provider: Arc::new(provider),
             contract_address,
+            wallet_address: None,
             _marker: PhantomData,
         })
     }
@@ -350,7 +351,10 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         custom_params: Bytes,
     ) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
-        let nonce = next_pending_nonce(&*self.provider).await?;
+        let wallet_addr = self
+            .wallet_address
+            .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
+        let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
         let e3_request = E3RequestParams {
             filter,
@@ -375,7 +379,10 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
 
     async fn activate(&self, e3_id: U256, pub_key: Bytes) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
-        let nonce = next_pending_nonce(&*self.provider).await?;
+        let wallet_addr = self
+            .wallet_address
+            .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
+        let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
         let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract.activate(e3_id, pub_key).nonce(nonce);
@@ -386,7 +393,10 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
 
     async fn enable_e3_program(&self, e3_program: Address) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
-        let nonce = next_pending_nonce(&*self.provider).await?;
+        let wallet_addr = self
+            .wallet_address
+            .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
+        let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
         let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract.enableE3Program(e3_program).nonce(nonce);
@@ -397,7 +407,10 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
 
     async fn publish_input(&self, e3_id: U256, data: Bytes) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
-        let nonce = next_pending_nonce(&*self.provider).await?;
+        let wallet_addr = self
+            .wallet_address
+            .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
+        let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
         let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract.publishInput(e3_id, data).nonce(nonce);
@@ -413,7 +426,10 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         proof: Bytes,
     ) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
-        let nonce = next_pending_nonce(&*self.provider).await?;
+        let wallet_addr = self
+            .wallet_address
+            .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
+        let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
         let contract = Enclave::new(self.contract_address, &self.provider);
         let builder = contract
@@ -428,12 +444,18 @@ impl EnclaveWrite for EnclaveContract<ReadWrite> {
         &self,
         e3_id: U256,
         data: Bytes,
+        proof: Bytes,
     ) -> Result<TransactionReceipt> {
         let _guard = NONCE_LOCK.lock().await;
-        let nonce = next_pending_nonce(&*self.provider).await?;
+        let wallet_addr = self
+            .wallet_address
+            .ok_or_else(|| eyre::eyre!("No wallet address configured"))?;
+        let nonce = get_next_nonce(&*self.provider, wallet_addr).await?;
 
         let contract = Enclave::new(self.contract_address, &self.provider);
-        let builder = contract.publishPlaintextOutput(e3_id, data).nonce(nonce);
+        let builder = contract
+            .publishPlaintextOutput(e3_id, data, proof)
+            .nonce(nonce);
         let receipt = builder.send().await?.get_receipt().await?;
 
         Ok(receipt)
