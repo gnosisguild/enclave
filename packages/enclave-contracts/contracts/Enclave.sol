@@ -9,7 +9,6 @@ import { IEnclave, E3, IE3Program } from "./interfaces/IEnclave.sol";
 import { IInputValidator } from "./interfaces/IInputValidator.sol";
 import { ICiphernodeRegistry } from "./interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "./interfaces/IBondingRegistry.sol";
-import { IRegistryFilter } from "./interfaces/IRegistryFilter.sol";
 import { IDecryptionVerifier } from "./interfaces/IDecryptionVerifier.sol";
 import {
     OwnableUpgradeable
@@ -330,20 +329,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         require(
-            ciphernodeRegistry.requestCommittee(
-                e3Id,
-                requestParams.filter,
-                requestParams.threshold
-            ),
+            ciphernodeRegistry.requestCommittee(e3Id, requestParams.threshold),
             CommitteeSelectionFailed()
         );
 
-        emit E3Requested(
-            e3Id,
-            e3,
-            requestParams.filter,
-            requestParams.e3Program
-        );
+        emit E3Requested(e3Id, e3, requestParams.e3Program);
     }
 
     /// @inheritdoc IEnclave
@@ -475,7 +465,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Emits RewardsDistributed event upon successful distribution.
     /// @param e3Id The ID of the E3 for which to distribute rewards.
     function _distributeRewards(uint256 e3Id) internal {
-        IRegistryFilter.Committee memory committee = ciphernodeRegistry
+        ICiphernodeRegistry.Committee memory committee = ciphernodeRegistry
             .getCommittee(e3Id);
         uint256[] memory amounts = new uint256[](committee.nodes.length);
 

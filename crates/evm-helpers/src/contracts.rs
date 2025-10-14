@@ -365,6 +365,7 @@ where
             e3Program: e3_program,
             e3ProgramParams: e3_params,
             computeProviderParams: compute_provider_params,
+            customParams: Bytes::new(),
         };
 
         let contract = Enclave::new(self.contract_address, &self.provider);

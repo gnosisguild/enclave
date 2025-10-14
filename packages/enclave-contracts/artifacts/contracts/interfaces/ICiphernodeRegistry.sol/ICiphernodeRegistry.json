@@ -95,6 +95,12 @@
         },
         {
           "indexed": false,
+          "internalType": "address[]",
+          "name": "nodes",
+          "type": "address[]"
+        },
+        {
+          "indexed": false,
           "internalType": "bytes",
           "name": "publicKey",
           "type": "bytes"
@@ -111,12 +117,6 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "address",
-          "name": "filter",
-          "type": "address"
         },
         {
           "indexed": false,
@@ -214,28 +214,9 @@
               "type": "bytes32"
             }
           ],
-          "internalType": "struct IRegistryFilter.Committee",
+          "internalType": "struct ICiphernodeRegistry.Committee",
           "name": "committee",
           "type": "tuple"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "e3Id",
-          "type": "uint256"
-        }
-      ],
-      "name": "getFilter",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "filter",
-          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -287,9 +268,9 @@
           "type": "uint256"
         },
         {
-          "internalType": "bytes",
-          "name": "proof",
-          "type": "bytes"
+          "internalType": "address[]",
+          "name": "nodes",
+          "type": "address[]"
         },
         {
           "internalType": "bytes",
@@ -326,11 +307,6 @@
           "internalType": "uint256",
           "name": "e3Id",
           "type": "uint256"
-        },
-        {
-          "internalType": "address",
-          "name": "filter",
-          "type": "address"
         },
         {
           "internalType": "uint32[2]",
@@ -427,5 +403,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_27-905ad4d81abe02c455b9927aa66f20cea780e518"
+  "buildInfoId": "solc-0_8_27-944178351e7c6a2ade6cf3019319b93f86f65a3f"
 }

@@ -11,7 +11,6 @@ import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
 import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
 import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
-import { deployAndSaveNaiveRegistryFilter } from "./deployAndSave/naiveRegistryFilter";
 import { deployAndSaveSlashingManager } from "./deployAndSave/slashingManager";
 import { deployMocks } from "./deployMocks";
 
@@ -119,15 +118,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const enclaveAddress = await enclave.getAddress();
   console.log("Enclave deployed to:", enclaveAddress);
 
-  console.log("Deploying NaiveRegistryFilter...");
-  const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
-    ciphernodeRegistryAddress: ciphernodeRegistryAddress,
-    owner: ownerAddress,
-    hre,
-  });
-  const naiveRegistryFilterAddress = await naiveRegistryFilter.getAddress();
-  console.log("NaiveRegistryFilter deployed to:", naiveRegistryFilterAddress);
-
   ///////////////////////////////////////////
   // Configure cross-contract dependencies
   ///////////////////////////////////////////
@@ -195,7 +185,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
     BondingRegistry: ${bondingRegistryAddress}
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
     Enclave: ${enclaveAddress}
-    NaiveRegistryFilter: ${naiveRegistryFilterAddress}
     ============================================
   `);
 };

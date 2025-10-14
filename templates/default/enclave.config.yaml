@@ -5,7 +5,7 @@ chains:
       e3_program: "0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8"
       enclave: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
       ciphernode_registry: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-      filter_registry: "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
+      bonding_registry: "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
 
 program:
   dev: true

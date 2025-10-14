@@ -20,13 +20,11 @@ import MockDecryptionVerifierModule from "../ignition/modules/mockDecryptionVeri
 import MockE3ProgramModule from "../ignition/modules/mockE3Program";
 import MockInputValidatorModule from "../ignition/modules/mockInputValidator";
 import MockStableTokenModule from "../ignition/modules/mockStableToken";
-import NaiveRegistryFilterModule from "../ignition/modules/naiveRegistryFilter";
 import SlashingManagerModule from "../ignition/modules/slashingManager";
 import {
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
   Enclave__factory as EnclaveFactory,
   MockUSDC__factory as MockUSDCFactory,
-  NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
 } from "../types";
 import type { Enclave } from "../types/contracts/Enclave";
 import type { MockUSDC } from "../types/contracts/test/MockStableToken.sol/MockUSDC";
@@ -176,28 +174,9 @@ describe("Enclave", function () {
     const ciphernodeRegistryAddress =
       await ciphernodeRegistry.cipherNodeRegistry.getAddress();
 
-    const naiveRegistryFilter = await ignition.deploy(
-      NaiveRegistryFilterModule,
-      {
-        parameters: {
-          NaiveRegistryFilter: {
-            ciphernodeRegistryAddress,
-            owner: ownerAddress,
-          },
-        },
-      },
-    );
-
-    const naiveRegistryFilterAddress =
-      await naiveRegistryFilter.naiveRegistryFilter.getAddress();
-
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
       ciphernodeRegistryAddress,
-      owner,
-    );
-    const naiveRegistryFilterContract = NaiveRegistryFilterFactory.connect(
-      naiveRegistryFilterAddress,
       owner,
     );
     const registryAddress = await enclave.ciphernodeRegistry();
@@ -258,7 +237,6 @@ describe("Enclave", function () {
     );
 
     const request = {
-      filter: await naiveRegistryFilterContract.getAddress(),
       threshold: [2, 2] as [number, number],
       startWindow: [await time.latest(), (await time.latest()) + 100] as [
         number,
@@ -296,7 +274,6 @@ describe("Enclave", function () {
     return {
       enclave,
       ciphernodeRegistryContract,
-      naiveRegistryFilterContract,
       bondingRegistry: bondingRegistryContract.bondingRegistry,
       ticketToken: ticketTokenContract.enclaveTicketToken,
       licenseToken: enclTokenContract.enclaveToken,
@@ -481,16 +458,10 @@ describe("Enclave", function () {
     });
 
     it("returns correct E3 details", async function () {
-      const {
-        enclave,
-        request,
-        mocks,
-        naiveRegistryFilterContract,
-        usdcToken,
-      } = await loadFixture(setup);
+      const { enclave, request, mocks, ciphernodeRegistryContract, usdcToken } =
+        await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: await naiveRegistryFilterContract.getAddress(),
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -739,7 +710,6 @@ describe("Enclave", function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
       await expect(
         enclave.request({
-          filter: request.filter,
           threshold: request.threshold,
           startWindow: request.startWindow,
           duration: request.duration,
@@ -753,7 +723,6 @@ describe("Enclave", function () {
     it("reverts if threshold is 0", async function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
       const fee = await enclave.getE3Quote({
-        filter: request.filter,
         threshold: [0, 2],
         startWindow: request.startWindow,
         duration: request.duration,
@@ -765,7 +734,6 @@ describe("Enclave", function () {
       await usdcToken.approve(await enclave.getAddress(), fee);
       await expect(
         enclave.request({
-          filter: request.filter,
           threshold: [0, 2],
           startWindow: request.startWindow,
           duration: request.duration,
@@ -779,12 +747,11 @@ describe("Enclave", function () {
         .withArgs([0, 2]);
     });
     it("reverts if threshold is greater than number", async function () {
-      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
         await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
-          filter: await naiveRegistryFilterContract.getAddress(),
           threshold: [3, 2],
           startWindow: request.startWindow,
           duration: request.duration,
@@ -798,12 +765,11 @@ describe("Enclave", function () {
         .withArgs([3, 2]);
     });
     it("reverts if duration is 0", async function () {
-      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
         await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
-          filter: await naiveRegistryFilterContract.getAddress(),
           threshold: request.threshold,
           startWindow: request.startWindow,
           duration: 0,
@@ -817,12 +783,11 @@ describe("Enclave", function () {
         .withArgs(0);
     });
     it("reverts if duration is greater than maxDuration", async function () {
-      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
         await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
-          filter: await naiveRegistryFilterContract.getAddress(),
           threshold: request.threshold,
           startWindow: request.startWindow,
           duration: time.duration.days(31),
@@ -836,12 +801,11 @@ describe("Enclave", function () {
         .withArgs(time.duration.days(31));
     });
     it("reverts if E3 Program is not enabled", async function () {
-      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
         await loadFixture(setup);
 
       await expect(
         makeRequest(enclave, usdcToken, {
-          filter: await naiveRegistryFilterContract.getAddress(),
           threshold: request.threshold,
           startWindow: request.startWindow,
           duration: request.duration,
@@ -855,12 +819,11 @@ describe("Enclave", function () {
         .withArgs(ethers.ZeroAddress);
     });
     it("reverts if given encryption scheme is not enabled", async function () {
-      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
         await loadFixture(setup);
       await enclave.disableEncryptionScheme(encryptionSchemeId);
       await expect(
         makeRequest(enclave, usdcToken, {
-          filter: await naiveRegistryFilterContract.getAddress(),
           threshold: request.threshold,
           startWindow: request.startWindow,
           duration: request.duration,
@@ -874,23 +837,15 @@ describe("Enclave", function () {
         .withArgs(encryptionSchemeId);
     });
 
-    it("reverts if committee selection fails", async function () {
-      const { enclave, request, usdcToken } = await loadFixture(setup);
-
-      const invalidFilterAddress = "0x0000000000000000000000000000000000000002";
-
-      await expect(
-        makeRequest(enclave, usdcToken, {
-          ...request,
-          filter: invalidFilterAddress,
-        }),
-      ).to.be.revert(ethers);
+    it.skip("reverts if committee selection fails", async function () {
+      // This test is obsolete after removing NaiveRegistryFilter
+      // Committee selection no longer happens during request(),
+      // it happens externally before activate() is called
     });
     it("instantiates a new E3", async function () {
       const { enclave, request, mocks, usdcToken } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -920,7 +875,6 @@ describe("Enclave", function () {
     it("emits E3Requested event", async function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
       const tx = await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -933,7 +887,7 @@ describe("Enclave", function () {
 
       await expect(tx)
         .to.emit(enclave, "E3Requested")
-        .withArgs(0, e3, request.filter, request.e3Program);
+        .withArgs(0, e3, request.e3Program);
     });
   });
 
@@ -946,11 +900,10 @@ describe("Enclave", function () {
         .withArgs(0);
     });
     it("reverts if E3 has already been activated", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -960,7 +913,7 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         0,
         [addressOne, AddressTwo],
         data,
@@ -980,7 +933,6 @@ describe("Enclave", function () {
       ] as [number, number];
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: startTime,
         duration: request.duration,
@@ -995,7 +947,7 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "E3NotReady");
     });
     it("reverts if E3 start has expired", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
       const currentTime = await time.latest();
@@ -1009,7 +961,7 @@ describe("Enclave", function () {
         startWindow: startTime,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1030,7 +982,6 @@ describe("Enclave", function () {
       ] as [number, number];
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: startTime,
         duration: request.duration,
@@ -1045,7 +996,7 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "E3NotReady");
     });
     it("reverts if E3 start has expired", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
       const currentTime = await time.latest();
@@ -1056,7 +1007,7 @@ describe("Enclave", function () {
         startWindow: startTime,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1070,7 +1021,7 @@ describe("Enclave", function () {
       );
     });
     it("reverts if ciphernodeRegistry does not return a public key", async function () {
-      const { enclave, request, naiveRegistryFilterContract, usdcToken } =
+      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
         await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, request);
@@ -1082,16 +1033,14 @@ describe("Enclave", function () {
         await reg.mockCiphernodeRegistryEmptyKey.getAddress();
 
       await enclave.setCiphernodeRegistry(nextRegistry);
-      await naiveRegistryFilterContract.setRegistry(nextRegistry);
 
       await expect(
         enclave.activate(0, ethers.ZeroHash),
       ).to.be.revertedWithCustomError(enclave, "CommitteeSelectionFailed");
 
       await enclave.setCiphernodeRegistry(prevRegistry);
-      await naiveRegistryFilterContract.setRegistry(prevRegistry);
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         0,
         [addressOne, AddressTwo],
         data,
@@ -1101,16 +1050,10 @@ describe("Enclave", function () {
     });
 
     it("sets committeePublicKey correctly", async () => {
-      const {
-        enclave,
-        request,
-        ciphernodeRegistryContract,
-        usdcToken,
-        naiveRegistryFilterContract,
-      } = await loadFixture(setup);
+      const { enclave, request, ciphernodeRegistryContract, usdcToken } =
+        await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1122,7 +1065,7 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1140,11 +1083,10 @@ describe("Enclave", function () {
       expect(e3.committeePublicKey).to.equal(publicKey);
     });
     it("returns true if E3 is activated successfully", async () => {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1156,7 +1098,7 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1165,11 +1107,10 @@ describe("Enclave", function () {
       expect(await enclave.activate.staticCall(e3Id, data)).to.be.equal(true);
     });
     it("emits E3Activated event", async () => {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1181,7 +1122,7 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1207,7 +1148,6 @@ describe("Enclave", function () {
       const { enclave, request, usdcToken } = await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1226,11 +1166,10 @@ describe("Enclave", function () {
     });
 
     it("reverts if input is not valid", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1240,7 +1179,7 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         0,
         [addressOne, AddressTwo],
         data,
@@ -1252,11 +1191,10 @@ describe("Enclave", function () {
     });
 
     it("reverts if outside of input window", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1266,7 +1204,7 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         0,
         [addressOne, AddressTwo],
         data,
@@ -1283,12 +1221,11 @@ describe("Enclave", function () {
     it("it allows publishing input to different requests", async function () {
       const fixtureSetup = () => setup();
 
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(fixtureSetup);
       const inputData = "0x12345678";
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1298,7 +1235,7 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         0,
         [addressOne, AddressTwo],
         data,
@@ -1307,7 +1244,6 @@ describe("Enclave", function () {
       await enclave.publishInput(0, inputData);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1317,7 +1253,7 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         1,
         [addressOne, AddressTwo],
         data,
@@ -1326,12 +1262,11 @@ describe("Enclave", function () {
       await enclave.publishInput(1, inputData);
     });
     it("returns true if input is published successfully", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const inputData = "0x12345678";
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1341,7 +1276,7 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         0,
         [addressOne, AddressTwo],
         data,
@@ -1354,14 +1289,13 @@ describe("Enclave", function () {
     });
 
     it("adds inputHash to merkle tree", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
 
       const tree = new LeanIMT(hash);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1373,7 +1307,7 @@ describe("Enclave", function () {
 
       const e3Id = 0;
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1391,11 +1325,10 @@ describe("Enclave", function () {
       expect(await enclave.getInputRoot(e3Id)).to.equal(tree.root);
     });
     it("emits InputPublished event", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1408,7 +1341,7 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       const inputData = abiCoder.encode(["bytes"], ["0xaabbccddeeff"]);
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1435,7 +1368,6 @@ describe("Enclave", function () {
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: request.startWindow,
         duration: request.duration,
@@ -1449,7 +1381,7 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if input deadline has not passed", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const currentTime = await time.latest();
       await makeRequest(enclave, usdcToken, {
@@ -1458,7 +1390,7 @@ describe("Enclave", function () {
       });
       const e3Id = 0;
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1470,12 +1402,11 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "InputDeadlineNotPassed");
     });
     it("reverts if output has already been published", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: [await time.latest(), (await time.latest()) + 100],
         duration: request.duration,
@@ -1485,7 +1416,7 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1501,12 +1432,11 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if output is not valid", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
       await makeRequest(enclave, usdcToken, {
-        filter: request.filter,
         threshold: request.threshold,
         startWindow: [await time.latest(), (await time.latest()) + 100],
         duration: request.duration,
@@ -1516,7 +1446,7 @@ describe("Enclave", function () {
         customParams: request.customParams,
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1528,7 +1458,7 @@ describe("Enclave", function () {
       ).to.be.revertedWithCustomError(enclave, "InvalidOutput");
     });
     it("sets ciphertextOutput correctly", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1537,7 +1467,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1549,7 +1479,7 @@ describe("Enclave", function () {
       expect(e3.ciphertextOutput).to.equal(dataHash);
     });
     it("returns true if output is published successfully", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1558,7 +1488,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1570,7 +1500,7 @@ describe("Enclave", function () {
       ).to.equal(true);
     });
     it("emits CiphertextOutputPublished event", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1579,7 +1509,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1614,7 +1544,7 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if ciphertextOutput has not been published", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1623,7 +1553,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1634,7 +1564,7 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if plaintextOutput has already been published", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1643,7 +1573,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1660,7 +1590,7 @@ describe("Enclave", function () {
         .withArgs(e3Id);
     });
     it("reverts if output is not valid", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1669,7 +1599,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1682,7 +1612,7 @@ describe("Enclave", function () {
         .withArgs(data);
     });
     it("sets plaintextOutput correctly", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1691,7 +1621,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1705,7 +1635,7 @@ describe("Enclave", function () {
       expect(e3.plaintextOutput).to.equal(data);
     });
     it("returns true if output is published successfully", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1714,7 +1644,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,
@@ -1727,7 +1657,7 @@ describe("Enclave", function () {
       ).to.equal(true);
     });
     it("emits PlaintextOutputPublished event", async function () {
-      const { enclave, request, usdcToken, naiveRegistryFilterContract } =
+      const { enclave, request, usdcToken, ciphernodeRegistryContract } =
         await loadFixture(setup);
       const e3Id = 0;
 
@@ -1736,7 +1666,7 @@ describe("Enclave", function () {
         startWindow: [await time.latest(), (await time.latest()) + 100],
       });
 
-      await naiveRegistryFilterContract.publishCommittee(
+      await ciphernodeRegistryContract.publishCommittee(
         e3Id,
         [addressOne, AddressTwo],
         data,

@@ -9,11 +9,7 @@ import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
 import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
-import NaiveRegistryFilterModule from "../../ignition/modules/naiveRegistryFilter";
-import {
-  CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory,
-  NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
-} from "../../types";
+import { CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory } from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
 const AddressTwo = "0x0000000000000000000000000000000000000002";
@@ -41,22 +37,8 @@ describe("CiphernodeRegistryOwnable", function () {
       },
     });
 
-    const filterContract = await ignition.deploy(NaiveRegistryFilterModule, {
-      parameters: {
-        NaiveRegistryFilter: {
-          owner: await owner.getAddress(),
-          ciphernodeRegistryAddress:
-            await registryContract.cipherNodeRegistry.getAddress(),
-        },
-      },
-    });
-
     const registry = CiphernodeRegistryFactory.connect(
       await registryContract.cipherNodeRegistry.getAddress(),
-      owner,
-    );
-    const filter = NaiveRegistryFilterFactory.connect(
-      await filterContract.naiveRegistryFilter.getAddress(),
       owner,
     );
 
@@ -70,11 +52,9 @@ describe("CiphernodeRegistryOwnable", function () {
       owner,
       notTheOwner,
       registry,
-      filter,
       tree,
       request: {
         e3Id: 1,
-        filter: await filter.getAddress(),
         threshold: [2, 2] as [number, number],
       },
     };
@@ -106,81 +86,29 @@ describe("CiphernodeRegistryOwnable", function () {
   describe("requestCommittee()", function () {
     it("reverts if committee has already been requested for given e3Id", async function () {
       const { registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
+      await registry.requestCommittee(request.e3Id, request.threshold);
       await expect(
-        registry.requestCommittee(
-          request.e3Id,
-          request.filter,
-          request.threshold,
-        ),
+        registry.requestCommittee(request.e3Id, request.threshold),
       ).to.be.revertedWithCustomError(registry, "CommitteeAlreadyRequested");
-    });
-    it("stores the registry filter for the given e3Id", async function () {
-      const { registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
-      expect(await registry.getFilter(request.e3Id)).to.equal(request.filter);
     });
     it("stores the root of the ciphernode registry at the time of the request", async function () {
       const { registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
+      await registry.requestCommittee(request.e3Id, request.threshold);
       expect(await registry.rootAt(request.e3Id)).to.equal(
         await registry.root(),
       );
     });
-    it("requests a committee from the given filter", async function () {
-      const { registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
-      expect(await registry.getFilter(request.e3Id)).to.equal(request.filter);
-    });
     it("emits a CommitteeRequested event", async function () {
       const { registry, request } = await loadFixture(setup);
-      await expect(
-        registry.requestCommittee(
-          request.e3Id,
-          request.filter,
-          request.threshold,
-        ),
-      )
+      await expect(registry.requestCommittee(request.e3Id, request.threshold))
         .to.emit(registry, "CommitteeRequested")
-        .withArgs(request.e3Id, request.filter, request.threshold);
-    });
-    it("reverts if filter.requestCommittee() fails", async function () {
-      const { owner, registry, filter, request } = await loadFixture(setup);
-
-      await filter.setRegistry(await owner.getAddress());
-      await filter.requestCommittee(request.e3Id, request.threshold);
-      await filter.setRegistry(await registry.getAddress());
-
-      await expect(
-        registry.requestCommittee(
-          request.e3Id,
-          request.filter,
-          request.threshold,
-        ),
-      ).to.be.revertedWithCustomError(filter, "CommitteeAlreadyExists");
+        .withArgs(request.e3Id, request.threshold);
     });
     it("returns true if the request is successful", async function () {
       const { registry, request } = await loadFixture(setup);
       expect(
         await registry.requestCommittee.staticCall(
           request.e3Id,
-          request.filter,
           request.threshold,
         ),
       ).to.be.true;
@@ -188,25 +116,20 @@ describe("CiphernodeRegistryOwnable", function () {
   });
 
   describe("publishCommittee()", function () {
-    it("reverts if the caller is not the filter for the given e3Id", async function () {
-      const { registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
+    it("reverts if the caller is not the owner", async function () {
+      const { registry, request, notTheOwner } = await loadFixture(setup);
+      await registry.requestCommittee(request.e3Id, request.threshold);
+
       await expect(
-        registry.publishCommittee(request.e3Id, "0xc0de", data),
-      ).to.be.revertedWithCustomError(registry, "OnlyFilter");
+        registry
+          .connect(notTheOwner)
+          .publishCommittee(request.e3Id, [AddressOne, AddressTwo], data),
+      ).to.be.revertedWithCustomError(registry, "OwnableUnauthorizedAccount");
     });
     it("stores the public key of the committee", async function () {
-      const { filter, registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
-      await filter.publishCommittee(
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(request.e3Id, request.threshold);
+      await registry.publishCommittee(
         request.e3Id,
         [AddressOne, AddressTwo],
         data,
@@ -216,21 +139,17 @@ describe("CiphernodeRegistryOwnable", function () {
       );
     });
     it("emits a CommitteePublished event", async function () {
-      const { filter, registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(request.e3Id, request.threshold);
       await expect(
-        await filter.publishCommittee(
+        await registry.publishCommittee(
           request.e3Id,
           [AddressOne, AddressTwo],
           data,
         ),
       )
         .to.emit(registry, "CommitteePublished")
-        .withArgs(request.e3Id, data);
+        .withArgs(request.e3Id, [AddressOne, AddressTwo], data);
     });
   });
 
@@ -333,13 +252,9 @@ describe("CiphernodeRegistryOwnable", function () {
 
   describe("committeePublicKey()", function () {
     it("returns the public key of the committee for the given e3Id", async function () {
-      const { filter, registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
-      await filter.publishCommittee(
+      const { registry, request } = await loadFixture(setup);
+      await registry.requestCommittee(request.e3Id, request.threshold);
+      await registry.publishCommittee(
         request.e3Id,
         [AddressOne, AddressTwo],
         data,
@@ -350,11 +265,7 @@ describe("CiphernodeRegistryOwnable", function () {
     });
     it("reverts if the committee has not been published", async function () {
       const { registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
+      await registry.requestCommittee(request.e3Id, request.threshold);
       await expect(
         registry.committeePublicKey(request.e3Id),
       ).to.be.revertedWithCustomError(registry, "CommitteeNotPublished");
@@ -393,24 +304,8 @@ describe("CiphernodeRegistryOwnable", function () {
   describe("rootAt()", function () {
     it("returns the root of the ciphernode registry merkle tree at the given e3Id", async function () {
       const { registry, tree, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
+      await registry.requestCommittee(request.e3Id, request.threshold);
       expect(await registry.rootAt(request.e3Id)).to.equal(tree.root);
-    });
-  });
-
-  describe("getFilter()", function () {
-    it("returns the registry filter for the given e3Id", async function () {
-      const { registry, request } = await loadFixture(setup);
-      await registry.requestCommittee(
-        request.e3Id,
-        request.filter,
-        request.threshold,
-      );
-      expect(await registry.getFilter(request.e3Id)).to.equal(request.filter);
     });
   });
 

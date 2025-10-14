@@ -13,8 +13,9 @@ use e3_data::RepositoriesFactory;
 use e3_events::{get_enclave_event_bus, EnclaveEvent, EventBus};
 use e3_evm::{
     helpers::{load_signer_from_repository, ProviderConfig},
+    BondingRegistryReaderRepositoryFactory, BondingRegistrySolReader,
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
 };
 use e3_fhe::ext::FheExtension;
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
@@ -65,18 +66,27 @@ pub async fn execute(
             chain.rpc_url.clone(),
         )
         .await?;
-        RegistryFilterSol::attach(
-            &bus,
-            write_provider.clone(),
-            &chain.contracts.filter_registry.address(),
-        )
-        .await?;
         CiphernodeRegistrySol::attach(
             &bus,
             read_provider.clone(),
             &chain.contracts.ciphernode_registry.address(),
             &repositories.ciphernode_registry_reader(read_provider.chain_id()),
             chain.contracts.ciphernode_registry.deploy_block(),
+            chain.rpc_url.clone(),
+        )
+        .await?;
+        CiphernodeRegistrySol::attach_writer(
+            &bus,
+            write_provider.clone(),
+            &chain.contracts.ciphernode_registry.address(),
+        )
+        .await?;
+        BondingRegistrySolReader::attach(
+            &bus,
+            read_provider.clone(),
+            &chain.contracts.bonding_registry.address(),
+            &repositories.bonding_registry_reader(read_provider.chain_id()),
+            chain.contracts.bonding_registry.deploy_block(),
             chain.rpc_url.clone(),
         )
         .await?;

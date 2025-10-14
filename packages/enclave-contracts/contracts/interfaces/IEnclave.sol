@@ -21,14 +21,8 @@ interface IEnclave {
     /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully requested.
     /// @param e3Id ID of the E3.
     /// @param e3 Details of the E3.
-    /// @param filter Address of the pool of nodes from which the Cipher Node committee was selected.
     /// @param e3Program Address of the Computation module selected.
-    event E3Requested(
-        uint256 e3Id,
-        E3 e3,
-        address filter,
-        IE3Program indexed e3Program
-    );
+    event E3Requested(uint256 e3Id, E3 e3, IE3Program indexed e3Program);
 
     /// @notice This event MUST be emitted when an Encrypted Execution Environment (E3) is successfully activated.
     /// @param e3Id ID of the E3.
@@ -119,7 +113,6 @@ interface IEnclave {
     ////////////////////////////////////////////////////////////
 
     /// @notice This struct contains the parameters to submit a request to Enclave.
-    /// @param filter The address of the pool of nodes from which to select the committee.
     /// @param threshold The M/N threshold for the committee.
     /// @param startWindow The start window for the computation.
     /// @param duration The duration of the computation in seconds.
@@ -128,7 +121,6 @@ interface IEnclave {
     /// @param computeProviderParams The ABI encoded compute provider parameters.
     /// @param customParams Arbitrary ABI-encoded application-defined parameters.
     struct E3RequestParams {
-        address filter;
         uint32[2] threshold;
         uint256[2] startWindow;
         uint256 duration;

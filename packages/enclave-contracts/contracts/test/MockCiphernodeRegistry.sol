@@ -6,19 +6,13 @@
 pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
-import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 
 contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function requestCommittee(
         uint256,
-        address filter,
         uint32[2] calldata
     ) external pure returns (bool success) {
-        if (filter == address(2)) {
-            success = false;
-        } else {
-            success = true;
-        }
+        success = true;
     }
 
     function isEnabled(address) external pure returns (bool) {
@@ -45,20 +39,16 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     function publishCommittee(
         uint256,
-        bytes calldata,
+        address[] calldata,
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
-    function getFilter(uint256) external pure returns (address) {
-        return address(0);
-    }
-
     function getCommittee(
         uint256
-    ) external pure returns (IRegistryFilter.Committee memory) {
+    ) external pure returns (ICiphernodeRegistry.Committee memory) {
         address[] memory nodes = new address[](0);
         uint32[2] memory threshold = [uint32(0), uint32(0)];
-        return IRegistryFilter.Committee(nodes, threshold, bytes32(0));
+        return ICiphernodeRegistry.Committee(nodes, threshold, bytes32(0));
     }
 
     function root() external pure returns (uint256) {
@@ -87,14 +77,9 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function requestCommittee(
         uint256,
-        address filter,
         uint32[2] calldata
     ) external pure returns (bool success) {
-        if (filter == address(2)) {
-            success = false;
-        } else {
-            success = true;
-        }
+        success = true;
     }
 
     function isEnabled(address) external pure returns (bool) {
@@ -117,20 +102,16 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     function publishCommittee(
         uint256,
-        bytes calldata,
+        address[] calldata,
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
-    function getFilter(uint256) external pure returns (address) {
-        return address(0);
-    }
-
     function getCommittee(
         uint256
-    ) external pure returns (IRegistryFilter.Committee memory) {
+    ) external pure returns (ICiphernodeRegistry.Committee memory) {
         address[] memory nodes = new address[](0);
         uint32[2] memory threshold = [uint32(0), uint32(0)];
-        return IRegistryFilter.Committee(nodes, threshold, bytes32(0));
+        return ICiphernodeRegistry.Committee(nodes, threshold, bytes32(0));
     }
 
     function root() external pure returns (uint256) {

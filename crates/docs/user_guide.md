@@ -35,7 +35,7 @@ chains:
       ciphernode_registry:
         address: "0x0952388f6028a9Eda93a5041a3B216Ea331d97Ab"
         deploy_block: 7073318
-      filter_registry:
+      bonding_registry:
         address: "0xcBaCE7C360b606bb554345b20884A28e41436934"
         deploy_block: 7073319
 ```

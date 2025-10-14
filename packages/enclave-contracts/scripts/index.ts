@@ -13,7 +13,6 @@ export * from "./deployAndSave/enclave";
 export * from "./deployAndSave/enclaveTicketToken";
 export * from "./deployAndSave/enclaveToken";
 export * from "./deployAndSave/mockStableToken";
-export * from "./deployAndSave/naiveRegistryFilter";
 export * from "./deployAndSave/slashingManager";
 export * from "./deployAndSave/mockComputeProvider";
 export * from "./deployAndSave/mockDecryptionVerifier";

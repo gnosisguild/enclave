@@ -6,7 +6,6 @@
 pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
-import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import {
     OwnableUpgradeable
@@ -52,14 +51,15 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Incremental Merkle Tree (IMT) containing all registered ciphernodes
     LeanIMTData public ciphernodes;
 
-    /// @notice Maps E3 ID to its associated registry filter contract
-    mapping(uint256 e3Id => IRegistryFilter filter) public registryFilters;
-
     /// @notice Maps E3 ID to the IMT root at the time of committee request
     mapping(uint256 e3Id => uint256 root) public roots;
 
     /// @notice Maps E3 ID to the hash of the committee's public key
     mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
+
+    /// @notice Maps E3 ID to its committee data
+    mapping(uint256 e3Id => ICiphernodeRegistry.Committee committee)
+        public committees;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -72,9 +72,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @notice Committee has already been published for this E3
     error CommitteeAlreadyPublished();
-
-    /// @notice Caller is not the authorized filter for this E3
-    error OnlyFilter();
 
     /// @notice Committee has not been published yet for this E3
     error CommitteeNotPublished();
@@ -167,32 +164,36 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @inheritdoc ICiphernodeRegistry
     function requestCommittee(
         uint256 e3Id,
-        address filter,
         uint32[2] calldata threshold
     ) external onlyEnclave returns (bool success) {
         require(
-            registryFilters[e3Id] == IRegistryFilter(address(0)),
+            committees[e3Id].threshold[1] == 0,
             CommitteeAlreadyRequested()
         );
-        registryFilters[e3Id] = IRegistryFilter(filter);
+        committees[e3Id].threshold = threshold;
         roots[e3Id] = root();
 
-        IRegistryFilter(filter).requestCommittee(e3Id, threshold);
-        emit CommitteeRequested(e3Id, filter, threshold);
+        emit CommitteeRequested(e3Id, threshold);
         success = true;
     }
 
-    /// @inheritdoc ICiphernodeRegistry
+    /// @notice Publishes a committee for an E3 computation
+    /// @dev Only callable by owner. Stores committee data and emits event
+    /// @param e3Id ID of the E3 computation
+    /// @param nodes Array of ciphernode addresses selected for the committee
+    /// @param publicKey Aggregated public key of the committee
     function publishCommittee(
         uint256 e3Id,
-        bytes calldata,
+        address[] calldata nodes,
         bytes calldata publicKey
-    ) external {
-        // only to be published by the filter
-        require(address(registryFilters[e3Id]) == msg.sender, OnlyFilter());
-
-        publicKeyHashes[e3Id] = keccak256(publicKey);
-        emit CommitteePublished(e3Id, publicKey);
+    ) external onlyOwner {
+        ICiphernodeRegistry.Committee storage committee = committees[e3Id];
+        require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
+        committee.nodes = nodes;
+        bytes32 publicKeyHash = keccak256(publicKey);
+        committee.publicKey = publicKeyHash;
+        publicKeyHashes[e3Id] = publicKeyHash;
+        emit CommitteePublished(e3Id, nodes, publicKey);
     }
 
     /// @inheritdoc ICiphernodeRegistry
@@ -291,16 +292,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc ICiphernodeRegistry
-    function getFilter(uint256 e3Id) public view returns (address filter) {
-        return address(registryFilters[e3Id]);
-    }
-
-    /// @inheritdoc ICiphernodeRegistry
     function getCommittee(
         uint256 e3Id
-    ) public view returns (IRegistryFilter.Committee memory committee) {
-        committee = registryFilters[e3Id].getCommittee(e3Id);
-        require(committee.nodes.length > 0, CommitteeNotPublished());
+    ) public view returns (ICiphernodeRegistry.Committee memory committee) {
+        committee = committees[e3Id];
+        require(committee.publicKey != bytes32(0), CommitteeNotPublished());
     }
 
     /// @notice Returns the current size of the ciphernode IMT
