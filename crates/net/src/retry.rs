@@ -44,7 +44,7 @@ where
 
     loop {
         match operation().await {
-            Ok(t) => return Ok(t),
+            Ok(value) => return Ok(value),
             Err(re) => {
                 match re {
                     RetryError::Retry(e) => {
