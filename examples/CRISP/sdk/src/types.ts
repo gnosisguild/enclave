@@ -61,3 +61,28 @@ export interface IMerkleProof {
   index: number
   proof: LeanIMTMerkleProof<bigint>
 }
+
+/**
+ * Enum representing the voting modes
+ */
+export enum VotingMode {
+  /**
+   *  Governance voting requires to spend all credits on one option 
+      they cannot be split
+   */
+  GOVERNANCE = 'GOVERNANCE',
+}
+
+/**
+ * Interface representing a vote with power for 'yes' and 'no'
+ */
+export interface IVote {
+  /**
+   * The voting power for 'yes' votes
+   */
+  yes: bigint
+  /**
+   * The voting power for 'no' votes
+   */
+  no: bigint
+}
