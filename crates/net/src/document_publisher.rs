@@ -504,7 +504,9 @@ mod tests {
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
         bus.do_send(EnclaveEvent::from(CiphernodeSelected {
             e3_id: e3_id.clone(),
-            threshold_m: 5, // TODO: this will change with the merging of #660
+            threshold_m: 3,
+            threshold_n: 5,
+            ..CiphernodeSelected::default()
         }));
 
         net_evt_tx.send(NetEvent::GossipData(
@@ -544,8 +546,17 @@ mod tests {
 
     #[actix::test]
     async fn test_publishes_document_fails_with_exponential_backoff() -> Result<()> {
-        let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, history, errors, _) =
-            setup_test();
+        let (
+            _guard,
+            bus,
+            _net_cmd_tx,
+            mut net_cmd_rx,
+            net_evt_tx,
+            _net_evt_rx,
+            _history,
+            errors,
+            _,
+        ) = setup_test();
         let value = b"I am a special document".to_vec();
         let expires_at = Utc::now() + chrono::Duration::days(1);
         let e3_id = E3id::new("1243", 1);
@@ -596,7 +607,9 @@ mod tests {
         // 1. Ensure the publisher is interested in the id by receiving CiphernodeSelected
         bus.do_send(EnclaveEvent::from(CiphernodeSelected {
             e3_id: e3_id.clone(),
-            threshold_m: 5, // TODO: this will change with the merging of #660
+            threshold_m: 3,
+            threshold_n: 5,
+            ..CiphernodeSelected::default()
         }));
 
         // 2. Dispatch a NetEvent from the NetInterface signaling that a document was published
