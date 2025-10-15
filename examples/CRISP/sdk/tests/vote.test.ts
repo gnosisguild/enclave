@@ -7,11 +7,11 @@
 import { describe, it, expect } from 'vitest'
 import { BfvProtocolParams, type ProtocolParams } from '@enclave-e3/sdk'
 
-import { encodeVote, validateVote } from '../src/vote'
+import { decodeTally, encodeVote, validateVote } from '../src/vote'
 import { VotingMode } from '../src/types'
 
 describe('Vote', () => {
-    const votingPower = 10n
+  const votingPower = 10n
   describe('encodeVote', () => {
     const vote = { yes: 10n, no: 0n }
     it('should work for valid votes', () => {
@@ -33,6 +33,16 @@ describe('Vote', () => {
       expect(encoded).toEqual(['0', '1', '0', '1', '0', '0', '0', '0', '0', '0'])
     })
   })
+
+  describe('decode tally', () => {
+    it('should decode correctly', () => {
+      const tally = ['0', '2', '0', '1', '0', '0', '0', '0', '0', '0']
+
+      const decoded = decodeTally(tally, VotingMode.GOVERNANCE)
+      expect(decoded.yes).toBe(18n)
+      expect(decoded.no).toBe(0n)
+    })
+  })
   describe('validateVote', () => {
     const validVote = { yes: 10n, no: 0n }
     const invalidVote = { yes: 5n, no: 5n }
@@ -49,10 +59,10 @@ describe('Vote', () => {
         validateVote(VotingMode.GOVERNANCE, validVote, votingPower)
       }).not.toThrow()
     })
-    it('shoudl throw when vote are greater than the voting power available', () => {
-        expect(() => {
-            validateVote(VotingMode.GOVERNANCE, { yes: 11n, no: 0n }, votingPower)
-        }).toThrow('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
+    it('should throw when vote are greater than the voting power available', () => {
+      expect(() => {
+        validateVote(VotingMode.GOVERNANCE, { yes: 11n, no: 0n }, votingPower)
+      }).toThrow('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
     })
   })
 })

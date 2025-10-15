@@ -45,6 +45,41 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, bfvConfig: Proto
 }
 
 /**
+ * Given an encoded tally, decode it into its decimal representation
+ * @param tally The encoded tally to decode
+ * @param votingMode The voting mode
+ * @param bfvConfig The BFV protocol parameters used for encryption
+ */
+export const decodeTally = (tally: string[], votingMode: VotingMode): IVote => {
+  switch (votingMode) {
+    case VotingMode.GOVERNANCE:
+      const halfLength = tally.length / 2
+
+      // Split the tally into two halves
+      const yesBinary = tally.slice(0, halfLength)
+      const noBinary = tally.slice(halfLength, tally.length)
+
+      let yes = 0n
+      let no = 0n
+
+      // Convert each half back to decimal
+      for (let i = 0; i < halfLength; i += 1) {
+        const weight = 2n ** BigInt(halfLength - 1 - i)
+
+        yes += BigInt(yesBinary[i]) * weight
+        no += BigInt(noBinary[i]) * weight
+      }
+
+      return {
+        yes,
+        no,
+      }
+    default:
+      throw new Error('Unsupported voting mode')
+  }
+}
+
+/**
  * Validate whether a vote is valid for a given voting mode
  * @param votingMode The voting mode to validate against
  * @param vote The vote to validate
