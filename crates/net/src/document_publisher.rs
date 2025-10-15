@@ -251,34 +251,6 @@ pub async fn handle_publish_document_requested(
     Ok(())
 }
 
-/// Broadcasts document published notification on NetInterface
-async fn broadcast_document_published_notification(
-    net_cmds: mpsc::Sender<NetCommand>,
-    net_events: Arc<broadcast::Receiver<NetEvent>>,
-    payload: DocumentPublishedNotification,
-    topic: impl Into<String>,
-) -> Result<()> {
-    let id = CorrelationId::new();
-    call_and_await_response(
-        net_cmds,
-        net_events,
-        NetCommand::GossipPublish {
-            topic: topic.into(),
-            correlation_id: id,
-            data: GossipData::DocumentPublishedNotification(payload),
-        },
-        |event| match event {
-            NetEvent::GossipPublished { .. } => Some(Ok(())),
-            NetEvent::GossipPublishError { error, .. } => {
-                Some(Err(anyhow::anyhow!("GossipPublished failed: {:?}", error)))
-            }
-            _ => None,
-        },
-        Duration::from_secs(3),
-    )
-    .await
-}
-
 /// Called when we receive a notification from the net_interface
 pub async fn handle_document_published_notification(
     net_cmds: mpsc::Sender<NetCommand>,
@@ -366,6 +338,34 @@ async fn get_record(
             NetEvent::DhtGetRecordSucceeded { value, .. } => Some(Ok(value.clone())),
             NetEvent::DhtGetRecordError { error, .. } => {
                 Some(Err(anyhow::anyhow!("DHT get record failed: {:?}", error)))
+            }
+            _ => None,
+        },
+        Duration::from_secs(3),
+    )
+    .await
+}
+
+/// Broadcasts document published notification on NetInterface
+async fn broadcast_document_published_notification(
+    net_cmds: mpsc::Sender<NetCommand>,
+    net_events: Arc<broadcast::Receiver<NetEvent>>,
+    payload: DocumentPublishedNotification,
+    topic: impl Into<String>,
+) -> Result<()> {
+    let id = CorrelationId::new();
+    call_and_await_response(
+        net_cmds,
+        net_events,
+        NetCommand::GossipPublish {
+            topic: topic.into(),
+            correlation_id: id,
+            data: GossipData::DocumentPublishedNotification(payload),
+        },
+        |event| match event {
+            NetEvent::GossipPublished { .. } => Some(Ok(())),
+            NetEvent::GossipPublishError { error, .. } => {
+                Some(Err(anyhow::anyhow!("GossipPublished failed: {:?}", error)))
             }
             _ => None,
         },
