@@ -66,7 +66,6 @@ sdk.onEnclaveEvent(RegistryEventType.CIPHERNODE_ADDED, (event) => {
 
 // Interact with contracts
 const hash = await sdk.requestE3({
-  filter: "0x...",
   threshold: [1, 3],
   startWindow: [BigInt(0), BigInt(100)],
   duration: BigInt(3600),
@@ -212,7 +211,6 @@ function MyComponent() {
 ```typescript
 // Request a new E3 computation
 await sdk.requestE3({
-  filter: `0x${string}`,
   threshold: [number, number],
   startWindow: [bigint, bigint],
   duration: bigint,

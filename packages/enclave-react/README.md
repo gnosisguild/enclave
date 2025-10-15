@@ -61,7 +61,6 @@ function MyComponent() {
   const handleRequest = async () => {
     try {
       const hash = await requestE3({
-        filter: "0x...",
         threshold: [2, 3],
         startWindow: [BigInt(Date.now()), BigInt(Date.now() + 300000)],
         duration: BigInt(1800),

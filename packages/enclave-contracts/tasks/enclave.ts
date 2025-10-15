@@ -77,7 +77,6 @@ export const requestCommittee = task(
   .setAction(async () => ({
     default: async (
       {
-        filter,
         thresholdQuorum,
         thresholdTotal,
         windowStart,

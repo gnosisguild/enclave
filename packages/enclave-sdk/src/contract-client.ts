@@ -75,7 +75,6 @@ export class ContractClient {
    * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams, bytes customParams)
    */
   public async requestE3(
-    filter: `0x${string}`,
     threshold: [number, number],
     startWindow: [bigint, bigint],
     duration: bigint,
@@ -109,13 +108,13 @@ export class ContractClient {
         functionName: "request",
         args: [
           {
-            filter,
             threshold,
             startWindow,
             duration,
             e3Program,
             e3ProgramParams,
             computeProviderParams,
+            customParams: customParams || "0x",
           },
         ],
         account,

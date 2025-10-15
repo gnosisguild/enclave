@@ -177,7 +177,6 @@ export class EnclaveSDK {
    * Request a new E3 computation
    */
   public async requestE3(params: {
-    filter: `0x${string}`;
     threshold: [number, number];
     startWindow: [bigint, bigint];
     duration: bigint;
@@ -194,14 +193,13 @@ export class EnclaveSDK {
     }
 
     return this.contractClient.requestE3(
-      params.filter,
       params.threshold,
       params.startWindow,
       params.duration,
       params.e3Program,
       params.e3ProgramParams,
       params.computeProviderParams,
-      params.value,
+      params.customParams,
       params.gasLimit
     );
   }
