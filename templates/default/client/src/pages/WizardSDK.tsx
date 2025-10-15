@@ -725,7 +725,6 @@ const WizardSDK: React.FC = () => {
 
       console.log('requestE3')
       const hash = await requestE3({
-        filter: contracts.filterRegistry,
         threshold,
         startWindow,
         duration,

@@ -157,7 +157,7 @@ After deployment, you will see the addresses for the following contracts:
 
 - Enclave
 - Ciphernode Registry
-- Naive Registry Filter
+- Bonding Registry Filter
 - Mock Input Validator
 - Mock E3 Program
 - Mock Decryption Verifier
@@ -237,7 +237,6 @@ CRON_API_KEY=1234567890
 # Based on Default Anvil Deployments (Only for testing)
 ENCLAVE_ADDRESS="0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
 CIPHERNODE_REGISTRY_ADDRESS="0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-NAIVE_REGISTRY_FILTER_ADDRESS="0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
 E3_PROGRAM_ADDRESS="0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8" # CRISPProgram Contract Address
 FEE_TOKEN_ADDRESS="0x5FbDB2315678afecb367f032d93F642f64180aa3" # Mock ERC20 Token Address
 

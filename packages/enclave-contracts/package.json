@@ -162,7 +162,6 @@
     "prettier:write": "prettier --write \"**/*.{js,json,md,sol,ts,yml}\"",
     "test": "hardhat test mocha",
     "test:report-gas": "REPORT_GAS=true hardhat test mocha",
-    "test:registryFilter": "pnpm run test test/CiphernodeRegistry/NaiveRegistryFilter.spec.ts",
     "test:enclave": "pnpm run test test/Enclave.spec.ts",
     "test:ciphernodeRegistry": "pnpm run test test/CiphernodeRegistry/CiphernodeRegistryOwnable.spec.ts",
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",

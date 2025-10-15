@@ -127,15 +127,6 @@ export const requestCommittee = task(
         throw new Error("CiphernodeRegistry deployment arguments not found");
       }
 
-      const filterArgs = readDeploymentArgs(
-        "NaiveRegistryFilter",
-        hre.globalOptions.network,
-      );
-
-      if (!filterArgs) {
-        throw new Error("NaiveRegistryFilter deployment arguments not found");
-      }
-
       const mockE3ProgramArgs = readDeploymentArgs(
         "MockE3Program",
         hre.globalOptions.network,
@@ -172,7 +163,6 @@ export const requestCommittee = task(
       }
 
       const requestParams = {
-        filter: filter === ZeroAddress ? filterArgs.address : filter,
         threshold: [thresholdQuorum, thresholdTotal] as [number, number],
         startWindow: [windowStart, windowEnd] as [number, number],
         duration: duration,
@@ -266,13 +256,14 @@ export const publishCommittee = task(
   })
   .setAction(async () => ({
     default: async ({ e3Id, nodes, publicKey }, hre) => {
-      const { deployAndSaveNaiveRegistryFilter } = await import(
-        "../scripts/deployAndSave/naiveRegistryFilter"
+      const { deployAndSaveCiphernodeRegistryOwnable } = await import(
+        "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
 
-      const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
-        hre,
-      });
+      const { ciphernodeRegistry } =
+        await deployAndSaveCiphernodeRegistryOwnable({
+          hre,
+        });
 
       const nodesToSend = nodes
         .split(",")
@@ -283,7 +274,7 @@ export const publishCommittee = task(
         throw new Error("Invalid nodes format: no valid addresses found");
       }
 
-      const tx = await naiveRegistryFilter.publishCommittee(
+      const tx = await ciphernodeRegistry.publishCommittee(
         e3Id,
         nodesToSend,
         publicKey,

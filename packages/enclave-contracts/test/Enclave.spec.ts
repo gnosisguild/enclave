@@ -830,12 +830,6 @@ describe("Enclave", function () {
         .to.be.revertedWithCustomError(enclave, "InvalidEncryptionScheme")
         .withArgs(encryptionSchemeId);
     });
-
-    it.skip("reverts if committee selection fails", async function () {
-      // This test is obsolete after removing NaiveRegistryFilter
-      // Committee selection no longer happens during request(),
-      // it happens externally before activate() is called
-    });
     it("instantiates a new E3", async function () {
       const { enclave, request, mocks, usdcToken } = await loadFixture(setup);
 

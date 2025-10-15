@@ -27,7 +27,7 @@ export function getContractAddresses() {
   return {
     enclave: process.env.ENCLAVE_ADDRESS as `0x${string}`,
     ciphernodeRegistry: process.env.REGISTRY_ADDRESS as `0x${string}`,
-    filterRegistry: process.env.FILTER_REGISTRY_ADDRESS as `0x${string}`,
+    bondingRegistry: process.env.BONDING_REGISTRY_ADDRESS as `0x${string}`,
     e3Program: process.env.E3_PROGRAM_ADDRESS as `0x${string}`,
   };
 }
@@ -199,7 +199,6 @@ describe("Integration", () => {
     await waitForEvent(EnclaveEventType.E3_REQUESTED, async () => {
       console.log("Requested E3...");
       await sdk.requestE3({
-        filter: contracts.filterRegistry,
         threshold,
         startWindow,
         duration,
@@ -212,7 +211,6 @@ describe("Integration", () => {
     state = store.get(0n);
     assert(state);
     assert.strictEqual(state.e3Id, 0n);
-    assert.strictEqual(state.filter, contracts.filterRegistry);
     assert.strictEqual(state.type, "requested");
 
     // Ciphernodes will publish a public key within the COMMITTEE_PUBLISHED event
