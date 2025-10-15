@@ -12,10 +12,12 @@ import { toBinary } from './utils'
  * Encode a vote based on the voting mode
  * @param vote The vote to encode
  * @param votingMode The voting mode to use for encoding
+ * @param bfvConfig The BFV protocol parameters to use for encoding
+ * @param votingPower The voting power of the voter
  * @returns The encoded vote as a string
  */
-export const encodeVote = (vote: IVote, votingMode: VotingMode, bfvConfig: ProtocolParams): string[] => {
-  validateVote(votingMode, vote)
+export const encodeVote = (vote: IVote, votingMode: VotingMode, bfvConfig: ProtocolParams, votingPower: bigint): string[] => {
+  validateVote(votingMode, vote, votingPower)
 
   switch (votingMode) {
     case VotingMode.GOVERNANCE:
@@ -46,12 +48,17 @@ export const encodeVote = (vote: IVote, votingMode: VotingMode, bfvConfig: Proto
  * Validate whether a vote is valid for a given voting mode
  * @param votingMode The voting mode to validate against
  * @param vote The vote to validate
+ * @param votingPower The voting power of the voter
  */
-export const validateVote = (votingMode: VotingMode, vote: IVote) => {
+export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: bigint) => {
   switch (votingMode) {
     case VotingMode.GOVERNANCE:
       if (vote.yes > 0n && vote.no > 0n) {
         throw new Error('Invalid vote for GOVERNANCE mode: cannot spread votes between options')
+      }
+
+      if (vote.yes > votingPower || vote.no > votingPower) {
+        throw new Error('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
       }
   }
 }
