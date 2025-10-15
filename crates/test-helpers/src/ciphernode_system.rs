@@ -6,7 +6,7 @@
 
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
-use e3_events::{EnclaveEvent, GetHistory, ResetHistory, TakeHistory};
+use e3_events::{EnclaveEvent, GetEvents, ResetHistory, TakeEvents};
 use tokio::time::timeout;
 
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
@@ -106,7 +106,7 @@ impl CiphernodeSystem {
         };
 
         let history = if let Some(history) = node.history() {
-            history.send(GetHistory::new()).await?
+            history.send(GetEvents::new()).await?
         } else {
             vec![]
         };
@@ -133,7 +133,7 @@ impl CiphernodeSystem {
             return Ok(CiphernodeHistory(vec![]));
         };
 
-        let history = timeout(tout, history.send(TakeHistory::new(count)))
+        let history = timeout(tout, history.send(TakeEvents::new(count)))
             .await
             .context(format!(
                 "Could not take {} events from node {}",
@@ -149,7 +149,7 @@ impl CiphernodeSystem {
                 break;
             };
             loop {
-                let nhs = history.send(TakeHistory::new(1));
+                let nhs = history.send(TakeEvents::new(1));
                 let tr = timeout(Duration::from_millis(millis), nhs).await;
                 if !tr.is_ok() {
                     break;

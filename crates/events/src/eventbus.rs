@@ -89,9 +89,9 @@ impl<E: Event> EventBus<E> {
         source.do_send(Subscribe::new("*", addr.clone().recipient()));
         addr
     }
-    pub fn error<EE: ErrorEvent>(source: &Addr<EventBus<EE>>) -> Addr<ErrorCollector<EE>> {
-        let addr = ErrorCollector::<EE>::new().start();
-        source.do_send(Subscribe::new("*", addr.clone().recipient()));
+    pub fn error<EE: ErrorEvent>(source: &Addr<EventBus<EE>>) -> Addr<HistoryCollector<EE>> {
+        let addr = HistoryCollector::<EE>::new().start();
+        source.do_send(Subscribe::new("EnclaveError", addr.clone().recipient()));
         addr
     }
 
@@ -251,9 +251,9 @@ impl<E: Event> Handler<E> for EventFilter<E> {
 
 #[derive(Message)]
 #[rtype(result = "Vec<E>")]
-pub struct GetHistory<E: Event>(PhantomData<E>);
+pub struct GetEvents<E: Event>(PhantomData<E>);
 
-impl<E: Event> GetHistory<E> {
+impl<E: Event> GetEvents<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -261,12 +261,12 @@ impl<E: Event> GetHistory<E> {
 
 #[derive(Message)]
 #[rtype(result = "Vec<E>")]
-pub struct TakeHistory<E: Event> {
+pub struct TakeEvents<E: Event> {
     amount: usize,
     _d: PhantomData<E>,
 }
 
-impl<E: Event> TakeHistory<E> {
+impl<E: Event> TakeEvents<E> {
     pub fn new(amount: usize) -> Self {
         Self {
             amount,
@@ -388,18 +388,18 @@ impl<E: Event> HistoryCollector<E> {
     }
 }
 
-impl<E: Event> Handler<GetHistory<E>> for HistoryCollector<E> {
+impl<E: Event> Handler<GetEvents<E>> for HistoryCollector<E> {
     type Result = Vec<E>;
 
-    fn handle(&mut self, _: GetHistory<E>, _: &mut Context<Self>) -> Vec<E> {
+    fn handle(&mut self, _: GetEvents<E>, _: &mut Context<Self>) -> Vec<E> {
         self.history.iter().cloned().collect()
     }
 }
 
-impl<E: Event> Handler<TakeHistory<E>> for HistoryCollector<E> {
+impl<E: Event> Handler<TakeEvents<E>> for HistoryCollector<E> {
     type Result = ResponseActFuture<Self, Vec<E>>;
 
-    fn handle(&mut self, msg: TakeHistory<E>, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: TakeEvents<E>, _: &mut Context<Self>) -> Self::Result {
         let count = msg.amount;
 
         // If we have enough events in history, return immediately
@@ -443,46 +443,6 @@ impl<E: Event> Handler<E> for HistoryCollector<E> {
     type Result = E::Result;
     fn handle(&mut self, msg: E, _ctx: &mut Self::Context) -> Self::Result {
         self.add_event(msg);
-    }
-}
-
-//////////////////////////////////////////////////////////////////////////////
-// Error Collector
-//////////////////////////////////////////////////////////////////////////////
-
-/// Actor to subscribe to EventBus to capture errors
-pub struct ErrorCollector<E: ErrorEvent> {
-    errors: Vec<E>,
-}
-
-impl<E: ErrorEvent> ErrorCollector<E> {
-    pub fn new() -> Self {
-        Self { errors: Vec::new() }
-    }
-}
-
-impl<E: ErrorEvent> Actor for ErrorCollector<E> {
-    type Context = Context<Self>;
-}
-
-impl<E: ErrorEvent> Handler<E> for ErrorCollector<E> {
-    type Result = E::Result;
-    fn handle(&mut self, msg: E, _: &mut Self::Context) -> Self::Result {
-        if let Some(_) = msg.as_error() {
-            self.errors.push(msg);
-        }
-    }
-}
-
-impl<E: ErrorEvent> Handler<GetErrors<E>> for ErrorCollector<E> {
-    type Result = Vec<E::Error>;
-
-    fn handle(&mut self, _: GetErrors<E>, _: &mut Context<Self>) -> Vec<E::Error> {
-        self.errors
-            .iter()
-            .filter_map(|evt| evt.as_error())
-            .cloned()
-            .collect()
     }
 }
 
