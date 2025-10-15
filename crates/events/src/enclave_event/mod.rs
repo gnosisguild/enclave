@@ -232,6 +232,9 @@ impl EnclaveEvent {
             EnclaveEvent::DecryptionshareCreated { data, .. } => Some(data.e3_id),
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
+            EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteePublished { data, .. } => Some(data.e3_id),
+            EnclaveEvent::PlaintextOutputPublished { data, .. } => Some(data.e3_id),
             _ => None,
         }
     }
