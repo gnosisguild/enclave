@@ -313,3 +313,18 @@ export const BfvProtocolParams = {
     moduli: 0x3FFFFFFF000001n,
   } as const satisfies ProtocolParams,
 }
+
+/**
+ * The result of encrypting a value and generating a proof
+ */
+export interface EncryptedValueAndPublicInputs {
+  /**
+   * The encrypted vector
+   */
+  encryptedVector: Uint8Array;
+
+  /**
+   * The public inputs for the proof
+   */
+  publicInputs: Object;
+}
