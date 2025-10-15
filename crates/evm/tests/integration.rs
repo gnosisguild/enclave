@@ -17,7 +17,7 @@ use anyhow::Result;
 use e3_data::Repository;
 use e3_entrypoint::helpers::datastore::get_in_mem_store;
 use e3_events::{
-    new_event_bus_with_history, EnclaveEvent, GetHistory, HistoryCollector, Shutdown, TestEvent,
+    new_event_bus_with_history, EnclaveEvent, GetEvents, HistoryCollector, Shutdown, TestEvent,
 };
 use e3_evm::{helpers::EthProvider, EvmEventReader};
 use std::time::Duration;
@@ -93,7 +93,7 @@ async fn evm_reader() -> Result<()> {
     sleep(Duration::from_millis(1)).await;
 
     let history = history_collector
-        .send(GetHistory::<EnclaveEvent>::new())
+        .send(GetEvents::<EnclaveEvent>::new())
         .await?;
 
     assert_eq!(history.len(), 2);
@@ -165,7 +165,7 @@ async fn ensure_historical_events() -> Result<()> {
     let expected: Vec<_> = historical_msgs.into_iter().chain(live_events).collect();
 
     let history = history_collector
-        .send(GetHistory::<EnclaveEvent>::new())
+        .send(GetEvents::<EnclaveEvent>::new())
         .await?;
 
     assert_eq!(history.len(), 8);
@@ -203,7 +203,7 @@ async fn ensure_resume_after_shutdown() -> Result<()> {
         history_collector: &Addr<HistoryCollector<EnclaveEvent>>,
     ) -> Result<Vec<String>> {
         let history = history_collector
-            .send(GetHistory::<EnclaveEvent>::new())
+            .send(GetEvents::<EnclaveEvent>::new())
             .await?;
         let msgs: Vec<String> = history
             .into_iter()
