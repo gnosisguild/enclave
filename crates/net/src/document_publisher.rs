@@ -385,9 +385,9 @@ mod tests {
     use actix::Addr;
     use anyhow::{bail, Result};
     use e3_events::{
-        CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveEvent, ErrorCollector,
-        EventBus, EventBusConfig, GetErrors, GetHistory, HistoryCollector,
-        PublishDocumentRequested,
+        CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
+        EventBusConfig, GetErrors, GetEvents, HistoryCollector, PublishDocumentRequested,
+        TakeEvents,
     };
     use tokio::{
         sync::{broadcast, mpsc},
@@ -403,7 +403,7 @@ mod tests {
         broadcast::Sender<NetEvent>,
         Arc<broadcast::Receiver<NetEvent>>,
         Addr<HistoryCollector<EnclaveEvent>>,
-        Addr<ErrorCollector<EnclaveEvent>>,
+        Addr<HistoryCollector<EnclaveEvent>>,
         Addr<DocumentPublisher>,
     ) {
         use tracing_subscriber::{fmt, EnvFilter};
@@ -420,9 +420,9 @@ mod tests {
         let (net_evt_tx, net_evt_rx) = broadcast::channel(100);
         let net_evt_rx = Arc::new(net_evt_rx);
         let history = HistoryCollector::<EnclaveEvent>::new().start();
-        let error = ErrorCollector::<EnclaveEvent>::new().start();
+        let error = HistoryCollector::<EnclaveEvent>::new().start();
         bus.do_send(Subscribe::new("*", history.clone().recipient()));
-        bus.do_send(Subscribe::new("*", error.clone().recipient()));
+        bus.do_send(Subscribe::new("EnclaveError", error.clone().recipient()));
 
         let publisher = DocumentPublisher::setup(&bus, &net_cmd_tx, &net_evt_rx, "topic");
 
@@ -548,10 +548,18 @@ mod tests {
         // wait for events to settle
         // Expect error to exist
         // TODO: Setup TakeErrors from #660
-        sleep(Duration::from_secs(8)).await;
-        let errors = errors.send(GetErrors::new()).await?;
-
-        assert_eq!(errors.len(), 1);
+        let errors = errors.send(TakeEvents::new(1)).await?;
+        let Some(EnclaveEvent::EnclaveError {
+            data: EnclaveError { message, .. },
+            ..
+        }) = errors.first()
+        else {
+            bail!("Bad errors!");
+        };
+        assert_eq!(
+            message,
+            "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout"
+        );
 
         Ok(())
     }
@@ -599,7 +607,7 @@ mod tests {
         // Expect error to exist
         // TODO: Setup TakeErrors from #660
         sleep(Duration::from_secs(5)).await;
-        let errors = errors.send(GetErrors::new()).await?;
+        let errors = errors.send(GetEvents::new()).await?;
 
         assert_eq!(errors.len(), 1);
 
@@ -674,7 +682,7 @@ mod tests {
         sleep(Duration::from_millis(100)).await;
 
         // Check event was dispatched
-        let events = history.send(GetHistory::<EnclaveEvent>::new()).await?;
+        let events = history.send(GetEvents::new()).await?;
         let Some(EnclaveEvent::DocumentReceived {
             data: DocumentReceived { value: doc, .. },
             ..
