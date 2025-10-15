@@ -386,8 +386,7 @@ mod tests {
     use anyhow::{bail, Result};
     use e3_events::{
         CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
-        EventBusConfig, GetErrors, GetEvents, HistoryCollector, PublishDocumentRequested,
-        TakeEvents,
+        EventBusConfig, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
     };
     use tokio::{
         sync::{broadcast, mpsc},
@@ -546,18 +545,12 @@ mod tests {
         }
 
         // wait for events to settle
-        // Expect error to exist
-        // TODO: Setup TakeErrors from #660
         let errors = errors.send(TakeEvents::new(1)).await?;
-        let Some(EnclaveEvent::EnclaveError {
-            data: EnclaveError { message, .. },
-            ..
-        }) = errors.first()
-        else {
-            bail!("Bad errors!");
-        };
+
+        let error: EnclaveError = errors.first().unwrap().try_into()?;
+
         assert_eq!(
-            message,
+            error.message,
             "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout"
         );
 
@@ -605,11 +598,14 @@ mod tests {
         }
 
         // Expect error to exist
-        // TODO: Setup TakeErrors from #660
-        sleep(Duration::from_secs(5)).await;
-        let errors = errors.send(GetEvents::new()).await?;
+        let errors = errors.send(TakeEvents::new(1)).await?;
 
-        assert_eq!(errors.len(), 1);
+        let error: EnclaveError = errors.first().unwrap().try_into()?;
+
+        assert_eq!(
+            error.message,
+            "Operation failed after 4 attempts. Last error: DHT put record failed: Timeout"
+        );
 
         Ok(())
     }

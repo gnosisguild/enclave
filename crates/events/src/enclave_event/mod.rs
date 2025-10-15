@@ -263,6 +263,24 @@ impl FromError for EnclaveEvent {
     }
 }
 
+impl TryFrom<&EnclaveEvent> for EnclaveError {
+    type Error = anyhow::Error;
+    fn try_from(value: &EnclaveEvent) -> Result<Self, Self::Error> {
+        value.clone().try_into()
+    }
+}
+
+impl TryFrom<EnclaveEvent> for EnclaveError {
+    type Error = anyhow::Error;
+    fn try_from(value: EnclaveEvent) -> Result<Self, Self::Error> {
+        if let EnclaveEvent::EnclaveError { data, .. } = value.clone() {
+            Ok(data)
+        } else {
+            return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
+        }
+    }
+}
+
 impl fmt::Display for EnclaveEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&format!("{}({})", self.event_type(), self.get_data()))
