@@ -15,11 +15,10 @@ use alloy::primitives::Address;
 use anyhow::*;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::{
-    CiphernodeAdded, EnclaveEvent, ErrorCollector, EventBus, EventBusConfig, HistoryCollector,
-    Seed, Subscribe,
+    CiphernodeAdded, EnclaveEvent, EventBus, EventBusConfig, HistoryCollector, Seed, Subscribe,
 };
 use e3_fhe::{create_crp, setup_crp_params, ParamsWithCrp};
-use e3_net::{DocumentPublisher, NetEventTranslator};
+use e3_net::NetEventTranslator;
 use e3_sdk::bfv_helpers::params::SET_2048_1032193_1;
 use e3_utils::SharedRng;
 use fhe::bfv::{BfvParameters, Ciphertext, Encoding, Plaintext, PublicKey};
@@ -77,11 +76,11 @@ pub fn get_common_setup(
     Seed,
     Arc<BfvParameters>,
     CommonRandomPoly,
-    Addr<ErrorCollector<EnclaveEvent>>,
+    Addr<HistoryCollector<EnclaveEvent>>,
     Addr<HistoryCollector<EnclaveEvent>>,
 )> {
     let bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-    let errors = ErrorCollector::<EnclaveEvent>::new().start();
+    let errors = HistoryCollector::<EnclaveEvent>::new().start();
     let history = HistoryCollector::<EnclaveEvent>::new().start();
     bus.do_send(Subscribe::new("*", history.clone().recipient()));
     bus.do_send(Subscribe::new("EnclaveError", errors.clone().recipient()));
