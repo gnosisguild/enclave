@@ -180,7 +180,7 @@ export class EnclaveSDK {
     await initializeWasm();
     switch (this.protocol) {
       case FheProtocol.BFV:
-        const [encryptedVote, circuitInputs] = bfv_verifiable_encrypt_number(
+        const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_number(
           data,
           publicKey,
           this.protocolParams.degree,
@@ -193,7 +193,7 @@ export class EnclaveSDK {
         const proof = await generateProof(inputs, circuit);
 
         return {
-          encryptedVote,
+          encryptedData,
           proof,
         };
       default:
@@ -229,7 +229,7 @@ export class EnclaveSDK {
         const proof = await generateProof(inputs, circuit);
 
         return {
-          encryptedVote: encryptedVector,
+          encryptedData: encryptedVector,
           proof,
         };
       default:
@@ -262,7 +262,7 @@ export class EnclaveSDK {
         return {
           encryptedVector,
           publicInputs: inputs
-        }
+        };
       default:
         throw new Error("Protocol not supported");
     }
