@@ -98,7 +98,7 @@ pub fn bfv_encrypt_v64(
 
 #[derive(Debug, Clone)]
 pub struct VerifiableEncryptionResult {
-    pub encrypted_vote: Vec<u8>,
+    pub encrypted_data: Vec<u8>,
     pub circuit_inputs: String,
 }
 
@@ -122,7 +122,7 @@ pub struct VerifiableEncryptionResult {
 /// - Encryption fails
 /// - Input validation vector computation fails
 pub fn bfv_verifiable_encrypt_u64(
-    vote: u64,
+    data: u64,
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
@@ -133,14 +133,14 @@ pub fn bfv_verifiable_encrypt_u64(
     let pk = PublicKey::from_bytes(&public_key, &params)
         .map_err(|e| anyhow!("Error deserializing public key: {}", e))?;
 
-    let vote_vector = vec![vote];
+    let data_vector = vec![data];
 
-    let plaintext = Plaintext::try_encode(&vote_vector, Encoding::poly(), &params)
+    let plaintext = Plaintext::try_encode(&data_vector, Encoding::poly(), &params)
         .map_err(|e| anyhow!("Error encoding plaintext: {}", e))?;
 
     let (cipher_text, u_rns, e0_rns, e1_rns) = pk
         .try_encrypt_extended(&plaintext, &mut thread_rng())
-        .map_err(|e| anyhow!("Error encrypting vote: {}", e))?;
+        .map_err(|e| anyhow!("Error encrypting data: {}", e))?;
 
     // Create Greco input validation ZK proof
     let input_val_vectors = InputValidationVectors::compute(
@@ -163,7 +163,7 @@ pub fn bfv_verifiable_encrypt_u64(
     let standard_input_val = input_val_vectors.standard_form(&zkp_modulus);
 
     Ok(VerifiableEncryptionResult {
-        encrypted_vote: cipher_text.to_bytes(),
+        encrypted_data: cipher_text.to_bytes(),
         circuit_inputs: standard_input_val.to_json().to_string(),
     })
 }
@@ -188,7 +188,7 @@ pub fn bfv_verifiable_encrypt_u64(
 /// - Encryption fails
 /// - Input validation vector computation fails
 pub fn bfv_verifiable_encrypt_v64(
-    vote: Vec<u64>,
+    data: Vec<u64>,
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
@@ -199,12 +199,12 @@ pub fn bfv_verifiable_encrypt_v64(
     let pk = PublicKey::from_bytes(&public_key, &params)
         .map_err(|e| anyhow!("Error deserializing public key: {}", e))?;
 
-    let plaintext = Plaintext::try_encode(&vote, Encoding::poly(), &params)
+    let plaintext = Plaintext::try_encode(&data, Encoding::poly(), &params)
         .map_err(|e| anyhow!("Error encoding plaintext: {}", e))?;
 
     let (cipher_text, u_rns, e0_rns, e1_rns) = pk
         .try_encrypt_extended(&plaintext, &mut thread_rng())
-        .map_err(|e| anyhow!("Error encrypting vote: {}", e))?;
+        .map_err(|e| anyhow!("Error encrypting data: {}", e))?;
 
     // Create Greco input validation ZK proof
     let input_val_vectors = InputValidationVectors::compute(
@@ -227,7 +227,7 @@ pub fn bfv_verifiable_encrypt_v64(
     let standard_input_val = input_val_vectors.standard_form(&zkp_modulus);
 
     Ok(VerifiableEncryptionResult {
-        encrypted_vote: cipher_text.to_bytes(),
+        encrypted_data: cipher_text.to_bytes(),
         circuit_inputs: standard_input_val.to_json().to_string(),
     })
 }
@@ -250,10 +250,10 @@ mod tests {
         let pk = PublicKey::new(&sk, &mut rng);
 
         let num = 1;
-        let encrypted_vote =
+        let encrypted_data =
             bfv_encrypt_u64(num, pk.to_bytes(), degree, plaintext_modulus, moduli).unwrap();
 
-        let ct = Ciphertext::from_bytes(&encrypted_vote, &params).unwrap();
+        let ct = Ciphertext::from_bytes(&encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
 
         assert_eq!(pt.value[0], num);
@@ -271,7 +271,7 @@ mod tests {
         let pk = PublicKey::new(&sk, &mut rng);
 
         let num = vec![1, 2];
-        let encrypted_vote = bfv_encrypt_v64(
+        let encrypted_data = bfv_encrypt_v64(
             num.clone(),
             pk.to_bytes(),
             degree,
@@ -280,7 +280,7 @@ mod tests {
         )
         .unwrap();
 
-        let ct = Ciphertext::from_bytes(&encrypted_vote, &params).unwrap();
+        let ct = Ciphertext::from_bytes(&encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
 
         assert_eq!(pt.value[0], num[0]);
@@ -299,11 +299,11 @@ mod tests {
         let pk = PublicKey::new(&sk, &mut rng);
 
         let num = 1;
-        let encrypted_vote =
+        let encrypted_data =
             bfv_verifiable_encrypt_u64(num, pk.to_bytes(), degree, plaintext_modulus, moduli)
                 .unwrap();
 
-        let ct = Ciphertext::from_bytes(&encrypted_vote.encrypted_vote, &params).unwrap();
+        let ct = Ciphertext::from_bytes(&encrypted_data.encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
 
         assert_eq!(pt.value[0], num);
@@ -321,7 +321,7 @@ mod tests {
         let pk = PublicKey::new(&sk, &mut rng);
 
         let num = vec![1, 2];
-        let encrypted_vote = bfv_verifiable_encrypt_v64(
+        let encrypted_data = bfv_verifiable_encrypt_v64(
             num.clone(),
             pk.to_bytes(),
             degree,
@@ -330,7 +330,7 @@ mod tests {
         )
         .unwrap();
 
-        let ct = Ciphertext::from_bytes(&encrypted_vote.encrypted_vote, &params).unwrap();
+        let ct = Ciphertext::from_bytes(&encrypted_data.encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
 
         assert_eq!(pt.value[0], num[0]);

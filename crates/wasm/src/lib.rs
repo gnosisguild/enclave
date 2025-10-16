@@ -100,7 +100,7 @@ pub fn bfv_verifiable_encrypt_number(
 
     // Return as a vector of JsValues
     Ok(vec![
-        JsValue::from(result.encrypted_vote),
+        JsValue::from(result.encrypted_data),
         JsValue::from(result.circuit_inputs),
     ])
 }
@@ -136,7 +136,7 @@ pub fn bfv_verifiable_encrypt_vector(
 
     // Return as a vector of JsValues
     Ok(vec![
-        JsValue::from(result.encrypted_vote),
+        JsValue::from(result.encrypted_data),
         JsValue::from(result.circuit_inputs),
     ])
 }
