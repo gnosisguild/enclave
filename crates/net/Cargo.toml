@@ -17,6 +17,7 @@ futures = { workspace = true }
 e3-crypto = { workspace = true }
 e3-config = { workspace = true }
 e3-data = { workspace = true }
+e3-utils = { workspace = true }
 libp2p = { workspace = true }
 serde = { workspace = true }
 sha2 = { workspace = true }

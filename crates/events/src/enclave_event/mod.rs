@@ -119,6 +119,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: Shutdown,
     },
+    DocumentReceived {
+        id: EventId,
+        data: DocumentReceived,
+    },
     ThresholdShareCreated {
         id: EventId,
         data: ThresholdShareCreated,
@@ -189,6 +193,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
             EnclaveEvent::TestEvent { id, .. } => id,
+            EnclaveEvent::DocumentReceived { id, .. } => id,
             EnclaveEvent::ThresholdShareCreated { id, .. } => id,
         }
     }
@@ -225,6 +230,7 @@ impl EnclaveEvent {
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
             EnclaveEvent::ThresholdShareCreated { data, .. } => format!("{:?}", data),
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
+            EnclaveEvent::DocumentReceived { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
     }
@@ -245,6 +251,7 @@ impl_from_event!(
     EnclaveError,
     Shutdown,
     TestEvent,
+    DocumentReceived,
     ThresholdShareCreated
 );
 
@@ -253,6 +260,24 @@ impl FromError for EnclaveEvent {
     fn from_error(err_type: EnclaveErrorType, error: Self::Error) -> Self {
         let error_event = EnclaveError::from_error(err_type, error);
         EnclaveEvent::from(error_event)
+    }
+}
+
+impl TryFrom<&EnclaveEvent> for EnclaveError {
+    type Error = anyhow::Error;
+    fn try_from(value: &EnclaveEvent) -> Result<Self, Self::Error> {
+        value.clone().try_into()
+    }
+}
+
+impl TryFrom<EnclaveEvent> for EnclaveError {
+    type Error = anyhow::Error;
+    fn try_from(value: EnclaveEvent) -> Result<Self, Self::Error> {
+        if let EnclaveEvent::EnclaveError { data, .. } = value.clone() {
+            Ok(data)
+        } else {
+            return Err(anyhow::anyhow!("Not an enclave error {:?}", value));
+        }
     }
 }
 

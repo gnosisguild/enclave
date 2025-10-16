@@ -3011,6 +3011,7 @@ dependencies = [
  "e3-crypto",
  "e3-data",
  "e3-events",
+ "e3-utils",
  "futures",
  "libp2p",
  "serde",
