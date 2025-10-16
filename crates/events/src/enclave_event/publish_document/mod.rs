@@ -10,6 +10,7 @@ use std::fmt::{self, Display};
 
 use actix::Message;
 use chrono::{serde::ts_seconds, DateTime, Utc};
+use e3_utils::ArcBytes;
 use filter::Filter;
 use serde::{Deserialize, Serialize};
 
@@ -72,12 +73,12 @@ impl DocumentMeta {
 pub struct PublishDocumentRequested {
     pub meta: DocumentMeta,
     /// Key will be a simple hash eg. Sha256Hash of the value so we need not put it here
-    pub value: Vec<u8>, // TODO: ArcBytes from ry/599-multithread
+    pub value: ArcBytes,
 }
 
 impl Display for PublishDocumentRequested {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.meta) // XXX:: apply ArcBytes and rely on debug once trbfv is merged
+        write!(f, "{:?}", self.meta)
     }
 }
 
@@ -88,7 +89,7 @@ pub struct DocumentReceived {
     /// Document metadata
     pub meta: DocumentMeta,
     /// Document value from kademlia
-    pub value: Vec<u8>, // TODO: ArcBytes
+    pub value: ArcBytes,
 }
 
 #[cfg(test)]

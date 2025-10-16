@@ -8,13 +8,13 @@ use crate::Cid;
 use actix::Message;
 use anyhow::{Context, Result};
 use e3_events::{CorrelationId, DocumentMeta};
+use e3_utils::ArcBytes;
 use libp2p::{
     gossipsub::{MessageId, PublishError},
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    future::Future,
     hash::Hash,
     sync::Arc,
     time::{Duration, Instant},
@@ -53,7 +53,7 @@ pub enum NetCommand {
     DhtPutRecord {
         correlation_id: CorrelationId,
         expires: Option<Instant>,
-        value: Vec<u8>,
+        value: ArcBytes,
         key: Cid,
     },
     /// Fetch Document from Kademlia
@@ -104,7 +104,7 @@ pub enum NetEvent {
     DhtGetRecordSucceeded {
         key: Cid,
         correlation_id: CorrelationId,
-        value: Vec<u8>,
+        value: ArcBytes,
     },
     /// This node received a document from a Kademlia Request
     DhtPutRecordSucceeded {

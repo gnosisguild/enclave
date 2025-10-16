@@ -18,6 +18,7 @@ use e3_events::{
     BusError, CiphernodeSelected, CorrelationId, DocumentReceived, E3RequestComplete, E3id,
     EnclaveErrorType, EnclaveEvent, EventBus, PartyId, PublishDocumentRequested, Subscribe,
 };
+use e3_utils::ArcBytes;
 use futures::TryFutureExt;
 use std::{
     collections::HashMap,
@@ -295,7 +296,7 @@ async fn put_record(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     expires: Option<Instant>,
-    value: Vec<u8>,
+    value: ArcBytes,
     key: Cid,
 ) -> Result<()> {
     let id = CorrelationId::new();
@@ -325,7 +326,7 @@ async fn get_record(
     net_cmds: mpsc::Sender<NetCommand>,
     net_events: Arc<broadcast::Receiver<NetEvent>>,
     key: Cid,
-) -> Result<Vec<u8>> {
+) -> Result<ArcBytes> {
     let id = CorrelationId::new();
     call_and_await_response(
         net_cmds,
@@ -432,7 +433,7 @@ mod tests {
     async fn test_publishes_document() -> Result<()> {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, _, _, _) =
             setup_test();
-        let value = b"I am a special document".to_vec();
+        let value = ArcBytes::from_bytes(b"I am a special document".to_vec());
         let expires_at = Utc::now() + chrono::Duration::days(1);
         let e3_id = E3id::new("1243", 1);
 
@@ -457,7 +458,7 @@ mod tests {
 
         // Fake DHT put the record
         let mut mykad: HashMap<Cid, Vec<u8>> = HashMap::new();
-        mykad.insert(key.clone(), msg_value.clone());
+        mykad.insert(key.clone(), msg_value.extract_bytes());
 
         // 3. Report that everything went well
         net_evt_tx.send(NetEvent::DhtPutRecordSucceeded {
@@ -566,7 +567,7 @@ mod tests {
             errors,
             _,
         ) = setup_test();
-        let value = b"I am a special document".to_vec();
+        let value = ArcBytes::from_bytes(b"I am a special document".to_vec());
         let expires_at = Utc::now() + chrono::Duration::days(1);
         let e3_id = E3id::new("1243", 1);
 
@@ -609,7 +610,7 @@ mod tests {
         let (_guard, bus, _net_cmd_tx, mut net_cmd_rx, net_evt_tx, _net_evt_rx, history, _, _) =
             setup_test();
 
-        let value = b"I am a special document".to_vec();
+        let value = ArcBytes::from_bytes(b"I am a special document".to_vec());
         let expires_at = Utc::now() + chrono::Duration::days(1);
         let e3_id = E3id::new("1243", 1);
         let cid = Cid::from_content(&value);
@@ -681,7 +682,11 @@ mod tests {
             bail!("No event sent");
         };
 
-        assert_eq!(doc, b"I am a special document", "document did not match");
+        assert_eq!(
+            doc.extract_bytes(),
+            b"I am a special document",
+            "document did not match"
+        );
 
         Ok(())
     }

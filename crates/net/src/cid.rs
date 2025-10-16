@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 pub struct Cid(Vec<u8>);
 
 impl Cid {
-    pub fn from_content(content: &Vec<u8>) -> Self {
+    pub fn from_content(content: &[u8]) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(&content);
         let hashed = hasher.finalize();
