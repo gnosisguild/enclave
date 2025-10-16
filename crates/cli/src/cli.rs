@@ -154,7 +154,10 @@ impl Cli {
         }
 
         match self.command {
-            Commands::Start { peers } => start::execute(config, peers).await?,
+            Commands::Start {
+                peers,
+                experimental_trbfv,
+            } => start::execute(config, peers).await?,
             Commands::Init { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }
@@ -216,6 +219,9 @@ pub enum Commands {
             help = "Sets a peer URL",
         )]
         peers: Vec<String>,
+
+        #[arg(long, hide = true)]
+        experimental_trbfv: Option<String>,
     },
 
     /// Print the config env
