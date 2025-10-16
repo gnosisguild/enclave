@@ -232,8 +232,8 @@ pub async fn handle_publish_document_requested(
             put_record(tx.clone(), rx.clone(), expires, value.clone(), key.clone())
                 .map_err(to_retry)
         },
-        3,
-        999,
+        4,
+        1000,
     )
     .await?;
 
