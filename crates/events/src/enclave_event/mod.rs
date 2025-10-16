@@ -8,6 +8,7 @@ mod ciphernode_added;
 mod ciphernode_removed;
 mod ciphernode_selected;
 mod ciphertext_output_published;
+mod committee_published;
 mod compute_request;
 mod decryptionshare_created;
 mod die;
@@ -15,17 +16,21 @@ mod e3_request_complete;
 mod e3_requested;
 mod enclave_error;
 mod keyshare_created;
+mod operator_activation_changed;
 mod plaintext_aggregated;
+mod plaintext_output_published;
 mod publickey_aggregated;
 mod publish_document;
 mod shutdown;
 mod test_event;
 mod threshold_share_created;
+mod ticket_balance_updated;
 
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
 pub use ciphernode_selected::*;
 pub use ciphertext_output_published::*;
+pub use committee_published::*;
 pub use compute_request::*;
 pub use decryptionshare_created::*;
 pub use die::*;
@@ -33,12 +38,15 @@ pub use e3_request_complete::*;
 pub use e3_requested::*;
 pub use enclave_error::*;
 pub use keyshare_created::*;
+pub use operator_activation_changed::*;
 pub use plaintext_aggregated::*;
+pub use plaintext_output_published::*;
 pub use publickey_aggregated::*;
 pub use publish_document::*;
 pub use shutdown::*;
 pub use test_event::*;
 pub use threshold_share_created::*;
+pub use ticket_balance_updated::*;
 
 use crate::{E3id, ErrorEvent, Event, EventId};
 use actix::Message;
@@ -106,6 +114,22 @@ pub enum EnclaveEvent {
     CiphernodeRemoved {
         id: EventId,
         data: CiphernodeRemoved,
+    },
+    TicketBalanceUpdated {
+        id: EventId,
+        data: TicketBalanceUpdated,
+    },
+    OperatorActivationChanged {
+        id: EventId,
+        data: OperatorActivationChanged,
+    },
+    CommitteePublished {
+        id: EventId,
+        data: CommitteePublished,
+    },
+    PlaintextOutputPublished {
+        id: EventId,
+        data: PlaintextOutputPublished,
     },
     EnclaveError {
         id: EventId,
@@ -189,6 +213,10 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeSelected { id, .. } => id,
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
+            EnclaveEvent::TicketBalanceUpdated { id, .. } => id,
+            EnclaveEvent::OperatorActivationChanged { id, .. } => id,
+            EnclaveEvent::CommitteePublished { id, .. } => id,
+            EnclaveEvent::PlaintextOutputPublished { id, .. } => id,
             EnclaveEvent::EnclaveError { id, .. } => id,
             EnclaveEvent::E3RequestComplete { id, .. } => id,
             EnclaveEvent::Shutdown { id, .. } => id,
@@ -210,6 +238,8 @@ impl EnclaveEvent {
             EnclaveEvent::PlaintextAggregated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
             EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteePublished { data, .. } => Some(data.e3_id),
+            EnclaveEvent::PlaintextOutputPublished { data, .. } => Some(data.e3_id),
             _ => None,
         }
     }
@@ -225,6 +255,10 @@ impl EnclaveEvent {
             EnclaveEvent::CiphernodeSelected { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeAdded { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeRemoved { data, .. } => format!("{}", data),
+            EnclaveEvent::TicketBalanceUpdated { data, .. } => format!("{:?}", data),
+            EnclaveEvent::OperatorActivationChanged { data, .. } => format!("{:?}", data),
+            EnclaveEvent::CommitteePublished { data, .. } => format!("{:?}", data),
+            EnclaveEvent::PlaintextOutputPublished { data, .. } => format!("{:?}", data),
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
@@ -248,6 +282,10 @@ impl_from_event!(
     CiphernodeSelected,
     CiphernodeAdded,
     CiphernodeRemoved,
+    TicketBalanceUpdated,
+    OperatorActivationChanged,
+    CommitteePublished,
+    PlaintextOutputPublished,
     EnclaveError,
     Shutdown,
     TestEvent,

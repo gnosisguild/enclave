@@ -61,7 +61,6 @@ function MyComponent() {
   const handleRequest = async () => {
     try {
       const hash = await requestE3({
-        filter: "0x...",
         threshold: [2, 3],
         startWindow: [BigInt(Date.now()), BigInt(Date.now() + 300000)],
         duration: BigInt(1800),
@@ -69,7 +68,6 @@ function MyComponent() {
         e3ProgramParams: "0x...",
         computeProviderParams: "0x...",
         customParams: "0x...",
-        value: BigInt("1000000000000000"), // 0.001 ETH
       });
       console.log("E3 requested with hash:", hash);
     } catch (error) {

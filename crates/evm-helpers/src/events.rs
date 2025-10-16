@@ -13,7 +13,7 @@ sol! {
     event E3Activated(uint256 e3Id, uint256 expiration, bytes committeePublicKey);
 
     #[derive(Debug)]
-    event E3Requested(uint256 e3Id, E3 e3, address filter, IE3Program indexed e3Program);
+    event E3Requested(uint256 e3Id, E3 e3, IE3Program indexed e3Program);
 
     #[derive(Debug)]
     interface IE3Program {
@@ -59,5 +59,5 @@ sol! {
     event PlaintextOutputPublished(uint256 indexed e3Id, bytes plaintextOutput);
 
     #[derive(Debug)]
-    event CommitteePublished(uint256 indexed e3Id, bytes publicKey);
+    event CommitteePublished(uint256 indexed e3Id, address[] nodes, bytes publicKey);
 }

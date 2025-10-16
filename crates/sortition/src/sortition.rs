@@ -5,7 +5,9 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::distance::DistanceSortition;
+use crate::node_state::NodeStateStore;
 use crate::ticket::{RegisteredNode, Ticket};
+use crate::ticket_bonding_sortition::{NodeWithTickets, TicketBondingSortition};
 use crate::ticket_sortition::ScoreSortition;
 use actix::prelude::*;
 use alloy::primitives::Address;
@@ -281,17 +283,66 @@ impl SortitionList<String> for ScoreBackend {
     }
 }
 
-/// Enum wrapper around the two supported backends.
+/// Bonding-based sortition backend.
+///
+/// Stores a set of hex-encoded addresses and delegates committee selection
+/// to `TicketBondingSortition`. Ticket availability is calculated from
+/// NodeStateManager: `floor(ticket_balance / ticket_price) - active_jobs`
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BondingBackend {
+    /// Set of registered node addresses (hex strings).
+    nodes: HashSet<String>,
+}
+
+impl Default for BondingBackend {
+    fn default() -> Self {
+        Self {
+            nodes: HashSet::new(),
+        }
+    }
+}
+
+impl BondingBackend {
+    /// Get nodes with their available tickets from NodeStateStore
+    pub fn get_nodes_with_tickets(
+        &self,
+        chain_id: u64,
+        node_state: &NodeStateStore,
+    ) -> Vec<NodeWithTickets> {
+        self.nodes
+            .iter()
+            .filter_map(|addr_str| {
+                let addr = addr_str.parse::<Address>().ok()?;
+                let available_tickets = node_state.available_tickets(chain_id, addr_str);
+
+                // Only include nodes with available tickets
+                if available_tickets > 0 {
+                    Some(NodeWithTickets {
+                        address: addr,
+                        available_tickets,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+
+/// Enum wrapper around the supported backends.
 ///
 /// New chains should default to `Distance`. If a chain is intended to
 /// use score selection, construct it as `SortitionBackend::Score(ScoreBackend::default())`
-/// and then populate tickets explicitly.
+/// and then populate tickets explicitly. For bonding-based sortition with
+/// dynamic ticket calculation, use `SortitionBackend::Bonding(BondingBackend::default())`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SortitionBackend {
     /// Distance-based selection (stores a simple set of addresses).
     Distance(DistanceBackend),
     /// Score-based selection (stores `RegisteredNode`s with tickets).
     Score(ScoreBackend),
+    /// Bonding-based selection (uses NodeStateManager for dynamic tickets).
+    Bonding(BondingBackend),
 }
 
 impl SortitionBackend {
@@ -303,7 +354,7 @@ impl SortitionBackend {
     /// Helper for Score backends: assign local ticket IDs `1..=count` for `address`.
     ///
     /// # Errors
-    /// Returns an error if called on a `Distance` backend.
+    /// Returns an error if called on a `Distance` or `Bonding` backend.
     pub fn set_ticket_count_addr(&mut self, address: Address, count: u64) -> Result<()> {
         match self {
             SortitionBackend::Score(b) => {
@@ -313,7 +364,46 @@ impl SortitionBackend {
             SortitionBackend::Distance(_) => {
                 anyhow::bail!("set_ticket_count_addr is only valid for Score backend")
             }
+            SortitionBackend::Bonding(_) => {
+                anyhow::bail!("set_ticket_count_addr is not applicable to Bonding backend (uses NodeStateStore)")
+            }
         }
+    }
+}
+
+impl SortitionList<String> for BondingBackend {
+    /// Check membership using bonding-based sortition.
+    ///
+    /// Note: This implementation cannot access NodeStateStore directly,
+    /// so it returns false. For proper bonding sortition, use the
+    /// `Sortition` actor's `GetHasNode` message which has access to state.
+    fn contains(&self, _seed: Seed, _size: usize, _address: String) -> Result<bool> {
+        // BondingBackend requires NodeStateStore which isn't available here
+        // The Sortition actor will handle this by querying the node state
+        Ok(false)
+    }
+
+    /// Get index using bonding-based sortition.
+    ///
+    /// Note: This implementation cannot access NodeStateStore directly,
+    /// so it returns None. For proper bonding sortition, use the
+    /// `Sortition` actor's `GetNodeIndex` message which has access to state.
+    fn get_index(&self, _seed: Seed, _size: usize, _address: String) -> Result<Option<u64>> {
+        // BondingBackend requires NodeStateStore which isn't available here
+        // The Sortition actor will handle this by querying the node state
+        Ok(None)
+    }
+
+    fn add(&mut self, address: String) {
+        self.nodes.insert(address);
+    }
+
+    fn remove(&mut self, address: String) {
+        self.nodes.remove(&address);
+    }
+
+    fn nodes(&self) -> Vec<String> {
+        self.nodes.iter().cloned().collect()
     }
 }
 
@@ -322,6 +412,7 @@ impl SortitionList<String> for SortitionBackend {
         match self {
             SortitionBackend::Distance(backend) => backend.contains(seed, size, address),
             SortitionBackend::Score(backend) => backend.contains(seed, size, address),
+            SortitionBackend::Bonding(backend) => backend.contains(seed, size, address),
         }
     }
 
@@ -329,12 +420,14 @@ impl SortitionList<String> for SortitionBackend {
         match self {
             SortitionBackend::Distance(backend) => backend.get_index(seed, size, address),
             SortitionBackend::Score(backend) => backend.get_index(seed, size, address),
+            SortitionBackend::Bonding(backend) => backend.get_index(seed, size, address),
         }
     }
     fn add(&mut self, address: String) {
         match self {
             SortitionBackend::Distance(backend) => backend.add(address),
             SortitionBackend::Score(backend) => backend.add(address),
+            SortitionBackend::Bonding(backend) => backend.add(address),
         }
     }
 
@@ -342,6 +435,7 @@ impl SortitionList<String> for SortitionBackend {
         match self {
             SortitionBackend::Distance(backend) => backend.remove(address),
             SortitionBackend::Score(backend) => backend.remove(address),
+            SortitionBackend::Bonding(backend) => backend.remove(address),
         }
     }
 
@@ -349,6 +443,7 @@ impl SortitionList<String> for SortitionBackend {
         match self {
             SortitionBackend::Distance(backend) => backend.nodes(),
             SortitionBackend::Score(backend) => backend.nodes(),
+            SortitionBackend::Bonding(backend) => backend.nodes(),
         }
     }
 }
@@ -366,6 +461,8 @@ pub struct Sortition {
     list: Persistable<HashMap<u64, SortitionBackend>>,
     /// Event bus for error reporting and enclave event subscription.
     bus: Addr<EventBus<EnclaveEvent>>,
+    /// Optional reference to node state for bonding-based sortition
+    node_state: Option<Persistable<NodeStateStore>>,
 }
 
 /// Parameters for constructing a `Sortition` actor.
@@ -375,6 +472,8 @@ pub struct SortitionParams {
     pub bus: Addr<EventBus<EnclaveEvent>>,
     /// Persisted per-chain backend map.
     pub list: Persistable<HashMap<u64, SortitionBackend>>,
+    /// Optional node state for bonding-based sortition
+    pub node_state: Option<Persistable<NodeStateStore>>,
 }
 
 impl Sortition {
@@ -383,6 +482,7 @@ impl Sortition {
         Self {
             list: params.list,
             bus: params.bus,
+            node_state: params.node_state,
         }
     }
 
@@ -398,6 +498,31 @@ impl Sortition {
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
+            node_state: None, // Legacy attach without node state
+        })
+        .start();
+        bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
+        bus.do_send(Subscribe::new("CiphernodeRemoved", addr.clone().into()));
+        Ok(addr)
+    }
+
+    /// Load persisted state with node state support for bonding-based sortition.
+    ///
+    /// This version allows bonding-based backends to query ticket availability.
+    #[instrument(name = "sortition_attach_with_node_state", skip_all)]
+    pub async fn attach_with_node_state(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        store: Repository<HashMap<u64, SortitionBackend>>,
+        node_state_store: Repository<NodeStateStore>,
+    ) -> Result<Addr<Sortition>> {
+        let list = store.load_or_default(HashMap::new()).await?;
+        let node_state = node_state_store
+            .load_or_default(NodeStateStore::default())
+            .await?;
+        let addr = Sortition::new(SortitionParams {
+            bus: bus.clone(),
+            list,
+            node_state: Some(node_state),
         })
         .start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
@@ -495,11 +620,46 @@ impl Handler<GetNodeIndex> for Sortition {
     ///
     /// Errors while accessing persisted state or parsing the address are
     /// reported on the event bus and surfaced here as `None`.
-    #[instrument(name = "sortition_contains", skip_all)]
+    #[instrument(name = "sortition_get_index", skip_all)]
     fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
         self.list
             .try_with(|map| {
                 if let Some(backend) = map.get(&msg.chain_id) {
+                    // For bonding backends, we need to use the node state
+                    if let SortitionBackend::Bonding(bonding_backend) = backend {
+                        if let Some(node_state_ref) = &self.node_state {
+                            return node_state_ref.try_with(|node_state| {
+                                // Get nodes with their available tickets
+                                let nodes_with_tickets = bonding_backend
+                                    .get_nodes_with_tickets(msg.chain_id, node_state);
+
+                                // Use ticket bonding sortition
+                                let sortition = TicketBondingSortition::new(msg.size);
+                                let target_addr: Address = msg.address.parse()?;
+
+                                // Get committee and find the index of the address
+                                let committee = sortition.get_committee(
+                                    &nodes_with_tickets,
+                                    msg.chain_id,
+                                    msg.seed.into(),
+                                )?;
+
+                                // Find the index of the target address in the committee
+                                let maybe_index =
+                                    committee.iter().enumerate().find_map(|(index, addr)| {
+                                        if addr == &target_addr {
+                                            Some(index as u64)
+                                        } else {
+                                            None
+                                        }
+                                    });
+
+                                Ok(maybe_index)
+                            });
+                        }
+                    }
+
+                    // For other backends, use their native get_index method
                     backend.get_index(msg.seed, msg.size, msg.address.clone())
                 } else {
                     Ok(None)

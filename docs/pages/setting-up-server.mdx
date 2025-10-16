@@ -74,7 +74,6 @@ await sdk.initialize()
 
 // Request a new E3 computation
 const hash = await sdk.requestE3({
-  filter: '0x0000000000000000000000000000000000000000',
   threshold: [2, 3],
   startWindow: [BigInt(0), BigInt(100)],
   duration: BigInt(3600),
@@ -139,7 +138,6 @@ function E3Dashboard() {
   const handleRequestE3 = async () => {
     try {
       const hash = await requestE3({
-        filter: '0x0000000000000000000000000000000000000000',
         threshold: [2, 3],
         startWindow: [BigInt(Date.now()), BigInt(Date.now() + 300000)],
         duration: BigInt(1800),

@@ -47,12 +47,56 @@ pnpm deploy:mocks --network localhost
 This will ensure that you are a local node running, as well as that there are no
 conflicting deployments stored in localhost.
 
-## Registering a Ciphernode
+## Configuration
 
-To add a ciphernode to the registry, run
+### Using Environment Variables (Development)
+
+For development, you can set your private key in a `.env` file:
 
 ```sh
-pnpm ciphernode:add --network [network] --ciphernode-address [address]
+# .env
+PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+```
+
+### Using Hardhat Configuration Variables (Production)
+
+For production, it's recommended to use Hardhat's configuration variables
+system:
+
+```sh
+# Set your configuration variable (securely stored)
+npx hardhat vars set PRIVATE_KEY
+
+```
+
+Then update `hardhat.config.ts` to use configuration variables:
+
+```typescript
+import { vars } from "hardhat/config";
+
+const privateKey = vars.get("PRIVATE_KEY", "");
+```
+
+## Registering a Ciphernode
+
+The tasks use the first signer configured in your Hardhat network configuration.
+
+To add a ciphernode to the registry:
+
+```sh
+pnpm ciphernode:add --network [network]
+```
+
+Options:
+
+- `--license-bond-amount`: Amount of ENCL to bond (default: 1000 ENCL)
+- `--ticket-amount`: Amount of USDC for tickets (default: 1000 USDC)
+
+For testing/development, you can also use the admin task to register any
+ciphernode address:
+
+```sh
+pnpm ciphernode:admin-add --network localhost --ciphernode-address [address]
 ```
 
 To request a new committee, run

@@ -7,14 +7,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-export default buildModule("NaiveRegistryFilter", (m) => {
-  const ciphernodeRegistryAddress = m.getParameter("ciphernodeRegistryAddress");
-  const owner = m.getParameter("owner");
+export default buildModule("SlashingManager", (m) => {
+  const bondingRegistry = m.getParameter("bondingRegistry");
+  const admin = m.getParameter("admin");
 
-  const naiveRegistryFilter = m.contract("NaiveRegistryFilter", [
-    owner,
-    ciphernodeRegistryAddress,
+  const slashingManager = m.contract("SlashingManager", [
+    admin,
+    bondingRegistry,
   ]);
 
-  return { naiveRegistryFilter };
+  return { slashingManager };
 }) as any;

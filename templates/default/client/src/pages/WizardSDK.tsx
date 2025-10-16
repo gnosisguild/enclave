@@ -725,14 +725,12 @@ const WizardSDK: React.FC = () => {
 
       console.log('requestE3')
       const hash = await requestE3({
-        filter: contracts.filterRegistry,
         threshold,
         startWindow,
         duration,
         e3Program: contracts.e3Program,
         e3ProgramParams,
         computeProviderParams,
-        value: BigInt('1000000000000000'), // 0.001 ETH
       })
 
       setLastTransactionHash(hash)

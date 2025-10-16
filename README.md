@@ -147,7 +147,7 @@ sequenceDiagram
     E3Program-->>Enclave: inputValidator
     Enclave->>ComputeProvider: validate(computeProviderParams)
     ComputeProvider-->>Enclave: decryptionVerifier
-    Enclave->>CiphernodeRegistry: requestCommittee(e3Id, filter, threshold)
+    Enclave->>CiphernodeRegistry: requestCommittee(e3Id, threshold)
     CiphernodeRegistry-->>Enclave: success
     Enclave-->>Users: e3Id, E3 struct
 
@@ -223,6 +223,7 @@ pnpm bump:versions 1.0.0-beta.1
 ```
 
 This command automatically:
+
 - ✅ Validates working directory is clean
 - ✅ Updates version in `Cargo.toml` (workspace version)
 - ✅ Updates version in all npm `package.json` files
@@ -261,12 +262,12 @@ Once the tag is pushed, GitHub Actions automatically:
    - macOS (x86_64, aarch64)
 3. **Runs** all tests
 4. **Publishes** packages:
-    * All versions (stable and pre-release):
-        * ✅ Publishes to crates.io
-        * ✅ Publishes to npm
-    * Tag differences:
-        * Stable (`v1.0.0`): npm `latest` tag, updates `stable` git tag
-        * Pre-release (`v1.0.0-beta.1`): npm `next` tag, no `stable` tag update
+   - All versions (stable and pre-release):
+     - ✅ Publishes to crates.io
+     - ✅ Publishes to npm
+   - Tag differences:
+     - Stable (`v1.0.0`): npm `latest` tag, updates `stable` git tag
+     - Pre-release (`v1.0.0-beta.1`): npm `next` tag, no `stable` tag update
 5. **Creates** GitHub Release with:
    - Binary downloads for all platforms
    - Release notes from CHANGELOG.md
@@ -288,21 +289,27 @@ Enclave follows [Semantic Versioning](https://semver.org/):
 ### Which Version Should I Use?
 
 #### For Production (Mainnet)
+
 Use stable versions only:
+
 ```bash
 enclaveup install              # Latest stable
 enclaveup install v1.0.0       # Specific stable version
 ```
 
 #### For Testing (Testnet)
+
 You can use pre-release versions:
+
 ```bash
 enclaveup install --pre-release # Latest pre-release
 enclaveup install v1.0.0-beta.1 # Specific pre-release
 ```
 
 #### For Development
+
 Build from source:
+
 ```bash
 git clone https://github.com/gnosisguild/enclave.git
 cd enclave
@@ -313,7 +320,7 @@ cargo build --release
 
 ### Current Setup
 
-- **`main`** - Stable branch 
+- **`main`** - Stable branch
 - **`v*.*.*`** - Version tags for releases
 - **`stable`** - Always points to the latest stable release
 - **`dev`** - Branch for ongoing development
@@ -375,11 +382,13 @@ pnpm bump:versions --help
 If a release has issues:
 
 1. **Mark as deprecated on npm**:
+
    ```bash
    npm deprecate @enclave/sdk@1.0.0 "Critical bug, use 1.0.1"
    ```
 
 2. **Yank from crates.io** (if critical):
+
    ```bash
    cargo yank --version 1.0.0 enclave
    ```
