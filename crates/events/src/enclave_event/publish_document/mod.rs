@@ -94,9 +94,7 @@ pub struct DocumentReceived {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-
     #[test]
     fn test_meta_filters() {
         let meta = DocumentMeta::new(
@@ -105,18 +103,15 @@ mod tests {
             vec![Filter::Range(Some(100), Some(200)), Filter::Item(77)],
             Utc::now(),
         );
-
         assert_eq!(meta.matches(&21), false);
         assert_eq!(meta.matches(&77), true);
         assert_eq!(meta.matches(&90), false);
         assert_eq!(meta.matches(&140), true);
         assert_eq!(meta.matches(&230), false);
     }
-
     #[test]
     fn test_meta_no_filters() {
         let meta = DocumentMeta::new(E3id::new("1", 1), DocumentKind::TrBFV, vec![], Utc::now());
-
         assert_eq!(meta.matches(&21), true);
         assert_eq!(meta.matches(&77), true);
         assert_eq!(meta.matches(&90), true);

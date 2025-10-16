@@ -204,10 +204,8 @@ where
                     if event.correlation_id() == Some(id) {
                         if let Some(result) = matcher(&event) {
                             return result;
-                        }
-                        // None means unexpected event type, keep waiting
-                    }
-                    // Ignore events with non-matching IDs
+                        } // None means unexpected event type, keep waiting
+                    } // Ignore events with non-matching IDs
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
                 Err(e) => return Err(e.into()),
