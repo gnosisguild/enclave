@@ -9,6 +9,35 @@ import { IVote, VotingMode } from './types'
 import { toBinary } from './utils'
 
 /**
+ * This utility function calculates the first valid index for for vote options
+ * based on the total voting power and plaintext modulus.
+ * @dev This is needed to calculate the decoded plaintext
+ * @dev Also, we will need to check in the circuit that anything within these indexes is
+ * either 0 or 1.
+ * @param totalVotingPower The maximum vote amount (if a single voter had all of the power)
+ * @param degree The degree of the polynomial
+ */
+export const calculateValidIndexesForPlaintext = (totalVotingPower: bigint, degree: number): { yesIndex: number; noIndex: number } => {
+  // Calculate the number of bits needed to represent the total voting power
+  const bitsNeeded = totalVotingPower.toString(2).length
+
+  const halfLength = Math.floor(degree / 2)
+
+  // For "yes": right-align in first half
+  // Start index = (half length) - (bits needed)
+  const yesIndex = halfLength - bitsNeeded
+
+  // For "no": right-align in second half
+  // Start index = (full length) - (bits needed)
+  const noIndex = degree - bitsNeeded
+
+  return {
+    yesIndex: yesIndex,
+    noIndex: noIndex,
+  }
+}
+
+/**
  * Encode a vote based on the voting mode
  * @param vote The vote to encode
  * @param votingMode The voting mode to use for encoding

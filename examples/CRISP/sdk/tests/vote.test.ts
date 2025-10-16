@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import { BfvProtocolParams, type ProtocolParams } from '@enclave-e3/sdk'
 
-import { decodeTally, encodeVote, validateVote } from '../src/vote'
+import { calculateValidIndexesForPlaintext, decodeTally, encodeVote, validateVote } from '../src/vote'
 import { VotingMode } from '../src/types'
 
 describe('Vote', () => {
@@ -63,6 +63,22 @@ describe('Vote', () => {
       expect(() => {
         validateVote(VotingMode.GOVERNANCE, { yes: 11n, no: 0n }, votingPower)
       }).toThrow('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
+    })
+  })
+
+  describe('calculateValidIndexesForPlaintext', () => {
+    it('should return the correct indeces', () => {
+      const degree = 8192
+      const totalVotingPower = 100n
+
+      // bitsNeeded = 7 -> 1100100 = 100 in binary
+      // half length = 4096
+      // first valid index for yes 4096 - 7 = 4089
+      // first valid index for no 8192 - 7 = 8185
+      expect(calculateValidIndexesForPlaintext(totalVotingPower, degree)).toEqual({
+        yesIndex: 4089,
+        noIndex: 8185,
+      })
     })
   })
 })
