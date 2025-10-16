@@ -60,6 +60,10 @@ pub struct Cli {
     /// Set the Open Telemetry collector grpc endpoint. Eg. http://localhost:4317
     #[arg(long = "otel", global = true)]
     pub otel: Option<ValidUrl>,
+
+    // TODO: expose this as a feature once we have this hooked up to the bin integration test
+    #[arg(long, hide = true)]
+    pub experimental_trbfv: Option<String>,
 }
 
 impl Cli {
@@ -154,10 +158,7 @@ impl Cli {
         }
 
         match self.command {
-            Commands::Start {
-                peers,
-                experimental_trbfv,
-            } => start::execute(config, peers).await?,
+            Commands::Start { peers } => start::execute(config, peers).await?,
             Commands::Init { .. } => {
                 bail!("Cannot run `enclave init` when a configuration exists.");
             }
@@ -219,9 +220,6 @@ pub enum Commands {
             help = "Sets a peer URL",
         )]
         peers: Vec<String>,
-
-        #[arg(long, hide = true)]
-        experimental_trbfv: Option<String>,
     },
 
     /// Print the config env
