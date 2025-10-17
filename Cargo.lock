@@ -2628,6 +2628,7 @@ dependencies = [
  "actix",
  "alloy",
  "anyhow",
+ "derivative",
  "e3-aggregator",
  "e3-config",
  "e3-crypto",

@@ -4,12 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::CiphernodeHandle;
 use actix::{Actor, Addr};
 use alloy::signers::{
     k256::{ecdsa::SigningKey, Secp256k1},
     local::LocalSigner,
 };
 use anyhow::Result;
+use derivative::Derivative;
 use e3_aggregator::ext::{
     PlaintextAggregatorExtension, PublicKeyAggregatorExtension,
     ThresholdPlaintextAggregatorExtension,
@@ -35,9 +37,9 @@ use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, sync::Arc};
 use tracing::info;
 
-use crate::CiphernodeHandle;
-
 /// Build a ciphernode configuration.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct CiphernodeBuilder {
     trbfv: bool,
     address: Option<String>,
@@ -54,10 +56,11 @@ pub struct CiphernodeBuilder {
     multithread_cache: Option<Addr<Multithread>>,
     data: Option<Addr<InMemStore>>,
     rng: SharedRng,
+    #[derivative(Debug = "ignore")]
     cipher: Arc<Cipher>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ContractComponents {
     enclave_reader: bool,
     enclave: bool,
@@ -65,7 +68,7 @@ pub struct ContractComponents {
     ciphernode_registry: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum BusMode<T> {
     Forked(T),
     Source(T),
@@ -212,6 +215,8 @@ impl CiphernodeBuilder {
     }
 
     pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
+        println!("Building Ciphernode:");
+        println!("{:?}", self);
         // Local bus for ciphernode events can either be forked from a bus or it can be directly
         // attached to a source bus
         let local_bus = match self.source_bus {
