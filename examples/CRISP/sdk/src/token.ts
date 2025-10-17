@@ -73,7 +73,7 @@ export const getBalanceAt = async (voterAddress: string, tokenAddress: string, s
 }
 
 /**
- * Get the total supply of a ERC20 Token at a specific block
+ * Get the total supply of a ERC20Votes Token at a specific block
  * @param tokenAddress The token address to query
  * @param snapshotBlock The block number at which to get the total supply
  * @param chainId The chain ID of the network

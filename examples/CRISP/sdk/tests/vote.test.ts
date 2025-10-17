@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import { BfvProtocolParams, type ProtocolParams } from '@enclave-e3/sdk'
 
-import { calculateValidIndexesForPlaintext, decodeTally, encodeVote, validateVote } from '../src/vote'
+import { calculateValidIndicesForPlaintext, decodeTally, encodeVote, validateVote } from '../src/vote'
 import { VotingMode } from '../src/types'
 
 describe('Vote', () => {
@@ -43,6 +43,7 @@ describe('Vote', () => {
       expect(decoded.no).toBe(0n)
     })
   })
+
   describe('validateVote', () => {
     const validVote = { yes: 10n, no: 0n }
     const invalidVote = { yes: 5n, no: 5n }
@@ -66,8 +67,8 @@ describe('Vote', () => {
     })
   })
 
-  describe('calculateValidIndexesForPlaintext', () => {
-    it('should return the correct indeces', () => {
+  describe('calculateValidIndicesForPlaintext', () => {
+    it('should return the correct indices', () => {
       const degree = 8192
       const totalVotingPower = 100n
 
@@ -75,10 +76,28 @@ describe('Vote', () => {
       // half length = 4096
       // first valid index for yes 4096 - 7 = 4089
       // first valid index for no 8192 - 7 = 8185
-      expect(calculateValidIndexesForPlaintext(totalVotingPower, degree)).toEqual({
+      expect(calculateValidIndicesForPlaintext(totalVotingPower, degree)).toEqual({
         yesIndex: 4089,
         noIndex: 8185,
       })
+    })
+    it('should throw if voting power is too high for degree', () => {
+      const degree = 16
+      const totalVotingPower = 10000n
+
+      expect(() => {
+        calculateValidIndicesForPlaintext(totalVotingPower, degree)
+      }).toThrow('Total voting power exceeds maximum representable votes for the given degree')
+    })
+    it('should throw when the degree is negative', () => {
+      expect(() => {
+        calculateValidIndicesForPlaintext(10n, -16)
+      }).toThrow('Degree must be a positive even number')
+    })
+    it('should throw when the degree is not even', () => {
+      expect(() => {
+        calculateValidIndicesForPlaintext(10n, 15)
+      }).toThrow('Degree must be a positive even number')
     })
   })
 })
