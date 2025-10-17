@@ -126,6 +126,15 @@ impl CiphernodeBuilder {
         self
     }
 
+    pub fn with_chains(mut self, chains: &[ChainConfig]) -> Self {
+        self.chains.extend(
+            chains
+                .iter()
+                .map(|chain| (chain.name.clone(), chain.clone())),
+        );
+        self
+    }
+
     pub fn with_address(mut self, addr: &str) -> Self {
         self.address = Some(addr.to_owned());
         self
@@ -161,32 +170,28 @@ impl CiphernodeBuilder {
         self
     }
 
-    fn ensure_chain(&mut self, chain: &ChainConfig) {
-        if let None = self.chains.get(&chain.name) {
-            self.chains.insert(chain.name.clone(), chain.clone());
-        }
-    }
+    // fn ensure_chain(&mut self, chain: &ChainConfig) {
+    //     if let None = self.chains.get(&chain.name) {
+    //         self.chains.insert(chain.name.clone(), chain.clone());
+    //     }
+    // }
 
-    pub fn with_contract_enclave_reader(mut self, chain: &ChainConfig) -> Self {
-        self.ensure_chain(chain);
+    pub fn with_contract_enclave_reader(mut self) -> Self {
         self.contract_components.enclave_reader = true;
         self
     }
 
-    pub fn with_contract_enclave_full(mut self, chain: &ChainConfig) -> Self {
-        self.ensure_chain(chain);
+    pub fn with_contract_enclave_full(mut self) -> Self {
         self.contract_components.enclave = true;
         self
     }
 
-    pub fn with_contract_registry_filter(mut self, chain: &ChainConfig) -> Self {
-        self.ensure_chain(chain);
+    pub fn with_contract_registry_filter(mut self) -> Self {
         self.contract_components.registry_filter = true;
         self
     }
 
-    pub fn with_contract_ciphernode_registry(mut self, chain: &ChainConfig) -> Self {
-        self.ensure_chain(chain);
+    pub fn with_contract_ciphernode_registry(mut self) -> Self {
         self.contract_components.ciphernode_registry = true;
         self
     }

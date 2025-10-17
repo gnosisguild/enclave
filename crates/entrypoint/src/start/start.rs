@@ -7,6 +7,7 @@
 use actix::Addr;
 use alloy::primitives::Address;
 use anyhow::Result;
+use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
@@ -41,49 +42,14 @@ pub async fn execute(
     let bus = get_enclave_event_bus();
     let cipher = Arc::new(Cipher::from_file(&config.key_file()).await?);
     let store = setup_datastore(&config, &bus)?;
-
     let repositories = store.repositories();
 
-    let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
-    CiphernodeSelector::attach(&bus, &sortition, &address.to_string());
-
-    // TODO: gather an async handle from the event readers that closes when they shutdown and
-    // join it with the network manager joinhandle below
-    for chain in config
-        .chains()
-        .iter()
-        .filter(|chain| chain.enabled.unwrap_or(true))
-    {
-        let rpc_url = chain.rpc_url()?;
-        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
-        let read_provider = provider_config.create_readonly_provider().await?;
-        EnclaveSolReader::attach(
-            &bus,
-            read_provider.clone(),
-            &chain.contracts.enclave.address(),
-            &repositories.enclave_sol_reader(read_provider.chain_id()),
-            chain.contracts.enclave.deploy_block(),
-            chain.rpc_url.clone(),
-        )
-        .await?;
-        CiphernodeRegistrySol::attach(
-            &bus,
-            read_provider.clone(),
-            &chain.contracts.ciphernode_registry.address(),
-            &repositories.ciphernode_registry_reader(read_provider.chain_id()),
-            chain.contracts.ciphernode_registry.deploy_block(),
-            chain.rpc_url.clone(),
-        )
-        .await?;
-    }
-
-    E3Router::builder(&bus, store.clone())
-        .with(FheExtension::create(&bus, &rng))
-        .with(KeyshareExtension::create(
-            &bus,
-            &address.to_string(),
-            &cipher,
-        ))
+    CiphernodeBuilder::new(rng.clone(), cipher.clone())
+        .with_address(&address)
+        .with_source_bus(&bus)
+        .with_chains(&config.chains())
+        .with_contract_enclave_reader()
+        .with_contract_registry_filter()
         .build()
         .await?;
 
