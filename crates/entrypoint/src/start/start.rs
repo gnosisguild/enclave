@@ -45,7 +45,7 @@ pub async fn execute(
     let repositories = store.repositories();
 
     CiphernodeBuilder::new(rng.clone(), cipher.clone())
-        .with_address(&address)
+        .with_address(&address.to_string())
         .with_source_bus(&bus)
         .with_chains(&config.chains())
         .with_contract_enclave_reader()
