@@ -110,10 +110,6 @@ This strategy avoids scenarios where pull requests grow too large/out-of-scope a
 
 The easiest way to do this is to have multiple Conventional Commits while you work and then you can cherry-pick the smaller changes into separate branches for pull requesting.
 
-### Typos and other small changes
-
-You are welcome to make PRs for smaller fixes, such as typos, or you can simply report them to us on [Telegram][telegram].
-
 ### Reviews
 
 For any repository in the Enclave repo, we require code review & approval by **one** contributor with edit access before the changes are merged, as enforced by GitHub branch protection. Non-breaking pull requests may be merged at any time. Breaking pull requests will only be merged alongside a breaking release.

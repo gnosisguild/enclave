@@ -105,7 +105,10 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated
                     Ok(receipt) => {
                         info!(tx=%receipt.transaction_hash, "Transaction published");
                     }
-                    Err(err) => bus.err(EnclaveErrorType::Evm, err),
+                    Err(err) => bus.err(
+                        EnclaveErrorType::Evm,
+                        anyhow::anyhow!("Error publishing committee output: {:?}", err),
+                    ),
                 }
             }
         })
@@ -142,6 +145,10 @@ pub async fn publish_committee<P: Provider + WalletProvider + Clone>(
         .pending()
         .await?;
     let contract = NaiveRegistryFilter::new(contract_address, provider.provider());
+    info!(
+        "publishCommittee called. e3_id={:?}, nodes={:?}",
+        e3_id, nodes
+    );
     let builder = contract
         .publishCommittee(e3_id, nodes, public_key)
         .nonce(current_nonce);

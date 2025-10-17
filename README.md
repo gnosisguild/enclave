@@ -25,6 +25,24 @@ Join the Enclave [Telegram group][telegram].
 
 See [CONTRIBUTING.md][contributing].
 
+## Development
+
+This section covers the essential commands for setting up and working with the Enclave codebase locally.
+
+```bash
+# Install dependencies
+pnpm i
+
+# Build the project
+pnpm build
+
+# Run tests
+pnpm test
+
+# Clean build artifacts
+pnpm clean
+```
+
 ### Contributors
 
 <!-- readme: contributors -start -->
@@ -76,10 +94,10 @@ See [CONTRIBUTING.md][contributing].
 		</tr>
 		<tr>
             <td align="center">
-                <a href="https://github.com/ctrlc03">
-                    <img src="https://avatars.githubusercontent.com/u/93448202?v=4" width="100;" alt="ctrlc03"/>
+                <a href="https://github.com/nginnever">
+                    <img src="https://avatars.githubusercontent.com/u/7103153?v=4" width="100;" alt="nginnever"/>
                     <br />
-                    <sub><b>ctrlc03</b></sub>
+                    <sub><b>Nathan Ginnever</b></sub>
                 </a>
             </td>
 		</tr>
@@ -117,6 +135,13 @@ See [CONTRIBUTING.md][contributing].
                     <img src="https://avatars.githubusercontent.com/u/92573882?v=4" width="100;" alt="Subhasish-Behera"/>
                     <br />
                     <sub><b>SUBHASISH BEHERA</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/ozgurarmanc">
+                    <img src="https://avatars.githubusercontent.com/u/94117770?v=4" width="100;" alt="ozgurarmanc"/>
+                    <br />
+                    <sub><b>Armanc</b></sub>
                 </a>
             </td>
 		</tr>
@@ -223,6 +248,7 @@ pnpm bump:versions 1.0.0-beta.1
 ```
 
 This command automatically:
+
 - ✅ Validates working directory is clean
 - ✅ Updates version in `Cargo.toml` (workspace version)
 - ✅ Updates version in all npm `package.json` files
@@ -261,12 +287,12 @@ Once the tag is pushed, GitHub Actions automatically:
    - macOS (x86_64, aarch64)
 3. **Runs** all tests
 4. **Publishes** packages:
-    * All versions (stable and pre-release):
-        * ✅ Publishes to crates.io
-        * ✅ Publishes to npm
-    * Tag differences:
-        * Stable (`v1.0.0`): npm `latest` tag, updates `stable` git tag
-        * Pre-release (`v1.0.0-beta.1`): npm `next` tag, no `stable` tag update
+   - All versions (stable and pre-release):
+     - ✅ Publishes to crates.io
+     - ✅ Publishes to npm
+   - Tag differences:
+     - Stable (`v1.0.0`): npm `latest` tag, updates `stable` git tag
+     - Pre-release (`v1.0.0-beta.1`): npm `next` tag, no `stable` tag update
 5. **Creates** GitHub Release with:
    - Binary downloads for all platforms
    - Release notes from CHANGELOG.md
@@ -288,21 +314,27 @@ Enclave follows [Semantic Versioning](https://semver.org/):
 ### Which Version Should I Use?
 
 #### For Production (Mainnet)
+
 Use stable versions only:
+
 ```bash
 enclaveup install              # Latest stable
 enclaveup install v1.0.0       # Specific stable version
 ```
 
 #### For Testing (Testnet)
+
 You can use pre-release versions:
+
 ```bash
 enclaveup install --pre-release # Latest pre-release
 enclaveup install v1.0.0-beta.1 # Specific pre-release
 ```
 
 #### For Development
+
 Build from source:
+
 ```bash
 git clone https://github.com/gnosisguild/enclave.git
 cd enclave
@@ -313,7 +345,7 @@ cargo build --release
 
 ### Current Setup
 
-- **`main`** - Stable branch 
+- **`main`** - Stable branch
 - **`v*.*.*`** - Version tags for releases
 - **`stable`** - Always points to the latest stable release
 - **`dev`** - Branch for ongoing development
@@ -375,11 +407,13 @@ pnpm bump:versions --help
 If a release has issues:
 
 1. **Mark as deprecated on npm**:
+
    ```bash
    npm deprecate @enclave/sdk@1.0.0 "Critical bug, use 1.0.1"
    ```
 
 2. **Yank from crates.io** (if critical):
+
    ```bash
    cargo yank --version 1.0.0 enclave
    ```

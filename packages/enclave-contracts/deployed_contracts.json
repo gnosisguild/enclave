@@ -3,28 +3,47 @@
     "Enclave": {
       "constructorArgs": {
         "params": "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001",
-        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676",
+        "owner": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B",
         "maxDuration": "2592000",
         "registry": "0x0000000000000000000000000000000000000001"
       },
-      "blockNumber": 9181738,
-      "address": "0xD43c70A343E631475d8470d0403e0c4b43c76927"
+      "blockNumber": 9375734,
+      "address": "0x7aF55D944285cc6f417Ddfda05393FA18679046d"
     },
     "CiphernodeRegistry": {
       "constructorArgs": {
-        "enclaveAddress": "0xD43c70A343E631475d8470d0403e0c4b43c76927",
-        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676"
+        "enclaveAddress": "0x7aF55D944285cc6f417Ddfda05393FA18679046d",
+        "owner": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B"
       },
-      "blockNumber": 9181748,
-      "address": "0x5ABDfCbA0366ABF2893D3f2465F4C97908488A6d"
+      "blockNumber": 9375745,
+      "address": "0x772CED56a1aA2dFBF53e9ad65D2b2De227F7CEBE"
     },
     "NaiveRegistryFilter": {
       "constructorArgs": {
-        "ciphernodeRegistryAddress": "0x5ABDfCbA0366ABF2893D3f2465F4C97908488A6d",
-        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676"
+        "ciphernodeRegistryAddress": "0x772CED56a1aA2dFBF53e9ad65D2b2De227F7CEBE",
+        "owner": "0x8837e47c4Bb520ADE83AAB761C3B60679443af1B"
       },
-      "blockNumber": 9181753,
-      "address": "0x58708A1bf1AEdf8e75755FDa1882F8dc46985009"
+      "blockNumber": 9375774,
+      "address": "0x6FD987C9CC35bfc5a9Dfc3B89EFd787985C262A5"
+    },
+    "MockComputeProvider": {
+      "blockNumber": 9377000,
+      "address": "0x473c9ac12C0F8265657741f7300b7C89D927A673"
+    },
+    "MockDecryptionVerifier": {
+      "blockNumber": 9377008,
+      "address": "0x64962f93cF88B391572D81c4A1eaAA59c6A0D12c"
+    },
+    "MockInputValidator": {
+      "blockNumber": 9377014,
+      "address": "0x910680dB8F077dd07977B9A9725A485170e5bb8a"
+    },
+    "MockE3Program": {
+      "constructorArgs": {
+        "mockInputValidator": "0x910680dB8F077dd07977B9A9725A485170e5bb8a"
+      },
+      "blockNumber": 9377020,
+      "address": "0x7e6F82A4367Abd4A8f1C54E38C850b59094DcD9a"
     }
   }
 }

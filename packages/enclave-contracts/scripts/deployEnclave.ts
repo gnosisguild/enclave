@@ -32,6 +32,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
+  console.log("Deploying Enclave");
   const { enclave } = await deployAndSaveEnclave({
     params: encoded,
     owner: ownerAddress,
@@ -42,6 +43,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const enclaveAddress = await enclave.getAddress();
 
+  console.log("Deploying CiphernodeRegistry");
   const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
     enclaveAddress: enclaveAddress,
     owner: ownerAddress,
@@ -50,6 +52,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
 
+  console.log("Deploying NaiveRegistryFilter");
   const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
     ciphernodeRegistryAddress: ciphernodeRegistryAddress,
     owner: ownerAddress,
@@ -60,6 +63,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   const registryAddress = await enclave.ciphernodeRegistry();
 
+  console.log("Setting CiphernodeRegistry in Enclave");
   if (registryAddress === ciphernodeRegistryAddress) {
     console.log(`Enclave contract already has registry`);
   } else {
@@ -81,6 +85,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
 
   if (shouldDeployMocks) {
+    console.log("Deploying Mocks");
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
 
     const encryptionSchemeId = ethers.keccak256(

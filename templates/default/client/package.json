@@ -23,7 +23,8 @@
     "connectkit": "^1.9.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "viem": "2.30.6",
+    "react-router-dom": "^6.28.0",
+    "viem": "2.38.1",
     "wagmi": "^2.14.16"
   },
   "devDependencies": {
