@@ -16,7 +16,7 @@ use e3_aggregator::ext::{
 };
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
-use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory, Repository};
+use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory};
 use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
 use e3_evm::{
     helpers::{
@@ -106,26 +106,31 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Use the TrBFV feature
     pub fn with_trbfv(mut self) -> Self {
         self.trbfv = true;
         self
     }
 
+    /// Attach an existing data actor to store data
     pub fn with_data(mut self, data: Addr<InMemStore>) -> Self {
         self.data = Some(data);
         self
     }
 
+    /// Attach a history collecting test module
     pub fn with_history(mut self) -> Self {
         self.history = true;
         self
     }
 
+    /// Attach an error collecting test module
     pub fn with_errors(mut self) -> Self {
         self.errors = true;
         self
     }
 
+    /// Use the node configuration on these specific chains
     pub fn with_chains(mut self, chains: &[ChainConfig]) -> Self {
         self.chains.extend(
             chains
@@ -135,62 +140,68 @@ impl CiphernodeBuilder {
         self
     }
 
+    /// Use the given Address to represent the node
     pub fn with_address(mut self, addr: &str) -> Self {
         self.address = Some(addr.to_owned());
         self
     }
 
+    /// Log data actor events
     pub fn with_logging(mut self) -> Self {
         self.logging = true;
         self
     }
 
+    /// Do public key aggregation
     pub fn with_pubkey_aggregation(mut self) -> Self {
         self.pubkey_agg = true;
         self
     }
 
+    /// Do plaintext aggregation
     pub fn with_plaintext_aggregation(mut self) -> Self {
         self.plaintext_agg = true;
         self
     }
 
+    /// Inject a preexisting multithread actor. This is mainly used for testing.
     pub fn with_injected_multithread(mut self, multithread: Addr<Multithread>) -> Self {
         self.multithread_cache = Some(multithread);
         self
     }
 
+    /// Setup how many threads to use within the multithread actor
+    #[deprecated(note = "This method is under construction and should not be used yet")]
     pub fn with_threads(mut self, threads: usize) -> Self {
         self.threads = Some(threads);
         self
     }
 
+    /// Setup a ThresholdPlaintextAggregator
     pub fn with_threshold_plaintext_aggregation(mut self) -> Self {
         self.threshold_plaintext_agg = true;
         self
     }
 
-    // fn ensure_chain(&mut self, chain: &ChainConfig) {
-    //     if let None = self.chains.get(&chain.name) {
-    //         self.chains.insert(chain.name.clone(), chain.clone());
-    //     }
-    // }
-
+    /// Setup an Enclave contract reader for every evm chain provided
     pub fn with_contract_enclave_reader(mut self) -> Self {
         self.contract_components.enclave_reader = true;
         self
     }
 
+    /// Setup an Enclave contract reader and writer for every evm chain provided
     pub fn with_contract_enclave_full(mut self) -> Self {
         self.contract_components.enclave = true;
         self
     }
 
+    /// Setup a writable RegistryFilter for every evm chain provided
     pub fn with_contract_registry_filter(mut self) -> Self {
         self.contract_components.registry_filter = true;
         self
     }
 
+    /// Setup a CiphernodeRegistry listener for every evm chain provided
     pub fn with_contract_ciphernode_registry(mut self) -> Self {
         self.contract_components.ciphernode_registry = true;
         self
@@ -397,6 +408,8 @@ impl CiphernodeBuilder {
     }
 }
 
+/// Struct to cache modules required during the ciphernode construction so that providers are only
+/// constructed once.
 struct ProviderCaches {
     signer_cache: Option<LocalSigner<SigningKey>>,
     read_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteReadProvider>>,
