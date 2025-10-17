@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum Contract {
     Full {
@@ -34,7 +34,7 @@ impl Contract {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ContractAddresses {
     pub enclave: Contract,
     pub ciphernode_registry: Contract,

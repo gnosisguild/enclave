@@ -29,6 +29,7 @@ pub enum NodeCommands {
     /// Shutdown all nodes
     Down,
 
+    #[command(hide = true)]
     Daemon {
         /// Exclude nodes by name
         #[arg(short, long, value_delimiter = ',')]

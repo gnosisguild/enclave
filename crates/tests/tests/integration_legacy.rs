@@ -49,7 +49,7 @@ async fn setup_local_ciphernode(
 ) -> Result<CiphernodeHandle> {
     let mut builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_address(addr)
-        .with_source_bus(bus)
+        .with_forked_bus(bus)
         .with_history()
         .with_errors()
         .with_pubkey_aggregation()

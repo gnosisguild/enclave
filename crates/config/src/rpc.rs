@@ -69,7 +69,7 @@ impl RPC {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Hash, Eq, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(tag = "type", content = "credentials")]
 pub enum RpcAuth {
     None,
