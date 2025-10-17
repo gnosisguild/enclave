@@ -6,12 +6,13 @@
 
 import type { Log, PublicClient, WalletClient } from "viem";
 import type { ProofData } from "@aztec/bb.js";
-
-import {
-  type CiphernodeRegistryOwnable,
-  type Enclave,
-  type MockCiphernodeRegistry,
+import type {
+  CiphernodeRegistryOwnable,
+  Enclave,
+  MockCiphernodeRegistry,
 } from "@enclave-e3/contracts/types";
+
+import type { CircuitInputs } from "./greco";
 
 /**
  * SDK configuration
@@ -319,12 +320,12 @@ export const BfvProtocolParams = {
  */
 export interface EncryptedValueAndPublicInputs {
   /**
-   * The encrypted vector
+   * The encrypted data
    */
-  encryptedVector: Uint8Array;
+  encryptedData: Uint8Array;
 
   /**
    * The public inputs for the proof
    */
-  publicInputs: Object;
+  publicInputs: CircuitInputs;
 }
