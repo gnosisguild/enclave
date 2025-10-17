@@ -49,10 +49,8 @@ pub struct CiphernodeBuilder {
     threshold_plaintext_agg: bool,
     plaintext_agg: bool,
     source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
-
     chains: HashMap<String, ChainConfig>,
     contract_components: ContractComponents,
-    // read_provider: Option<,
     multithread_cache: Option<Addr<Multithread>>,
     data: Option<Addr<InMemStore>>,
     rng: SharedRng,
@@ -448,7 +446,6 @@ impl ProviderCaches {
             return Ok(cache.clone());
         }
 
-        // let signer = load_signer_from_repository(repository, cipher).await?;
         let signer = self.ensure_signer(cipher, repositories).await?;
         let rpc_url = chain.rpc_url()?;
         let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
