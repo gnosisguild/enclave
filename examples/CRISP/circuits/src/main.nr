@@ -11,6 +11,8 @@ mod ecdsa;
 use ecdsa::{address_to_field, derive_address, verify_signature};
 mod merkle_tree;
 use merkle_tree::get_merkle_root;
+mod utils;
+use utils::calculate_indices;
 
 fn main(
     params: pub Params<2048, 1>,
@@ -66,6 +68,7 @@ fn main(
         p1is,
         p2is,
     );
+
     assert(
         0
             == k1.coefficients[2048 - 1]
