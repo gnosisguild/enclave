@@ -6,7 +6,13 @@
 
 use alloy::{
     network::EthereumWallet,
-    providers::{Provider, ProviderBuilder, WalletProvider},
+    providers::{
+        fillers::{
+            BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+            WalletFiller,
+        },
+        Identity, Provider, ProviderBuilder, RootProvider, WalletProvider,
+    },
     signers::local::PrivateKeySigner,
     transports::{
         http::{
@@ -82,12 +88,31 @@ pub struct ProviderConfig {
     auth: RpcAuth,
 }
 
+pub type ConcreteReadProvider = FillProvider<
+    JoinFill<
+        Identity,
+        JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+    >,
+    RootProvider,
+>;
+
+pub type ConcreteWriteProvider = FillProvider<
+    JoinFill<
+        JoinFill<
+            Identity,
+            JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>,
+        >,
+        WalletFiller<EthereumWallet>,
+    >,
+    RootProvider,
+>;
+
 impl ProviderConfig {
     pub fn new(rpc: RPC, auth: RpcAuth) -> Self {
         Self { rpc, auth }
     }
 
-    pub async fn create_readonly_provider(&self) -> Result<EthProvider<impl Provider + Clone>> {
+    pub async fn create_readonly_provider(&self) -> Result<EthProvider<ConcreteReadProvider>> {
         let provider = if self.rpc.is_websocket() {
             ProviderBuilder::new()
                 .connect_ws(self.create_ws_connect()?)
@@ -103,7 +128,7 @@ impl ProviderConfig {
     pub async fn create_signer_provider(
         &self,
         signer: &PrivateKeySigner,
-    ) -> Result<EthProvider<impl Provider + WalletProvider + Clone>> {
+    ) -> Result<EthProvider<ConcreteWriteProvider>> {
         let wallet = EthereumWallet::from(signer.clone());
 
         let provider = if self.rpc.is_websocket() {

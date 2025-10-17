@@ -5,20 +5,34 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::{Actor, Addr};
+use alloy::signers::{
+    k256::{ecdsa::SigningKey, Secp256k1},
+    local::LocalSigner,
+};
+use anyhow::Result;
 use e3_aggregator::ext::{
     PlaintextAggregatorExtension, PublicKeyAggregatorExtension,
     ThresholdPlaintextAggregatorExtension,
 };
+use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
-use e3_data::{DataStore, InMemStore, RepositoriesFactory};
+use e3_data::{DataStore, InMemStore, Repositories, RepositoriesFactory, Repository};
 use e3_events::{EnclaveEvent, EventBus, EventBusConfig};
+use e3_evm::{
+    helpers::{
+        load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
+        ProviderConfig,
+    },
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol, EnclaveSolReader,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
+};
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::Multithread;
 use e3_request::E3Router;
 use e3_sortition::{CiphernodeSelector, Sortition, SortitionRepositoryFactory};
 use e3_utils::{rand_eth_addr, SharedRng};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tracing::info;
 
 use crate::CiphernodeHandle;
@@ -34,11 +48,29 @@ pub struct CiphernodeBuilder {
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
     plaintext_agg: bool,
-    source_bus: Option<Addr<EventBus<EnclaveEvent>>>,
+    source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
+
+    chains: HashMap<String, ChainConfig>,
+    contract_components: ContractComponents,
+    // read_provider: Option<,
     multithread_cache: Option<Addr<Multithread>>,
     data: Option<Addr<InMemStore>>,
     rng: SharedRng,
     cipher: Arc<Cipher>,
+}
+
+#[derive(Default)]
+pub struct ContractComponents {
+    enclave_reader: bool,
+    enclave: bool,
+    registry_filter: bool,
+    ciphernode_registry: bool,
+}
+
+#[derive(Clone)]
+pub enum BusMode<T> {
+    Forked(T),
+    Source(T),
 }
 
 impl CiphernodeBuilder {
@@ -52,6 +84,8 @@ impl CiphernodeBuilder {
             pubkey_agg: false,
             plaintext_agg: false,
             threshold_plaintext_agg: false,
+            contract_components: ContractComponents::default(),
+            chains: HashMap::new(),
             source_bus: None,
             data: None,
             threads: None,
@@ -61,8 +95,16 @@ impl CiphernodeBuilder {
         }
     }
 
+    /// Use the given bus for all events. No new bus is created.
     pub fn with_source_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
-        self.source_bus = Some(bus.clone());
+        self.source_bus = Some(BusMode::Source(bus.clone()));
+        self
+    }
+
+    /// Fork all events from the given source bus. Events will be both broadcast on the source bus
+    /// and a local bus created for this instance
+    pub fn with_forked_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+        self.source_bus = Some(BusMode::Forked(bus.clone()));
         self
     }
 
@@ -121,14 +163,56 @@ impl CiphernodeBuilder {
         self
     }
 
-    pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
-        // Local bus for ciphernode events
-        let local_bus = EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start();
-
-        if let Some(ref bus) = self.source_bus {
-            info!("Setting up Event pipe");
-            EventBus::pipe(bus, &local_bus);
+    fn ensure_chain(&mut self, chain: &ChainConfig) {
+        if let None = self.chains.get(&chain.name) {
+            self.chains.insert(chain.name.clone(), chain.clone());
         }
+    }
+
+    pub fn with_contract_enclave_reader(mut self, chain: &ChainConfig) -> Self {
+        self.ensure_chain(chain);
+        self.contract_components.enclave_reader = true;
+        self
+    }
+
+    pub fn with_contract_enclave_full(mut self, chain: &ChainConfig) -> Self {
+        self.ensure_chain(chain);
+        self.contract_components.enclave = true;
+        self
+    }
+
+    pub fn with_contract_registry_filter(mut self, chain: &ChainConfig) -> Self {
+        self.ensure_chain(chain);
+        self.contract_components.registry_filter = true;
+        self
+    }
+
+    pub fn with_contract_ciphernode_registry(mut self, chain: &ChainConfig) -> Self {
+        self.ensure_chain(chain);
+        self.contract_components.ciphernode_registry = true;
+        self
+    }
+
+    fn create_local_bus() -> Addr<EventBus<EnclaveEvent>> {
+        EventBus::<EnclaveEvent>::new(EventBusConfig { deduplicate: true }).start()
+    }
+
+    pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
+        // Local bus for ciphernode events can either be forked from a bus or it can be directly
+        // attached to a source bus
+        let local_bus = match self.source_bus {
+            // Forked bus - pipe all events from the source to dest
+            Some(BusMode::Forked(ref bus)) => {
+                let local_bus = Self::create_local_bus();
+                info!("Setting up Event pipe");
+                EventBus::pipe(&bus, &local_bus);
+                local_bus
+            }
+            // Source bus - simply attach to the source bus
+            Some(BusMode::Source(ref bus)) => bus.clone(),
+            // Nothing specified
+            None => Self::create_local_bus(),
+        };
 
         // History collector for taking historical events for analysis
         let history = if self.history {
@@ -164,6 +248,70 @@ impl CiphernodeBuilder {
         let store = DataStore::from(&data_actor);
         let repositories = store.repositories();
         let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
+
+        let mut provider_cache = ProviderCaches::new();
+        let cipher = &self.cipher;
+        for chain in self
+            .chains
+            .iter()
+            .map(|(_, chain)| chain)
+            .filter(|chain| chain.enabled.unwrap_or(true))
+        {
+            if self.contract_components.enclave {
+                let read_provider = provider_cache.ensure_read_provider(chain).await?;
+                let write_provider = provider_cache
+                    .ensure_write_provider(&repositories, chain, cipher)
+                    .await?;
+                EnclaveSol::attach(
+                    &local_bus,
+                    read_provider.clone(),
+                    write_provider.clone(),
+                    &chain.contracts.enclave.address(),
+                    &repositories.enclave_sol_reader(read_provider.chain_id()),
+                    chain.contracts.enclave.deploy_block(),
+                    chain.rpc_url.clone(),
+                )
+                .await?;
+            }
+
+            if self.contract_components.enclave_reader {
+                let read_provider = provider_cache.ensure_read_provider(chain).await?;
+                EnclaveSolReader::attach(
+                    &local_bus,
+                    read_provider.clone(),
+                    &chain.contracts.enclave.address(),
+                    &repositories.enclave_sol_reader(read_provider.chain_id()),
+                    chain.contracts.enclave.deploy_block(),
+                    chain.rpc_url.clone(),
+                )
+                .await?;
+            }
+
+            if self.contract_components.registry_filter {
+                let write_provider = provider_cache
+                    .ensure_write_provider(&repositories, chain, cipher)
+                    .await?;
+                RegistryFilterSol::attach(
+                    &local_bus,
+                    write_provider.clone(),
+                    &chain.contracts.filter_registry.address(),
+                )
+                .await?;
+            }
+
+            if self.contract_components.ciphernode_registry {
+                let read_provider = provider_cache.ensure_read_provider(chain).await?;
+                CiphernodeRegistrySol::attach(
+                    &local_bus,
+                    read_provider.clone(),
+                    &chain.contracts.ciphernode_registry.address(),
+                    &repositories.ciphernode_registry_reader(read_provider.chain_id()),
+                    chain.contracts.ciphernode_registry.deploy_block(),
+                    chain.rpc_url.clone(),
+                )
+                .await?;
+            }
+        }
 
         // Ciphernode Selector
         CiphernodeSelector::attach(&local_bus, &sortition, &addr);
@@ -243,5 +391,70 @@ impl CiphernodeBuilder {
 
         // return it
         addr
+    }
+}
+
+struct ProviderCaches {
+    signer_cache: Option<LocalSigner<SigningKey>>,
+    read_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteReadProvider>>,
+    write_provider_cache: HashMap<ChainConfig, EthProvider<ConcreteWriteProvider>>,
+}
+
+impl ProviderCaches {
+    pub fn new() -> Self {
+        ProviderCaches {
+            signer_cache: None,
+            read_provider_cache: HashMap::new(),
+            write_provider_cache: HashMap::new(),
+        }
+    }
+
+    pub async fn ensure_signer(
+        &mut self,
+        cipher: &Cipher,
+        repositories: &Repositories,
+    ) -> Result<LocalSigner<SigningKey>> {
+        if let Some(ref cache) = self.signer_cache {
+            return Ok(cache.clone());
+        }
+
+        let signer = load_signer_from_repository(repositories.eth_private_key(), cipher).await?;
+        self.signer_cache = Some(signer.clone());
+        Ok(signer)
+    }
+
+    pub async fn ensure_read_provider(
+        &mut self,
+        chain: &ChainConfig,
+    ) -> Result<EthProvider<ConcreteReadProvider>> {
+        if let Some(cache) = self.read_provider_cache.get(chain) {
+            return Ok(cache.clone());
+        }
+        let rpc_url = chain.rpc_url()?;
+        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
+        let read_provider = provider_config.create_readonly_provider().await?;
+        self.read_provider_cache
+            .insert(chain.clone(), read_provider.clone());
+        Ok(read_provider)
+    }
+
+    pub async fn ensure_write_provider(
+        &mut self,
+        repositories: &Repositories,
+        chain: &ChainConfig,
+        cipher: &Cipher,
+    ) -> Result<EthProvider<ConcreteWriteProvider>> {
+        if let Some(cache) = self.write_provider_cache.get(chain) {
+            return Ok(cache.clone());
+        }
+
+        // let signer = load_signer_from_repository(repository, cipher).await?;
+        let signer = self.ensure_signer(cipher, repositories).await?;
+        let rpc_url = chain.rpc_url()?;
+        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
+        let write_provider = provider_config.create_signer_provider(&signer).await?;
+        self.write_provider_cache
+            .insert(chain.clone(), write_provider.clone());
+        Ok(write_provider)
     }
 }
