@@ -38,7 +38,10 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
-  const preDeployedArgs = readDeploymentArgs("CiphernodeRegistryOwnable", chain);
+  const preDeployedArgs = readDeploymentArgs(
+    "CiphernodeRegistryOwnable",
+    chain,
+  );
 
   if (
     !enclaveAddress ||
@@ -59,20 +62,24 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   }
 
   const ciphernodeRegistryFactory = await ethers.getContractFactory(
-    CiphernodeRegistryOwnableFactory.abi, 
+    CiphernodeRegistryOwnableFactory.abi,
     CiphernodeRegistryOwnableFactory.linkBytecode({
-      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3": poseidonT3Address,
-    }), 
-    signer);
+      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
+        poseidonT3Address,
+    }),
+    signer,
+  );
 
-  const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(enclaveAddress, owner);
+  const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
+    enclaveAddress,
+    owner,
+  );
 
   await ciphernodeRegistry.waitForDeployment();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
-  const ciphernodeRegistryAddress =
-    await ciphernodeRegistry.getAddress();
+  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
 
   storeDeploymentArgs(
     {

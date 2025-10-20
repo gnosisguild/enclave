@@ -48,14 +48,18 @@ export const deployAndSaveNaiveRegistryFilter = async ({
     return { naiveRegistryFilter: naiveRegistryFilterContract };
   }
 
-  const naiveRegistryFilterFactory = await ethers.getContractFactory("NaiveRegistryFilter");
+  const naiveRegistryFilterFactory = await ethers.getContractFactory(
+    "NaiveRegistryFilter",
+  );
 
-  const naiveRegistryFilter = await naiveRegistryFilterFactory.deploy(ciphernodeRegistryAddress, owner);
+  const naiveRegistryFilter = await naiveRegistryFilterFactory.deploy(
+    ciphernodeRegistryAddress,
+    owner,
+  );
 
   await naiveRegistryFilter.waitForDeployment();
 
-  const naiveRegistryFilterAddress =
-    await naiveRegistryFilter.getAddress();
+  const naiveRegistryFilterAddress = await naiveRegistryFilter.getAddress();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 

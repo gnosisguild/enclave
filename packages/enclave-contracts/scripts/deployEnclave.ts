@@ -8,8 +8,8 @@ import hre from "hardhat";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveNaiveRegistryFilter } from "./deployAndSave/naiveRegistryFilter";
-import { deployMocks } from "./deployMocks";
 import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
+import { deployMocks } from "./deployMocks";
 
 /**
  * Deploys the Enclave contracts

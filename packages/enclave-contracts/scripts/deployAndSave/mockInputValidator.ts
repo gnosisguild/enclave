@@ -19,13 +19,11 @@ export const deployAndSaveMockInputValidator = async (
   const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
 
-  const mockInputValidatorFactory = await ethers.getContractFactory(
-    "MockInputValidator",
-  );
+  const mockInputValidatorFactory =
+    await ethers.getContractFactory("MockInputValidator");
   const inputValidator = await mockInputValidatorFactory.deploy();
   await inputValidator.waitForDeployment();
-  const inputValidatorAddress =
-    await inputValidator.getAddress();
+  const inputValidatorAddress = await inputValidator.getAddress();
 
   const chain = hre.globalOptions.network;
   const blockNumber = await ethers.provider.getBlockNumber();

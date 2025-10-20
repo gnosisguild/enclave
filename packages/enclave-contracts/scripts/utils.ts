@@ -106,7 +106,7 @@ export const readAllDeployments = (): Deployments => {
 
 /**
  * Clean the deployments for a given network
- * @param network
+ * @param network - The network for which to clean the deployments
  */
 export const cleanDeployments = (network: string): void => {
   if (!fs.existsSync(deploymentsFile)) {
@@ -119,3 +119,23 @@ export const cleanDeployments = (network: string): void => {
   }
   fs.writeFileSync(deploymentsFile, JSON.stringify(deployments, null, 2));
 };
+
+/**
+ * Check if two arrays are equal by checking the values inside
+ * @param arr1 - The first array
+ * @param arr2 - The second array to check
+ * @returns Whether the two arrays are equal
+ */
+export function areArraysEqual<T>(arr1: T[], arr2: T[]): boolean {
+  if (arr1.length !== arr2.length) {
+    return false;
+  }
+
+  for (let i = 0; i < arr1.length; i++) {
+    if (arr1[i] !== arr2[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}

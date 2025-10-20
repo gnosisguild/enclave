@@ -26,8 +26,7 @@ export const deployAndSaveMockDecryptionVerifier = async (
   const decryptionVerifier = await decryptionVerifierFactory.deploy();
 
   await decryptionVerifier.waitForDeployment();
-  const decryptionVerifierAddress =
-    await decryptionVerifier.getAddress();
+  const decryptionVerifierAddress = await decryptionVerifier.getAddress();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 

@@ -18,13 +18,14 @@ export const deployAndSaveMockComputeProvider = async (
 }> => {
   const { ethers } = await hre.network.connect();
 
-  const computeProviderFactory = await ethers.getContractFactory("MockComputeProvider");
+  const computeProviderFactory = await ethers.getContractFactory(
+    "MockComputeProvider",
+  );
   const computeProvider = await computeProviderFactory.deploy();
 
   await computeProvider.waitForDeployment();
 
-  const computeProviderAddress =
-    await computeProvider.getAddress();
+  const computeProviderAddress = await computeProvider.getAddress();
 
   const [signer] = await ethers.getSigners();
   const chain = hre.globalOptions.network;

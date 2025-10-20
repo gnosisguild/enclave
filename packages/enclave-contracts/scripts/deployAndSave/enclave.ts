@@ -6,7 +6,11 @@
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
 import { Enclave, Enclave__factory as EnclaveFactory } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  areArraysEqual,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 /**
  * The arguments for the deployAndSaveEnclave function
@@ -45,10 +49,13 @@ export const deployAndSaveEnclave = async ({
     !owner ||
     !maxDuration ||
     !registry ||
-    (preDeployedArgs?.constructorArgs?.params === params &&
-      preDeployedArgs?.constructorArgs?.owner === owner &&
+    (preDeployedArgs?.constructorArgs?.owner === owner &&
       preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
-      preDeployedArgs?.constructorArgs?.registry === registry)
+      preDeployedArgs?.constructorArgs?.registry === registry &&
+      areArraysEqual(
+        preDeployedArgs?.constructorArgs?.params as string[],
+        params,
+      ))
   ) {
     if (!preDeployedArgs?.address) {
       throw new Error("Enclave address not found, it must be deployed first");
@@ -61,13 +68,20 @@ export const deployAndSaveEnclave = async ({
   }
 
   const enclaveFactory = await ethers.getContractFactory(
-    EnclaveFactory.abi, 
+    EnclaveFactory.abi,
     EnclaveFactory.linkBytecode({
-      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3": poseidonT3Address,
-    }), 
-    signer);
+      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
+        poseidonT3Address,
+    }),
+    signer,
+  );
 
-  const enclave = await enclaveFactory.deploy(owner, registry, maxDuration, params);
+  const enclave = await enclaveFactory.deploy(
+    owner,
+    registry,
+    maxDuration,
+    params,
+  );
 
   await enclave.waitForDeployment();
 
