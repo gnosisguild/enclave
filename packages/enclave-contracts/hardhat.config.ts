@@ -33,7 +33,7 @@ const mnemonic =
   process.env.MNEMONIC ??
   "test test test test test test test test test test test junk";
 const privateKey = process.env.PRIVATE_KEY!;
-const infuraApiKey = process.env.INFURA_KEY!;
+const rpcUrl = process.env.RPC_URL ?? "http://localhost:8545";
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -50,18 +50,6 @@ const chainIds = {
 };
 
 function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
-  let jsonRpcUrl: string;
-  switch (chain) {
-    case "avalanche":
-      jsonRpcUrl = "https://api.avax.network/ext/bc/C/rpc";
-      break;
-    case "bsc":
-      jsonRpcUrl = "https://bsc-dataseed1.binance.org";
-      break;
-    default:
-      jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
-  }
-
   let accounts: [string] | { count: number; mnemonic: string; path: string };
   if (privateKey) {
     accounts = [privateKey];
@@ -76,7 +64,7 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
   return {
     accounts,
     chainId: chainIds[chain],
-    url: jsonRpcUrl,
+    url: rpcUrl,
     type: "http" as const,
     chainType: "l1" as const,
     blockExplorers: {
