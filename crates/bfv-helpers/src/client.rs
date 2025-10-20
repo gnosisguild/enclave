@@ -8,7 +8,7 @@ use crate::build_bfv_params_arc;
 use anyhow::{anyhow, Result};
 use fhe_rs::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
-use greco::InputValidationVectors;
+use greco::vectors::GrecoVectors;
 use num_bigint::BigInt;
 use num_traits::Num;
 use rand::thread_rng;
@@ -101,8 +101,11 @@ pub fn bfv_verifiable_encrypt_u64(
         .try_encrypt_extended(&plaintext, &mut thread_rng())
         .map_err(|e| anyhow!("Error encrypting vote: {}", e))?;
 
+    // Generate bounds and vectors directly
+    // let (crypto_params, bounds) = GrecoBounds::compute(bfv_params, 0)?;
+
     // Create Greco input validation ZK proof
-    let input_val_vectors = InputValidationVectors::compute(
+    let input_val_vectors = GrecoVectors::compute(
         &plaintext,
         &u_rns,
         &e0_rns,

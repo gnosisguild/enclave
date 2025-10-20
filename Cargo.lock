@@ -1684,6 +1684,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
+name = "bigint-poly"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/bigint-poly#6b992dd81c65cc693b388e37edfd190749bfc3b3"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2608,7 +2619,6 @@ dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
  "anyhow",
- "e3-greco-generator",
  "fhe",
  "fhe-traits",
  "fhe-util",
@@ -2616,6 +2626,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "rand 0.8.5",
+ "zkfhe-greco",
 ]
 
 [[package]]
@@ -2842,37 +2853,6 @@ dependencies = [
  "regex",
  "tokio",
  "vfs",
-]
-
-[[package]]
-name = "e3-greco-generator"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/greco#77ef983e259c6ed5fd9f226ecc3778c21a6acf2b"
-dependencies = [
- "blake3",
- "clap",
- "e3-greco-polynomial",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "itertools 0.14.0",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "toml",
-]
-
-[[package]]
-name = "e3-greco-polynomial"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/greco#77ef983e259c6ed5fd9f226ecc3778c21a6acf2b"
-dependencies = [
- "num-bigint",
- "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -3293,7 +3273,7 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat#549969e8103a89fb8caad81e08339b59c1b32b66"
 dependencies = [
  "doc-comment",
  "fhe-math",
@@ -3318,7 +3298,7 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat#549969e8103a89fb8caad81e08339b59c1b32b66"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -3332,6 +3312,7 @@ dependencies = [
  "prost-build",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "rayon",
  "sha2",
  "thiserror 1.0.69",
  "zeroize",
@@ -3340,7 +3321,7 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat#549969e8103a89fb8caad81e08339b59c1b32b66"
 dependencies = [
  "rand 0.8.5",
 ]
@@ -3348,7 +3329,7 @@ dependencies = [
 [[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs#ee350f2b759ffa7026eca16af576b6dbdc2a2ebd"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat#549969e8103a89fb8caad81e08339b59c1b32b66"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -6198,6 +6179,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pvw"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/pvw-rs?branch=main#0c6e9e8928b3e2fdc58b723dfc2dfad55e9ba6d9"
+dependencies = [
+ "console 0.16.1",
+ "fhe-math",
+ "fhe-traits",
+ "fhe-util",
+ "ndarray",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rayon",
+ "thiserror 1.0.69",
+ "zeroize",
+ "zeroize_derive",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8791,6 +8792,51 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.106",
+]
+
+[[package]]
+name = "zkfhe-greco"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=chore%2Fdeps#ef504ba96123c2328f0d12dd6f814f30dbfa6787"
+dependencies = [
+ "anyhow",
+ "bigint-poly",
+ "blake3",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "itertools 0.14.0",
+ "num-bigint",
+ "num-traits",
+ "pvw",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "zkfhe-shared",
+]
+
+[[package]]
+name = "zkfhe-shared"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=chore%2Fdeps#ef504ba96123c2328f0d12dd6f814f30dbfa6787"
+dependencies = [
+ "anyhow",
+ "bigint-poly",
+ "chrono",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "num-bigint",
+ "num-traits",
+ "pvw",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "toml",
 ]
 
 [[package]]
