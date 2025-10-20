@@ -2619,9 +2619,9 @@ dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
  "anyhow",
- "fhe",
- "fhe-traits",
- "fhe-util",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
  "hex",
  "num-bigint",
  "num-traits",
@@ -2834,9 +2834,9 @@ dependencies = [
  "e3-data",
  "e3-events",
  "e3-request",
- "fhe",
- "fhe-traits",
- "fhe-util",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "serde",
@@ -3012,8 +3012,8 @@ dependencies = [
  "e3-events",
  "e3-fhe",
  "e3-sdk",
- "fhe",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "tracing",
@@ -3044,9 +3044,9 @@ dependencies = [
  "e3-sdk",
  "e3-sortition",
  "e3-test-helpers",
- "fhe",
- "fhe-traits",
- "fhe-util",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "tokio",
@@ -3276,9 +3276,34 @@ version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat#549969e8103a89fb8caad81e08339b59c1b32b66"
 dependencies = [
  "doc-comment",
- "fhe-math",
- "fhe-traits",
- "fhe-util",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "itertools 0.12.1",
+ "ndarray",
+ "num-bigint",
+ "num-traits",
+ "prost 0.12.6",
+ "prost-build",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rand_distr",
+ "rayon",
+ "serde",
+ "thiserror 1.0.69",
+ "zeroize",
+ "zeroize_derive",
+]
+
+[[package]]
+name = "fhe"
+version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
+dependencies = [
+ "doc-comment",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -3301,8 +3326,8 @@ version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat#549969e8103a89fb8caad81e08339b59c1b32b66"
 dependencies = [
  "ethnum",
- "fhe-traits",
- "fhe-util",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -3319,6 +3344,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "fhe-math"
+version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
+dependencies = [
+ "ethnum",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "itertools 0.12.1",
+ "ndarray",
+ "num-bigint",
+ "num-bigint-dig",
+ "num-traits",
+ "prost 0.12.6",
+ "prost-build",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "sha2",
+ "thiserror 1.0.69",
+ "zeroize",
+]
+
+[[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat#549969e8103a89fb8caad81e08339b59c1b32b66"
@@ -3327,9 +3374,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "fhe-traits"
+version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
+dependencies = [
+ "rand 0.8.5",
+]
+
+[[package]]
 name = "fhe-util"
 version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat#549969e8103a89fb8caad81e08339b59c1b32b66"
+dependencies = [
+ "itertools 0.12.1",
+ "num-bigint-dig",
+ "num-traits",
+ "prime_factorization",
+ "rand 0.8.5",
+ "rand_distr",
+ "rayon",
+]
+
+[[package]]
+name = "fhe-util"
+version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "itertools 0.12.1",
  "num-bigint-dig",
@@ -6181,12 +6250,12 @@ dependencies = [
 [[package]]
 name = "pvw"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/pvw-rs?branch=main#0c6e9e8928b3e2fdc58b723dfc2dfad55e9ba6d9"
+source = "git+https://github.com/gnosisguild/pvw-rs#0c6e9e8928b3e2fdc58b723dfc2dfad55e9ba6d9"
 dependencies = [
  "console 0.16.1",
- "fhe-math",
- "fhe-traits",
- "fhe-util",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
  "ndarray",
  "num-bigint",
  "num-traits",
@@ -8797,14 +8866,14 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=chore%2Fdeps#ef504ba96123c2328f0d12dd6f814f30dbfa6787"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#20051f17762bcf90748abe506a498e0198769cbe"
 dependencies = [
  "anyhow",
  "bigint-poly",
  "blake3",
- "fhe",
- "fhe-math",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
  "itertools 0.14.0",
  "num-bigint",
  "num-traits",
@@ -8821,14 +8890,14 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator?branch=chore%2Fdeps#ef504ba96123c2328f0d12dd6f814f30dbfa6787"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#20051f17762bcf90748abe506a498e0198769cbe"
 dependencies = [
  "anyhow",
  "bigint-poly",
  "chrono",
- "fhe",
- "fhe-math",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=refactor%2Fpvw-compat)",
  "num-bigint",
  "num-traits",
  "pvw",
