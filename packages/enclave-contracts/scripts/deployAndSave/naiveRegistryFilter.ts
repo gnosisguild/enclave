@@ -53,8 +53,8 @@ export const deployAndSaveNaiveRegistryFilter = async ({
   );
 
   const naiveRegistryFilter = await naiveRegistryFilterFactory.deploy(
-    ciphernodeRegistryAddress,
     owner,
+    ciphernodeRegistryAddress,
   );
 
   await naiveRegistryFilter.waitForDeployment();

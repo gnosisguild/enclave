@@ -71,8 +71,8 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
   );
 
   const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
-    enclaveAddress,
     owner,
+    enclaveAddress,
   );
 
   await ciphernodeRegistry.waitForDeployment();
