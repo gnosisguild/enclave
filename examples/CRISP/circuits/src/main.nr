@@ -8,21 +8,21 @@ use greco::{Greco, Params};
 use polynomial::Polynomial;
 
 fn main(
-    params: pub Params<8192, 4>,
-    pk0is: pub [Polynomial<8192>; 4],
-    pk1is: pub [Polynomial<8192>; 4],
-    ct0is: pub [Polynomial<8192>; 4],
-    ct1is: pub [Polynomial<8192>; 4],
-    u: Polynomial<8192>,
-    e0: Polynomial<8192>,
-    e1: Polynomial<8192>,
-    k1: Polynomial<8192>,
-    r1is: [Polynomial<16383>; 4],
-    r2is: [Polynomial<8191>; 4],
-    p1is: [Polynomial<16383>; 4],
-    p2is: [Polynomial<8191>; 4],
+    params: Params<2048, 1>,
+    pk0is: [Polynomial<2048>; 1],
+    pk1is: [Polynomial<2048>; 1],
+    ct0is: [Polynomial<2048>; 1],
+    ct1is: [Polynomial<2048>; 1],
+    u: Polynomial<2048>,
+    e0: Polynomial<2048>,
+    e1: Polynomial<2048>,
+    k1: Polynomial<2048>,
+    r1is: [Polynomial<4095>; 1],
+    r2is: [Polynomial<2047>; 1],
+    p1is: [Polynomial<4095>; 1],
+    p2is: [Polynomial<2047>; 1],
 ) {
-    let circuit: Greco<8192, 4, 56, 56, 5, 5, 10, 20, 56, 20, 56> = Greco::new(
+    let circuit: Greco<2048, 1, 54, 54, 5, 5, 20, 18, 54, 16, 54> = Greco::new(
         params,
         pk0is,
         pk1is,
@@ -39,8 +39,8 @@ fn main(
     );
     assert(
         0
-            == k1.coefficients[8192 - 1]
-                * (params.crypto_params().q_mod_t - k1.coefficients[8192 - 1]),
+            == k1.coefficients[2048 - 1]
+                * (params.crypto_params().q_mod_t - k1.coefficients[2048 - 1]),
     );
 
     circuit.verify_correct_ciphertext_encryption();
