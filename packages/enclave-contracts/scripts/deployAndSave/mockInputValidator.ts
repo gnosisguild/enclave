@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import MockInputValidatorModule from "../../ignition/modules/mockInputValidator";
 import {
   MockInputValidator,
   MockInputValidator__factory as MockInputValidatorFactory,
@@ -17,12 +16,16 @@ export const deployAndSaveMockInputValidator = async (
 ): Promise<{
   inputValidator: MockInputValidator;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
-  const inputValidator = await ignition.deploy(MockInputValidatorModule);
-  await inputValidator.mockInputValidator.waitForDeployment();
+
+  const mockInputValidatorFactory = await ethers.getContractFactory(
+    "MockInputValidator",
+  );
+  const inputValidator = await mockInputValidatorFactory.deploy();
+  await inputValidator.waitForDeployment();
   const inputValidatorAddress =
-    await inputValidator.mockInputValidator.getAddress();
+    await inputValidator.getAddress();
 
   const chain = hre.globalOptions.network;
   const blockNumber = await ethers.provider.getBlockNumber();

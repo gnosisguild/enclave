@@ -6,12 +6,12 @@
 import fs from "fs";
 import path from "path";
 
-const deploymentsFile = path.join("deployed_contracts.json");
+export const deploymentsFile = path.join("deployed_contracts.json");
 
 // Type for deployment arguments
 export interface DeploymentArgs {
   address: string;
-  constructorArgs?: Record<string, string>;
+  constructorArgs?: Record<string, string | string[]>;
   blockNumber?: number | null;
 }
 

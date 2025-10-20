@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import NaiveRegistryFilterModule from "../../ignition/modules/naiveRegistryFilter";
 import {
   NaiveRegistryFilter,
   NaiveRegistryFilter__factory as NaiveRegistryFilterFactory,
@@ -25,7 +24,7 @@ export const deployAndSaveNaiveRegistryFilter = async ({
 }: NaiveRegistryFilterArgs): Promise<{
   naiveRegistryFilter: NaiveRegistryFilter;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = hre.globalOptions.network;
 
@@ -49,27 +48,22 @@ export const deployAndSaveNaiveRegistryFilter = async ({
     return { naiveRegistryFilter: naiveRegistryFilterContract };
   }
 
-  const naiveRegistryFilter = await ignition.deploy(NaiveRegistryFilterModule, {
-    parameters: {
-      NaiveRegistryFilter: {
-        ciphernodeRegistryAddress,
-        owner,
-      },
-    },
-  });
+  const naiveRegistryFilterFactory = await ethers.getContractFactory("NaiveRegistryFilter");
 
-  await naiveRegistryFilter.naiveRegistryFilter.waitForDeployment();
+  const naiveRegistryFilter = await naiveRegistryFilterFactory.deploy(ciphernodeRegistryAddress, owner);
+
+  await naiveRegistryFilter.waitForDeployment();
 
   const naiveRegistryFilterAddress =
-    await naiveRegistryFilter.naiveRegistryFilter.getAddress();
+    await naiveRegistryFilter.getAddress();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
   storeDeploymentArgs(
     {
       constructorArgs: {
-        ciphernodeRegistryAddress: ciphernodeRegistryAddress,
         owner,
+        ciphernodeRegistryAddress: ciphernodeRegistryAddress,
       },
       blockNumber,
       address: naiveRegistryFilterAddress,

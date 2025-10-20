@@ -9,6 +9,7 @@ import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/cipherno
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveNaiveRegistryFilter } from "./deployAndSave/naiveRegistryFilter";
 import { deployMocks } from "./deployMocks";
+import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 
 /**
  * Deploys the Enclave contracts
@@ -34,10 +35,11 @@ export const deployEnclave = async (withMocks?: boolean) => {
 
   console.log("Deploying Enclave");
   const { enclave } = await deployAndSaveEnclave({
-    params: encoded,
+    params: [encoded],
     owner: ownerAddress,
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: addressOne,
+    poseidonT3Address: poseidonT3,
     hre,
   });
 
@@ -47,6 +49,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
     enclaveAddress: enclaveAddress,
     owner: ownerAddress,
+    poseidonT3Address: poseidonT3,
     hre,
   });
 
