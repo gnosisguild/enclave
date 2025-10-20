@@ -145,7 +145,7 @@
     "compile:ts": "tsc",
     "coverage": "pnpm test --coverage",
     "deploy": "hardhat run scripts/run.ts",
-    "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm clean:deployments && pnpm run deploy",
+    "deploy:mocks": "export DEPLOY_MOCKS=true && pnpm run deploy",
     "e3:activate": "hardhat e3:activate",
     "e3:enable": "hardhat e3:enable",
     "ciphernode:add": "hardhat ciphernode:add",
