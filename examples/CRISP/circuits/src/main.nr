@@ -8,11 +8,11 @@ use greco::{Greco, Params};
 use polynomial::Polynomial;
 
 fn main(
-    params: Params<2048, 1>,
-    pk0is: [Polynomial<2048>; 1],
-    pk1is: [Polynomial<2048>; 1],
-    ct0is: [Polynomial<2048>; 1],
-    ct1is: [Polynomial<2048>; 1],
+    params: pub Params<2048, 1>,
+    pk0is: pub [Polynomial<2048>; 1],
+    pk1is: pub [Polynomial<2048>; 1],
+    ct0is: pub [Polynomial<2048>; 1],
+    ct1is: pub [Polynomial<2048>; 1],
     u: Polynomial<2048>,
     e0: Polynomial<2048>,
     e1: Polynomial<2048>,
@@ -22,7 +22,7 @@ fn main(
     p1is: [Polynomial<4095>; 1],
     p2is: [Polynomial<2047>; 1],
 ) {
-    let circuit: Greco<2048, 1, 54, 54, 5, 5, 20, 18, 54, 16, 54> = Greco::new(
+    let circuit: Greco<2048, 1, 54, 54, 5, 5, 20, 20, 54, 16, 54> = Greco::new(
         params,
         pk0is,
         pk1is,
