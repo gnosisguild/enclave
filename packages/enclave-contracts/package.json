@@ -138,10 +138,7 @@
   },
   "scripts": {
     "clean": "rimraf ./artifacts ./cache ./coverage ./types ./dist ./coverage.json",
-    "clean:ignition:deployments:localhost": "rimraf ./ignition/deployments/chain-31337",
-    "clean:ignition:deployments:sepolia": "rimraf ./ignition/deployments/chain-11155111",
-    "clean:deployments:localhost": "hardhat utils:clean-deployments && pnpm clean:ignition:deployments:localhost",
-    "clean:deployments:sepolia": "hardhat utils:clean-deployments --network sepolia && pnpm clean:ignition:deployments:sepolia",
+    "clean:deployments": "hardhat utils:clean-deployments",
     "build": "pnpm compile",
     "compile": "pnpm compile:contracts && pnpm compile:ts",
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
