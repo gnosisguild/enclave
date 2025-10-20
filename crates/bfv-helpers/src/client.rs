@@ -7,16 +7,17 @@
 use crate::build_bfv_params_arc;
 use anyhow::{anyhow, Result};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
+use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use greco::InputValidationVectors;
 use num_bigint::BigInt;
 use num_traits::Num;
 use rand::thread_rng;
 
-/// Encrypt a u64 using BFV homomorphic encryption
+/// Encrypt some data using BFV homomorphic encryption
 ///
 /// # Arguments
-/// * `data` - The value to encrypt (u64)
+/// * `data` - The value to encrypt (Generic type T)
 /// * `public_key` - Serialized BFV public key bytes
 /// # `degree` - Polynomial degree for BFV parameters
 /// # `plaintext_modulus` - Plaintext modulus for BFV parameters
@@ -31,21 +32,23 @@ use rand::thread_rng;
 /// - Plaintext encoding fails  
 /// - Encryption fails
 /// - Input validation vector computation fails
-pub fn bfv_encrypt_u64(
-    data: u64,
+pub fn bfv_encrypt<T>(
+    data: T,
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
     moduli: [u64; 1],
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>>
+where
+    Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
+{
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
 
     let pk = PublicKey::from_bytes(&public_key, &params)
         .map_err(|e| anyhow!("Error deserializing public key:{e}"))?;
 
-    let input = vec![data];
-    let pt = Plaintext::try_encode(&input, Encoding::poly(), &params)
-        .map_err(|e| anyhow!("Error encoding plaintext: {e}"))?;
+    let pt = Plaintext::try_encode(&data, Encoding::poly(), &params)
+        .map_err(|e: FheError| anyhow!("Error encoding plaintext: {e}"))?;
 
     let ct = pk
         .try_encrypt(&pt, &mut thread_rng())
@@ -57,15 +60,15 @@ pub fn bfv_encrypt_u64(
 
 #[derive(Debug, Clone)]
 pub struct VerifiableEncryptionResult {
-    pub encrypted_vote: Vec<u8>,
+    pub encrypted_data: Vec<u8>,
     pub circuit_inputs: String,
 }
 
-/// Verifiably encrypt a u64 using BFV homomorphic encryption and generate circuit inputs
+/// Verifiably encrypt some data using BFV homomorphic encryption and generate circuit inputs
 /// to pass into Greco to prove the validity of the ciphertext
 ///
 /// # Arguments
-/// * `data` - The value to encrypt (u64)
+/// * `data` - The value to encrypt (Generic type T)
 /// * `public_key` - Serialized BFV public key bytes
 /// # `degree` - Polynomial degree for BFV parameters
 /// # `plaintext_modulus` - Plaintext modulus for BFV parameters
@@ -80,26 +83,27 @@ pub struct VerifiableEncryptionResult {
 /// - Plaintext encoding fails  
 /// - Encryption fails
 /// - Input validation vector computation fails
-pub fn bfv_verifiable_encrypt_u64(
-    vote: u64,
+pub fn bfv_verifiable_encrypt<T>(
+    data: T,
     public_key: Vec<u8>,
     degree: usize,
     plaintext_modulus: u64,
     moduli: [u64; 1],
-) -> Result<VerifiableEncryptionResult> {
+) -> Result<VerifiableEncryptionResult>
+where
+    Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
+{
     let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
 
     let pk = PublicKey::from_bytes(&public_key, &params)
         .map_err(|e| anyhow!("Error deserializing public key: {}", e))?;
 
-    let vote_vector = vec![vote];
-
-    let plaintext = Plaintext::try_encode(&vote_vector, Encoding::poly(), &params)
-        .map_err(|e| anyhow!("Error encoding plaintext: {}", e))?;
+    let plaintext = Plaintext::try_encode(&data, Encoding::poly(), &params)
+        .map_err(|e: FheError| anyhow!("Error encoding plaintext: {}", e))?;
 
     let (cipher_text, u_rns, e0_rns, e1_rns) = pk
         .try_encrypt_extended(&plaintext, &mut thread_rng())
-        .map_err(|e| anyhow!("Error encrypting vote: {}", e))?;
+        .map_err(|e| anyhow!("Error encrypting data: {}", e))?;
 
     // Create Greco input validation ZK proof
     let input_val_vectors = InputValidationVectors::compute(
@@ -122,7 +126,7 @@ pub fn bfv_verifiable_encrypt_u64(
     let standard_input_val = input_val_vectors.standard_form(&zkp_modulus);
 
     Ok(VerifiableEncryptionResult {
-        encrypted_vote: cipher_text.to_bytes(),
+        encrypted_data: cipher_text.to_bytes(),
         circuit_inputs: standard_input_val.to_json().to_string(),
     })
 }
@@ -134,7 +138,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bfv_encrypt_u64() {
+    fn test_bfv_encrypt_a64() {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
@@ -144,18 +148,18 @@ mod tests {
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
 
-        let num = 1;
-        let encrypted_vote =
-            bfv_encrypt_u64(num, pk.to_bytes(), degree, plaintext_modulus, moduli).unwrap();
+        let num = [1u64];
+        let encrypted_data =
+            bfv_encrypt(num, pk.to_bytes(), degree, plaintext_modulus, moduli).unwrap();
 
-        let ct = Ciphertext::from_bytes(&encrypted_vote, &params).unwrap();
+        let ct = Ciphertext::from_bytes(&encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
 
-        assert_eq!(pt.value[0], num);
+        assert_eq!(pt.value[0], num[0]);
     }
 
     #[test]
-    fn test_bfv_verifiable_encrypt_u64() {
+    fn test_bfv_encrypt_v64() {
         use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
         use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
 
@@ -165,14 +169,69 @@ mod tests {
         let sk = SecretKey::random(&params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
 
-        let num = 1;
-        let encrypted_vote =
-            bfv_verifiable_encrypt_u64(num, pk.to_bytes(), degree, plaintext_modulus, moduli)
-                .unwrap();
+        let num = vec![1, 2];
+        let encrypted_data = bfv_encrypt(
+            num.clone(),
+            pk.to_bytes(),
+            degree,
+            plaintext_modulus,
+            moduli,
+        )
+        .unwrap();
 
-        let ct = Ciphertext::from_bytes(&encrypted_vote.encrypted_vote, &params).unwrap();
+        let ct = Ciphertext::from_bytes(&encrypted_data, &params).unwrap();
         let pt = sk.try_decrypt(&ct).unwrap();
 
-        assert_eq!(pt.value[0], num);
+        assert_eq!(pt.value[0], num[0]);
+        assert_eq!(pt.value[1], num[1]);
+    }
+
+    #[test]
+    fn test_bfv_verifiable_encrypt_a64() {
+        use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
+        use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
+
+        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+        let mut rng = thread_rng();
+        let sk = SecretKey::random(&params, &mut rng);
+        let pk = PublicKey::new(&sk, &mut rng);
+
+        let num = [1u64];
+        let encrypted_data =
+            bfv_verifiable_encrypt(num, pk.to_bytes(), degree, plaintext_modulus, moduli).unwrap();
+
+        let ct = Ciphertext::from_bytes(&encrypted_data.encrypted_data, &params).unwrap();
+        let pt = sk.try_decrypt(&ct).unwrap();
+
+        assert_eq!(pt.value[0], num[0]);
+    }
+
+    #[test]
+    fn test_bfv_verifiable_encrypt_v64() {
+        use fhe::bfv::{Ciphertext, PublicKey, SecretKey};
+        use fhe_traits::{DeserializeParametrized, FheDecrypter, Serialize};
+
+        let (degree, plaintext_modulus, moduli) = SET_2048_1032193_1;
+        let params = build_bfv_params_arc(degree, plaintext_modulus, &moduli);
+        let mut rng = thread_rng();
+        let sk = SecretKey::random(&params, &mut rng);
+        let pk = PublicKey::new(&sk, &mut rng);
+
+        let num = vec![1, 2];
+        let encrypted_data = bfv_verifiable_encrypt(
+            num.clone(),
+            pk.to_bytes(),
+            degree,
+            plaintext_modulus,
+            moduli,
+        )
+        .unwrap();
+
+        let ct = Ciphertext::from_bytes(&encrypted_data.encrypted_data, &params).unwrap();
+        let pt = sk.try_decrypt(&ct).unwrap();
+
+        assert_eq!(pt.value[0], num[0]);
+        assert_eq!(pt.value[1], num[1]);
     }
 }

@@ -324,6 +324,9 @@ importers:
 
   examples/CRISP/sdk:
     dependencies:
+      '@enclave-e3/sdk':
+        specifier: workspace:*
+        version: link:../../../packages/enclave-sdk
       '@zk-kit/lean-imt':
         specifier: ^2.2.4
         version: 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)

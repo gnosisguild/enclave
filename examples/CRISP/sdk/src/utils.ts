@@ -58,3 +58,16 @@ export const generateMerkleProof = (threshold: number, balance: number, address:
     proof,
   }
 }
+
+/**
+ * Convert a number to its binary representation
+ * @param number The number to convert to binary
+ * @returns The binary representation of the number as a string
+ */
+export const toBinary = (number: bigint): string => {
+  if (number < 0) {
+    throw new Error('Value cannot be negative')
+  }
+
+  return number.toString(2)
+}

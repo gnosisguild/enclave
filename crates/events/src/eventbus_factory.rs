@@ -13,10 +13,10 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use crate::EnclaveEvent;
-use crate::ErrorCollector;
 use crate::ErrorEvent;
 use crate::Event;
 use crate::EventBus;
+use crate::HistoryCollector;
 use crate::Subscribe;
 
 // The singleton factory using once_cell
@@ -60,20 +60,20 @@ impl EventBusFactory {
 
         event_bus
     }
-    pub fn get_error_collector<E: ErrorEvent>(&self) -> Addr<ErrorCollector<E>> {
+    pub fn get_error_collector<E: ErrorEvent>(&self) -> Addr<HistoryCollector<E>> {
         let type_id = TypeId::of::<E>();
         let mut error_collector_cache = self.error_collector_cache.lock().unwrap();
 
         // If we already have this type of ErrorCollector, return it
         if let Some(instance) = error_collector_cache.get(&type_id) {
             return instance
-                .downcast_ref::<Addr<ErrorCollector<E>>>()
+                .downcast_ref::<Addr<HistoryCollector<E>>>()
                 .expect("Type mismatch in EventBusFactory")
                 .clone();
         }
 
         // Create a new EventBus for this event type
-        let error_collector = ErrorCollector::<E>::new().start();
+        let error_collector = HistoryCollector::<E>::new().start();
         // Importantly subscribe to events
         let bus = self.get_event_bus::<E>();
         bus.do_send(Subscribe::new("*", error_collector.clone().recipient()));
@@ -88,6 +88,6 @@ pub fn get_enclave_event_bus() -> Addr<EventBus<EnclaveEvent>> {
     EventBusFactory::instance().get_event_bus()
 }
 
-pub fn get_error_collector() -> Addr<ErrorCollector<EnclaveEvent>> {
+pub fn get_error_collector() -> Addr<HistoryCollector<EnclaveEvent>> {
     EventBusFactory::instance().get_error_collector()
 }
