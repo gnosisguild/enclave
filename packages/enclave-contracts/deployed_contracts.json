@@ -51,58 +51,5 @@
       "blockNumber": 9454625,
       "address": "0x8c0d11f55F0547b750AffD5d30D068b26e260215"
     }
-  },
-  "localhost": {
-    "PoseidonT3": {
-      "blockNumber": 15,
-      "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
-    },
-    "Enclave": {
-      "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "registry": "0x0000000000000000000000000000000000000001",
-        "maxDuration": "2592000",
-        "params": [
-          "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001"
-        ]
-      },
-      "blockNumber": 2,
-      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-    },
-    "CiphernodeRegistryOwnable": {
-      "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "enclaveAddress": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-      },
-      "blockNumber": 3,
-      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-    },
-    "NaiveRegistryFilter": {
-      "constructorArgs": {
-        "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "ciphernodeRegistryAddress": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
-      },
-      "blockNumber": 4,
-      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
-    },
-    "MockComputeProvider": {
-      "blockNumber": 6,
-      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
-    },
-    "MockDecryptionVerifier": {
-      "blockNumber": 7,
-      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
-    },
-    "MockInputValidator": {
-      "blockNumber": 8,
-      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-    },
-    "MockE3Program": {
-      "constructorArgs": {
-        "mockInputValidator": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-      },
-      "blockNumber": 9,
-      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
-    }
   }
 }
