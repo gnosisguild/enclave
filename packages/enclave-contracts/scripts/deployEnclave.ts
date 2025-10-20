@@ -10,7 +10,6 @@ import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveNaiveRegistryFilter } from "./deployAndSave/naiveRegistryFilter";
 import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 import { deployMocks } from "./deployMocks";
-import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 
 /**
  * Deploys the Enclave contracts
