@@ -6,6 +6,7 @@
 
 import { ciphernodeAdd } from "@enclave-e3/contracts/tasks/ciphernode";
 import { cleanDeploymentsTask } from "@enclave-e3/contracts/tasks/utils";
+import dotenv from "dotenv";
 
 import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
 import hardhatIgnitionEthers from "@nomicfoundation/hardhat-ignition-ethers";
@@ -14,12 +15,14 @@ import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mo
 import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
 
 import type { HardhatUserConfig } from "hardhat/config";
-import { configVariable } from "hardhat/config";
-import { ConfigurationVariable } from "hardhat/types/config";
 
-const mnemonic = configVariable("MNEMONIC");
-const privateKey = configVariable("PRIVATE_KEY");
-const infuraApiKey = configVariable("INFURA_API_KEY");
+dotenv.config();
+
+const mnemonic =
+  process.env.MNEMONIC ??
+  "test test test test test test test test test test test junk";
+const privateKey = process.env.PRIVATE_KEY!;
+const rpcUrl = process.env.RPC_URL ?? "http://localhost:8545";
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -36,21 +39,7 @@ const chainIds = {
 };
 
 function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
-  let jsonRpcUrl: string;
-  switch (chain) {
-    case "avalanche":
-      jsonRpcUrl = "https://api.avax.network/ext/bc/C/rpc";
-      break;
-    case "bsc":
-      jsonRpcUrl = "https://bsc-dataseed1.binance.org";
-      break;
-    default:
-      jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
-  }
-
-  let accounts:
-    | [ConfigurationVariable]
-    | { count: number; mnemonic: ConfigurationVariable; path: string };
+  let accounts: [string] | { count: number; mnemonic: string; path: string };
   if (privateKey) {
     accounts = [privateKey];
   } else {
@@ -64,7 +53,7 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
   return {
     accounts,
     chainId: chainIds[chain],
-    url: jsonRpcUrl,
+    url: rpcUrl,
     type: "http" as const,
     chainType: "l1" as const,
     blockExplorers: {

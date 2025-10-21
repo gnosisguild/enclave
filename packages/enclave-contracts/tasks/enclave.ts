@@ -114,7 +114,7 @@ export const requestCommittee = task(
       }
 
       const registryArgs = readDeploymentArgs(
-        "CiphernodeRegistry",
+        "CiphernodeRegistryOwnable",
         hre.globalOptions.network,
       );
 

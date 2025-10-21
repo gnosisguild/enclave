@@ -463,7 +463,7 @@ importers:
         version: 3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       hardhat-gas-reporter:
         specifier: ^2.2.0
-        version: 2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+        version: 2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
@@ -595,6 +595,9 @@ importers:
       '@types/yargs':
         specifier: ^17.0.33
         version: 17.0.33
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       viem:
         specifier: 2.30.6
         version: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
@@ -16561,7 +16564,7 @@ snapshots:
       - debug
       - utf-8-validate
 
-  hardhat-gas-reporter@2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76):
+  hardhat-gas-reporter@2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10):
     dependencies:
       '@ethersproject/abi': 5.8.0
       '@ethersproject/bytes': 5.8.0
@@ -16578,7 +16581,7 @@ snapshots:
       lodash: 4.17.21
       markdown-table: 2.0.0
       sha1: 1.1.1
-      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.22.4)
     transitivePeerDependencies:
       - bufferutil
       - debug
