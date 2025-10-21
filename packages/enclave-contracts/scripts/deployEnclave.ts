@@ -33,6 +33,8 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
+  const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
   console.log("Deploying Enclave");
   const { enclave } = await deployAndSaveEnclave({
     params: [encoded],
