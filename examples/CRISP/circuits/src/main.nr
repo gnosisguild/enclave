@@ -12,7 +12,7 @@ use ecdsa::{address_to_field, derive_address, verify_signature};
 mod merkle_tree;
 use merkle_tree::get_merkle_root;
 mod utils;
-use utils::calculate_indices;
+use utils::check_coefficient_values;
 
 fn main(
     params: pub Params<2048, 1>,
@@ -69,11 +69,7 @@ fn main(
         p2is,
     );
 
-    assert(
-        0
-            == k1.coefficients[2048 - 1]
-                * (params.crypto_params().q_mod_t - k1.coefficients[2048 - 1]),
-    );
+    check_coefficient_values(k1, params.crypto_params().q_mod_t);
 
     circuit.verify_correct_ciphertext_encryption();
 }
