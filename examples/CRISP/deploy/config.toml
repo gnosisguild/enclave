@@ -14,4 +14,4 @@ enclaveAddress = "0xE3000000000000000000000000000000000000E3"
 [profile.custom]
 chainId = 31337
 riscZeroVerifierAddress = "0x0000000000000000000000000000000000000000" # Deployed with the script. Don't set or it will be skipped.
-enclaveAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" # Based on default deployment address using local hardhat node
+enclaveAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" # Based on default deployment address using local anvil node
