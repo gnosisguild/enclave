@@ -13,17 +13,7 @@ use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_events::get_enclave_event_bus;
 use e3_events::{EnclaveEvent, EventBus};
-use e3_evm::{
-    helpers::ProviderConfig, CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
-    EnclaveSolReader, EnclaveSolReaderRepositoryFactory,
-};
-use e3_fhe::ext::FheExtension;
-use e3_keyshare::ext::KeyshareExtension;
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
-use e3_request::E3Router;
-use e3_sortition::CiphernodeSelector;
-use e3_sortition::Sortition;
-use e3_sortition::SortitionRepositoryFactory;
 use rand::SeedableRng;
 use rand_chacha::rand_core::OsRng;
 use std::sync::{Arc, Mutex};
@@ -47,6 +37,7 @@ pub async fn execute(
     CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_address(&address.to_string())
         .with_source_bus(&bus)
+        .with_datastore(store)
         .with_chains(&config.chains())
         .with_contract_enclave_reader()
         .with_contract_registry_filter()

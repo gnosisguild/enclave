@@ -56,7 +56,7 @@ async fn setup_local_ciphernode(
         .with_plaintext_aggregation();
 
     if let Some(data) = data {
-        builder = builder.with_data(data);
+        builder = builder.with_datastore((&data).into());
     }
 
     if logging {
@@ -274,8 +274,9 @@ async fn test_stopped_keyshares_retain_state() -> Result<()> {
         // This is probably overkill but required to ensure that all the data is written
         sleep(Duration::from_secs(1)).await;
 
-        let cn1_dump = cn1.store().send(GetDump).await??;
-        let cn2_dump = cn2.store().send(GetDump).await??;
+        // Unwrap does not matter as we are in a test
+        let cn1_dump = cn1.in_mem_store().unwrap().send(GetDump).await??;
+        let cn2_dump = cn2.in_mem_store().unwrap().send(GetDump).await??;
 
         (
             rng,

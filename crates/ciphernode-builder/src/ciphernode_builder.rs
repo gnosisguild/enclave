@@ -6,10 +6,7 @@
 
 use crate::CiphernodeHandle;
 use actix::{Actor, Addr};
-use alloy::signers::{
-    k256::{ecdsa::SigningKey, Secp256k1},
-    local::LocalSigner,
-};
+use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
 use anyhow::Result;
 use derivative::Derivative;
 use e3_aggregator::ext::{
@@ -54,7 +51,7 @@ pub struct CiphernodeBuilder {
     chains: HashMap<String, ChainConfig>,
     contract_components: ContractComponents,
     multithread_cache: Option<Addr<Multithread>>,
-    data: Option<Addr<InMemStore>>,
+    datastore: Option<DataStore>,
     rng: SharedRng,
     #[derivative(Debug = "ignore")]
     cipher: Arc<Cipher>,
@@ -88,7 +85,7 @@ impl CiphernodeBuilder {
             contract_components: ContractComponents::default(),
             chains: HashMap::new(),
             source_bus: None,
-            data: None,
+            datastore: None,
             threads: None,
             multithread_cache: None,
             rng,
@@ -115,9 +112,9 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Attach an existing data actor to store data
-    pub fn with_data(mut self, data: Addr<InMemStore>) -> Self {
-        self.data = Some(data);
+    /// Attach an existing in mem store to the node
+    pub fn with_datastore(mut self, store: DataStore) -> Self {
+        self.datastore = Some(store);
         self
     }
 
@@ -257,14 +254,11 @@ impl CiphernodeBuilder {
             rand_eth_addr(&self.rng)
         };
 
-        // create data actor for saving data
-        let data_actor = self
-            .data
+        let store = self
+            .datastore
             .clone()
-            .unwrap_or_else(|| InMemStore::new(self.logging).start());
+            .unwrap_or_else(|| (&InMemStore::new(true).start()).into());
 
-        // Sortition
-        let store = DataStore::from(&data_actor);
         let repositories = store.repositories();
         let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
 
@@ -336,7 +330,7 @@ impl CiphernodeBuilder {
         CiphernodeSelector::attach(&local_bus, &sortition, &addr);
 
         // E3 specific setup
-        let mut e3_builder = E3Router::builder(&local_bus, store);
+        let mut e3_builder = E3Router::builder(&local_bus, store.clone());
 
         if self.trbfv {
             let multithread = self.ensure_multithread();
@@ -385,7 +379,7 @@ impl CiphernodeBuilder {
 
         Ok(CiphernodeHandle::new(
             addr.to_owned(),
-            data_actor.clone(),
+            store,
             local_bus,
             history,
             errors,
