@@ -209,8 +209,6 @@ impl CiphernodeBuilder {
     }
 
     pub async fn build(mut self) -> anyhow::Result<CiphernodeHandle> {
-        println!("Building Ciphernode:");
-        println!("{:?}", self);
         // Local bus for ciphernode events can either be forked from a bus or it can be directly
         // attached to a source bus
         let local_bus = match self.source_bus {
@@ -227,7 +225,7 @@ impl CiphernodeBuilder {
             None => Self::create_local_bus(),
         };
 
-        // History collector for taking historical events for analysis
+        // History collector for taking historical events for analysis and testing
         let history = if self.history {
             info!("Setting up history collector");
             Some(EventBus::<EnclaveEvent>::history(&local_bus))
@@ -235,6 +233,7 @@ impl CiphernodeBuilder {
             None
         };
 
+        // Error collector for taking historical events for analysis and testing
         let errors = if self.errors {
             info!("Setting up error collector");
             Some(EventBus::<EnclaveEvent>::error(&local_bus))
@@ -254,7 +253,7 @@ impl CiphernodeBuilder {
         let store = self
             .datastore
             .clone()
-            .unwrap_or_else(|| (&InMemStore::new(true).start()).into());
+            .unwrap_or_else(|| (&InMemStore::new(self.logging).start()).into());
 
         let repositories = store.repositories();
         let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
