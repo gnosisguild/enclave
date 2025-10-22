@@ -40,7 +40,7 @@ pub async fn execute(
         .with_datastore(store)
         .with_chains(&config.chains())
         .with_contract_enclave_reader()
-        .with_contract_registry_filter()
+        .with_contract_ciphernode_registry()
         .build()
         .await?;
 

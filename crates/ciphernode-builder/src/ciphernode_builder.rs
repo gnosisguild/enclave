@@ -48,7 +48,7 @@ pub struct CiphernodeBuilder {
     threshold_plaintext_agg: bool,
     plaintext_agg: bool,
     source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
-    chains: HashMap<String, ChainConfig>,
+    chains: Vec<ChainConfig>,
     contract_components: ContractComponents,
     multithread_cache: Option<Addr<Multithread>>,
     datastore: Option<DataStore>,
@@ -83,7 +83,7 @@ impl CiphernodeBuilder {
             plaintext_agg: false,
             threshold_plaintext_agg: false,
             contract_components: ContractComponents::default(),
-            chains: HashMap::new(),
+            chains: vec![],
             source_bus: None,
             datastore: None,
             threads: None,
@@ -130,13 +130,10 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Use the node configuration on these specific chains
+    /// Use the node configuration on these specific chains. This will overwrite any previously
+    /// given chains.
     pub fn with_chains(mut self, chains: &[ChainConfig]) -> Self {
-        self.chains.extend(
-            chains
-                .iter()
-                .map(|chain| (chain.name.clone(), chain.clone())),
-        );
+        self.chains = chains.to_vec();
         self
     }
 
@@ -262,12 +259,17 @@ impl CiphernodeBuilder {
         let repositories = store.repositories();
         let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
 
+        // Ciphernode Selector
+        CiphernodeSelector::attach(&local_bus, &sortition, &addr);
+
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
+
+        // TODO: gather an async handle from the event readers that closes when they shutdown and
+        // join it with the network manager joinhandle below
         for chain in self
             .chains
             .iter()
-            .map(|(_, chain)| chain)
             .filter(|chain| chain.enabled.unwrap_or(true))
         {
             if self.contract_components.enclave {
@@ -325,9 +327,6 @@ impl CiphernodeBuilder {
                 .await?;
             }
         }
-
-        // Ciphernode Selector
-        CiphernodeSelector::attach(&local_bus, &sortition, &addr);
 
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&local_bus, store.clone());
