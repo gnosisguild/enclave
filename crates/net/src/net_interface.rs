@@ -10,7 +10,7 @@ use crate::{events::NetEvent, Cid};
 use anyhow::Result;
 use e3_events::CorrelationId;
 use e3_utils::ArcBytes;
-use libp2p::kad::{self, GetRecordOk, InboundRequest, PeerRecord, QueryId, QueryResult};
+use libp2p::kad::{self, GetRecordOk, PeerRecord, QueryId, QueryResult};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -22,14 +22,14 @@ use libp2p::{
     Swarm,
 };
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 use std::{hash::DefaultHasher, io::Error, time::Duration};
 use std::{
     hash::{Hash, Hasher},
     time::Instant,
 };
 use tokio::{select, sync::broadcast, sync::mpsc};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, info, trace, warn};
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -100,7 +100,7 @@ impl NetInterface {
         let event_tx = self.event_tx.clone();
         let cmd_tx = self.cmd_tx.clone();
         let cmd_rx = &mut self.cmd_rx;
-        let correlator = Correlator::new();
+        let mut correlator = Correlator::new();
 
         // Subscribe to topic
         self.swarm
@@ -132,38 +132,25 @@ impl NetInterface {
             select! {
                 // Process commands
                 Some(command) = cmd_rx.recv() => {
-                    match command {
-                        NetCommand::GossipPublish { data, topic, correlation_id } => {
-                            match handle_gossip_publish(&mut self.swarm, &event_tx, data, topic, correlation_id) {
-                                Ok(_) => (),
-                                Err(e) => error!("{e}")
-                            }
-                        },
-                        NetCommand::Dial(multi) => {
-                            match handle_dial(&mut self.swarm, &event_tx, multi) {
-
-                                Ok(_) => (),
-                                Err(e) => error!("{e}")
-                            }
-                        },
-                        NetCommand::DhtPutRecord { correlation_id, key, expires, value } => {
-                           match handle_put_record(&mut self.swarm, &event_tx, correlation_id, key, expires, value) {
-                               Ok(_) => (),
-                               Err(e) => error!("{e}")
-                           }
-                        },
-                        NetCommand::DhtGetRecord { correlation_id, key } => {
-                            match handle_get_record(&mut self.swarm, &correlator, correlation_id, key) {
-                                Ok(_) => (),
-                                Err(e) => error!("{e}")
-                            }
-                        }
-
+                    let result = match command {
+                        NetCommand::GossipPublish { data, topic, correlation_id } =>
+                            handle_gossip_publish(&mut self.swarm, &event_tx, data, topic, correlation_id),
+                        NetCommand::Dial(multi) =>
+                            handle_dial(&mut self.swarm, &event_tx, multi),
+                        NetCommand::DhtPutRecord { correlation_id, key, expires, value } =>
+                            handle_put_record(&mut self.swarm, &event_tx, correlation_id, key, expires, value),
+                        NetCommand::DhtGetRecord { correlation_id, key } =>
+                            handle_get_record(&mut self.swarm, &mut correlator, correlation_id, key)
+                    };
+                    match result {
+                        Ok(_) => (),
+                        Err(e) => error!("NetCommand Error: {e}")
                     }
                 }
+
                 // Process events
                 event = self.swarm.select_next_some() =>  {
-                    process_swarm_event(&mut self.swarm, &event_tx, event).await?
+                    process_swarm_event(&mut self.swarm, &event_tx, &mut correlator, event).await?
                 }
             }
         }
@@ -251,7 +238,7 @@ fn handle_put_record(
 
 fn handle_get_record(
     swarm: &mut Swarm<NodeBehaviour>,
-    correlator: &Correlator,
+    correlator: &mut Correlator,
     correlation_id: CorrelationId,
     key: Cid,
 ) -> Result<()> {
@@ -313,8 +300,8 @@ fn create_kad_behaviour(
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
+    correlator: &mut Correlator,
     event: SwarmEvent<NodeBehaviourEvent>,
-    correlator: &Correlator,
 ) -> Result<()> {
     match event {
         SwarmEvent::ConnectionEstablished {
@@ -402,30 +389,23 @@ async fn process_swarm_event(
 
 #[derive(Clone)]
 struct Correlator {
-    inner: Arc<RwLock<HashMap<QueryId, CorrelationId>>>,
+    inner: HashMap<QueryId, CorrelationId>,
 }
 
 impl Correlator {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(RwLock::new(HashMap::new())),
+            inner: HashMap::new(),
         }
     }
 
-    pub fn track(&self, query_id: QueryId, correlation_id: CorrelationId) {
-        let mut guard = self.inner.write().unwrap();
-        guard.insert(query_id, correlation_id);
+    pub fn track(&mut self, query_id: QueryId, correlation_id: CorrelationId) {
+        self.inner.insert(query_id, correlation_id);
     }
 
-    pub fn expire(&self, query_id: &QueryId) -> Result<CorrelationId> {
-        let mut guard = self.inner.write().map_err(|e| anyhow::anyhow!("{e}"))?;
-        guard
+    pub fn expire(&mut self, query_id: &QueryId) -> Result<CorrelationId> {
+        self.inner
             .remove(query_id)
             .ok_or_else(|| anyhow::anyhow!("Failed to correlate query_id={}", query_id))
-    }
-
-    pub fn check(&self, query_id: &QueryId) -> Option<CorrelationId> {
-        let guard = self.inner.read().unwrap();
-        guard.get(query_id).map(|s| s.clone())
     }
 }
