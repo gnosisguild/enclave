@@ -11,6 +11,7 @@ use e3_events::{CorrelationId, DocumentMeta};
 use e3_utils::ArcBytes;
 use libp2p::{
     gossipsub::{MessageId, PublishError},
+    kad::store,
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
@@ -123,6 +124,16 @@ pub enum NetEvent {
     },
 }
 
+impl Into<DhtPutRecordError> for store::Error {
+    fn into(self) -> DhtPutRecordError {
+        match self {
+            Self::MaxRecords => DhtPutRecordError::MaxRecords,
+            Self::ValueTooLarge => DhtPutRecordError::ValueTooLarge,
+            Self::MaxProvidedKeys => DhtPutRecordError::MaxProvidedKeys,
+        }
+    }
+}
+
 impl NetEvent {
     pub fn correlation_id(&self) -> Option<CorrelationId> {
         use NetEvent as N;
@@ -144,7 +155,11 @@ pub enum DhtGetRecordError {
 }
 
 #[derive(Clone, Debug)]
-pub struct DhtPutRecordError(pub String);
+pub enum DhtPutRecordError {
+    MaxRecords,
+    ValueTooLarge,
+    MaxProvidedKeys,
+}
 
 /// Payload that is dispatched as a net -> net gossip event from Kademlia. This event signals that
 /// a document was published and that this node might be interested in it.

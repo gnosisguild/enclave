@@ -238,7 +238,7 @@ fn handle_put_record(
             error!("PUT RECORD ERROR: {:?}", error);
             let err_evt = NetEvent::DhtPutRecordError {
                 correlation_id,
-                error: DhtPutRecordError(error.to_string()),
+                error: error.into(),
             };
 
             event_tx.send(err_evt)?;

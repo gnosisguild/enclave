@@ -590,7 +590,7 @@ mod tests {
             // Report failure
             net_evt_tx.send(NetEvent::DhtPutRecordError {
                 correlation_id,
-                error: DhtPutRecordError::Timeout,
+                error: DhtPutRecordError::ValueTooLarge,
             })?;
         }
 
@@ -599,7 +599,7 @@ mod tests {
         let error: EnclaveError = errors.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
-            "Operation failed after 4 attempts. Last error: DHT put record failed: Timeout"
+            "Operation failed after 4 attempts. Last error: DHT put record failed: ValueTooLarge"
         );
 
         Ok(())
