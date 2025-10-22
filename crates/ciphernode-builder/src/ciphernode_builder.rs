@@ -110,7 +110,7 @@ impl CiphernodeBuilder {
 
     /// Fork all events from the given source bus. Events will be both broadcast on the source bus
     /// and a local bus created for this instance
-    pub fn with_forked_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
+    pub fn testmode_with_forked_bus(mut self, bus: &Addr<EventBus<EnclaveEvent>>) -> Self {
         self.source_bus = Some(BusMode::Forked(bus.clone()));
         self
     }
