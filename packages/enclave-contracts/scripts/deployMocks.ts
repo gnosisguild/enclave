@@ -23,18 +23,22 @@ export interface MockDeployments {
  * @returns The addresses of the mock contracts.
  */
 export const deployMocks = async (): Promise<MockDeployments> => {
+  console.log("Deploying Compute Provider");
   const { computeProvider } = await deployAndSaveMockComputeProvider(hre);
 
   const computeProviderAddress = await computeProvider.getAddress();
 
+  console.log("Deploying Decryption Verifier");
   const { decryptionVerifier } = await deployAndSaveMockDecryptionVerifier(hre);
 
   const decryptionVerifierAddress = await decryptionVerifier.getAddress();
 
+  console.log("Deploying Input Validator");
   const { inputValidator } = await deployAndSaveMockInputValidator(hre);
 
   const inputValidatorAddress = await inputValidator.getAddress();
 
+  console.log("Deploying E3 Program");
   const { e3Program } = await deployAndSaveMockProgram({
     mockInputValidator: inputValidatorAddress,
     hre,

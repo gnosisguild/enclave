@@ -1,144 +1,174 @@
-# Enclave Protocol Template Setup
+# Template
 
-The Enclave Protocol Template provides a complete development environment for building and testing applications with Fully Homomorphic Encryption (FHE). This template enables local deployment and interaction with the Enclave protocol without requiring the core contracts to be copied.
+The Enclave Protocol Template provides a complete development environment for building and testing applications with Fully Homomorphic Encryption (FHE). This template enables local deployment and interaction with the Enclave protocol without requiring the core contracts to be copied and avoiding complexities of specific programs (as zk circuits for CRISP).
 
 ## Prerequisites
 
-Before getting started, ensure your development environment meets the following requirements:
+Before getting started, ensure you have installed:
 
-### Required Software
+- [Rust](https://rust-lang.org/tools/install/)
+- [NodeJS](https://nodejs.org/en/download)
+- [RiscZero](https://dev.risczero.com/api/zkvm/install)
+- [pnpm](https://pnpm.io)
+- [Metamask](https://metamask.io)
 
-**Docker** (tested with version 25.0.6 or later)
-
-```bash
-docker --version
-# Expected output: Docker version 25.0.6, build v25.0.6
-```
-
-**Node.js** (version 22.10.0 or later)
-
-```bash
-node --version
-# Expected output: v22.10.0
-```
-
-**pnpm** (version 10.7.1 or later)
-
-```bash
-pnpm --version
-# Expected output: 10.7.1
-```
-
-**Rust** (version 1.86.0 or later)
-
-```bash
-rustc --version
-# Expected output: rustc 1.86.0 (05f9846f8 2025-03-31)
-```
-
-### Optional Software
-
-**tmux** (recommended for managing multiple processes)
-
-```bash
-tmux -V
-# Expected output: tmux 3.4
-```
-
-### System Requirements
+As system requirements:
 
 - Linux/POSIX environment
 - For Nix users: A Nix flake is included in the generated template
 
-## Installation
+## Quick Start
 
-### 1. Install the Enclave CLI
+### (optional) Install RISC Zero Toolchain
 
-Install the Enclave CLI tool from the official repository:
+Next, install `rzup` for the `cargo-risczero` toolchain.
 
-```bash
-cargo install --git https://github.com/gnosisguild/enclave --branch main e3-cli
+```sh
+# Install rzup
+curl -L https://risczero.com/install | bash
+
+# Install RISC Zero toolchain
+rzup install cargo-risczero
 ```
 
-### 2. Install wasm-pack
+Verify the installation was successful by running:
 
-Install wasm-pack for WebAssembly compilation:
-
-```bash
-cargo install wasm-pack
+```sh
+cargo risczero --version
 ```
 
-## Project Setup
+At this point, you should have all the tools required to develop and deploy an application with
+[RISC Zero](https://www.risczero.com).
 
-### Generate a New Project
+### Install Metamask
 
-Create a new Enclave project using the CLI:
+You can add Metamask as an extension to your browser following the official
+[documentation](https://metamask.io).
+
+### Install the Enclave CLI
+
+The easiest way to install the Enclave CLI is using our installer script:
+`curl -fsSL https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash`
+
+Or if you prefer wget:
+`wget -qO- https://raw.githubusercontent.com/gnosisguild/enclave/main/install | bash`
+
+This script will download and install enclaveup, which is the standalone installer for the Enclave CLI.
+
+Once you have `enclaveup` installed, you can manage your Enclave CLI installation:
 
 ```bash
-enclave init myenclave
-cd ./myenclave
+# Install to ~/.local/bin (default)
+enclaveup install
+
+# Install to /usr/local/bin (requires sudo)
+enclaveup install --system
 ```
 
-Replace `myenclave` with your desired project name.
+Running `enclaveup install` will install the latest version of the Enclave CLI.
 
-### Project Structure
+After installation, verify that the Enclave CLI is working correctly:
 
-The generated project contains the following directories and files:
+`enclave --help`
 
-| File/Directory          | Description                                        |
-| ----------------------- | -------------------------------------------------- |
-| `./client`              | Client-side application                            |
-| `./contracts`           | Your contracts that interact with the protocol     |
-| `./deploy`              | Your deploy scripts                                |
-| `./enclave.config.yaml` | Configuration for the enclave CLI                  |
-| `./program`             | FHE computation code                               |
-| `./scripts`             | Scripts to run the project                         |
-| `./server`              | TypeScript server that coordinates the FHE process |
+You should see the help information for the Enclave CLI.
 
-## Running the Development Environment
+### Create your Project
 
-### Start All Services
+Generate a new E3 program from the default template:
 
-Launch the complete development stack with a single command:
+```bash
+enclave init my-first-e3
+cd my-first-e3
+```
+
+This creates a complete E3 project with:
+
+- **FHE computation logic** (`./program/`)
+- **Smart contracts** (`./contracts/`)
+- **Client application** (`./client/`)
+- **Coordination server** (`./server/`)
+- **Configuration** (`enclave.config.yaml`)
+
+### Compile your E3 Program
+
+First, compile your E3 program to build the Risc0 zkvm image:
+
+```bash
+enclave program compile
+```
+
+This builds the Risc0 zkvm image that will be deployed on the blockchain and used for verification of the final proof.
+
+If you want to avoid the proof or you have trouble with Risc0 zkvm installation, you can run it in dev mode (no proof).
+
+```bash
+enclave program start --dev true
+```
+
+### Start the Development Environment
+
+Launch all services with one command:
 
 ```bash
 pnpm dev:all
 ```
 
-or, if you have `tmux` installed:
+This starts:
 
-```bash
-pnpm dev:all --tmux
-```
+- Local Ethereum network (Hardhat)
+- Deploys all the smart contracts to the local network
+- Multiple ciphernodes for FHE processing
+- TypeScript coordination server
+- FHE program server
+- Frontend client application
 
-### What Happens Next
+**Wait for all services to start** (usually 30-60 seconds).
 
-The command will start multiple processes simultaneously:
+### Access Your Application
 
-1. **Hardhat EVM Node** - Local Ethereum development network
-2. **Enclave Ciphernodes** - Set of nodes for FHE processing
-3. **TypeScript Coordination Server** - Manages FHE process coordination
-4. **FHE Program Server** - Handles encrypted computation execution
-5. **Frontend Application** - User interface for interaction
+1. Open your browser to [http://localhost:3000](http://localhost:3000)
+2. Import the local development private key: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` (DO NOT USE IN PRODUCTION)
+3. Configure MetaMask for local network development:
+   - Network: `http://localhost:8545`
+   - Chain ID: `31337`
+4. Switch to the network.
 
-### Process Management
+### Test the FHE Computation
 
-- **With tmux installed**: Your terminal will split into multiple panes, each showing logs from different services
-- **Without tmux**: You'll see a stream of logs from all processes in a single terminal
+The default template includes a simple addition program that:
 
-### Accessing the Application
+1. **Encrypts** two numbers on the client
+2. **Computes** their sum using FHE (without decrypting)
+3. **Returns** the encrypted result
+4. **Decrypts** and displays the result
 
-1. **Wait for initialization**: Allow all processes to fully start and stabilize
-2. **Open your browser**: Navigate to [http://localhost:3000](http://localhost:3000)
-3. **Configure MetaMask**: Ensure MetaMask is installed and configured with a local network pointing to `http://localhost:8545`
+Try it:
+
+- Input two numbers in the web interface
+- Click "Submit"
+- Watch the encrypted computation happen!
+
+### What Just Happened?
+
+You successfully ran a **Fully Homomorphic Encryption** computation where:
+
+- Your inputs were encrypted before leaving the browser
+- The computation happened on encrypted data
+- The result was computed without exposing your private inputs
+- All coordination was handled by the Enclave protocol
+
+## Manual Start
+
+If you prefer to install the Enclave CLI manually, please visit the dedicated section in the [documentation](https://docs.enclave.gg/installation#manual-installation).
 
 ## Next Steps
 
-Once your development environment is running, you can:
+Now that you have a working E3 program:
 
-- Modify the FHE computation logic in the `./program` directory
-- Update smart contracts in the `./contracts` directory
-- Customize the client application in the `./client` directory
-- Configure deployment scripts in the `./deploy` directory
+1. **Explore the code**: Check out `./program/src/lib.rs` to see the FHE computation
+2. **Modify the computation**: Try changing the addition to multiplication
+3. **Update the UI**: Customize the client in `./client/src/`
+4. **Deploy**: Learn about production deployment
 
-For detailed usage instructions and API documentation, refer to the project's README.md file and the official Enclave Protocol documentation.
+Ready to dive deeper? Continue with our [Hello World Tutorial](https://docs.enclave.gg/hello-world-tutorial) for a step-by-step breakdown of building E3 programs from scratch.
