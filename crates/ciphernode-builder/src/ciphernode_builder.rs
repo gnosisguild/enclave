@@ -54,8 +54,8 @@ pub struct CiphernodeBuilder {
     pubkey_agg: bool,
     rng: SharedRng,
     source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
-    testingmode_errors: bool,
-    testingmode_history: bool,
+    testmode_errors: bool,
+    testmode_history: bool,
     threads: Option<usize>,
     threshold_plaintext_agg: bool,
 }
@@ -86,8 +86,8 @@ impl CiphernodeBuilder {
             address: None,
             keyshare: None,
             logging: false,
-            testingmode_history: false,
-            testingmode_errors: false,
+            testmode_history: false,
+            testmode_errors: false,
             pubkey_agg: false,
             plaintext_agg: false,
             threshold_plaintext_agg: false,
@@ -136,14 +136,14 @@ impl CiphernodeBuilder {
     /// Attach a history collecting test module.
     /// This is conspicuously named so we understand that this should only be used when testing
     pub fn testmode_with_history(mut self) -> Self {
-        self.testingmode_history = true;
+        self.testmode_history = true;
         self
     }
 
     /// Attach an error collecting test module
     /// This is conspicuously named so we understand that this should only be used when testing
     pub fn testmode_with_errors(mut self) -> Self {
-        self.testingmode_errors = true;
+        self.testmode_errors = true;
         self
     }
 
@@ -243,7 +243,7 @@ impl CiphernodeBuilder {
         };
 
         // History collector for taking historical events for analysis and testing
-        let history = if self.testingmode_history {
+        let history = if self.testmode_history {
             info!("Setting up history collector");
             Some(EventBus::<EnclaveEvent>::history(&local_bus))
         } else {
@@ -251,7 +251,7 @@ impl CiphernodeBuilder {
         };
 
         // Error collector for taking historical events for analysis and testing
-        let errors = if self.testingmode_errors {
+        let errors = if self.testmode_errors {
             info!("Setting up error collector");
             Some(EventBus::<EnclaveEvent>::error(&local_bus))
         } else {
