@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Cid(Vec<u8>);
+pub struct Cid(pub Vec<u8>);
 
 impl Cid {
     pub fn from_content(content: &[u8]) -> Self {

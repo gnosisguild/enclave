@@ -4,9 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::dialer::dial_peers;
+use crate::events::{GossipData, NetCommand};
+use crate::{events::NetEvent, Cid};
 use anyhow::Result;
 use e3_events::CorrelationId;
 use e3_utils::ArcBytes;
+use libp2p::kad::{self, GetRecordOk, InboundRequest, PeerRecord, QueryId, QueryResult};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -17,7 +21,8 @@ use libp2p::{
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     Swarm,
 };
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
 use std::{hash::DefaultHasher, io::Error, time::Duration};
 use std::{
     hash::{Hash, Hasher},
@@ -25,10 +30,6 @@ use std::{
 };
 use tokio::{select, sync::broadcast, sync::mpsc};
 use tracing::{debug, error, info, trace, warn};
-
-use crate::events::{GossipData, NetCommand};
-use crate::{dialer::dial_peers, events::DhtPutRecordError};
-use crate::{events::NetEvent, Cid};
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -99,6 +100,7 @@ impl NetInterface {
         let event_tx = self.event_tx.clone();
         let cmd_tx = self.cmd_tx.clone();
         let cmd_rx = &mut self.cmd_rx;
+        let correlator = Correlator::new();
 
         // Subscribe to topic
         self.swarm
@@ -151,7 +153,7 @@ impl NetInterface {
                            }
                         },
                         NetCommand::DhtGetRecord { correlation_id, key } => {
-                            match handle_get_record(&mut self.swarm, &event_tx, correlation_id, key) {
+                            match handle_get_record(&mut self.swarm, &correlator, correlation_id, key) {
                                 Ok(_) => (),
                                 Err(e) => error!("{e}")
                             }
@@ -249,10 +251,22 @@ fn handle_put_record(
 
 fn handle_get_record(
     swarm: &mut Swarm<NodeBehaviour>,
-    event_tx: &broadcast::Sender<NetEvent>,
+    correlator: &Correlator,
     correlation_id: CorrelationId,
     key: Cid,
 ) -> Result<()> {
+    let query_id = swarm
+        .behaviour_mut()
+        .kademlia
+        .get_record(RecordKey::new(&key));
+
+    // So because of the API above the contract here must
+    // be that this will only ever return after some amount of time
+    // I could not see a way to specify your own QueryId so we have to
+    // track with the correlator
+    correlator.track(query_id, correlation_id);
+
+    trace!("get_record sent {:?}", query_id);
     Ok(())
 }
 
@@ -300,6 +314,7 @@ async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
     event: SwarmEvent<NodeBehaviourEvent>,
+    correlator: &Correlator,
 ) -> Result<()> {
     match event {
         SwarmEvent::ConnectionEstablished {
@@ -337,8 +352,34 @@ async fn process_swarm_event(
             warn!("{:#}", anyhow::Error::from(error))
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
-            debug!("Kademlia event: {:?}", e);
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
+            kad::Event::OutboundQueryProgressed {
+                id,
+                result:
+                    QueryResult::GetRecord(Ok(GetRecordOk::FoundRecord(PeerRecord { record, .. }))),
+                ..
+            },
+        )) => {
+            let correlation_id = correlator.expire(&id)?;
+            event_tx.send(NetEvent::DhtGetRecordSucceeded {
+                key: Cid(record.key.to_vec()),
+                correlation_id,
+                value: ArcBytes::from_bytes(record.value),
+            })?;
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
+            kad::Event::OutboundQueryProgressed {
+                result: QueryResult::GetRecord(Err(error)),
+                id,
+                ..
+            },
+        )) => {
+            let correlation_id = correlator.expire(&id)?;
+            event_tx.send(NetEvent::DhtGetRecordError {
+                correlation_id,
+                error,
+            })?;
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
@@ -350,10 +391,41 @@ async fn process_swarm_event(
             let gossip_data = GossipData::from_bytes(&message.data)?;
             event_tx.send(NetEvent::GossipData(gossip_data))?;
         }
+
         SwarmEvent::NewListenAddr { address, .. } => {
             trace!("Local node is listening on {address}");
         }
         _ => {}
     };
     Ok(())
+}
+
+#[derive(Clone)]
+struct Correlator {
+    inner: Arc<RwLock<HashMap<QueryId, CorrelationId>>>,
+}
+
+impl Correlator {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    pub fn track(&self, query_id: QueryId, correlation_id: CorrelationId) {
+        let mut guard = self.inner.write().unwrap();
+        guard.insert(query_id, correlation_id);
+    }
+
+    pub fn expire(&self, query_id: &QueryId) -> Result<CorrelationId> {
+        let mut guard = self.inner.write().map_err(|e| anyhow::anyhow!("{e}"))?;
+        guard
+            .remove(query_id)
+            .ok_or_else(|| anyhow::anyhow!("Failed to correlate query_id={}", query_id))
+    }
+
+    pub fn check(&self, query_id: &QueryId) -> Option<CorrelationId> {
+        let guard = self.inner.read().unwrap();
+        guard.get(query_id).map(|s| s.clone())
+    }
 }
