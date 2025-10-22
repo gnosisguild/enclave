@@ -54,7 +54,7 @@ export const deployCRISPContracts = async () => {
 
     const crispFactory = await ethers.getContractFactory("CRISPProgram");
     const crisp = await crispFactory.deploy(
-        await enclave.getAddress(),
+        enclaveAddress,
         verifier,
         crispInputValidatorFactory.getAddress(),
         honkVerifierAddress,
@@ -66,9 +66,11 @@ export const deployCRISPContracts = async () => {
     storeDeploymentArgs({
         address: crispAddress,
         constructorArgs: {
-            enclave: await enclave.getAddress(),
+            enclave: enclaveAddress,
             verifierAddress: verifier,
             inputValidatorAddress: inputValidator,
+            honkVerifierAddress,
+            imageId: IMAGE_ID
         }
     }, "CRISPProgram", chain);
 
