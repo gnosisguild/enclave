@@ -22,8 +22,16 @@ export const ciphernodeAdd = task(
       const { deployAndSaveCiphernodeRegistryOwnable } = await import(
         "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
       const { ciphernodeRegistry } =
-        await deployAndSaveCiphernodeRegistryOwnable({ hre });
+        await deployAndSaveCiphernodeRegistryOwnable({
+          hre,
+          poseidonT3Address: poseidonT3,
+        });
 
       const tx = await ciphernodeRegistry.addCiphernode(ciphernodeAddress);
       await tx.wait();
@@ -51,8 +59,16 @@ export const ciphernodeRemove = task(
       const { deployAndSaveCiphernodeRegistryOwnable } = await import(
         "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
       const { ciphernodeRegistry } =
-        await deployAndSaveCiphernodeRegistryOwnable({ hre });
+        await deployAndSaveCiphernodeRegistryOwnable({
+          hre,
+          poseidonT3Address: poseidonT3,
+        });
 
       const siblingsArray = siblings.split(",").map((s: string) => BigInt(s));
 

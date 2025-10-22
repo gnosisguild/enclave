@@ -5,14 +5,17 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import type { HardhatUserConfig } from "hardhat/config";
-import { configVariable } from "hardhat/config";
+import dotenv from "dotenv";
+
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 
-import { ConfigurationVariable } from "hardhat/types/config";
+dotenv.config();
 
-const mnemonic = configVariable("MNEMONIC");
-const privateKey = configVariable("PRIVATE_KEY");
-const infuraApiKey = configVariable("INFURA_API_KEY");
+const mnemonic =
+  process.env.MNEMONIC ??
+  "test test test test test test test test test test test junk";
+const privateKey = process.env.PRIVATE_KEY!;
+const rpcUrl = process.env.RPC_URL ?? "http://localhost:8545";
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -29,38 +32,26 @@ const chainIds = {
 };
 
 function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
-  let jsonRpcUrl: string;
-  switch (chain) {
-    case "avalanche":
-      jsonRpcUrl = "https://api.avax.network/ext/bc/C/rpc";
-      break;
-    case "bsc":
-      jsonRpcUrl = "https://bsc-dataseed1.binance.org";
-      break;
-    default:
-      jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
-  }
-
-  let accounts: [ConfigurationVariable] | {  count: number, mnemonic: ConfigurationVariable, path: string } ;
+  let accounts: [string] | { count: number; mnemonic: string; path: string };
   if (privateKey) {
     accounts = [privateKey];
   } else {
-    accounts = { 
+    accounts = {
       count: 10,
-      mnemonic,
+      mnemonic: mnemonic,
       path: "m/44'/60'/0'/0",
-     };
+    };
   }
 
   return {
     accounts,
     chainId: chainIds[chain],
-    url: jsonRpcUrl,
-    type: 'http' as const,
+    url: rpcUrl,
+    type: "http" as const,
     chainType: "l1" as const,
-    blockExporers: {
+    blockExplorers: {
       etherscan: {
-        apiUrl, 
+        apiUrl,
       },
     },
   };
@@ -103,16 +94,14 @@ const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.28",
     settings: {
-      metadata: {
-        // Not including the metadata hash
-        // https://github.com/paulrberg/hardhat-template/issues/31
-        bytecodeHash: "none",
-      },
       // Disable the optimizer when debugging
       // https://hardhat.org/hardhat-network/#solidity-optimizer-support
       optimizer: {
         enabled: true,
         runs: 800,
+      },
+      metadata: {
+        bytecodeHash: "none",
       },
     },
   },

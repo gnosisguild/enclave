@@ -8,6 +8,7 @@ import hre from "hardhat";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveNaiveRegistryFilter } from "./deployAndSave/naiveRegistryFilter";
+import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 import { deployMocks } from "./deployMocks";
 
 /**
@@ -32,12 +33,15 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
+  const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
   console.log("Deploying Enclave");
   const { enclave } = await deployAndSaveEnclave({
-    params: encoded,
+    params: [encoded],
     owner: ownerAddress,
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: addressOne,
+    poseidonT3Address: poseidonT3,
     hre,
   });
 
@@ -47,6 +51,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
     enclaveAddress: enclaveAddress,
     owner: ownerAddress,
+    poseidonT3Address: poseidonT3,
     hre,
   });
 

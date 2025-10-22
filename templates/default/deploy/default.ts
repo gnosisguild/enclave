@@ -19,6 +19,7 @@ export const deployTemplate = async () => {
     throw new Error("Enclave address not found, it must be deployed first");
   }
   const enclave = EnclaveFactory.connect(enclaveAddress, owner);
+  
   const verifier = await ethers.deployContract("MockRISC0Verifier");
   await verifier.waitForDeployment();
 

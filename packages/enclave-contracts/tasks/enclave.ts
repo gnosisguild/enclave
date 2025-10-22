@@ -94,7 +94,15 @@ export const requestCommittee = task(
         "../scripts/deployAndSave/enclave"
       );
 
-      const { enclave } = await deployAndSaveEnclave({ hre });
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
+      const { enclave } = await deployAndSaveEnclave({
+        hre,
+        poseidonT3Address: poseidonT3,
+      });
 
       const enclaveArgs = readDeploymentArgs(
         "Enclave",
@@ -106,7 +114,7 @@ export const requestCommittee = task(
       }
 
       const registryArgs = readDeploymentArgs(
-        "CiphernodeRegistry",
+        "CiphernodeRegistryOwnable",
         hre.globalOptions.network,
       );
 
@@ -204,8 +212,15 @@ export const enableE3 = task("enclave:enableE3", "Enable an E3 program")
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
 
-      const { enclave } = await deployAndSaveEnclave({ hre });
+      const { enclave } = await deployAndSaveEnclave({
+        hre,
+        poseidonT3Address: poseidonT3,
+      });
 
       const tx = await enclave.enableE3Program(e3Address);
 
@@ -290,7 +305,15 @@ export const activateE3 = task("e3:activate", "Activate an E3 program")
         "../scripts/deployAndSave/enclave"
       );
 
-      const { enclave } = await deployAndSaveEnclave({ hre });
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
+      const { enclave } = await deployAndSaveEnclave({
+        hre,
+        poseidonT3Address: poseidonT3,
+      });
 
       const tx = await enclave.activate(e3Id, publicKey);
 
@@ -330,7 +353,15 @@ export const publishInput = task(
         "../scripts/deployAndSave/enclave"
       );
 
-      const { enclave } = await deployAndSaveEnclave({ hre });
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
+      const { enclave } = await deployAndSaveEnclave({
+        hre,
+        poseidonT3Address: poseidonT3,
+      });
 
       let dataToSend = data;
 
@@ -388,8 +419,15 @@ export const publishCiphertext = task(
       const { deployAndSaveEnclave } = await import(
         "../scripts/deployAndSave/enclave"
       );
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
 
-      const { enclave } = await deployAndSaveEnclave({ hre });
+      const { enclave } = await deployAndSaveEnclave({
+        hre,
+        poseidonT3Address: poseidonT3,
+      });
 
       let dataToSend = data;
 
@@ -459,7 +497,15 @@ export const publishPlaintext = task(
         "../scripts/deployAndSave/enclave"
       );
 
-      const { enclave } = await deployAndSaveEnclave({ hre });
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
+      const { enclave } = await deployAndSaveEnclave({
+        hre,
+        poseidonT3Address: poseidonT3,
+      });
 
       let dataToSend = data;
 
