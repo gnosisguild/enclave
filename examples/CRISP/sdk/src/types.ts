@@ -86,3 +86,37 @@ export interface IVote {
    */
   no: bigint
 }
+
+/**
+ * The inputs required for the CRISP circuit
+ */
+export interface CRISPCircuitInputs {
+  pk0is: string[][]
+  pk1is: string[][]
+  ct0is: string[][]
+  ct1is: string[][]
+  u: string[]
+  e0: string[]
+  e1: string[]
+  k1: string[]
+  r1is: string[][]
+  r2is: string[][]
+  p1is: string[][]
+  p2is: string[][]
+  public_key_x: string[]
+  public_key_y: string[]
+  signature: string[]
+  hashed_message: string[]
+  balance: string
+  merkle_proof_length: string
+  merkle_proof_indices: string[]
+  merkle_proof_siblings: string[]
+}
+
+/**
+ * The result of encrypting a vote and generating CRISP circuit inputs
+ */
+export interface CRISPVoteAndInputs {
+  encryptedVote: Uint8Array
+  circuitInputs: CRISPCircuitInputs
+}
