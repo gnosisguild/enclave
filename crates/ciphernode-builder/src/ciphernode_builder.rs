@@ -38,23 +38,23 @@ use tracing::info;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CiphernodeBuilder {
-    keyshare: Option<KeyshareKind>,
     address: Option<String>,
-    history: bool,
-    logging: bool,
-    errors: bool,
-    pubkey_agg: bool,
-    threads: Option<usize>,
-    threshold_plaintext_agg: bool,
-    plaintext_agg: bool,
-    source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
     chains: Vec<ChainConfig>,
-    contract_components: ContractComponents,
-    multithread_cache: Option<Addr<Multithread>>,
-    datastore: Option<DataStore>,
-    rng: SharedRng,
     #[derivative(Debug = "ignore")]
     cipher: Arc<Cipher>,
+    contract_components: ContractComponents,
+    datastore: Option<DataStore>,
+    keyshare: Option<KeyshareKind>,
+    logging: bool,
+    multithread_cache: Option<Addr<Multithread>>,
+    plaintext_agg: bool,
+    pubkey_agg: bool,
+    rng: SharedRng,
+    source_bus: Option<BusMode<Addr<EventBus<EnclaveEvent>>>>,
+    testingmode_errors: bool,
+    testingmode_history: bool,
+    threads: Option<usize>,
+    threshold_plaintext_agg: bool,
 }
 
 #[derive(Default, Debug)]
@@ -83,8 +83,8 @@ impl CiphernodeBuilder {
             address: None,
             keyshare: None,
             logging: false,
-            history: false,
-            errors: false,
+            testingmode_history: false,
+            testingmode_errors: false,
             pubkey_agg: false,
             plaintext_agg: false,
             threshold_plaintext_agg: false,
@@ -132,13 +132,13 @@ impl CiphernodeBuilder {
 
     /// Attach a history collecting test module
     pub fn with_history(mut self) -> Self {
-        self.history = true;
+        self.testingmode_history = true;
         self
     }
 
     /// Attach an error collecting test module
     pub fn with_errors(mut self) -> Self {
-        self.errors = true;
+        self.testingmode_errors = true;
         self
     }
 
@@ -238,7 +238,7 @@ impl CiphernodeBuilder {
         };
 
         // History collector for taking historical events for analysis and testing
-        let history = if self.history {
+        let history = if self.testingmode_history {
             info!("Setting up history collector");
             Some(EventBus::<EnclaveEvent>::history(&local_bus))
         } else {
@@ -246,7 +246,7 @@ impl CiphernodeBuilder {
         };
 
         // Error collector for taking historical events for analysis and testing
-        let errors = if self.errors {
+        let errors = if self.testingmode_errors {
             info!("Setting up error collector");
             Some(EventBus::<EnclaveEvent>::error(&local_bus))
         } else {

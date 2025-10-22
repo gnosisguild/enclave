@@ -52,6 +52,7 @@ pub async fn execute(
     )
     .await?;
 
+    // These are here purely for our integration test so leaving out of the builder
     if let Some(path) = pubkey_write_path {
         PublicKeyWriter::attach(&path, bus.clone());
     }
