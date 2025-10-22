@@ -84,21 +84,21 @@ impl CiphernodeBuilder {
     pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
             address: None,
+            chains: vec![],
+            cipher,
+            contract_components: ContractComponents::default(),
+            datastore: None,
             keyshare: None,
             logging: false,
-            testmode_history: false,
-            testmode_errors: false,
-            pubkey_agg: false,
-            plaintext_agg: false,
-            threshold_plaintext_agg: false,
-            contract_components: ContractComponents::default(),
-            chains: vec![],
-            source_bus: None,
-            datastore: None,
-            threads: None,
             multithread_cache: None,
+            plaintext_agg: false,
+            pubkey_agg: false,
             rng,
-            cipher,
+            source_bus: None,
+            testmode_errors: false,
+            testmode_history: false,
+            threads: None,
+            threshold_plaintext_agg: false,
         }
     }
 
