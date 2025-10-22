@@ -8,6 +8,7 @@ import hardhatIgnitionEthers from "@nomicfoundation/hardhat-ignition-ethers";
 import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 import dotenv from "dotenv";
 import type { HardhatUserConfig } from "hardhat/config";
 
@@ -82,6 +83,7 @@ const config: HardhatUserConfig = {
     hardhatNetworkHelpers,
     hardhatIgnitionEthers,
     hardhatEthersChaiMatchers,
+    hardhatVerify,
   ],
   tasks: [
     ciphernodeAdd,
@@ -132,6 +134,14 @@ const config: HardhatUserConfig = {
     sepolia: getChainConfig("sepolia", process.env.ETHERSCAN_API_KEY || ""),
     goerli: getChainConfig("goerli", process.env.ETHERSCAN_API_KEY || ""),
   },
+  verify: {
+    etherscan: {
+      apiKey: process.env.ETHERSCAN_API_KEY || "",
+    },
+    blockscout: {
+      enabled: false,
+    },
+  },
   paths: {
     artifacts: "./artifacts",
     cache: "./cache",
@@ -153,7 +163,6 @@ const config: HardhatUserConfig = {
             runs: 800,
           },
           metadata: {
-            // Make builds more deterministic
             bytecodeHash: "none",
           },
         },

@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import MockComputeProviderModule from "../../ignition/modules/mockComputeProvider";
 import {
   MockComputeProvider,
   MockComputeProvider__factory as MockComputeProviderFactory,
@@ -17,14 +16,16 @@ export const deployAndSaveMockComputeProvider = async (
 ): Promise<{
   computeProvider: MockComputeProvider;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
 
-  const computeProvider = await ignition.deploy(MockComputeProviderModule);
+  const computeProviderFactory = await ethers.getContractFactory(
+    "MockComputeProvider",
+  );
+  const computeProvider = await computeProviderFactory.deploy();
 
-  await computeProvider.mockComputeProvider.waitForDeployment();
+  await computeProvider.waitForDeployment();
 
-  const computeProviderAddress =
-    await computeProvider.mockComputeProvider.getAddress();
+  const computeProviderAddress = await computeProvider.getAddress();
 
   const [signer] = await ethers.getSigners();
   const chain = hre.globalOptions.network;

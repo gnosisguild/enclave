@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import MockE3ProgramModule from "../../ignition/modules/mockE3Program";
 import {
   MockE3Program,
   MockE3Program__factory as MockE3ProgramFactory,
@@ -23,7 +22,7 @@ export const deployAndSaveMockProgram = async ({
 }: MockProgramArgs): Promise<{
   e3Program: MockE3Program;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
@@ -39,17 +38,12 @@ export const deployAndSaveMockProgram = async ({
     return { e3Program: e3ProgramContract };
   }
 
-  const e3Program = await ignition.deploy(MockE3ProgramModule, {
-    parameters: {
-      MockE3Program: {
-        mockInputValidator,
-      },
-    },
-  });
+  const e3ProgramFactory = await ethers.getContractFactory("MockE3Program");
+  const e3Program = await e3ProgramFactory.deploy(mockInputValidator);
 
-  await e3Program.mockE3Program.waitForDeployment();
+  await e3Program.waitForDeployment();
 
-  const e3ProgramAddress = await e3Program.mockE3Program.getAddress();
+  const e3ProgramAddress = await e3Program.getAddress();
   const blockNumber = await ethers.provider.getBlockNumber();
 
   storeDeploymentArgs(

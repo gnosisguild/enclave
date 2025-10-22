@@ -21,7 +21,7 @@ import {
 import { hexToBytes } from "viem";
 import assert from "assert";
 
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it } from "vitest";
 
 export function getContractAddresses() {
   return {

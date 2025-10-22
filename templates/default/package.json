@@ -6,8 +6,7 @@
   "scripts": {
     "ciphernode:add": "hardhat run scripts/ciphernode-add.ts -- ",
     "compile": "hardhat compile",
-    "clean:ignition:deployments": "rm -rf ./ignition/deployments/chain-31337",
-    "clean:deployments": "hardhat utils:clean-deployments && pnpm clean:ignition:deployments",
+    "clean:deployments": "hardhat utils:clean-deployments",
     "deploy": "pnpm clean:deployments && hardhat run scripts/deploy-local.ts --network localhost",
     "deploy:dev": "hardhat run scripts/deploy-local.ts",
     "dev:all": "./scripts/dev_all.sh",
@@ -24,6 +23,7 @@
     "@enclave-e3/contracts": "workspace:*",
     "@enclave-e3/sdk": "workspace:*",
     "@types/yargs": "^17.0.33",
+    "dotenv": "^16.4.5",
     "viem": "2.38.1",
     "yargs": "^18.0.0"
   },

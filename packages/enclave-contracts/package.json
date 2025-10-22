@@ -81,7 +81,7 @@
     "@nomicfoundation/hardhat-network-helpers": "3",
     "@nomicfoundation/hardhat-toolbox-mocha-ethers": "3.0.0",
     "@nomicfoundation/hardhat-typechain": "3",
-    "@nomicfoundation/hardhat-verify": "3",
+    "@nomicfoundation/hardhat-verify": "^3.0.1",
     "@openzeppelin/contracts": "^5.0.2",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@typechain/hardhat": "^9.1.0",
@@ -138,8 +138,7 @@
   },
   "scripts": {
     "clean": "rimraf ./artifacts ./cache ./coverage ./types ./dist ./coverage.json",
-    "clean:ignition:deployments": "rimraf ./ignition/deployments/chain-31337",
-    "clean:deployments": "hardhat utils:clean-deployments && pnpm clean:ignition:deployments",
+    "clean:deployments": "hardhat utils:clean-deployments",
     "build": "pnpm compile",
     "compile": "pnpm compile:contracts && pnpm compile:ts",
     "compile:contracts": "cross-env TS_NODE_TRANSPILE_ONLY=true hardhat compile",
@@ -164,7 +163,8 @@
     "test:enclave": "pnpm run test test/Enclave.spec.ts",
     "test:ciphernodeRegistry": "pnpm run test test/CiphernodeRegistry/CiphernodeRegistryOwnable.spec.ts",
     "prerelease": "pnpm clean && pnpm compile && pnpm typechain",
-    "release": "pnpm publish"
+    "release": "pnpm publish",
+    "verify:contracts": "hardhat run scripts/runVerification.ts"
   },
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
