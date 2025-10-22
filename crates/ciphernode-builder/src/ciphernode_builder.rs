@@ -38,7 +38,7 @@ use tracing::info;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CiphernodeBuilder {
-    trbfv: bool,
+    keyshare: Option<KeyshareKind>,
     address: Option<String>,
     history: bool,
     logging: bool,
@@ -71,11 +71,17 @@ pub enum BusMode<T> {
     Source(T),
 }
 
+#[derive(Clone, Debug)]
+pub enum KeyshareKind {
+    Threshold,
+    NonThreshold, // Soft Deprecated
+}
+
 impl CiphernodeBuilder {
     pub fn new(rng: SharedRng, cipher: Arc<Cipher>) -> Self {
         Self {
             address: None,
-            trbfv: false,
+            keyshare: None,
             logging: false,
             history: false,
             errors: false,
@@ -108,7 +114,13 @@ impl CiphernodeBuilder {
 
     /// Use the TrBFV feature
     pub fn with_trbfv(mut self) -> Self {
-        self.trbfv = true;
+        self.keyshare = Some(KeyshareKind::Threshold);
+        self
+    }
+
+    /// Use the Deprecated Keyshare feature
+    pub fn with_keyshare(mut self) -> Self {
+        self.keyshare = Some(KeyshareKind::NonThreshold);
         self
     }
 
@@ -330,7 +342,7 @@ impl CiphernodeBuilder {
         // E3 specific setup
         let mut e3_builder = E3Router::builder(&local_bus, store.clone());
 
-        if self.trbfv {
+        if let Some(KeyshareKind::Threshold) = self.keyshare {
             let multithread = self.ensure_multithread();
             info!("Setting up ThresholdKeyshareExtension");
             e3_builder = e3_builder.with(ThresholdKeyshareExtension::create(
@@ -341,7 +353,10 @@ impl CiphernodeBuilder {
             ))
         }
 
-        if !self.trbfv || self.pubkey_agg || self.plaintext_agg {
+        if matches!(self.keyshare, Some(KeyshareKind::NonThreshold))
+            || self.pubkey_agg
+            || self.plaintext_agg
+        {
             info!("Setting up FheExtension");
             e3_builder = e3_builder.with(FheExtension::create(&local_bus, &self.rng))
         }
@@ -368,7 +383,7 @@ impl CiphernodeBuilder {
             ))
         }
 
-        if !self.trbfv {
+        if matches!(self.keyshare, Some(KeyshareKind::NonThreshold)) {
             info!("Setting up KeyshareExtension (legacy)!");
             e3_builder = e3_builder.with(KeyshareExtension::create(&local_bus, &addr, &self.cipher))
         }

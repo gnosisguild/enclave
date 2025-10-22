@@ -6,21 +6,12 @@
 
 use actix::Addr;
 use anyhow::Result;
-use e3_aggregator::ext::{PlaintextAggregatorExtension, PublicKeyAggregatorExtension};
+use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
 use e3_data::RepositoriesFactory;
 use e3_events::{get_enclave_event_bus, EnclaveEvent, EventBus};
-use e3_evm::{
-    helpers::{load_signer_from_repository, ProviderConfig},
-    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
-};
-use e3_fhe::ext::FheExtension;
 use e3_net::{NetEventTranslator, NetRepositoryFactory};
-use e3_request::E3Router;
-use e3_sortition::Sortition;
-use e3_sortition::SortitionRepositoryFactory;
 use e3_test_helpers::{PlaintextWriter, PublicKeyWriter};
 use rand::SeedableRng;
 use rand_chacha::{rand_core::OsRng, ChaCha20Rng};
@@ -41,51 +32,14 @@ pub async fn execute(
     let rng = Arc::new(Mutex::new(ChaCha20Rng::from_rng(OsRng)?));
     let store = setup_datastore(config, &bus)?;
     let repositories = store.repositories();
-    let sortition = Sortition::attach(&bus, repositories.sortition()).await?;
     let cipher = Arc::new(Cipher::from_file(config.key_file()).await?);
-    let signer = load_signer_from_repository(repositories.eth_private_key(), &cipher).await?;
 
-    for chain in config
-        .chains()
-        .iter()
-        .filter(|chain| chain.enabled.unwrap_or(true))
-    {
-        let rpc_url = chain.rpc_url()?;
-        let provider_config = ProviderConfig::new(rpc_url, chain.rpc_auth.clone());
-        let read_provider = provider_config.create_readonly_provider().await?;
-        let write_provider = provider_config.create_signer_provider(&signer).await?;
-
-        EnclaveSol::attach(
-            &bus,
-            read_provider.clone(),
-            write_provider.clone(),
-            &chain.contracts.enclave.address(),
-            &repositories.enclave_sol_reader(read_provider.chain_id()),
-            chain.contracts.enclave.deploy_block(),
-            chain.rpc_url.clone(),
-        )
-        .await?;
-        RegistryFilterSol::attach(
-            &bus,
-            write_provider.clone(),
-            &chain.contracts.filter_registry.address(),
-        )
-        .await?;
-        CiphernodeRegistrySol::attach(
-            &bus,
-            read_provider.clone(),
-            &chain.contracts.ciphernode_registry.address(),
-            &repositories.ciphernode_registry_reader(read_provider.chain_id()),
-            chain.contracts.ciphernode_registry.deploy_block(),
-            chain.rpc_url.clone(),
-        )
-        .await?;
-    }
-
-    E3Router::builder(&bus, store)
-        .with(FheExtension::create(&bus, &rng))
-        .with(PublicKeyAggregatorExtension::create(&bus, &sortition))
-        .with(PlaintextAggregatorExtension::create(&bus, &sortition))
+    CiphernodeBuilder::new(rng.clone(), cipher.clone())
+        .with_source_bus(&bus)
+        .with_datastore(store)
+        .with_chains(&config.chains())
+        .with_contract_enclave_full()
+        .with_contract_ciphernode_registry()
         .build()
         .await?;
 

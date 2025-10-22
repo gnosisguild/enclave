@@ -36,6 +36,7 @@ pub async fn execute(
 
     CiphernodeBuilder::new(rng.clone(), cipher.clone())
         .with_address(&address.to_string())
+        .with_keyshare()
         .with_source_bus(&bus)
         .with_datastore(store)
         .with_chains(&config.chains())
