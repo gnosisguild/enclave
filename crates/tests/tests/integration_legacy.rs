@@ -51,8 +51,8 @@ async fn setup_local_ciphernode(
         .with_keyshare()
         .with_address(addr)
         .with_forked_bus(bus)
-        .with_history()
-        .with_errors()
+        .testmode_with_history()
+        .testmode_with_errors()
         .with_pubkey_aggregation()
         .with_plaintext_aggregation();
 

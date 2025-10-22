@@ -133,14 +133,16 @@ impl CiphernodeBuilder {
         self
     }
 
-    /// Attach a history collecting test module
-    pub fn with_history(mut self) -> Self {
+    /// Attach a history collecting test module.
+    /// This is conspicuously named so we understand that this should only be used when testing
+    pub fn testmode_with_history(mut self) -> Self {
         self.testingmode_history = true;
         self
     }
 
     /// Attach an error collecting test module
-    pub fn with_errors(mut self) -> Self {
+    /// This is conspicuously named so we understand that this should only be used when testing
+    pub fn testmode_with_errors(mut self) -> Self {
         self.testingmode_errors = true;
         self
     }
