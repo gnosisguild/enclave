@@ -14,6 +14,7 @@
     "compile": "pnpm evm:build && pnpm sdk:build && pnpm react:build && pnpm ciphernode:build && ./scripts/compile-circuits.sh",
     "lint": "pnpm evm:lint && pnpm ciphernode:lint && ./scripts/lint-circuits.sh",
     "check:license": "./scripts/check-license-headers.sh",
+    "check:pnpm": "./scripts/check-pnpm.sh",
     "test": "pnpm evm:test && pnpm ciphernode:test && pnpm sdk:test && ./scripts/test-circuits.sh",
     "test:integration": "cd ./tests/integration && ./test.sh",
     "coverage": "pnpm evm:coverage",
