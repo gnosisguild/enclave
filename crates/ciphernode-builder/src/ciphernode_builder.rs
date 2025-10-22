@@ -122,6 +122,7 @@ impl CiphernodeBuilder {
     }
 
     /// Use the Deprecated Keyshare feature
+    #[deprecated = "in future versions we will migrate to with_trbfv()"]
     pub fn with_keyshare(mut self) -> Self {
         self.keyshare = Some(KeyshareKind::NonThreshold);
         self
