@@ -36,6 +36,7 @@ export type {
   RegistryEventData,
   ProtocolParams,
   VerifiableEncryptionResult,
+  EncryptedValueAndPublicInputs,
 } from "./types";
 
 // enums and constants
@@ -70,4 +71,4 @@ export {
   type ComputeProviderParams,
 } from "./utils";
 
-export { generateProof } from "./greco";
+export { generateProof, type Polynomial, convertToPolynomial, convertToPolynomialArray } from "./greco";
