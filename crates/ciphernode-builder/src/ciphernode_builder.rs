@@ -35,6 +35,9 @@ use std::{collections::HashMap, sync::Arc};
 use tracing::info;
 
 /// Build a ciphernode configuration.
+// NOTE: We could use a typestate pattern here to separate production and testing methods. I hummed
+// and hawed about it for quite a while and in the end felt it was too complex while we dont know
+// the exact configurations we will use yet
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CiphernodeBuilder {
