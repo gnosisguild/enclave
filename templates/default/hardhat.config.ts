@@ -137,7 +137,6 @@ const config: HardhatUserConfig = {
             runs: 800,
           },
           metadata: {
-            // Make builds more deterministic
             bytecodeHash: "none",
           },
         },
