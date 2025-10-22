@@ -37,3 +37,9 @@ impl DerefMut for Cid {
         &mut self.0
     }
 }
+
+impl AsRef<[u8]> for Cid {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}

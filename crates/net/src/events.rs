@@ -144,10 +144,7 @@ pub enum DhtGetRecordError {
 }
 
 #[derive(Clone, Debug)]
-pub enum DhtPutRecordError {
-    QuorumFailed,
-    Timeout,
-}
+pub struct DhtPutRecordError(pub String);
 
 /// Payload that is dispatched as a net -> net gossip event from Kademlia. This event signals that
 /// a document was published and that this node might be interested in it.

@@ -5,25 +5,30 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use anyhow::Result;
+use e3_events::CorrelationId;
+use e3_utils::ArcBytes;
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
     gossipsub,
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
-    kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
-    swarm::{NetworkBehaviour, SwarmEvent},
+    kad::{store::MemoryStore, Behaviour as KademliaBehaviour, Quorum, Record, RecordKey},
+    swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     Swarm,
 };
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::{hash::DefaultHasher, io::Error, time::Duration};
+use std::{
+    hash::{Hash, Hasher},
+    time::Instant,
+};
 use tokio::{select, sync::broadcast, sync::mpsc};
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
-use crate::dialer::dial_peers;
-use crate::events::NetEvent;
 use crate::events::{GossipData, NetCommand};
+use crate::{dialer::dial_peers, events::DhtPutRecordError};
+use crate::{events::NetEvent, Cid};
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -123,35 +128,34 @@ impl NetInterface {
 
         loop {
             select! {
-                 // Process commands
+                // Process commands
                 Some(command) = cmd_rx.recv() => {
                     match command {
                         NetCommand::GossipPublish { data, topic, correlation_id } => {
-                            // let serialized = data.to_bytes()
-                            let gossipsub_behaviour = &mut self.swarm.behaviour_mut().gossipsub;
-                            match gossipsub_behaviour
-                                .publish(gossipsub::IdentTopic::new(topic), data.to_bytes()?) {
-                                Ok(message_id) => {
-                                    event_tx.send(NetEvent::GossipPublished { correlation_id, message_id })?;
-                                },
-                                Err(e) => {
-                                    warn!(error=?e, "Could not publish to swarm. Retrying...");
-                                    event_tx.send(NetEvent::GossipPublishError { correlation_id, error: Arc::new(e) })?;
-                                }
+                            match handle_gossip_publish(&mut self.swarm, &event_tx, data, topic, correlation_id) {
+                                Ok(_) => (),
+                                Err(e) => error!("{e}")
                             }
                         },
                         NetCommand::Dial(multi) => {
-                            trace!("DIAL: {:?}", multi);
-                            match self.swarm.dial(multi) {
-                                Ok(v) => trace!("Dial returned {:?}", v),
-                                Err(error) => {
-                                    warn!("Dialing error! {}", error);
-                                    event_tx.send(NetEvent::DialError { error: error.into() })?;
-                                }
+                            match handle_dial(&mut self.swarm, &event_tx, multi) {
+
+                                Ok(_) => (),
+                                Err(e) => error!("{e}")
                             }
                         },
-                        NetCommand::DhtPutRecord { .. } => todo!(),
-                        NetCommand::DhtGetRecord { .. } => todo!(),
+                        NetCommand::DhtPutRecord { correlation_id, key, expires, value } => {
+                           match handle_put_record(&mut self.swarm, &event_tx, correlation_id, key, expires, value) {
+                               Ok(_) => (),
+                               Err(e) => error!("{e}")
+                           }
+                        },
+                        NetCommand::DhtGetRecord { correlation_id, key } => {
+                            match handle_get_record(&mut self.swarm, &event_tx, correlation_id, key) {
+                                Ok(_) => (),
+                                Err(e) => error!("{e}")
+                            }
+                        }
 
                     }
                 }
@@ -162,6 +166,94 @@ impl NetInterface {
             }
         }
     }
+}
+
+fn handle_gossip_publish(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    data: GossipData,
+    topic: String,
+    correlation_id: CorrelationId,
+) -> Result<()> {
+    let gossipsub_behaviour = &mut swarm.behaviour_mut().gossipsub;
+    match gossipsub_behaviour.publish(gossipsub::IdentTopic::new(topic), data.to_bytes()?) {
+        Ok(message_id) => {
+            event_tx.send(NetEvent::GossipPublished {
+                correlation_id,
+                message_id,
+            })?;
+        }
+        Err(e) => {
+            warn!(error=?e, "Could not publish to swarm. Retrying...");
+            event_tx.send(NetEvent::GossipPublishError {
+                correlation_id,
+                error: Arc::new(e),
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn handle_dial(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    dial_opts: DialOpts,
+) -> Result<()> {
+    trace!("DIAL: {:?}", dial_opts);
+    match swarm.dial(dial_opts) {
+        Ok(v) => trace!("Dial returned {:?}", v),
+        Err(error) => {
+            warn!("Dialing error! {}", error);
+            event_tx.send(NetEvent::DialError {
+                error: error.into(),
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn handle_put_record(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    correlation_id: CorrelationId,
+    key: Cid,
+    expires: Option<Instant>,
+    value: ArcBytes,
+) -> Result<()> {
+    trace!("DHT PUT RECORD");
+    let record = Record {
+        key: RecordKey::new(&key),
+        value: value.extract_bytes(),
+        publisher: None, // Will be set automatically to local peer ID
+        expires,
+    };
+
+    match swarm
+        .behaviour_mut()
+        .kademlia
+        .put_record(record, Quorum::One)
+    {
+        Ok(r) => trace!("PUT RECORD OK {:?}", r),
+        Err(error) => {
+            error!("PUT RECORD ERROR: {:?}", error);
+            let err_evt = NetEvent::DhtPutRecordError {
+                correlation_id,
+                error: DhtPutRecordError(error.to_string()),
+            };
+
+            event_tx.send(err_evt)?;
+        }
+    };
+    Ok(())
+}
+
+fn handle_get_record(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    correlation_id: CorrelationId,
+    key: Cid,
+) -> Result<()> {
+    Ok(())
 }
 
 /// Create the libp2p behaviour
