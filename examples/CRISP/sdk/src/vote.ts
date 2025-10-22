@@ -4,9 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ProtocolParams } from '@enclave-e3/sdk'
-import { IVote, VotingMode } from './types'
+import { ProtocolParams, EnclaveSDK, FheProtocol } from '@enclave-e3/sdk'
+import { type CRISPVoteAndInputs, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
+import { MAXIMUM_VOTE_VALUE } from './constants'
 
 /**
  * This utility function calculates the first valid index for vote options
@@ -134,5 +135,53 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
       if (vote.yes > votingPower || vote.no > votingPower) {
         throw new Error('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
       }
+
+      if (vote.yes > MAXIMUM_VOTE_VALUE || vote.no > MAXIMUM_VOTE_VALUE) {
+        throw new Error('Invalid vote for GOVERNANCE mode: vote exceeds maximum allowed value')
+      }
+  }
+}
+
+/**
+ * This is a wrapper around enclave-e3/sdk encryption functions as CRISP circuit will require some more
+ * input values which generic Greco do not need.
+ * @param encodedVote The encoded vote as string array
+ * @param publicKey The public key to use for encryption
+ */
+export const encryptVoteAndGenerateCRISPInputs = async (encodedVote: string[], publicKey: Uint8Array): Promise<CRISPVoteAndInputs> => {
+  // @todo The SDK need refactoring
+  const enclaveSDK = EnclaveSDK.create({
+    protocol: FheProtocol.BFV,
+    chainId: 31337,
+    contracts: {
+      enclave: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
+      ciphernodeRegistry: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
+    },
+    // local node
+    rpcUrl: 'http://localhost:8545',
+    // default Anvil private key
+    privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+  })
+
+  // Convert string[] to BigUint64Array
+  const bigUint64Array = new BigUint64Array(encodedVote.map((str) => BigInt(str)))
+
+  const encryptedData = await enclaveSDK.encryptVectorAndGenInputs(bigUint64Array, publicKey)
+
+  // the rest of the public and private inputs will need to be generated before calling the circuit to generate the CRISP proof
+  return {
+    encryptedVote: encryptedData.encryptedData,
+    circuitInputs: {
+      ...encryptedData.publicInputs,
+      // @todo fill the rest of the inputs needed for CRISP
+      public_key_x: [],
+      public_key_y: [],
+      signature: [],
+      hashed_message: [],
+      balance: '0',
+      merkle_proof_length: '0',
+      merkle_proof_indices: [],
+      merkle_proof_siblings: [],
+    },
   }
 }
