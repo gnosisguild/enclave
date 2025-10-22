@@ -4,6 +4,8 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use std::hash::Hash;
+
 use crate::{
     contract::ContractAddresses,
     rpc::{RpcAuth, RPC},
@@ -11,7 +13,7 @@ use crate::{
 use anyhow::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq, Deserialize, Serialize)]
 pub struct ChainConfig {
     pub enabled: Option<bool>,
     pub name: String,

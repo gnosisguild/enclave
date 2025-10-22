@@ -85,13 +85,11 @@ impl<'a> CiphernodeSystemBuilder<'a> {
             simulate_libp2p_net(&nodes);
         }
 
-        // for node in nodes.clone().iter() {
         for then_fn in self.thens {
             for node in nodes.clone() {
                 then_fn(node).await?;
             }
         }
-        // }
 
         Ok(CiphernodeSystem(nodes))
     }
@@ -211,7 +209,7 @@ mod tests {
 
         Ok(CiphernodeHandle {
             address,
-            store,
+            store: (&store).into(),
             bus,
             history: Some(history),
             errors: Some(errors),

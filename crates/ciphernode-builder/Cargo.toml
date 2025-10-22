@@ -8,11 +8,15 @@ repository = "https://github.com/gnosisguild/enclave/crates/ciphernode-builder"
 
 [dependencies]
 actix.workspace = true
+alloy.workspace = true
 anyhow.workspace = true
+derivative.workspace = true
 e3-aggregator.workspace = true
 e3-crypto.workspace = true
+e3-config.workspace = true
 e3-data.workspace = true
 e3-events.workspace = true
+e3-evm.workspace = true
 e3-fhe.workspace = true
 e3-keyshare.workspace = true
 e3-multithread.workspace = true

@@ -5,13 +5,13 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Addr;
-use e3_data::InMemStore;
+use e3_data::{DataStore, InMemStore, StoreAddr};
 use e3_events::{EnclaveEvent, EventBus, HistoryCollector};
 
 #[derive(Clone, Debug)]
 pub struct CiphernodeHandle {
     pub address: String,
-    pub store: Addr<InMemStore>,
+    pub store: DataStore,
     pub bus: Addr<EventBus<EnclaveEvent>>,
     pub history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
     pub errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
@@ -20,7 +20,7 @@ pub struct CiphernodeHandle {
 impl CiphernodeHandle {
     pub fn new(
         address: String,
-        store: Addr<InMemStore>,
+        store: DataStore,
         bus: Addr<EventBus<EnclaveEvent>>,
         history: Option<Addr<HistoryCollector<EnclaveEvent>>>,
         errors: Option<Addr<HistoryCollector<EnclaveEvent>>>,
@@ -50,7 +50,16 @@ impl CiphernodeHandle {
         self.address.clone()
     }
 
-    pub fn store(&self) -> Addr<InMemStore> {
-        self.store.clone()
+    pub fn store(&self) -> &DataStore {
+        &self.store
+    }
+
+    pub fn in_mem_store(&self) -> Option<&Addr<InMemStore>> {
+        let addr = self.store.get_addr();
+        if let StoreAddr::InMem(ref store) = addr {
+            return Some(store);
+        };
+
+        None
     }
 }

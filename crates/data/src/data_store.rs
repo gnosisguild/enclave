@@ -80,11 +80,34 @@ impl Remove {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum StoreAddr {
+    InMem(Addr<InMemStore>),
+    Sled(Addr<SledStore>),
+}
+
+impl StoreAddr {
+    pub fn to_data_store(&self) -> DataStore {
+        match self {
+            StoreAddr::InMem(s) => s.into(),
+            StoreAddr::Sled(s) => s.into(),
+        }
+    }
+
+    pub fn to_maybe_in_mem(&self) -> Option<&Addr<InMemStore>> {
+        match self {
+            StoreAddr::InMem(ref store) => Some(store),
+            _ => None,
+        }
+    }
+}
+
 /// Generate proxy for the DB / KV store
 /// DataStore is scopable
 #[derive(Clone, Debug)]
 pub struct DataStore {
     scope: Vec<u8>,
+    addr: StoreAddr,
     get: Recipient<Get>,
     insert: Recipient<Insert>,
     insert_sync: Recipient<InsertSync>,
@@ -143,6 +166,11 @@ impl DataStore {
         Ok(String::from_utf8_lossy(&self.scope))
     }
 
+    /// Get a reference to the addr enum
+    pub fn get_addr(&self) -> &StoreAddr {
+        &self.addr
+    }
+
     /// Changes the scope for the data store.
     /// Note that if the scope does not start with a slash one is appended.
     /// ```
@@ -170,6 +198,7 @@ impl DataStore {
         }
         scope.extend(encoded_key);
         Self {
+            addr: self.addr.clone(),
             get: self.get.clone(),
             insert: self.insert.clone(),
             insert_sync: self.insert_sync.clone(),
@@ -180,6 +209,7 @@ impl DataStore {
 
     pub fn base<K: IntoKey>(&self, key: K) -> Self {
         Self {
+            addr: self.addr.clone(),
             get: self.get.clone(),
             insert: self.insert.clone(),
             insert_sync: self.insert_sync.clone(),
@@ -192,6 +222,7 @@ impl DataStore {
 impl From<&Addr<SledStore>> for DataStore {
     fn from(addr: &Addr<SledStore>) -> Self {
         Self {
+            addr: StoreAddr::Sled(addr.clone()),
             get: addr.clone().recipient(),
             insert: addr.clone().recipient(),
             insert_sync: addr.clone().recipient(),
@@ -204,6 +235,7 @@ impl From<&Addr<SledStore>> for DataStore {
 impl From<&Addr<InMemStore>> for DataStore {
     fn from(addr: &Addr<InMemStore>) -> Self {
         Self {
+            addr: StoreAddr::InMem(addr.clone()),
             get: addr.clone().recipient(),
             insert: addr.clone().recipient(),
             insert_sync: addr.clone().recipient(),

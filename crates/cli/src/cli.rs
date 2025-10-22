@@ -60,6 +60,10 @@ pub struct Cli {
     /// Set the Open Telemetry collector grpc endpoint. Eg. http://localhost:4317
     #[arg(long = "otel", global = true)]
     pub otel: Option<ValidUrl>,
+
+    // TODO: expose this as a feature once we have this hooked up to the bin integration test
+    #[arg(long, hide = true)]
+    pub experimental_trbfv: Option<String>,
 }
 
 impl Cli {
