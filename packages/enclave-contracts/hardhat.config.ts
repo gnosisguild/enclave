@@ -146,11 +146,15 @@ const config: HardhatUserConfig = {
     npmFilesToBuild: ["poseidon-solidity/PoseidonT3.sol"],
     compilers: [
       {
-        version: "0.8.27",
+        version: "0.8.28",
         settings: {
           optimizer: {
             enabled: true,
             runs: 800,
+          },
+          metadata: {
+            // Make builds more deterministic
+            bytecodeHash: "none",
           },
         },
       },
