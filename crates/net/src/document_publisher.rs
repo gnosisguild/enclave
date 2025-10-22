@@ -387,6 +387,7 @@ mod tests {
         CiphernodeSelected, DocumentKind, DocumentMeta, E3id, EnclaveError, EnclaveEvent, EventBus,
         EventBusConfig, GetEvents, HistoryCollector, PublishDocumentRequested, TakeEvents,
     };
+    use libp2p::kad::{GetRecordError, RecordKey};
     use tokio::{
         sync::{broadcast, mpsc},
         time::{sleep, timeout},
@@ -539,7 +540,9 @@ mod tests {
             // Report failure
             net_evt_tx.send(NetEvent::DhtGetRecordError {
                 correlation_id,
-                error: DhtGetRecordError::Timeout,
+                error: GetRecordError::Timeout {
+                    key: RecordKey::new(&cid),
+                },
             })?;
         }
 
@@ -548,7 +551,7 @@ mod tests {
         let error: EnclaveError = errors.first().unwrap().try_into()?;
         assert_eq!(
             error.message,
-            "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout"
+            "Operation failed after 4 attempts. Last error: DHT get record failed: Timeout { key: Key(b\"\\xda-\\xe1\\xc0T\\x11$X\\x05\\xd1\\xd4\\xa6C\\x86\\x96\\xb7e\\xd9j\\x96\\x1bD\\xc8P#\\x0f\\\"\\xea A@b\") }"
         );
 
         Ok(())
