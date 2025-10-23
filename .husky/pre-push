@@ -1,2 +1,3 @@
 pnpm lint
 pnpm check:license
+pnpm check:pnpm

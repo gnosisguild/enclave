@@ -4,9 +4,49 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { ProtocolParams } from '@enclave-e3/sdk'
-import { IVote, VotingMode } from './types'
+import { ProtocolParams, EnclaveSDK, FheProtocol } from '@enclave-e3/sdk'
+import { type CRISPVoteAndInputs, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
+import { MAXIMUM_VOTE_VALUE } from './constants'
+
+/**
+ * This utility function calculates the first valid index for vote options
+ * based on the total voting power and degree.
+ * @dev This is needed to calculate the decoded plaintext
+ * @dev Also, we will need to check in the circuit that anything within these indices is
+ * either 0 or 1.
+ * @param totalVotingPower The maximum vote amount (if a single voter had all of the power)
+ * @param degree The degree of the polynomial
+ */
+export const calculateValidIndicesForPlaintext = (totalVotingPower: bigint, degree: number): { yesIndex: number; noIndex: number } => {
+  // Sanity check: degree must be even and positive
+  if (degree <= 0 || degree % 2 !== 0) {
+    throw new Error('Degree must be a positive even number')
+  }
+
+  // Calculate the number of bits needed to represent the total voting power
+  const bitsNeeded = totalVotingPower.toString(2).length
+
+  const halfLength = Math.floor(degree / 2)
+
+  // Check if bits needed exceed half the degree
+  if (bitsNeeded > halfLength) {
+    throw new Error('Total voting power exceeds maximum representable votes for the given degree')
+  }
+
+  // For "yes": right-align in first half
+  // Start index = (half length) - (bits needed)
+  const yesIndex = halfLength - bitsNeeded
+
+  // For "no": right-align in second half
+  // Start index = (full length) - (bits needed)
+  const noIndex = degree - bitsNeeded
+
+  return {
+    yesIndex: yesIndex,
+    noIndex: noIndex,
+  }
+}
 
 /**
  * Encode a vote based on the voting mode
@@ -95,5 +135,53 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
       if (vote.yes > votingPower || vote.no > votingPower) {
         throw new Error('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
       }
+
+      if (vote.yes > MAXIMUM_VOTE_VALUE || vote.no > MAXIMUM_VOTE_VALUE) {
+        throw new Error('Invalid vote for GOVERNANCE mode: vote exceeds maximum allowed value')
+      }
+  }
+}
+
+/**
+ * This is a wrapper around enclave-e3/sdk encryption functions as CRISP circuit will require some more
+ * input values which generic Greco do not need.
+ * @param encodedVote The encoded vote as string array
+ * @param publicKey The public key to use for encryption
+ */
+export const encryptVoteAndGenerateCRISPInputs = async (encodedVote: string[], publicKey: Uint8Array): Promise<CRISPVoteAndInputs> => {
+  // @todo The SDK need refactoring
+  const enclaveSDK = EnclaveSDK.create({
+    protocol: FheProtocol.BFV,
+    chainId: 31337,
+    contracts: {
+      enclave: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
+      ciphernodeRegistry: '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d',
+    },
+    // local node
+    rpcUrl: 'http://localhost:8545',
+    // default Anvil private key
+    privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+  })
+
+  // Convert string[] to BigUint64Array
+  const bigUint64Array = new BigUint64Array(encodedVote.map((str) => BigInt(str)))
+
+  const encryptedData = await enclaveSDK.encryptVectorAndGenInputs(bigUint64Array, publicKey)
+
+  // the rest of the public and private inputs will need to be generated before calling the circuit to generate the CRISP proof
+  return {
+    encryptedVote: encryptedData.encryptedData,
+    circuitInputs: {
+      ...encryptedData.publicInputs,
+      // @todo fill the rest of the inputs needed for CRISP
+      public_key_x: [],
+      public_key_y: [],
+      signature: [],
+      hashed_message: [],
+      balance: '0',
+      merkle_proof_length: '0',
+      merkle_proof_indices: [],
+      merkle_proof_siblings: [],
+    },
   }
 }

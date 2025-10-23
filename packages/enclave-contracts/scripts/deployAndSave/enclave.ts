@@ -5,18 +5,22 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import EnclaveModule from "../../ignition/modules/enclave";
 import { Enclave, Enclave__factory as EnclaveFactory } from "../../types";
-import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
+import {
+  areArraysEqual,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+} from "../utils";
 
 /**
  * The arguments for the deployAndSaveEnclave function
  */
 export interface EnclaveArgs {
-  params?: string;
+  params?: string[];
   owner?: string;
   maxDuration?: string;
   registry?: string;
+  poseidonT3Address: string;
   bondingRegistry?: string;
   feeToken?: string;
   hre: HardhatRuntimeEnvironment;
@@ -34,9 +38,10 @@ export const deployAndSaveEnclave = async ({
   registry,
   bondingRegistry,
   feeToken,
+  poseidonT3Address,
   hre,
 }: EnclaveArgs): Promise<{ enclave: Enclave }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
 
   const [signer] = await ethers.getSigners();
 
@@ -54,8 +59,10 @@ export const deployAndSaveEnclave = async ({
       preDeployedArgs?.constructorArgs?.owner === owner &&
       preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
       preDeployedArgs?.constructorArgs?.registry === registry &&
-      preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
-      preDeployedArgs?.constructorArgs?.feeToken === feeToken)
+      areArraysEqual(
+        preDeployedArgs?.constructorArgs?.params as string[],
+        params,
+      ))
   ) {
     if (!preDeployedArgs?.address) {
       throw new Error("Enclave address not found, it must be deployed first");
@@ -67,6 +74,21 @@ export const deployAndSaveEnclave = async ({
     return { enclave: enclaveContract };
   }
 
+  const enclaveFactory = await ethers.getContractFactory(
+    EnclaveFactory.abi,
+    EnclaveFactory.linkBytecode({
+      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
+        poseidonT3Address,
+    }),
+    signer,
+  );
+
+  const enclave = await enclaveFactory.deploy(
+    owner,
+    registry,
+    maxDuration,
+    params,
+  );
   const enclave = await ignition.deploy(EnclaveModule, {
     parameters: {
       Enclave: {
@@ -80,9 +102,9 @@ export const deployAndSaveEnclave = async ({
     },
   });
 
-  await enclave.enclave.waitForDeployment();
+  await enclave.waitForDeployment();
 
-  const enclaveAddress = await enclave.enclave.getAddress();
+  const enclaveAddress = await enclave.getAddress();
   const blockNumber = await ethers.provider.getBlockNumber();
 
   storeDeploymentArgs(
@@ -95,6 +117,7 @@ export const deployAndSaveEnclave = async ({
         bondingRegistry,
         feeToken,
       },
+      constructorArgs: { owner, registry, maxDuration, params },
       blockNumber,
       address: enclaveAddress,
     },

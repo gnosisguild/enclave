@@ -1,43 +1,34 @@
 # CRISP - Coercion-Resistant Impartial Selection Protocol
 
-Welcome to the CRISP project! This document provides a comprehensive guide to setting up and deploying the application both locally. Follow the steps carefully to ensure that all dependencies, services, and components are properly configured.
+CRISP (Coercion-Resistant Impartial Selection Protocol) is a secure protocol for digital decision-making, leveraging fully homomorphic encryption (FHE) and distributed threshold cryptography (DTC) to enable verifiable secret ballots. Built with Enclave, CRISP safeguards democratic systems and decision-making applications against coercion, manipulation, and other vulnerabilities. To learn more about CRISP, you can read our [blog post](https://blog.enclave.gg/crisp-private-voting-secret-ballot-fhe-zkp-mpc/) or visit the [documentation](https://docs.enclave.gg/CRISP/introduction).
 
 ## Project Structure
 
-```
-CRISP
-├── Dockerfile - Dockerfile for a local development environment
-├── client
-├── server
-├── wasm-crypto
-├── contracts - Contracts for the CRISP protocol
-├── docker-compose.yaml
-└── scripts - Scripts for the CRISP protocol, including setup and testing
-```
+CRISP follows a modern structure with clear separation of concerns
 
-## Development
-
-To start the development environment, run the following commands from inside the CRISP directory:
-
-```sh
-pnpm install # install dependencies
-pnpm dev:setup # build the project
-pnpm dev:up # run the services
+```bash
+CRISP/
+|── client/                  # React frontend application
+|── server/                  # Rust coordination server
+|── program/                 # RISC Zero computation program
+├── contracts/               # Smart contracts (Solidity)
+├── circuits/                # Noir circuits for ZK proofs
+├── scripts/                 # Development and utility scripts
+├── enclave.config.yaml      # Ciphernode configuration
 ```
 
-The two commands above will start everything you need to run the CRISP protocol. You can then interact with it using the web application at `http://localhost:3000`. Please ensure you follow the prerequisites installation for running the protocol locally.
+You can have an extended explanation of the single folders in the dedicated [documentation](https://docs.enclave.gg/CRISP/introduction#project-structure).
 
-## Prerequisites for running without Docker
+## Prerequisites
 
-Before getting started, make sure you have the following tools installed:
+Before getting started, ensure you have installed:
 
-- **Rust**
-- **RISC Zero toolchain** (not needed for development only)
-- **Foundry** and **Anvil** (for local testnet)
-- **Node.js** (for client-side dependencies)
-- **Pnpm** (as Node package manager)
-
-## Dependencies
+- [Rust](https://rust-lang.org/tools/install/)
+- [Foundry](https://getfoundry.sh)
+- [RiscZero](https://dev.risczero.com/api/zkvm/install)
+- [NodeJS](https://nodejs.org/en/download)
+- [pnpm](https://pnpm.io)
+- [Metamask](https://metamask.io)
 
 ### Install Node
 
@@ -47,16 +38,18 @@ You can install Node following the official [documentation](https://nodejs.org/e
 
 You can install Pnpm following the official [documentation](https://pnpm.io/installation).
 
-### Install Rust and Foundry
+### Install Metamask
 
-You need to install Rust and Foundry first. After installation, restart your terminal.
+You can add Metamask as extension to your browser following the official [documentation](https://metamask.io).
+
+### Install Rust
+
+You need to install Rust. After installation, restart your terminal.
 
 ```sh
 # Install Rust
 curl https://sh.rustup.rs -sSf | sh
 
-# Install Foundry
-curl -L https://foundry.paradigm.xyz | bash
 ```
 
 ### Install RISC Zero Toolchain
@@ -79,7 +72,93 @@ cargo risczero --version
 
 At this point, you should have all the tools required to develop and deploy an application with [RISC Zero](https://www.risczero.com).
 
-## Setting Up the project
+## Environment
+
+You need to setup your environment variables for `client/` and `server/`. Just copy and paste the `.env.default` as `.env` and overwrite with your values the following variables (you can leave the others initialized with the default values).
+
+### Client
+
+```bash
+VITE_E3_PROGRAM_ADDRESS=0x0B306BF915C4d645ff596e518fAf3F9669b97016 # Default E3 program address
+```
+
+### Server
+
+```bash
+ENCLAVE_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+CIPHERNODE_REGISTRY_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+NAIVE_REGISTRY_FILTER_ADDRESS="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPProgram Contract Address
+```
+
+These address will be displayed after successfully running the `pnpm dev:up` command in a log that will look like the following:
+
+```bash
+Deployments:
+----------------------------------------------------------------------
+Enclave: 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+Verifier: 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0
+InputValidator: 0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6
+CRISPInputValidatorFactory: 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82
+HonkVerifier: 0x9A676e781A523b5d0C0e43731313A708CB607508
+CRISPProgram: 0x0B306BF915C4d645ff596e518fAf3F9669b97016
+```
+
+If you find any inconsistency with the addresses on the environment, you must update them and run the script again (they must match).
+
+## Quick Start
+
+The fastest way to get CRISP running is using the scripts provided in the `scripts/` directory:
+
+```bash
+# Install dependencies
+pnpm install
+
+# Setup and build the development environment
+pnpm dev:setup
+
+# Start all services (Anvil, Ciphernodes, Applications)
+pnpm dev:up
+
+# Clean up all artifacts and generated output (e.g., builds)
+# This must be run from enclave root (do cd ../../ if you are inside examples/CRISP)
+pnpm clean
+```
+
+This will start all CRISP components:
+
+- Hardhat node (local blockchain)
+- Deploy all contracts
+- Compile all ZK circuits
+- Ciphernodes network
+- CRISP applications (server, client)
+
+```bash
+# Build the development containers
+pnpm dev:setup
+
+# Start all services
+pnpm dev:up
+
+# Rebuild containers
+pnpm dev:build
+
+# Invoke the Server CLI
+pnpm cli
+```
+
+Once everything is running, you can:
+
+1. Navigate `http://localhost:3000` for the client interface
+2. Add the Hardhat private key to your wallet: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+3. Press `Connect Wallet` button and complete the association with your MetaMask account
+4. Switch to `Hardhat` local network (this will be handled automatically by the app. You just need to press on the connected account on the frontend and select the network. Then, complete the configuration on MetaMask pop-up).
+5. Open a new terminal, run `pnpm cli` and start a new E3 Round.
+6. Refresh and interact with the round following the Client interface.
+
+## Manual Start
+
+### Setting Up the project
 
 1. Navigate to the root directory:
 
@@ -93,7 +172,7 @@ At this point, you should have all the tools required to develop and deploy an a
    pnpm install
    ```
 
-## Setting Up the Web App
+### Setting Up the Web App
 
 To set up the CRISP dApp in your local environment, follow these steps:
 
@@ -109,7 +188,7 @@ To set up the CRISP dApp in your local environment, follow these steps:
    pnpm dev
    ```
 
-## Setting Up the CRISP Server
+### Setting Up the CRISP Server
 
 Setting up the CRISP server involves several components, but this guide will walk you through each step.
 
@@ -129,28 +208,16 @@ Keep Anvil running in the terminal, and open a new terminal for the next steps.
    git clone https://github.com/gnosisguild/enclave.git
    ```
 
-2. Navigate to the `evm` directory:
+2. Navigate to the `examples/CRISP` directory inside the cloned repository:
 
    ```sh
-   cd enclave/packages/enclave-contracts
+   cd enclave/examples/CRISP
    ```
 
-3. Install dependencies:
+3. Deploy the contracts:
 
    ```sh
-   pnpm install
-   ```
-
-4. Delete any previous local deployment (if any):
-
-   ```sh
-   rm -rf deployments/localhost/
-   ```
-
-5. Deploy the contracts on the local testnet:
-
-   ```sh
-   pnpm deploy:mocks --network localhost
+   pnpm deploy:contracts:full
    ```
 
 After deployment, you will see the addresses for the following contracts:
@@ -162,14 +229,15 @@ After deployment, you will see the addresses for the following contracts:
 - Mock E3 Program
 - Mock Decryption Verifier
 - Mock Compute Provider
+- RISC Zero Verifier
+- Honk Verifier
+- CRISP Input Validator Factory
+- CRISP Program
 
-Note down the first four addresses as they will be needed to configure `risc0`, `local_testnet` and the `server`.
-
-### Step 3: Deploy the RISC Zero Contracts
+### Step 3: RISC0 Setup (Optional)
 
 > Please note that this step is optional for development only. You can run the program server in dev mode which does not use Risc0.
-
-1. Navigate to the `CRISP/lib/risc0-ethereum` directory.
+> The smart contracts would have already been deployed at the previous step.
 
 ---
 
@@ -195,30 +263,6 @@ The following steps are optional. You can config [Bonsai](https://dev.risczero.c
 
 ---
 
-2. In the `risc0/script` directory, update the `config.toml` with the deployed contract addresses. The following configuration is based on default deployment addresses using local Anvil node:
-
-   ```toml
-   [profile.custom]
-   chainId = 31337
-   riscZeroVerifierAddress = "0x0000000000000000000000000000000000000000"
-   enclaveAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-   inputValidatorAddress = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-   ```
-
-3. Export the ETH_WALLET_PRIVATE_KEY environment variable (Anvil's default private key):
-
-   ```sh
-   export ETH_WALLET_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-   ```
-
-4. Deploy the contracts:
-
-   ```sh
-   forge script --rpc-url http://localhost:8545 --broadcast script/Deploy.s.sol
-   ```
-
-Note down the `CRISPProgram` contract Address, which will be used as the E3 Program Address.
-
 ### Step 4: Set up Environment Variables
 
 Create a `.env` file in the `server` directory with the following:
@@ -228,8 +272,12 @@ Create a `.env` file in the `server` directory with the following:
 PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ENCLAVE_SERVER_URL=http://0.0.0.0:4000
 HTTP_RPC_URL=http://127.0.0.1:8545
+PROGRAM_SERVER_URL=http://127.0.0.1:13151
 WS_RPC_URL=ws://127.0.0.1:8545
 CHAIN_ID=31337
+
+# Bitquery API key
+BITQUERY_API_KEY=""
 
 # Cron-job API key to trigger new rounds
 CRON_API_KEY=1234567890
@@ -241,10 +289,11 @@ E3_PROGRAM_ADDRESS="0x1613beB3B2C4f22Ee086B2b38C1476A3cE7f78E8" # CRISPProgram C
 FEE_TOKEN_ADDRESS="0x5FbDB2315678afecb367f032d93F642f64180aa3" # Mock ERC20 Token Address
 
 # E3 Config
-E3_WINDOW_SIZE=600
+E3_WINDOW_SIZE=40
 E3_THRESHOLD_MIN=1
 E3_THRESHOLD_MAX=2
-E3_DURATION=600
+E3_DURATION=160
+
 # E3 Compute Provider Config
 E3_COMPUTE_PROVIDER_NAME="RISC0"
 E3_COMPUTE_PROVIDER_PARALLEL=false
@@ -259,7 +308,7 @@ BITQUERY_API_KEY=""
 To run three ciphernodes, use the following command inside the CRISP directory:
 
 ```sh
-./scripts/dev_ciphernodes.sh
+./scripts/dev_cipher.sh
 ```
 
 This script will start the ciphernodes, add the ciphernodes to the registry on chain.

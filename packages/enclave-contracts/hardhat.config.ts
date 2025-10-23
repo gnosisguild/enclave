@@ -8,6 +8,7 @@ import hardhatIgnitionEthers from "@nomicfoundation/hardhat-ignition-ethers";
 import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 import dotenv from "dotenv";
 import type { HardhatUserConfig } from "hardhat/config";
 
@@ -35,7 +36,7 @@ const mnemonic =
   process.env.MNEMONIC ??
   "test test test test test test test test test test test junk";
 const privateKey = process.env.PRIVATE_KEY!;
-const infuraApiKey = process.env.INFURA_KEY!;
+const rpcUrl = process.env.RPC_URL ?? "http://localhost:8545";
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -52,18 +53,6 @@ const chainIds = {
 };
 
 function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
-  let jsonRpcUrl: string;
-  switch (chain) {
-    case "avalanche":
-      jsonRpcUrl = "https://api.avax.network/ext/bc/C/rpc";
-      break;
-    case "bsc":
-      jsonRpcUrl = "https://bsc-dataseed1.binance.org";
-      break;
-    default:
-      jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
-  }
-
   let accounts: [string] | { count: number; mnemonic: string; path: string };
   if (privateKey) {
     accounts = [privateKey];
@@ -78,7 +67,7 @@ function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
   return {
     accounts,
     chainId: chainIds[chain],
-    url: jsonRpcUrl,
+    url: rpcUrl,
     type: "http" as const,
     chainType: "l1" as const,
     blockExplorers: {
@@ -96,6 +85,7 @@ const config: HardhatUserConfig = {
     hardhatNetworkHelpers,
     hardhatIgnitionEthers,
     hardhatEthersChaiMatchers,
+    hardhatVerify,
   ],
   tasks: [
     ciphernodeAdd,
@@ -148,6 +138,14 @@ const config: HardhatUserConfig = {
     sepolia: getChainConfig("sepolia", process.env.ETHERSCAN_API_KEY || ""),
     goerli: getChainConfig("goerli", process.env.ETHERSCAN_API_KEY || ""),
   },
+  verify: {
+    etherscan: {
+      apiKey: process.env.ETHERSCAN_API_KEY || "",
+    },
+    blockscout: {
+      enabled: false,
+    },
+  },
   paths: {
     artifacts: "./artifacts",
     cache: "./cache",
@@ -162,11 +160,14 @@ const config: HardhatUserConfig = {
     npmFilesToBuild: ["poseidon-solidity/PoseidonT3.sol"],
     compilers: [
       {
-        version: "0.8.27",
+        version: "0.8.28",
         settings: {
           optimizer: {
             enabled: true,
             runs: 800,
+          },
+          metadata: {
+            bytecodeHash: "none",
           },
         },
       },

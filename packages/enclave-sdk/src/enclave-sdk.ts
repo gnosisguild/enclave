@@ -34,10 +34,13 @@ import type {
   SDKConfig,
   ProtocolParams,
   VerifiableEncryptionResult,
+  EncryptedValueAndPublicInputs,
 } from "./types";
 import {
   bfv_encrypt_number,
+  bfv_encrypt_vector,
   bfv_verifiable_encrypt_number,
+  bfv_verifiable_encrypt_vector,
 } from "@enclave-e3/wasm";
 import { CircuitInputs, generateProof } from "./greco";
 import { CompiledCircuit } from "@noir-lang/noir_js";
@@ -138,6 +141,63 @@ export class EnclaveSDK {
   }
 
   /**
+   * Encrypt a vector using the configured protocol
+   * @param data - The vector to encrypt
+   * @param publicKey - The public key to use for encryption
+   * @returns The ciphertext
+   */
+  public async encryptVector(
+    data: BigUint64Array,
+    publicKey: Uint8Array
+  ): Promise<Uint8Array> {
+    await initializeWasm();
+    switch (this.protocol) {
+      case FheProtocol.BFV:
+        return bfv_encrypt_vector(
+          data,
+          publicKey,
+          this.protocolParams.degree,
+          this.protocolParams.plaintextModulus,
+          this.protocolParams.moduli
+        );
+      default:
+        throw new Error("Protocol not supported");
+    }
+  }
+
+  /**
+   * This function encrypts a number using the configured FHE protocol 
+   * and generates the necessary public inputs for a zk-SNARK proof.
+   * @param data The number to encrypt
+   * @param publicKey The public key to use for encryption
+   * @returns The encrypted number and the inputs for the zk-SNARK proof
+   */
+  public async encryptNumberAndGenInputs(
+    data: bigint,
+    publicKey: Uint8Array,
+  ): Promise<EncryptedValueAndPublicInputs> {
+    await initializeWasm();
+    switch (this.protocol) {
+      case FheProtocol.BFV:
+        const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_number(
+          data,
+          publicKey,
+          this.protocolParams.degree,
+          this.protocolParams.plaintextModulus,
+          this.protocolParams.moduli
+        );
+
+        const publicInputs = JSON.parse(circuitInputs);
+        return {
+          encryptedData,
+          publicInputs
+        };
+      default:
+        throw new Error("Protocol not supported");
+    }
+  }
+
+  /**
    * Encrypt a number using the configured protocol and generate a zk-SNARK proof using Greco
    * @param data - The number to encrypt
    * @param publicKey - The public key to use for encryption
@@ -149,10 +209,29 @@ export class EnclaveSDK {
     publicKey: Uint8Array,
     circuit: CompiledCircuit
   ): Promise<VerifiableEncryptionResult> {
+    const { publicInputs, encryptedData } = await this.encryptNumberAndGenInputs(data, publicKey);
+        const proof = await generateProof(publicInputs, circuit);
+
+        return {
+          encryptedData,
+          proof,
+        };
+  }
+
+  /**
+   * Encrypt a vector and generate inputs for an E3 computation
+   * @param data - The vector to encrypt
+   * @param publicKey - The public key to use for encryption
+   * @returns The encrypted vector and the inputs for the E3 computation
+   */
+  public async encryptVectorAndGenInputs(
+    data: BigUint64Array,
+    publicKey: Uint8Array,
+  ): Promise<EncryptedValueAndPublicInputs> {
     await initializeWasm();
     switch (this.protocol) {
       case FheProtocol.BFV:
-        const [encryptedVote, circuitInputs] = bfv_verifiable_encrypt_number(
+        const [encryptedData, circuitInputs] = bfv_verifiable_encrypt_vector(
           data,
           publicKey,
           this.protocolParams.degree,
@@ -160,17 +239,36 @@ export class EnclaveSDK {
           this.protocolParams.moduli
         );
 
-        const inputs = JSON.parse(circuitInputs) as CircuitInputs;
-        // inputs.params = defaultParams;
-        const proof = await generateProof(inputs, circuit);
-
+        const publicInputs = JSON.parse(circuitInputs);
         return {
-          encryptedVote,
-          proof,
+          encryptedData,
+          publicInputs
         };
       default:
         throw new Error("Protocol not supported");
     }
+  }
+
+  /**
+   * Encrypt a vector using the configured protocol and generate a zk-SNARK proof using Greco
+   * @param data - The vector to encrypt
+   * @param publicKey - The public key to use for encryption
+   * @param circuit - The circuit to use for proof generation
+   * @returns The encrypted vector and the proof
+   */
+  public async encryptVectorAndGenProof(
+    data: BigUint64Array,
+    publicKey: Uint8Array,
+    circuit: CompiledCircuit
+  ): Promise<VerifiableEncryptionResult> {
+    const { publicInputs, encryptedData } = await this.encryptVectorAndGenInputs(data, publicKey);
+
+    const proof = await generateProof(publicInputs, circuit);
+
+    return {
+      encryptedData,
+      proof,
+    };
   }
 
   /**

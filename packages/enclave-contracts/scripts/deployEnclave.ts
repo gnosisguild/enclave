@@ -9,6 +9,8 @@ import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
 import { deployAndSaveCommitteeSortition } from "./deployAndSave/committeeSortition";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
+import { deployAndSaveNaiveRegistryFilter } from "./deployAndSave/naiveRegistryFilter";
+import { deployAndSavePoseidonT3 } from "./deployAndSave/poseidonT3";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
 import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
 import { deployAndSaveMockStableToken } from "./deployAndSave/mockStableToken";
@@ -37,6 +39,11 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
+  const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
+  console.log("Deploying Enclave");
+  const { enclave } = await deployAndSaveEnclave({
+    params: [encoded],
   const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
   let feeTokenAddress: string;
 
@@ -76,6 +83,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const { slashingManager } = await deployAndSaveSlashingManager({
     admin: ownerAddress,
     bondingRegistry: addressOne,
+    poseidonT3Address: poseidonT3,
     hre,
   });
   const slashingManagerAddress = await slashingManager.getAddress();
@@ -98,9 +106,14 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("BondingRegistry deployed to:", bondingRegistryAddress);
 
   console.log("Deploying CiphernodeRegistry...");
+
+  const enclaveAddress = await enclave.getAddress();
+
+  console.log("Deploying CiphernodeRegistry");
   const { ciphernodeRegistry } = await deployAndSaveCiphernodeRegistryOwnable({
     enclaveAddress: addressOne,
     owner: ownerAddress,
+    poseidonT3Address: poseidonT3,
     hre,
   });
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
@@ -118,6 +131,10 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
     params: encoded,
+
+  console.log("Deploying NaiveRegistryFilter");
+  const { naiveRegistryFilter } = await deployAndSaveNaiveRegistryFilter({
+    ciphernodeRegistryAddress: ciphernodeRegistryAddress,
     owner: ownerAddress,
     maxDuration: THIRTY_DAYS_IN_SECONDS.toString(),
     registry: ciphernodeRegistryAddress,
@@ -158,7 +175,33 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting CommitteeSortition address in CiphernodeRegistry...");
   await ciphernodeRegistry.setCommitteeSortition(committeeSortitionAddress);
 
+  const naiveRegistryFilterAddress = await naiveRegistryFilter.getAddress();
+
+  const registryAddress = await enclave.ciphernodeRegistry();
+
+  console.log("Setting CiphernodeRegistry in Enclave");
+  if (registryAddress === ciphernodeRegistryAddress) {
+    console.log(`Enclave contract already has registry`);
+  } else {
+    const tx = await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
+    await tx.wait();
+
+    console.log(`Enclave contract updated with registry`);
+  }
+
+  console.log(`
+        Deployments:
+        ----------------------------------------------------------------------
+        Enclave: ${enclaveAddress}
+        CiphernodeRegistry: ${ciphernodeRegistryAddress}
+        NaiveRegistryFilter: ${naiveRegistryFilterAddress}
+        `);
+
+  // Deploy mocks only if specified
+  const shouldDeployMocks = process.env.DEPLOY_MOCKS === "true" || withMocks;
+
   if (shouldDeployMocks) {
+    console.log("Deploying Mocks");
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
 
     const encryptionSchemeId = ethers.keccak256(

@@ -1,7 +1,7 @@
 {
   "name": "@enclave/main",
   "description": "Enclave is an open-source protocol for Encrypted Execution Environments (E3).",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "license": "LGPL-3.0-only",
   "author": {
@@ -10,10 +10,11 @@
   },
   "scripts": {
     "bump:versions": "tsx scripts/bump-versions.ts",
-    "clean": "cd packages/enclave-contracts && pnpm clean",
+    "clean": "tsx scripts/clean.ts",
     "compile": "pnpm evm:build && pnpm sdk:build && pnpm react:build && pnpm ciphernode:build && ./scripts/compile-circuits.sh",
     "lint": "pnpm evm:lint && pnpm ciphernode:lint && ./scripts/lint-circuits.sh",
     "check:license": "./scripts/check-license-headers.sh",
+    "check:pnpm": "./scripts/check-pnpm.sh",
     "test": "pnpm evm:test && pnpm ciphernode:test && pnpm sdk:test && ./scripts/test-circuits.sh",
     "test:integration": "cd ./tests/integration && ./test.sh",
     "coverage": "pnpm evm:coverage",
@@ -58,8 +59,10 @@
     "@types/node": "22.7.5",
     "conventional-changelog-cli": "^5.0.0",
     "husky": "^9.1.7",
+    "prompts": "^2.4.2",
     "tsx": "^4.20.3",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "glob": "^11.0.3"
   },
   "pnpm": {
     "overrides": {

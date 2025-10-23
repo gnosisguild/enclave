@@ -113,11 +113,11 @@ async fn test_trbfv_actor() -> Result<()> {
             CiphernodeBuilder::new(rng.clone(), cipher.clone())
                 .with_address(&addr)
                 .with_injected_multithread(multithread.clone())
-                .with_history()
+                .testmode_with_history()
                 .with_trbfv()
                 .with_pubkey_aggregation()
                 .with_threshold_plaintext_aggregation()
-                .with_source_bus(&bus)
+                .testmode_with_forked_bus(&bus)
                 .with_logging()
                 .build()
                 .await
@@ -129,7 +129,7 @@ async fn test_trbfv_actor() -> Result<()> {
                 .with_address(&addr)
                 .with_injected_multithread(multithread.clone())
                 .with_trbfv()
-                .with_source_bus(&bus)
+                .testmode_with_forked_bus(&bus)
                 .with_logging()
                 .build()
                 .await

@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import MockDecryptionVerifierModule from "../../ignition/modules/mockDecryptionVerifier";
 import {
   MockDecryptionVerifier,
   MockDecryptionVerifier__factory as MockDecryptionVerifierFactory,
@@ -17,17 +16,17 @@ export const deployAndSaveMockDecryptionVerifier = async (
 ): Promise<{
   decryptionVerifier: MockDecryptionVerifier;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = hre.globalOptions.network;
 
-  const decryptionVerifier = await ignition.deploy(
-    MockDecryptionVerifierModule,
+  const decryptionVerifierFactory = await ethers.getContractFactory(
+    "MockDecryptionVerifier",
   );
+  const decryptionVerifier = await decryptionVerifierFactory.deploy();
 
-  await decryptionVerifier.mockDecryptionVerifier.waitForDeployment();
-  const decryptionVerifierAddress =
-    await decryptionVerifier.mockDecryptionVerifier.getAddress();
+  await decryptionVerifier.waitForDeployment();
+  const decryptionVerifierAddress = await decryptionVerifier.getAddress();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 

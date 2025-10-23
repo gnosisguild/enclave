@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
 import {
   CiphernodeRegistryOwnable,
   CiphernodeRegistryOwnable__factory as CiphernodeRegistryOwnableFactory,
@@ -18,6 +17,7 @@ import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 export interface CiphernodeRegistryOwnableArgs {
   enclaveAddress?: string;
   owner?: string;
+  poseidonT3Address: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -29,15 +29,19 @@ export interface CiphernodeRegistryOwnableArgs {
 export const deployAndSaveCiphernodeRegistryOwnable = async ({
   enclaveAddress,
   owner,
+  poseidonT3Address,
   hre,
 }: CiphernodeRegistryOwnableArgs): Promise<{
   ciphernodeRegistry: CiphernodeRegistryOwnable;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
-  const preDeployedArgs = readDeploymentArgs("CiphernodeRegistry", chain);
+  const preDeployedArgs = readDeploymentArgs(
+    "CiphernodeRegistryOwnable",
+    chain,
+  );
 
   if (
     !enclaveAddress ||
@@ -57,29 +61,33 @@ export const deployAndSaveCiphernodeRegistryOwnable = async ({
     return { ciphernodeRegistry: ciphernodeRegistryContract };
   }
 
-  const ciphernodeRegistry = await ignition.deploy(CiphernodeRegistryModule, {
-    parameters: {
-      CiphernodeRegistry: {
-        enclaveAddress,
-        owner,
-      },
-    },
-  });
+  const ciphernodeRegistryFactory = await ethers.getContractFactory(
+    CiphernodeRegistryOwnableFactory.abi,
+    CiphernodeRegistryOwnableFactory.linkBytecode({
+      "npm/poseidon-solidity@0.0.5/PoseidonT3.sol:PoseidonT3":
+        poseidonT3Address,
+    }),
+    signer,
+  );
 
-  await ciphernodeRegistry.cipherNodeRegistry.waitForDeployment();
+  const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
+    owner,
+    enclaveAddress,
+  );
+
+  await ciphernodeRegistry.waitForDeployment();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
-  const ciphernodeRegistryAddress =
-    await ciphernodeRegistry.cipherNodeRegistry.getAddress();
+  const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
 
   storeDeploymentArgs(
     {
-      constructorArgs: { enclaveAddress: enclaveAddress, owner },
+      constructorArgs: { owner, enclaveAddress: enclaveAddress },
       blockNumber,
       address: ciphernodeRegistryAddress,
     },
-    "CiphernodeRegistry",
+    "CiphernodeRegistryOwnable",
     chain,
   );
 

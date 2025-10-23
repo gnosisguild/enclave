@@ -4,11 +4,14 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { describe, it, expect } from 'vitest'
+import fs from 'fs/promises'
+import path from 'path'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { BfvProtocolParams, type ProtocolParams } from '@enclave-e3/sdk'
 
-import { decodeTally, encodeVote, validateVote } from '../src/vote'
+import { calculateValidIndicesForPlaintext, decodeTally, encodeVote, encryptVoteAndGenerateCRISPInputs, validateVote } from '../src/vote'
 import { VotingMode } from '../src/types'
+import { MAXIMUM_VOTE_VALUE } from '../src'
 
 describe('Vote', () => {
   const votingPower = 10n
@@ -43,6 +46,7 @@ describe('Vote', () => {
       expect(decoded.no).toBe(0n)
     })
   })
+
   describe('validateVote', () => {
     const validVote = { yes: 10n, no: 0n }
     const invalidVote = { yes: 5n, no: 5n }
@@ -63,6 +67,71 @@ describe('Vote', () => {
       expect(() => {
         validateVote(VotingMode.GOVERNANCE, { yes: 11n, no: 0n }, votingPower)
       }).toThrow('Invalid vote for GOVERNANCE mode: vote exceeds voting power')
+    })
+    it('should not throw when vote does not exceed the maximum value supported', () => {
+      expect(() => {
+        validateVote(VotingMode.GOVERNANCE, { yes: 10n, no: 0n }, votingPower)
+      }).not.toThrow()
+    })
+    it('should throw when the vote exceeds the maximum value supported', () => {
+      expect(() => {
+        validateVote(VotingMode.GOVERNANCE, { yes: MAXIMUM_VOTE_VALUE + 1n, no: 0n }, MAXIMUM_VOTE_VALUE + 1n)
+      }).toThrow('Invalid vote for GOVERNANCE mode: vote exceeds maximum allowed value')
+    })
+  })
+
+  describe('calculateValidIndicesForPlaintext', () => {
+    it('should return the correct indices', () => {
+      const degree = 8192
+      const totalVotingPower = 100n
+
+      // bitsNeeded = 7 -> 1100100 = 100 in binary
+      // half length = 4096
+      // first valid index for yes 4096 - 7 = 4089
+      // first valid index for no 8192 - 7 = 8185
+      expect(calculateValidIndicesForPlaintext(totalVotingPower, degree)).toEqual({
+        yesIndex: 4089,
+        noIndex: 8185,
+      })
+    })
+    it('should throw if voting power is too high for degree', () => {
+      const degree = 16
+      const totalVotingPower = 10000n
+
+      expect(() => {
+        calculateValidIndicesForPlaintext(totalVotingPower, degree)
+      }).toThrow('Total voting power exceeds maximum representable votes for the given degree')
+    })
+    it('should throw when the degree is negative', () => {
+      expect(() => {
+        calculateValidIndicesForPlaintext(10n, -16)
+      }).toThrow('Degree must be a positive even number')
+    })
+    it('should throw when the degree is not even', () => {
+      expect(() => {
+        calculateValidIndicesForPlaintext(10n, 15)
+      }).toThrow('Degree must be a positive even number')
+    })
+  })
+
+  describe('encryptVoteAndGenerateCRISPInputs', () => {
+    const vote = { yes: 10n, no: 0n }
+    const votingPower = 10n
+
+    let publicKey: Uint8Array
+
+    beforeAll(async () => {
+      const buffer = await fs.readFile(path.resolve(__dirname, './fixtures/pubkey.bin'))
+
+      publicKey = Uint8Array.from(buffer)
+    })
+
+    it('should encrypt a vote and generate the circuit inputs', async () => {
+      const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, BfvProtocolParams.BFV_NORMAL, votingPower)
+      const encryptedData = await encryptVoteAndGenerateCRISPInputs(encodedVote, publicKey)
+
+      expect(encryptedData.encryptedVote).toBeInstanceOf(Uint8Array)
+      expect(encryptedData.circuitInputs).toBeInstanceOf(Object)
     })
   })
 })

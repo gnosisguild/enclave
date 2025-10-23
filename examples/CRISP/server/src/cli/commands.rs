@@ -257,6 +257,8 @@ pub async fn decrypt_and_publish_result(
     let votes = Vec::<u64>::try_decode(&pt, Encoding::poly())?[0];
     info!("Vote count: {:?}", votes);
 
+    let proof = Bytes::from(vec![0]);
+
     let contract = EnclaveContract::new(
         &CONFIG.http_rpc_url,
         &CONFIG.private_key,
@@ -264,7 +266,11 @@ pub async fn decrypt_and_publish_result(
     )
     .await?;
     let res = contract
-        .publish_plaintext_output(U256::from(input_crisp_id), Bytes::from(votes.to_be_bytes()))
+        .publish_plaintext_output(
+            U256::from(input_crisp_id),
+            Bytes::from(votes.to_be_bytes()),
+            proof,
+        )
         .await?;
     info!("Vote broadcast. TxHash: {:?}", res.transaction_hash);
 

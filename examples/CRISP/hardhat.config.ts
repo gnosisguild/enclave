@@ -5,14 +5,22 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 import type { HardhatUserConfig } from "hardhat/config";
-import { configVariable } from "hardhat/config";
-import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
+import { cleanDeploymentsTask} from "@enclave-e3/contracts/tasks/utils";
+import { ciphernodeAdd } from "@enclave-e3/contracts/tasks/ciphernode";
+import dotenv from "dotenv";
 
-import { ConfigurationVariable } from "hardhat/types/config";
+import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
+import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
+import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
 
-const mnemonic = configVariable("MNEMONIC");
-const privateKey = configVariable("PRIVATE_KEY");
-const infuraApiKey = configVariable("INFURA_API_KEY");
+dotenv.config();
+
+const mnemonic =
+  process.env.MNEMONIC ??
+  "test test test test test test test test test test test junk";
+const privateKey = process.env.PRIVATE_KEY!;
+const rpcUrl = process.env.RPC_URL ?? "http://localhost:8545";
 
 const chainIds = {
   "arbitrum-mainnet": 42161,
@@ -29,52 +37,46 @@ const chainIds = {
 };
 
 function getChainConfig(chain: keyof typeof chainIds, apiUrl: string) {
-  let jsonRpcUrl: string;
-  switch (chain) {
-    case "avalanche":
-      jsonRpcUrl = "https://api.avax.network/ext/bc/C/rpc";
-      break;
-    case "bsc":
-      jsonRpcUrl = "https://bsc-dataseed1.binance.org";
-      break;
-    default:
-      jsonRpcUrl = "https://" + chain + ".infura.io/v3/" + infuraApiKey;
-  }
-
-  let accounts: [ConfigurationVariable] | {  count: number, mnemonic: ConfigurationVariable, path: string } ;
+  let accounts: [string] | { count: number; mnemonic: string; path: string };
   if (privateKey) {
     accounts = [privateKey];
   } else {
-    accounts = { 
+    accounts = {
       count: 10,
-      mnemonic,
+      mnemonic: mnemonic,
       path: "m/44'/60'/0'/0",
-     };
+    };
   }
 
   return {
     accounts,
     chainId: chainIds[chain],
-    url: jsonRpcUrl,
-    type: 'http' as const,
+    url: rpcUrl,
+    type: "http" as const,
     chainType: "l1" as const,
-    blockExporers: {
+    blockExplorers: {
       etherscan: {
-        apiUrl, 
+        apiUrl,
       },
     },
   };
 }
 
 const config: HardhatUserConfig = {
-  plugins: [hardhatToolboxViemPlugin],
+  plugins: [
+    hardhatTypechainPlugin,
+    hardhatEthersChaiMatchers,
+    hardhatNetworkHelpers,
+    hardhatToolboxMochaEthersPlugin,
+  ],
+  tasks: [
+    cleanDeploymentsTask,
+    ciphernodeAdd,
+  ],
   networks: {
     hardhat: {
-      accounts: {
-        mnemonic,
-      },
-      chainId: chainIds.hardhat,
       type: "edr-simulated",
+      chainType: "l1",
     },
     ganache: {
       accounts: {
@@ -84,13 +86,25 @@ const config: HardhatUserConfig = {
       url: "http://localhost:8545",
       type: "http",
     },
-    arbitrum: getChainConfig("arbitrum-mainnet", process.env.ARBISCAN_API_KEY || ""),
+    arbitrum: getChainConfig(
+      "arbitrum-mainnet",
+      process.env.ARBISCAN_API_KEY || "",
+    ),
     avalanche: getChainConfig("avalanche", process.env.SNOWTRACE_API_KEY || ""),
     bsc: getChainConfig("bsc", process.env.BSCSCAN_API_KEY || ""),
     mainnet: getChainConfig("mainnet", process.env.ETHERSCAN_API_KEY || ""),
-    optimism: getChainConfig("optimism-mainnet", process.env.OPTIMISM_API_KEY || ""),
-    "polygon-mainnet": getChainConfig("polygon-mainnet", process.env.POLYGONSCAN_API_KEY || ""),
-    "polygon-mumbai": getChainConfig("polygon-mumbai", process.env.POLYGONSCAN_API_KEY || ""),
+    optimism: getChainConfig(
+      "optimism-mainnet",
+      process.env.OPTIMISM_API_KEY || "",
+    ),
+    "polygon-mainnet": getChainConfig(
+      "polygon-mainnet",
+      process.env.POLYGONSCAN_API_KEY || "",
+    ),
+    "polygon-mumbai": getChainConfig(
+      "polygon-mumbai",
+      process.env.POLYGONSCAN_API_KEY || "",
+    ),
     sepolia: getChainConfig("sepolia", process.env.ETHERSCAN_API_KEY || ""),
     goerli: getChainConfig("goerli", process.env.ETHERSCAN_API_KEY || ""),
   },
@@ -100,19 +114,31 @@ const config: HardhatUserConfig = {
     sources: "./contracts",
     tests: "./tests",
   },
+  typechain: {
+    outDir: "./types",
+    tsNocheck: false,
+  },
   solidity: {
     version: "0.8.28",
+    npmFilesToBuild: [
+      "poseidon-solidity/PoseidonT3.sol", 
+      "@enclave-e3/contracts/contracts/Enclave.sol",
+      "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
+      "@enclave-e3/contracts/contracts/registry/NaiveRegistryFilter.sol",
+      "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
+      "@enclave-e3/contracts/contracts/test/MockCiphernodeRegistry.sol",
+      "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
+      "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
+      "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
+      "@enclave-e3/contracts/contracts/test/MockRegistryFilter.sol",
+    ],
     settings: {
-      metadata: {
-        // Not including the metadata hash
-        // https://github.com/paulrberg/hardhat-template/issues/31
-        bytecodeHash: "none",
-      },
-      // Disable the optimizer when debugging
-      // https://hardhat.org/hardhat-network/#solidity-optimizer-support
       optimizer: {
         enabled: true,
         runs: 800,
+      },
+      metadata: {
+        bytecodeHash: "none",
       },
     },
   },
