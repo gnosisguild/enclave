@@ -101,8 +101,6 @@ async fn test_gossip(peer_handle: &mut PeerHandle) -> Result<()> {
     Ok(())
 }
 
-// async fn test_dht() -> Result<()> {}
-
 async fn runner() -> Result<()> {
     let mut peer = setup_peer().await?;
     test_gossip(&mut peer).await?;

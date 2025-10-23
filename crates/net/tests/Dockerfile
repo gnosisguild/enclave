@@ -26,6 +26,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iptables ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/p2p_test .
+COPY --from=builder /app/target/debug/p2p_test .
 
 ENTRYPOINT ["/app/p2p_test"]
