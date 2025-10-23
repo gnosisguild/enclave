@@ -20,9 +20,9 @@ export interface EnclaveArgs {
   owner?: string;
   maxDuration?: string;
   registry?: string;
-  poseidonT3Address: string;
   bondingRegistry?: string;
   feeToken?: string;
+  poseidonT3Address: string;
   hre: HardhatRuntimeEnvironment;
 }
 
@@ -55,10 +55,11 @@ export const deployAndSaveEnclave = async ({
     !registry ||
     !bondingRegistry ||
     !feeToken ||
-    (preDeployedArgs?.constructorArgs?.params === params &&
-      preDeployedArgs?.constructorArgs?.owner === owner &&
+    (preDeployedArgs?.constructorArgs?.owner === owner &&
       preDeployedArgs?.constructorArgs?.maxDuration === maxDuration &&
       preDeployedArgs?.constructorArgs?.registry === registry &&
+      preDeployedArgs?.constructorArgs?.bondingRegistry === bondingRegistry &&
+      preDeployedArgs?.constructorArgs?.feeToken === feeToken &&
       areArraysEqual(
         preDeployedArgs?.constructorArgs?.params as string[],
         params,
@@ -86,21 +87,11 @@ export const deployAndSaveEnclave = async ({
   const enclave = await enclaveFactory.deploy(
     owner,
     registry,
+    bondingRegistry,
+    feeToken,
     maxDuration,
     params,
   );
-  const enclave = await ignition.deploy(EnclaveModule, {
-    parameters: {
-      Enclave: {
-        params,
-        owner,
-        maxDuration,
-        registry,
-        bondingRegistry,
-        feeToken,
-      },
-    },
-  });
 
   await enclave.waitForDeployment();
 
@@ -110,14 +101,13 @@ export const deployAndSaveEnclave = async ({
   storeDeploymentArgs(
     {
       constructorArgs: {
-        params,
         owner,
-        maxDuration,
         registry,
         bondingRegistry,
         feeToken,
+        maxDuration,
+        params,
       },
-      constructorArgs: { owner, registry, maxDuration, params },
       blockNumber,
       address: enclaveAddress,
     },

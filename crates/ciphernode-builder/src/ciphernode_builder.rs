@@ -22,8 +22,9 @@ use e3_evm::{
         load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
         ProviderConfig,
     },
+    BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
     CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol, EnclaveSolReader,
-    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory, RegistryFilterSol,
+    EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
 };
 use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
@@ -64,8 +65,9 @@ pub struct CiphernodeBuilder {
 pub struct ContractComponents {
     enclave_reader: bool,
     enclave: bool,
-    registry_filter: bool,
     ciphernode_registry: bool,
+    bonding_registry: bool,
+    committee_sortition: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -211,8 +213,14 @@ impl CiphernodeBuilder {
     }
 
     /// Setup a writable RegistryFilter for every evm chain provided
-    pub fn with_contract_registry_filter(mut self) -> Self {
-        self.contract_components.registry_filter = true;
+    pub fn with_contract_bonding_registry(mut self) -> Self {
+        self.contract_components.bonding_registry = true;
+        self
+    }
+
+    /// Setup a writable CommitteeSortition for every evm chain provided
+    pub fn with_contract_committee_sortition(mut self) -> Self {
+        self.contract_components.committee_sortition = true;
         self
     }
 
@@ -319,14 +327,15 @@ impl CiphernodeBuilder {
                 .await?;
             }
 
-            if self.contract_components.registry_filter {
-                let write_provider = provider_cache
-                    .ensure_write_provider(&repositories, chain, cipher)
-                    .await?;
-                RegistryFilterSol::attach(
+            if self.contract_components.bonding_registry {
+                let read_provider = provider_cache.ensure_read_provider(chain).await?;
+                BondingRegistrySol::attach(
                     &local_bus,
-                    write_provider.clone(),
-                    &chain.contracts.filter_registry.address(),
+                    read_provider.clone(),
+                    &chain.contracts.bonding_registry.address(),
+                    &repositories.bonding_registry_reader(read_provider.chain_id()),
+                    chain.contracts.bonding_registry.deploy_block(),
+                    chain.rpc_url.clone(),
                 )
                 .await?;
             }

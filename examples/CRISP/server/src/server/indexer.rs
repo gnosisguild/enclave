@@ -47,10 +47,9 @@ pub async fn register_e3_requested(
             info!("E3Requested: {:?}", event);
 
             async move {
-                 // Convert custom params bytes back to token address and balance threshold.
-                 let custom_params: CustomParams =
-                 serde_json::from_slice(&event.e3.customParams)
-                     .with_context(|| "Failed to parse custom params from E3 event")?;
+                // Convert custom params bytes back to token address and balance threshold.
+                let custom_params: CustomParams = serde_json::from_slice(&event.e3.customParams)
+                    .with_context(|| "Failed to parse custom params from E3 event")?;
 
                 let token_address: Address = custom_params
                     .token_address
@@ -62,7 +61,8 @@ pub async fn register_e3_requested(
                         .ok_or_else(|| eyre::eyre!("Invalid balance threshold"))?;
 
                 // save the e3 details
-                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold).await?;
+                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold)
+                    .await?;
 
                 // Get token holders from Bitquery API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
@@ -294,7 +294,7 @@ pub async fn register_committee_published(
 pub async fn start_indexer(
     ws_url: &str,
     contract_address: &str,
-    registry_filter_address: &str,
+    registry_address: &str,
     store: impl DataStore,
     private_key: &str,
 ) -> Result<()> {
@@ -317,7 +317,7 @@ pub async fn start_indexer(
 
     // Registry Listener
     let registry_contract_listener =
-        EventListener::create_contract_listener(&ws_url, registry_filter_address).await?;
+        EventListener::create_contract_listener(&ws_url, registry_address).await?;
     let registry_listener =
         register_committee_published(registry_contract_listener, readwrite_contract).await?;
     registry_listener.start();
