@@ -122,12 +122,17 @@ const config: HardhatUserConfig = {
       "@enclave-e3/contracts/contracts/Enclave.sol",
       "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
       "@enclave-e3/contracts/contracts/registry/BondingRegistry.sol",
+      "@enclave-e3/contracts/contracts/slashing/SlashingManager.sol",
       "@enclave-e3/contracts/contracts/sortition/CommitteeSortition.sol",
+      "@enclave-e3/contracts/contracts/token/EnclaveToken.sol",
+      "@enclave-e3/contracts/contracts/token/EnclaveTicketToken.sol",
       "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
       "@enclave-e3/contracts/contracts/test/MockCiphernodeRegistry.sol",
       "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
       "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
       "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
+      "@enclave-e3/contracts/contracts/test/MockStableToken.sol",
+      "@enclave-e3/contracts/contracts/test/MockSlashingVerifier.sol",
     ],
     settings: {
       optimizer: {
