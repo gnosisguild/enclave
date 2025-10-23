@@ -345,7 +345,7 @@ importers:
     devDependencies:
       '@types/chai':
         specifier: ^5.2.2
-        version: 5.2.2
+        version: 5.2.3
       '@types/node':
         specifier: 22.7.5
         version: 22.7.5
@@ -469,7 +469,7 @@ importers:
         version: 3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       hardhat-gas-reporter:
         specifier: ^2.2.0
-        version: 2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)
+        version: 2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
@@ -640,7 +640,7 @@ importers:
         version: 5.3.0
       '@risc0/ethereum':
         specifier: file:lib/risc0-ethereum
-        version: file:templates/default/lib/risc0-ethereum
+        version: risc0-ethereum@file:templates/default/lib/risc0-ethereum
       '@types/chai':
         specifier: ^4.2.0
         version: 4.3.20
@@ -2701,9 +2701,6 @@ packages:
   '@nomicfoundation/hardhat-errors@3.0.1':
     resolution: {integrity: sha512-qXzTDmND5aNSolxms6shuLlPK8+rugKjDsLb1BRVAYnZfPBCIc52v8nX2HEW+/qBRp3YMZVDyJVrhud+Uby2JQ==}
 
-  '@nomicfoundation/hardhat-errors@3.0.3':
-    resolution: {integrity: sha512-qvVIyNE5yXFdwCD7G74fb3j+p5PjYSej/K2mhOuJBhxdGwzARpyoJbcDZrjkNyabytlt95iniZLHHWM9jvVXEA==}
-
   '@nomicfoundation/hardhat-ethers-chai-matchers@3.0.0':
     resolution: {integrity: sha512-IhDOUXv5+7cH1b8X5TX2qr2jLsMPjboFH/jXh7j090PbYWCRGwzdG3Olzzmd1X1WWpkw16nnz91+6pXuLpbQkw==}
     peerDependencies:
@@ -2794,9 +2791,6 @@ packages:
 
   '@nomicfoundation/hardhat-utils@3.0.0':
     resolution: {integrity: sha512-dpzumbxM69ny/BSVd/8jquZO3wjg61e+S81DJPJwQ7naeZNai1r9gYuxT65VgKKTYZG/xKwrP36tJvB+gRtBrg==}
-
-  '@nomicfoundation/hardhat-utils@3.0.3':
-    resolution: {integrity: sha512-XNoDJshvGR3l8/oQdNoLPLlcv+P+mGZBLixCyuO8Q0wTIyH/1+KYI77E+yvgTyw+GG4UmldFw9R3Hmnemk3KCA==}
 
   '@nomicfoundation/hardhat-verify@3.0.1':
     resolution: {integrity: sha512-gFLN8CekE0TvkwyjQ3eChoeZHd2gi4gVp+a6ntOZtlAUUbvxuKIq5OanzBa1SOPtwnYXsBAPKDsiC5uOVW4crw==}
@@ -2926,9 +2920,6 @@ packages:
 
   '@reown/appkit@1.7.8':
     resolution: {integrity: sha512-51kTleozhA618T1UvMghkhKfaPcc9JlKwLJ5uV+riHyvSoWPKPRIa5A6M1Wano5puNyW0s3fwywhyqTHSilkaA==}
-
-  '@risc0/ethereum@file:templates/default/lib/risc0-ethereum':
-    resolution: {directory: templates/default/lib/risc0-ethereum, type: directory}
 
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
@@ -3455,8 +3446,8 @@ packages:
   '@types/chai@4.3.20':
     resolution: {integrity: sha512-/pC9HAB5I/xMlc5FP77qjCnI16ChlJfW0tGa0IUcFn38VJrTV6DeZ60NU5KZBtaOZqjdpwTWohz5HU1RrhiYxQ==}
 
-  '@types/chai@5.2.2':
-    resolution: {integrity: sha512-8kB30R7Hwqf40JPiKhVzodJs2Qc1ZJ5zuT3uzw5Hq/dhNCl3G3l83jfpdI1e20BP348+fV7VIL/+FxaXkqBmWg==}
+  '@types/chai@5.2.3':
+    resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
   '@types/concat-stream@1.6.1':
     resolution: {integrity: sha512-eHE4cQPoj6ngxBZMvVf6Hw7Mh4jMW4U9lpGmS5GBPB9RYxlFg+CHaVN7ErNY4W9XfLIEn20b4VDYaIrbq0q4uA==}
@@ -3870,11 +3861,11 @@ packages:
       zod:
         optional: true
 
-  abitype@1.0.9:
-    resolution: {integrity: sha512-oN0S++TQmlwWuB+rkA6aiEefLv3SP+2l/tC5mux/TLj6qdA6rF15Vbpex4fHovLsMkwLwTIRj8/Q8vXCS3GfOg==}
+  abitype@1.1.0:
+    resolution: {integrity: sha512-6Vh4HcRxNMLA0puzPjM5GBgT4aAcFGKZzSgAXvuZ27shJP6NEpielTuqbBmZILR5/xd0PizkBGy5hReKz9jl5A==}
     peerDependencies:
       typescript: 5.8.3
-      zod: ^3 >=3.22.0
+      zod: ^3.22.0 || ^4.0.0
     peerDependenciesMeta:
       typescript:
         optional: true
@@ -8051,6 +8042,9 @@ packages:
   ripemd160@2.0.2:
     resolution: {integrity: sha512-ii4iagi25WusVoiC4B4lq7pbXfAp3D9v5CwfkY33vffw2+pkDjY1D8GaN7spsxvCSx8dkPqOZCEZyfxcmJG2IA==}
 
+  risc0-ethereum@file:templates/default/lib/risc0-ethereum:
+    resolution: {directory: templates/default/lib/risc0-ethereum, type: directory}
+
   robust-predicates@3.0.2:
     resolution: {integrity: sha512-IXgzBWvWQwE6PrDI05OvmXUIruQTcoMDzRsOd5CDvHCVLcLHMTSYvOK5Cm46kWqlV3yAbuSpBZdJ5oP5OUoStg==}
 
@@ -11744,12 +11738,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-errors@3.0.3':
-    dependencies:
-      '@nomicfoundation/hardhat-utils': 3.0.3
-    transitivePeerDependencies:
-      - supports-color
-
   '@nomicfoundation/hardhat-ethers-chai-matchers@3.0.0(@nomicfoundation/hardhat-ethers@4.0.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10))(chai@4.5.0)(ethers@6.15.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.0.1
@@ -11838,8 +11826,8 @@ snapshots:
     dependencies:
       '@noble/ciphers': 1.2.1
       '@noble/hashes': 1.7.1
-      '@nomicfoundation/hardhat-errors': 3.0.3
-      '@nomicfoundation/hardhat-utils': 3.0.3
+      '@nomicfoundation/hardhat-errors': 3.0.1
+      '@nomicfoundation/hardhat-utils': 3.0.0
       '@nomicfoundation/hardhat-zod-utils': 3.0.0(zod@3.25.76)
       chalk: 5.3.0
       debug: 4.4.1(supports-color@5.5.0)
@@ -11850,8 +11838,8 @@ snapshots:
 
   '@nomicfoundation/hardhat-mocha@3.0.1(bufferutil@4.0.9)(utf-8-validate@5.0.10)':
     dependencies:
-      '@nomicfoundation/hardhat-errors': 3.0.3
-      '@nomicfoundation/hardhat-utils': 3.0.3
+      '@nomicfoundation/hardhat-errors': 3.0.1
+      '@nomicfoundation/hardhat-utils': 3.0.0
       '@nomicfoundation/hardhat-zod-utils': 3.0.0(zod@3.25.76)
       hardhat: 3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       mocha: 11.7.2
@@ -11954,19 +11942,6 @@ snapshots:
       - typescript
 
   '@nomicfoundation/hardhat-utils@3.0.0':
-    dependencies:
-      '@streamparser/json-node': 0.0.22
-      debug: 4.4.1(supports-color@5.5.0)
-      env-paths: 2.2.1
-      ethereum-cryptography: 2.2.1
-      fast-equals: 5.2.2
-      json-stream-stringify: 3.1.6
-      rfdc: 1.4.1
-      undici: 6.21.3
-    transitivePeerDependencies:
-      - supports-color
-
-  '@nomicfoundation/hardhat-utils@3.0.3':
     dependencies:
       '@streamparser/json-node': 0.0.22
       debug: 4.4.1(supports-color@5.5.0)
@@ -12351,8 +12326,6 @@ snapshots:
       - uploadthing
       - utf-8-validate
       - zod
-
-  '@risc0/ethereum@file:templates/default/lib/risc0-ethereum': {}
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
@@ -12978,9 +12951,10 @@ snapshots:
 
   '@types/chai@4.3.20': {}
 
-  '@types/chai@5.2.2':
+  '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
+      assertion-error: 2.0.1
 
   '@types/concat-stream@1.6.1':
     dependencies:
@@ -13967,12 +13941,12 @@ snapshots:
       typescript: 5.8.3
       zod: 3.25.76
 
-  abitype@1.0.9(typescript@5.8.3)(zod@3.22.4):
+  abitype@1.1.0(typescript@5.8.3)(zod@3.22.4):
     optionalDependencies:
       typescript: 5.8.3
       zod: 3.22.4
 
-  abitype@1.0.9(typescript@5.8.3)(zod@3.25.76):
+  abitype@1.1.0(typescript@5.8.3)(zod@3.25.76):
     optionalDependencies:
       typescript: 5.8.3
       zod: 3.25.76
@@ -16404,7 +16378,7 @@ snapshots:
       - debug
       - utf-8-validate
 
-  hardhat-gas-reporter@2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10):
+  hardhat-gas-reporter@2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76):
     dependencies:
       '@ethersproject/abi': 5.8.0
       '@ethersproject/bytes': 5.8.0
@@ -16421,7 +16395,7 @@ snapshots:
       lodash: 4.17.21
       markdown-table: 2.0.0
       sha1: 1.1.1
-      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.22.4)
+      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
     transitivePeerDependencies:
       - bufferutil
       - debug
@@ -18315,7 +18289,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.0.9(typescript@5.8.3)(zod@3.25.76)
+      abitype: 1.1.0(typescript@5.8.3)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.8.3
@@ -18330,7 +18304,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.0.9(typescript@5.8.3)(zod@3.22.4)
+      abitype: 1.1.0(typescript@5.8.3)(zod@3.22.4)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.8.3
@@ -18345,7 +18319,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.0.9(typescript@5.8.3)(zod@3.25.76)
+      abitype: 1.1.0(typescript@5.8.3)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.8.3
@@ -19124,6 +19098,8 @@ snapshots:
     dependencies:
       hash-base: 3.1.0
       inherits: 2.0.4
+
+  risc0-ethereum@file:templates/default/lib/risc0-ethereum: {}
 
   robust-predicates@3.0.2: {}
 
