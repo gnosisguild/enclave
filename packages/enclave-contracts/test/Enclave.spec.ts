@@ -11,6 +11,7 @@ import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
+import CommitteeSortitionModule from "../ignition/modules/committeeSortition";
 import EnclaveModule from "../ignition/modules/enclave";
 import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
 import EnclaveTokenModule from "../ignition/modules/enclaveToken";
@@ -174,6 +175,17 @@ describe("Enclave", function () {
     const ciphernodeRegistryAddress =
       await ciphernodeRegistry.cipherNodeRegistry.getAddress();
 
+    const committeeSortition = await ignition.deploy(CommitteeSortitionModule, {
+      parameters: {
+        CommitteeSortition: {
+          bondingRegistry:
+            await bondingRegistryContract.bondingRegistry.getAddress(),
+          ciphernodeRegistry: ciphernodeRegistryAddress,
+          submissionWindow: 300,
+        },
+      },
+    });
+
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
       ciphernodeRegistryAddress,
@@ -184,6 +196,10 @@ describe("Enclave", function () {
     if (registryAddress !== ciphernodeRegistryAddress) {
       await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
     }
+
+    await ciphernodeRegistryContract.setCommitteeSortition(
+      await committeeSortition.committeeSortition.getAddress(),
+    );
 
     await ticketTokenContract.enclaveTicketToken.setRegistry(
       await bondingRegistryContract.bondingRegistry.getAddress(),

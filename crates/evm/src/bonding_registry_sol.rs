@@ -45,6 +45,19 @@ impl From<TicketBalanceUpdatedWithChainId> for EnclaveEvent {
     }
 }
 
+struct ConfigurationUpdatedWithChainId(pub IBondingRegistry::ConfigurationUpdated, pub u64);
+
+impl From<ConfigurationUpdatedWithChainId> for e3_events::ConfigurationUpdated {
+    fn from(value: ConfigurationUpdatedWithChainId) -> Self {
+        e3_events::ConfigurationUpdated {
+            parameter: value.0.parameter.to_string(),
+            old_value: value.0.oldValue,
+            new_value: value.0.newValue,
+            chain_id: value.1,
+        }
+    }
+}
+
 impl From<IBondingRegistry::OperatorActivationChanged> for e3_events::OperatorActivationChanged {
     fn from(value: IBondingRegistry::OperatorActivationChanged) -> Self {
         e3_events::OperatorActivationChanged {
@@ -57,6 +70,13 @@ impl From<IBondingRegistry::OperatorActivationChanged> for e3_events::OperatorAc
 impl From<IBondingRegistry::OperatorActivationChanged> for EnclaveEvent {
     fn from(value: IBondingRegistry::OperatorActivationChanged) -> Self {
         let payload: e3_events::OperatorActivationChanged = value.into();
+        EnclaveEvent::from(payload)
+    }
+}
+
+impl From<ConfigurationUpdatedWithChainId> for EnclaveEvent {
+    fn from(value: ConfigurationUpdatedWithChainId) -> Self {
+        let payload: e3_events::ConfigurationUpdated = value.into();
         EnclaveEvent::from(payload)
     }
 }
@@ -79,6 +99,15 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 return None;
             };
             Some(EnclaveEvent::from(event))
+        }
+        Some(&IBondingRegistry::ConfigurationUpdated::SIGNATURE_HASH) => {
+            let Ok(event) = IBondingRegistry::ConfigurationUpdated::decode_log_data(data) else {
+                error!("Error parsing event ConfigurationUpdated after topic was matched!");
+                return None;
+            };
+            Some(EnclaveEvent::from(ConfigurationUpdatedWithChainId(
+                event, chain_id,
+            )))
         }
         _topic => {
             trace!(

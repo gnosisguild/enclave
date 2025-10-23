@@ -54,3 +54,16 @@ impl BondingRegistryReaderRepositoryFactory for Repositories {
         )
     }
 }
+
+pub trait CommitteeSortitionReaderRepositoryFactory {
+    fn committee_sortition_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState>;
+}
+
+impl CommitteeSortitionReaderRepositoryFactory for Repositories {
+    fn committee_sortition_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
+        Repository::new(
+            self.store
+                .scope(StoreKeys::committee_sortition_reader(chain_id)),
+        )
+    }
+}

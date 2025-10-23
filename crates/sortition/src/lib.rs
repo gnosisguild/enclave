@@ -10,12 +10,10 @@ mod node_state;
 mod repo;
 mod sortition;
 mod ticket;
-mod ticket_bonding_sortition;
 mod ticket_sortition;
 
 pub use ciphernode_selector::*;
 pub use node_state::*;
 pub use repo::*;
 pub use sortition::*;
-pub use ticket_bonding_sortition::*;
 pub use ticket_sortition::*;

@@ -7,6 +7,7 @@ pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
+import { CommitteeSortition } from "../sortition/CommitteeSortition.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -33,6 +34,10 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @param bondingRegistry Address of the bonding registry contract
     event BondingRegistrySet(address indexed bondingRegistry);
 
+    /// @notice Emitted when the committee sortition address is set
+    /// @param committeeSortition Address of the committee sortition contract
+    event CommitteeSortitionSet(address indexed committeeSortition);
+
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //
@@ -44,6 +49,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @notice Address of the bonding registry for checking node eligibility
     address public bondingRegistry;
+
+    /// @notice Address of the committee sortition contract
+    address public committeeSortition;
 
     /// @notice Current number of registered ciphernodes
     uint256 public numCiphernodes;
@@ -98,6 +106,9 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @notice Bonding registry has not been set
     error BondingRegistryNotSet();
+
+    /// @notice Committee sortition has not been set
+    error CommitteeSortitionNotSet();
 
     /// @notice Caller is not authorized
     error Unauthorized();
@@ -170,8 +181,21 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
             committees[e3Id].threshold[1] == 0,
             CommitteeAlreadyRequested()
         );
+        require(committeeSortition != address(0), CommitteeSortitionNotSet());
+
         committees[e3Id].threshold = threshold;
         roots[e3Id] = root();
+
+        // Initialize sortition in CommitteeSortition contract
+        // Get seed from Enclave contract (will be passed via E3Requested event)
+        // For now, we'll generate it here - note: should match E3.seed from Enclave
+        uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
+        CommitteeSortition(committeeSortition).initializeSortition(
+            e3Id,
+            threshold[1], // Use N (total committee size)
+            seed,
+            block.number
+        );
 
         emit CommitteeRequested(e3Id, threshold);
         success = true;
@@ -189,6 +213,29 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) external onlyOwner {
         ICiphernodeRegistry.Committee storage committee = committees[e3Id];
         require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
+        committee.nodes = nodes;
+        bytes32 publicKeyHash = keccak256(publicKey);
+        committee.publicKey = publicKeyHash;
+        publicKeyHashes[e3Id] = publicKeyHash;
+        emit CommitteePublished(e3Id, nodes, publicKey);
+    }
+
+    /// @notice Finalizes committee from sortition and publishes it
+    /// @dev Can be called by anyone after sortition deadline. Gets committee from CommitteeSortition.
+    /// @param e3Id ID of the E3 computation
+    /// @param publicKey Aggregated public key of the committee
+    function finalizeAndPublishCommittee(
+        uint256 e3Id,
+        bytes calldata publicKey
+    ) external {
+        require(committeeSortition != address(0), CommitteeSortitionNotSet());
+        ICiphernodeRegistry.Committee storage committee = committees[e3Id];
+        require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
+
+        // Finalize sortition and get committee
+        address[] memory nodes = CommitteeSortition(committeeSortition)
+            .finalizeCommittee(e3Id);
+
         committee.nodes = nodes;
         bytes32 publicKeyHash = keccak256(publicKey);
         committee.publicKey = publicKeyHash;
@@ -249,6 +296,17 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(_bondingRegistry != address(0), ZeroAddress());
         bondingRegistry = _bondingRegistry;
         emit BondingRegistrySet(_bondingRegistry);
+    }
+
+    /// @notice Sets the committee sortition contract address
+    /// @dev Only callable by owner
+    /// @param _committeeSortition Address of the committee sortition contract
+    function setCommitteeSortition(
+        address _committeeSortition
+    ) public onlyOwner {
+        require(_committeeSortition != address(0), ZeroAddress());
+        committeeSortition = _committeeSortition;
+        emit CommitteeSortitionSet(_committeeSortition);
     }
 
     ////////////////////////////////////////////////////////////

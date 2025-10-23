@@ -8,7 +8,13 @@ import { expect } from "chai";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
 
+import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
+import CommitteeSortitionModule from "../../ignition/modules/committeeSortition";
+import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
+import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
+import MockStableTokenModule from "../../ignition/modules/mockStableToken";
+import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import { CiphernodeRegistryOwnable__factory as CiphernodeRegistryFactory } from "../../types";
 
 const AddressOne = "0x0000000000000000000000000000000000000001";
@@ -27,19 +33,109 @@ const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
 describe("CiphernodeRegistryOwnable", function () {
   async function setup() {
     const [owner, notTheOwner] = await ethers.getSigners();
+    const ownerAddress = await owner.getAddress();
 
-    const registryContract = await ignition.deploy(CiphernodeRegistryModule, {
+    // Deploy token contracts
+    const usdcContract = await ignition.deploy(MockStableTokenModule, {
       parameters: {
-        CiphernodeRegistry: {
-          enclaveAddress: await owner.getAddress(),
-          owner: await owner.getAddress(),
+        MockUSDC: {
+          initialSupply: 1000000,
         },
       },
     });
 
-    const registry = CiphernodeRegistryFactory.connect(
-      await registryContract.cipherNodeRegistry.getAddress(),
-      owner,
+    const enclTokenContract = await ignition.deploy(EnclaveTokenModule, {
+      parameters: {
+        EnclaveToken: {
+          owner: ownerAddress,
+        },
+      },
+    });
+
+    const ticketTokenContract = await ignition.deploy(
+      EnclaveTicketTokenModule,
+      {
+        parameters: {
+          EnclaveTicketToken: {
+            baseToken: await usdcContract.mockUSDC.getAddress(),
+            registry: AddressOne,
+            owner: ownerAddress,
+          },
+        },
+      },
+    );
+
+    const slashingManagerContract = await ignition.deploy(
+      SlashingManagerModule,
+      {
+        parameters: {
+          SlashingManager: {
+            admin: ownerAddress,
+            bondingRegistry: AddressOne,
+          },
+        },
+      },
+    );
+
+    const bondingRegistryContract = await ignition.deploy(
+      BondingRegistryModule,
+      {
+        parameters: {
+          BondingRegistry: {
+            owner: ownerAddress,
+            ticketToken:
+              await ticketTokenContract.enclaveTicketToken.getAddress(),
+            licenseToken: await enclTokenContract.enclaveToken.getAddress(),
+            registry: AddressOne,
+            slashedFundsTreasury: ownerAddress,
+            ticketPrice: ethers.parseEther("10"),
+            licenseRequiredBond: ethers.parseEther("1000"),
+            minTicketBalance: 5,
+            exitDelay: 7 * 24 * 60 * 60,
+          },
+        },
+      },
+    );
+
+    const registryContract = await ignition.deploy(CiphernodeRegistryModule, {
+      parameters: {
+        CiphernodeRegistry: {
+          enclaveAddress: ownerAddress,
+          owner: ownerAddress,
+        },
+      },
+    });
+
+    const registryAddress =
+      await registryContract.cipherNodeRegistry.getAddress();
+
+    const committeeSortition = await ignition.deploy(CommitteeSortitionModule, {
+      parameters: {
+        CommitteeSortition: {
+          bondingRegistry:
+            await bondingRegistryContract.bondingRegistry.getAddress(),
+          ciphernodeRegistry: registryAddress,
+          submissionWindow: 300,
+        },
+      },
+    });
+
+    const registry = CiphernodeRegistryFactory.connect(registryAddress, owner);
+
+    // Set up cross-contract dependencies
+    await ticketTokenContract.enclaveTicketToken.setRegistry(
+      await bondingRegistryContract.bondingRegistry.getAddress(),
+    );
+    await bondingRegistryContract.bondingRegistry.setRegistry(registryAddress);
+    await bondingRegistryContract.bondingRegistry.setSlashingManager(
+      await slashingManagerContract.slashingManager.getAddress(),
+    );
+    await slashingManagerContract.slashingManager.setBondingRegistry(
+      await bondingRegistryContract.bondingRegistry.getAddress(),
+    );
+
+    await registry.setCommitteeSortition(
+      await committeeSortition.committeeSortition.getAddress(),
     );
 
     const tree = new LeanIMT(hash);

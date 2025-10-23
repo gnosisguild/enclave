@@ -9,7 +9,7 @@ use alloy::primitives::U256;
 use anyhow::Result;
 use e3_data::{AutoPersist, Persistable, Repository};
 use e3_events::{
-    BusError, CommitteePublished, EnclaveErrorType, EnclaveEvent, EventBus,
+    BusError, CommitteePublished, ConfigurationUpdated, EnclaveErrorType, EnclaveEvent, EventBus,
     OperatorActivationChanged, PlaintextOutputPublished, Subscribe, TicketBalanceUpdated,
 };
 use serde::{Deserialize, Serialize};
@@ -116,6 +116,8 @@ impl NodeStateManager {
             addr.clone().into(),
         ))
         .await?;
+        bus.send(Subscribe::new("ConfigurationUpdated", addr.clone().into()))
+            .await?;
         bus.send(Subscribe::new("CommitteePublished", addr.clone().into()))
             .await?;
         bus.send(Subscribe::new(
@@ -133,33 +135,6 @@ impl Actor for NodeStateManager {
     type Context = Context<Self>;
 }
 
-/// Message to set ticket price for a chain
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct SetTicketPrice {
-    pub chain_id: u64,
-    pub price: U256,
-}
-
-impl Handler<SetTicketPrice> for NodeStateManager {
-    type Result = ();
-
-    fn handle(&mut self, msg: SetTicketPrice, _: &mut Self::Context) -> Self::Result {
-        match self.state.try_mutate(|mut state| {
-            state.ticket_prices.insert(msg.chain_id, msg.price);
-            info!(
-                chain_id = msg.chain_id,
-                price = ?msg.price,
-                "Updated ticket price"
-            );
-            Ok(state)
-        }) {
-            Ok(_) => (),
-            Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
-        }
-    }
-}
-
 impl Handler<EnclaveEvent> for NodeStateManager {
     type Result = ();
 
@@ -169,6 +144,9 @@ impl Handler<EnclaveEvent> for NodeStateManager {
                 ctx.notify(data);
             }
             EnclaveEvent::OperatorActivationChanged { data, .. } => {
+                ctx.notify(data);
+            }
+            EnclaveEvent::ConfigurationUpdated { data, .. } => {
                 ctx.notify(data);
             }
             EnclaveEvent::CommitteePublished { data, .. } => {
@@ -224,6 +202,28 @@ impl Handler<OperatorActivationChanged> for NodeStateManager {
                         "Updated operator active status"
                     );
                 }
+            }
+            Ok(state)
+        }) {
+            Ok(_) => (),
+            Err(err) => self.bus.err(EnclaveErrorType::Sortition, err),
+        }
+    }
+}
+
+impl Handler<ConfigurationUpdated> for NodeStateManager {
+    type Result = ();
+
+    fn handle(&mut self, msg: ConfigurationUpdated, _: &mut Self::Context) -> Self::Result {
+        match self.state.try_mutate(|mut state| {
+            if msg.parameter == "ticketPrice" {
+                state.ticket_prices.insert(msg.chain_id, msg.new_value);
+                info!(
+                    chain_id = msg.chain_id,
+                    old_ticket_price = ?msg.old_value,
+                    new_ticket_price = ?msg.new_value,
+                    "ConfigurationUpdated - ticket price updated"
+                );
             }
             Ok(state)
         }) {

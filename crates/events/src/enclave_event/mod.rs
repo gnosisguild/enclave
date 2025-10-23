@@ -8,8 +8,10 @@ mod ciphernode_added;
 mod ciphernode_removed;
 mod ciphernode_selected;
 mod ciphertext_output_published;
+mod committee_finalized;
 mod committee_published;
 mod compute_request;
+mod configuration_updated;
 mod decryptionshare_created;
 mod die;
 mod e3_request_complete;
@@ -25,13 +27,16 @@ mod shutdown;
 mod test_event;
 mod threshold_share_created;
 mod ticket_balance_updated;
+mod ticket_submitted;
 
 pub use ciphernode_added::*;
 pub use ciphernode_removed::*;
 pub use ciphernode_selected::*;
 pub use ciphertext_output_published::*;
+pub use committee_finalized::*;
 pub use committee_published::*;
 pub use compute_request::*;
+pub use configuration_updated::*;
 pub use decryptionshare_created::*;
 pub use die::*;
 pub use e3_request_complete::*;
@@ -47,6 +52,7 @@ pub use shutdown::*;
 pub use test_event::*;
 pub use threshold_share_created::*;
 pub use ticket_balance_updated::*;
+pub use ticket_submitted::*;
 
 use crate::{E3id, ErrorEvent, Event, EventId};
 use actix::Message;
@@ -119,6 +125,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: TicketBalanceUpdated,
     },
+    ConfigurationUpdated {
+        id: EventId,
+        data: ConfigurationUpdated,
+    },
     OperatorActivationChanged {
         id: EventId,
         data: OperatorActivationChanged,
@@ -126,6 +136,14 @@ pub enum EnclaveEvent {
     CommitteePublished {
         id: EventId,
         data: CommitteePublished,
+    },
+    CommitteeFinalized {
+        id: EventId,
+        data: CommitteeFinalized,
+    },
+    TicketSubmitted {
+        id: EventId,
+        data: TicketSubmitted,
     },
     PlaintextOutputPublished {
         id: EventId,
@@ -210,6 +228,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::CiphernodeAdded { id, .. } => id,
             EnclaveEvent::CiphernodeRemoved { id, .. } => id,
             EnclaveEvent::TicketBalanceUpdated { id, .. } => id,
+            EnclaveEvent::ConfigurationUpdated { id, .. } => id,
             EnclaveEvent::OperatorActivationChanged { id, .. } => id,
             EnclaveEvent::CommitteePublished { id, .. } => id,
             EnclaveEvent::PlaintextOutputPublished { id, .. } => id,
@@ -218,6 +237,8 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::Shutdown { id, .. } => id,
             EnclaveEvent::TestEvent { id, .. } => id,
             EnclaveEvent::ThresholdShareCreated { id, .. } => id,
+            EnclaveEvent::CommitteeFinalized { id, .. } => id,
+            EnclaveEvent::TicketSubmitted { id, .. } => id,
         }
     }
 }
@@ -235,6 +256,8 @@ impl EnclaveEvent {
             EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CommitteePublished { data, .. } => Some(data.e3_id),
             EnclaveEvent::PlaintextOutputPublished { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteeFinalized { data, .. } => Some(data.e3_id),
+            EnclaveEvent::TicketSubmitted { data, .. } => Some(data.e3_id),
             _ => None,
         }
     }
@@ -251,6 +274,7 @@ impl EnclaveEvent {
             EnclaveEvent::CiphernodeAdded { data, .. } => format!("{}", data),
             EnclaveEvent::CiphernodeRemoved { data, .. } => format!("{}", data),
             EnclaveEvent::TicketBalanceUpdated { data, .. } => format!("{:?}", data),
+            EnclaveEvent::ConfigurationUpdated { data, .. } => format!("{:?}", data),
             EnclaveEvent::OperatorActivationChanged { data, .. } => format!("{:?}", data),
             EnclaveEvent::CommitteePublished { data, .. } => format!("{:?}", data),
             EnclaveEvent::PlaintextOutputPublished { data, .. } => format!("{:?}", data),
@@ -259,6 +283,8 @@ impl EnclaveEvent {
             EnclaveEvent::Shutdown { data, .. } => format!("{:?}", data),
             EnclaveEvent::ThresholdShareCreated { data, .. } => format!("{:?}", data),
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
+            EnclaveEvent::CommitteeFinalized { data, .. } => format!("{:?}", data),
+            EnclaveEvent::TicketSubmitted { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
     }
@@ -277,8 +303,11 @@ impl_from_event!(
     CiphernodeAdded,
     CiphernodeRemoved,
     TicketBalanceUpdated,
+    ConfigurationUpdated,
     OperatorActivationChanged,
     CommitteePublished,
+    CommitteeFinalized,
+    TicketSubmitted,
     PlaintextOutputPublished,
     EnclaveError,
     Shutdown,

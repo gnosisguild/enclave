@@ -78,7 +78,7 @@ impl Handler<E3Requested> for CiphernodeSelector {
                 seed,
                 size
             );
-            if let Ok(found_index) = sortition
+            if let Ok(found_result) = sortition
                 .send(GetNodeIndex {
                     chain_id,
                     seed,
@@ -87,13 +87,23 @@ impl Handler<E3Requested> for CiphernodeSelector {
                 })
                 .await
             {
-                let Some(party_id) = found_index else {
+                let Some((party_id, ticket_id)) = found_result else {
                     info!(node = address, "Ciphernode was not selected");
                     return;
                 };
-                info!("CIPHERNODE SELECTED: node={} address={}", party_id, address);
+                match ticket_id {
+                    Some(ticket) => info!(
+                        "CIPHERNODE SELECTED: node={} address={} ticket={}",
+                        party_id, address, ticket
+                    ),
+                    None => info!(
+                        "CIPHERNODE SELECTED: node={} address={} (no ticket)",
+                        party_id, address
+                    ),
+                }
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
                     party_id,
+                    ticket_id,
                     e3_id: data.e3_id,
                     threshold_m: data.threshold_m,
                     threshold_n: data.threshold_n,

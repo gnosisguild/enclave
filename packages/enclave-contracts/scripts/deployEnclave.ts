@@ -7,6 +7,7 @@ import hre from "hardhat";
 
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
+import { deployAndSaveCommitteeSortition } from "./deployAndSave/committeeSortition";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
 import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
@@ -105,6 +106,15 @@ export const deployEnclave = async (withMocks?: boolean) => {
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
   console.log("CiphernodeRegistry deployed to:", ciphernodeRegistryAddress);
 
+  console.log("Deploying CommitteeSortition...");
+  const { committeeSortition } = await deployAndSaveCommitteeSortition({
+    bondingRegistry: bondingRegistryAddress,
+    ciphernodeRegistry: ciphernodeRegistryAddress,
+    hre,
+  });
+  const committeeSortitionAddress = await committeeSortition.getAddress();
+  console.log("CommitteeSortition deployed to:", committeeSortitionAddress);
+
   console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
     params: encoded,
@@ -145,6 +155,9 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);
 
+  console.log("Setting CommitteeSortition address in CiphernodeRegistry...");
+  await ciphernodeRegistry.setCommitteeSortition(committeeSortitionAddress);
+
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
 
@@ -183,6 +196,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
     EnclaveTicketToken: ${enclaveTicketTokenAddress}
     SlashingManager: ${slashingManagerAddress}
     BondingRegistry: ${bondingRegistryAddress}
+    CommitteeSortition: ${committeeSortitionAddress}
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
     Enclave: ${enclaveAddress}
     ============================================

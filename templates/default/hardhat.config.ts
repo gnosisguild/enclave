@@ -134,7 +134,7 @@ const config: HardhatUserConfig = {
       "@enclave-e3/contracts/contracts/test/MockComputeProvider.sol",
       "@enclave-e3/contracts/contracts/test/MockDecryptionVerifier.sol",
       "@enclave-e3/contracts/contracts/test/MockE3Program.sol",
-      "@enclave-e3/contracts/contracts/test/MockRegistryFilter.sol",
+      "@enclave-e3/contracts/contracts/sortition/CommitteeSortition.sol",
     ],
     compilers: [
       {

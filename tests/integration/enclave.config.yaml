@@ -2,9 +2,11 @@ chains:
   - name: "hardhat"
     rpc_url: "ws://localhost:8545"
     contracts:
-      enclave: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
+      e3_program: "0x67d269191c92Caf3cD7723F116c85e6E9bf55933"
+      enclave: "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"
       ciphernode_registry: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
       bonding_registry: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+      committee_sortition: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
 
 nodes:
   cn1:
