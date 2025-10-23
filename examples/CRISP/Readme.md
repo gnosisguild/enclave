@@ -280,7 +280,7 @@ CHAIN_ID=31337
 BITQUERY_API_KEY=""
 
 # Cron-job API key to trigger new rounds
-CRON_API_KEY=1234567890 
+CRON_API_KEY=1234567890
 
 # Based on Default Hardhat Deployments (Only for testing)
 ENCLAVE_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
