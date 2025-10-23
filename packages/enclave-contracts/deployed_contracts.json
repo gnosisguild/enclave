@@ -1,7 +1,7 @@
 {
   "sepolia": {
     "PoseidonT3": {
-      "blockNumber": 9461441,
+      "blockNumber": 9473394,
       "address": "0x3333333C0A88F9BE4fd23ed0536F9B6c427e3B93"
     },
     "Enclave": {
@@ -33,23 +33,23 @@
       "address": "0x0DC777566d1255B871dda65dD770cDb0E0280223"
     },
     "MockComputeProvider": {
-      "blockNumber": 9461446,
-      "address": "0x15b4159E8Cc37ce91c1C89cAcDCE71592A3D12cf"
+      "blockNumber": 9473395,
+      "address": "0x3528F39143034D0c84ebBAEc58407AD3775F26e1"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 9461448,
-      "address": "0x4697A79238A021c17Ffb76cf0995d9ec41383692"
+      "blockNumber": 9473396,
+      "address": "0x1F48f9939b9bb53635264c88E3F956Ac4F56bB58"
     },
     "MockInputValidator": {
-      "blockNumber": 9461452,
-      "address": "0x826C5Eb0C388fbCe7Ef483b9595749D42ACe14ad"
+      "blockNumber": 9473397,
+      "address": "0x645da3bFA7699d2006a34b1B223ecc712FD5d600"
     },
     "MockE3Program": {
       "constructorArgs": {
-        "mockInputValidator": "0x826C5Eb0C388fbCe7Ef483b9595749D42ACe14ad"
+        "mockInputValidator": "0x645da3bFA7699d2006a34b1B223ecc712FD5d600"
       },
-      "blockNumber": 9461453,
-      "address": "0x1375c3dB8De6F0b77B8AE2789DE2C953E96ca15e"
+      "blockNumber": 9473398,
+      "address": "0x40fF23DE7F572524CE9125E8EfDAd2aF1faFd929"
     }
   }
 }

@@ -17,7 +17,7 @@ import { readAllDeployments } from "./utils";
  */
 const findContractPath = (
   contractName: string,
-  contractsDir: string = "contracts",
+  artifactsDir: string = "artifacts",
 ): string | undefined => {
   const searchDir = (dir: string): string | undefined => {
     const files = fs.readdirSync(dir);
@@ -29,23 +29,42 @@ const findContractPath = (
       if (stat.isDirectory()) {
         const result = searchDir(fullPath);
         if (result) return result;
-      } else if (file.endsWith(".sol")) {
-        const content = fs.readFileSync(fullPath, "utf-8");
-        // Look for contract definition
-        const contractRegex = new RegExp(
-          `contract\\s+${contractName}\\s+`,
-          "m",
-        );
-        if (contractRegex.test(content)) {
-          // Return in Hardhat's format: relative/path/File.sol:ContractName
-          return `${fullPath}:${contractName}`;
+      } else if (file === `${contractName}.json`) {
+        try {
+          const artifact = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+
+          if (artifact.sourceName && artifact.contractName === contractName) {
+            const sourceName = artifact.sourceName;
+
+            // Skip external packages - return undefined so they won't be verified
+            if (
+              sourceName.startsWith("./@") ||
+              sourceName.startsWith("@") ||
+              sourceName.includes("node_modules")
+            ) {
+              console.log(
+                `⏭️  Skipping external contract: ${contractName} (from ${sourceName})`,
+              );
+              return undefined;
+            }
+
+            // For local contracts, remove leading './' and return the path
+            let localPath = sourceName;
+            if (localPath.startsWith("./")) {
+              localPath = localPath.slice(2);
+            }
+
+            return `${localPath}:${contractName}`;
+          }
+        } catch (error) {
+          console.warn(`Failed to parse artifact at ${fullPath}:`, error);
         }
       }
     }
     return undefined;
   };
 
-  return searchDir(contractsDir);
+  return searchDir(artifactsDir);
 };
 
 /**
