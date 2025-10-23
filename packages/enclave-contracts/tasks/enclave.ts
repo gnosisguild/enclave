@@ -275,9 +275,15 @@ export const publishCommittee = task(
         "../scripts/deployAndSave/ciphernodeRegistryOwnable"
       );
 
+      const { deployAndSavePoseidonT3 } = await import(
+        "../scripts/deployAndSave/poseidonT3"
+      );
+      const poseidonT3 = await deployAndSavePoseidonT3({ hre });
+
       const { ciphernodeRegistry } =
         await deployAndSaveCiphernodeRegistryOwnable({
           hre,
+          poseidonT3Address: poseidonT3,
         });
 
       const nodesToSend = nodes
