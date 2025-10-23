@@ -9,8 +9,6 @@ use anyhow::{anyhow, Result};
 use fhe_rs::bfv::{Encoding, Plaintext, PublicKey};
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
 use greco::vectors::GrecoVectors;
-use num_bigint::BigInt;
-use num_traits::Num;
 use rand::thread_rng;
 
 /// Encrypt a u64 using BFV homomorphic encryption
@@ -116,13 +114,7 @@ pub fn bfv_verifiable_encrypt_u64(
     )
     .map_err(|e| anyhow!("Error computing input validation vectors: {}", e))?;
 
-    let zkp_modulus = BigInt::from_str_radix(
-        "21888242871839275222246405745257275088548364400416034343698204186575808495617",
-        10,
-    )
-    .unwrap();
-
-    let standard_input_val = input_val_vectors.standard_form(&zkp_modulus);
+    let standard_input_val = input_val_vectors.standard_form();
 
     Ok(VerifiableEncryptionResult {
         encrypted_vote: cipher_text.to_bytes(),
