@@ -8,12 +8,11 @@ import { network } from "hardhat";
 import { zeroAddress, zeroHash } from "viem";
 
 import assert from "node:assert/strict";
-import { describe, it, before } from "node:test";
+import { describe, it } from "node:test";
 
 
 describe("CRISP Contracts", async function () {
-    const { viem: viemHardhat } = await network.connect();
-    const publicClient = await viemHardhat.getPublicClient();
+    const { ethers } = await network.connect();
 
     const nonZeroAddress = "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d";
 
@@ -22,17 +21,11 @@ describe("CRISP Contracts", async function () {
             /*
                 IEnclave _enclave,
                 IRiscZeroVerifier _verifier,
-                ISemaphore _semaphore,
-                CRISPCheckerFactory _checkerFactory,
-                CRISPPolicyFactory _policyFactory,
                 CRISPInputValidatorFactory _inputValidatorFactory,
                 HonkVerifier _honkVerifier,
                 bytes32 _imageId
             */
-            const program = await viemHardhat.deployContract("CRISPProgram", [
-                nonZeroAddress,
-                nonZeroAddress,
-                nonZeroAddress,
+            const program = await ethers.deployContract("CRISPProgram", [
                 nonZeroAddress,
                 nonZeroAddress,
                 nonZeroAddress,
@@ -40,7 +33,7 @@ describe("CRISP Contracts", async function () {
                 zeroHash
             ])
             
-            assert(program.address !== zeroAddress)
+            assert(await program.getAddress() !== zeroAddress)
         })
     })
 })

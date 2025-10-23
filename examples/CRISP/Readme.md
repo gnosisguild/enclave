@@ -42,16 +42,14 @@ You can install Pnpm following the official [documentation](https://pnpm.io/inst
 
 You can add Metamask as extension to your browser following the official [documentation](https://metamask.io).
 
-### Install Rust and Foundry
+### Install Rust
 
-You need to install Rust and Foundry first. After installation, restart your terminal.
+You need to install Rust. After installation, restart your terminal.
 
 ```sh
 # Install Rust
 curl https://sh.rustup.rs -sSf | sh
 
-# Install Foundry
-curl -L https://foundry.paradigm.xyz | bash
 ```
 
 ### Install RISC Zero Toolchain
@@ -81,41 +79,29 @@ You need to setup your environment variables for `client/` and `server/`. Just c
 ### Client
 
 ```bash
-VITE_E3_PROGRAM_ADDRESS=0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44 # Default E3 program address from anvil
-VITE_SEMAPHORE_ADDRESS=0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
+VITE_E3_PROGRAM_ADDRESS=0x0B306BF915C4d645ff596e518fAf3F9669b97016 # Default E3 program address
 ```
 
 ### Server
 
 ```bash
-ENCLAVE_ADDRESS="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+ENCLAVE_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 CIPHERNODE_REGISTRY_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
 NAIVE_REGISTRY_FILTER_ADDRESS="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-E3_PROGRAM_ADDRESS="0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44" # CRISPProgram Contract Address
+E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPProgram Contract Address
 ```
 
 These address will be displayed after successfully running the `pnpm dev:up` command in a log that will look like the following:
 
 ```bash
-[DEPLOY] Script ran successfully.
-[DEPLOY]
-[DEPLOY] == Logs ==
-[DEPLOY]   Deploying on ChainID 31337
-[DEPLOY]   Using config profile: custom
-[DEPLOY]   Using MockRISC0Verifier
-[DEPLOY]   Deployed MockRISC0Verifier to 0x0B306BF915C4d645ff596e518fAf3F9669b97016
-[DEPLOY]   Enclave Address:  0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-[DEPLOY]   Verifier Address:  0x0B306BF915C4d645ff596e518fAf3F9669b97016
-[DEPLOY]   Deployed SemaphoreNoirVerifier to 0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1
-[DEPLOY]   Deployed Semaphore to 0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
-[DEPLOY]   Deployed CRISPCheckerFactory to 0x68B1D87F95878fE05B998F19b66F4baba5De1aed
-[DEPLOY]   Deployed CRISPPolicyFactory to 0x3Aa5ebB10DC797CAC828524e59A333d0A371443c
-[DEPLOY]   Using CRISPInputValidator
-[DEPLOY]   Deployed InputValidator to:  0xc6e7DF5E7b4f2A278906862b61205850344D4e7d
-[DEPLOY]   Deployed CRISPInputValidatorFactory to 0x59b670e9fA9D0A427751Af201D676719a970857b
-[DEPLOY]   Deployed HonkVerifier to 0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1
-[DEPLOY]   Deployed CRISPProgram to 0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44
-[DEPLOY]   Enabled E3 Program on Enclave
+Deployments:
+----------------------------------------------------------------------
+Enclave: 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+Verifier: 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0
+InputValidator: 0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6
+CRISPInputValidatorFactory: 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82
+HonkVerifier: 0x9A676e781A523b5d0C0e43731313A708CB607508
+CRISPProgram: 0x0B306BF915C4d645ff596e518fAf3F9669b97016
 ```
 
 If you find any inconsistency with the addresses on the environment, you must update them and run the script again (they must match).
@@ -141,7 +127,7 @@ pnpm clean
 
 This will start all CRISP components:
 
-- Anvil (local blockchain)
+- Hardhat node (local blockchain)
 - Deploy all contracts
 - Compile all ZK circuits
 - Ciphernodes network
@@ -164,9 +150,9 @@ pnpm cli
 Once everything is running, you can:
 
 1. Navigate `http://localhost:3000` for the client interface
-2. Add the Anvil private key to your wallet: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+2. Add the Hardhat private key to your wallet: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
 3. Press `Connect Wallet` button and complete the association with your MetaMask account
-4. Switch to `Anvil` local network (this will be handled automatically by the app. You just need to press on the connected account on the frontend and select the network. Then, complete the configuration on MetaMask pop-up).
+4. Switch to `Hardhat` local network (this will be handled automatically by the app. You just need to press on the connected account on the frontend and select the network. Then, complete the configuration on MetaMask pop-up).
 5. Open a new terminal, run `pnpm cli` and start a new E3 Round.
 6. Refresh and interact with the round following the Client interface.
 
@@ -222,28 +208,16 @@ Keep Anvil running in the terminal, and open a new terminal for the next steps.
    git clone https://github.com/gnosisguild/enclave.git
    ```
 
-2. Navigate to the `enclave-contracts` directory:
+2. Navigate to the `examples/CRISP` directory inside the cloned repository:
 
    ```sh
-   cd enclave/packages/enclave-contracts
+   cd enclave/examples/CRISP
    ```
 
-3. Install dependencies:
+3. Deploy the contracts:
 
    ```sh
-   pnpm install
-   ```
-
-4. Delete any previous local deployment (if any):
-
-   ```sh
-   pnpm clean:ignition:deployments
-   ```
-
-5. Deploy the contracts on the local testnet:
-
-   ```sh
-   pnpm deploy:mocks --network localhost
+   pnpm deploy:contracts:full
    ```
 
 After deployment, you will see the addresses for the following contracts:
@@ -255,14 +229,15 @@ After deployment, you will see the addresses for the following contracts:
 - Mock E3 Program
 - Mock Decryption Verifier
 - Mock Compute Provider
+- RISC Zero Verifier
+- Honk Verifier
+- CRISP Input Validator Factory
+- CRISP Program
 
-Note down the first four addresses as they will be needed to configure `risc0`, `local_testnet` and the `server`.
-
-### Step 3: Deploy the RISC Zero Contracts
+### Step 3: RISC0 Setup (Optional)
 
 > Please note that this step is optional for development only. You can run the program server in dev mode which does not use Risc0.
-
-1. Navigate to the `CRISP/lib/risc0-ethereum` directory.
+> The smart contracts would have already been deployed at the previous step.
 
 ---
 
@@ -288,30 +263,6 @@ The following steps are optional. You can config [Bonsai](https://dev.risczero.c
 
 ---
 
-2. In the `risc0/script` directory, update the `config.toml` with the deployed contract addresses. The following configuration is based on default deployment addresses using local Anvil node:
-
-   ```toml
-   [profile.custom]
-   chainId = 31337
-   riscZeroVerifierAddress = "0x0000000000000000000000000000000000000000"
-   enclaveAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-   inputValidatorAddress = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
-   ```
-
-3. Export the ETH_WALLET_PRIVATE_KEY environment variable (Anvil's default private key):
-
-   ```sh
-   export ETH_WALLET_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-   ```
-
-4. Deploy the contracts:
-
-   ```sh
-   forge script --rpc-url http://localhost:8545 --broadcast script/Deploy.s.sol
-   ```
-
-Note down the `CRISPProgram` contract Address, which will be used as the E3 Program Address.
-
 ### Step 4: Set up Environment Variables
 
 Create a `.env` file in the `server` directory with the following:
@@ -325,14 +276,17 @@ PROGRAM_SERVER_URL=http://127.0.0.1:13151
 WS_RPC_URL=ws://127.0.0.1:8545
 CHAIN_ID=31337
 
-# Cron-job API key to trigger new rounds
-CRON_API_KEY=1234567890
+# Bitquery API key
+BITQUERY_API_KEY=""
 
-# Based on Default Anvil Deployments (Only for testing)
-ENCLAVE_ADDRESS="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+# Cron-job API key to trigger new rounds
+CRON_API_KEY=1234567890 
+
+# Based on Default Hardhat Deployments (Only for testing)
+ENCLAVE_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 CIPHERNODE_REGISTRY_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
 NAIVE_REGISTRY_FILTER_ADDRESS="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-E3_PROGRAM_ADDRESS="0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44" # CRISPProgram Contract Address
+E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPProgram Contract Address
 
 # E3 Config
 E3_WINDOW_SIZE=40

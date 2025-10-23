@@ -33,6 +33,6 @@ concurrently \
   -ks first \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
-  "anvil" \
-  "./scripts/evm_deploy.sh && ./scripts/crisp_deploy.sh && ./scripts/dev_services.sh"
+  "pnpm hardhat node" \
+  "./scripts/crisp_deploy.sh && ./scripts/dev_services.sh"
 
