@@ -3,7 +3,6 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-
 import { expect } from "chai";
 import { network } from "hardhat";
 
@@ -531,7 +530,7 @@ describe("CommitteeSortition", function () {
       await committeeSortition.connect(node1).submitTicket(E3_ID, 1);
       await committeeSortition.connect(node2).submitTicket(E3_ID, 1);
 
-      const topNodesBefore = await committeeSortition.getTopNodes(E3_ID);
+      // const topNodesBefore = await committeeSortition.getTopNodes(E3_ID);
 
       // Submit from node3 - should replace worst if score is better
       await committeeSortition.connect(node3).submitTicket(E3_ID, 1);
