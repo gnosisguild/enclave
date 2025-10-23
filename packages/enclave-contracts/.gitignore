@@ -8,12 +8,14 @@
 !/artifacts/contracts/
 !/artifacts/contracts/interfaces/
 !/artifacts/contracts/registry/
+!/artifacts/contracts/sortition/
 !/artifacts/contracts/interfaces/IEnclave.sol/
 !/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/
 !/artifacts/contracts/interfaces/IBondingRegistry.sol/
 !/artifacts/contracts/interfaces/IEnclave.sol/IEnclave.json
 !/artifacts/contracts/interfaces/ICiphernodeRegistry.sol/ICiphernodeRegistry.json
 !/artifacts/contracts/interfaces/IBondingRegistry.sol/IBondingRegistry.json
+!/artifacts/contracts/sortition/CommitteeSortition.sol/CommitteeSortition.json
 build
 cache
 coverage
