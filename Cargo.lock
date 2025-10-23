@@ -1684,6 +1684,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
 
 [[package]]
+name = "bigint-poly"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/bigint-poly#6b992dd81c65cc693b388e37edfd190749bfc3b3"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2611,14 +2622,12 @@ dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
  "anyhow",
- "e3-greco-generator",
  "fhe",
  "fhe-traits",
  "fhe-util",
  "hex",
- "num-bigint",
- "num-traits",
  "rand 0.8.5",
+ "zkfhe-greco",
 ]
 
 [[package]]
@@ -2883,37 +2892,6 @@ dependencies = [
  "regex",
  "tokio",
  "vfs",
-]
-
-[[package]]
-name = "e3-greco-generator"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/greco#77ef983e259c6ed5fd9f226ecc3778c21a6acf2b"
-dependencies = [
- "blake3",
- "clap",
- "e3-greco-polynomial",
- "fhe",
- "fhe-math",
- "fhe-traits",
- "itertools 0.14.0",
- "num-bigint",
- "num-traits",
- "rand 0.8.5",
- "rayon",
- "serde",
- "serde_json",
- "toml",
-]
-
-[[package]]
-name = "e3-greco-polynomial"
-version = "0.1.0"
-source = "git+https://github.com/gnosisguild/greco#77ef983e259c6ed5fd9f226ecc3778c21a6acf2b"
-dependencies = [
- "num-bigint",
- "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -8990,6 +8968,49 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.106",
+]
+
+[[package]]
+name = "zkfhe-greco"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#8b3d302ef4c0f7f5e425a9d9e2e630919a12e8f8"
+dependencies = [
+ "anyhow",
+ "bigint-poly",
+ "blake3",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "itertools 0.14.0",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "zkfhe-shared",
+]
+
+[[package]]
+name = "zkfhe-shared"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#8b3d302ef4c0f7f5e425a9d9e2e630919a12e8f8"
+dependencies = [
+ "anyhow",
+ "bigint-poly",
+ "chrono",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "toml",
 ]
 
 [[package]]

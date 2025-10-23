@@ -9,9 +9,7 @@ use anyhow::{anyhow, Result};
 use fhe::bfv::{Encoding, Plaintext, PublicKey};
 use fhe::Error as FheError;
 use fhe_traits::{DeserializeParametrized, FheEncoder, FheEncrypter, Serialize};
-use greco::InputValidationVectors;
-use num_bigint::BigInt;
-use num_traits::Num;
+use greco::vectors::GrecoVectors;
 use rand::thread_rng;
 
 /// Encrypt some data using BFV homomorphic encryption
@@ -106,7 +104,7 @@ where
         .map_err(|e| anyhow!("Error encrypting data: {}", e))?;
 
     // Create Greco input validation ZK proof
-    let input_val_vectors = InputValidationVectors::compute(
+    let input_val_vectors = GrecoVectors::compute(
         &plaintext,
         &u_rns,
         &e0_rns,
@@ -117,13 +115,7 @@ where
     )
     .map_err(|e| anyhow!("Error computing input validation vectors: {}", e))?;
 
-    let zkp_modulus = BigInt::from_str_radix(
-        "21888242871839275222246405745257275088548364400416034343698204186575808495617",
-        10,
-    )
-    .unwrap();
-
-    let standard_input_val = input_val_vectors.standard_form(&zkp_modulus);
+    let standard_input_val = input_val_vectors.standard_form();
 
     Ok(VerifiableEncryptionResult {
         encrypted_data: cipher_text.to_bytes(),
