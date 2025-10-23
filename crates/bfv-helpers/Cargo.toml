@@ -13,8 +13,6 @@ fhe-traits.workspace = true
 fhe_rs.workspace = true
 rand.workspace = true
 anyhow.workspace = true
-num-bigint.workspace = true
-num-traits.workspace = true
 fhe-util = { git = "https://github.com/gnosisguild/fhe.rs" }
 greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator", version = "0.1.0"} 
 
