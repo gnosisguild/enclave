@@ -7,7 +7,8 @@
 use anyhow::{bail, Result};
 use e3_events::CorrelationId;
 use e3_net::events::{GossipData, NetCommand, NetEvent};
-use e3_net::NetInterface;
+use e3_net::{Cid, NetInterface};
+use e3_utils::ArcBytes;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::sync::{broadcast, mpsc};
@@ -22,15 +23,14 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 // We have a docker test harness that runs the nodes and blocks things like mdns ports to ensure
 // that basic discovery is working
 
-async fn test_gossip(peer_handle: &mut PeerHandle) -> Result<()> {
+async fn test_gossip(peer: &mut PeerHandle) -> Result<()> {
     let topic = "test-topic";
-    let name = peer_handle.name.clone();
+    let name = peer.name.clone();
     println!("{} starting up", name);
 
     // Send our message first
     println!("{} sending message", name);
-    peer_handle
-        .tx
+    peer.tx
         .send(NetCommand::GossipPublish {
             correlation_id: CorrelationId::new(),
             topic: topic.to_string(),
@@ -55,7 +55,7 @@ async fn test_gossip(peer_handle: &mut PeerHandle) -> Result<()> {
     // Wrap the message receiving loop in a timeout
     let receive_result = timeout(Duration::from_secs(10), async {
         while received != expected {
-            match peer_handle.rx.recv().await? {
+            match peer.rx.recv().await? {
                 NetEvent::GossipData(GossipData::GossipBytes(msg)) => {
                     match String::from_utf8(msg) {
                         Ok(msg) => {
@@ -91,7 +91,7 @@ async fn test_gossip(peer_handle: &mut PeerHandle) -> Result<()> {
     }
 
     // Make sure router task is still running
-    if peer_handle.running.is_finished() {
+    if peer.running.is_finished() {
         println!("{} warning: router task finished early", name);
     }
 
@@ -101,9 +101,30 @@ async fn test_gossip(peer_handle: &mut PeerHandle) -> Result<()> {
     Ok(())
 }
 
+async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
+    let value = b"I am he as you are he, as you are me and we are all together";
+    peer.tx
+        .send(NetCommand::DhtPutRecord {
+            correlation_id: CorrelationId::new(),
+            key: Cid::from_content(value),
+            value: ArcBytes::from_bytes(value.to_vec()),
+            expires: None,
+        })
+        .await?;
+
+    let NetEvent::DhtPutRecordSucceeded { correlation_id, .. } =
+        timeout(Duration::from_secs(4), peer.rx.recv()).await??
+    else {
+        bail!("msg not as expected");
+    };
+
+    Ok(())
+}
+
 async fn runner() -> Result<()> {
     let mut peer = setup_peer().await?;
     test_gossip(&mut peer).await?;
+    test_dht(&mut peer).await?;
     Ok(())
 }
 
