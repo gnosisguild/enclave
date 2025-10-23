@@ -148,6 +148,10 @@ async fn publish_plaintext_output<P: Provider + WalletProvider + Clone>(
     let e3_id: U256 = e3_id.try_into()?;
     let decrypted_output = Bytes::from(decrypted_output);
     let proof = Bytes::from(vec![1]);
+
+    // Wait for ciphertext output transaction to propagate
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
     let from_address = provider.provider().default_signer_address();
     let current_nonce = provider
         .provider()
