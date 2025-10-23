@@ -208,7 +208,7 @@ Keep Anvil running in the terminal, and open a new terminal for the next steps.
    git clone https://github.com/gnosisguild/enclave.git
    ```
 
-2. Navigate to the `examples/CRISP` directory inside the cloned repository:ain
+2. Navigate to the `examples/CRISP` directory inside the cloned repository:
 
    ```sh
    cd enclave/examples/CRISP
@@ -286,7 +286,7 @@ CRON_API_KEY=1234567890
 ENCLAVE_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 CIPHERNODE_REGISTRY_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
 NAIVE_REGISTRY_FILTER_ADDRESS="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPProgram Contract Addressin
+E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPProgram Contract Address
 
 # E3 Config
 E3_WINDOW_SIZE=40
