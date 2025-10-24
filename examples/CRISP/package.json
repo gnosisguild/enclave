@@ -16,7 +16,7 @@
     "compile:contracts": "pnpm -C packages/crisp-contracts compile",
     "ciphernode:add": "pnpm -C packages/crisp-contracts ciphernode:add",
     "test": "pnpm test:e2e",
-    "test:circuits:inputs": "hardhat test test/governanceCircuit.test.ts",
+    "test:circuits:inputs": "node --test test/governanceCircuit.test.ts",
     "test:circuits": "cd circuits && nargo test",
     "test:sdk": "cd sdk && pnpm test",
     "release:sdk": "cd sdk && pnpm release",
