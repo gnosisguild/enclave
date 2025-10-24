@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import {
   EnclaveToken,
   EnclaveToken__factory as EnclaveTokenFactory,
@@ -56,7 +55,7 @@ export const deployAndSaveEnclaveToken = async ({
 }: EnclaveTokenArgs): Promise<{
   enclaveToken: EnclaveToken;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
@@ -78,19 +77,14 @@ export const deployAndSaveEnclaveToken = async ({
     return { enclaveToken: enclaveTokenContract };
   }
 
-  const enclaveToken = await ignition.deploy(EnclaveTokenModule, {
-    parameters: {
-      EnclaveToken: {
-        owner,
-      },
-    },
-  });
+  const enclaveTokenFactory = await ethers.getContractFactory("EnclaveToken");
+  const enclaveToken = await enclaveTokenFactory.deploy(owner);
 
-  await enclaveToken.enclaveToken.waitForDeployment();
+  await enclaveToken.waitForDeployment();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
-  const enclaveTokenAddress = await enclaveToken.enclaveToken.getAddress();
+  const enclaveTokenAddress = await enclaveToken.getAddress();
 
   storeDeploymentArgs(
     {

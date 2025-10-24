@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
 import {
   EnclaveTicketToken,
   EnclaveTicketToken__factory as EnclaveTicketTokenFactory,
@@ -35,7 +34,7 @@ export const deployAndSaveEnclaveTicketToken = async ({
 }: EnclaveTicketTokenArgs): Promise<{
   enclaveTicketToken: EnclaveTicketToken;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
@@ -61,22 +60,19 @@ export const deployAndSaveEnclaveTicketToken = async ({
     return { enclaveTicketToken: enclaveTicketTokenContract };
   }
 
-  const enclaveTicketToken = await ignition.deploy(EnclaveTicketTokenModule, {
-    parameters: {
-      EnclaveTicketToken: {
-        baseToken,
-        registry,
-        owner,
-      },
-    },
-  });
+  const enclaveTicketTokenFactory =
+    await ethers.getContractFactory("EnclaveTicketToken");
+  const enclaveTicketToken = await enclaveTicketTokenFactory.deploy(
+    baseToken,
+    registry,
+    owner,
+  );
 
-  await enclaveTicketToken.enclaveTicketToken.waitForDeployment();
+  await enclaveTicketToken.waitForDeployment();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
-  const enclaveTicketTokenAddress =
-    await enclaveTicketToken.enclaveTicketToken.getAddress();
+  const enclaveTicketTokenAddress = await enclaveTicketToken.getAddress();
 
   storeDeploymentArgs(
     {

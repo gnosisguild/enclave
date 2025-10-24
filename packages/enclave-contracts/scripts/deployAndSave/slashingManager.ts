@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import SlashingManagerModule from "../../ignition/modules/slashingManager";
 import {
   SlashingManager,
   SlashingManager__factory as SlashingManagerFactory,
@@ -33,7 +32,7 @@ export const deployAndSaveSlashingManager = async ({
 }: SlashingManagerArgs): Promise<{
   slashingManager: SlashingManager;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
@@ -57,21 +56,18 @@ export const deployAndSaveSlashingManager = async ({
     return { slashingManager: slashingManagerContract };
   }
 
-  const slashingManager = await ignition.deploy(SlashingManagerModule, {
-    parameters: {
-      SlashingManager: {
-        admin,
-        bondingRegistry,
-      },
-    },
-  });
+  const slashingManagerFactory =
+    await ethers.getContractFactory("SlashingManager");
+  const slashingManager = await slashingManagerFactory.deploy(
+    admin,
+    bondingRegistry,
+  );
 
-  await slashingManager.slashingManager.waitForDeployment();
+  await slashingManager.waitForDeployment();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
-  const slashingManagerAddress =
-    await slashingManager.slashingManager.getAddress();
+  const slashingManagerAddress = await slashingManager.getAddress();
 
   storeDeploymentArgs(
     {

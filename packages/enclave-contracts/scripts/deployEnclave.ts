@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import hre from "hardhat";
 
-import { autoCleanIgnitionForLocalhost } from "./cleanIgnitionState";
+import { autoCleanForLocalhost } from "./cleanIgnitionState";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
 import { deployAndSaveCommitteeSortition } from "./deployAndSave/committeeSortition";
@@ -23,12 +23,9 @@ import { deployMocks } from "./deployMocks";
 export const deployEnclave = async (withMocks?: boolean) => {
   const { ethers } = await hre.network.connect();
 
-  // Auto-clean Ignition state for local networks to prevent stale state issues
-  const [signer] = await ethers.getSigners();
-  const network = await signer.provider?.getNetwork();
-  const chainId = Number(network?.chainId ?? 31337);
+  // Auto-clean state for local networks to prevent stale state issues
   const networkName = hre.globalOptions.network ?? "localhost";
-  await autoCleanIgnitionForLocalhost(networkName, chainId);
+  await autoCleanForLocalhost(networkName);
 
   const [owner] = await ethers.getSigners();
 

@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
 import {
   BondingRegistry,
   BondingRegistry__factory as BondingRegistryFactory,
@@ -47,7 +46,7 @@ export const deployAndSaveBondingRegistry = async ({
 }: BondingRegistryArgs): Promise<{
   bondingRegistry: BondingRegistry;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
@@ -88,28 +87,26 @@ export const deployAndSaveBondingRegistry = async ({
     return { bondingRegistry: bondingRegistryContract };
   }
 
-  const bondingRegistry = await ignition.deploy(BondingRegistryModule, {
-    parameters: {
-      BondingRegistry: {
-        owner,
-        ticketToken,
-        licenseToken,
-        registry,
-        slashedFundsTreasury,
-        ticketPrice,
-        licenseRequiredBond,
-        minTicketBalance,
-        exitDelay,
-      },
-    },
-  });
+  const bondingRegistryFactory =
+    await ethers.getContractFactory("BondingRegistry");
 
-  await bondingRegistry.bondingRegistry.waitForDeployment();
+  const bondingRegistry = await bondingRegistryFactory.deploy(
+    owner,
+    ticketToken,
+    licenseToken,
+    registry,
+    slashedFundsTreasury,
+    ticketPrice,
+    licenseRequiredBond,
+    minTicketBalance,
+    exitDelay,
+  );
+
+  await bondingRegistry.waitForDeployment();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
-  const bondingRegistryAddress =
-    await bondingRegistry.bondingRegistry.getAddress();
+  const bondingRegistryAddress = await bondingRegistry.getAddress();
 
   storeDeploymentArgs(
     {
