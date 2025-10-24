@@ -3,7 +3,8 @@ packages:
   - docs
   - examples/CRISP
   - examples/CRISP/client
-  - examples/CRISP/sdk
+  - examples/CRISP/packages/crisp-sdk
+  - examples/CRISP/packages/crisp-contracts
   - packages/enclave-config
   - packages/enclave-react
   - packages/enclave-sdk

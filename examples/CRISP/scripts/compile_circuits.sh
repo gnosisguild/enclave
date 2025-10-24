@@ -37,7 +37,7 @@ fi
 
 # Copy the Solidity Verifier to the contracts folder
 echo "Copying Solidity Verifier to contracts folder..."
-if ! cp circuits/target/CRISPVerifier.sol contracts/CRISPVerifier.sol; then
+if ! cp circuits/target/CRISPVerifier.sol packages/crisp-contracts/contracts/CRISPVerifier.sol; then
     echo "Error: Failed to copy Solidity Verifier to contracts folder"
     exit 1
 fi
