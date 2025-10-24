@@ -4,14 +4,15 @@ CRISP (Coercion-Resistant Impartial Selection Protocol) is a secure protocol for
 
 ## Project Structure
 
-CRISP follows a modern structure with clear separation of concerns
+CRISP follows a modern structure with clear separation of concerns, consistent with the Enclave root structure.
 
 ```bash
 CRISP/
 |── client/                  # React frontend application
 |── server/                  # Rust coordination server
 |── program/                 # RISC Zero computation program
-├── contracts/               # Smart contracts (Solidity)
+|__ packages/                # JavaScript packages.
+|__ crates/                  # Rust crates.
 ├── circuits/                # Noir circuits for ZK proofs
 ├── scripts/                 # Development and utility scripts
 ├── enclave.config.yaml      # Ciphernode configuration
@@ -79,7 +80,7 @@ You need to setup your environment variables for `client/` and `server/`. Just c
 ### Client
 
 ```bash
-VITE_E3_PROGRAM_ADDRESS=0x0B306BF915C4d645ff596e518fAf3F9669b97016 # Default E3 program address
+VITE_E3_PROGRAM_ADDRESS=0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1 # Default E3 program address
 ```
 
 ### Server
@@ -88,7 +89,7 @@ VITE_E3_PROGRAM_ADDRESS=0x0B306BF915C4d645ff596e518fAf3F9669b97016 # Default E3 
 ENCLAVE_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 CIPHERNODE_REGISTRY_ADDRESS="0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
 NAIVE_REGISTRY_FILTER_ADDRESS="0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
-E3_PROGRAM_ADDRESS="0x0B306BF915C4d645ff596e518fAf3F9669b97016" # CRISPProgram Contract Address
+E3_PROGRAM_ADDRESS="0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1" # CRISPProgram Contract Address
 ```
 
 These address will be displayed after successfully running the `pnpm dev:up` command in a log that will look like the following:
@@ -101,7 +102,7 @@ Verifier: 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0
 InputValidator: 0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6
 CRISPInputValidatorFactory: 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82
 HonkVerifier: 0x9A676e781A523b5d0C0e43731313A708CB607508
-CRISPProgram: 0x0B306BF915C4d645ff596e518fAf3F9669b97016
+CRISPProgram: 0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1
 ```
 
 If you find any inconsistency with the addresses on the environment, you must update them and run the script again (they must match).
@@ -111,18 +112,11 @@ If you find any inconsistency with the addresses on the environment, you must up
 The fastest way to get CRISP running is using the scripts provided in the `scripts/` directory:
 
 ```bash
-# Install dependencies
-pnpm install
-
 # Setup and build the development environment
 pnpm dev:setup
 
 # Start all services (Anvil, Ciphernodes, Applications)
 pnpm dev:up
-
-# Clean up all artifacts and generated output (e.g., builds)
-# This must be run from enclave root (do cd ../../ if you are inside examples/CRISP)
-pnpm clean
 ```
 
 This will start all CRISP components:
@@ -133,14 +127,10 @@ This will start all CRISP components:
 - Ciphernodes network
 - CRISP applications (server, client)
 
+Additionally, other specific commands are:
+
 ```bash
-# Build the development containers
-pnpm dev:setup
-
-# Start all services
-pnpm dev:up
-
-# Rebuild containers
+# Rebuild crates, compiles contracts and build the client app
 pnpm dev:build
 
 # Invoke the Server CLI
@@ -157,20 +147,6 @@ Once everything is running, you can:
 6. Refresh and interact with the round following the Client interface.
 
 ## Manual Start
-
-### Setting Up the project
-
-1. Navigate to the root directory:
-
-   ```sh
-   cd examples/CRISP
-   ```
-
-2. Install dependencies:
-
-   ```sh
-   pnpm install
-   ```
 
 ### Setting Up the Web App
 
@@ -192,7 +168,7 @@ To set up the CRISP dApp in your local environment, follow these steps:
 
 Setting up the CRISP server involves several components, but this guide will walk you through each step.
 
-### Step 1: Start a Local Testnet with Anvil
+#### Step 1: Start a Local Testnet with Anvil
 
 ```sh
 anvil
@@ -200,7 +176,7 @@ anvil
 
 Keep Anvil running in the terminal, and open a new terminal for the next steps.
 
-### Step 2: Setting Up the Ciphernodes
+#### Step 2: Setting Up the Ciphernodes
 
 1. Clone the [Enclave Repo](https://github.com/gnosisguild/enclave):
 
@@ -234,7 +210,7 @@ After deployment, you will see the addresses for the following contracts:
 - CRISP Input Validator Factory
 - CRISP Program
 
-### Step 3: RISC0 Setup (Optional)
+#### Step 3: RISC0 Setup (Optional)
 
 > Please note that this step is optional for development only. You can run the program server in dev mode which does not use Risc0.
 > The smart contracts would have already been deployed at the previous step.
@@ -263,7 +239,7 @@ The following steps are optional. You can config [Bonsai](https://dev.risczero.c
 
 ---
 
-### Step 4: Set up Environment Variables
+#### Step 4: Set up Environment Variables
 
 Create a `.env` file in the `server` directory with the following:
 
