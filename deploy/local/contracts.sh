@@ -3,11 +3,8 @@
 # Install the enclave binary
 # cargo install --locked --path ./crates/cli --bin enclave -f
 
-# Deploy Contacts
-(cd packages/enclave-contracts && rm -rf deployments/localhost && pnpm deploy:mocks --network localhost)
-
 # Deploy CRISP Contracts
-(cd examples/CRISP && ETH_WALLET_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 FOUNDRY_PROFILE=local forge script --rpc-url http://localhost:8545 --broadcast deploy/Deploy.s.sol)
+(cd examples/CRISP && pnpm deploy:contracts:full:mock --network localhost)
 
 # Add Ciphernodes to Enclave
 sleep 2 # wait for enclave to start

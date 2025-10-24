@@ -6,7 +6,10 @@
 
 import type { HardhatUserConfig } from "hardhat/config";
 import { cleanDeploymentsTask } from "@enclave-e3/contracts/tasks/utils";
-import { ciphernodeAdd } from "@enclave-e3/contracts/tasks/ciphernode";
+import {
+  ciphernodeAdd,
+  ciphernodeAdminAdd,
+} from "@enclave-e3/contracts/tasks/ciphernode";
 import dotenv from "dotenv";
 
 import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matchers";
@@ -69,11 +72,21 @@ const config: HardhatUserConfig = {
     hardhatNetworkHelpers,
     hardhatToolboxMochaEthersPlugin,
   ],
-  tasks: [cleanDeploymentsTask, ciphernodeAdd],
+  tasks: [cleanDeploymentsTask, ciphernodeAdd, ciphernodeAdminAdd],
   networks: {
     hardhat: {
       type: "edr-simulated",
       chainType: "l1",
+    },
+    localhost: {
+      accounts: {
+        mnemonic,
+      },
+      chainId: chainIds.hardhat,
+      url: "http://localhost:8545",
+      type: "http",
+      chainType: "l1",
+      timeout: 60000,
     },
     ganache: {
       accounts: {
@@ -82,6 +95,7 @@ const config: HardhatUserConfig = {
       chainId: chainIds.ganache,
       url: "http://localhost:8545",
       type: "http",
+      timeout: 60000,
     },
     arbitrum: getChainConfig(
       "arbitrum-mainnet",

@@ -30,6 +30,8 @@ async function disableTransferRestrictionsForLocal(
   if (chain !== "localhost" && chain !== "hardhat") {
     return;
   }
+  console.log("Disabling transfer restrictions for chain", chain);
+  console.log("Contract address", await contract.getAddress());
 
   try {
     const isRestricted = await contract.transfersRestricted();

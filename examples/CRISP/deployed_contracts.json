@@ -18,14 +18,14 @@
       "constructorArgs": {
         "initialSupply": "1000000"
       },
-      "blockNumber": 24,
+      "blockNumber": 2,
       "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
     },
     "EnclaveToken": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 24,
+      "blockNumber": 3,
       "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
     },
     "EnclaveTicketToken": {
@@ -34,7 +34,7 @@
         "registry": "0x0000000000000000000000000000000000000001",
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
       },
-      "blockNumber": 24,
+      "blockNumber": 5,
       "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
     },
     "SlashingManager": {
@@ -42,7 +42,7 @@
         "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "bondingRegistry": "0x0000000000000000000000000000000000000001"
       },
-      "blockNumber": 24,
+      "blockNumber": 6,
       "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
     },
     "BondingRegistry": {
@@ -57,7 +57,7 @@
         "minTicketBalance": "1",
         "exitDelay": "604800"
       },
-      "blockNumber": 24,
+      "blockNumber": 7,
       "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F"
     },
     "CiphernodeRegistryOwnable": {
@@ -65,22 +65,22 @@
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
         "enclaveAddress": "0x0000000000000000000000000000000000000001"
       },
-      "blockNumber": 25,
-      "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
+      "blockNumber": 8,
+      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"
     },
     "CommitteeSortition": {
       "constructorArgs": {
         "bondingRegistry": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-        "ciphernodeRegistry": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
+        "ciphernodeRegistry": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
         "submissionWindow": "300"
       },
-      "blockNumber": 2,
-      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      "blockNumber": 9,
+      "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
     },
     "Enclave": {
       "constructorArgs": {
         "owner": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-        "registry": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
+        "registry": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
         "bondingRegistry": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
         "feeToken": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
         "maxDuration": "2592000",
@@ -88,47 +88,47 @@
           "0x000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000fc00100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000003fffffff000001"
         ]
       },
-      "blockNumber": 3,
-      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      "blockNumber": 10,
+      "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"
     },
     "MockComputeProvider": {
-      "blockNumber": 12,
-      "address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
+      "blockNumber": 19,
+      "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
     },
     "MockDecryptionVerifier": {
-      "blockNumber": 13,
-      "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"
+      "blockNumber": 20,
+      "address": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
     },
     "MockInputValidator": {
-      "blockNumber": 14,
-      "address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
+      "blockNumber": 21,
+      "address": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
     },
     "MockE3Program": {
       "constructorArgs": {
-        "mockInputValidator": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
+        "mockInputValidator": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
       },
-      "blockNumber": 15,
-      "address": "0x9A676e781A523b5d0C0e43731313A708CB607508"
+      "blockNumber": 22,
+      "address": "0x59b670e9fA9D0A427751Af201D676719a970857b"
     },
     "MockRISC0Verifier": {
-      "address": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
+      "address": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f"
     },
     "CRISPInputValidatorFactory": {
-      "address": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+      "address": "0x4A679253410272dd5232B3Ff7cF5dbB88f295319",
       "constructorArgs": {
-        "inputValidator": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
+        "inputValidator": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
       }
     },
     "HonkVerifier": {
-      "address": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c"
+      "address": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F"
     },
     "CRISPProgram": {
-      "address": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+      "address": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
       "constructorArgs": {
-        "enclave": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-        "verifierAddress": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
-        "inputValidatorAddress": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
-        "honkVerifierAddress": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+        "enclave": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+        "verifierAddress": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
+        "inputValidatorAddress": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+        "honkVerifierAddress": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
         "imageId": "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
       }
     }

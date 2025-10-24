@@ -10,7 +10,7 @@
   },
   "scripts": {
     "compile": "forge compile",
-    "ciphernode:add": "hardhat ciphernode:add",
+    "ciphernode:add": "hardhat ciphernode:admin-add",
     "cli": "bash ./scripts/cli.sh",
     "clean:deployments": "hardhat utils:clean-deployments",
     "dev:setup": "bash ./scripts/setup.sh",
@@ -18,7 +18,7 @@
     "dev:up": "bash ./scripts/dev.sh",
     "deploy:contracts": "pnpm hardhat run deploy/deploy.ts",
     "deploy:contracts:full": "export DEPLOY_ENCLAVE=true && pnpm deploy:contracts",
-    "deploy:contracts:full:mock": "export DEPLOY_ENCLAVE=true && export USE_MOCK_VERIFIER=true && export USE_MOCK_INPUT_VALIDATOR=true && pnpm deploy:contracts", 
+    "deploy:contracts:full:mock": "export DEPLOY_ENCLAVE=true && export USE_MOCK_VERIFIER=true && export USE_MOCK_INPUT_VALIDATOR=true && pnpm deploy:contracts",
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "test": "pnpm test:e2e",
     "test:contracts": "hardhat test tests/crisp.contracts.test.ts --network localhost",

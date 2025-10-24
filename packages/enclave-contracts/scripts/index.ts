@@ -7,6 +7,7 @@
 export * from "./deployEnclave";
 export * from "./deployMocks";
 export * from "./utils";
+export * from "./cleanIgnitionState";
 export * from "./deployAndSave/bondingRegistry";
 export * from "./deployAndSave/ciphernodeRegistryOwnable";
 export * from "./deployAndSave/enclave";

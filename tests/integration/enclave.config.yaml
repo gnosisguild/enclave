@@ -30,7 +30,7 @@ nodes:
     autonetkey: true
     autopassword: true
   ag:
-    address: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+    address: "0xdF3e18d64BC6A983f673Ab319CCaE4f1a57C7097"
     quic_port: 9095
     autonetkey: true
     autopassword: true
