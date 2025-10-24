@@ -1,9 +1,7 @@
 forge-std/=lib/risc0-ethereum/lib/forge-std/src/
 risc0/=lib/risc0-ethereum/contracts/src/
 @enclave-e3/contracts/=node_modules/@enclave-e3/contracts/
-@excubiae/contracts/=node_modules/@excubiae/contracts/
 solady/=node_modules/solady/
 @zk-kit/lean-imt.sol=node_modules/@zk-kit/lean-imt.sol
 poseidon-solidity/=node_modules/poseidon-solidity/
-@openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/
-openzeppelin/=lib/risc0-ethereum/lib/openzeppelin-contracts/
+@openzeppelin/=node_modules/@openzeppelin/
