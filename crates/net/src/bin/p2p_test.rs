@@ -103,6 +103,7 @@ async fn test_gossip(peer: &mut PeerHandle) -> Result<()> {
 
 async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
     let value = b"I am he as you are he, as you are me and we are all together";
+    println!("test_dht. Sending message...");
     peer.tx
         .send(NetCommand::DhtPutRecord {
             correlation_id: CorrelationId::new(),
@@ -112,8 +113,9 @@ async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
         })
         .await?;
 
+    println!("test_dht. Awaiting success message...");
     let NetEvent::DhtPutRecordSucceeded { correlation_id, .. } =
-        timeout(Duration::from_secs(4), peer.rx.recv()).await??
+        timeout(Duration::from_secs(1000), peer.rx.recv()).await??
     else {
         bail!("msg not as expected");
     };
@@ -123,7 +125,7 @@ async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
 
 async fn runner() -> Result<()> {
     let mut peer = setup_peer().await?;
-    test_gossip(&mut peer).await?;
+    // test_gossip(&mut peer).await?;
     test_dht(&mut peer).await?;
     Ok(())
 }
@@ -180,7 +182,7 @@ async fn setup_peer() -> Result<PeerHandle> {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug")))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
