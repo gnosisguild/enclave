@@ -75,7 +75,7 @@ sol! {
         mapping(uint256 e3Id => uint256 inputCount) public inputCounts;
         mapping(uint256 e3Id => bytes params) public e3Params;
         mapping(address e3Program => bool allowed) public e3Programs;
-        function request(E3RequestParams memory request) external payable returns (uint256 e3Id, E3 memory e3);
+        function request(E3RequestParams calldata requestParams) external returns (uint256 e3Id, E3 memory e3);
         function activate(uint256 e3Id,bytes calldata publicKey) external returns (bool success);
         function enableE3Program(address e3Program) public onlyOwner returns (bool success);
         function publishInput(uint256 e3Id, bytes calldata data) external returns (bool success);

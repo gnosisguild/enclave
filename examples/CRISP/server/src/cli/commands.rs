@@ -77,7 +77,9 @@ pub async fn initialize_crisp_round(
     info!("Enabling E3 Program with address: {}", e3_program);
     match contract.is_e3_program_enabled(e3_program).await {
         Ok(enabled) => {
+            info!("Debug - E3 Program enabled status: {}", enabled);
             if !enabled {
+                info!("E3 Program not enabled, attempting to enable...");
                 match contract.enable_e3_program(e3_program).await {
                     Ok(res) => info!("E3 Program enabled. TxHash: {:?}", res.transaction_hash),
                     Err(e) => info!("Error enabling E3 Program: {:?}", e),
@@ -136,6 +138,19 @@ pub async fn initialize_crisp_round(
         fee_amount,
     )
     .await?;
+
+    info!("Requesting E3 on contract: {}", CONFIG.enclave_address);
+
+    info!("Debug - threshold: {:?}", threshold);
+    info!("Debug - start_window: {:?}", start_window);
+    info!("Debug - duration: {}", duration);
+    info!("Debug - e3_program: {}", e3_program);
+    info!("Debug - current timestamp: {}", Utc::now().timestamp());
+
+    info!(
+        "Debug - Checking ciphernode registry at: {}",
+        CONFIG.ciphernode_registry_address
+    );
 
     let res = contract
         .request_e3(
