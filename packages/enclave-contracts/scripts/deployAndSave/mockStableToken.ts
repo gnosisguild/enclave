@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import MockStableTokenModule from "../../ignition/modules/mockStableToken";
 import { MockUSDC, MockUSDC__factory as MockUSDCFactory } from "../../types";
 import { readDeploymentArgs, storeDeploymentArgs } from "../utils";
 
@@ -28,7 +27,7 @@ export const deployAndSaveMockStableToken = async ({
 }: MockStableTokenArgs): Promise<{
   mockStableToken: MockUSDC;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
@@ -49,19 +48,14 @@ export const deployAndSaveMockStableToken = async ({
     return { mockStableToken: mockStableTokenContract };
   }
 
-  const mockStableToken = await ignition.deploy(MockStableTokenModule, {
-    parameters: {
-      MockUSDC: {
-        initialSupply,
-      },
-    },
-  });
+  const mockStableTokenFactory = await ethers.getContractFactory("MockUSDC");
+  const mockStableToken = await mockStableTokenFactory.deploy(initialSupply);
 
-  await mockStableToken.mockUSDC.waitForDeployment();
+  await mockStableToken.waitForDeployment();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
-  const mockStableTokenAddress = await mockStableToken.mockUSDC.getAddress();
+  const mockStableTokenAddress = await mockStableToken.getAddress();
 
   storeDeploymentArgs(
     {

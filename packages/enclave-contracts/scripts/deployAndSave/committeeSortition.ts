@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import type { HardhatRuntimeEnvironment } from "hardhat/types/hre";
 
-import CommitteeSortitionModule from "../../ignition/modules/committeeSortition";
 import {
   CommitteeSortition,
   CommitteeSortition__factory as CommitteeSortitionFactory,
@@ -35,7 +34,7 @@ export const deployAndSaveCommitteeSortition = async ({
 }: CommitteeSortitionArgs): Promise<{
   committeeSortition: CommitteeSortition;
 }> => {
-  const { ignition, ethers } = await hre.network.connect();
+  const { ethers } = await hre.network.connect();
   const [signer] = await ethers.getSigners();
   const chain = (await signer.provider?.getNetwork())?.name ?? "localhost";
 
@@ -62,22 +61,20 @@ export const deployAndSaveCommitteeSortition = async ({
     return { committeeSortition: committeeSortitionContract };
   }
 
-  const committeeSortition = await ignition.deploy(CommitteeSortitionModule, {
-    parameters: {
-      CommitteeSortition: {
-        bondingRegistry,
-        ciphernodeRegistry,
-        submissionWindow,
-      },
-    },
-  });
+  const committeeSortitionFactory =
+    await ethers.getContractFactory("CommitteeSortition");
 
-  await committeeSortition.committeeSortition.waitForDeployment();
+  const committeeSortition = await committeeSortitionFactory.deploy(
+    bondingRegistry,
+    ciphernodeRegistry,
+    submissionWindow,
+  );
+
+  await committeeSortition.waitForDeployment();
 
   const blockNumber = await ethers.provider.getBlockNumber();
 
-  const committeeSortitionAddress =
-    await committeeSortition.committeeSortition.getAddress();
+  const committeeSortitionAddress = await committeeSortition.getAddress();
 
   storeDeploymentArgs(
     {
