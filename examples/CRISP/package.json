@@ -1,6 +1,7 @@
 {
   "name": "crisp",
   "private": true,
+  "type": "module",
   "description": "CRISP - Coercion-Resistant Impartial Selection Protocol",
   "author": {
     "name": "gnosisguild",
