@@ -20,8 +20,7 @@
     "test:circuits": "cd circuits && nargo test",
     "test:sdk": "cd sdk && pnpm test",
     "release:sdk": "cd sdk && pnpm release",
-    "report": "playwright show-report",
-    "build:wasm": "cd crates/js-lib && wasm-pack build --scope enclave"
+    "report": "playwright show-report"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0",
