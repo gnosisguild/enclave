@@ -47,6 +47,7 @@
     "@nomicfoundation/hardhat-toolbox-mocha-ethers": "3.0.0",
     "@nomicfoundation/hardhat-typechain": "3",
     "@nomicfoundation/hardhat-verify": "^3.0.1",
+    "@openzeppelin/contracts": "^5.0.2",
     "@playwright/test": "1.52.0",
     "@synthetixio/synpress": "^4.1.0",
     "@synthetixio/synpress-cache": "^0.0.12",

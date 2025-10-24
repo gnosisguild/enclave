@@ -8,10 +8,9 @@
 import { readDeploymentArgs, storeDeploymentArgs } from "@enclave-e3/contracts/scripts";
 import { Enclave__factory as EnclaveFactory } from "@enclave-e3/contracts/types";
 
+import { execSync } from "child_process";
 import hre from "hardhat";
 
-const CONTROL_ROOT = "0xa54dc85ac99f851c92d7c96d7318af41dbe7c0194edfcc37eb4d422a998c1f56"
-const BN254_CONTROL_ID = "0x04446e66d300eb7fb45c9726bb53c793dda407a62e9601618bb43c5c14657ac0"
 const IMAGE_ID = "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
 
 export const deployCRISPContracts = async () => {
@@ -82,7 +81,7 @@ export const deployCRISPContracts = async () => {
         Deployments:
         ----------------------------------------------------------------------
         Enclave: ${enclaveAddress}
-        Verifier: ${verifier}
+        Risc0Verifier: ${verifier}
         InputValidator: ${inputValidator}
         CRISPInputValidatorFactory: ${crispInputValidatorFactoryAddress}
         HonkVerifier: ${honkVerifierAddress}
@@ -105,20 +104,41 @@ export const deployVerifier = async (useMockVerifier: boolean): Promise<string> 
             console.log("RiscZeroGroth16Verifier already deployed at:", existingVerifier.address);
             return existingVerifier.address;
         }
-        
-        const verifierFactory = await ethers.getContractFactory("RiscZeroGroth16Verifier");
-        const verifier = await verifierFactory.deploy(CONTROL_ROOT, BN254_CONTROL_ID);
-        const address = await verifier.getAddress();
 
-        storeDeploymentArgs({
-            address,
-            constructorArgs: {
-                controlRoot: CONTROL_ROOT,
-                controlId: BN254_CONTROL_ID
+        // use forge to deploy while we work on a way to have hardhat deploy from git submodules artifacts
+        // Deploy using Foundry
+        const rpcUrl = chain === "default" || "localhost" ? "http://localhost:8545" : process.env.RPC_URL!;
+        try {
+            // Run forge script
+            const command = `forge script deploy/Deploy.s.sol --rpc-url ${rpcUrl} --broadcast`;
+
+            const output = execSync(command, {
+                encoding: "utf-8",
+                env: {
+                    ...process.env,
+                },
+            });
+
+            // Parse the output to get the deployed address
+            // Looking for: "Deployed RiscZeroGroth16Verifier to 0x..."
+            const match = output.match(/Deployed RiscZeroGroth16Verifier to (0x[a-fA-F0-9]{40})/);
+            
+            if (!match) {
+                console.error("Forge output:", output);
+                throw new Error("Could not parse deployed address from forge output");
             }
-        }, "RiscZeroGroth16Verifier", hre.globalOptions.network);
 
-        return address
+            const address = match[1];
+
+            storeDeploymentArgs({
+                address,
+            }, "RiscZeroGroth16Verifier", chain);
+
+            return address;
+        } catch (error) {
+            console.error("Failed to deploy with Foundry:", error);
+            throw error;
+        }
     }
 
     // Check if mock verifier already deployed
