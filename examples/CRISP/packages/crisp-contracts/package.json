@@ -10,7 +10,7 @@
     "url": "https://github.com/gnosisguild"
   },
   "scripts": {
-    "compile": "forge compile",
+    "compile": "hardhat compile",
     "ciphernode:add": "hardhat ciphernode:add",
     "clean:deployments": "hardhat utils:clean-deployments",
     "deploy:contracts": "hardhat run deploy/deploy.ts",
