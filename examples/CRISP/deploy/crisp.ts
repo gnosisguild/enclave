@@ -22,6 +22,8 @@ export const deployCRISPContracts = async () => {
     const useMockVerifier = Boolean(process.env.USE_MOCK_VERIFIER) ?? false;
     const useMockInputValidator = Boolean(process.env.USE_MOCK_INPUT_VALIDATOR) ?? false;
 
+    console.log("useMockVerifier", useMockVerifier)
+
     const verifier = await deployVerifier(useMockVerifier)
 
     const inputValidator = await deployInputValidator(useMockInputValidator)
@@ -171,19 +173,19 @@ export const deployInputValidator = async (useMockInputValidator: boolean): Prom
 
     if (useMockInputValidator) {
         // Check if mock input validator already deployed
-        const existingMockInputValidator = readDeploymentArgs("MockInputValidator", chain);
+        const existingMockInputValidator = readDeploymentArgs("MockCRISPInputValidator", chain);
         if (existingMockInputValidator?.address) {
             console.log("MockInputValidator already deployed at:", existingMockInputValidator.address);
             return existingMockInputValidator.address;
         }
 
-        const mockInputValidatorFactory = await ethers.getContractFactory("MockInputValidator");
+        const mockInputValidatorFactory = await ethers.getContractFactory("MockCRISPInputValidator");
         const mockInputValidator = await mockInputValidatorFactory.deploy();
         const address = await mockInputValidator.getAddress();
 
         storeDeploymentArgs({
             address,
-        }, "MockInputValidator", hre.globalOptions.network);
+        }, "MockCRISPInputValidator", hre.globalOptions.network);
 
         return address;
     }
