@@ -3,6 +3,8 @@ members = [
   "server",
   ".enclave/support/dev",
   "program",
+  "crates/generator",
+  "crates/js-lib",
 ]
 resolver = "3"
 
