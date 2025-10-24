@@ -12,6 +12,8 @@ use crate::server::{
     token_holders::{build_tree, compute_token_holder_hashes},
     CONFIG,
 };
+use alloy::sol_types::{sol_data, SolType};
+
 use alloy_primitives::Address;
 use e3_sdk::{
     evm_helpers::{
@@ -47,22 +49,30 @@ pub async fn register_e3_requested(
             info!("E3Requested: {:?}", event);
 
             async move {
-                 // Convert custom params bytes back to token address and balance threshold.
-                 let custom_params: CustomParams =
-                 serde_json::from_slice(&event.e3.customParams)
-                     .with_context(|| "Failed to parse custom params from E3 event")?;
+                // Convert custom params bytes back to token address and balance threshold.
 
-                let token_address: Address = custom_params
-                    .token_address
-                    .parse()
-                    .with_context(|| "Failed to parse token address")?;
+                // Use sol_data types instead of primitives
+                type CustomParamsTuple = (sol_data::Address, sol_data::Uint<256>);
+
+                let decoded = <CustomParamsTuple as SolType>::abi_decode(&event.e3.customParams)
+                    .with_context(|| "Failed to decode custom params from E3 event")?;
+
+                let custom_params = CustomParams {
+                    token_address: decoded.0.to_string(),
+                    balance_threshold: decoded.1.to_string(),
+                };
 
                 let balance_threshold =
                     BigUint::parse_bytes(custom_params.balance_threshold.as_bytes(), 10)
                         .ok_or_else(|| eyre::eyre!("Invalid balance threshold"))?;
+                let token_address: Address = custom_params
+                    .token_address
+                    .parse()
+                    .with_context(|| "Invalid token address")?;
 
                 // save the e3 details
-                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold).await?;
+                repo.initialize_round(custom_params.token_address, custom_params.balance_threshold)
+                    .await?;
 
                 // Get token holders from Bitquery API or mocked data.
                 let token_holders = if matches!(CONFIG.chain_id, 31337 | 1337) {
