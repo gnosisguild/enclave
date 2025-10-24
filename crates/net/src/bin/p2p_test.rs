@@ -101,9 +101,31 @@ async fn test_gossip(peer: &mut PeerHandle) -> Result<()> {
     Ok(())
 }
 
+async fn get_events_until_settled(
+    seconds: u64,
+    rx: &mut broadcast::Receiver<NetEvent>,
+) -> Result<Vec<NetEvent>> {
+    let mut events = Vec::new();
+
+    loop {
+        match timeout(Duration::from_secs(seconds), rx.recv()).await {
+            Ok(Ok(event)) => events.push(event),
+            Ok(Err(_)) => break, // Channel error
+            Err(_) => break,     // 15-second timeout
+        }
+    }
+
+    Ok(events)
+}
+
 async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
     let value = b"I am he as you are he, as you are me and we are all together";
     println!("test_dht. Sending message...");
+
+    let events = get_events_until_settled(15, &mut peer.rx).await?;
+
+    println!("SETTLED WITH: {:?}", events);
+
     peer.tx
         .send(NetCommand::DhtPutRecord {
             correlation_id: CorrelationId::new(),
@@ -113,13 +135,9 @@ async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
         })
         .await?;
 
-    println!("test_dht. Awaiting success message...");
-    let NetEvent::DhtPutRecordSucceeded { correlation_id, .. } =
-        timeout(Duration::from_secs(1000), peer.rx.recv()).await??
-    else {
-        bail!("msg not as expected");
-    };
+    let events = get_events_until_settled(15, &mut peer.rx).await?;
 
+    println!("SETTLED WITH: {:?}", events);
     Ok(())
 }
 

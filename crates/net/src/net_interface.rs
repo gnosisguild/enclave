@@ -285,10 +285,9 @@ fn create_kad_behaviour(
         gossipsub_config,
     )?;
 
-    let mut kademlia = KademliaBehaviour::new(
-        key.public().to_peer_id(),
-        MemoryStore::new(key.public().to_peer_id()),
-    );
+    let peer_id = key.public().to_peer_id();
+    println!("PEER ID = ({})", peer_id);
+    let mut kademlia = KademliaBehaviour::new(peer_id, MemoryStore::new(peer_id));
 
     kademlia.set_mode(Some(kad::Mode::Server));
 
