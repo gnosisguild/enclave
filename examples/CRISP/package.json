@@ -25,6 +25,7 @@
     "@synthetixio/synpress-cache": "^0.0.12",
     "@types/node": "^22.18.0",
     "dotenv": "^16.4.5",
+    "concurrently": "^9.1.2",
     "playwright": "1.52.0",
     "typescript": "5.8.3",
     "wait-on": "^8.0.3",
