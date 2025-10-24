@@ -107,40 +107,17 @@ export const deployVerifier = async (useMockVerifier: boolean): Promise<string> 
             return existingVerifier.address;
         }
 
-        // use forge to deploy while we work on a way to have hardhat deploy from git submodules artifacts
-        // Deploy using Foundry
-        const rpcUrl = chain === "default" || "localhost" ? "http://localhost:8545" : process.env.RPC_URL!;
-        try {
-            // Run forge script
-            const command = `forge script deploy/Deploy.s.sol --rpc-url ${rpcUrl} --broadcast`;
+        const verifierFactory = await ethers.getContractFactory("RiscZeroGroth16Verifier");
+        const verifier = await verifierFactory.deploy();
+        await verifier.waitForDeployment();
 
-            const output = execSync(command, {
-                encoding: "utf-8",
-                env: {
-                    ...process.env,
-                },
-            });
+        const address = await verifier.getAddress();
+        
+        storeDeploymentArgs({
+            address,
+        }, "RiscZeroGroth16Verifier", chain);
 
-            // Parse the output to get the deployed address
-            // Looking for: "Deployed RiscZeroGroth16Verifier to 0x..."
-            const match = output.match(/Deployed RiscZeroGroth16Verifier to (0x[a-fA-F0-9]{40})/);
-            
-            if (!match) {
-                console.error("Forge output:", output);
-                throw new Error("Could not parse deployed address from forge output");
-            }
-
-            const address = match[1];
-
-            storeDeploymentArgs({
-                address,
-            }, "RiscZeroGroth16Verifier", chain);
-
-            return address;
-        } catch (error) {
-            console.error("Failed to deploy with Foundry:", error);
-            throw error;
-        }
+        return address;
     }
 
     // Check if mock verifier already deployed
