@@ -1422,6 +1422,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bigint-poly"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/bigint-poly#6b992dd81c65cc693b388e37edfd190749bfc3b3"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1870,8 +1881,8 @@ dependencies = [
  "e3-sdk",
  "env_logger",
  "eyre",
- "fhe",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "hex",
  "lean-imt",
  "light-poseidon 0.1.0",
@@ -1885,6 +1896,39 @@ dependencies = [
  "sled",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "crisp-wasm"
+version = "0.1.0"
+dependencies = [
+ "crisp-zk-inputs",
+ "getrandom 0.2.16",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "web-sys",
+]
+
+[[package]]
+name = "crisp-zk-inputs"
+version = "0.1.0"
+dependencies = [
+ "bigint-poly",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "hex",
+ "itertools 0.14.0",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "serde_json",
+ "zkfhe-greco",
+ "zkfhe-shared",
 ]
 
 [[package]]
@@ -2176,9 +2220,9 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "e3-greco-generator",
- "fhe",
- "fhe-traits",
- "fhe-util",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "num-bigint",
  "num-traits",
  "rand 0.8.5",
@@ -2238,9 +2282,9 @@ dependencies = [
  "blake3",
  "clap",
  "e3-greco-polynomial",
- "fhe",
- "fhe-math",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "itertools 0.14.0",
  "num-bigint",
  "num-traits",
@@ -2316,8 +2360,8 @@ version = "0.1.0"
 dependencies = [
  "e3-bfv-helpers",
  "e3-compute-provider 0.1.0",
- "fhe",
- "fhe-traits",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
 ]
 
 [[package]]
@@ -2475,12 +2519,37 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=pvss#2785711cee85259edb3913b140f633b9d98e8e91"
+dependencies = [
+ "doc-comment",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "itertools 0.12.1",
+ "ndarray",
+ "num-bigint",
+ "num-traits",
+ "prost",
+ "prost-build",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rand_distr",
+ "rayon",
+ "serde",
+ "thiserror 1.0.69",
+ "zeroize",
+ "zeroize_derive",
+]
+
+[[package]]
+name = "fhe"
+version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "doc-comment",
- "fhe-math",
- "fhe-traits",
- "fhe-util",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -2500,11 +2569,33 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=pvss#2785711cee85259edb3913b140f633b9d98e8e91"
+dependencies = [
+ "ethnum",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "itertools 0.12.1",
+ "ndarray",
+ "num-bigint",
+ "num-bigint-dig",
+ "num-traits",
+ "prost",
+ "prost-build",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "sha2",
+ "thiserror 1.0.69",
+ "zeroize",
+]
+
+[[package]]
+name = "fhe-math"
+version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "ethnum",
- "fhe-traits",
- "fhe-util",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -2522,9 +2613,31 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=pvss#2785711cee85259edb3913b140f633b9d98e8e91"
+dependencies = [
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "fhe-traits"
+version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "rand 0.8.5",
+]
+
+[[package]]
+name = "fhe-util"
+version = "0.1.0-beta.7"
+source = "git+https://github.com/gnosisguild/fhe.rs?branch=pvss#2785711cee85259edb3913b140f633b9d98e8e91"
+dependencies = [
+ "itertools 0.12.1",
+ "num-bigint-dig",
+ "num-traits",
+ "prime_factorization",
+ "rand 0.8.5",
+ "rand_distr",
+ "rayon",
 ]
 
 [[package]]
@@ -2758,8 +2871,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "335ff9f135e4384c8150d6f27c6daed433577f86b4750418338c01a1a2528592"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi 0.11.1+wasi-snapshot-preview1",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -3564,6 +3679,16 @@ name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
+
+[[package]]
+name = "minicov"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f27fe9f1cc3c22e1687f9446c2083c4c5fc7f0bcf1c7a86bdbded14985895b4b"
+dependencies = [
+ "cc",
+ "walkdir",
+]
 
 [[package]]
 name = "minimal-lexical"
@@ -4697,6 +4822,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
+name = "same-file"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
+dependencies = [
+ "winapi-util",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5658,6 +5792,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "walkdir"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
+dependencies = [
+ "same-file",
+ "winapi-util",
+]
+
+[[package]]
 name = "want"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5754,6 +5898,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm-bindgen-test"
+version = "0.3.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80cc7f8a4114fdaa0c58383caf973fc126cf004eba25c9dc639bccd3880d55ad"
+dependencies = [
+ "js-sys",
+ "minicov",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-test-macro"
+version = "0.3.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5ada2ab788d46d4bda04c9d567702a79c8ced14f51f221646a16ed39d0e6a5d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
+]
+
+[[package]]
 name = "wasmtimer"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5816,6 +5984,15 @@ name = "winapi-i686-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
+
+[[package]]
+name = "winapi-util"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
+dependencies = [
+ "windows-sys 0.60.2",
+]
 
 [[package]]
 name = "winapi-x86_64-pc-windows-gnu"
@@ -6223,6 +6400,49 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.106",
+]
+
+[[package]]
+name = "zkfhe-greco"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#206ff0ea3cf9ab7bb80a1a1a63bf6dfc45154158"
+dependencies = [
+ "anyhow",
+ "bigint-poly",
+ "blake3",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "itertools 0.14.0",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "zkfhe-shared",
+]
+
+[[package]]
+name = "zkfhe-shared"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#206ff0ea3cf9ab7bb80a1a1a63bf6dfc45154158"
+dependencies = [
+ "anyhow",
+ "bigint-poly",
+ "chrono",
+ "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "toml",
 ]
 
 [[package]]
