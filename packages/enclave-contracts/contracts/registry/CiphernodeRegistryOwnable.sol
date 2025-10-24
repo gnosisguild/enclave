@@ -6,7 +6,8 @@
 pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
-import { IRegistryFilter } from "../interfaces/IRegistryFilter.sol";
+import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
+import { CommitteeSortition } from "../sortition/CommitteeSortition.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -15,8 +16,27 @@ import {
     LeanIMTData
 } from "@zk-kit/lean-imt.sol/InternalLeanIMT.sol";
 
+/**
+ * @title CiphernodeRegistryOwnable
+ * @notice Ownable implementation of the ciphernode registry with IMT-based membership tracking
+ * @dev Manages ciphernode registration, committee selection, and integrates with bonding registry
+ */
 contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     using InternalLeanIMT for LeanIMTData;
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                        Events                          //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Emitted when the bonding registry address is set
+    /// @param bondingRegistry Address of the bonding registry contract
+    event BondingRegistrySet(address indexed bondingRegistry);
+
+    /// @notice Emitted when the committee sortition address is set
+    /// @param committeeSortition Address of the committee sortition contract
+    event CommitteeSortitionSet(address indexed committeeSortition);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -24,13 +44,30 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @notice Address of the Enclave contract authorized to request committees
     address public enclave;
+
+    /// @notice Address of the bonding registry for checking node eligibility
+    address public bondingRegistry;
+
+    /// @notice Address of the committee sortition contract
+    address public committeeSortition;
+
+    /// @notice Current number of registered ciphernodes
     uint256 public numCiphernodes;
+
+    /// @notice Incremental Merkle Tree (IMT) containing all registered ciphernodes
     LeanIMTData public ciphernodes;
 
-    mapping(uint256 e3Id => IRegistryFilter filter) public registryFilters;
+    /// @notice Maps E3 ID to the IMT root at the time of committee request
     mapping(uint256 e3Id => uint256 root) public roots;
+
+    /// @notice Maps E3 ID to the hash of the committee's public key
     mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
+
+    /// @notice Maps E3 ID to its committee data
+    mapping(uint256 e3Id => ICiphernodeRegistry.Committee committee)
+        public committees;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -38,12 +75,43 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @notice Committee has already been requested for this E3
     error CommitteeAlreadyRequested();
+
+    /// @notice Committee has already been published for this E3
     error CommitteeAlreadyPublished();
-    error OnlyFilter();
+
+    /// @notice Committee has not been published yet for this E3
     error CommitteeNotPublished();
+
+    /// @notice Ciphernode is not enabled in the registry
+    /// @param node Address of the ciphernode
     error CiphernodeNotEnabled(address node);
+
+    /// @notice Caller is not the Enclave contract
     error OnlyEnclave();
+
+    /// @notice Caller is not the bonding registry
+    error OnlyBondingRegistry();
+
+    /// @notice Caller is neither owner nor bonding registry
+    error NotOwnerOrBondingRegistry();
+
+    /// @notice Node is not bonded
+    /// @param node Address of the node
+    error NodeNotBonded(address node);
+
+    /// @notice Address cannot be zero
+    error ZeroAddress();
+
+    /// @notice Bonding registry has not been set
+    error BondingRegistryNotSet();
+
+    /// @notice Committee sortition has not been set
+    error CommitteeSortitionNotSet();
+
+    /// @notice Caller is not authorized
+    error Unauthorized();
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -51,8 +119,24 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @dev Restricts function access to only the Enclave contract
     modifier onlyEnclave() {
         require(msg.sender == enclave, OnlyEnclave());
+        _;
+    }
+
+    /// @dev Restricts function access to only the bonding registry
+    modifier onlyBondingRegistry() {
+        require(msg.sender == bondingRegistry, OnlyBondingRegistry());
+        _;
+    }
+
+    /// @dev Restricts function access to owner or bonding registry
+    modifier onlyOwnerOrBondingVault() {
+        require(
+            msg.sender == owner() || msg.sender == bondingRegistry,
+            NotOwnerOrBondingRegistry()
+        );
         _;
     }
 
@@ -62,11 +146,21 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @notice Constructor that initializes the registry with owner and enclave
+    /// @param _owner Address that will own the contract
+    /// @param _enclave Address of the Enclave contract
     constructor(address _owner, address _enclave) {
         initialize(_owner, _enclave);
     }
 
+    /// @notice Initializes the registry contract
+    /// @dev Can only be called once due to initializer modifier
+    /// @param _owner Address that will own the contract
+    /// @param _enclave Address of the Enclave contract
     function initialize(address _owner, address _enclave) public initializer {
+        require(_owner != address(0), ZeroAddress());
+        require(_enclave != address(0), ZeroAddress());
+
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
         if (_owner != owner()) transferOwnership(_owner);
@@ -78,36 +172,83 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @inheritdoc ICiphernodeRegistry
     function requestCommittee(
         uint256 e3Id,
-        address filter,
         uint32[2] calldata threshold
     ) external onlyEnclave returns (bool success) {
         require(
-            registryFilters[e3Id] == IRegistryFilter(address(0)),
+            committees[e3Id].threshold[1] == 0,
             CommitteeAlreadyRequested()
         );
-        registryFilters[e3Id] = IRegistryFilter(filter);
+        require(committeeSortition != address(0), CommitteeSortitionNotSet());
+
+        committees[e3Id].threshold = threshold;
         roots[e3Id] = root();
 
-        IRegistryFilter(filter).requestCommittee(e3Id, threshold);
-        emit CommitteeRequested(e3Id, filter, threshold);
+        // Initialize sortition in CommitteeSortition contract
+        // Get seed from Enclave contract (will be passed via E3Requested event)
+        // For now, we'll generate it here - note: should match E3.seed from Enclave
+        uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
+        CommitteeSortition(committeeSortition).initializeSortition(
+            e3Id,
+            threshold[1], // Use N (total committee size)
+            seed,
+            block.number
+        );
+
+        emit CommitteeRequested(e3Id, threshold);
         success = true;
     }
 
+    /// @notice Publishes a committee for an E3 computation
+    /// @dev Only callable by owner. Stores committee data and emits event
+    /// @param e3Id ID of the E3 computation
+    /// @param nodes Array of ciphernode addresses selected for the committee
+    /// @param publicKey Aggregated public key of the committee
     function publishCommittee(
         uint256 e3Id,
-        bytes calldata,
+        address[] calldata nodes,
         bytes calldata publicKey
-    ) external {
-        // only to be published by the filter
-        require(address(registryFilters[e3Id]) == msg.sender, OnlyFilter());
-
-        publicKeyHashes[e3Id] = keccak256(publicKey);
-        emit CommitteePublished(e3Id, publicKey);
+    ) external onlyOwner {
+        ICiphernodeRegistry.Committee storage committee = committees[e3Id];
+        require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
+        committee.nodes = nodes;
+        bytes32 publicKeyHash = keccak256(publicKey);
+        committee.publicKey = publicKeyHash;
+        publicKeyHashes[e3Id] = publicKeyHash;
+        emit CommitteePublished(e3Id, nodes, publicKey);
     }
 
-    function addCiphernode(address node) external onlyOwner {
+    /// @notice Finalizes committee from sortition and publishes it
+    /// @dev Can be called by anyone after sortition deadline. Gets committee from CommitteeSortition.
+    /// @param e3Id ID of the E3 computation
+    /// @param publicKey Aggregated public key of the committee
+    function finalizeAndPublishCommittee(
+        uint256 e3Id,
+        bytes calldata publicKey
+    ) external {
+        require(committeeSortition != address(0), CommitteeSortitionNotSet());
+        ICiphernodeRegistry.Committee storage committee = committees[e3Id];
+        require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
+
+        // Finalize sortition and get committee
+        address[] memory nodes = CommitteeSortition(committeeSortition)
+            .finalizeCommittee(e3Id);
+
+        committee.nodes = nodes;
+        bytes32 publicKeyHash = keccak256(publicKey);
+        committee.publicKey = publicKeyHash;
+        publicKeyHashes[e3Id] = publicKeyHash;
+        emit CommitteePublished(e3Id, nodes, publicKey);
+    }
+
+    /// @inheritdoc ICiphernodeRegistry
+    function addCiphernode(address node) external onlyOwnerOrBondingVault {
+        if (isEnabled(node)) {
+            return;
+        }
+
         uint160 ciphernode = uint160(node);
         ciphernodes._insert(ciphernode);
         numCiphernodes++;
@@ -119,10 +260,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         );
     }
 
+    /// @inheritdoc ICiphernodeRegistry
     function removeCiphernode(
         address node,
         uint256[] calldata siblingNodes
-    ) external onlyOwner {
+    ) external onlyOwnerOrBondingVault {
+        require(isEnabled(node), CiphernodeNotEnabled(node));
+
         uint160 ciphernode = uint160(node);
         uint256 index = ciphernodes._indexOf(ciphernode);
         ciphernodes._remove(ciphernode, siblingNodes);
@@ -136,9 +280,33 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @notice Sets the Enclave contract address
+    /// @dev Only callable by owner
+    /// @param _enclave Address of the Enclave contract
     function setEnclave(address _enclave) public onlyOwner {
+        require(_enclave != address(0), ZeroAddress());
         enclave = _enclave;
         emit EnclaveSet(_enclave);
+    }
+
+    /// @notice Sets the bonding registry contract address
+    /// @dev Only callable by owner
+    /// @param _bondingRegistry Address of the bonding registry contract
+    function setBondingRegistry(address _bondingRegistry) public onlyOwner {
+        require(_bondingRegistry != address(0), ZeroAddress());
+        bondingRegistry = _bondingRegistry;
+        emit BondingRegistrySet(_bondingRegistry);
+    }
+
+    /// @notice Sets the committee sortition contract address
+    /// @dev Only callable by owner
+    /// @param _committeeSortition Address of the committee sortition contract
+    function setCommitteeSortition(
+        address _committeeSortition
+    ) public onlyOwner {
+        require(_committeeSortition != address(0), ZeroAddress());
+        committeeSortition = _committeeSortition;
+        emit CommitteeSortitionSet(_committeeSortition);
     }
 
     ////////////////////////////////////////////////////////////
@@ -147,6 +315,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
+    /// @inheritdoc ICiphernodeRegistry
     function committeePublicKey(
         uint256 e3Id
     ) external view returns (bytes32 publicKeyHash) {
@@ -154,27 +323,49 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         require(publicKeyHash != bytes32(0), CommitteeNotPublished());
     }
 
+    /// @inheritdoc ICiphernodeRegistry
     function isCiphernodeEligible(address node) external view returns (bool) {
-        return isEnabled(node);
+        if (!isEnabled(node)) return false;
+
+        require(bondingRegistry != address(0), BondingRegistryNotSet());
+        return IBondingRegistry(bondingRegistry).isActive(node);
     }
 
+    /// @inheritdoc ICiphernodeRegistry
     function isEnabled(address node) public view returns (bool) {
         return ciphernodes._has(uint160(node));
     }
 
+    /// @notice Returns the current root of the ciphernode IMT
+    /// @return Current IMT root
     function root() public view returns (uint256) {
         return (ciphernodes._root());
     }
 
+    /// @notice Returns the IMT root at the time a committee was requested
+    /// @param e3Id ID of the E3
+    /// @return IMT root at time of committee request
     function rootAt(uint256 e3Id) public view returns (uint256) {
         return roots[e3Id];
     }
 
-    function getFilter(uint256 e3Id) public view returns (IRegistryFilter) {
-        return registryFilters[e3Id];
+    /// @inheritdoc ICiphernodeRegistry
+    function getCommittee(
+        uint256 e3Id
+    ) public view returns (ICiphernodeRegistry.Committee memory committee) {
+        committee = committees[e3Id];
+        require(committee.publicKey != bytes32(0), CommitteeNotPublished());
     }
 
+    /// @notice Returns the current size of the ciphernode IMT
+    /// @return Size of the IMT
     function treeSize() public view returns (uint256) {
         return ciphernodes.size;
+    }
+
+    /// @notice Returns the address of the bonding registry
+    /// @return Address of the bonding registry contract
+    function getBondingRegistry() external view returns (address) {
+        return bondingRegistry;
     }
 }

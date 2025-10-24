@@ -5,16 +5,20 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::{event_reader::EvmEventReaderState, helpers::EthProvider, EvmEventReader};
-use actix::Addr;
+use actix::prelude::*;
 use alloy::{
-    primitives::{LogData, B256},
-    providers::Provider,
+    primitives::{Address, Bytes, LogData, B256, U256},
+    providers::{Provider, WalletProvider},
+    rpc::types::TransactionReceipt,
     sol,
     sol_types::SolEvent,
 };
 use anyhow::Result;
 use e3_data::Repository;
-use e3_events::{EnclaveEvent, EventBus};
+use e3_events::{
+    BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet, PublicKeyAggregated,
+    Shutdown, Subscribe,
+};
 use tracing::{error, info, trace};
 
 sol!(
@@ -143,7 +147,133 @@ impl CiphernodeRegistrySolReader {
     }
 }
 
-/// Wrapper for a reader and a future writer
+/// Writer for publishing committees to CiphernodeRegistry
+pub struct CiphernodeRegistrySolWriter<P> {
+    provider: EthProvider<P>,
+    contract_address: Address,
+    bus: Addr<EventBus<EnclaveEvent>>,
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter<P> {
+    pub async fn new(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        provider: EthProvider<P>,
+        contract_address: Address,
+    ) -> Result<Self> {
+        Ok(Self {
+            provider,
+            contract_address,
+            bus: bus.clone(),
+        })
+    }
+
+    pub async fn attach(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        provider: EthProvider<P>,
+        contract_address: &str,
+    ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>> {
+        let addr = CiphernodeRegistrySolWriter::new(bus, provider, contract_address.parse()?)
+            .await?
+            .start();
+
+        let _ = bus
+            .send(Subscribe::new("PublicKeyAggregated", addr.clone().into()))
+            .await;
+
+        Ok(addr)
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Actor for CiphernodeRegistrySolWriter<P> {
+    type Context = actix::Context<Self>;
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
+    for CiphernodeRegistrySolWriter<P>
+{
+    type Result = ();
+
+    fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            EnclaveEvent::PublicKeyAggregated { data, .. } => {
+                // Only publish if the src and destination chains match
+                if self.provider.chain_id() == data.e3_id.chain_id() {
+                    ctx.notify(data);
+                }
+            }
+            EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
+            _ => (),
+        }
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<PublicKeyAggregated>
+    for CiphernodeRegistrySolWriter<P>
+{
+    type Result = ResponseFuture<()>;
+
+    fn handle(&mut self, msg: PublicKeyAggregated, _: &mut Self::Context) -> Self::Result {
+        Box::pin({
+            let e3_id = msg.e3_id.clone();
+            let pubkey = msg.pubkey.clone();
+            let contract_address = self.contract_address;
+            let provider = self.provider.clone();
+            let bus = self.bus.clone();
+            let nodes = msg.nodes.clone();
+
+            async move {
+                let result =
+                    publish_committee_to_registry(provider, contract_address, e3_id, nodes, pubkey)
+                        .await;
+                match result {
+                    Ok(receipt) => {
+                        info!(tx=%receipt.transaction_hash, "Committee published to registry");
+                    }
+                    Err(err) => bus.err(EnclaveErrorType::Evm, err),
+                }
+            }
+        })
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
+    for CiphernodeRegistrySolWriter<P>
+{
+    type Result = ();
+
+    fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
+        ctx.stop();
+    }
+}
+
+pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: E3id,
+    nodes: OrderedSet<String>,
+    public_key: Vec<u8>,
+) -> Result<TransactionReceipt> {
+    let e3_id: U256 = e3_id.try_into()?;
+    let public_key = Bytes::from(public_key);
+    let nodes_vec: Vec<Address> = nodes
+        .into_iter()
+        .filter_map(|node| node.parse().ok())
+        .collect();
+    let from_address = provider.provider().default_signer_address();
+    let current_nonce = provider
+        .provider()
+        .get_transaction_count(from_address)
+        .pending()
+        .await?;
+    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+    let builder = contract
+        .publishCommittee(e3_id, nodes_vec, public_key)
+        .nonce(current_nonce);
+    let receipt = builder.send().await?.get_receipt().await?;
+    Ok(receipt)
+}
+
+/// Wrapper for a reader and writer
 pub struct CiphernodeRegistrySol;
 
 impl CiphernodeRegistrySol {
@@ -167,7 +297,18 @@ impl CiphernodeRegistrySol {
             rpc_url,
         )
         .await?;
-        // TODO: Writer if needed
+        Ok(())
+    }
+
+    pub async fn attach_writer<P>(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        provider: EthProvider<P>,
+        contract_address: &str,
+    ) -> Result<()>
+    where
+        P: Provider + WalletProvider + Clone + 'static,
+    {
+        CiphernodeRegistrySolWriter::attach(bus, provider, contract_address).await?;
         Ok(())
     }
 }

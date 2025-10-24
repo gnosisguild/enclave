@@ -75,7 +75,6 @@ export class ContractClient {
    * request(address filter, uint32[2] threshold, uint256[2] startWindow, uint256 duration, IE3Program e3Program, bytes e3ProgramParams, bytes computeProviderParams, bytes customParams)
    */
   public async requestE3(
-    filter: `0x${string}`,
     threshold: [number, number],
     startWindow: [bigint, bigint],
     duration: bigint,
@@ -83,7 +82,6 @@ export class ContractClient {
     e3ProgramParams: `0x${string}`,
     computeProviderParams: `0x${string}`,
     customParams?: `0x${string}`,
-    value?: bigint,
     gasLimit?: bigint
   ): Promise<Hash> {
     if (!this.walletClient) {
@@ -110,7 +108,6 @@ export class ContractClient {
         functionName: "request",
         args: [
           {
-            filter,
             threshold,
             startWindow,
             duration,
@@ -121,7 +118,6 @@ export class ContractClient {
           },
         ],
         account,
-        value: value || BigInt(0),
         gas: gasLimit,
       });
 
@@ -301,7 +297,7 @@ export class ContractClient {
   /**
    * Get the public key for an E3 computation
    * Based on the contract: committeePublicKey(uint256 e3Id) returns (bytes32 publicKeyHash)
-   * @param e3Id 
+   * @param e3Id
    * @returns The public key
    */
   public async getE3PublicKey(e3Id: bigint): Promise<`0x${string}`> {
@@ -319,7 +315,10 @@ export class ContractClient {
 
       return result;
     } catch (error) {
-      throw new SDKError(`Failed to get E3 public key: ${error}`, "GET_E3_PUBLIC_KEY_FAILED");
+      throw new SDKError(
+        `Failed to get E3 public key: ${error}`,
+        "GET_E3_PUBLIC_KEY_FAILED"
+      );
     }
   }
 

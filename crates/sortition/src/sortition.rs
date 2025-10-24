@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::distance::DistanceSortition;
+use crate::node_state::NodeStateStore;
 use crate::ticket::{RegisteredNode, Ticket};
 use crate::ticket_sortition::ScoreSortition;
 use actix::prelude::*;
@@ -26,10 +27,9 @@ use tracing::{info, instrument, trace};
 /// Membership semantics depend on the backend for that chain:
 /// - **Distance backend**: computes a committee using address distance.
 /// - **Score backend**: computes each node’s best ticket score and sorts globally.
-///
 /// Returns `true` if `address` appears in the resulting top-`size` selection.
 #[derive(Message, Clone, Debug, PartialEq, Eq)]
-#[rtype(result = "Option<u64>")]
+#[rtype(result = "Option<(u64, Option<u64>)>")]
 pub struct GetNodeIndex {
     /// Round seed / randomness used by the sortition algorithm.
     pub seed: Seed,
@@ -61,13 +61,27 @@ pub trait SortitionList<T> {
     ///
     /// Implementations should return `Ok(false)` if the backend has no nodes
     /// or if `size == 0`.
-    fn contains(&self, seed: Seed, size: usize, address: T) -> Result<bool>;
+    fn contains(
+        &self,
+        seed: Seed,
+        size: usize,
+        address: T,
+        node_state: Option<&NodeStateStore>,
+        chain_id: u64,
+    ) -> anyhow::Result<bool>;
 
     /// Return an index if `address` appears in the committee under `seed`.
     ///
     /// Implementations should return `Ok(None)` if the backend has no nodes
     /// or if `size == 0`.
-    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>>;
+    fn get_index(
+        &self,
+        seed: Seed,
+        size: usize,
+        address: String,
+        node_state: Option<&NodeStateStore>,
+        chain_id: u64,
+    ) -> Result<Option<(u64, Option<u64>)>>;
 
     /// Add a node to the backend. Backends should be idempotent on duplicates.
     fn add(&mut self, address: T);
@@ -102,7 +116,14 @@ impl SortitionList<String> for DistanceBackend {
     /// then check whether `address` is in the result.
     ///
     /// Returns `Ok(false)` if there are no nodes or `size == 0`.
-    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
+    fn contains(
+        &self,
+        seed: Seed,
+        size: usize,
+        address: String,
+        _node_state: Option<&NodeStateStore>,
+        _chain_id: u64,
+    ) -> anyhow::Result<bool> {
         if size == 0 {
             return Err(anyhow!("Size cannot be 0"));
         }
@@ -118,7 +139,14 @@ impl SortitionList<String> for DistanceBackend {
             .any(|(_, addr)| addr.to_string() == address))
     }
 
-    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>> {
+    fn get_index(
+        &self,
+        seed: Seed,
+        size: usize,
+        address: String,
+        _node_state: Option<&NodeStateStore>,
+        _chain_id: u64,
+    ) -> Result<Option<(u64, Option<u64>)>> {
         if size == 0 {
             return Err(anyhow!("Size cannot be 0"));
         }
@@ -129,14 +157,12 @@ impl SortitionList<String> for DistanceBackend {
 
         let committee = get_committee(seed, size, self.nodes.clone())?;
 
-        let maybe_index = committee.iter().enumerate().find_map(|(index, (_, addr))| {
-            if addr.to_string() == address {
-                return Some(index as u64);
-            }
-            None
-        });
+        let maybe = committee
+            .iter()
+            .enumerate()
+            .find_map(|(i, (_, addr))| (addr.to_string() == address).then(|| (i as u64, None)));
 
-        Ok(maybe_index)
+        Ok(maybe)
     }
 
     /// Insert a node address (hex). Duplicate inserts are harmless.
@@ -173,8 +199,6 @@ fn get_committee(
 /// Score-sortition backend.
 ///
 /// Stores richer `RegisteredNode` entries (address + per-node ticket set).
-/// Tickets use **local, per-node** IDs in the range `1..=k`, assigned by
-/// [`ScoreBackend::set_ticket_count_addr`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScoreBackend {
     /// Nodes with their ticket sets (used by score-based committee selection).
@@ -190,20 +214,38 @@ impl Default for ScoreBackend {
 }
 
 impl ScoreBackend {
-    /// Set (or replace) a node’s ticket *count* using local IDs `1..=count`.
+    /// Build a vector of ephemeral nodes from the node state.
     ///
-    /// - If the node already exists, its entire ticket vector is replaced.
-    /// - If the node doesn’t exist, a new `RegisteredNode` is created.
-    /// - Passing `count == 0` clears the ticket vector for that node.
-    ///
-    /// This does **not** attempt to deduplicate across nodes; IDs are local.
-    pub fn set_ticket_count_addr(&mut self, address: Address, count: u64) {
-        let tickets: Vec<Ticket> = (1..=count).map(|i| Ticket { ticket_id: i }).collect();
-        if let Some(existing) = self.registered.iter_mut().find(|n| n.address == address) {
-            existing.tickets = tickets;
-        } else {
-            self.registered.push(RegisteredNode { address, tickets });
-        }
+    /// The nodes are built from the node state and the registered nodes.
+    fn build_nodes_from_state(
+        &self,
+        chain_id: u64,
+        node_state: &NodeStateStore,
+    ) -> Vec<RegisteredNode> {
+        self.registered
+            .iter()
+            .filter_map(|n| {
+                let addr_str = n.address.to_string();
+                let key = (chain_id, addr_str.clone());
+                let Some(ns) = node_state.nodes.get(&key) else {
+                    return None;
+                };
+                if !ns.active {
+                    return None;
+                }
+
+                let count = node_state.available_tickets(chain_id, &addr_str) as u64;
+                if count == 0 {
+                    return None;
+                }
+
+                let tickets = (1..=count).map(|i| Ticket { ticket_id: i }).collect();
+                Some(RegisteredNode {
+                    address: n.address,
+                    tickets,
+                })
+            })
+            .collect()
     }
 }
 
@@ -211,11 +253,27 @@ impl SortitionList<String> for ScoreBackend {
     /// Compute score-based winners (`ScoreSortition`) and check if `address` is included.
     ///
     /// Returns `Ok(false)` if there are no nodes or `size == 0`.
-    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
-        if self.registered.is_empty() || size == 0 {
+    fn contains(
+        &self,
+        seed: Seed,
+        size: usize,
+        address: String,
+        node_state: Option<&NodeStateStore>,
+        chain_id: u64,
+    ) -> anyhow::Result<bool> {
+        if size == 0 {
             return Ok(false);
         }
-        let winners = ScoreSortition::new(size).get_committee(seed.into(), &self.registered)?;
+        let Some(state) = node_state else {
+            return Ok(false);
+        };
+
+        let nodes = self.build_nodes_from_state(chain_id, state);
+        if nodes.is_empty() {
+            return Ok(false);
+        }
+
+        let winners = ScoreSortition::new(size).get_committee(seed.into(), &nodes)?;
         let want: Address = address.parse()?;
         Ok(winners.iter().any(|w| w.address == want))
     }
@@ -223,27 +281,39 @@ impl SortitionList<String> for ScoreBackend {
     /// Compute score-based winners (`ScoreSortition`) and check if `address` is included.
     ///
     /// Returns `Ok(false)` if there are no nodes or `size == 0`.
-    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>> {
-        if self.registered.is_empty() || size == 0 {
+    fn get_index(
+        &self,
+        seed: Seed,
+        size: usize,
+        address: String,
+        node_state: Option<&NodeStateStore>,
+        chain_id: u64,
+    ) -> anyhow::Result<Option<(u64, Option<u64>)>> {
+        if size == 0 {
             return Ok(None);
         }
-        let winners = ScoreSortition::new(size).get_committee(seed.into(), &self.registered)?;
-        let want: Address = address.parse()?;
 
-        let maybe_index = winners.iter().enumerate().find_map(|(index, w)| {
-            if w.address == want {
-                return Some(index as u64);
-            }
-            None
-        });
+        if node_state.is_none() {
+            return Ok(None);
+        }
 
-        Ok(maybe_index)
+        let nodes: Vec<RegisteredNode> = self.build_nodes_from_state(chain_id, node_state.unwrap());
+
+        if nodes.is_empty() {
+            return Ok(None);
+        }
+
+        let winners = ScoreSortition::new(size).get_committee(seed.into(), &nodes)?;
+        let want: alloy::primitives::Address = address.parse()?;
+
+        let maybe = winners
+            .iter()
+            .enumerate()
+            .find_map(|(i, w)| (w.address == want).then(|| (i as u64, Some(w.ticket_id))));
+        Ok(maybe)
     }
 
     /// Add a node, creating an empty ticket set when first seen.
-    ///
-    /// To set tickets, call [`ScoreBackend::set_ticket_count_addr`] (or another
-    /// initialization path) after the node is added.
     fn add(&mut self, address: String) {
         match address.parse::<Address>() {
             Ok(addr) => {
@@ -281,7 +351,7 @@ impl SortitionList<String> for ScoreBackend {
     }
 }
 
-/// Enum wrapper around the two supported backends.
+/// Enum wrapper around the supported backends.
 ///
 /// New chains should default to `Distance`. If a chain is intended to
 /// use score selection, construct it as `SortitionBackend::Score(ScoreBackend::default())`
@@ -299,38 +369,37 @@ impl SortitionBackend {
     pub fn default() -> Self {
         SortitionBackend::Distance(DistanceBackend::default())
     }
-
-    /// Helper for Score backends: assign local ticket IDs `1..=count` for `address`.
-    ///
-    /// # Errors
-    /// Returns an error if called on a `Distance` backend.
-    pub fn set_ticket_count_addr(&mut self, address: Address, count: u64) -> Result<()> {
-        match self {
-            SortitionBackend::Score(b) => {
-                b.set_ticket_count_addr(address, count);
-                Ok(())
-            }
-            SortitionBackend::Distance(_) => {
-                anyhow::bail!("set_ticket_count_addr is only valid for Score backend")
-            }
-        }
-    }
 }
 
 impl SortitionList<String> for SortitionBackend {
-    fn contains(&self, seed: Seed, size: usize, address: String) -> Result<bool> {
+    fn contains(
+        &self,
+        seed: Seed,
+        size: usize,
+        address: String,
+        node_state: Option<&NodeStateStore>,
+        chain_id: u64,
+    ) -> anyhow::Result<bool> {
         match self {
-            SortitionBackend::Distance(backend) => backend.contains(seed, size, address),
-            SortitionBackend::Score(backend) => backend.contains(seed, size, address),
+            SortitionBackend::Distance(b) => b.contains(seed, size, address, None, chain_id),
+            SortitionBackend::Score(b) => b.contains(seed, size, address, node_state, chain_id),
         }
     }
 
-    fn get_index(&self, seed: Seed, size: usize, address: String) -> Result<Option<u64>> {
+    fn get_index(
+        &self,
+        seed: Seed,
+        size: usize,
+        address: String,
+        node_state: Option<&NodeStateStore>,
+        chain_id: u64,
+    ) -> anyhow::Result<Option<(u64, Option<u64>)>> {
         match self {
-            SortitionBackend::Distance(backend) => backend.get_index(seed, size, address),
-            SortitionBackend::Score(backend) => backend.get_index(seed, size, address),
+            SortitionBackend::Distance(b) => b.get_index(seed, size, address, None, chain_id),
+            SortitionBackend::Score(b) => b.get_index(seed, size, address, node_state, chain_id),
         }
     }
+
     fn add(&mut self, address: String) {
         match self {
             SortitionBackend::Distance(backend) => backend.add(address),
@@ -366,6 +435,8 @@ pub struct Sortition {
     list: Persistable<HashMap<u64, SortitionBackend>>,
     /// Event bus for error reporting and enclave event subscription.
     bus: Addr<EventBus<EnclaveEvent>>,
+    /// Optional reference to node state for score-based sortition
+    node_state: Option<Persistable<NodeStateStore>>,
 }
 
 /// Parameters for constructing a `Sortition` actor.
@@ -375,6 +446,8 @@ pub struct SortitionParams {
     pub bus: Addr<EventBus<EnclaveEvent>>,
     /// Persisted per-chain backend map.
     pub list: Persistable<HashMap<u64, SortitionBackend>>,
+    /// Optional node state for score-based sortition
+    pub node_state: Option<Persistable<NodeStateStore>>,
 }
 
 impl Sortition {
@@ -383,6 +456,7 @@ impl Sortition {
         Self {
             list: params.list,
             bus: params.bus,
+            node_state: params.node_state,
         }
     }
 
@@ -398,6 +472,31 @@ impl Sortition {
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
+            node_state: None, // Legacy attach without node state
+        })
+        .start();
+        bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
+        bus.do_send(Subscribe::new("CiphernodeRemoved", addr.clone().into()));
+        Ok(addr)
+    }
+
+    /// Load persisted state with node state support for score-based sortition.
+    ///
+    /// This version allows score-based backends to query ticket availability.
+    #[instrument(name = "sortition_attach_with_node_state", skip_all)]
+    pub async fn attach_with_node_state(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        store: Repository<HashMap<u64, SortitionBackend>>,
+        node_state_store: Repository<NodeStateStore>,
+    ) -> Result<Addr<Sortition>> {
+        let list = store.load_or_default(HashMap::new()).await?;
+        let node_state = node_state_store
+            .load_or_default(NodeStateStore::default())
+            .await?;
+        let addr = Sortition::new(SortitionParams {
+            bus: bus.clone(),
+            list,
+            node_state: Some(node_state),
         })
         .start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
@@ -488,19 +587,22 @@ impl Handler<CiphernodeRemoved> for Sortition {
 }
 
 impl Handler<GetNodeIndex> for Sortition {
-    type Result = Option<u64>;
+    type Result = Option<(u64, Option<u64>)>;
 
-    /// Return the index of `address` in the size-`size` committee for `seed`
-    /// on `chain_id`. If the chain has not been initialized, returns `None`.
-    ///
-    /// Errors while accessing persisted state or parsing the address are
-    /// reported on the event bus and surfaced here as `None`.
-    #[instrument(name = "sortition_contains", skip_all)]
     fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
+        let node_state_snapshot = self.node_state.as_ref().and_then(|p| p.get());
+        let node_state_ref = node_state_snapshot.as_ref();
+
         self.list
             .try_with(|map| {
                 if let Some(backend) = map.get(&msg.chain_id) {
-                    backend.get_index(msg.seed, msg.size, msg.address.clone())
+                    backend.get_index(
+                        msg.seed,
+                        msg.size,
+                        msg.address.clone(),
+                        node_state_ref,
+                        msg.chain_id,
+                    )
                 } else {
                     Ok(None)
                 }
@@ -511,7 +613,6 @@ impl Handler<GetNodeIndex> for Sortition {
             })
     }
 }
-
 impl Handler<GetNodes> for Sortition {
     type Result = Vec<String>;
 

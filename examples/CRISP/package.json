@@ -10,7 +10,7 @@
   },
   "scripts": {
     "compile": "forge compile",
-    "ciphernode:add": "hardhat ciphernode:add",
+    "ciphernode:add": "hardhat ciphernode:admin-add",
     "cli": "bash ./scripts/cli.sh",
     "clean:deployments": "hardhat utils:clean-deployments",
     "dev:setup": "bash ./scripts/setup.sh",

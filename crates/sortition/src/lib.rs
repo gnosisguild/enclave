@@ -6,11 +6,14 @@
 
 mod ciphernode_selector;
 mod distance;
+mod node_state;
 mod repo;
 mod sortition;
 mod ticket;
 mod ticket_sortition;
 
 pub use ciphernode_selector::*;
+pub use node_state::*;
 pub use repo::*;
 pub use sortition::*;
+pub use ticket_sortition::*;

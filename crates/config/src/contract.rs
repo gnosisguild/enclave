@@ -38,6 +38,7 @@ impl Contract {
 pub struct ContractAddresses {
     pub enclave: Contract,
     pub ciphernode_registry: Contract,
-    pub filter_registry: Contract,
+    pub bonding_registry: Contract,
+    pub committee_sortition: Option<Contract>,
     pub e3_program: Option<Contract>,
 }

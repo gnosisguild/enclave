@@ -41,3 +41,29 @@ impl CiphernodeRegistryReaderRepositoryFactory for Repositories {
         )
     }
 }
+
+pub trait BondingRegistryReaderRepositoryFactory {
+    fn bonding_registry_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState>;
+}
+
+impl BondingRegistryReaderRepositoryFactory for Repositories {
+    fn bonding_registry_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
+        Repository::new(
+            self.store
+                .scope(StoreKeys::bonding_registry_reader(chain_id)),
+        )
+    }
+}
+
+pub trait CommitteeSortitionReaderRepositoryFactory {
+    fn committee_sortition_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState>;
+}
+
+impl CommitteeSortitionReaderRepositoryFactory for Repositories {
+    fn committee_sortition_reader(&self, chain_id: u64) -> Repository<EvmEventReaderState> {
+        Repository::new(
+            self.store
+                .scope(StoreKeys::committee_sortition_reader(chain_id)),
+        )
+    }
+}

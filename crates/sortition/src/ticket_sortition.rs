@@ -66,7 +66,12 @@ impl ScoreSortition {
         let mut items: Vec<WinnerTicket> = best_map.into_values().collect();
 
         // Sort ascending by (score, ticket_id)
-        items.sort_unstable_by(|a, b| a.score.cmp(&b.score).then(a.ticket_id.cmp(&b.ticket_id)));
+        items.sort_unstable_by(|a, b| {
+            a.score
+                .cmp(&b.score)
+                .then(a.ticket_id.cmp(&b.ticket_id))
+                .then(a.address.as_slice().cmp(b.address.as_slice()))
+        });
 
         let k = self.size.min(items.len());
         items.truncate(k);

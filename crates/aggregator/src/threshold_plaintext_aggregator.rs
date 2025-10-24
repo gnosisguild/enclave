@@ -278,7 +278,7 @@ impl Handler<DecryptionshareCreated> for ThresholdPlaintextAggregator {
                 .into_actor(self)
                 .map(move |res, act, ctx| {
                     let maybe_found_index = res?;
-                    let Some(party) = maybe_found_index else {
+                    let Some((party, _ticket_number)) = maybe_found_index else {
                         error!("Attempting to aggregate share but party not found in committee");
                         return Ok(());
                     };

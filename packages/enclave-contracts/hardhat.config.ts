@@ -14,6 +14,8 @@ import type { HardhatUserConfig } from "hardhat/config";
 
 import {
   ciphernodeAdd,
+  ciphernodeAdminAdd,
+  ciphernodeMintTokens,
   ciphernodeRemove,
   ciphernodeSiblings,
 } from "./tasks/ciphernode";
@@ -87,6 +89,8 @@ const config: HardhatUserConfig = {
   ],
   tasks: [
     ciphernodeAdd,
+    ciphernodeAdminAdd,
+    ciphernodeMintTokens,
     ciphernodeRemove,
     ciphernodeSiblings,
     requestCommittee,
@@ -104,6 +108,16 @@ const config: HardhatUserConfig = {
       type: "edr-simulated",
       chainType: "l1",
     },
+    localhost: {
+      accounts: {
+        mnemonic,
+      },
+      chainId: chainIds.hardhat,
+      url: "http://localhost:8545",
+      type: "http",
+      chainType: "l1",
+      timeout: 60000,
+    },
     ganache: {
       accounts: {
         mnemonic,
@@ -111,6 +125,7 @@ const config: HardhatUserConfig = {
       chainId: chainIds.ganache,
       url: "http://localhost:8545",
       type: "http",
+      timeout: 60000,
     },
     arbitrum: getChainConfig(
       "arbitrum-mainnet",

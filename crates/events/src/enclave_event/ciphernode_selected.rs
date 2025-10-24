@@ -21,6 +21,7 @@ pub struct CiphernodeSelected {
     pub esi_per_ct: usize,
     pub params: ArcBytes,
     pub party_id: u64,
+    pub ticket_id: Option<u64>,
 }
 
 impl Default for CiphernodeSelected {
@@ -34,6 +35,7 @@ impl Default for CiphernodeSelected {
             seed: Seed([0u8; 32]),
             threshold_m: 0,
             threshold_n: 0,
+            ticket_id: None,
         }
     }
 }
