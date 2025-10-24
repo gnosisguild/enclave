@@ -351,6 +351,24 @@ impl CiphernodeBuilder {
                     chain.rpc_url.clone(),
                 )
                 .await?;
+
+                match provider_cache
+                    .ensure_write_provider(&repositories, chain, cipher)
+                    .await
+                {
+                    Ok(write_provider) => {
+                        CiphernodeRegistrySol::attach_writer(
+                            &local_bus,
+                            write_provider.clone(),
+                            &chain.contracts.ciphernode_registry.address(),
+                        )
+                        .await?;
+                        info!("CiphernodeRegistrySolWriter attached for publishing committees");
+                    }
+                    Err(_) => {
+                        info!("No wallet configured for this node, skipping writer attachment");
+                    }
+                }
             }
         }
 

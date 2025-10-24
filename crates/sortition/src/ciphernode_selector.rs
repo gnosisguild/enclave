@@ -63,7 +63,6 @@ impl Handler<E3Requested> for CiphernodeSelector {
     type Result = ResponseFuture<()>;
 
     fn handle(&mut self, data: E3Requested, _ctx: &mut Self::Context) -> Self::Result {
-        info!("CiphernodeSelector is handling E3Requested!!!");
         let address = self.address.clone();
         let sortition = self.sortition.clone();
         let bus = self.bus.clone();
@@ -91,16 +90,6 @@ impl Handler<E3Requested> for CiphernodeSelector {
                     info!(node = address, "Ciphernode was not selected");
                     return;
                 };
-                match ticket_id {
-                    Some(ticket) => info!(
-                        "CIPHERNODE SELECTED: node={} address={} ticket={}",
-                        party_id, address, ticket
-                    ),
-                    None => info!(
-                        "CIPHERNODE SELECTED: node={} address={} (no ticket)",
-                        party_id, address
-                    ),
-                }
                 bus.do_send(EnclaveEvent::from(CiphernodeSelected {
                     party_id,
                     ticket_id,

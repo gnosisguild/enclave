@@ -4,7 +4,7 @@
 # cargo install --locked --path ./crates/cli --bin enclave -f
 
 # Deploy CRISP Contracts
-(cd examples/CRISP && pnpm deploy:contracts:full:mock --network localhost)
+(cd examples/CRISP && pnpm deploy:contracts:full --network localhost)
 
 # Add Ciphernodes to Enclave
 sleep 2 # wait for enclave to start
