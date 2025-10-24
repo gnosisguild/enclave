@@ -19,3 +19,4 @@ export * from "./deployAndSave/mockComputeProvider";
 export * from "./deployAndSave/mockDecryptionVerifier";
 export * from "./deployAndSave/mockInputValidator";
 export * from "./deployAndSave/mockProgram";
+export * from "./verify";
