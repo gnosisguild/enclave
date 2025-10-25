@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Core crisp inputs generation library
+//! Core crisp inputs generation library.
 //!
-//! This crate contains the main logic for generating crisp inputs.
+//! This crate contains the main logic for generating crisp inputs for zero-knowledge proofs.
 
 use eyre::{Context, Result};
 use fhe::bfv::Ciphertext;
@@ -35,6 +35,7 @@ impl CrispZKInputsGenerator {
         Self::with_defaults()
     }
 
+    /// Creates a new generator with custom BFV parameters.
     pub fn with_params(degree: usize, plaintext_modulus: u64, moduli: &[u64]) -> Self {
         let bfv_params = BfvParametersBuilder::new()
             .set_degree(degree)
@@ -45,6 +46,7 @@ impl CrispZKInputsGenerator {
         Self { bfv_params }
     }
 
+    /// Creates a generator with default BFV parameters.
     fn with_defaults() -> Self {
         let degree = 2048;
         let plaintext_modulus = 1032193;
@@ -53,23 +55,32 @@ impl CrispZKInputsGenerator {
         Self::with_params(degree, plaintext_modulus, &moduli)
     }
 
+    /// Generates crisp ZK inputs for a vote encryption and addition operation.
+    ///
+    /// # Arguments
+    /// * `prev_ciphertext` - Hex-encoded previous ciphertext to add to
+    /// * `public_key` - Hex-encoded public key for encryption
+    /// * `vote` - Vote value (0 or 1)
+    ///
+    /// # Returns
+    /// JSON string containing the crisp ZK inputs
     pub fn generate_inputs(
         &self,
-        old_ciphertext: &str,
+        prev_ciphertext: &str,
         public_key: &str,
         vote: u8,
     ) -> Result<String> {
-        // Deserialize the provided public key
+        // Deserialize the provided public key.
         let pk = PublicKey::from_bytes(
             &hex::decode(public_key).with_context(|| "Failed to decode public key from hex")?,
             &self.bfv_params,
         )
         .with_context(|| "Failed to deserialize public key")?;
 
-        // Create a sample plaintext consistent with the GRECO sample generator
+        // Create a sample plaintext consistent with the GRECO sample generator.
         // All coefficients are 3, and the first coefficient represents the vote.
         let mut message_data = vec![3u64; self.bfv_params.degree()];
-        // Set vote value (0 or 1) in the first coefficient
+        // Set vote value (0 or 1) in the first coefficient.
         message_data[0] = if vote == 1 { 1 } else { 0 };
 
         // Encode the plaintext into a polynomial.
@@ -81,7 +92,7 @@ impl CrispZKInputsGenerator {
             .try_encrypt_extended(&pt, &mut thread_rng())
             .with_context(|| "Failed to encrypt plaintext")?;
 
-        // Compute the vectors of the Greco inputs.
+        // Compute the vectors of the GRECO inputs.
         let greco_vectors =
             GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &self.bfv_params)
                 .with_context(|| "Failed to compute vectors")?;
@@ -89,26 +100,24 @@ impl CrispZKInputsGenerator {
         let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
             .with_context(|| "Failed to compute bounds")?;
 
-        // #########################################  Ciphertext Addition ################################################
-
-        // Deserialize the old ciphertext.
-        let old_ct = Ciphertext::from_bytes(
-            &hex::decode(old_ciphertext)
-                .with_context(|| "Failed to decode old ciphertext from hex")?,
+        // Ciphertext Addition Section.
+        // Deserialize the previous ciphertext.
+        let prev_ct = Ciphertext::from_bytes(
+            &hex::decode(prev_ciphertext)
+                .with_context(|| "Failed to decode previous ciphertext from hex")?,
             &self.bfv_params,
         )
-        .with_context(|| "Failed to deserialize old ciphertext")?;
+        .with_context(|| "Failed to deserialize previous ciphertext")?;
 
-        // Compute the cyphertext addition.
-        let sum_ct = &ct + &old_ct;
+        // Compute the ciphertext addition.
+        let sum_ct = &ct + &prev_ct;
 
         // Compute the inputs of the ciphertext addition.
         let ciphertext_addition_inputs =
-            CiphertextAdditionInputs::compute(&pt, &old_ct, &ct, &sum_ct, &self.bfv_params)
+            CiphertextAdditionInputs::compute(&pt, &prev_ct, &ct, &sum_ct, &self.bfv_params)
                 .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
-        // #########################################  Construct Inputs ################################################
-
+        // Construct Inputs Section.
         let inputs = construct_inputs(
             &crypto_params,
             &bounds,
@@ -119,6 +128,14 @@ impl CrispZKInputsGenerator {
         Ok(serialize_inputs_to_json(&inputs)?)
     }
 
+    /// Encrypts a vote using the provided public key.
+    ///
+    /// # Arguments
+    /// * `public_key` - Hex-encoded public key for encryption
+    /// * `vote` - Vote value (0 or 1)
+    ///
+    /// # Returns
+    /// Hex-encoded ciphertext
     pub fn encrypt_vote(&self, public_key: &str, vote: u8) -> Result<String> {
         let pk = PublicKey::from_bytes(
             &hex::decode(public_key).with_context(|| "Failed to decode public key from hex")?,
@@ -127,7 +144,7 @@ impl CrispZKInputsGenerator {
         .with_context(|| "Failed to deserialize public key")?;
 
         let mut message_data = vec![3u64; self.bfv_params.degree()];
-        // Set vote value (0 or 1) in the first coefficient
+        // Set vote value (0 or 1) in the first coefficient.
         message_data[0] = if vote == 1 { 1 } else { 0 };
 
         let pt = Plaintext::try_encode(&message_data, Encoding::poly(), &self.bfv_params)
@@ -140,8 +157,12 @@ impl CrispZKInputsGenerator {
         Ok(hex::encode(ct.to_bytes()))
     }
 
+    /// Generates a new public/secret key pair and returns the public key.
+    ///
+    /// # Returns
+    /// Hex-encoded public key
     pub fn generate_public_key(&self) -> Result<String> {
-        // Generate keys
+        // Generate keys.
         let mut rng = thread_rng();
         let sk = SecretKey::random(&self.bfv_params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
@@ -149,6 +170,7 @@ impl CrispZKInputsGenerator {
         Ok(hex::encode(pk.to_bytes()))
     }
 
+    /// Returns a clone of the BFV parameters used by this generator.
     pub fn get_bfv_params(&self) -> Arc<BfvParameters> {
         self.bfv_params.clone()
     }
@@ -164,14 +186,14 @@ mod tests {
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
-        let old_ciphertext = generator
+        let prev_ciphertext = generator
             .encrypt_vote(&public_key, 1)
-            .expect("failed to generate old ciphertext");
-        let result = generator.generate_inputs(&old_ciphertext, &public_key, 0);
+            .expect("failed to generate previous ciphertext");
+        let result = generator.generate_inputs(&prev_ciphertext, &public_key, 0);
 
         assert!(result.is_ok());
         let json_output = result.unwrap();
-        // Verify it's valid JSON and contains expected fields
+        // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
         assert!(json_output.contains("crypto"));
@@ -183,14 +205,14 @@ mod tests {
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
-        let old_ciphertext = generator
+        let prev_ciphertext = generator
             .encrypt_vote(&public_key, 0)
-            .expect("failed to generate old ciphertext");
-        let result = generator.generate_inputs(&old_ciphertext, &public_key, 1);
+            .expect("failed to generate previous ciphertext");
+        let result = generator.generate_inputs(&prev_ciphertext, &public_key, 1);
 
         assert!(result.is_ok());
         let json_output = result.unwrap();
-        // Verify it's valid JSON and contains expected fields
+        // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
         assert!(json_output.contains("crypto"));
@@ -202,14 +224,14 @@ mod tests {
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
-        let old_ciphertext = generator
+        let prev_ciphertext = generator
             .encrypt_vote(&public_key, 0)
-            .expect("failed to generate old ciphertext");
-        let result = generator.generate_inputs(&old_ciphertext, &public_key, 1);
+            .expect("failed to generate previous ciphertext");
+        let result = generator.generate_inputs(&prev_ciphertext, &public_key, 1);
 
         assert!(result.is_ok());
         let json_output = result.unwrap();
-        // Verify it's valid JSON and contains expected fields
+        // Verify it's valid JSON and contains expected fields.
         assert!(json_output.contains("params"));
         assert!(json_output.contains("pk0is"));
         assert!(json_output.contains("crypto"));
@@ -229,7 +251,7 @@ mod tests {
     fn test_secure_rng_usage() {
         let generator = CrispZKInputsGenerator::new();
 
-        // Test that functions use secure randomness (no deterministic seed)
+        // Test that functions use secure randomness (no deterministic seed).
         let public_key = generator
             .generate_public_key()
             .expect("failed to generate public key");
