@@ -9,10 +9,7 @@ use e3_events::CorrelationId;
 use e3_net::events::{GossipData, NetCommand, NetEvent};
 use e3_net::{Cid, MeshParams, NetInterface};
 use e3_utils::ArcBytes;
-use libp2p::gossipsub::{self, IdentTopic, Topic, TopicHash};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
+use libp2p::gossipsub::{self, IdentTopic};
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::sync::{broadcast, mpsc};
@@ -97,37 +94,33 @@ async fn test_gossip(peer: &mut PeerHandle) -> Result<()> {
     Ok(())
 }
 
-async fn get_events_until_settled(
-    seconds: u64,
-    rx: &mut broadcast::Receiver<NetEvent>,
-) -> Result<Vec<NetEvent>> {
-    let mut events = Vec::new();
-
-    loop {
-        match timeout(Duration::from_secs(seconds), rx.recv()).await {
-            Ok(Ok(event)) => events.push(event),
-            Ok(Err(_)) => break, // Channel error
-            Err(_) => break,     // 15-second timeout
-        }
-    }
-
-    Ok(events)
-}
+// async fn get_events_until_settled(
+//     seconds: u64,
+//     rx: &mut broadcast::Receiver<NetEvent>,
+// ) -> Result<Vec<NetEvent>> {
+//     let mut events = Vec::new();
+//
+//     loop {
+//         match timeout(Duration::from_secs(seconds), rx.recv()).await {
+//             Ok(Ok(event)) => events.push(event),
+//             Ok(Err(_)) => break, // Channel error
+//             Err(_) => break,     // 15-second timeout
+//         }
+//     }
+//
+//     Ok(events)
+// }
 
 async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
     let test_config = env::var("TEST_CONFIG").unwrap_or_default();
-    let is_lead = test_config.contains("dht_lead");
+    let is_lead = test_config.contains("lead");
     if is_lead {
-        let value = format!(
-            "{}: I am he as you are he, as you are me and we are all together",
-            peer.name
-        );
-        let value = value.as_bytes();
-
+        let value = b"I am he as you are he, as you are me and we are all together";
+        let key = Cid::from_content(value);
         peer.tx
             .send(NetCommand::DhtPutRecord {
                 correlation_id: CorrelationId::new(),
-                key: Cid::from_content(value),
+                key: key.clone(),
                 value: ArcBytes::from_bytes(value.to_vec()),
                 expires: None,
             })
@@ -142,12 +135,40 @@ async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
             Duration::from_secs(15),
         )
         .await?;
+
+        peer.tx
+            .send(NetCommand::DhtGetRecord {
+                correlation_id: CorrelationId::new(),
+                key,
+            })
+            .await?;
+        let events = receive_until_collect(
+            &mut peer.rx,
+            |e| match e {
+                NetEvent::DhtGetRecordSucceeded { .. } => true,
+                _ => false,
+            },
+            Duration::from_secs(15),
+        )
+        .await?;
+
+        let Some(NetEvent::DhtGetRecordSucceeded { value: actual, .. }) = events.last() else {
+            return Err(anyhow::anyhow!(
+                "Failed to receive success from GET RECORD!"
+            ));
+        };
+
+        assert_eq!(
+            value.to_vec(),
+            actual.extract_bytes(),
+            "Value does not match!"
+        );
+
         peer.send_test_finished("test").await?;
     } else {
-        peer.wait_for_test_finished(Duration::from_secs(15)).await?;
+        peer.wait_for_test_finished(Duration::from_secs(120))
+            .await?;
     }
-
-    println!("PUT RECORD SUCCEEDED");
 
     Ok(())
 }
