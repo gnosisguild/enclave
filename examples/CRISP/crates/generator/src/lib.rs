@@ -20,7 +20,7 @@ use rand::thread_rng;
 use std::sync::Arc;
 
 mod ciphertext_addition;
-use crate::ciphertext_addition::CiphertextAdditionParams;
+use crate::ciphertext_addition::CiphertextAdditionInputs;
 
 mod serialization;
 use serialization::{construct_inputs, serialize_inputs_to_json};
@@ -101,10 +101,10 @@ impl CrispZKInputsGenerator {
         // Compute the cyphertext addition.
         let sum_ct = &ct + &old_ct;
 
-        // Compute the vectors of the ciphertext addition inputs.
-        let ciphertext_addition_vectors =
-            CiphertextAdditionParams::compute(&pt, &old_ct, &ct, &sum_ct, &self.bfv_params)
-                .map_err(|e| format!("Failed to compute ciphertext addition vectors: {}", e))?;
+        // Compute the inputs of the ciphertext addition.
+        let ciphertext_addition_inputs =
+            CiphertextAdditionInputs::compute(&pt, &old_ct, &ct, &sum_ct, &self.bfv_params)
+                .map_err(|e| format!("Failed to compute ciphertext addition inputs: {}", e))?;
 
         // #########################################  Construct Inputs ################################################
 
@@ -112,7 +112,7 @@ impl CrispZKInputsGenerator {
             &crypto_params,
             &bounds,
             &greco_vectors.standard_form(),
-            &ciphertext_addition_vectors.standard_form(),
+            &ciphertext_addition_inputs.standard_form(),
         );
 
         Ok(serialize_inputs_to_json(&inputs)?)
