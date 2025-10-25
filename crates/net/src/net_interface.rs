@@ -4,26 +4,36 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::dialer::dial_peers;
+use crate::events::{GossipData, NetCommand};
+use crate::{events::NetEvent, Cid};
 use anyhow::Result;
+use e3_events::CorrelationId;
+use e3_utils::ArcBytes;
+use libp2p::gossipsub::{IdentTopic, TopicHash};
+use libp2p::kad::{
+    self, GetRecordOk, GetRecordResult, PeerRecord, PutRecordOk, QueryId, QueryResult,
+};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
     gossipsub,
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
-    kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
-    swarm::{NetworkBehaviour, SwarmEvent},
+    kad::{store::MemoryStore, Behaviour as KademliaBehaviour, Quorum, Record, RecordKey},
+    swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     Swarm,
 };
-use std::hash::{Hash, Hasher};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::{hash::DefaultHasher, io::Error, time::Duration};
+use std::{
+    hash::{Hash, Hasher},
+    time::Instant,
+};
+use tokio::time::{sleep, timeout};
 use tokio::{select, sync::broadcast, sync::mpsc};
-use tracing::{debug, info, trace, warn};
-
-use crate::dialer::dial_peers;
-use crate::events::NetEvent;
-use crate::events::{GossipData, NetCommand};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -58,14 +68,16 @@ impl NetInterface {
         peers: Vec<String>,
         udp_port: Option<u16>,
         topic: &str,
+        mesh_params: MeshParams,
     ) -> Result<Self> {
+        println!("{:?}", mesh_params);
         let (event_tx, _) = broadcast::channel(100); // TODO : tune this param
         let (cmd_tx, cmd_rx) = mpsc::channel(100); // TODO : tune this param
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| create_kad_behaviour(key))?
+            .with_behaviour(|key| create_behaviour(key, mesh_params))?
             .build();
 
         // TODO: Use topics to manage network traffic instead of just using a single topic
@@ -94,6 +106,7 @@ impl NetInterface {
         let event_tx = self.event_tx.clone();
         let cmd_tx = self.cmd_tx.clone();
         let cmd_rx = &mut self.cmd_rx;
+        let mut correlator = Correlator::new();
 
         // Subscribe to topic
         self.swarm
@@ -123,54 +136,189 @@ impl NetInterface {
 
         loop {
             select! {
-                 // Process commands
+                // Process commands
                 Some(command) = cmd_rx.recv() => {
-                    match command {
-                        NetCommand::GossipPublish { data, topic, correlation_id } => {
-                            // let serialized = data.to_bytes()
-                            let gossipsub_behaviour = &mut self.swarm.behaviour_mut().gossipsub;
-                            match gossipsub_behaviour
-                                .publish(gossipsub::IdentTopic::new(topic), data.to_bytes()?) {
-                                Ok(message_id) => {
-                                    event_tx.send(NetEvent::GossipPublished { correlation_id, message_id })?;
-                                },
-                                Err(e) => {
-                                    warn!(error=?e, "Could not publish to swarm. Retrying...");
-                                    event_tx.send(NetEvent::GossipPublishError { correlation_id, error: Arc::new(e) })?;
-                                }
-                            }
-                        },
-                        NetCommand::Dial(multi) => {
-                            trace!("DIAL: {:?}", multi);
-                            match self.swarm.dial(multi) {
-                                Ok(v) => trace!("Dial returned {:?}", v),
-                                Err(error) => {
-                                    warn!("Dialing error! {}", error);
-                                    event_tx.send(NetEvent::DialError { error: error.into() })?;
-                                }
-                            }
-                        },
-                        NetCommand::DhtPutRecord { .. } => todo!(),
-                        NetCommand::DhtGetRecord { .. } => todo!(),
-
+                    let result = match command {
+                        NetCommand::GossipPublish { data, topic, correlation_id } =>
+                            handle_gossip_publish(&mut self.swarm, &event_tx, data, topic, correlation_id),
+                        NetCommand::Dial(multi) =>
+                            handle_dial(&mut self.swarm, &event_tx, multi),
+                        NetCommand::DhtPutRecord { correlation_id, key, expires, value } =>
+                            handle_put_record(&mut self.swarm, &event_tx,&mut correlator, correlation_id, key, expires, value),
+                        NetCommand::DhtGetRecord { correlation_id, key } =>
+                            handle_get_record(&mut self.swarm, &mut correlator, correlation_id, key)
+                    };
+                    match result {
+                        Ok(_) => (),
+                        Err(e) => error!("NetCommand Error: {e}")
                     }
                 }
+
                 // Process events
                 event = self.swarm.select_next_some() =>  {
-                    process_swarm_event(&mut self.swarm, &event_tx, event).await?
+                    process_swarm_event(&mut self.swarm, &event_tx, &mut correlator, event).await?
                 }
             }
         }
     }
 }
 
+fn handle_gossip_publish(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    data: GossipData,
+    topic: String,
+    correlation_id: CorrelationId,
+) -> Result<()> {
+    let gossipsub_behaviour = &mut swarm.behaviour_mut().gossipsub;
+    match gossipsub_behaviour.publish(gossipsub::IdentTopic::new(topic), data.to_bytes()?) {
+        Ok(message_id) => {
+            event_tx.send(NetEvent::GossipPublished {
+                correlation_id,
+                message_id,
+            })?;
+        }
+        Err(e) => {
+            warn!(error=?e, "Could not publish to swarm. Retrying...");
+            event_tx.send(NetEvent::GossipPublishError {
+                correlation_id,
+                error: Arc::new(e),
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn handle_dial(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    dial_opts: DialOpts,
+) -> Result<()> {
+    trace!("DIAL: {:?}", dial_opts);
+    match swarm.dial(dial_opts) {
+        Ok(v) => trace!("Dial returned {:?}", v),
+        Err(error) => {
+            warn!("Dialing error! {}", error);
+            event_tx.send(NetEvent::DialError {
+                error: error.into(),
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn handle_put_record(
+    swarm: &mut Swarm<NodeBehaviour>,
+    event_tx: &broadcast::Sender<NetEvent>,
+    correlator: &mut Correlator,
+    correlation_id: CorrelationId,
+    key: Cid,
+    expires: Option<Instant>,
+    value: ArcBytes,
+) -> Result<()> {
+    debug!("DHT PUT RECORD");
+    let record = Record {
+        key: RecordKey::new(&key),
+        value: value.extract_bytes(),
+        publisher: None, // Will be set automatically to local peer ID
+        expires,
+    };
+
+    match swarm
+        .behaviour_mut()
+        .kademlia
+        .put_record(record, Quorum::One)
+    {
+        Ok(query_id) => {
+            debug!("PUT RECORD OK {:?}", query_id);
+            correlator.track(query_id, correlation_id);
+        }
+        Err(error) => {
+            error!("PUT RECORD ERROR: {:?}", error);
+            let err_evt = NetEvent::DhtPutRecordError {
+                correlation_id,
+                error: error.into(),
+            };
+
+            event_tx.send(err_evt)?;
+        }
+    };
+    Ok(())
+}
+
+fn handle_get_record(
+    swarm: &mut Swarm<NodeBehaviour>,
+    correlator: &mut Correlator,
+    correlation_id: CorrelationId,
+    key: Cid,
+) -> Result<()> {
+    let query_id = swarm
+        .behaviour_mut()
+        .kademlia
+        .get_record(RecordKey::new(&key));
+
+    // So because of the API above the contract here must
+    // be that this will only ever return after some amount of time
+    // I could not see a way to specify your own QueryId so we have to
+    // track with the correlator
+    correlator.track(query_id, correlation_id);
+
+    trace!("get_record sent {:?}", query_id);
+    Ok(())
+}
+
+async fn wait_for_mesh_ready(
+    swarm: &mut Swarm<NodeBehaviour>,
+    topic: &TopicHash,
+    min_peers: usize,
+    timeout_duration: Duration,
+) -> Result<()> {
+    timeout(timeout_duration, async {
+        loop {
+            let mesh_peers = swarm.behaviour().gossipsub.mesh_peers(topic).count();
+
+            if mesh_peers >= min_peers {
+                println!("✓ Mesh ready with {mesh_peers} peers");
+                return Ok(());
+            }
+
+            println!("Waiting for mesh... ({mesh_peers}/{min_peers} peers)");
+
+            // Process events to allow connections
+            tokio::select! {
+                _ = swarm.select_next_some() => {},
+                _ = sleep(Duration::from_millis(100)) => {},
+            }
+        }
+    })
+    .await?
+}
+
+#[derive(Debug)]
+pub struct MeshParams {
+    pub mesh_n: usize,            // D: Sweet spot for redundancy vs overhead
+    pub mesh_n_low: usize,        // D_low: Trigger grafting
+    pub mesh_n_high: usize,       // D_high: Trigger pruning
+    pub mesh_outbound_min: usize, // Min outbound connections
+}
+impl Default for MeshParams {
+    fn default() -> Self {
+        Self {
+            mesh_n: 6,
+            mesh_n_low: 5,
+            mesh_n_high: 12,
+            mesh_outbound_min: 2,
+        }
+    }
+}
 /// Create the libp2p behaviour
-fn create_kad_behaviour(
+fn create_behaviour(
     key: &Keypair,
+    mesh_params: MeshParams,
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
     let identify_config = IdentifyBehaviour::new(
-        identify::Config::new("/kad/0.1.0".into(), key.public())
+        identify::Config::new("/enclave/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
 
@@ -183,6 +331,10 @@ fn create_kad_behaviour(
     let gossipsub_config = gossipsub::ConfigBuilder::default()
         .heartbeat_interval(Duration::from_secs(10))
         .validation_mode(gossipsub::ValidationMode::Strict)
+        .mesh_n(mesh_params.mesh_n) // D: Sweet spot for redundancy vs overhead
+        .mesh_n_low(mesh_params.mesh_n_low) // D_low: Trigger grafting
+        .mesh_n_high(mesh_params.mesh_n_high) // D_high: Trigger pruning
+        .mesh_outbound_min(mesh_params.mesh_outbound_min) // Min outbound connections
         .message_id_fn(message_id_fn)
         .build()
         .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
@@ -192,12 +344,15 @@ fn create_kad_behaviour(
         gossipsub_config,
     )?;
 
+    let peer_id = key.public().to_peer_id();
+    println!("PEER ID = ({})", peer_id);
+    let mut kademlia = KademliaBehaviour::new(peer_id, MemoryStore::new(peer_id));
+
+    kademlia.set_mode(Some(kad::Mode::Server));
+
     Ok(NodeBehaviour {
         gossipsub,
-        kademlia: KademliaBehaviour::new(
-            key.public().to_peer_id(),
-            MemoryStore::new(key.public().to_peer_id()),
-        ),
+        kademlia,
         connection_limits,
         identify: identify_config,
     })
@@ -207,6 +362,7 @@ fn create_kad_behaviour(
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
+    correlator: &mut Correlator,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
     match event {
@@ -245,8 +401,35 @@ async fn process_swarm_event(
             warn!("{:#}", anyhow::Error::from(error))
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(e)) => {
-            debug!("Kademlia event: {:?}", e);
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
+            kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::GetRecord(Ok(GetRecordOk::FoundRecord(peer_record))),
+                ..
+            },
+        )) => {
+            println!("#######>>>>>>>>> FoundRecord! {:?}", peer_record);
+            let correlation_id = correlator.expire(&id)?;
+            event_tx.send(NetEvent::DhtGetRecordSucceeded {
+                key: Cid(peer_record.record.key.to_vec()),
+                correlation_id,
+                value: ArcBytes::from_bytes(peer_record.record.value),
+            })?;
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
+            kad::Event::OutboundQueryProgressed {
+                id,
+                result: QueryResult::PutRecord(Ok(record)),
+                ..
+            },
+        )) => {
+            println!("#######>>>>>>>>> PutRecordOk! {:?}", record);
+            let correlation_id = correlator.expire(&id)?;
+            event_tx.send(NetEvent::DhtPutRecordSucceeded {
+                key: Cid(record.key.to_vec()),
+                correlation_id,
+            })?;
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
@@ -258,10 +441,56 @@ async fn process_swarm_event(
             let gossip_data = GossipData::from_bytes(&message.data)?;
             event_tx.send(NetEvent::GossipData(gossip_data))?;
         }
+
         SwarmEvent::NewListenAddr { address, .. } => {
             trace!("Local node is listening on {address}");
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
+            peer_id,
+            topic,
+        })) => {
+            trace!("Peer {} subscribed to {}", peer_id, topic);
+            let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
+            event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
+        }
+
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Identify(event)) => {
+            if let identify::Event::Received {
+                connection_id,
+                peer_id,
+                info,
+            } = event
+            {
+                for addr in info.listen_addrs {
+                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
+                }
+            }
         }
         _ => {}
     };
     Ok(())
+}
+
+#[derive(Clone)]
+struct Correlator {
+    inner: HashMap<QueryId, CorrelationId>,
+}
+
+impl Correlator {
+    pub fn new() -> Self {
+        Self {
+            inner: HashMap::new(),
+        }
+    }
+
+    pub fn track(&mut self, query_id: QueryId, correlation_id: CorrelationId) {
+        self.inner.insert(query_id, correlation_id);
+    }
+
+    pub fn expire(&mut self, query_id: &QueryId) -> Result<CorrelationId> {
+        self.inner
+            .remove(query_id)
+            .ok_or_else(|| anyhow::anyhow!("Failed to correlate query_id={}", query_id))
+    }
 }

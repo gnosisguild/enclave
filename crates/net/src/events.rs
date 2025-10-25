@@ -10,7 +10,8 @@ use anyhow::{Context, Result};
 use e3_events::{CorrelationId, DocumentMeta};
 use e3_utils::ArcBytes;
 use libp2p::{
-    gossipsub::{MessageId, PublishError},
+    gossipsub::{MessageId, PublishError, TopicHash},
+    kad::{store, GetRecordError},
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
@@ -114,13 +115,27 @@ pub enum NetEvent {
     /// There was an error receiving the document
     DhtGetRecordError {
         correlation_id: CorrelationId,
-        error: DhtGetRecordError,
+        error: GetRecordError,
     },
     /// There was an error putting the document
     DhtPutRecordError {
         correlation_id: CorrelationId,
         error: DhtPutRecordError,
     },
+    /// GossipSubscribed
+    GossipSubscribed { count: usize, topic: TopicHash },
+    /// Used for testing only
+    TestFinished,
+}
+
+impl Into<DhtPutRecordError> for store::Error {
+    fn into(self) -> DhtPutRecordError {
+        match self {
+            Self::MaxRecords => DhtPutRecordError::MaxRecords,
+            Self::ValueTooLarge => DhtPutRecordError::ValueTooLarge,
+            Self::MaxProvidedKeys => DhtPutRecordError::MaxProvidedKeys,
+        }
+    }
 }
 
 impl NetEvent {
@@ -145,8 +160,9 @@ pub enum DhtGetRecordError {
 
 #[derive(Clone, Debug)]
 pub enum DhtPutRecordError {
-    QuorumFailed,
-    Timeout,
+    MaxRecords,
+    ValueTooLarge,
+    MaxProvidedKeys,
 }
 
 /// Payload that is dispatched as a net -> net gossip event from Kademlia. This event signals that

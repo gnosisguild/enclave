@@ -22,6 +22,7 @@ pub type SharedRng = Arc<Mutex<ChaCha20Rng>>;
 pub struct ArcBytes(Arc<Vec<u8>>);
 
 impl ArcBytes {
+    // TODO: make this accept &[u8]
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self(Arc::new(bytes))
     }
