@@ -8,7 +8,7 @@
 //!
 //! This module handles the serialization of inputs data to JSON format.
 
-use crate::ciphertext_addition::CiphertextAdditionParams;
+use crate::ciphertext_addition::CiphertextAdditionInputs;
 use greco::bounds::GrecoBounds;
 use greco::bounds::GrecoCryptographicParameters;
 use greco::vectors::GrecoVectors;
@@ -43,7 +43,7 @@ pub fn construct_inputs(
     crypto_params: &GrecoCryptographicParameters,
     bounds: &GrecoBounds,
     vectors_standard: &GrecoVectors,
-    ciphertext_addition_vectors_standard: &CiphertextAdditionParams,
+    ciphertext_addition_inputs_standard: &CiphertextAdditionInputs,
 ) -> CrispZKInputs {
     let mut params_json = serde_json::Map::new();
 
@@ -72,9 +72,9 @@ pub fn construct_inputs(
 
     let mut ciphertext_addition_params_json = serde_json::Map::new();
     ciphertext_addition_params_json.insert(
-        "old_ct0is".to_string(),
-        ciphertext_addition_vectors_standard
-            .old_ct0is
+        "prev_ct0is".to_string(),
+        ciphertext_addition_inputs_standard
+            .prev_ct0is
             .iter()
             .map(|v| {
                 serde_json::json!({
@@ -84,9 +84,9 @@ pub fn construct_inputs(
             .collect(),
     );
     ciphertext_addition_params_json.insert(
-        "old_ct1is".to_string(),
-        ciphertext_addition_vectors_standard
-            .old_ct1is
+        "prev_ct1is".to_string(),
+        ciphertext_addition_inputs_standard
+            .prev_ct1is
             .iter()
             .map(|v| {
                 serde_json::json!({
@@ -97,7 +97,7 @@ pub fn construct_inputs(
     );
     ciphertext_addition_params_json.insert(
         "sum_ct0is".to_string(),
-        ciphertext_addition_vectors_standard
+        ciphertext_addition_inputs_standard
             .sum_ct0is
             .iter()
             .map(|v| {
@@ -109,7 +109,7 @@ pub fn construct_inputs(
     );
     ciphertext_addition_params_json.insert(
         "sum_ct1is".to_string(),
-        ciphertext_addition_vectors_standard
+        ciphertext_addition_inputs_standard
             .sum_ct1is
             .iter()
             .map(|v| {
@@ -120,9 +120,9 @@ pub fn construct_inputs(
             .collect(),
     );
     ciphertext_addition_params_json.insert(
-        "sum_r0is".to_string(),
-        ciphertext_addition_vectors_standard
-            .sum_r0is
+        "r0is".to_string(),
+        ciphertext_addition_inputs_standard
+            .r0is
             .iter()
             .map(|v| {
                 serde_json::json!({
@@ -132,9 +132,9 @@ pub fn construct_inputs(
             .collect(),
     );
     ciphertext_addition_params_json.insert(
-        "sum_r1is".to_string(),
-        ciphertext_addition_vectors_standard
-            .sum_r1is
+        "r1is".to_string(),
+        ciphertext_addition_inputs_standard
+            .r1is
             .iter()
             .map(|v| {
                 serde_json::json!({
@@ -145,7 +145,7 @@ pub fn construct_inputs(
     );
     ciphertext_addition_params_json.insert(
         "r_bound".to_string(),
-        serde_json::json!(ciphertext_addition_vectors_standard.r_bound),
+        serde_json::json!(ciphertext_addition_inputs_standard.r_bound),
     );
 
     CrispZKInputs {
