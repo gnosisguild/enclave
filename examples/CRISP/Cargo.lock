@@ -1422,6 +1422,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bigint-poly"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/bigint-poly#6b992dd81c65cc693b388e37edfd190749bfc3b3"
+dependencies = [
+ "num-bigint",
+ "num-traits",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1885,6 +1896,28 @@ dependencies = [
  "sled",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "crisp-zk-inputs"
+version = "0.1.0"
+dependencies = [
+ "bigint-poly",
+ "eyre",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "hex",
+ "itertools 0.14.0",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "serde_json",
+ "zkfhe-greco",
+ "zkfhe-shared",
 ]
 
 [[package]]
@@ -6223,6 +6256,49 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.106",
+]
+
+[[package]]
+name = "zkfhe-greco"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#8e7b3099f536418e4a133e9029142ebcda2faa65"
+dependencies = [
+ "anyhow",
+ "bigint-poly",
+ "blake3",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "itertools 0.14.0",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "zkfhe-shared",
+]
+
+[[package]]
+name = "zkfhe-shared"
+version = "0.1.0"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#8e7b3099f536418e4a133e9029142ebcda2faa65"
+dependencies = [
+ "anyhow",
+ "bigint-poly",
+ "chrono",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
+ "num-bigint",
+ "num-traits",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "toml",
 ]
 
 [[package]]
