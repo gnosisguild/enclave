@@ -16,8 +16,7 @@ use fhe::bfv::{Encoding, Plaintext};
 use fhe_traits::{DeserializeParametrized, FheEncoder, Serialize};
 use greco::bounds::GrecoBounds;
 use greco::vectors::GrecoVectors;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
+use rand::thread_rng;
 use std::sync::Arc;
 
 mod ciphertext_addition;
@@ -77,9 +76,8 @@ impl CrispZKInputsGenerator {
             .map_err(|e| format!("Failed to encode plaintext: {}", e))?;
 
         // Encrypt using the provided public key to ensure ciphertext matches the key.
-        let mut rng = StdRng::seed_from_u64(0);
         let (ct, u_rns, e0_rns, e1_rns) = pk
-            .try_encrypt_extended(&pt, &mut rng)
+            .try_encrypt_extended(&pt, &mut thread_rng())
             .map_err(|e| format!("Failed to encrypt plaintext: {}", e))?;
 
         // Compute the vectors of the Greco inputs.
@@ -134,18 +132,16 @@ impl CrispZKInputsGenerator {
         let pt = Plaintext::try_encode(&message_data, Encoding::poly(), &self.bfv_params)
             .map_err(|e| format!("Failed to encode plaintext: {}", e))?;
 
-        let mut rng = StdRng::seed_from_u64(0);
         let (ct, _u_rns, _e0_rns, _e1_rns) = pk
-            .try_encrypt_extended(&pt, &mut rng)
+            .try_encrypt_extended(&pt, &mut thread_rng())
             .map_err(|e| format!("Failed to encrypt plaintext: {}", e))?;
 
         Ok(hex::encode(ct.to_bytes()))
     }
 
     pub fn generate_public_key(&self) -> Result<String, String> {
-        let mut rng = StdRng::seed_from_u64(0);
-
         // Generate keys
+        let mut rng = thread_rng();
         let sk = SecretKey::random(&self.bfv_params, &mut rng);
         let pk = PublicKey::new(&sk, &mut rng);
 
@@ -226,5 +222,28 @@ mod tests {
         assert!(bfv_params.degree() == 2048);
         assert!(bfv_params.plaintext() == 1032193 as u64);
         assert!(bfv_params.moduli() == &[0x3FFFFFFF000001]);
+    }
+
+    #[test]
+    fn test_secure_rng_usage() {
+        let generator = CrispZKInputsGenerator::new();
+
+        // Test that functions use secure randomness (no deterministic seed)
+        let public_key = generator
+            .generate_public_key()
+            .expect("failed to generate public key");
+        assert!(!public_key.is_empty());
+
+        let ciphertext = generator
+            .encrypt_vote(&public_key, 1)
+            .expect("failed to encrypt vote");
+        assert!(!ciphertext.is_empty());
+
+        let result = generator.generate_inputs(&ciphertext, &public_key, 0);
+        assert!(result.is_ok());
+        let json_output = result.unwrap();
+        assert!(json_output.contains("params"));
+        assert!(json_output.contains("pk0is"));
+        assert!(json_output.contains("crypto"));
     }
 }
