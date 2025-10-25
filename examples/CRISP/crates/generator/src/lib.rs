@@ -269,4 +269,109 @@ mod tests {
         assert!(json_output.contains("pk0is"));
         assert!(json_output.contains("crypto"));
     }
+
+    // Error handling tests
+    #[test]
+    fn test_invalid_inputs() {
+        let generator = CrispZKInputsGenerator::new();
+
+        // Test invalid hex inputs.
+        let result = generator.generate_inputs("invalid_hex", "invalid_hex", 0);
+        assert!(result.is_err());
+
+        // Test empty strings.
+        let result = generator.generate_inputs("", "", 0);
+        assert!(result.is_err());
+
+        // Test invalid public key for encryption.
+        let result = generator.encrypt_vote("invalid_hex", 0);
+        assert!(result.is_err());
+    }
+
+    // Core functionality tests
+    #[test]
+    fn test_vote_values() {
+        let generator = CrispZKInputsGenerator::new();
+        let public_key = generator
+            .generate_public_key()
+            .expect("failed to generate public key");
+        let prev_ciphertext = generator
+            .encrypt_vote(&public_key, 0)
+            .expect("failed to encrypt vote");
+
+        // Test vote = 0.
+        let result_0 = generator.generate_inputs(&prev_ciphertext, &public_key, 0);
+        assert!(result_0.is_ok());
+
+        // Test vote = 1.
+        let result_1 = generator.generate_inputs(&prev_ciphertext, &public_key, 1);
+        assert!(result_1.is_ok());
+    }
+
+    #[test]
+    fn test_bfv_params_consistency() {
+        let generator = CrispZKInputsGenerator::new();
+        let bfv_params = generator.get_bfv_params();
+
+        // Verify default parameters.
+        assert_eq!(bfv_params.degree(), 2048);
+        assert_eq!(bfv_params.plaintext(), 1032193);
+        assert_eq!(bfv_params.moduli(), &[0x3FFFFFFF000001]);
+    }
+
+    #[test]
+    fn test_json_output_structure() {
+        let generator = CrispZKInputsGenerator::new();
+        let public_key = generator
+            .generate_public_key()
+            .expect("failed to generate public key");
+        let prev_ciphertext = generator
+            .encrypt_vote(&public_key, 0)
+            .expect("failed to encrypt vote");
+        let result = generator.generate_inputs(&prev_ciphertext, &public_key, 1);
+
+        assert!(result.is_ok());
+        let json_output = result.unwrap();
+
+        // Parse JSON to verify structure.
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json_output).expect("Invalid JSON output");
+
+        // Check required top-level fields.
+        assert!(parsed.get("params").is_some());
+        assert!(parsed.get("ct0is").is_some());
+        assert!(parsed.get("ct1is").is_some());
+        assert!(parsed.get("pk0is").is_some());
+        assert!(parsed.get("pk1is").is_some());
+        assert!(parsed.get("ct_add").is_some());
+    }
+
+    #[test]
+    fn test_cryptographic_properties() {
+        let generator = CrispZKInputsGenerator::new();
+        let public_key = generator
+            .generate_public_key()
+            .expect("Failed to generate public key");
+
+        // Test that different votes produce different ciphertexts.
+        let ct0 = generator
+            .encrypt_vote(&public_key, 0)
+            .expect("Failed to encrypt vote 0");
+        let ct1 = generator
+            .encrypt_vote(&public_key, 1)
+            .expect("Failed to encrypt vote 1");
+
+        assert_ne!(ct0, ct1);
+
+        // Test that same vote produces different ciphertexts (due to randomness).
+        let ct0_2 = generator
+            .encrypt_vote(&public_key, 0)
+            .expect("Failed to encrypt vote 0 again");
+        assert_ne!(ct0, ct0_2);
+
+        // Test that all ciphertexts are valid hex.
+        assert!(hex::decode(&ct0).is_ok());
+        assert!(hex::decode(&ct1).is_ok());
+        assert!(hex::decode(&ct0_2).is_ok());
+    }
 }

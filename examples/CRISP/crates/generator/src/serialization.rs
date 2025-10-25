@@ -18,7 +18,7 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct CrispZKInputs {
-    ct_add_params: serde_json::Value,
+    ct_add: serde_json::Value,
     params: serde_json::Value,
     ct0is: Vec<serde_json::Value>,
     ct1is: Vec<serde_json::Value>,
@@ -159,7 +159,7 @@ pub fn construct_inputs(
     );
 
     CrispZKInputs {
-        ct_add_params: serde_json::Value::Object(ciphertext_addition_params_json),
+        ct_add: serde_json::Value::Object(ciphertext_addition_params_json),
         params: serde_json::Value::Object(params_json),
         ct0is: vectors_standard
             .ct0is
@@ -257,4 +257,148 @@ pub fn construct_inputs(
 /// JSON string representation of the inputs
 pub fn serialize_inputs_to_json(inputs: &CrispZKInputs) -> Result<String> {
     serde_json::to_string(inputs).with_context(|| "Failed to serialize inputs to JSON")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use num_bigint::BigInt;
+    use serde_json::Value;
+
+    fn create_mock_crypto_params() -> GrecoCryptographicParameters {
+        GrecoCryptographicParameters {
+            q_mod_t: BigInt::from(12345),
+            moduli: vec![1000007u64, 1000009u64],
+            k0is: vec![1u64, 2u64],
+        }
+    }
+
+    fn create_mock_bounds() -> GrecoBounds {
+        GrecoBounds {
+            e_bound: 100u64,
+            u_bound: 200u64,
+            k1_low_bound: 10i64,
+            k1_up_bound: 20u64,
+            p1_bounds: vec![30u64, 40u64],
+            p2_bounds: vec![50u64, 60u64],
+            pk_bounds: vec![70u64, 80u64],
+            r1_low_bounds: vec![90i64, 100i64],
+            r1_up_bounds: vec![110u64, 120u64],
+            r2_bounds: vec![130u64, 140u64],
+        }
+    }
+
+    fn create_mock_vectors() -> GrecoVectors {
+        GrecoVectors {
+            ct0is: vec![
+                vec![BigInt::from(1), BigInt::from(2)],
+                vec![BigInt::from(3), BigInt::from(4)],
+            ],
+            ct1is: vec![
+                vec![BigInt::from(5), BigInt::from(6)],
+                vec![BigInt::from(7), BigInt::from(8)],
+            ],
+            pk0is: vec![
+                vec![BigInt::from(9), BigInt::from(10)],
+                vec![BigInt::from(11), BigInt::from(12)],
+            ],
+            pk1is: vec![
+                vec![BigInt::from(13), BigInt::from(14)],
+                vec![BigInt::from(15), BigInt::from(16)],
+            ],
+            k0is: vec![BigInt::from(17), BigInt::from(18)],
+            r1is: vec![
+                vec![BigInt::from(21), BigInt::from(22)],
+                vec![BigInt::from(23), BigInt::from(24)],
+            ],
+            r2is: vec![
+                vec![BigInt::from(25), BigInt::from(26)],
+                vec![BigInt::from(27), BigInt::from(28)],
+            ],
+            p1is: vec![
+                vec![BigInt::from(29), BigInt::from(30)],
+                vec![BigInt::from(31), BigInt::from(32)],
+            ],
+            p2is: vec![
+                vec![BigInt::from(33), BigInt::from(34)],
+                vec![BigInt::from(35), BigInt::from(36)],
+            ],
+            u: vec![BigInt::from(37), BigInt::from(38)],
+            e0: vec![BigInt::from(39), BigInt::from(40)],
+            e1: vec![BigInt::from(41), BigInt::from(42)],
+            k1: vec![BigInt::from(43), BigInt::from(44)],
+        }
+    }
+
+    fn create_mock_ciphertext_addition_inputs() -> CiphertextAdditionInputs {
+        CiphertextAdditionInputs {
+            prev_ct0is: vec![vec![BigInt::from(1), BigInt::from(2)]],
+            prev_ct1is: vec![vec![BigInt::from(3), BigInt::from(4)]],
+            sum_ct0is: vec![vec![BigInt::from(5), BigInt::from(6)]],
+            sum_ct1is: vec![vec![BigInt::from(7), BigInt::from(8)]],
+            r0is: vec![vec![BigInt::from(9), BigInt::from(10)]],
+            r1is: vec![vec![BigInt::from(11), BigInt::from(12)]],
+            r_bound: 1,
+        }
+    }
+
+    #[test]
+    fn test_construct_inputs_basic() {
+        let crypto_params = create_mock_crypto_params();
+        let bounds = create_mock_bounds();
+        let vectors = create_mock_vectors();
+        let ciphertext_addition_inputs = create_mock_ciphertext_addition_inputs();
+
+        let inputs = construct_inputs(
+            &crypto_params,
+            &bounds,
+            &vectors,
+            &ciphertext_addition_inputs,
+        );
+
+        // Verify basic structure.
+        assert!(inputs.params.is_object());
+        assert!(inputs.ct_add.is_object());
+        assert_eq!(inputs.ct0is.len(), 2);
+        assert_eq!(inputs.ct1is.len(), 2);
+        assert_eq!(inputs.pk0is.len(), 2);
+        assert_eq!(inputs.pk1is.len(), 2);
+        assert!(inputs.u.is_object());
+        assert!(inputs.e0.is_object());
+        assert!(inputs.e1.is_object());
+        assert!(inputs.k1.is_object());
+    }
+
+    #[test]
+    fn test_serialize_inputs_to_json() {
+        let crypto_params = create_mock_crypto_params();
+        let bounds = create_mock_bounds();
+        let vectors = create_mock_vectors();
+        let ciphertext_addition_inputs = create_mock_ciphertext_addition_inputs();
+
+        let inputs = construct_inputs(
+            &crypto_params,
+            &bounds,
+            &vectors,
+            &ciphertext_addition_inputs,
+        );
+
+        let json_result = serialize_inputs_to_json(&inputs);
+        assert!(json_result.is_ok());
+
+        let json_string = json_result.unwrap();
+        assert!(!json_string.is_empty());
+
+        // Verify it's valid JSON.
+        let parsed: Value = serde_json::from_str(&json_string).unwrap();
+        assert!(parsed.is_object());
+
+        // Verify required fields exist.
+        assert!(parsed.get("params").is_some());
+        assert!(parsed.get("ct_add").is_some());
+        assert!(parsed.get("ct0is").is_some());
+        assert!(parsed.get("ct1is").is_some());
+        assert!(parsed.get("pk0is").is_some());
+        assert!(parsed.get("pk1is").is_some());
+    }
 }
