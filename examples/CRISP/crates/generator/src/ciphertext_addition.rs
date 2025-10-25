@@ -93,7 +93,7 @@ impl CiphertextAdditionInputs {
         // Initialize matrices to store results.
         let mut res = CiphertextAdditionInputs::new(params.moduli().len(), n as usize);
 
-        // For M=2 (adding two ciphertexts), each coefficient of the quotient polynomial
+        // For M=2 (adding two ciphertexts), each coefficient of the quotient polynomial.
         // must be in {-1, 0, 1}, so the bound is 1 for all CRT moduli.
         let r_bound = 1u64;
 
@@ -253,5 +253,98 @@ impl CiphertextAdditionInputs {
             r1is: reduce_coefficients_2d(&self.r1is, zkp_modulus),
             r_bound: self.r_bound,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext, PublicKey, SecretKey};
+    use fhe_traits::FheEncoder;
+    use rand::thread_rng;
+
+    fn create_test_generator() -> (Arc<BfvParameters>, PublicKey, SecretKey) {
+        let bfv_params = BfvParametersBuilder::new()
+            .set_degree(1024) // Smaller degree for faster tests.
+            .set_plaintext_modulus(1032193)
+            .set_moduli(&[0x3FFFFFFF000001])
+            .build_arc()
+            .unwrap();
+
+        let mut rng = thread_rng();
+        let sk = SecretKey::random(&bfv_params, &mut rng);
+        let pk = PublicKey::new(&sk, &mut rng);
+
+        (bfv_params, pk, sk)
+    }
+
+    fn create_test_plaintext(params: &Arc<BfvParameters>, vote: u8) -> Plaintext {
+        let mut message_data = vec![3u64; params.degree()];
+        message_data[0] = if vote == 1 { 1 } else { 0 };
+        Plaintext::try_encode(&message_data, Encoding::poly(), params).unwrap()
+    }
+
+    #[test]
+    fn test_new_initialization() {
+        let inputs = CiphertextAdditionInputs::new(2, 1024);
+
+        assert_eq!(inputs.prev_ct0is.len(), 2);
+        assert_eq!(inputs.prev_ct1is.len(), 2);
+        assert_eq!(inputs.sum_ct0is.len(), 2);
+        assert_eq!(inputs.sum_ct1is.len(), 2);
+        assert_eq!(inputs.r0is.len(), 2);
+        assert_eq!(inputs.r1is.len(), 2);
+        assert_eq!(inputs.r_bound, 0);
+    }
+
+    #[test]
+    fn test_compute_basic_functionality() {
+        let (bfv_params, pk, _sk) = create_test_generator();
+        let mut rng = thread_rng();
+
+        // Create test plaintexts.
+        let pt1 = create_test_plaintext(&bfv_params, 0);
+        let pt2 = create_test_plaintext(&bfv_params, 1);
+
+        // Encrypt plaintexts.
+        let (ct1, _u1, _e0_1, _e1_1) = pk.try_encrypt_extended(&pt1, &mut rng).unwrap();
+        let (ct2, _u2, _e0_2, _e1_2) = pk.try_encrypt_extended(&pt2, &mut rng).unwrap();
+
+        // Compute sum.
+        let sum_ct = &ct1 + &ct2;
+
+        // Compute ciphertext addition inputs.
+        let result = CiphertextAdditionInputs::compute(&pt2, &ct1, &ct2, &sum_ct, &bfv_params);
+
+        assert!(result.is_ok());
+        let inputs = result.unwrap();
+
+        // Verify structure.
+        assert_eq!(inputs.prev_ct0is.len(), 1); // One modulus
+        assert_eq!(inputs.prev_ct1is.len(), 1);
+        assert_eq!(inputs.sum_ct0is.len(), 1);
+        assert_eq!(inputs.sum_ct1is.len(), 1);
+        assert_eq!(inputs.r0is.len(), 1);
+        assert_eq!(inputs.r1is.len(), 1);
+        assert_eq!(inputs.r_bound, 1);
+    }
+
+    #[test]
+    fn test_standard_form_conversion() {
+        let (bfv_params, pk, _sk) = create_test_generator();
+        let mut rng = thread_rng();
+
+        let pt = create_test_plaintext(&bfv_params, 1);
+        let (ct1, _u1, _e0_1, _e1_1) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
+        let (ct2, _u2, _e0_2, _e1_2) = pk.try_encrypt_extended(&pt, &mut rng).unwrap();
+        let sum_ct = &ct1 + &ct2;
+
+        let inputs =
+            CiphertextAdditionInputs::compute(&pt, &ct1, &ct2, &sum_ct, &bfv_params).unwrap();
+        let standard_form = inputs.standard_form();
+
+        // Verify structure is preserved.
+        assert_eq!(standard_form.prev_ct0is.len(), inputs.prev_ct0is.len());
+        assert_eq!(standard_form.r_bound, inputs.r_bound);
     }
 }
