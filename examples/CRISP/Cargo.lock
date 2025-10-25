@@ -1881,8 +1881,8 @@ dependencies = [
  "e3-sdk",
  "env_logger",
  "eyre",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe",
+ "fhe-traits",
  "hex",
  "lean-imt",
  "light-poseidon 0.1.0",
@@ -1903,9 +1903,9 @@ name = "crisp-zk-inputs"
 version = "0.1.0"
 dependencies = [
  "bigint-poly",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
  "hex",
  "itertools 0.14.0",
  "num-bigint",
@@ -2207,9 +2207,9 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "e3-greco-generator",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe",
+ "fhe-traits",
+ "fhe-util",
  "num-bigint",
  "num-traits",
  "rand 0.8.5",
@@ -2269,9 +2269,9 @@ dependencies = [
  "blake3",
  "clap",
  "e3-greco-polynomial",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
  "itertools 0.14.0",
  "num-bigint",
  "num-traits",
@@ -2347,8 +2347,8 @@ version = "0.1.0"
 dependencies = [
  "e3-bfv-helpers",
  "e3-compute-provider 0.1.0",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe",
+ "fhe-traits",
 ]
 
 [[package]]
@@ -2506,37 +2506,12 @@ dependencies = [
 [[package]]
 name = "fhe"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=pvss#2785711cee85259edb3913b140f633b9d98e8e91"
-dependencies = [
- "doc-comment",
- "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "itertools 0.12.1",
- "ndarray",
- "num-bigint",
- "num-traits",
- "prost",
- "prost-build",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "rand_distr",
- "rayon",
- "serde",
- "thiserror 1.0.69",
- "zeroize",
- "zeroize_derive",
-]
-
-[[package]]
-name = "fhe"
-version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "doc-comment",
- "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-math",
+ "fhe-traits",
+ "fhe-util",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -2556,33 +2531,11 @@ dependencies = [
 [[package]]
 name = "fhe-math"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=pvss#2785711cee85259edb3913b140f633b9d98e8e91"
-dependencies = [
- "ethnum",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "itertools 0.12.1",
- "ndarray",
- "num-bigint",
- "num-bigint-dig",
- "num-traits",
- "prost",
- "prost-build",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "sha2",
- "thiserror 1.0.69",
- "zeroize",
-]
-
-[[package]]
-name = "fhe-math"
-version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "ethnum",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
- "fhe-util 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs)",
+ "fhe-traits",
+ "fhe-util",
  "itertools 0.12.1",
  "ndarray",
  "num-bigint",
@@ -2600,31 +2553,9 @@ dependencies = [
 [[package]]
 name = "fhe-traits"
 version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=pvss#2785711cee85259edb3913b140f633b9d98e8e91"
-dependencies = [
- "rand 0.8.5",
-]
-
-[[package]]
-name = "fhe-traits"
-version = "0.1.0-beta.7"
 source = "git+https://github.com/gnosisguild/fhe.rs#8b921cf1ddf5d6c51ebab4ac454d200f434c0832"
 dependencies = [
  "rand 0.8.5",
-]
-
-[[package]]
-name = "fhe-util"
-version = "0.1.0-beta.7"
-source = "git+https://github.com/gnosisguild/fhe.rs?branch=pvss#2785711cee85259edb3913b140f633b9d98e8e91"
-dependencies = [
- "itertools 0.12.1",
- "num-bigint-dig",
- "num-traits",
- "prime_factorization",
- "rand 0.8.5",
- "rand_distr",
- "rayon",
 ]
 
 [[package]]
@@ -6328,14 +6259,14 @@ dependencies = [
 [[package]]
 name = "zkfhe-greco"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#206ff0ea3cf9ab7bb80a1a1a63bf6dfc45154158"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#8e7b3099f536418e4a133e9029142ebcda2faa65"
 dependencies = [
  "anyhow",
  "bigint-poly",
  "blake3",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
  "itertools 0.14.0",
  "num-bigint",
  "num-traits",
@@ -6351,14 +6282,14 @@ dependencies = [
 [[package]]
 name = "zkfhe-shared"
 version = "0.1.0"
-source = "git+https://github.com/gnosisguild/zkfhe-generator#206ff0ea3cf9ab7bb80a1a1a63bf6dfc45154158"
+source = "git+https://github.com/gnosisguild/zkfhe-generator#8e7b3099f536418e4a133e9029142ebcda2faa65"
 dependencies = [
  "anyhow",
  "bigint-poly",
  "chrono",
- "fhe 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-math 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
- "fhe-traits 0.1.0-beta.7 (git+https://github.com/gnosisguild/fhe.rs?branch=pvss)",
+ "fhe",
+ "fhe-math",
+ "fhe-traits",
  "num-bigint",
  "num-traits",
  "rand 0.8.5",
