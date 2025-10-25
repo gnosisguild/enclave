@@ -11,6 +11,7 @@ use fhe::bfv::Plaintext;
 use fhe_math::rq::Representation;
 use itertools::izip;
 use num_bigint::BigInt;
+use num_integer::Integer;
 use num_traits::Zero;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use shared::constants::get_zkp_modulus;
@@ -162,22 +163,44 @@ impl CiphertextAdditionParams {
                 let mut sum_r0i = Vec::new();
                 let mut sum_r1i = Vec::new();
 
+                sum_r0i.reserve_exact(n as usize);
+                sum_r1i.reserve_exact(n as usize);
                 for j in 0..n as usize {
-                    // For ct0 component: r0[j] = (sum_ct0i[j] - (new_ct0i[j] + old_ct0i[j])) / qi
-                    let sum_r0_j = (&sum_ct0i[j] - (&new_ct0i[j] + &old_ct0i[j])) / &qi_bigint;
-                    let sum_r1_j = (&sum_ct1i[j] - (&new_ct1i[j] + &old_ct1i[j])) / &qi_bigint;
-
-                    sum_r0i.push(sum_r0_j);
-                    sum_r1i.push(sum_r1_j);
+                    let diff0 = &sum_ct0i[j] - (&new_ct0i[j] + &old_ct0i[j]);
+                    let (q0, r0) = diff0.div_rem(&qi_bigint);
+                    if !r0.is_zero() {
+                        return Err(format!(
+                            "Non-zero remainder in ct0 division at modulus index {}, coeff {}: remainder = {}", i, j, r0
+                        ));
+                    }
+                    if q0 < (-1).into() || q0 > 1.into() {
+                        return Err(format!(
+                            "Quotient out of range [-1, 1] for ct0 at modulus index {}, coeff {}: quotient = {}", i, j, q0
+                        ));
+                    }
+                    let diff1 = &sum_ct1i[j] - (&new_ct1i[j] + &old_ct1i[j]);
+                    let (q1, r1) = diff1.div_rem(&qi_bigint);
+                    if !r1.is_zero() {
+                        return Err(format!(
+                            "Non-zero remainder in ct1 division at modulus index {}, coeff {}: remainder = {}", i, j, r1
+                        ));
+                    }
+                    if q1 < (-1).into() || q1 > 1.into() {
+                        return Err(format!(
+                            "Quotient out of range [-1, 1] for ct1 at modulus index {}, coeff {}: quotient = {}", i, j, q1
+                        ));
+                    }
+                    sum_r0i.push(q0);
+                    sum_r1i.push(q1);
                 }
 
-                (i, old_ct0i, old_ct1i, sum_ct0i, sum_ct1i, sum_r0i, sum_r1i)
+                Ok((i, old_ct0i, old_ct1i, sum_ct0i, sum_ct1i, sum_r0i, sum_r1i))
             },
         )
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
         // Merge results into the `res` structure after parallel execution.
-        for (i, old_ct0i, old_ct1i, sum_ct0i, sum_ct1i, sum_r0i, sum_r1i) in results.into_iter() {
+        for (i, old_ct0i, old_ct1i, sum_ct0i, sum_ct1i, sum_r0i, sum_r1i) in results {
             res.old_ct0is[i] = old_ct0i;
             res.old_ct1is[i] = old_ct1i;
             res.sum_ct0is[i] = sum_ct0i;
