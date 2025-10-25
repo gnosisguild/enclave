@@ -31,6 +31,7 @@ COPY examples/CRISP/program/Cargo.toml examples/CRISP/program/
 COPY examples/CRISP/program/client/Cargo.toml examples/CRISP/program/client/
 COPY examples/CRISP/program/core/Cargo.toml examples/CRISP/program/core/
 COPY examples/CRISP/Cargo.toml examples/CRISP/
+COPY examples/CRISP/crates/generator/Cargo.toml examples/CRISP/crates/generator/
 
 COPY crates/sdk/Cargo.toml crates/sdk/
 COPY Cargo.toml Cargo.lock ./
@@ -51,6 +52,7 @@ COPY --from=chef /app/examples/CRISP/server/recipe.json \
 
 COPY examples/CRISP/server/Cargo.toml examples/CRISP/server/Cargo.lock examples/CRISP/server/
 COPY examples/CRISP/program/core/Cargo.toml examples/CRISP/program/core/
+COPY examples/CRISP/crates/generator/Cargo.toml examples/CRISP/crates/generator/
 
 COPY Cargo.lock ./Cargo.lock
 COPY Cargo.toml ./Cargo.toml
@@ -90,6 +92,7 @@ COPY crates/wasm/Cargo.toml crates/wasm/Cargo.toml
 RUN set -eux; \
     find \
     examples/CRISP/program \
+    examples/CRISP/crates \
     crates \
     -type f -name Cargo.toml ! -path '*/target/*' -print0 \
     | while IFS= read -r -d '' manifest_path; do \
@@ -120,6 +123,7 @@ WORKDIR /app
 COPY examples/CRISP/.enclave/   examples/CRISP/.enclave/
 COPY examples/CRISP/server/    examples/CRISP/server/
 COPY examples/CRISP/program/   examples/CRISP/program/
+COPY examples/CRISP/crates/   examples/CRISP/crates/
 COPY examples/CRISP/Cargo.*    examples/CRISP/
 COPY Cargo.*                        ./
 COPY crates/           crates/
