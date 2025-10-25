@@ -93,13 +93,9 @@ pub enum NetEvent {
         message_id: MessageId,
     },
     /// There was an error Dialing a peer
-    DialError {
-        error: Arc<DialError>,
-    },
+    DialError { error: Arc<DialError> },
     /// A connection was established to a peer
-    ConnectionEstablished {
-        connection_id: ConnectionId,
-    },
+    ConnectionEstablished { connection_id: ConnectionId },
     /// There was an error creating a connection
     OutgoingConnectionError {
         connection_id: ConnectionId,
@@ -126,10 +122,10 @@ pub enum NetEvent {
         correlation_id: CorrelationId,
         error: DhtPutRecordError,
     },
-    GossipSubscribed {
-        count: usize,
-        topic: TopicHash,
-    },
+    /// GossipSubscribed
+    GossipSubscribed { count: usize, topic: TopicHash },
+    /// Used for testing only
+    TestFinished,
 }
 
 impl Into<DhtPutRecordError> for store::Error {

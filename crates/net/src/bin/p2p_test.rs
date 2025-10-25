@@ -4,12 +4,15 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use e3_events::CorrelationId;
 use e3_net::events::{GossipData, NetCommand, NetEvent};
 use e3_net::{Cid, MeshParams, NetInterface};
 use e3_utils::ArcBytes;
 use libp2p::gossipsub::{self, IdentTopic, Topic, TopicHash};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::sync::{broadcast, mpsc};
@@ -121,12 +124,6 @@ async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
         );
         let value = value.as_bytes();
 
-        // println!("test_dht. Sending message...");
-
-        // let events = get_events_until_settled(150, &mut peer.rx).await?;
-
-        // println!("SETTLED WITH: {:?}", events);
-
         peer.tx
             .send(NetCommand::DhtPutRecord {
                 correlation_id: CorrelationId::new(),
@@ -135,19 +132,72 @@ async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
                 expires: None,
             })
             .await?;
+
+        receive_until_collect(
+            &mut peer.rx,
+            |e| match e {
+                NetEvent::DhtPutRecordSucceeded { .. } => true,
+                _ => false,
+            },
+            Duration::from_secs(15),
+        )
+        .await?;
+        peer.send_test_finished("test").await?;
+    } else {
+        peer.wait_for_test_finished(Duration::from_secs(15)).await?;
     }
 
-    let events = get_events_until_settled(150, &mut peer.rx).await?;
+    println!("PUT RECORD SUCCEEDED");
 
-    println!("SETTLED WITH: {:?}", events);
     Ok(())
 }
 
-async fn runner() -> Result<()> {
+async fn receive_until_collect<T, F>(
+    rx: &mut broadcast::Receiver<T>,
+    predicate: F,
+    timeout_duration: Duration,
+) -> Result<Vec<T>>
+where
+    T: Clone,
+    F: Fn(&T) -> bool,
+{
+    let result = timeout(timeout_duration, async {
+        let mut results = Vec::new();
+        loop {
+            let value = rx.recv().await?;
+            let matches = predicate(&value);
+            results.push(value);
+            if matches {
+                return Ok::<Vec<T>, broadcast::error::RecvError>(results);
+            }
+        }
+    })
+    .await
+    .context("Timeout waiting for predicate")?
+    .context("Failed to receive from channel")?;
+
+    Ok(result)
+}
+
+async fn runner() -> Result<Vec<String>> {
     let mut peer = setup_peer().await?;
+    let mut report = vec![];
+
+    // Gossip Test
     test_gossip(&mut peer).await?;
+    report.push("Gossip Test");
+
+    // DHT test
     test_dht(&mut peer).await?;
-    Ok(())
+    report.push("DHT Test");
+
+    // Write report
+    let report_string = report
+        .iter()
+        .map(|line| format!("\x1b[32m✓\x1b[0m {}", line))
+        .collect::<Vec<String>>();
+
+    Ok(report_string)
 }
 
 struct PeerHandle {
@@ -155,6 +205,33 @@ struct PeerHandle {
     rx: broadcast::Receiver<NetEvent>,
     tx: mpsc::Sender<NetCommand>,
     running: JoinHandle<()>,
+}
+
+impl PeerHandle {
+    pub async fn send_test_finished(&self, topic: &str) -> Result<()> {
+        let topic = IdentTopic::new(topic);
+        self.tx
+            .send(NetCommand::GossipPublish {
+                correlation_id: CorrelationId::new(),
+                topic: topic.to_string(),
+                data: GossipData::GossipBytes(b"test_finished".to_vec()),
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn wait_for_test_finished(&mut self, timeout: Duration) -> Result<()> {
+        receive_until_collect(
+            &mut self.rx,
+            |e| match e {
+                NetEvent::TestFinished => true,
+                _ => false,
+            },
+            timeout,
+        )
+        .await?;
+        Ok(())
+    }
 }
 
 async fn setup_peer() -> Result<PeerHandle> {
@@ -242,12 +319,12 @@ async fn main() -> Result<()> {
         .init();
 
     match runner().await {
-        Ok(()) => {
-            println!("SUCCESS!");
+        Ok(report) => {
+            print!("\n\n<<< TEST REPORT >>>\n---------------------------\n{}\n\n---------------------------\n\n",report.join("\n"));
             process::exit(0);
         }
         Err(e) => {
-            eprintln!("FAILURE: {e}");
+            print!("\n\n<<< FAILURE REPORT >>>\n---------------------------\n{}\n\n---------------------------\n\n",e);
             process::exit(1);
         }
     }

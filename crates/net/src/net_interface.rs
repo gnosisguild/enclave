@@ -144,7 +144,7 @@ impl NetInterface {
                         NetCommand::Dial(multi) =>
                             handle_dial(&mut self.swarm, &event_tx, multi),
                         NetCommand::DhtPutRecord { correlation_id, key, expires, value } =>
-                            handle_put_record(&mut self.swarm, &event_tx, correlation_id, key, expires, value),
+                            handle_put_record(&mut self.swarm, &event_tx,&mut correlator, correlation_id, key, expires, value),
                         NetCommand::DhtGetRecord { correlation_id, key } =>
                             handle_get_record(&mut self.swarm, &mut correlator, correlation_id, key)
                     };
@@ -210,6 +210,7 @@ fn handle_dial(
 fn handle_put_record(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
+    correlator: &mut Correlator,
     correlation_id: CorrelationId,
     key: Cid,
     expires: Option<Instant>,
@@ -228,7 +229,10 @@ fn handle_put_record(
         .kademlia
         .put_record(record, Quorum::One)
     {
-        Ok(r) => debug!("PUT RECORD OK {:?}", r),
+        Ok(query_id) => {
+            debug!("PUT RECORD OK {:?}", query_id);
+            correlator.track(query_id, correlation_id);
+        }
         Err(error) => {
             error!("PUT RECORD ERROR: {:?}", error);
             let err_evt = NetEvent::DhtPutRecordError {
