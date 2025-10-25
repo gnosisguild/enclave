@@ -16,6 +16,7 @@ bigint-poly = { git = "https://github.com/gnosisguild/bigint-poly", features = [
 serde.workspace = true
 serde_json.workspace = true
 num-bigint = "0.4.6"
+num-integer = "0.1"
 num-traits = "0.2"
 rayon = "1.10.0"
 rand = "0.8.5"
