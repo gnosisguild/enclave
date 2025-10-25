@@ -1975,6 +1975,7 @@ name = "crisp-zk-inputs"
 version = "0.1.0"
 dependencies = [
  "bigint-poly",
+ "eyre",
  "fhe",
  "fhe-math",
  "fhe-traits",

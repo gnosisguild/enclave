@@ -9,6 +9,7 @@
 //! This module handles the serialization of inputs data to JSON format.
 
 use crate::ciphertext_addition::CiphertextAdditionInputs;
+use eyre::{Context, Result};
 use greco::bounds::GrecoBounds;
 use greco::bounds::GrecoCryptographicParameters;
 use greco::vectors::GrecoVectors;
@@ -239,6 +240,6 @@ pub fn construct_inputs(
 }
 
 /// Serializes a CrispZKInputs to JSON string
-pub fn serialize_inputs_to_json(inputs: &CrispZKInputs) -> Result<String, String> {
-    serde_json::to_string(inputs).map_err(|e| format!("Failed to serialize inputs: {}", e))
+pub fn serialize_inputs_to_json(inputs: &CrispZKInputs) -> Result<String> {
+    serde_json::to_string(inputs).with_context(|| "Failed to serialize inputs to JSON")
 }

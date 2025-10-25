@@ -8,6 +8,7 @@
 //!
 //! This crate contains the main logic for generating crisp inputs.
 
+use eyre::{Context, Result};
 use fhe::bfv::Ciphertext;
 use fhe::bfv::PublicKey;
 use fhe::bfv::SecretKey;
@@ -57,13 +58,13 @@ impl CrispZKInputsGenerator {
         old_ciphertext: &str,
         public_key: &str,
         vote: u8,
-    ) -> Result<String, String> {
+    ) -> Result<String> {
         // Deserialize the provided public key
         let pk = PublicKey::from_bytes(
-            &hex::decode(public_key).map_err(|e| format!("Failed to decode public key: {}", e))?,
+            &hex::decode(public_key).with_context(|| "Failed to decode public key from hex")?,
             &self.bfv_params,
         )
-        .map_err(|e| format!("Failed to deserialize public key: {}", e))?;
+        .with_context(|| "Failed to deserialize public key")?;
 
         // Create a sample plaintext consistent with the GRECO sample generator
         // All coefficients are 3, and the first coefficient represents the vote.
@@ -73,30 +74,30 @@ impl CrispZKInputsGenerator {
 
         // Encode the plaintext into a polynomial.
         let pt = Plaintext::try_encode(&message_data, Encoding::poly(), &self.bfv_params)
-            .map_err(|e| format!("Failed to encode plaintext: {}", e))?;
+            .with_context(|| "Failed to encode plaintext")?;
 
         // Encrypt using the provided public key to ensure ciphertext matches the key.
         let (ct, u_rns, e0_rns, e1_rns) = pk
             .try_encrypt_extended(&pt, &mut thread_rng())
-            .map_err(|e| format!("Failed to encrypt plaintext: {}", e))?;
+            .with_context(|| "Failed to encrypt plaintext")?;
 
         // Compute the vectors of the Greco inputs.
         let greco_vectors =
             GrecoVectors::compute(&pt, &u_rns, &e0_rns, &e1_rns, &ct, &pk, &self.bfv_params)
-                .map_err(|e| format!("Failed to compute vectors: {}", e))?;
+                .with_context(|| "Failed to compute vectors")?;
 
         let (crypto_params, bounds) = GrecoBounds::compute(&self.bfv_params, 0)
-            .map_err(|e| format!("Failed to compute bounds: {}", e))?;
+            .with_context(|| "Failed to compute bounds")?;
 
         // #########################################  Ciphertext Addition ################################################
 
         // Deserialize the old ciphertext.
         let old_ct = Ciphertext::from_bytes(
             &hex::decode(old_ciphertext)
-                .map_err(|e| format!("Failed to decode old ciphertext: {}", e))?,
+                .with_context(|| "Failed to decode old ciphertext from hex")?,
             &self.bfv_params,
         )
-        .map_err(|e| format!("Failed to deserialize old ciphertext: {}", e))?;
+        .with_context(|| "Failed to deserialize old ciphertext")?;
 
         // Compute the cyphertext addition.
         let sum_ct = &ct + &old_ct;
@@ -104,7 +105,7 @@ impl CrispZKInputsGenerator {
         // Compute the inputs of the ciphertext addition.
         let ciphertext_addition_inputs =
             CiphertextAdditionInputs::compute(&pt, &old_ct, &ct, &sum_ct, &self.bfv_params)
-                .map_err(|e| format!("Failed to compute ciphertext addition inputs: {}", e))?;
+                .with_context(|| "Failed to compute ciphertext addition inputs")?;
 
         // #########################################  Construct Inputs ################################################
 
@@ -118,28 +119,28 @@ impl CrispZKInputsGenerator {
         Ok(serialize_inputs_to_json(&inputs)?)
     }
 
-    pub fn encrypt_vote(&self, public_key: &str, vote: u8) -> Result<String, String> {
+    pub fn encrypt_vote(&self, public_key: &str, vote: u8) -> Result<String> {
         let pk = PublicKey::from_bytes(
-            &hex::decode(public_key).map_err(|e| format!("Failed to decode public key: {}", e))?,
+            &hex::decode(public_key).with_context(|| "Failed to decode public key from hex")?,
             &self.bfv_params,
         )
-        .map_err(|e| format!("Failed to deserialize public key: {}", e))?;
+        .with_context(|| "Failed to deserialize public key")?;
 
         let mut message_data = vec![3u64; self.bfv_params.degree()];
         // Set vote value (0 or 1) in the first coefficient
         message_data[0] = if vote == 1 { 1 } else { 0 };
 
         let pt = Plaintext::try_encode(&message_data, Encoding::poly(), &self.bfv_params)
-            .map_err(|e| format!("Failed to encode plaintext: {}", e))?;
+            .with_context(|| "Failed to encode plaintext")?;
 
         let (ct, _u_rns, _e0_rns, _e1_rns) = pk
             .try_encrypt_extended(&pt, &mut thread_rng())
-            .map_err(|e| format!("Failed to encrypt plaintext: {}", e))?;
+            .with_context(|| "Failed to encrypt plaintext")?;
 
         Ok(hex::encode(ct.to_bytes()))
     }
 
-    pub fn generate_public_key(&self) -> Result<String, String> {
+    pub fn generate_public_key(&self) -> Result<String> {
         // Generate keys
         let mut rng = thread_rng();
         let sk = SecretKey::random(&self.bfv_params, &mut rng);
