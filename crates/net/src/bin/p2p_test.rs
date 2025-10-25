@@ -7,8 +7,9 @@
 use anyhow::{bail, Result};
 use e3_events::CorrelationId;
 use e3_net::events::{GossipData, NetCommand, NetEvent};
-use e3_net::{Cid, NetInterface};
+use e3_net::{Cid, MeshParams, NetInterface};
 use e3_utils::ArcBytes;
+use libp2p::gossipsub::{self, IdentTopic, Topic, TopicHash};
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::sync::{broadcast, mpsc};
@@ -90,14 +91,6 @@ async fn test_gossip(peer: &mut PeerHandle) -> Result<()> {
         }
     }
 
-    // Make sure router task is still running
-    if peer.running.is_finished() {
-        println!("{} warning: router task finished early", name);
-    }
-
-    // Give some time for final message propagation
-    sleep(Duration::from_secs(1)).await;
-    println!("{} finished successfully", name);
     Ok(())
 }
 
@@ -119,23 +112,32 @@ async fn get_events_until_settled(
 }
 
 async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
-    let value = b"I am he as you are he, as you are me and we are all together";
-    println!("test_dht. Sending message...");
+    let test_config = env::var("TEST_CONFIG").unwrap_or_default();
+    let is_lead = test_config.contains("dht_lead");
+    if is_lead {
+        let value = format!(
+            "{}: I am he as you are he, as you are me and we are all together",
+            peer.name
+        );
+        let value = value.as_bytes();
 
-    let events = get_events_until_settled(15, &mut peer.rx).await?;
+        // println!("test_dht. Sending message...");
 
-    println!("SETTLED WITH: {:?}", events);
+        // let events = get_events_until_settled(150, &mut peer.rx).await?;
 
-    peer.tx
-        .send(NetCommand::DhtPutRecord {
-            correlation_id: CorrelationId::new(),
-            key: Cid::from_content(value),
-            value: ArcBytes::from_bytes(value.to_vec()),
-            expires: None,
-        })
-        .await?;
+        // println!("SETTLED WITH: {:?}", events);
 
-    let events = get_events_until_settled(15, &mut peer.rx).await?;
+        peer.tx
+            .send(NetCommand::DhtPutRecord {
+                correlation_id: CorrelationId::new(),
+                key: Cid::from_content(value),
+                value: ArcBytes::from_bytes(value.to_vec()),
+                expires: None,
+            })
+            .await?;
+    }
+
+    let events = get_events_until_settled(150, &mut peer.rx).await?;
 
     println!("SETTLED WITH: {:?}", events);
     Ok(())
@@ -143,7 +145,7 @@ async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
 
 async fn runner() -> Result<()> {
     let mut peer = setup_peer().await?;
-    // test_gossip(&mut peer).await?;
+    test_gossip(&mut peer).await?;
     test_dht(&mut peer).await?;
     Ok(())
 }
@@ -170,11 +172,22 @@ async fn setup_peer() -> Result<PeerHandle> {
     let peers: Vec<String> = dial_to.iter().cloned().collect();
 
     let id = libp2p::identity::Keypair::generate_ed25519();
-    let mut peer = NetInterface::new(&id, peers, udp_port, "test-topic")?;
+    let mut peer = NetInterface::new(
+        &id,
+        peers,
+        udp_port,
+        "test-topic",
+        MeshParams {
+            mesh_n: 4,
+            mesh_n_low: 3,
+            mesh_outbound_min: 2,
+            ..Default::default()
+        },
+    )?;
 
     // Extract input and outputs
     let tx = peer.tx();
-    let rx = peer.rx();
+    let mut rx = peer.rx();
 
     let router_task = tokio::spawn({
         let name = name.clone();
@@ -186,7 +199,9 @@ async fn setup_peer() -> Result<PeerHandle> {
             println!("{} router task finished", name);
         }
     });
-
+    println!("Waiting for mesh to be ready...");
+    wait_for_mesh_ready(15, 3, &mut rx, "test-topic").await;
+    println!("MESH READY!");
     // Give network time to initialize
     sleep(Duration::from_secs(3)).await;
     Ok(PeerHandle {
@@ -195,6 +210,28 @@ async fn setup_peer() -> Result<PeerHandle> {
         rx,
         running: router_task,
     })
+}
+
+async fn wait_for_mesh_ready(
+    seconds: u64,
+    min_size: usize,
+    rx: &mut broadcast::Receiver<NetEvent>,
+    topic: &str,
+) {
+    let topic = gossipsub::IdentTopic::new(topic);
+    let topic_hash = topic.hash();
+    loop {
+        match timeout(Duration::from_secs(seconds), rx.recv()).await {
+            Ok(Ok(NetEvent::GossipSubscribed { count, topic })) => {
+                if topic_hash == topic && count >= min_size {
+                    break;
+                }
+            }
+            Ok(Err(_)) => break,
+            Err(_) => break,
+            _ => (),
+        }
+    }
 }
 
 #[tokio::main]

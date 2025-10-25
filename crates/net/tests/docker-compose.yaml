@@ -5,6 +5,7 @@ services:
     environment:
       QUIC_PORT: 9091
       DIAL_TO: "/dns4/charlie/udp/9091/quic-v1"
+      TEST_CONFIG: "dht_lead"
     networks:
       - p2p_test_net
 

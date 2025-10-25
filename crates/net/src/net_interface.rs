@@ -10,7 +10,10 @@ use crate::{events::NetEvent, Cid};
 use anyhow::Result;
 use e3_events::CorrelationId;
 use e3_utils::ArcBytes;
-use libp2p::kad::{self, GetRecordOk, PeerRecord, QueryId, QueryResult};
+use libp2p::gossipsub::{IdentTopic, TopicHash};
+use libp2p::kad::{
+    self, GetRecordOk, GetRecordResult, PeerRecord, PutRecordOk, QueryId, QueryResult,
+};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -28,8 +31,9 @@ use std::{
     hash::{Hash, Hasher},
     time::Instant,
 };
+use tokio::time::{sleep, timeout};
 use tokio::{select, sync::broadcast, sync::mpsc};
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(NetworkBehaviour)]
 pub struct NodeBehaviour {
@@ -64,14 +68,16 @@ impl NetInterface {
         peers: Vec<String>,
         udp_port: Option<u16>,
         topic: &str,
+        mesh_params: MeshParams,
     ) -> Result<Self> {
+        println!("{:?}", mesh_params);
         let (event_tx, _) = broadcast::channel(100); // TODO : tune this param
         let (cmd_tx, cmd_rx) = mpsc::channel(100); // TODO : tune this param
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| create_kad_behaviour(key))?
+            .with_behaviour(|key| create_behaviour(key, mesh_params))?
             .build();
 
         // TODO: Use topics to manage network traffic instead of just using a single topic
@@ -209,7 +215,7 @@ fn handle_put_record(
     expires: Option<Instant>,
     value: ArcBytes,
 ) -> Result<()> {
-    trace!("DHT PUT RECORD");
+    debug!("DHT PUT RECORD");
     let record = Record {
         key: RecordKey::new(&key),
         value: value.extract_bytes(),
@@ -222,7 +228,7 @@ fn handle_put_record(
         .kademlia
         .put_record(record, Quorum::One)
     {
-        Ok(r) => trace!("PUT RECORD OK {:?}", r),
+        Ok(r) => debug!("PUT RECORD OK {:?}", r),
         Err(error) => {
             error!("PUT RECORD ERROR: {:?}", error);
             let err_evt = NetEvent::DhtPutRecordError {
@@ -257,13 +263,58 @@ fn handle_get_record(
     Ok(())
 }
 
+async fn wait_for_mesh_ready(
+    swarm: &mut Swarm<NodeBehaviour>,
+    topic: &TopicHash,
+    min_peers: usize,
+    timeout_duration: Duration,
+) -> Result<()> {
+    timeout(timeout_duration, async {
+        loop {
+            let mesh_peers = swarm.behaviour().gossipsub.mesh_peers(topic).count();
+
+            if mesh_peers >= min_peers {
+                println!("✓ Mesh ready with {mesh_peers} peers");
+                return Ok(());
+            }
+
+            println!("Waiting for mesh... ({mesh_peers}/{min_peers} peers)");
+
+            // Process events to allow connections
+            tokio::select! {
+                _ = swarm.select_next_some() => {},
+                _ = sleep(Duration::from_millis(100)) => {},
+            }
+        }
+    })
+    .await?
+}
+
+#[derive(Debug)]
+pub struct MeshParams {
+    pub mesh_n: usize,            // D: Sweet spot for redundancy vs overhead
+    pub mesh_n_low: usize,        // D_low: Trigger grafting
+    pub mesh_n_high: usize,       // D_high: Trigger pruning
+    pub mesh_outbound_min: usize, // Min outbound connections
+}
+impl Default for MeshParams {
+    fn default() -> Self {
+        Self {
+            mesh_n: 6,
+            mesh_n_low: 5,
+            mesh_n_high: 12,
+            mesh_outbound_min: 2,
+        }
+    }
+}
 /// Create the libp2p behaviour
-fn create_kad_behaviour(
+fn create_behaviour(
     key: &Keypair,
+    mesh_params: MeshParams,
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
     let identify_config = IdentifyBehaviour::new(
-        identify::Config::new("/kad/0.1.0".into(), key.public())
+        identify::Config::new("/enclave/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
 
@@ -276,6 +327,10 @@ fn create_kad_behaviour(
     let gossipsub_config = gossipsub::ConfigBuilder::default()
         .heartbeat_interval(Duration::from_secs(10))
         .validation_mode(gossipsub::ValidationMode::Strict)
+        .mesh_n(mesh_params.mesh_n) // D: Sweet spot for redundancy vs overhead
+        .mesh_n_low(mesh_params.mesh_n_low) // D_low: Trigger grafting
+        .mesh_n_high(mesh_params.mesh_n_high) // D_high: Trigger pruning
+        .mesh_outbound_min(mesh_params.mesh_outbound_min) // Min outbound connections
         .message_id_fn(message_id_fn)
         .build()
         .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
@@ -345,30 +400,31 @@ async fn process_swarm_event(
         SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
             kad::Event::OutboundQueryProgressed {
                 id,
-                result:
-                    QueryResult::GetRecord(Ok(GetRecordOk::FoundRecord(PeerRecord { record, .. }))),
+                result: QueryResult::GetRecord(Ok(GetRecordOk::FoundRecord(peer_record))),
                 ..
             },
         )) => {
+            println!("#######>>>>>>>>> FoundRecord! {:?}", peer_record);
             let correlation_id = correlator.expire(&id)?;
             event_tx.send(NetEvent::DhtGetRecordSucceeded {
-                key: Cid(record.key.to_vec()),
+                key: Cid(peer_record.record.key.to_vec()),
                 correlation_id,
-                value: ArcBytes::from_bytes(record.value),
+                value: ArcBytes::from_bytes(peer_record.record.value),
             })?;
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
             kad::Event::OutboundQueryProgressed {
-                result: QueryResult::GetRecord(Err(error)),
                 id,
+                result: QueryResult::PutRecord(Ok(record)),
                 ..
             },
         )) => {
+            println!("#######>>>>>>>>> PutRecordOk! {:?}", record);
             let correlation_id = correlator.expire(&id)?;
-            event_tx.send(NetEvent::DhtGetRecordError {
+            event_tx.send(NetEvent::DhtPutRecordSucceeded {
+                key: Cid(record.key.to_vec()),
                 correlation_id,
-                error,
             })?;
         }
 
@@ -386,6 +442,15 @@ async fn process_swarm_event(
             trace!("Local node is listening on {address}");
         }
 
+        SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
+            peer_id,
+            topic,
+        })) => {
+            trace!("Peer {} subscribed to {}", peer_id, topic);
+            let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
+            event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
+        }
+
         SwarmEvent::Behaviour(NodeBehaviourEvent::Identify(event)) => {
             if let identify::Event::Received {
                 connection_id,
@@ -393,7 +458,6 @@ async fn process_swarm_event(
                 info,
             } = event
             {
-                println!("IDENTIFY!!!!!  ");
                 for addr in info.listen_addrs {
                     swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
                 }

@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use e3_events::{CorrelationId, DocumentMeta};
 use e3_utils::ArcBytes;
 use libp2p::{
-    gossipsub::{MessageId, PublishError},
+    gossipsub::{MessageId, PublishError, TopicHash},
     kad::{store, GetRecordError},
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
@@ -93,9 +93,13 @@ pub enum NetEvent {
         message_id: MessageId,
     },
     /// There was an error Dialing a peer
-    DialError { error: Arc<DialError> },
+    DialError {
+        error: Arc<DialError>,
+    },
     /// A connection was established to a peer
-    ConnectionEstablished { connection_id: ConnectionId },
+    ConnectionEstablished {
+        connection_id: ConnectionId,
+    },
     /// There was an error creating a connection
     OutgoingConnectionError {
         connection_id: ConnectionId,
@@ -121,6 +125,10 @@ pub enum NetEvent {
     DhtPutRecordError {
         correlation_id: CorrelationId,
         error: DhtPutRecordError,
+    },
+    GossipSubscribed {
+        count: usize,
+        topic: TopicHash,
     },
 }
 

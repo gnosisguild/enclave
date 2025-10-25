@@ -7,6 +7,7 @@
 use crate::events::GossipData;
 use crate::events::NetCommand;
 use crate::events::NetEvent;
+use crate::MeshParams;
 use crate::NetInterface;
 /// Actor for connecting to an libp2p client via it's mpsc channel interface
 /// This Actor should be responsible for
@@ -128,7 +129,13 @@ impl NetEventTranslator {
         // Create peer from keypair
         let keypair: libp2p::identity::Keypair =
             ed25519::Keypair::try_from_bytes(&mut bytes)?.try_into()?;
-        let mut interface = NetInterface::new(&keypair, peers, Some(quic_port), topic)?;
+        let mut interface = NetInterface::new(
+            &keypair,
+            peers,
+            Some(quic_port),
+            topic,
+            MeshParams::default(),
+        )?;
 
         // Setup and start net event translator
         let rx = interface.rx();
