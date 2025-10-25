@@ -52,11 +52,11 @@ dialoguer = { version = "=0.11.0", features = ["fuzzy-select"] }
 bincode.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+eyre.workspace = true
 
 # Utility libraries
 bigdecimal = "=0.4.3"
 chrono = "=0.4.41"
-eyre = "=0.6.12"
 hex = "=0.4.3"
 once_cell = "=1.21.3"
 rand.workspace = true

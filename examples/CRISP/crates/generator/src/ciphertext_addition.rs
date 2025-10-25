@@ -5,6 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use bigint_poly::*;
+use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
 use fhe::bfv::Plaintext;
@@ -48,10 +49,10 @@ impl CiphertextAdditionInputs {
         new_ct: &Ciphertext,
         sum_ct: &Ciphertext,
         params: &BfvParameters,
-    ) -> Result<CiphertextAdditionInputs, String> {
+    ) -> Result<CiphertextAdditionInputs> {
         let ctx: &Arc<fhe_math::rq::Context> = params
             .ctx_at_level(pt.level())
-            .map_err(|e| format!("Failed to get context at level: {}", e))?;
+            .with_context(|| "Failed to get context at level")?;
         let n: u64 = params.degree() as u64;
 
         // Extract and convert ciphertexts and public key polynomials.
@@ -169,24 +170,24 @@ impl CiphertextAdditionInputs {
                     let diff0 = &sum_ct0i[j] - (&new_ct0i[j] + &old_ct0i[j]);
                     let (q0, r0) = diff0.div_rem(&qi_bigint);
                     if !r0.is_zero() {
-                        return Err(format!(
+                        return Err(eyre::eyre!(
                             "Non-zero remainder in ct0 division at modulus index {}, coeff {}: remainder = {}", i, j, r0
                         ));
                     }
                     if q0 < (-1).into() || q0 > 1.into() {
-                        return Err(format!(
+                        return Err(eyre::eyre!(
                             "Quotient out of range [-1, 1] for ct0 at modulus index {}, coeff {}: quotient = {}", i, j, q0
                         ));
                     }
                     let diff1 = &sum_ct1i[j] - (&new_ct1i[j] + &old_ct1i[j]);
                     let (q1, r1) = diff1.div_rem(&qi_bigint);
                     if !r1.is_zero() {
-                        return Err(format!(
+                        return Err(eyre::eyre!(
                             "Non-zero remainder in ct1 division at modulus index {}, coeff {}: remainder = {}", i, j, r1
                         ));
                     }
                     if q1 < (-1).into() || q1 > 1.into() {
-                        return Err(format!(
+                        return Err(eyre::eyre!(
                             "Quotient out of range [-1, 1] for ct1 at modulus index {}, coeff {}: quotient = {}", i, j, q1
                         ));
                     }
