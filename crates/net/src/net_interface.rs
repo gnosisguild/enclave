@@ -12,7 +12,7 @@ use libp2p::{
     gossipsub,
     identify::{self, Behaviour as IdentifyBehaviour},
     identity::Keypair,
-    kad::{store::MemoryStore, Behaviour as KademliaBehaviour},
+    kad::{self, store::MemoryStore, Behaviour as KademliaBehaviour},
     swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
     Swarm,
 };
@@ -137,7 +137,7 @@ impl NetInterface {
                 }
                 // Process events
                 event = self.swarm.select_next_some() =>  {
-                    match process_swarm_event(&mut self.swarm, &event_tx, event).await {
+                    match process_swarm_event(&mut self.swarm, &event_tx, &shutdown_flag, event).await {
                         Ok(_) => (),
                         Err(e) => error!("Error processing NetEvent: {e}")
                     }
@@ -151,22 +151,16 @@ impl NetInterface {
 fn create_behaviour(
     key: &Keypair,
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    let peer_id = key.public().to_peer_id();
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
     let identify_config = IdentifyBehaviour::new(
-        identify::Config::new("/kad/0.1.0".into(), key.public())
+        identify::Config::new("/enclave/0.0.1".into(), key.public())
             .with_interval(Duration::from_secs(60)),
     );
-
-    let message_id_fn = |message: &gossipsub::Message| {
-        let mut s = DefaultHasher::new();
-        message.data.hash(&mut s);
-        gossipsub::MessageId::from(s.finish().to_string())
-    };
 
     let gossipsub_config = gossipsub::ConfigBuilder::default()
         .heartbeat_interval(Duration::from_secs(10))
         .validation_mode(gossipsub::ValidationMode::Strict)
-        .message_id_fn(message_id_fn)
         .build()
         .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
 
@@ -175,12 +169,13 @@ fn create_behaviour(
         gossipsub_config,
     )?;
 
+    // Setup Kademlia as server so that it responds to events correctly
+    let mut kademlia = KademliaBehaviour::new(peer_id, MemoryStore::new(peer_id));
+    kademlia.set_mode(Some(kad::Mode::Server));
+
     Ok(NodeBehaviour {
         gossipsub,
-        kademlia: KademliaBehaviour::new(
-            key.public().to_peer_id(),
-            MemoryStore::new(key.public().to_peer_id()),
-        ),
+        kademlia,
         connection_limits,
         identify: identify_config,
     })
@@ -190,8 +185,12 @@ fn create_behaviour(
 async fn process_swarm_event(
     swarm: &mut Swarm<NodeBehaviour>,
     event_tx: &broadcast::Sender<NetEvent>,
+    shutdown_flag: &Arc<AtomicBool>,
     event: SwarmEvent<NodeBehaviourEvent>,
 ) -> Result<()> {
+    if shutdown_flag.load(Ordering::Relaxed) {
+        return Ok(()); // Skip processing during shutdown
+    }
     match event {
         SwarmEvent::ConnectionEstablished {
             peer_id,
