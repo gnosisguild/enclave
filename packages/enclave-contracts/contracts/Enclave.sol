@@ -58,11 +58,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Incremented after each successful E3 request.
     uint256 public nexte3Id;
 
-    /// @notice Submission Window for an E3 Sortition.
-    /// @dev The submission window is the time period during which the ciphernodes can submit
-    /// their tickets to be a part of the committee.
-    uint256 public sortitionSubmissionWindow;
-
     /// @notice Mapping of allowed E3 Programs.
     /// @dev Only enabled E3 Programs can be used in computation requests.
     mapping(IE3Program e3Program => bool allowed) public e3Programs;
@@ -208,7 +203,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _bondingRegistry The address of the Bonding Registry contract.
     /// @param _feeToken The address of the ERC20 token used for E3 fees.
     /// @param _maxDuration The maximum duration of a computation in seconds.
-    /// @param _sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
     /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
     constructor(
         address _owner,
@@ -216,7 +210,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         IBondingRegistry _bondingRegistry,
         IERC20 _feeToken,
         uint256 _maxDuration,
-        uint256 _sortitionSubmissionWindow,
         bytes[] memory _e3ProgramsParams
     ) {
         initialize(
@@ -225,7 +218,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             _bondingRegistry,
             _feeToken,
             _maxDuration,
-            _sortitionSubmissionWindow,
             _e3ProgramsParams
         );
     }
@@ -237,7 +229,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _bondingRegistry The address of the Bonding Registry contract.
     /// @param _feeToken The address of the ERC20 token used for E3 fees.
     /// @param _maxDuration The maximum duration of a computation in seconds.
-    /// @param _sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
     /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
     function initialize(
         address _owner,
@@ -245,7 +236,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         IBondingRegistry _bondingRegistry,
         IERC20 _feeToken,
         uint256 _maxDuration,
-        uint256 _sortitionSubmissionWindow,
         bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
@@ -253,7 +243,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         setCiphernodeRegistry(_ciphernodeRegistry);
         setBondingRegistry(_bondingRegistry);
         setFeeToken(_feeToken);
-        setSortitionSubmissionWindow(_sortitionSubmissionWindow);
         setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
@@ -343,8 +332,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             ciphernodeRegistry.requestCommittee(
                 e3Id,
                 seed,
-                requestParams.threshold,
-                sortitionSubmissionWindow
+                requestParams.threshold
             ),
             CommitteeSelectionFailed()
         );
@@ -481,14 +469,16 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Emits RewardsDistributed event upon successful distribution.
     /// @param e3Id The ID of the E3 for which to distribute rewards.
     function _distributeRewards(uint256 e3Id) internal {
-        ICiphernodeRegistry.Committee memory committee = ciphernodeRegistry
-            .getCommittee(e3Id);
-        uint256[] memory amounts = new uint256[](committee.nodes.length);
+        address[] memory committeeNodes = ciphernodeRegistry.getCommitteeNodes(
+            e3Id
+        );
+        uint256 committeeLength = committeeNodes.length;
+        uint256[] memory amounts = new uint256[](committeeLength);
 
         // TODO: do we need to pay different amounts to different nodes?
         // For now, we'll pay the same amount to all nodes.
-        uint256 amount = e3Payments[e3Id] / committee.nodes.length;
-        for (uint256 i = 0; i < committee.nodes.length; i++) {
+        uint256 amount = e3Payments[e3Id] / committeeLength;
+        for (uint256 i = 0; i < committeeLength; i++) {
             amounts[i] = amount;
         }
 
@@ -497,12 +487,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
 
         feeToken.approve(address(bondingRegistry), totalAmount);
 
-        bondingRegistry.distributeRewards(feeToken, committee.nodes, amounts);
+        bondingRegistry.distributeRewards(feeToken, committeeNodes, amounts);
 
         // TODO: decide where does dust go? Treasury maybe?
         feeToken.approve(address(bondingRegistry), 0);
 
-        emit RewardsDistributed(e3Id, committee.nodes, amounts);
+        emit RewardsDistributed(e3Id, committeeNodes, amounts);
     }
 
     ////////////////////////////////////////////////////////////
@@ -518,15 +508,6 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         maxDuration = _maxDuration;
         success = true;
         emit MaxDurationSet(_maxDuration);
-    }
-
-    /// @inheritdoc IEnclave
-    function setSortitionSubmissionWindow(
-        uint256 _sortitionSubmissionWindow
-    ) public onlyOwner returns (bool success) {
-        sortitionSubmissionWindow = _sortitionSubmissionWindow;
-        success = true;
-        emit SortitionSubmissionWindowSet(_sortitionSubmissionWindow);
     }
 
     /// @inheritdoc IEnclave

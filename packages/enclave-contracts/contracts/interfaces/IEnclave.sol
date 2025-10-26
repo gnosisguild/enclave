@@ -64,10 +64,6 @@ interface IEnclave {
     /// @param maxDuration The maximum duration of a computation in seconds.
     event MaxDurationSet(uint256 maxDuration);
 
-    /// @notice This event MUST be emitted any time the `sortitionSubmissionWindow` is set.
-    /// @param sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
-    event SortitionSubmissionWindowSet(uint256 sortitionSubmissionWindow);
-
     /// @notice This event MUST be emitted any time the CiphernodeRegistry is set.
     /// @param ciphernodeRegistry The address of the CiphernodeRegistry contract.
     event CiphernodeRegistrySet(address ciphernodeRegistry);
@@ -208,13 +204,6 @@ interface IEnclave {
     /// @return success True if the max duration was successfully set.
     function setMaxDuration(
         uint256 _maxDuration
-    ) external returns (bool success);
-
-    /// @notice This function should be called to set the submission window for the E3 sortition.
-    /// @param _sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
-    /// @return success True if the sortition submission window was successfully set.
-    function setSortitionSubmissionWindow(
-        uint256 _sortitionSubmissionWindow
     ) external returns (bool success);
 
     /// @notice Sets the Ciphernode Registry contract address.

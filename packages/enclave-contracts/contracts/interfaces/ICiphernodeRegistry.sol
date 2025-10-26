@@ -94,6 +94,10 @@ interface ICiphernodeRegistry {
         uint256 size
     );
 
+    /// @notice This event MUST be emitted any time the `sortitionSubmissionWindow` is set.
+    /// @param sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
+    event SortitionSubmissionWindowSet(uint256 sortitionSubmissionWindow);
+
     /// @notice Check if a ciphernode is eligible for committee selection
     /// @dev A ciphernode is eligible if it is enabled in the registry and meets bonding requirements
     /// @param ciphernode Address of the ciphernode to check
@@ -122,13 +126,11 @@ interface ICiphernodeRegistry {
     /// @param e3Id ID of the E3 for which to select the committee.
     /// @param seed Random seed for score computation.
     /// @param threshold The M/N threshold for the committee.
-    /// @param submissionWindow The submission window for the E3 sortition in seconds.
     /// @return success True if committee selection was successfully initiated.
     function requestCommittee(
         uint256 e3Id,
         uint256 seed,
-        uint32[2] calldata threshold,
-        uint256 submissionWindow
+        uint32[2] calldata threshold
     ) external returns (bool success);
 
     /// @notice Publishes the public key resulting from the committee selection process.
@@ -154,10 +156,10 @@ interface ICiphernodeRegistry {
     /// @notice This function should be called by the Enclave contract to get the committee for a given E3.
     /// @dev This function MUST revert if no committee has been requested for the given E3.
     /// @param e3Id ID of the E3 for which to get the committee.
-    /// @return committee The committee for the given E3.
-    function getCommittee(
+    /// @return committeeNodes The nodes in the committee for the given E3.
+    function getCommitteeNodes(
         uint256 e3Id
-    ) external view returns (Committee memory committee);
+    ) external view returns (address[] memory committeeNodes);
 
     /// @notice Returns the current root of the ciphernode IMT
     /// @return Current IMT root
@@ -185,4 +187,25 @@ interface ICiphernodeRegistry {
     /// @dev Only callable by owner
     /// @param _bondingRegistry Address of the bonding registry contract
     function setBondingRegistry(address _bondingRegistry) external;
+
+    /// @notice This function should be called to set the submission window for the E3 sortition.
+    /// @param _sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
+    function setSortitionSubmissionWindow(
+        uint256 _sortitionSubmissionWindow
+    ) external;
+
+    /// @notice Submit a ticket for sortition
+    /// @dev Validates ticket against node's balance at request block
+    /// @param e3Id ID of the E3 computation
+    /// @param ticketNumber The ticket number to submit
+    function submitTicket(uint256 e3Id, uint256 ticketNumber) external;
+
+    /// @notice Finalize the committee after submission window closes
+    /// @param e3Id ID of the E3 computation
+    function finalizeCommittee(uint256 e3Id) external;
+
+    /// @notice Check if submission window is still open for an E3
+    /// @param e3Id ID of the E3 computation
+    /// @return Whether the submission window is open
+    function isOpen(uint256 e3Id) external view returns (bool);
 }

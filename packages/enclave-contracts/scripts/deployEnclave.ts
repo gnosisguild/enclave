@@ -8,7 +8,6 @@ import hre from "hardhat";
 import { autoCleanForLocalhost } from "./cleanIgnitionState";
 import { deployAndSaveBondingRegistry } from "./deployAndSave/bondingRegistry";
 import { deployAndSaveCiphernodeRegistryOwnable } from "./deployAndSave/ciphernodeRegistryOwnable";
-import { deployAndSaveCommitteeSortition } from "./deployAndSave/committeeSortition";
 import { deployAndSaveEnclave } from "./deployAndSave/enclave";
 import { deployAndSaveEnclaveTicketToken } from "./deployAndSave/enclaveTicketToken";
 import { deployAndSaveEnclaveToken } from "./deployAndSave/enclaveToken";
@@ -41,6 +40,7 @@ export const deployEnclave = async (withMocks?: boolean) => {
   );
 
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
+  const SORTITION_SUBMISSION_WINDOW = 300;
   const addressOne = "0x0000000000000000000000000000000000000001";
 
   const poseidonT3 = await deployAndSavePoseidonT3({ hre });
@@ -110,19 +110,11 @@ export const deployEnclave = async (withMocks?: boolean) => {
     poseidonT3Address: poseidonT3,
     enclaveAddress: addressOne,
     owner: ownerAddress,
+    submissionWindow: SORTITION_SUBMISSION_WINDOW,
     hre,
   });
   const ciphernodeRegistryAddress = await ciphernodeRegistry.getAddress();
   console.log("CiphernodeRegistry deployed to:", ciphernodeRegistryAddress);
-
-  console.log("Deploying CommitteeSortition...");
-  const { committeeSortition } = await deployAndSaveCommitteeSortition({
-    bondingRegistry: bondingRegistryAddress,
-    ciphernodeRegistry: ciphernodeRegistryAddress,
-    hre,
-  });
-  const committeeSortitionAddress = await committeeSortition.getAddress();
-  console.log("CommitteeSortition deployed to:", committeeSortitionAddress);
 
   console.log("Deploying Enclave...");
   const { enclave } = await deployAndSaveEnclave({
@@ -165,9 +157,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
   console.log("Setting Enclave as reward distributor in BondingRegistry...");
   await bondingRegistry.setRewardDistributor(enclaveAddress);
 
-  console.log("Setting CommitteeSortition address in CiphernodeRegistry...");
-  await ciphernodeRegistry.setCommitteeSortition(committeeSortitionAddress);
-
   if (shouldDeployMocks) {
     const { decryptionVerifierAddress, e3ProgramAddress } = await deployMocks();
 
@@ -206,7 +195,6 @@ export const deployEnclave = async (withMocks?: boolean) => {
     EnclaveTicketToken: ${enclaveTicketTokenAddress}
     SlashingManager: ${slashingManagerAddress}
     BondingRegistry: ${bondingRegistryAddress}
-    CommitteeSortition: ${committeeSortitionAddress}
     CiphernodeRegistry: ${ciphernodeRegistryAddress}
     Enclave: ${enclaveAddress}
     ============================================

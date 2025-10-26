@@ -135,6 +135,12 @@
           "internalType": "uint256",
           "name": "requestBlock",
           "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "submissionDeadline",
+          "type": "uint256"
         }
       ],
       "name": "CommitteeRequested",
@@ -151,6 +157,19 @@
         }
       ],
       "name": "EnclaveSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "sortitionSubmissionWindow",
+          "type": "uint256"
+        }
+      ],
+      "name": "SortitionSubmissionWindowSet",
       "type": "event"
     },
     {
@@ -186,6 +205,19 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "finalizeCommittee",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "getBondingRegistry",
       "outputs": [
@@ -206,29 +238,12 @@
           "type": "uint256"
         }
       ],
-      "name": "getCommittee",
+      "name": "getCommitteeNodes",
       "outputs": [
         {
-          "components": [
-            {
-              "internalType": "address[]",
-              "name": "nodes",
-              "type": "address[]"
-            },
-            {
-              "internalType": "uint32[2]",
-              "name": "threshold",
-              "type": "uint32[2]"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "publicKey",
-              "type": "bytes32"
-            }
-          ],
-          "internalType": "struct ICiphernodeRegistry.Committee",
-          "name": "committee",
-          "type": "tuple"
+          "internalType": "address[]",
+          "name": "committeeNodes",
+          "type": "address[]"
         }
       ],
       "stateMutability": "view",
@@ -266,6 +281,25 @@
         {
           "internalType": "bool",
           "name": "enabled",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        }
+      ],
+      "name": "isOpen",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
           "type": "bool"
         }
       ],
@@ -401,6 +435,37 @@
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_sortitionSubmissionWindow",
+          "type": "uint256"
+        }
+      ],
+      "name": "setSortitionSubmissionWindow",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "ticketNumber",
+          "type": "uint256"
+        }
+      ],
+      "name": "submitTicket",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "treeSize",
       "outputs": [
@@ -420,5 +485,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-332be8f9366934dd9b42983a9b2838dffc905ed0"
+  "buildInfoId": "solc-0_8_28-a254ab6ed640b952e36a352bed155c87f85018f2"
 }

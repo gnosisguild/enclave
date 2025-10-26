@@ -11,7 +11,6 @@ import { poseidon2 } from "poseidon-lite";
 
 import BondingRegistryModule from "../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../ignition/modules/ciphernodeRegistry";
-import CommitteeSortitionModule from "../ignition/modules/committeeSortition";
 import EnclaveModule from "../ignition/modules/enclave";
 import EnclaveTicketTokenModule from "../ignition/modules/enclaveTicketToken";
 import EnclaveTokenModule from "../ignition/modules/enclaveToken";
@@ -35,6 +34,7 @@ const { loadFixture, time, mine } = networkHelpers;
 
 describe("Enclave", function () {
   const THIRTY_DAYS_IN_SECONDS = 60 * 60 * 24 * 30;
+  const SORTITION_SUBMISSION_WINDOW = 300;
   const addressOne = "0x0000000000000000000000000000000000000001";
   const AddressTwo = "0x0000000000000000000000000000000000000002";
 
@@ -168,23 +168,13 @@ describe("Enclave", function () {
         CiphernodeRegistry: {
           enclaveAddress: enclaveAddress,
           owner: ownerAddress,
+          submissionWindow: SORTITION_SUBMISSION_WINDOW,
         },
       },
     });
 
     const ciphernodeRegistryAddress =
       await ciphernodeRegistry.cipherNodeRegistry.getAddress();
-
-    const committeeSortition = await ignition.deploy(CommitteeSortitionModule, {
-      parameters: {
-        CommitteeSortition: {
-          bondingRegistry:
-            await bondingRegistryContract.bondingRegistry.getAddress(),
-          ciphernodeRegistry: ciphernodeRegistryAddress,
-          submissionWindow: 300,
-        },
-      },
-    });
 
     const enclave = EnclaveFactory.connect(enclaveAddress, owner);
     const ciphernodeRegistryContract = CiphernodeRegistryOwnableFactory.connect(
@@ -197,8 +187,8 @@ describe("Enclave", function () {
       await enclave.setCiphernodeRegistry(ciphernodeRegistryAddress);
     }
 
-    await ciphernodeRegistryContract.setCommitteeSortition(
-      await committeeSortition.committeeSortition.getAddress(),
+    await ciphernodeRegistryContract.setBondingRegistry(
+      await bondingRegistryContract.bondingRegistry.getAddress(),
     );
 
     await ticketTokenContract.enclaveTicketToken.setRegistry(

@@ -7,7 +7,6 @@ pragma solidity >=0.8.27;
 
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
-import { CommitteeSortition } from "../sortition/CommitteeSortition.sol";
 import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -34,9 +33,22 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @param bondingRegistry Address of the bonding registry contract
     event BondingRegistrySet(address indexed bondingRegistry);
 
-    /// @notice Emitted when the committee sortition address is set
-    /// @param committeeSortition Address of the committee sortition contract
-    event CommitteeSortitionSet(address indexed committeeSortition);
+    /// @notice Emitted when a ticket is submitted for sortition
+    /// @param e3Id ID of the E3 computation
+    /// @param node Address of the ciphernode submitting the ticket
+    /// @param ticketId The ticket number being submitted
+    /// @param score The computed score for the ticket
+    event TicketSubmitted(
+        uint256 indexed e3Id,
+        address indexed node,
+        uint256 ticketId,
+        uint256 score
+    );
+
+    /// @notice Emitted when a committee is finalized
+    /// @param e3Id ID of the E3 computation
+    /// @param committee Array of selected ciphernode addresses
+    event CommitteeFinalized(uint256 indexed e3Id, address[] committee);
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -50,11 +62,13 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Address of the bonding registry for checking node eligibility
     address public bondingRegistry;
 
-    /// @notice Address of the committee sortition contract
-    address public committeeSortition;
-
     /// @notice Current number of registered ciphernodes
     uint256 public numCiphernodes;
+
+    /// @notice Submission Window for an E3 Sortition.
+    /// @dev The submission window is the time period during which the ciphernodes can submit
+    /// their tickets to be a part of the committee.
+    uint256 public sortitionSubmissionWindow;
 
     /// @notice Incremental Merkle Tree (IMT) containing all registered ciphernodes
     LeanIMTData public ciphernodes;
@@ -66,7 +80,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
 
     /// @notice Maps E3 ID to its committee data
-    mapping(uint256 e3Id => Committee committee) public committees;
+    mapping(uint256 e3Id => Committee committee) internal committees;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -86,8 +100,8 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Committee has not been requested yet for this E3
     error CommitteeNotRequested();
 
-    /// @notice Submission Window Not valid for this E3
-    error SubmissionWindowNotValid();
+    /// @notice Committee Not Initialized or Finalized
+    error CommitteeNotInitializedOrFinalized();
 
     /// @notice Submission Window has been closed for this E3
     error SubmissionWindowClosed();
@@ -133,8 +147,11 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Bonding registry has not been set
     error BondingRegistryNotSet();
 
-    /// @notice Committee sortition has not been set
-    error CommitteeSortitionNotSet();
+    /// @notice Invalid ticket number
+    error InvalidTicketNumber();
+
+    /// @notice Submission window not closed yet
+    error SubmissionWindowNotClosed();
 
     /// @notice Caller is not authorized
     error Unauthorized();
@@ -175,20 +192,27 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @notice Constructor that initializes the registry with owner and enclave
     /// @param _owner Address that will own the contract
     /// @param _enclave Address of the Enclave contract
-    constructor(address _owner, address _enclave) {
-        initialize(_owner, _enclave);
+    /// @param _submissionWindow The submission window for the E3 sortition in seconds
+    constructor(address _owner, address _enclave, uint256 _submissionWindow) {
+        initialize(_owner, _enclave, _submissionWindow);
     }
 
     /// @notice Initializes the registry contract
     /// @dev Can only be called once due to initializer modifier
     /// @param _owner Address that will own the contract
     /// @param _enclave Address of the Enclave contract
-    function initialize(address _owner, address _enclave) public initializer {
+    /// @param _submissionWindow The submission window for the E3 sortition in seconds
+    function initialize(
+        address _owner,
+        address _enclave,
+        uint256 _submissionWindow
+    ) public initializer {
         require(_owner != address(0), ZeroAddress());
         require(_enclave != address(0), ZeroAddress());
 
         __Ownable_init(msg.sender);
         setEnclave(_enclave);
+        setSortitionSubmissionWindow(_submissionWindow);
         if (_owner != owner()) transferOwnership(_owner);
     }
 
@@ -202,8 +226,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     function requestCommittee(
         uint256 e3Id,
         uint256 seed,
-        uint32[2] calldata threshold,
-        uint256 submissionWindow
+        uint32[2] calldata threshold
     ) external onlyEnclave returns (bool success) {
         Committee storage c = committees[e3Id];
         require(!c.initialized, CommitteeAlreadyRequested());
@@ -212,7 +235,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         c.finalized = false;
         c.seed = seed;
         c.requestBlock = block.number;
-        c.submissionDeadline = block.timestamp + submissionWindow;
+        c.submissionDeadline = block.timestamp + sortitionSubmissionWindow;
         c.threshold = threshold;
         roots[e3Id] = root();
 
@@ -236,11 +259,16 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         address[] calldata nodes,
         bytes calldata publicKey
     ) external onlyOwner {
-        ICiphernodeRegistry.Committee storage committee = committees[e3Id];
-        require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
-        committee.nodes = nodes;
+        Committee storage c = committees[e3Id];
+        require(c.publicKey == bytes32(0), CommitteeAlreadyPublished());
+
+        // Store the nodes in the committee array
+        for (uint256 i = 0; i < nodes.length; i++) {
+            c.committee.push(nodes[i]);
+        }
+
         bytes32 publicKeyHash = keccak256(publicKey);
-        committee.publicKey = publicKeyHash;
+        c.publicKey = publicKeyHash;
         publicKeyHashes[e3Id] = publicKeyHash;
         emit CommitteePublished(e3Id, nodes, publicKey);
     }
@@ -282,31 +310,67 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     //                                                        //
     ////////////////////////////////////////////////////////////
 
-    /// @inheritdoc ICiphernodeRegistry
-    function submitTicket(
-        uint256 e3Id,
-        uint256 ticketId,
-        uint256 score
-    ) external {
+    /// @notice Submit a ticket for sortition
+    /// @dev Validates ticket against node's balance at request block and inserts into top-N
+    /// @param e3Id ID of the E3 computation
+    /// @param ticketNumber The ticket number to submit (1 to available tickets at snapshot)
+    function submitTicket(uint256 e3Id, uint256 ticketNumber) external {
         Committee storage c = committees[e3Id];
-        require(!r.initialized || r.finalized, CommitteeNotRequested());
+        require(c.initialized, CommitteeNotRequested());
+        require(!c.finalized, CommitteeAlreadyFinalized());
         require(
             block.timestamp <= c.submissionDeadline,
             SubmissionDeadlineReached()
         );
+        require(!c.submitted[msg.sender], NodeAlreadySubmitted());
 
-        if (!isOpen(e3Id)) revert SubmissionWindowClosed();
-        if (!IBondingRegistry(bondingRegistry).isActive(msg.sender))
-            revert NodeNotEligible();
-        if (r.submitted[msg.sender]) revert NodeAlreadySubmitted();
+        // Validate node eligibility and ticket number
+        _validateNodeEligibility(msg.sender, ticketNumber, e3Id);
 
-        r.submitted[msg.sender] = true;
-        r.scoreOf[msg.sender] = score;
+        // Compute score
+        uint256 score = _computeTicketScore(
+            msg.sender,
+            ticketNumber,
+            e3Id,
+            c.seed
+        );
 
-        // insert into top-N (ascending score)
-        _insertTopN(r, msg.sender, score);
+        // Store submission
+        c.submitted[msg.sender] = true;
+        c.scoreOf[msg.sender] = score;
 
-        emit TicketSubmitted(e3Id, msg.sender, ticketId, score);
+        // Insert into top-N (ascending score)
+        _insertTopN(c, msg.sender, score);
+
+        emit TicketSubmitted(e3Id, msg.sender, ticketNumber, score);
+    }
+
+    /// @notice Finalize the committee after submission window closes
+    /// @dev Can be called by anyone after the deadline. Reverts if not enough nodes submitted.
+    /// @param e3Id ID of the E3 computation
+    function finalizeCommittee(uint256 e3Id) external {
+        Committee storage c = committees[e3Id];
+        require(c.initialized, CommitteeNotRequested());
+        require(!c.finalized, CommitteeAlreadyFinalized());
+        require(
+            block.timestamp > c.submissionDeadline,
+            SubmissionWindowNotClosed()
+        );
+        require(c.topNodes.length >= c.threshold[0], NodeNotEligible());
+
+        c.finalized = true;
+        c.committee = c.topNodes;
+
+        emit CommitteeFinalized(e3Id, c.topNodes);
+    }
+
+    /// @notice Check if submission window is still open for an E3
+    /// @param e3Id ID of the E3 computation
+    /// @return Whether the submission window is open
+    function isOpen(uint256 e3Id) public view returns (bool) {
+        Committee storage c = committees[e3Id];
+        if (!c.initialized || c.finalized) return false;
+        return block.timestamp <= c.submissionDeadline;
     }
 
     ////////////////////////////////////////////////////////////
@@ -333,15 +397,12 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         emit BondingRegistrySet(_bondingRegistry);
     }
 
-    /// @notice Sets the committee sortition contract address
-    /// @dev Only callable by owner
-    /// @param _committeeSortition Address of the committee sortition contract
-    function setCommitteeSortition(
-        address _committeeSortition
+    /// @inheritdoc ICiphernodeRegistry
+    function setSortitionSubmissionWindow(
+        uint256 _sortitionSubmissionWindow
     ) public onlyOwner {
-        require(_committeeSortition != address(0), ZeroAddress());
-        committeeSortition = _committeeSortition;
-        emit CommitteeSortitionSet(_committeeSortition);
+        sortitionSubmissionWindow = _sortitionSubmissionWindow;
+        emit SortitionSubmissionWindowSet(_sortitionSubmissionWindow);
     }
 
     ////////////////////////////////////////////////////////////
@@ -385,11 +446,12 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     }
 
     /// @inheritdoc ICiphernodeRegistry
-    function getCommittee(
+    function getCommitteeNodes(
         uint256 e3Id
-    ) public view returns (ICiphernodeRegistry.Committee memory committee) {
-        committee = committees[e3Id];
-        require(committee.publicKey != bytes32(0), CommitteeNotPublished());
+    ) public view returns (address[] memory nodes) {
+        Committee storage c = committees[e3Id];
+        require(c.publicKey != bytes32(0), CommitteeNotPublished());
+        nodes = c.committee;
     }
 
     /// @notice Returns the current size of the ciphernode IMT
@@ -402,5 +464,116 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @return Address of the bonding registry contract
     function getBondingRegistry() external view returns (address) {
         return bondingRegistry;
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Internal Functions                   //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @notice Computes ticket score as keccak256(node || ticketNumber || e3Id || seed)
+    /// @param node Address of the ciphernode
+    /// @param ticketNumber The ticket number
+    /// @param e3Id ID of the E3 computation
+    /// @param seed Random seed for the E3
+    /// @return score The computed score
+    function _computeTicketScore(
+        address node,
+        uint256 ticketNumber,
+        uint256 e3Id,
+        uint256 seed
+    ) internal pure returns (uint256) {
+        bytes32 hash = keccak256(
+            abi.encodePacked(node, ticketNumber, e3Id, seed)
+        );
+        return uint256(hash);
+    }
+
+    /// @notice Validates that a node is eligible to submit a ticket
+    /// @dev Uses snapshot of ticket balance at E3 request block for deterministic validation
+    /// @param node Address of the ciphernode
+    /// @param ticketNumber The ticket number being submitted
+    /// @param e3Id ID of the E3 computation
+    function _validateNodeEligibility(
+        address node,
+        uint256 ticketNumber,
+        uint256 e3Id
+    ) internal view {
+        require(ticketNumber > 0, InvalidTicketNumber());
+        require(bondingRegistry != address(0), BondingRegistryNotSet());
+
+        Committee storage c = committees[e3Id];
+
+        // Get ticket balance at the time E3 was requested (snapshot)
+        uint256 ticketBalance = IBondingRegistry(bondingRegistry)
+            .getTicketBalanceAtBlock(node, c.requestBlock);
+        uint256 ticketPrice = IBondingRegistry(bondingRegistry).ticketPrice();
+
+        require(ticketPrice > 0, InvalidTicketNumber());
+
+        // Calculate available tickets at snapshot
+        uint256 availableTickets = ticketBalance / ticketPrice;
+
+        // Check node is eligible (has tickets at snapshot)
+        require(availableTickets > 0, NodeNotEligible());
+
+        // Check ticket number is valid
+        require(ticketNumber <= availableTickets, InvalidTicketNumber());
+    }
+
+    /// @notice Inserts a node into the top-N sorted list by score
+    /// @dev Maintains sorted order (ascending by score)
+    /// @param c Committee storage reference
+    /// @param node Address of the ciphernode
+    /// @param score The computed score
+    function _insertTopN(
+        Committee storage c,
+        address node,
+        uint256 score
+    ) internal {
+        address[] storage topNodes = c.topNodes;
+
+        // If list not full, insert in sorted order
+        if (topNodes.length < c.threshold[1]) {
+            _insertSorted(c, node, score);
+            return;
+        }
+
+        // If list is full, only add if score is better than worst
+        uint256 worstScore = c.scoreOf[topNodes[topNodes.length - 1]];
+        if (score < worstScore) {
+            topNodes.pop(); // Remove worst
+            _insertSorted(c, node, score);
+        }
+    }
+
+    /// @notice Inserts a node at the correct sorted position (ascending by score)
+    /// @param c Committee storage reference
+    /// @param node Address of the ciphernode
+    /// @param score The computed score
+    function _insertSorted(
+        Committee storage c,
+        address node,
+        uint256 score
+    ) internal {
+        address[] storage topNodes = c.topNodes;
+
+        // Find insertion position
+        uint256 insertPos = topNodes.length;
+        for (uint256 i = 0; i < topNodes.length; i++) {
+            uint256 existingScore = c.scoreOf[topNodes[i]];
+            if (score < existingScore) {
+                insertPos = i;
+                break;
+            }
+        }
+
+        // Insert at position
+        topNodes.push(address(0)); // Extend array
+        for (uint256 i = topNodes.length - 1; i > insertPos; i--) {
+            topNodes[i] = topNodes[i - 1];
+        }
+        topNodes[insertPos] = node;
     }
 }

@@ -44,12 +44,11 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
-    function getCommittee(
+    function getCommitteeNodes(
         uint256
-    ) external pure returns (ICiphernodeRegistry.Committee memory) {
+    ) external pure returns (address[] memory) {
         address[] memory nodes = new address[](0);
-        uint32[2] memory threshold = [uint32(0), uint32(0)];
-        return ICiphernodeRegistry.Committee(nodes, threshold, bytes32(0));
+        return nodes;
     }
 
     function root() external pure returns (uint256) {
@@ -73,6 +72,19 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
     // solhint-disable-next-line no-empty-blocks
     function setBondingRegistry(address) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function submitTicket(uint256, uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function finalizeCommittee(uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function setSortitionSubmissionWindow(uint256) external pure {}
+
+    function isOpen(uint256) external pure returns (bool) {
+        return false;
+    }
 }
 
 contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
@@ -108,12 +120,11 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
         bytes calldata
     ) external pure {} // solhint-disable-line no-empty-blocks
 
-    function getCommittee(
+    function getCommitteeNodes(
         uint256
-    ) external pure returns (ICiphernodeRegistry.Committee memory) {
+    ) external pure returns (address[] memory) {
         address[] memory nodes = new address[](0);
-        uint32[2] memory threshold = [uint32(0), uint32(0)];
-        return ICiphernodeRegistry.Committee(nodes, threshold, bytes32(0));
+        return nodes;
     }
 
     function root() external pure returns (uint256) {
@@ -137,4 +148,17 @@ contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
 
     // solhint-disable-next-line no-empty-blocks
     function setBondingRegistry(address) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function setSortitionSubmissionWindow(uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function submitTicket(uint256, uint256) external pure {}
+
+    // solhint-disable-next-line no-empty-blocks
+    function finalizeCommittee(uint256) external pure {}
+
+    function isOpen(uint256) external pure returns (bool) {
+        return false;
+    }
 }

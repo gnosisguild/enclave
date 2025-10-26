@@ -7,10 +7,10 @@ import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
+import { toASCII } from "punycode";
 
 import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
-import CommitteeSortitionModule from "../../ignition/modules/committeeSortition";
 import EnclaveTicketTokenModule from "../../ignition/modules/enclaveTicketToken";
 import EnclaveTokenModule from "../../ignition/modules/enclaveToken";
 import MockStableTokenModule from "../../ignition/modules/mockStableToken";
@@ -26,6 +26,7 @@ const { loadFixture } = networkHelpers;
 
 const data = "0xda7a";
 const dataHash = ethers.keccak256(data);
+const SORTITION_SUBMISSION_WINDOW = 300;
 
 // Hash function used to compute the tree nodes.
 const hash = (a: bigint, b: bigint) => poseidon2([a, b]);
@@ -102,23 +103,13 @@ describe("CiphernodeRegistryOwnable", function () {
         CiphernodeRegistry: {
           enclaveAddress: ownerAddress,
           owner: ownerAddress,
+          submissionWindow: SORTITION_SUBMISSION_WINDOW,
         },
       },
     });
 
     const registryAddress =
       await registryContract.cipherNodeRegistry.getAddress();
-
-    const committeeSortition = await ignition.deploy(CommitteeSortitionModule, {
-      parameters: {
-        CommitteeSortition: {
-          bondingRegistry:
-            await bondingRegistryContract.bondingRegistry.getAddress(),
-          ciphernodeRegistry: registryAddress,
-          submissionWindow: 300,
-        },
-      },
-    });
 
     const registry = CiphernodeRegistryFactory.connect(registryAddress, owner);
 
@@ -134,8 +125,8 @@ describe("CiphernodeRegistryOwnable", function () {
       await bondingRegistryContract.bondingRegistry.getAddress(),
     );
 
-    await registry.setCommitteeSortition(
-      await committeeSortition.committeeSortition.getAddress(),
+    await registry.setBondingRegistry(
+      await bondingRegistryContract.bondingRegistry.getAddress(),
     );
 
     const tree = new LeanIMT(hash);
@@ -173,9 +164,13 @@ describe("CiphernodeRegistryOwnable", function () {
       const ciphernodeRegistry = await ciphernodeRegistryFactory.deploy(
         deployer.address,
         AddressTwo,
+        SORTITION_SUBMISSION_WINDOW,
       );
       expect(await ciphernodeRegistry.owner()).to.equal(deployer.address);
       expect(await ciphernodeRegistry.enclave()).to.equal(AddressTwo);
+      expect(await ciphernodeRegistry.sortitionSubmissionWindow()).to.equal(
+        SORTITION_SUBMISSION_WINDOW,
+      );
     });
   });
 
@@ -196,12 +191,31 @@ describe("CiphernodeRegistryOwnable", function () {
     });
     it("emits a CommitteeRequested event", async function () {
       const { registry, request } = await loadFixture(setup);
-      const blockNumber = (await ethers.provider.getBlockNumber()) + 1;
-      await expect(
-        registry.requestCommittee(request.e3Id, 0, request.threshold),
-      )
+
+      const tx = await registry.requestCommittee(
+        request.e3Id,
+        0n,
+        request.threshold,
+      );
+      const receipt = await tx.wait();
+      if (!receipt) throw new Error("Transaction failed");
+
+      const sWindow = await registry.sortitionSubmissionWindow();
+      const block = await ethers.provider.getBlock(receipt.blockNumber);
+      if (!block) throw new Error("Block not found");
+
+      const expectedBlockNumber = BigInt(receipt.blockNumber);
+      const expectedDeadline = BigInt(block.timestamp) + sWindow;
+
+      await expect(tx)
         .to.emit(registry, "CommitteeRequested")
-        .withArgs(request.e3Id, 0, request.threshold, blockNumber);
+        .withArgs(
+          request.e3Id,
+          0n,
+          request.threshold,
+          expectedBlockNumber,
+          expectedDeadline,
+        );
     });
     it("returns true if the request is successful", async function () {
       const { registry, request } = await loadFixture(setup);

@@ -10,12 +10,13 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 export default buildModule("CiphernodeRegistry", (m) => {
   const enclaveAddress = m.getParameter("enclaveAddress");
   const owner = m.getParameter("owner");
+  const submissionWindow = m.getParameter("submissionWindow");
 
   const poseidonT3 = m.library("PoseidonT3");
 
   const cipherNodeRegistry = m.contract(
     "CiphernodeRegistryOwnable",
-    [owner, enclaveAddress],
+    [owner, enclaveAddress, submissionWindow],
     {
       libraries: {
         PoseidonT3: poseidonT3,
