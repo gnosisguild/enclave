@@ -1,0 +1,30 @@
+# First ignore everything
+*
+**/*
+
+# Then allow cargo workspace files
+!Cargo.toml
+!Cargo.lock
+
+# Allow all other workspace members
+!crates/*/Cargo.toml
+!crates/*/src/**/*.rs
+
+# Allow packages
+!crates/*/package.json
+!packages/**/*
+!pnpm-workspace.yaml
+!pnpm-lock.yaml
+!rust-toolchain.toml
+
+# Explicitly ignore build artifacts everywhere
+target/
+**/target/
+**/.git/
+**/.gitignore
+**/.DS_Store
+**/tests/tmp/
+**/*.log
+
+# Explicitly ignore node_modules
+**/node_modules/

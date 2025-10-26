@@ -2,19 +2,16 @@
 
 set -e
 
+# Export env vars once for all docker compose commands
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
 echo ""
 echo "Building docker image"
 echo ""
-docker compose build
+docker build --network host -f ./Dockerfile -t p2p_test:latest ../../..
 
 echo ""
-echo "TEST 1: Using MDNS with separate IP addresses"
+echo "NETWORK TESTS"
 echo ""
-docker compose up --build --abort-on-container-exit
-
-echo ""
-echo "TEST 2: Blocking MDNS traffic for each service"
-echo ""
-echo "Note this should display some libp2p_mdns::behaviour::iface errors in output"
-echo ""
-BLOCK_MDNS=true docker compose up --build --abort-on-container-exit
+docker compose up --abort-on-container-exit
