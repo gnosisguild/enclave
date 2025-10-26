@@ -10,6 +10,9 @@
 !crates/*/Cargo.toml
 !crates/*/src/**/*.rs
 
+# Allow packages
+!packages/*/enclave-contracts/**/*
+
 # Explicitly ignore build artifacts everywhere
 target/
 **/target/
@@ -18,3 +21,6 @@ target/
 **/.DS_Store
 **/tests/tmp/
 **/*.log
+
+# Explicitly ignore node_modules
+**/node_modules/
