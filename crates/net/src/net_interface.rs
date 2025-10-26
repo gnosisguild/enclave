@@ -10,10 +10,8 @@ use crate::{events::NetEvent, Cid};
 use anyhow::Result;
 use e3_events::CorrelationId;
 use e3_utils::ArcBytes;
-use libp2p::gossipsub::{IdentTopic, TopicHash};
-use libp2p::kad::{
-    self, GetRecordOk, GetRecordResult, PeerRecord, PutRecordOk, QueryId, QueryResult,
-};
+use libp2p::gossipsub::TopicHash;
+use libp2p::kad::{self, GetRecordOk, QueryId, QueryResult};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -25,6 +23,7 @@ use libp2p::{
     Swarm,
 };
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{hash::DefaultHasher, io::Error, time::Duration};
 use std::{
@@ -107,6 +106,7 @@ impl NetInterface {
         let cmd_tx = self.cmd_tx.clone();
         let cmd_rx = &mut self.cmd_rx;
         let mut correlator = Correlator::new();
+        let shutdown_flag = Arc::new(AtomicBool::new(false));
 
         // Subscribe to topic
         self.swarm
@@ -138,6 +138,9 @@ impl NetInterface {
             select! {
                 // Process commands
                 Some(command) = cmd_rx.recv() => {
+                    if shutdown_flag.load(Ordering::Relaxed) {
+                        continue; // Skip processing during shutdown
+                    }
                     let result = match command {
                         NetCommand::GossipPublish { data, topic, correlation_id } =>
                             handle_gossip_publish(&mut self.swarm, &event_tx, data, topic, correlation_id),
@@ -146,7 +149,8 @@ impl NetInterface {
                         NetCommand::DhtPutRecord { correlation_id, key, expires, value } =>
                             handle_put_record(&mut self.swarm, &event_tx,&mut correlator, correlation_id, key, expires, value),
                         NetCommand::DhtGetRecord { correlation_id, key } =>
-                            handle_get_record(&mut self.swarm, &mut correlator, correlation_id, key)
+                            handle_get_record(&mut self.swarm, &mut correlator, correlation_id, key),
+                        NetCommand::Shutdown => handle_shutdown(&mut self.swarm, &shutdown_flag)
                     };
                     match result {
                         Ok(_) => (),
@@ -156,6 +160,9 @@ impl NetInterface {
 
                 // Process events
                 event = self.swarm.select_next_some() =>  {
+                    if shutdown_flag.load(Ordering::Relaxed){
+                        continue; // Ignore new events during shutdown
+                    }
                     process_swarm_event(&mut self.swarm, &event_tx, &mut correlator, event).await?
                 }
             }
@@ -264,6 +271,26 @@ fn handle_get_record(
     correlator.track(query_id, correlation_id);
 
     trace!("get_record sent {:?}", query_id);
+    Ok(())
+}
+
+fn handle_shutdown(
+    swarm: &mut Swarm<NodeBehaviour>,
+    shutdown_flag: &Arc<AtomicBool>,
+) -> Result<()> {
+    info!("Starting graceful shutdown");
+
+    // Set the shutdown flag
+    shutdown_flag.store(true, Ordering::Relaxed);
+
+    // Disconnect all peers
+    let peers: Vec<_> = swarm.connected_peers().copied().collect();
+    for peer in peers {
+        info!("Disconnecting from peer: {}", peer);
+        let _ = swarm.disconnect_peer_id(peer);
+    }
+
+    info!("Graceful shutdown complete");
     Ok(())
 }
 
@@ -408,10 +435,15 @@ async fn process_swarm_event(
                 ..
             },
         )) => {
-            println!("#######>>>>>>>>> FoundRecord! {:?}", peer_record);
+            let key = Cid(peer_record.record.key.to_vec());
             let correlation_id = correlator.expire(&id)?;
+            debug!(
+                "Received DHT record for key={} correlation_id={}",
+                key.to_string(),
+                correlation_id
+            );
             event_tx.send(NetEvent::DhtGetRecordSucceeded {
-                key: Cid(peer_record.record.key.to_vec()),
+                key,
                 correlation_id,
                 value: ArcBytes::from_bytes(peer_record.record.value),
             })?;
@@ -424,10 +456,15 @@ async fn process_swarm_event(
                 ..
             },
         )) => {
-            println!("#######>>>>>>>>> PutRecordOk! {:?}", record);
+            let key = Cid(record.key.to_vec());
             let correlation_id = correlator.expire(&id)?;
+            debug!(
+                "Put DHT record for key={} correlation_id={}",
+                key.to_string(),
+                correlation_id
+            );
             event_tx.send(NetEvent::DhtPutRecordSucceeded {
-                key: Cid(record.key.to_vec()),
+                key,
                 correlation_id,
             })?;
         }

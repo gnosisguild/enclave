@@ -9,12 +9,13 @@ use e3_events::CorrelationId;
 use e3_net::events::{GossipData, NetCommand, NetEvent};
 use e3_net::{Cid, MeshParams, NetInterface};
 use e3_utils::ArcBytes;
-use libp2p::gossipsub::{self, IdentTopic};
+use libp2p::gossipsub::IdentTopic;
 use std::time::Duration;
 use std::{collections::HashSet, env, process};
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
+use tracing::{debug, error, info};
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 // So this is a simple test to test our networking configuration
@@ -24,7 +25,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 // We have a docker test harness that runs the nodes and blocks things like mdns ports to ensure
 // that basic discovery is working
 
-async fn test_gossip(peer: &mut PeerHandle) -> Result<()> {
+async fn test_gossip(peer: &mut TestPeer) -> Result<()> {
     let topic = "test-topic";
     let name = peer.name.clone();
     println!("{} starting up", name);
@@ -91,32 +92,16 @@ async fn test_gossip(peer: &mut PeerHandle) -> Result<()> {
         }
     }
 
+    // no need to mark test as finished because all nodes are leading
     Ok(())
 }
 
-// async fn get_events_until_settled(
-//     seconds: u64,
-//     rx: &mut broadcast::Receiver<NetEvent>,
-// ) -> Result<Vec<NetEvent>> {
-//     let mut events = Vec::new();
-//
-//     loop {
-//         match timeout(Duration::from_secs(seconds), rx.recv()).await {
-//             Ok(Ok(event)) => events.push(event),
-//             Ok(Err(_)) => break, // Channel error
-//             Err(_) => break,     // 15-second timeout
-//         }
-//     }
-//
-//     Ok(events)
-// }
+async fn test_dht(peer: &mut TestPeer) -> Result<()> {
+    let value = b"I am he as you are he, as you are me and we are all together";
+    let key = Cid::from_content(value);
 
-async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
-    let test_config = env::var("TEST_CONFIG").unwrap_or_default();
-    let is_lead = test_config.contains("lead");
-    if is_lead {
-        let value = b"I am he as you are he, as you are me and we are all together";
-        let key = Cid::from_content(value);
+    if peer.is_lead() {
+        // PUT RECORD
         peer.tx
             .send(NetCommand::DhtPutRecord {
                 correlation_id: CorrelationId::new(),
@@ -135,40 +120,41 @@ async fn test_dht(peer: &mut PeerHandle) -> Result<()> {
             Duration::from_secs(15),
         )
         .await?;
+    }
 
-        peer.tx
-            .send(NetCommand::DhtGetRecord {
-                correlation_id: CorrelationId::new(),
-                key,
-            })
-            .await?;
-        let events = receive_until_collect(
-            &mut peer.rx,
-            |e| match e {
-                NetEvent::DhtGetRecordSucceeded { .. } => true,
-                _ => false,
-            },
-            Duration::from_secs(15),
-        )
+    peer.sync_nodes().await?;
+
+    // GET RECORD
+    peer.tx
+        .send(NetCommand::DhtGetRecord {
+            correlation_id: CorrelationId::new(),
+            key,
+        })
         .await?;
 
-        let Some(NetEvent::DhtGetRecordSucceeded { value: actual, .. }) = events.last() else {
-            return Err(anyhow::anyhow!(
-                "Failed to receive success from GET RECORD!"
-            ));
-        };
+    let events = receive_until_collect(
+        &mut peer.rx,
+        |e| match e {
+            NetEvent::DhtGetRecordSucceeded { .. } => true,
+            _ => false,
+        },
+        Duration::from_secs(15),
+    )
+    .await?;
 
-        assert_eq!(
-            value.to_vec(),
-            actual.extract_bytes(),
-            "Value does not match!"
-        );
+    let Some(NetEvent::DhtGetRecordSucceeded { value: actual, .. }) = events.last() else {
+        return Err(anyhow::anyhow!(
+            "Failed to receive success from GET RECORD!"
+        ));
+    };
 
-        peer.send_test_finished("test").await?;
-    } else {
-        peer.wait_for_test_finished(Duration::from_secs(120))
-            .await?;
-    }
+    assert_eq!(
+        value.to_vec(),
+        actual.extract_bytes(),
+        "Value does not match!"
+    );
+
+    peer.sync_nodes().await?;
 
     Ok(())
 }
@@ -201,16 +187,15 @@ where
 }
 
 async fn runner() -> Result<Vec<String>> {
-    let mut peer = setup_peer().await?;
+    let mut peer = TestPeer::setup().await?;
     let mut report = vec![];
-
-    // Gossip Test
-    test_gossip(&mut peer).await?;
-    report.push("Gossip Test");
 
     // DHT test
     test_dht(&mut peer).await?;
     report.push("DHT Test");
+
+    peer.tx.send(NetCommand::Shutdown).await?;
+    sleep(Duration::from_secs(20)).await;
 
     // Write report
     let report_string = report
@@ -221,115 +206,180 @@ async fn runner() -> Result<Vec<String>> {
     Ok(report_string)
 }
 
-struct PeerHandle {
+struct TestPeer {
     name: String,
+    sync_threshold: usize,
     rx: broadcast::Receiver<NetEvent>,
     tx: mpsc::Sender<NetCommand>,
-    running: JoinHandle<()>,
+    topic: IdentTopic,
+    test_timeout: Option<Duration>,
+    _running: JoinHandle<()>,
 }
 
-impl PeerHandle {
-    pub async fn send_test_finished(&self, topic: &str) -> Result<()> {
-        let topic = IdentTopic::new(topic);
-        self.tx
+static START_SYNC: &[u8] = b"START_SYNC";
+static SYNC: &[u8] = b"SYNC";
+static END_SYNC: &[u8] = b"END_SYNC";
+
+impl TestPeer {
+    // This helps:
+    // - ensure nodes are connected and in communication for our tests.
+    // - prevents nodes from quitting early before a test has completed if they are not the leader.
+    // - tests the gossip pubsub in general
+    pub async fn sync_nodes(&mut self) -> Result<()> {
+        if self.is_lead() {
+            info!("LEAD IS SYNCING");
+            self.send_msg(START_SYNC).await?;
+
+            for node in 0..self.sync_threshold {
+                debug!(
+                    "SYNC: Waiting for reply {}/{}...",
+                    node + 1,
+                    self.sync_threshold
+                );
+                self.wait_for_msg(SYNC).await?;
+            }
+
+            self.send_msg(END_SYNC).await?;
+            info!("LEAD SYNCED!");
+        } else {
+            info!("FOLLOWER IS SYNCING");
+            self.wait_for_msg(START_SYNC).await?;
+
+            self.send_msg(SYNC).await?;
+
+            self.wait_for_msg(END_SYNC).await?;
+            info!("FOLLOWER SYNCED!");
+        }
+        Ok(())
+    }
+
+    pub async fn send_msg(&self, msg: &[u8]) -> Result<()> {
+        Ok(self
+            .tx
             .send(NetCommand::GossipPublish {
                 correlation_id: CorrelationId::new(),
-                topic: topic.to_string(),
-                data: GossipData::GossipBytes(b"test_finished".to_vec()),
+                topic: self.topic.to_string(),
+                data: GossipData::GossipBytes(msg.to_vec()),
             })
-            .await?;
-        Ok(())
+            .await?)
     }
 
-    pub async fn wait_for_test_finished(&mut self, timeout: Duration) -> Result<()> {
-        receive_until_collect(
+    pub async fn wait_for_msg(&mut self, msg: &[u8]) -> Result<Vec<NetEvent>> {
+        Ok(receive_until_collect(
             &mut self.rx,
             |e| match e {
-                NetEvent::TestFinished => true,
+                NetEvent::GossipData(GossipData::GossipBytes(bytes)) => {
+                    if msg.to_vec() == bytes.clone() {
+                        true
+                    } else {
+                        false
+                    }
+                }
                 _ => false,
             },
-            timeout,
+            self.test_timeout.unwrap_or(Duration::from_secs(120)),
         )
-        .await?;
-        Ok(())
+        .await?)
     }
-}
 
-async fn setup_peer() -> Result<PeerHandle> {
-    let name = env::args().nth(2).expect("need name");
-    println!("{} starting up", name);
+    pub fn is_lead(&self) -> bool {
+        env::var("TEST_CONFIG").unwrap_or_default().contains("lead")
+    }
 
-    let udp_port = env::var("QUIC_PORT")
-        .ok()
-        .and_then(|p| p.parse::<u16>().ok());
+    async fn setup() -> Result<TestPeer> {
+        let name = env::args().nth(2).expect("need name");
+        println!("{} starting up", name);
 
-    let dial_to = env::var("DIAL_TO")
-        .ok()
-        .and_then(|p| p.parse::<String>().ok());
+        let udp_port = env::var("QUIC_PORT")
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok());
 
-    let peers: Vec<String> = dial_to.iter().cloned().collect();
+        let dial_to = env::var("DIAL_TO")
+            .ok()
+            .and_then(|p| p.parse::<String>().ok());
 
-    let id = libp2p::identity::Keypair::generate_ed25519();
-    let mut peer = NetInterface::new(
-        &id,
-        peers,
-        udp_port,
-        "test-topic",
-        MeshParams {
-            mesh_n: 4,
-            mesh_n_low: 3,
-            mesh_outbound_min: 2,
-            ..Default::default()
-        },
-    )?;
+        let sync_threshold = env::var("SYNC_THRESHOLD")
+            .ok()
+            .and_then(|p| p.parse::<usize>().ok())
+            .unwrap_or(3);
 
-    // Extract input and outputs
-    let tx = peer.tx();
-    let mut rx = peer.rx();
+        let topic = IdentTopic::new("test");
 
-    let router_task = tokio::spawn({
-        let name = name.clone();
-        async move {
-            println!("{} starting router task", name);
-            if let Err(e) = peer.start().await {
-                println!("{} router task failed: {}", name, e);
+        let peers: Vec<String> = dial_to.iter().cloned().collect();
+
+        let id = libp2p::identity::Keypair::generate_ed25519();
+        let mut peer = NetInterface::new(
+            &id,
+            peers,
+            udp_port,
+            &topic.to_string(),
+            MeshParams {
+                mesh_n: 2,
+                mesh_n_low: 1,
+                mesh_n_high: 3,
+                mesh_outbound_min: 1,
+            },
+        )?;
+
+        // Extract input and outputs
+        let tx = peer.tx();
+        let mut rx = peer.rx();
+
+        let router_task = tokio::spawn({
+            let name = name.clone();
+            async move {
+                println!("{} starting router task", name);
+                if let Err(e) = peer.start().await {
+                    println!("{} router task failed: {}", name, e);
+                }
+                println!("{} router task finished", name);
             }
-            println!("{} router task finished", name);
-        }
-    });
-    println!("Waiting for mesh to be ready...");
-    wait_for_mesh_ready(15, 3, &mut rx, "test-topic").await;
-    println!("MESH READY!");
-    // Give network time to initialize
-    sleep(Duration::from_secs(3)).await;
-    Ok(PeerHandle {
-        name,
-        tx,
-        rx,
-        running: router_task,
-    })
+        });
+
+        println!("WAIT FOR MESH READY...");
+        wait_for_mesh_ready(60, 3, &mut rx, &topic).await?;
+
+        println!("MESH READY!");
+
+        // Give network time to initialize
+        sleep(Duration::from_secs(3)).await;
+
+        Ok(TestPeer {
+            name,
+            tx,
+            rx,
+            sync_threshold,
+            topic,
+            test_timeout: None,
+            _running: router_task,
+        })
+    }
 }
 
 async fn wait_for_mesh_ready(
     seconds: u64,
     min_size: usize,
     rx: &mut broadcast::Receiver<NetEvent>,
-    topic: &str,
-) {
-    let topic = gossipsub::IdentTopic::new(topic);
+    topic: &IdentTopic,
+) -> Result<()> {
     let topic_hash = topic.hash();
     loop {
         match timeout(Duration::from_secs(seconds), rx.recv()).await {
             Ok(Ok(NetEvent::GossipSubscribed { count, topic })) => {
+                info!(
+                    "Received GossipSubscribed with count={}/{} topic={}",
+                    count, min_size, topic
+                );
                 if topic_hash == topic && count >= min_size {
                     break;
                 }
             }
             Ok(Err(_)) => break,
-            Err(_) => break,
+            Err(e) => return Err(anyhow::anyhow!("MESH SYNC FAILED!")),
             _ => (),
         }
     }
+    Ok(())
 }
 
 #[tokio::main]

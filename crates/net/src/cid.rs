@@ -4,7 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -22,6 +25,12 @@ impl Cid {
 
     pub fn into_inner(self) -> Vec<u8> {
         self.0
+    }
+}
+
+impl ToString for Cid {
+    fn to_string(&self) -> String {
+        hex::encode(&self.0)
     }
 }
 
