@@ -9,22 +9,22 @@ chains:
 
 nodes:
   cn1:
-    address: "0x2546BcD3c84621e976D8185a91A922aE77ECEc30"
+    address: "0x90F79bf6EB2c4f870365E785982E1f101E93b906"
     quic_port: 9091
     autonetkey: true
     autopassword: true
   cn2:
-    address: "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E"
+    address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
     quic_port: 9092
     autonetkey: true
     autopassword: true
   cn3:
-    address: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
+    address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
     quic_port: 9093
     autonetkey: true
     autopassword: true
   cn4:
-    address: "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199"
+    address: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
     quic_port: 9094
     autonetkey: true
     autopassword: true

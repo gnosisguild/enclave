@@ -87,7 +87,10 @@ impl NodeStateStore {
     }
 }
 
-/// Actor that manages node state
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "Option<NodeStateStore>")]
+pub struct GetNodeState;
+
 pub struct NodeStateManager {
     state: Persistable<NodeStateStore>,
     bus: Addr<EventBus<EnclaveEvent>>,
@@ -133,6 +136,14 @@ impl NodeStateManager {
 
 impl Actor for NodeStateManager {
     type Context = Context<Self>;
+}
+
+impl Handler<GetNodeState> for NodeStateManager {
+    type Result = Option<NodeStateStore>;
+
+    fn handle(&mut self, _msg: GetNodeState, _: &mut Self::Context) -> Self::Result {
+        self.state.get()
+    }
 }
 
 impl Handler<EnclaveEvent> for NodeStateManager {

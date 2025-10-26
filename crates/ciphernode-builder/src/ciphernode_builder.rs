@@ -30,7 +30,9 @@ use e3_fhe::ext::FheExtension;
 use e3_keyshare::ext::{KeyshareExtension, ThresholdKeyshareExtension};
 use e3_multithread::Multithread;
 use e3_request::E3Router;
-use e3_sortition::{CiphernodeSelector, Sortition, SortitionRepositoryFactory};
+use e3_sortition::{
+    CiphernodeSelector, NodeStateRepositoryFactory, Sortition, SortitionRepositoryFactory,
+};
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, sync::Arc};
 use tracing::{error, info};
@@ -274,9 +276,16 @@ impl CiphernodeBuilder {
             .unwrap_or_else(|| (&InMemStore::new(self.logging).start()).into());
 
         let repositories = store.repositories();
-        let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
 
-        // Ciphernode Selector
+        let node_state_manager =
+            e3_sortition::NodeStateManager::attach(&local_bus, &repositories.node_state()).await?;
+        let sortition = Sortition::attach_with_node_state(
+            &local_bus,
+            repositories.sortition(),
+            node_state_manager,
+        )
+        .await?;
+
         CiphernodeSelector::attach(&local_bus, &sortition, &addr, &store);
 
         let mut provider_cache = ProviderCaches::new();

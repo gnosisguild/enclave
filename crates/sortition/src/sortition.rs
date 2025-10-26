@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use crate::distance::DistanceSortition;
-use crate::node_state::NodeStateStore;
+use crate::node_state::{GetNodeState, NodeStateManager, NodeStateStore};
 use crate::ticket::{RegisteredNode, Ticket};
 use crate::ticket_sortition::ScoreSortition;
 use actix::prelude::*;
@@ -222,23 +222,61 @@ impl ScoreBackend {
         chain_id: u64,
         node_state: &NodeStateStore,
     ) -> Vec<RegisteredNode> {
+        info!(
+            chain_id = chain_id,
+            registered_count = self.registered.len(),
+            node_state_count = node_state.nodes.len(),
+            "Building nodes from state for score sortition"
+        );
+
         self.registered
             .iter()
             .filter_map(|n| {
                 let addr_str = n.address.to_string();
                 let key = (chain_id, addr_str.clone());
                 let Some(ns) = node_state.nodes.get(&key) else {
+                    info!(
+                        address = %addr_str,
+                        chain_id = chain_id,
+                        "Node not found in NodeStateStore"
+                    );
                     return None;
                 };
                 if !ns.active {
+                    info!(
+                        address = %addr_str,
+                        "Node is not active"
+                    );
                     return None;
                 }
 
                 let count = node_state.available_tickets(chain_id, &addr_str) as u64;
+                let ticket_price = node_state
+                    .ticket_prices
+                    .get(&chain_id)
+                    .copied()
+                    .unwrap_or(alloy::primitives::U256::from(1));
+                let total_tickets = (ns.ticket_balance / ticket_price)
+                    .try_into()
+                    .unwrap_or(0u64);
+
                 if count == 0 {
+                    info!(
+                        address = %addr_str,
+                        ticket_balance = ?ns.ticket_balance,
+                        ticket_price = ?ticket_price,
+                        total_tickets = total_tickets,
+                        active_jobs = ns.active_jobs,
+                        "Node has no available tickets"
+                    );
                     return None;
                 }
 
+                info!(
+                    address = %addr_str,
+                    available_tickets = count,
+                    "Node eligible for score sortition"
+                );
                 let tickets = (1..=count).map(|i| Ticket { ticket_id: i }).collect();
                 Some(RegisteredNode {
                     address: n.address,
@@ -353,9 +391,9 @@ impl SortitionList<String> for ScoreBackend {
 
 /// Enum wrapper around the supported backends.
 ///
-/// New chains should default to `Distance`. If a chain is intended to
-/// use score selection, construct it as `SortitionBackend::Score(ScoreBackend::default())`
-/// and then populate tickets explicitly.
+/// New chains default to `Score` sortition. If a chain is intended to
+/// use distance selection, construct it as `SortitionBackend::Distance(DistanceBackend::default())`
+/// explicitly.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SortitionBackend {
     /// Distance-based selection (stores a simple set of addresses).
@@ -365,9 +403,9 @@ pub enum SortitionBackend {
 }
 
 impl SortitionBackend {
-    /// Construct a backend preconfigured with a default `DistanceBackend`.
+    /// Construct a backend preconfigured with a default `ScoreBackend`.
     pub fn default() -> Self {
-        SortitionBackend::Distance(DistanceBackend::default())
+        SortitionBackend::Score(ScoreBackend::default())
     }
 }
 
@@ -435,8 +473,8 @@ pub struct Sortition {
     list: Persistable<HashMap<u64, SortitionBackend>>,
     /// Event bus for error reporting and enclave event subscription.
     bus: Addr<EventBus<EnclaveEvent>>,
-    /// Optional reference to node state for score-based sortition
-    node_state: Option<Persistable<NodeStateStore>>,
+    /// Optional reference to NodeStateManager for score-based sortition
+    node_state_manager: Option<Addr<NodeStateManager>>,
 }
 
 /// Parameters for constructing a `Sortition` actor.
@@ -446,8 +484,8 @@ pub struct SortitionParams {
     pub bus: Addr<EventBus<EnclaveEvent>>,
     /// Persisted per-chain backend map.
     pub list: Persistable<HashMap<u64, SortitionBackend>>,
-    /// Optional node state for score-based sortition
-    pub node_state: Option<Persistable<NodeStateStore>>,
+    /// Optional NodeStateManager for score-based sortition
+    pub node_state_manager: Option<Addr<NodeStateManager>>,
 }
 
 impl Sortition {
@@ -456,7 +494,7 @@ impl Sortition {
         Self {
             list: params.list,
             bus: params.bus,
-            node_state: params.node_state,
+            node_state_manager: params.node_state_manager,
         }
     }
 
@@ -472,7 +510,7 @@ impl Sortition {
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
-            node_state: None, // Legacy attach without node state
+            node_state_manager: None, // Legacy attach without node state
         })
         .start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
@@ -487,16 +525,13 @@ impl Sortition {
     pub async fn attach_with_node_state(
         bus: &Addr<EventBus<EnclaveEvent>>,
         store: Repository<HashMap<u64, SortitionBackend>>,
-        node_state_store: Repository<NodeStateStore>,
+        node_state_manager: Addr<NodeStateManager>,
     ) -> Result<Addr<Sortition>> {
         let list = store.load_or_default(HashMap::new()).await?;
-        let node_state = node_state_store
-            .load_or_default(NodeStateStore::default())
-            .await?;
         let addr = Sortition::new(SortitionParams {
             bus: bus.clone(),
             list,
-            node_state: Some(node_state),
+            node_state_manager: Some(node_state_manager),
         })
         .start();
         bus.do_send(Subscribe::new("CiphernodeAdded", addr.clone().into()));
@@ -542,9 +577,9 @@ impl Handler<CiphernodeAdded> for Sortition {
 
     /// Add a node to the target chain.
     ///
-    /// If the chain does not exist yet, its backend is initialized to `Distance`.
-    /// For score-based chains, switch construction time to `SortitionBackend::Score`
-    /// and call the ticket setters separately (this handler only adds the address).
+    /// If the chain does not exist yet, its backend is initialized to `Score` (default).
+    /// For distance-based chains, initialize explicitly with `SortitionBackend::Distance`
+    /// before any nodes are added.
     #[instrument(name = "sortition_add_node", skip_all)]
     fn handle(&mut self, msg: CiphernodeAdded, _ctx: &mut Self::Context) -> Self::Result {
         trace!("Adding node: {}", msg.address);
@@ -587,30 +622,46 @@ impl Handler<CiphernodeRemoved> for Sortition {
 }
 
 impl Handler<GetNodeIndex> for Sortition {
-    type Result = Option<(u64, Option<u64>)>;
+    type Result = ResponseFuture<Option<(u64, Option<u64>)>>;
 
     fn handle(&mut self, msg: GetNodeIndex, _ctx: &mut Self::Context) -> Self::Result {
-        let node_state_snapshot = self.node_state.as_ref().and_then(|p| p.get());
-        let node_state_ref = node_state_snapshot.as_ref();
+        let node_state_manager = self.node_state_manager.clone();
+        let bus = self.bus.clone();
 
-        self.list
-            .try_with(|map| {
-                if let Some(backend) = map.get(&msg.chain_id) {
-                    backend.get_index(
-                        msg.seed,
-                        msg.size,
-                        msg.address.clone(),
-                        node_state_ref,
-                        msg.chain_id,
-                    )
-                } else {
-                    Ok(None)
-                }
-            })
-            .unwrap_or_else(|err| {
-                self.bus.err(EnclaveErrorType::Sortition, err);
+        // Get the sortition backends synchronously
+        let backends_snapshot = self.list.get();
+
+        Box::pin(async move {
+            // Query NodeStateManager for fresh state
+            let node_state_snapshot = if let Some(manager) = node_state_manager {
+                manager.send(GetNodeState).await.ok().flatten()
+            } else {
                 None
-            })
+            };
+            let node_state_ref = node_state_snapshot.as_ref();
+
+            // Use the backends snapshot
+            if let Some(map) = backends_snapshot {
+                if let Some(backend) = map.get(&msg.chain_id) {
+                    backend
+                        .get_index(
+                            msg.seed,
+                            msg.size,
+                            msg.address.clone(),
+                            node_state_ref,
+                            msg.chain_id,
+                        )
+                        .unwrap_or_else(|err| {
+                            bus.err(EnclaveErrorType::Sortition, err);
+                            None
+                        })
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
     }
 }
 impl Handler<GetNodes> for Sortition {

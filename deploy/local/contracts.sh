@@ -10,9 +10,9 @@
 sleep 2 # wait for enclave to start
 
 # Get the addresses of the ciphernodes
-CN1=0xbDA5747bFD65F08deb54cb465eB87D40e51B197E
-CN2=0xdD2FD4581271e230360230F9337D5c0430Bf44C0
-CN3=0x2546BcD3c84621e976D8185a91A922aE77ECEc30
+CN1=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+CN2=0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+CN3=0x90F79bf6EB2c4f870365E785982E1f101E93b906
 
 # Add the ciphernodes to the enclave
 (cd examples/CRISP/packages/crisp-contracts && pnpm ciphernode:add --ciphernode-address "$CN1" --network "localhost")

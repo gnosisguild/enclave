@@ -49,8 +49,18 @@ struct ConfigurationUpdatedWithChainId(pub IBondingRegistry::ConfigurationUpdate
 
 impl From<ConfigurationUpdatedWithChainId> for e3_events::ConfigurationUpdated {
     fn from(value: ConfigurationUpdatedWithChainId) -> Self {
+        let param_bytes = value.0.parameter.as_slice();
+        let param_str = String::from_utf8(
+            param_bytes
+                .iter()
+                .copied()
+                .take_while(|&b| b != 0)
+                .collect(),
+        )
+        .unwrap_or_else(|_| value.0.parameter.to_string());
+
         e3_events::ConfigurationUpdated {
-            parameter: value.0.parameter.to_string(),
+            parameter: param_str,
             old_value: value.0.oldValue,
             new_value: value.0.newValue,
             chain_id: value.1,

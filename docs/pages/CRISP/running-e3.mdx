@@ -7,7 +7,8 @@ import { Steps } from 'nextra/components'
 
 # Running an E3 Program
 
-In this section, we will go through all the steps to run an E3 Program using CRISP. We will run a complete voting round of CRISP and do the following:
+In this section, we will go through all the steps to run an E3 Program using CRISP. We will run a
+complete voting round of CRISP and do the following:
 
 - Start the infrastructure (nodes and contracts)
 - Start the CRISP applications (client, server, program)
@@ -24,17 +25,20 @@ Please make sure you have followed the [CRISP Setup](/CRISP/setup) guide before 
 First, ensure you have the infrastructure running. If you haven't already, complete the setup:
 
 **Terminal 1: Start Anvil**
+
 ```sh
 anvil
 ```
 
 **Terminal 2: Start Ciphernodes**
+
 ```sh
 cd examples/CRISP
 enclave nodes up -v
 ```
 
-Make sure contracts are deployed and ciphernodes are added to the registry as described in the setup guide.
+Make sure contracts are deployed and ciphernodes are added to the registry as described in the setup
+guide.
 
 ### Start the Client Application
 
@@ -70,7 +74,7 @@ Navigate to the program directory and start the program server:
 
 ```sh
 cd examples/CRISP/
-enclave program start 
+enclave program start
 ```
 
 This runs the RISC Zero program server that handles secure computations.
@@ -82,7 +86,7 @@ cd examples/CRISP/
 enclave program start --dev true
 ```
 
-In this case, Risc0 will not be used to generate proofs, and instead these will be mocked. 
+In this case, Risc0 will not be used to generate proofs, and instead these will be mocked.
 
 ### Initialize a New Voting Round
 
@@ -101,6 +105,7 @@ Follow these steps in the CLI:
 2. Choose `Initialize new E3 round` to start a new voting round
 
 You should see output similar to:
+
 ```sh
 [2024-10-22 11:56:11] [commands.rs:42] - Starting new CRISP round!
 [2024-10-22 11:56:11] [commands.rs:46] - Enabling E3 Program...
@@ -135,11 +140,13 @@ To interact with the client application, you need to configure MetaMask:
 You can monitor the entire process through the various terminal outputs:
 
 **Server logs will show:**
+
 - Vote submissions being received
 - Computation starting when the voting period ends
 - Results being computed and published
 
 **Example server output:**
+
 ```sh
 [2024-10-22 11:59:12] [handlers.rs:95] - Vote Count: 1
 [2024-10-22 11:59:12] [handlers.rs:101] - Starting computation for E3: 0
@@ -150,16 +157,18 @@ Prove function execution time: 2 minutes and 37 seconds
 ```
 
 **Ciphernode logs will show:**
+
 ```sh
 INFO Extracted log from evm sending now.
 INFO evt=CiphertextOutputPublished(e3_id: 0) e3_id=0
-INFO evt=DecryptionshareCreated(e3_id: 0, node: 0x2546BcD3c84621e976D8185a91A922aE77ECEc30) e3_id=0
+INFO evt=DecryptionshareCreated(e3_id: 0, node: 0x90F79bf6EB2c4f870365E785982E1f101E93b906) e3_id=0
 INFO evt=PlaintextAggregated(e3_id: 0, src_chain_id: 31337) e3_id=0
 INFO evt=E3RequestComplete(e3_id: 0)
 INFO Plaintext published. tx=0x320dd95358cc86c2a709b6fec0c6865b43fa063cb61dfcb8a748005d4886f040
 ```
 
 **Final result logs:**
+
 ```sh
 [2024-10-22 12:01:49] [handlers.rs:171] - Handling PlaintextOutputPublished event...
 [2024-10-22 12:01:49] [handlers.rs:181] - Vote Count: 1
@@ -183,7 +192,8 @@ The CRISP voting process involves several key steps:
 ## Troubleshooting
 
 - **Ensure all terminals remain open** during the voting process
-- **MetaMask connection issues**: Check that you're connected to the correct network (Chain ID: 31337)
+- **MetaMask connection issues**: Check that you're connected to the correct network (Chain
+  ID: 31337)
 - **Transaction failures**: Verify you have sufficient ETH balance from the Anvil faucet
 - **Server errors**: Monitor the server logs for detailed error messages
 - **Ciphernode issues**: Ensure all ciphernode processes are running and connected
@@ -198,4 +208,3 @@ Once you've successfully run a voting round, you can:
 - **Deploy to testnet**: Move beyond local development to public testnets
 
 ![Result](/poll-result.png)
-
