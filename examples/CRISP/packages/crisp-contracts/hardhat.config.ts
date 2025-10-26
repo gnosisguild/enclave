@@ -147,7 +147,6 @@ const config: HardhatUserConfig = {
       "@enclave-e3/contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
       "@enclave-e3/contracts/contracts/registry/BondingRegistry.sol",
       "@enclave-e3/contracts/contracts/slashing/SlashingManager.sol",
-      "@enclave-e3/contracts/contracts/sortition/CommitteeSortition.sol",
       "@enclave-e3/contracts/contracts/token/EnclaveToken.sol",
       "@enclave-e3/contracts/contracts/token/EnclaveTicketToken.sol",
       "@enclave-e3/contracts/contracts/test/MockInputValidator.sol",
