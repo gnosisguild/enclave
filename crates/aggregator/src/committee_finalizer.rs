@@ -71,7 +71,7 @@ impl Handler<CommitteeRequested> for CommitteeFinalizer {
 
         let current_timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("System time should be after UNIX_EPOCH")
             .as_secs();
 
         let seconds_until_deadline = if submission_deadline > current_timestamp {
