@@ -12,19 +12,45 @@ pragma solidity >=0.8.27;
  * and coordinates committee selection for E3 computations
  */
 interface ICiphernodeRegistry {
-    /// @notice Struct representing a committee for an E3.
-    /// @param nodes Array of ciphernode addresses in the committee.
+    /// @notice Struct representing the sortition state for an E3 round.
+    /// @param initialized Whether the round has been initialized.
+    /// @param finalized Whether the round has been finalized.
+    /// @param requestBlock The block number when the committee was requested.
+    /// @param submissionDeadline The deadline for submitting tickets.
     /// @param threshold The M/N threshold for the committee ([M, N]).
     /// @param publicKey Hash of the committee's public key.
+    /// @param seed The seed for the round.
+    /// @param topNodes The top nodes in the round.
+    /// @param committee The committee for the round.
+    /// @param submitted Mapping of nodes to their submission status.
+    /// @param scoreOf Mapping of nodes to their scores.
     struct Committee {
-        address[] nodes;
-        uint32[2] threshold;
+        bool initialized;
+        bool finalized;
+        uint256 seed;
+        uint256 requestBlock;
+        uint256 submissionDeadline;
         bytes32 publicKey;
+        uint32[2] threshold;
+        address[] topNodes;
+        address[] committee;
+        mapping(address node => bool submitted) submitted;
+        mapping(address node => uint256 score) scoreOf;
     }
+
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
+    /// @param seed Random seed for score computation.
     /// @param threshold The M/N threshold for the committee.
-    event CommitteeRequested(uint256 indexed e3Id, uint32[2] threshold);
+    /// @param requestBlock Block number for snapshot validation.
+    /// @param submissionDeadline Deadline for submitting tickets.
+    event CommitteeRequested(
+        uint256 indexed e3Id,
+        uint256 seed,
+        uint32[2] threshold,
+        uint256 requestBlock,
+        uint256 submissionDeadline
+    );
 
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
@@ -94,11 +120,15 @@ interface ICiphernodeRegistry {
     /// @notice Initiates the committee selection process for a specified E3.
     /// @dev This function MUST revert when not called by the Enclave contract.
     /// @param e3Id ID of the E3 for which to select the committee.
+    /// @param seed Random seed for score computation.
     /// @param threshold The M/N threshold for the committee.
+    /// @param submissionWindow The submission window for the E3 sortition in seconds.
     /// @return success True if committee selection was successfully initiated.
     function requestCommittee(
         uint256 e3Id,
-        uint32[2] calldata threshold
+        uint256 seed,
+        uint32[2] calldata threshold,
+        uint256 submissionWindow
     ) external returns (bool success);
 
     /// @notice Publishes the public key resulting from the committee selection process.

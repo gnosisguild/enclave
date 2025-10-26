@@ -14,9 +14,8 @@ use std::fmt::{self, Display};
 pub struct TicketSubmitted {
     pub e3_id: E3id,
     pub node: String,
-    pub ticket_number: u64,
+    pub ticket_id: u64,
     pub score: String,
-    pub added_to_committee: bool,
     pub chain_id: u64,
 }
 

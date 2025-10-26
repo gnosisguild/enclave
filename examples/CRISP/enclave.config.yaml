@@ -15,7 +15,7 @@ chains:
         address: "0x0165878A594ca255338adfa4d48449f69242Eb8F"
         deploy_block: 1 # Set to actual deploy block
       committee_sortition:
-        address: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+        address: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
         deploy_block: 1 # Set to actual deploy block
 
 program:

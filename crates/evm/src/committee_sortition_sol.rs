@@ -9,14 +9,13 @@ use actix::prelude::*;
 use alloy::{
     primitives::{Address, LogData, B256, U256},
     providers::{Provider, WalletProvider},
-    rpc::types::TransactionReceipt,
     sol,
     sol_types::SolEvent,
 };
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{BusError, E3id, EnclaveErrorType, EnclaveEvent, EventBus, Shutdown, Subscribe};
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 
 sol!(
     #[sol(rpc)]
@@ -32,9 +31,8 @@ impl From<TicketSubmittedWithChainId> for e3_events::TicketSubmitted {
         e3_events::TicketSubmitted {
             e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
             node: value.0.node.to_string(),
-            ticket_number: value.0.ticketNumber.try_into().unwrap_or(0),
+            ticket_id: value.0.ticketId.try_into().unwrap_or(0),
             score: value.0.score.to_string(),
-            added_to_committee: value.0.addedToCommittee,
             chain_id: value.1,
         }
     }
@@ -131,65 +129,32 @@ impl CommitteeSortitionSolReader {
 
 /// Writer for CommitteeSortition contract
 pub struct CommitteeSortitionSolWriter<P> {
+    bus: Addr<EventBus<EnclaveEvent>>,
     provider: EthProvider<P>,
     contract_address: Address,
-    bus: Addr<EventBus<EnclaveEvent>>,
+    is_aggregator: bool,
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> CommitteeSortitionSolWriter<P> {
-    pub fn new(
+    pub async fn attach_with_finalizer(
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: Address,
-    ) -> Result<Self> {
-        Ok(Self {
+        is_aggregator: bool,
+    ) -> Result<Addr<Self>> {
+        let writer = Self {
+            bus: bus.clone(),
             provider,
             contract_address,
-            bus: bus.clone(),
-        })
-    }
+            is_aggregator,
+        }
+        .start();
 
-    pub async fn attach(
-        bus: &Addr<EventBus<EnclaveEvent>>,
-        provider: EthProvider<P>,
-        contract_address: &str,
-    ) -> Result<Addr<CommitteeSortitionSolWriter<P>>> {
-        let addr =
-            CommitteeSortitionSolWriter::new(bus, provider, contract_address.parse()?)?.start();
-
-        bus.send(Subscribe::new("CiphernodeSelected", addr.clone().into()))
+        bus.send(Subscribe::new("E3Requested", writer.clone().recipient()))
             .await?;
 
-        bus.send(Subscribe::new("Shutdown", addr.clone().into()))
-            .await?;
-
-        Ok(addr)
+        Ok(writer)
     }
-
-    async fn submit_ticket(&self, e3_id: E3id, ticket_number: u64) -> Result<TransactionReceipt> {
-        let e3_id_u256: U256 = e3_id.clone().try_into()?;
-        let ticket_number_u256 = U256::from(ticket_number);
-
-        let from_address = self.provider.provider().default_signer_address();
-        let current_nonce = self
-            .provider
-            .provider()
-            .get_transaction_count(from_address)
-            .pending()
-            .await?;
-
-        let contract = CommitteeSortition::new(self.contract_address, self.provider.provider());
-        let builder = contract
-            .submitTicket(e3_id_u256, ticket_number_u256)
-            .nonce(current_nonce);
-
-        let receipt = builder.send().await?.get_receipt().await?;
-        Ok(receipt)
-    }
-}
-
-impl<P: Provider + WalletProvider + Clone + 'static> Actor for CommitteeSortitionSolWriter<P> {
-    type Context = actix::Context<Self>;
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
@@ -201,6 +166,16 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
         match msg {
             EnclaveEvent::CiphernodeSelected { data, .. } => {
                 ctx.notify(data);
+            }
+            EnclaveEvent::E3Requested { data, .. } => {
+                if self.enable_finalizer {
+                    ctx.notify(data);
+                }
+            }
+            EnclaveEvent::CommitteeFinalized { data, .. } => {
+                if self.enable_finalizer {
+                    ctx.notify(data);
+                }
             }
             EnclaveEvent::Shutdown { data, .. } => {
                 ctx.notify(data);
@@ -249,8 +224,14 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<e3_events::Cipherno
                 node_address, ticket, e3_id
             );
 
-            let writer = CommitteeSortitionSolWriter::new(&bus, provider.clone(), contract_address)
-                .expect("Failed to create writer");
+            let writer = CommitteeSortitionSolWriter::new(
+                &bus,
+                provider.clone(),
+                contract_address,
+                false,
+                60,
+            )
+            .expect("Failed to create writer");
 
             match writer.submit_ticket(e3_id.clone(), ticket).await {
                 Ok(receipt) => {
@@ -268,6 +249,40 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<e3_events::Cipherno
     }
 }
 
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<e3_events::E3Requested>
+    for CommitteeSortitionSolWriter<P>
+{
+    type Result = ();
+
+    fn handle(&mut self, data: e3_events::E3Requested, ctx: &mut Self::Context) -> Self::Result {
+        info!(
+            "E3Requested for E3 {:?}, scheduling committee finalization",
+            data.e3_id
+        );
+        self.schedule_finalization(data.e3_id, ctx);
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<e3_events::CommitteeFinalized>
+    for CommitteeSortitionSolWriter<P>
+{
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        data: e3_events::CommitteeFinalized,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        // Remove from pending tracking since it's already finalized
+        if self.pending_e3s.remove(&data.e3_id).is_some() {
+            info!(
+                "CommitteeFinalized received for E3 {:?}, removed from pending",
+                data.e3_id
+            );
+        }
+    }
+}
+
 impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
     for CommitteeSortitionSolWriter<P>
 {
@@ -282,6 +297,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
 pub struct CommitteeSortitionSol;
 
 impl CommitteeSortitionSol {
+    /// Attach reader and writer (no automatic finalization)
     pub async fn attach<P>(
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
@@ -289,6 +305,32 @@ impl CommitteeSortitionSol {
         repository: &Repository<EvmEventReaderState>,
         start_block: Option<u64>,
         rpc_url: String,
+    ) -> Result<Addr<CommitteeSortitionSolWriter<P>>>
+    where
+        P: Provider + WalletProvider + Clone + 'static,
+    {
+        Self::attach_with_finalizer(
+            bus,
+            provider,
+            contract_address,
+            repository,
+            start_block,
+            rpc_url,
+            false,
+        )
+        .await
+    }
+
+    /// Attach reader and writer with optional automatic committee finalization
+    /// The submission window is automatically fetched from the contract
+    pub async fn attach_with_finalizer<P>(
+        bus: &Addr<EventBus<EnclaveEvent>>,
+        provider: EthProvider<P>,
+        contract_address: &str,
+        repository: &Repository<EvmEventReaderState>,
+        start_block: Option<u64>,
+        rpc_url: String,
+        enable_finalizer: bool,
     ) -> Result<Addr<CommitteeSortitionSolWriter<P>>>
     where
         P: Provider + WalletProvider + Clone + 'static,
@@ -303,7 +345,13 @@ impl CommitteeSortitionSol {
         )
         .await?;
 
-        let writer = CommitteeSortitionSolWriter::attach(bus, provider, contract_address).await?;
+        let writer = CommitteeSortitionSolWriter::attach_with_finalizer(
+            bus,
+            provider,
+            contract_address,
+            enable_finalizer,
+        )
+        .await?;
 
         Ok(writer)
     }

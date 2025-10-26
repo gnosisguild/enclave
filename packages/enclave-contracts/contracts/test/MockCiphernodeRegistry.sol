@@ -10,6 +10,7 @@ import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
 contract MockCiphernodeRegistry is ICiphernodeRegistry {
     function requestCommittee(
         uint256,
+        uint256,
         uint32[2] calldata
     ) external pure returns (bool success) {
         success = true;
@@ -76,6 +77,7 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
 
 contract MockCiphernodeRegistryEmptyKey is ICiphernodeRegistry {
     function requestCommittee(
+        uint256,
         uint256,
         uint32[2] calldata
     ) external pure returns (bool success) {

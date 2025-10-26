@@ -66,8 +66,7 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes;
 
     /// @notice Maps E3 ID to its committee data
-    mapping(uint256 e3Id => ICiphernodeRegistry.Committee committee)
-        public committees;
+    mapping(uint256 e3Id => Committee committee) public committees;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -83,6 +82,33 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
 
     /// @notice Committee has not been published yet for this E3
     error CommitteeNotPublished();
+
+    /// @notice Committee has not been requested yet for this E3
+    error CommitteeNotRequested();
+
+    /// @notice Submission Window Not valid for this E3
+    error SubmissionWindowNotValid();
+
+    /// @notice Submission Window has been closed for this E3
+    error SubmissionWindowClosed();
+
+    /// @notice Submission deadline has been reached for this E3
+    error SubmissionDeadlineReached();
+
+    /// @notice Committee has already been finalized for this E3
+    error CommitteeAlreadyFinalized();
+
+    /// @notice Committee has not been finalized yet for this E3
+    error CommitteeNotFinalized();
+
+    /// @notice Node has already submitted a ticket for this E3
+    error NodeAlreadySubmitted();
+
+    /// @notice Node has not submitted a ticket for this E3
+    error NodeNotSubmitted();
+
+    /// @notice Node is not eligible for this E3
+    error NodeNotEligible();
 
     /// @notice Ciphernode is not enabled in the registry
     /// @param node Address of the ciphernode
@@ -175,29 +201,28 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @inheritdoc ICiphernodeRegistry
     function requestCommittee(
         uint256 e3Id,
-        uint32[2] calldata threshold
+        uint256 seed,
+        uint32[2] calldata threshold,
+        uint256 submissionWindow
     ) external onlyEnclave returns (bool success) {
-        require(
-            committees[e3Id].threshold[1] == 0,
-            CommitteeAlreadyRequested()
-        );
-        require(committeeSortition != address(0), CommitteeSortitionNotSet());
+        Committee storage c = committees[e3Id];
+        require(!c.initialized, CommitteeAlreadyRequested());
 
-        committees[e3Id].threshold = threshold;
+        c.initialized = true;
+        c.finalized = false;
+        c.seed = seed;
+        c.requestBlock = block.number;
+        c.submissionDeadline = block.timestamp + submissionWindow;
+        c.threshold = threshold;
         roots[e3Id] = root();
 
-        // Initialize sortition in CommitteeSortition contract
-        // Get seed from Enclave contract (will be passed via E3Requested event)
-        // For now, we'll generate it here - note: should match E3.seed from Enclave
-        uint256 seed = uint256(keccak256(abi.encode(block.prevrandao, e3Id)));
-        CommitteeSortition(committeeSortition).initializeSortition(
+        emit CommitteeRequested(
             e3Id,
-            threshold[1], // Use N (total committee size)
             seed,
-            block.number
+            threshold,
+            c.requestBlock,
+            c.submissionDeadline
         );
-
-        emit CommitteeRequested(e3Id, threshold);
         success = true;
     }
 
@@ -213,29 +238,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     ) external onlyOwner {
         ICiphernodeRegistry.Committee storage committee = committees[e3Id];
         require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
-        committee.nodes = nodes;
-        bytes32 publicKeyHash = keccak256(publicKey);
-        committee.publicKey = publicKeyHash;
-        publicKeyHashes[e3Id] = publicKeyHash;
-        emit CommitteePublished(e3Id, nodes, publicKey);
-    }
-
-    /// @notice Finalizes committee from sortition and publishes it
-    /// @dev Can be called by anyone after sortition deadline. Gets committee from CommitteeSortition.
-    /// @param e3Id ID of the E3 computation
-    /// @param publicKey Aggregated public key of the committee
-    function finalizeAndPublishCommittee(
-        uint256 e3Id,
-        bytes calldata publicKey
-    ) external {
-        require(committeeSortition != address(0), CommitteeSortitionNotSet());
-        ICiphernodeRegistry.Committee storage committee = committees[e3Id];
-        require(committee.publicKey == bytes32(0), CommitteeAlreadyPublished());
-
-        // Finalize sortition and get committee
-        address[] memory nodes = CommitteeSortition(committeeSortition)
-            .finalizeCommittee(e3Id);
-
         committee.nodes = nodes;
         bytes32 publicKeyHash = keccak256(publicKey);
         committee.publicKey = publicKeyHash;
@@ -272,6 +274,39 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
         ciphernodes._remove(ciphernode, siblingNodes);
         numCiphernodes--;
         emit CiphernodeRemoved(node, index, numCiphernodes, ciphernodes.size);
+    }
+
+    ////////////////////////////////////////////////////////////
+    //                                                        //
+    //                   Sortition Functions                  //
+    //                                                        //
+    ////////////////////////////////////////////////////////////
+
+    /// @inheritdoc ICiphernodeRegistry
+    function submitTicket(
+        uint256 e3Id,
+        uint256 ticketId,
+        uint256 score
+    ) external {
+        Committee storage c = committees[e3Id];
+        require(!r.initialized || r.finalized, CommitteeNotRequested());
+        require(
+            block.timestamp <= c.submissionDeadline,
+            SubmissionDeadlineReached()
+        );
+
+        if (!isOpen(e3Id)) revert SubmissionWindowClosed();
+        if (!IBondingRegistry(bondingRegistry).isActive(msg.sender))
+            revert NodeNotEligible();
+        if (r.submitted[msg.sender]) revert NodeAlreadySubmitted();
+
+        r.submitted[msg.sender] = true;
+        r.scoreOf[msg.sender] = score;
+
+        // insert into top-N (ascending score)
+        _insertTopN(r, msg.sender, score);
+
+        emit TicketSubmitted(e3Id, msg.sender, ticketId, score);
     }
 
     ////////////////////////////////////////////////////////////

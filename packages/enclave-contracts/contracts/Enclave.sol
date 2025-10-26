@@ -58,6 +58,11 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @dev Incremented after each successful E3 request.
     uint256 public nexte3Id;
 
+    /// @notice Submission Window for an E3 Sortition.
+    /// @dev The submission window is the time period during which the ciphernodes can submit
+    /// their tickets to be a part of the committee.
+    uint256 public sortitionSubmissionWindow;
+
     /// @notice Mapping of allowed E3 Programs.
     /// @dev Only enabled E3 Programs can be used in computation requests.
     mapping(IE3Program e3Program => bool allowed) public e3Programs;
@@ -203,6 +208,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _bondingRegistry The address of the Bonding Registry contract.
     /// @param _feeToken The address of the ERC20 token used for E3 fees.
     /// @param _maxDuration The maximum duration of a computation in seconds.
+    /// @param _sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
     /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
     constructor(
         address _owner,
@@ -210,6 +216,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         IBondingRegistry _bondingRegistry,
         IERC20 _feeToken,
         uint256 _maxDuration,
+        uint256 _sortitionSubmissionWindow,
         bytes[] memory _e3ProgramsParams
     ) {
         initialize(
@@ -218,6 +225,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
             _bondingRegistry,
             _feeToken,
             _maxDuration,
+            _sortitionSubmissionWindow,
             _e3ProgramsParams
         );
     }
@@ -229,6 +237,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
     /// @param _bondingRegistry The address of the Bonding Registry contract.
     /// @param _feeToken The address of the ERC20 token used for E3 fees.
     /// @param _maxDuration The maximum duration of a computation in seconds.
+    /// @param _sortitionSubmissionWindow The submission window for the E3 sortition in seconds.
     /// @param _e3ProgramsParams Array of ABI encoded E3 encryption scheme parameters sets (e.g., for BFV).
     function initialize(
         address _owner,
@@ -236,6 +245,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         IBondingRegistry _bondingRegistry,
         IERC20 _feeToken,
         uint256 _maxDuration,
+        uint256 _sortitionSubmissionWindow,
         bytes[] memory _e3ProgramsParams
     ) public initializer {
         __Ownable_init(msg.sender);
@@ -243,6 +253,7 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         setCiphernodeRegistry(_ciphernodeRegistry);
         setBondingRegistry(_bondingRegistry);
         setFeeToken(_feeToken);
+        setSortitionSubmissionWindow(_sortitionSubmissionWindow);
         setE3ProgramsParams(_e3ProgramsParams);
         if (_owner != owner()) transferOwnership(_owner);
     }
@@ -329,7 +340,12 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         feeToken.safeTransferFrom(msg.sender, address(this), e3Fee);
 
         require(
-            ciphernodeRegistry.requestCommittee(e3Id, requestParams.threshold),
+            ciphernodeRegistry.requestCommittee(
+                e3Id,
+                seed,
+                requestParams.threshold,
+                sortitionSubmissionWindow
+            ),
             CommitteeSelectionFailed()
         );
 
@@ -502,6 +518,15 @@ contract Enclave is IEnclave, OwnableUpgradeable {
         maxDuration = _maxDuration;
         success = true;
         emit MaxDurationSet(_maxDuration);
+    }
+
+    /// @inheritdoc IEnclave
+    function setSortitionSubmissionWindow(
+        uint256 _sortitionSubmissionWindow
+    ) public onlyOwner returns (bool success) {
+        sortitionSubmissionWindow = _sortitionSubmissionWindow;
+        success = true;
+        emit SortitionSubmissionWindowSet(_sortitionSubmissionWindow);
     }
 
     /// @inheritdoc IEnclave

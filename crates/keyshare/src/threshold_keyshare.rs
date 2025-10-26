@@ -9,9 +9,9 @@ use anyhow::{anyhow, bail, Result};
 use e3_crypto::{Cipher, SensitiveBytes};
 use e3_data::Persistable;
 use e3_events::{
-    CiphernodeSelected, CiphertextOutputPublished, ComputeRequest, ComputeResponse,
-    DecryptionshareCreated, E3id, EnclaveEvent, EventBus, KeyshareCreated, PartyId, ThresholdShare,
-    ThresholdShareCreated,
+    CiphernodeSelected, CiphertextOutputPublished, CommitteeFinalized, ComputeRequest,
+    ComputeResponse, DecryptionshareCreated, E3id, EnclaveEvent, EventBus, KeyshareCreated,
+    PartyId, ThresholdShare, ThresholdShareCreated,
 };
 use e3_fhe::create_crp;
 use e3_multithread::Multithread;
@@ -281,6 +281,8 @@ pub struct ThresholdKeyshare {
     decryption_key_collector: Option<Addr<ThresholdShareCollector>>,
     multithread: Addr<Multithread>,
     state: Persistable<ThresholdKeyshareState>,
+    /// Store pending E3 selections waiting for committee finalization (for score sortition)
+    pending_selections: HashMap<E3id, CiphernodeSelected>,
 }
 
 impl ThresholdKeyshare {
@@ -291,6 +293,7 @@ impl ThresholdKeyshare {
             decryption_key_collector: None,
             multithread: params.multithread,
             state: params.state,
+            pending_selections: HashMap::new(),
         }
     }
 }
@@ -755,6 +758,7 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
     fn handle(&mut self, msg: EnclaveEvent, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             EnclaveEvent::CiphernodeSelected { data, .. } => ctx.notify(data),
+            EnclaveEvent::CommitteeFinalized { data, .. } => ctx.notify(data),
             EnclaveEvent::CiphertextOutputPublished { data, .. } => ctx.notify(data),
             EnclaveEvent::ThresholdShareCreated { data, .. } => {
                 let _ = self.handle_threshold_share_created(data, ctx.address());
@@ -767,9 +771,60 @@ impl Handler<EnclaveEvent> for ThresholdKeyshare {
 impl Handler<CiphernodeSelected> for ThresholdKeyshare {
     type Result = ();
     fn handle(&mut self, msg: CiphernodeSelected, ctx: &mut Self::Context) -> Self::Result {
+        // Store selection for potential committee finalization
+        self.pending_selections
+            .insert(msg.e3_id.clone(), msg.clone());
+
+        // Start keygen immediately (for distance sortition or if no CommitteeFinalized comes)
+        // If CommitteeFinalized arrives later, it will verify committee membership
         match self.handle_ciphernode_selected(msg, ctx.address()) {
             Err(e) => error!("{e}"),
             Ok(_) => (),
+        }
+    }
+}
+
+impl Handler<CommitteeFinalized> for ThresholdKeyshare {
+    type Result = ();
+    fn handle(&mut self, msg: CommitteeFinalized, _: &mut Self::Context) -> Self::Result {
+        // Check if we have a pending selection for this E3
+        let Some(_selection) = self.pending_selections.get(&msg.e3_id) else {
+            info!(
+                "CommitteeFinalized for E3 {:?} but no pending selection found",
+                msg.e3_id
+            );
+            return;
+        };
+
+        // Get our node address from state
+        let Some(state) = self.state.get() else {
+            error!("State not found when handling CommitteeFinalized");
+            return;
+        };
+
+        // Check if we're in the finalized committee
+        let our_address = state.address.to_lowercase();
+        let in_committee = msg
+            .committee
+            .iter()
+            .any(|addr| addr.to_lowercase() == our_address);
+
+        if in_committee {
+            info!(
+                "Node {} is in finalized committee for E3 {:?}, keygen already started",
+                our_address, msg.e3_id
+            );
+            // Keygen already started in CiphernodeSelected handler
+            // Clean up pending selection
+            self.pending_selections.remove(&msg.e3_id);
+        } else {
+            info!(
+                "Node {} was selected but NOT in finalized committee for E3 {:?}",
+                our_address, msg.e3_id
+            );
+            // TODO: Should we stop/cancel the keygen that was started?
+            // For now, just remove from pending
+            self.pending_selections.remove(&msg.e3_id);
         }
     }
 }

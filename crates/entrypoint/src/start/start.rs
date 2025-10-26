@@ -42,6 +42,7 @@ pub async fn execute(
         .with_chains(&config.chains())
         .with_contract_enclave_reader()
         .with_contract_ciphernode_registry()
+        .with_contract_committee_sortition()
         .build()
         .await?;
 
