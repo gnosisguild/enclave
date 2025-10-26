@@ -11,12 +11,11 @@
 !crates/*/src/**/*.rs
 
 # Allow packages
-!packages/*/enclave-contracts/**/*
 !crates/*/package.json
 !packages/**/*
 !pnpm-workspace.yaml
 !pnpm-lock.yaml
-!rust-toolchain.yaml
+!rust-toolchain.toml
 
 # Explicitly ignore build artifacts everywhere
 target/
