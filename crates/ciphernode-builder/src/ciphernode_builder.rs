@@ -67,7 +67,6 @@ pub struct ContractComponents {
     enclave: bool,
     ciphernode_registry: bool,
     bonding_registry: bool,
-    committee_sortition: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -217,13 +216,6 @@ impl CiphernodeBuilder {
         self.contract_components.bonding_registry = true;
         self
     }
-
-    /// Setup a writable CommitteeSortition for every evm chain provided
-    pub fn with_contract_committee_sortition(mut self) -> Self {
-        self.contract_components.committee_sortition = true;
-        self
-    }
-
     /// Setup a CiphernodeRegistry listener for every evm chain provided
     pub fn with_contract_ciphernode_registry(mut self) -> Self {
         self.contract_components.ciphernode_registry = true;

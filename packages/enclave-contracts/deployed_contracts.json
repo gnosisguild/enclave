@@ -90,15 +90,6 @@
       },
       "blockNumber": 9479398,
       "address": "0xD461aeA2c84D3fD7D4B0E83E0035446f5A741d61"
-    },
-    "CommitteeSortition": {
-      "constructorArgs": {
-        "bondingRegistry": "0xD461aeA2c84D3fD7D4B0E83E0035446f5A741d61",
-        "ciphernodeRegistry": "0xEC98074C1F64f820f897842d266e1091A0f47Ad8",
-        "submissionWindow": "300"
-      },
-      "blockNumber": 9479400,
-      "address": "0xB48207B7faAf3504025552ba2db43d3b4aD74E04"
     }
   },
   "hardhat": {

@@ -65,10 +65,6 @@ impl StoreKeys {
         format!("//evm_readers/bonding_registry/{chain_id}")
     }
 
-    pub fn committee_sortition_reader(chain_id: u64) -> String {
-        format!("//evm_readers/committee_sortition/{chain_id}")
-    }
-
     pub fn node_state() -> String {
         String::from("//node_state")
     }
