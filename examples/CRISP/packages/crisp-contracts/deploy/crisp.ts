@@ -8,10 +8,9 @@
 import { readDeploymentArgs, storeDeploymentArgs } from "@enclave-e3/contracts/scripts";
 import { Enclave__factory as EnclaveFactory } from "@enclave-e3/contracts/types";
 
+import { execSync } from "child_process";
 import hre from "hardhat";
 
-const CONTROL_ROOT = "0xa54dc85ac99f851c92d7c96d7318af41dbe7c0194edfcc37eb4d422a998c1f56"
-const BN254_CONTROL_ID = "0x04446e66d300eb7fb45c9726bb53c793dda407a62e9601618bb43c5c14657ac0"
 const IMAGE_ID = "0x23734b77b0f76e85623a88d7a82f24c34c94834f2501964ea123b7a2027013a2"
 
 export const deployCRISPContracts = async () => {
@@ -22,6 +21,8 @@ export const deployCRISPContracts = async () => {
 
     const useMockVerifier = Boolean(process.env.USE_MOCK_VERIFIER) ?? false;
     const useMockInputValidator = Boolean(process.env.USE_MOCK_INPUT_VALIDATOR) ?? false;
+
+    console.log("useMockVerifier", useMockVerifier)
 
     const verifier = await deployVerifier(useMockVerifier)
 
@@ -82,7 +83,7 @@ export const deployCRISPContracts = async () => {
         Deployments:
         ----------------------------------------------------------------------
         Enclave: ${enclaveAddress}
-        Verifier: ${verifier}
+        Risc0Verifier: ${verifier}
         InputValidator: ${inputValidator}
         CRISPInputValidatorFactory: ${crispInputValidatorFactoryAddress}
         HonkVerifier: ${honkVerifierAddress}
@@ -105,20 +106,18 @@ export const deployVerifier = async (useMockVerifier: boolean): Promise<string> 
             console.log("RiscZeroGroth16Verifier already deployed at:", existingVerifier.address);
             return existingVerifier.address;
         }
-        
-        const verifierFactory = await ethers.getContractFactory("RiscZeroGroth16Verifier");
-        const verifier = await verifierFactory.deploy(CONTROL_ROOT, BN254_CONTROL_ID);
-        const address = await verifier.getAddress();
 
+        const verifierFactory = await ethers.getContractFactory("RiscZeroGroth16Verifier");
+        const verifier = await verifierFactory.deploy();
+        await verifier.waitForDeployment();
+
+        const address = await verifier.getAddress();
+        
         storeDeploymentArgs({
             address,
-            constructorArgs: {
-                controlRoot: CONTROL_ROOT,
-                controlId: BN254_CONTROL_ID
-            }
-        }, "RiscZeroGroth16Verifier", hre.globalOptions.network);
+        }, "RiscZeroGroth16Verifier", chain);
 
-        return address
+        return address;
     }
 
     // Check if mock verifier already deployed
@@ -151,19 +150,19 @@ export const deployInputValidator = async (useMockInputValidator: boolean): Prom
 
     if (useMockInputValidator) {
         // Check if mock input validator already deployed
-        const existingMockInputValidator = readDeploymentArgs("MockInputValidator", chain);
+        const existingMockInputValidator = readDeploymentArgs("MockCRISPInputValidator", chain);
         if (existingMockInputValidator?.address) {
             console.log("MockInputValidator already deployed at:", existingMockInputValidator.address);
             return existingMockInputValidator.address;
         }
 
-        const mockInputValidatorFactory = await ethers.getContractFactory("MockInputValidator");
+        const mockInputValidatorFactory = await ethers.getContractFactory("MockCRISPInputValidator");
         const mockInputValidator = await mockInputValidatorFactory.deploy();
         const address = await mockInputValidator.getAddress();
 
         storeDeploymentArgs({
             address,
-        }, "MockInputValidator", hre.globalOptions.network);
+        }, "MockCRISPInputValidator", hre.globalOptions.network);
 
         return address;
     }

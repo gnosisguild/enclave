@@ -33,6 +33,6 @@ concurrently \
   -ks first \
   --names "ANVIL,DEPLOY,NODES" \
   --prefix-colors "blue,green,yellow" \
-  "pnpm hardhat node" \
+  "cd packages/crisp-contracts && pnpm hardhat node" \
   "./scripts/crisp_deploy.sh && ./scripts/dev_services.sh"
 

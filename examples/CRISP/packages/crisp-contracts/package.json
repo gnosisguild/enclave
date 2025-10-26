@@ -1,0 +1,56 @@
+{
+  "name": "@enclave/crisp-contracts",
+  "version": "0.0.1",
+  "type": "module",
+  "files": [
+    "contracts/**/*.sol"
+  ],
+  "author": {
+    "name": "gnosisguild",
+    "url": "https://github.com/gnosisguild"
+  },
+  "scripts": {
+    "compile": "hardhat compile",
+    "ciphernode:add": "hardhat ciphernode:add",
+    "clean:deployments": "hardhat utils:clean-deployments",
+    "deploy:contracts": "hardhat run deploy/deploy.ts",
+    "deploy:contracts:full": "export DEPLOY_ENCLAVE=true && pnpm deploy:contracts",
+    "deploy:contracts:full:mock": "export DEPLOY_ENCLAVE=true && export USE_MOCK_VERIFIER=true && export USE_MOCK_INPUT_VALIDATOR=true && pnpm deploy:contracts",
+    "test": "hardhat test tests/crisp.contracts.test.ts --network localhost",
+    "verify": "hardhat run deploy/verify.ts"
+  },
+  "dependencies": {
+    "@enclave-e3/contracts": "workspace:*",
+    "@excubiae/contracts": "^0.4.0",
+    "@zk-kit/lean-imt.sol": "2.0.0",
+    "poseidon-solidity": "^0.0.5",
+    "solady": "^0.1.13"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "4",
+    "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "3",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "3.0.0",
+    "@nomicfoundation/hardhat-typechain": "3",
+    "@nomicfoundation/hardhat-verify": "^3.0.1",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "@types/node": "^22.18.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.15.0",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.4",
+    "hardhat": "^3.0.1",
+    "hardhat-deploy": "^0.12.4",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.1",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.0",
+    "typescript": "5.8.3",
+    "viem": "2.30.6"
+  },
+  "packageManager": "pnpm@10.7.1+sha512.2d92c86b7928dc8284f53494fb4201f983da65f0fb4f0d40baafa5cf628fa31dae3e5968f12466f17df7e97310e30f343a648baea1b9b350685dafafffdf5808"
+}

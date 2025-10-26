@@ -6,7 +6,7 @@
 
 import { CRISP_SERVER_TOKEN_TREE_ENDPOINT } from './constants'
 
-import ERC20Votes from './artifacts/ERC20Votes.json'
+import ERC20Votes from './ERC20Votes.json'
 import { createPublicClient, http } from 'viem'
 import { localhost, sepolia } from 'viem/chains'
 

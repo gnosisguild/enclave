@@ -13,6 +13,7 @@ import hardhatEthersChaiMatchers from "@nomicfoundation/hardhat-ethers-chai-matc
 import hardhatNetworkHelpers from "@nomicfoundation/hardhat-network-helpers";
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 import hardhatTypechainPlugin from "@nomicfoundation/hardhat-typechain";
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 
 dotenv.config();
 
@@ -68,6 +69,7 @@ const config: HardhatUserConfig = {
     hardhatEthersChaiMatchers,
     hardhatNetworkHelpers,
     hardhatToolboxMochaEthersPlugin,
+    hardhatVerify,
   ],
   tasks: [
     cleanDeploymentsTask,
@@ -117,6 +119,14 @@ const config: HardhatUserConfig = {
   typechain: {
     outDir: "./types",
     tsNocheck: false,
+  },
+  verify: {
+    etherscan: {
+      apiKey: process.env.ETHERSCAN_API_KEY || "",
+    },
+    blockscout: {
+      enabled: false,
+    },
   },
   solidity: {
     version: "0.8.28",

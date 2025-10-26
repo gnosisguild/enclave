@@ -13,26 +13,12 @@ import {IVerifier} from "../CRISPVerifier.sol";
 /// @title MockCRISPInputValidator.
 /// @notice Mock Enclave Input Validator
 contract MockCRISPInputValidator is IInputValidator, Clone {
-    /// @notice The policy that will be used to validate the input.
-    IBasePolicy internal policy;
-
-    /// @notice The verifier that will be used to validate the input.
-    IVerifier internal noirVerifier;
-
     /// @notice The error emitted when the input data is empty.
     error EmptyInputData();
-    /// @notice The error emitted when the input data is invalid.
-    error InvalidInputData(bytes reason);
-    /// @notice The error emitted when the Noir proof is invalid.
-    error InvalidNoirProof();
 
     /// @notice Initializes the contract with appended bytes data for configuration.
     function _initialize() internal virtual override(Clone) {
         super._initialize();
-
-        (address policyAddr, address verifierAddr) = abi.decode(_getAppendedBytes(), (address, address));
-        policy = IBasePolicy(policyAddr);
-        noirVerifier = IVerifier(verifierAddr);
     }
 
     /// @notice Validates input

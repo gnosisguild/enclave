@@ -17,7 +17,8 @@ services:
       - root-node-modules:/app/node_modules
       - client-node-modules:/app/examples/CRISP/client/node_modules
       - crisp-node-modules:/app/examples/CRISP/node_modules
-      - crisp-foundry-cache:/app/examples/CRISP/out
+      - crisp-contracts-node-modules:/app/examples/CRISP/packages/crisp-contracts/node_modules
+      - crisp-foundry-cache:/app/examples/CRISP/packages/crisp-contracts/out
       - synpress-cache:/app/examples/CRISP/.cache-synpress
       - test-results:/app/examples/CRISP/test-results
       - playwright-report:/app/examples/CRISP/playwright-report
@@ -43,6 +44,7 @@ volumes:
   root-node-modules:
   client-node-modules:
   crisp-node-modules:
+  crisp-contracts-node-modules:
   crisp-foundry-cache:
   git-folder:
   synpress-cache:

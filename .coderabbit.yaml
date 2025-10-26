@@ -7,4 +7,4 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    base_branches: ["main", dev"]
+    base_branches: ["main", "dev"]
