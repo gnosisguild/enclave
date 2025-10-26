@@ -11,7 +11,7 @@ use anyhow::Result;
 use e3_events::CorrelationId;
 use e3_utils::ArcBytes;
 use libp2p::gossipsub::TopicHash;
-use libp2p::kad::{self, GetRecordOk, QueryId, QueryResult};
+use libp2p::kad::{self, GetRecordOk, ProgressStep, QueryId, QueryResult};
 use libp2p::{
     connection_limits::{self, ConnectionLimits},
     futures::StreamExt,
@@ -154,7 +154,7 @@ impl NetInterface {
                     };
                     match result {
                         Ok(_) => (),
-                        Err(e) => error!("NetCommand Error: {e}")
+                        Err(e) => error!("Error processing NetCommand: {e}")
                     }
                 }
 
@@ -163,7 +163,11 @@ impl NetInterface {
                     if shutdown_flag.load(Ordering::Relaxed){
                         continue; // Ignore new events during shutdown
                     }
-                    process_swarm_event(&mut self.swarm, &event_tx, &mut correlator, event).await?
+                    let result =  process_swarm_event(&mut self.swarm, &event_tx, &mut correlator, event).await;
+                    match result {
+                        Ok(_) => (),
+                        Err(e) => error!("Error processing NetEvent: {e}")
+                    }
                 }
             }
         }
@@ -237,7 +241,10 @@ fn handle_put_record(
         .put_record(record, Quorum::One)
     {
         Ok(query_id) => {
-            debug!("PUT RECORD OK {:?}", query_id);
+            info!(
+                "PUT RECORD OK query_id={:?} correlation_id={}",
+                query_id, correlation_id
+            );
             correlator.track(query_id, correlation_id);
         }
         Err(error) => {
@@ -268,9 +275,13 @@ fn handle_get_record(
     // be that this will only ever return after some amount of time
     // I could not see a way to specify your own QueryId so we have to
     // track with the correlator
-    correlator.track(query_id, correlation_id);
 
-    trace!("get_record sent {:?}", query_id);
+    correlator.track(query_id, correlation_id);
+    info!(
+        "GET RECORD CORRELATED! query_id={:?} correlation_id={}",
+        query_id, correlation_id
+    );
+
     Ok(())
 }
 
@@ -349,20 +360,23 @@ fn create_behaviour(
             .with_interval(Duration::from_secs(60)),
     );
 
-    let message_id_fn = |message: &gossipsub::Message| {
-        let mut s = DefaultHasher::new();
-        message.data.hash(&mut s);
-        gossipsub::MessageId::from(s.finish().to_string())
-    };
+    // THIS WAS MEANT TO DEDUPLICATE EVENTS BUT DO WE WANT TO ACTUALLY DO THIS? (makes test sync
+    // harder)
+    // let message_id_fn = |message: &gossipsub::Message| {
+    //     let mut s = DefaultHasher::new();
+    //     message.data.hash(&mut s);
+    //     gossipsub::MessageId::from(s.finish().to_string())
+    // };
 
     let gossipsub_config = gossipsub::ConfigBuilder::default()
+        .heartbeat_initial_delay(Duration::from_millis(100))
         .heartbeat_interval(Duration::from_secs(10))
         .validation_mode(gossipsub::ValidationMode::Strict)
         .mesh_n(mesh_params.mesh_n) // D: Sweet spot for redundancy vs overhead
         .mesh_n_low(mesh_params.mesh_n_low) // D_low: Trigger grafting
         .mesh_n_high(mesh_params.mesh_n_high) // D_high: Trigger pruning
         .mesh_outbound_min(mesh_params.mesh_outbound_min) // Min outbound connections
-        .message_id_fn(message_id_fn)
+        // .message_id_fn(message_id_fn)
         .build()
         .map_err(|msg| Error::new(std::io::ErrorKind::Other, msg))?;
 
@@ -406,9 +420,7 @@ async fn process_swarm_event(
                 .kademlia
                 .add_address(&peer_id, remote_addr.clone());
 
-            trace!("Added address to kademlia {}", remote_addr);
-            swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-            trace!("Added peer to gossipsub {}", remote_addr);
+            info!("Added address to kademlia {}", remote_addr);
             event_tx.send(NetEvent::ConnectionEstablished { connection_id })?;
         }
 
@@ -417,7 +429,7 @@ async fn process_swarm_event(
             error,
             connection_id,
         } => {
-            warn!("Failed to dial {peer_id:?}: {error}");
+            error!("Failed to dial {peer_id:?}: {error}");
             event_tx.send(NetEvent::OutgoingConnectionError {
                 connection_id,
                 error: Arc::new(error),
@@ -425,29 +437,60 @@ async fn process_swarm_event(
         }
 
         SwarmEvent::IncomingConnectionError { error, .. } => {
-            warn!("{:#}", anyhow::Error::from(error))
+            error!("IncomingConnectionError: {:#}", anyhow::Error::from(error))
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
             kad::Event::OutboundQueryProgressed {
                 id,
-                result: QueryResult::GetRecord(Ok(GetRecordOk::FoundRecord(peer_record))),
+                result: QueryResult::GetRecord(result),
+                step,
                 ..
             },
-        )) => {
-            let key = Cid(peer_record.record.key.to_vec());
-            let correlation_id = correlator.expire(&id)?;
-            debug!(
-                "Received DHT record for key={} correlation_id={}",
-                key.to_string(),
-                correlation_id
-            );
-            event_tx.send(NetEvent::DhtGetRecordSucceeded {
-                key,
-                correlation_id,
-                value: ArcBytes::from_bytes(peer_record.record.value),
-            })?;
-        }
+        )) => match result {
+            Ok(GetRecordOk::FoundRecord(record)) => {
+                let key = Cid(record.record.key.to_vec());
+                let record_bytes = record.record.value;
+                let check_key = Cid::from_content(&record_bytes);
+                if check_key != key {
+                    // Perhaps we do something else here too? maybe this logic should be handled
+                    // upstream? Not sure...
+                    return Err(anyhow::anyhow!(format!(
+                        "Received record from peer {:?} but record was invalid ignoring.",
+                        record.peer
+                    )));
+                }
+
+                // As soon as we have a valid record we cancel the query because the record will be
+                // large and we can validate the value by hashing the content.
+                if let Some(mut query) = swarm.behaviour_mut().kademlia.query_mut(&id) {
+                    query.finish();
+                }
+
+                let correlation_id = correlator.expire(&id)?;
+                debug!(
+                    "Received valid DHT record for key={} correlation_id={}",
+                    key.to_string(),
+                    correlation_id
+                );
+
+                event_tx.send(NetEvent::DhtGetRecordSucceeded {
+                    key,
+                    correlation_id,
+                    value: ArcBytes::from_bytes(record_bytes),
+                })?;
+            }
+            Ok(GetRecordOk::FinishedWithNoAdditionalRecord { cache_candidates }) => {
+                trace!(
+                    "FinishedWithNoAdditionalRecord!! cache={:?} step={:?}",
+                    cache_candidates,
+                    step
+                );
+            }
+            Err(e) => {
+                error!("step={:?} error={}", step, e);
+            }
+        },
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
             kad::Event::OutboundQueryProgressed {
@@ -458,7 +501,7 @@ async fn process_swarm_event(
         )) => {
             let key = Cid(record.key.to_vec());
             let correlation_id = correlator.expire(&id)?;
-            debug!(
+            info!(
                 "Put DHT record for key={} correlation_id={}",
                 key.to_string(),
                 correlation_id
@@ -480,30 +523,18 @@ async fn process_swarm_event(
         }
 
         SwarmEvent::NewListenAddr { address, .. } => {
-            trace!("Local node is listening on {address}");
+            info!("Local node is listening on {address}");
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
             peer_id,
             topic,
         })) => {
-            trace!("Peer {} subscribed to {}", peer_id, topic);
+            info!("Peer {} subscribed to {}", peer_id, topic);
             let count = swarm.behaviour().gossipsub.mesh_peers(&topic).count();
             event_tx.send(NetEvent::GossipSubscribed { count, topic })?;
         }
 
-        SwarmEvent::Behaviour(NodeBehaviourEvent::Identify(event)) => {
-            if let identify::Event::Received {
-                connection_id,
-                peer_id,
-                info,
-            } = event
-            {
-                for addr in info.listen_addrs {
-                    swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
-                }
-            }
-        }
         _ => {}
     };
     Ok(())

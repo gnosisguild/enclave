@@ -23,9 +23,9 @@ FROM debian:bookworm-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    iptables ca-certificates && \
+    iptables ca-certificates iputils-ping netcat-traditional && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/debug/p2p_test .
 
-ENTRYPOINT ["/app/p2p_test"]
+# ENTRYPOINT ["/app/p2p_test"]

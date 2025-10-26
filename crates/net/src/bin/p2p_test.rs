@@ -4,101 +4,31 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use e3_events::CorrelationId;
 use e3_net::events::{GossipData, NetCommand, NetEvent};
 use e3_net::{Cid, MeshParams, NetInterface};
 use e3_utils::ArcBytes;
 use libp2p::gossipsub::IdentTopic;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
-use std::{collections::HashSet, env, process};
+use std::{env, process};
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
-use tracing::{debug, error, info};
+use tracing::info;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
-// So this is a simple test to test our networking configuration
-// Here we ensure we can send a gossipsub message to all connected nodes
-// Each node is assigned a name alice, bob or charlie and expects to receive the other two
-// names via gossipsub or the node will exit with an error code
-// We have a docker test harness that runs the nodes and blocks things like mdns ports to ensure
-// that basic discovery is working
-
-async fn test_gossip(peer: &mut TestPeer) -> Result<()> {
-    let topic = "test-topic";
-    let name = peer.name.clone();
-    println!("{} starting up", name);
-
-    // Send our message first
-    println!("{} sending message", name);
-    peer.tx
-        .send(NetCommand::GossipPublish {
-            correlation_id: CorrelationId::new(),
-            topic: topic.to_string(),
-            data: GossipData::GossipBytes(name.as_bytes().to_vec()),
-        })
-        .await?;
-    println!("{} message sent", name);
-
-    let expected: HashSet<String> = vec![
-        "alice".to_string(),
-        "bob".to_string(),
-        "charlie".to_string(),
-    ]
-    .into_iter()
-    .filter(|n| *n != name)
-    .collect();
-    println!("{} waiting for messages from: {:?}", name, expected);
-
-    // Then wait to receive from others with a timeout
-    let mut received = HashSet::new();
-
-    // Wrap the message receiving loop in a timeout
-    let receive_result = timeout(Duration::from_secs(10), async {
-        while received != expected {
-            match peer.rx.recv().await? {
-                NetEvent::GossipData(GossipData::GossipBytes(msg)) => {
-                    match String::from_utf8(msg) {
-                        Ok(msg) => {
-                            if !received.contains(&msg) {
-                                println!("{} received '{}'", name, msg);
-                                received.insert(msg);
-                            }
-                        }
-                        Err(e) => println!("{} received invalid UTF8: {}", name, e),
-                    }
-                }
-                _ => (),
-            }
-        }
-        Ok::<(), anyhow::Error>(())
-    })
-    .await;
-
-    match receive_result {
-        Ok(Ok(())) => {
-            println!("{} received all expected messages", name);
-        }
-        Ok(Err(e)) => {
-            bail!("{} error while receiving messages: {}", name, e);
-        }
-        Err(_) => {
-            bail!(
-                "{} timeout waiting for messages. Received only: {:?}",
-                name,
-                received
-            );
-        }
-    }
-
-    // no need to mark test as finished because all nodes are leading
-    Ok(())
-}
-
+// So this is a test to test our networking interface
+//
+// Here we ensure we can send a gossipsub message to all connected nodes by running a sync_nodes
+// operation.
+//
+// We have a docker test harness that runs the nodes
 async fn test_dht(peer: &mut TestPeer) -> Result<()> {
     let value = b"I am he as you are he, as you are me and we are all together";
     let key = Cid::from_content(value);
+    peer.sync_nodes().await?;
 
     if peer.is_lead() {
         // PUT RECORD
@@ -121,8 +51,6 @@ async fn test_dht(peer: &mut TestPeer) -> Result<()> {
         )
         .await?;
     }
-
-    peer.sync_nodes().await?;
 
     // GET RECORD
     peer.tx
@@ -206,6 +134,14 @@ async fn runner() -> Result<Vec<String>> {
     Ok(report_string)
 }
 
+// Universal counter to keep nodes in sync
+static COUNTER: AtomicU8 = AtomicU8::new(0);
+
+fn get_next_id() -> u8 {
+    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+    id
+}
+
 struct TestPeer {
     name: String,
     sync_threshold: usize,
@@ -226,30 +162,36 @@ impl TestPeer {
     // - prevents nodes from quitting early before a test has completed if they are not the leader.
     // - tests the gossip pubsub in general
     pub async fn sync_nodes(&mut self) -> Result<()> {
+        sleep(Duration::from_secs(2)).await;
+        let id = get_next_id();
         if self.is_lead() {
-            info!("LEAD IS SYNCING");
-            self.send_msg(START_SYNC).await?;
+            info!("LEAD IS SYNCING id={}", id);
+            let threshold = self.sync_threshold - 1;
+            self.send_msg(&with_id(START_SYNC, id)).await?;
 
-            for node in 0..self.sync_threshold {
-                debug!(
-                    "SYNC: Waiting for reply {}/{}...",
+            for node in 0..threshold {
+                info!(
+                    "SYNC: Waiting for reply {}/{} for id={} ...",
                     node + 1,
-                    self.sync_threshold
+                    threshold,
+                    id
                 );
-                self.wait_for_msg(SYNC).await?;
+                self.wait_for_msg(&with_id(SYNC, id)).await?;
             }
 
-            self.send_msg(END_SYNC).await?;
-            info!("LEAD SYNCED!");
+            self.send_msg(&with_id(END_SYNC, id)).await?;
+            info!("LEAD SYNCED for id={}!", id);
         } else {
-            info!("FOLLOWER IS SYNCING");
-            self.wait_for_msg(START_SYNC).await?;
+            info!("FOLLOWER IS SYNCING for id={}", id);
+            self.wait_for_msg(&with_id(START_SYNC, id)).await?;
 
-            self.send_msg(SYNC).await?;
+            self.send_msg(&with_id(SYNC, id)).await?;
 
-            self.wait_for_msg(END_SYNC).await?;
-            info!("FOLLOWER SYNCED!");
+            self.wait_for_msg(&with_id(END_SYNC, id)).await?;
+            info!("FOLLOWER SYNCED for id={}!", id);
         }
+
+        sleep(Duration::from_secs(2)).await;
         Ok(())
     }
 
@@ -287,7 +229,8 @@ impl TestPeer {
     }
 
     async fn setup() -> Result<TestPeer> {
-        let name = env::args().nth(2).expect("need name");
+        println!("Running with args {:?}", env::args());
+        let name = env::args().nth(1).expect("need name");
         println!("{} starting up", name);
 
         let udp_port = env::var("QUIC_PORT")
@@ -313,12 +256,7 @@ impl TestPeer {
             peers,
             udp_port,
             &topic.to_string(),
-            MeshParams {
-                mesh_n: 2,
-                mesh_n_low: 1,
-                mesh_n_high: 3,
-                mesh_outbound_min: 1,
-            },
+            MeshParams::default(),
         )?;
 
         // Extract input and outputs
@@ -338,7 +276,6 @@ impl TestPeer {
 
         println!("WAIT FOR MESH READY...");
         wait_for_mesh_ready(60, 3, &mut rx, &topic).await?;
-
         println!("MESH READY!");
 
         // Give network time to initialize
@@ -354,6 +291,12 @@ impl TestPeer {
             _running: router_task,
         })
     }
+}
+
+fn with_id(slice: &[u8], id: u8) -> Vec<u8> {
+    let mut vec = slice.to_vec();
+    vec.push(id);
+    vec
 }
 
 async fn wait_for_mesh_ready(
@@ -385,7 +328,7 @@ async fn wait_for_mesh_ready(
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug")))
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
