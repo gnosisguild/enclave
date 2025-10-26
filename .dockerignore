@@ -12,6 +12,16 @@
 
 # Allow packages
 !packages/*/enclave-contracts/**/*
+!crates/*/package.json
+!packages/enclave-react/
+!packages/enclave-sdk/
+!packages/enclave-config/
+!packages/enclave-contracts/
+!pnpm-workspace.yaml
+!pnpm-lock.yaml
+!rust-toolchain.yaml
+
+
 
 # Explicitly ignore build artifacts everywhere
 target/
