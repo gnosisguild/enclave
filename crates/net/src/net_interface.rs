@@ -65,7 +65,7 @@ impl NetInterface {
         let swarm = libp2p::SwarmBuilder::with_existing_identity(id.clone())
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| create_kad_behaviour(key))?
+            .with_behaviour(|key| create_behaviour(key))?
             .build();
 
         // TODO: Use topics to manage network traffic instead of just using a single topic
@@ -165,7 +165,7 @@ impl NetInterface {
 }
 
 /// Create the libp2p behaviour
-fn create_kad_behaviour(
+fn create_behaviour(
     key: &Keypair,
 ) -> std::result::Result<NodeBehaviour, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let connection_limits = connection_limits::Behaviour::new(ConnectionLimits::default());
