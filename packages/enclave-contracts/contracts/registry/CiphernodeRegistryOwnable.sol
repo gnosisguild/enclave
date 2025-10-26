@@ -33,23 +33,6 @@ contract CiphernodeRegistryOwnable is ICiphernodeRegistry, OwnableUpgradeable {
     /// @param bondingRegistry Address of the bonding registry contract
     event BondingRegistrySet(address indexed bondingRegistry);
 
-    /// @notice Emitted when a ticket is submitted for sortition
-    /// @param e3Id ID of the E3 computation
-    /// @param node Address of the ciphernode submitting the ticket
-    /// @param ticketId The ticket number being submitted
-    /// @param score The computed score for the ticket
-    event TicketSubmitted(
-        uint256 indexed e3Id,
-        address indexed node,
-        uint256 ticketId,
-        uint256 score
-    );
-
-    /// @notice Emitted when a committee is finalized
-    /// @param e3Id ID of the E3 computation
-    /// @param committee Array of selected ciphernode addresses
-    event CommitteeFinalized(uint256 indexed e3Id, address[] committee);
-
     ////////////////////////////////////////////////////////////
     //                                                        //
     //                 Storage Variables                      //

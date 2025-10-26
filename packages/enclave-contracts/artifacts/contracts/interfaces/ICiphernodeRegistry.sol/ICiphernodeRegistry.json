@@ -96,6 +96,25 @@
         {
           "indexed": false,
           "internalType": "address[]",
+          "name": "committee",
+          "type": "address[]"
+        }
+      ],
+      "name": "CommitteeFinalized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address[]",
           "name": "nodes",
           "type": "address[]"
         },
@@ -170,6 +189,37 @@
         }
       ],
       "name": "SortitionSubmissionWindowSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "e3Id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "node",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "ticketId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "score",
+          "type": "uint256"
+        }
+      ],
+      "name": "TicketSubmitted",
       "type": "event"
     },
     {
@@ -485,5 +535,5 @@
   "deployedLinkReferences": {},
   "immutableReferences": {},
   "inputSourceName": "project/contracts/interfaces/ICiphernodeRegistry.sol",
-  "buildInfoId": "solc-0_8_28-a254ab6ed640b952e36a352bed155c87f85018f2"
+  "buildInfoId": "solc-0_8_28-10b2b688a0db0c7a1bf549986929dcd9bb192f79"
 }

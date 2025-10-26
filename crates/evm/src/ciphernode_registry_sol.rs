@@ -16,8 +16,8 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
-    BusError, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet,
-    PublicKeyAggregated, Shutdown, Subscribe,
+    BusError, CiphernodeSelected, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent,
+    EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe,
 };
 use std::collections::HashMap;
 use tracing::{error, info, trace};
@@ -86,6 +86,73 @@ impl From<CiphernodeRemovedWithChainId> for EnclaveEvent {
     }
 }
 
+struct CommitteeRequestedWithChainId(pub ICiphernodeRegistry::CommitteeRequested, pub u64);
+
+impl From<CommitteeRequestedWithChainId> for e3_events::CommitteeRequested {
+    fn from(value: CommitteeRequestedWithChainId) -> Self {
+        e3_events::CommitteeRequested {
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
+            seed: Seed(value.0.seed.to_be_bytes()),
+            threshold: [value.0.threshold[0] as usize, value.0.threshold[1] as usize],
+            request_block: value.0.requestBlock.to(),
+            submission_deadline: value.0.submissionDeadline.to(),
+            chain_id: value.1,
+        }
+    }
+}
+
+impl From<CommitteeRequestedWithChainId> for EnclaveEvent {
+    fn from(value: CommitteeRequestedWithChainId) -> Self {
+        let payload: e3_events::CommitteeRequested = value.into();
+        EnclaveEvent::from(payload)
+    }
+}
+
+struct CommitteeFinalizedWithChainId(pub ICiphernodeRegistry::CommitteeFinalized, pub u64);
+
+impl From<CommitteeFinalizedWithChainId> for e3_events::CommitteeFinalized {
+    fn from(value: CommitteeFinalizedWithChainId) -> Self {
+        e3_events::CommitteeFinalized {
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
+            committee: value
+                .0
+                .committee
+                .iter()
+                .map(|addr| addr.to_string())
+                .collect(),
+            chain_id: value.1,
+        }
+    }
+}
+
+impl From<CommitteeFinalizedWithChainId> for EnclaveEvent {
+    fn from(value: CommitteeFinalizedWithChainId) -> Self {
+        let payload: e3_events::CommitteeFinalized = value.into();
+        EnclaveEvent::from(payload)
+    }
+}
+
+struct TicketSubmittedWithChainId(pub ICiphernodeRegistry::TicketSubmitted, pub u64);
+
+impl From<TicketSubmittedWithChainId> for e3_events::TicketSubmitted {
+    fn from(value: TicketSubmittedWithChainId) -> Self {
+        e3_events::TicketSubmitted {
+            e3_id: E3id::new(value.0.e3Id.to_string(), value.1),
+            node: value.0.node.to_string(),
+            ticket_id: value.0.ticketId.to(),
+            score: value.0.score.to_string(),
+            chain_id: value.1,
+        }
+    }
+}
+
+impl From<TicketSubmittedWithChainId> for EnclaveEvent {
+    fn from(value: TicketSubmittedWithChainId) -> Self {
+        let payload: e3_events::TicketSubmitted = value.into();
+        EnclaveEvent::from(payload)
+    }
+}
+
 pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<EnclaveEvent> {
     match topic {
         Some(&ICiphernodeRegistry::CiphernodeAdded::SIGNATURE_HASH) => {
@@ -103,6 +170,33 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 return None;
             };
             Some(EnclaveEvent::from(CiphernodeRemovedWithChainId(
+                event, chain_id,
+            )))
+        }
+        Some(&ICiphernodeRegistry::CommitteeRequested::SIGNATURE_HASH) => {
+            let Ok(event) = ICiphernodeRegistry::CommitteeRequested::decode_log_data(data) else {
+                error!("Error parsing event CommitteeRequested after topic was matched!");
+                return None;
+            };
+            Some(EnclaveEvent::from(CommitteeRequestedWithChainId(
+                event, chain_id,
+            )))
+        }
+        Some(&ICiphernodeRegistry::CommitteeFinalized::SIGNATURE_HASH) => {
+            let Ok(event) = ICiphernodeRegistry::CommitteeFinalized::decode_log_data(data) else {
+                error!("Error parsing event CommitteeFinalized after topic was matched!");
+                return None;
+            };
+            Some(EnclaveEvent::from(CommitteeFinalizedWithChainId(
+                event, chain_id,
+            )))
+        }
+        Some(&ICiphernodeRegistry::TicketSubmitted::SIGNATURE_HASH) => {
+            let Ok(event) = ICiphernodeRegistry::TicketSubmitted::decode_log_data(data) else {
+                error!("Error parsing event TicketSubmitted after topic was matched!");
+                return None;
+            };
+            Some(EnclaveEvent::from(TicketSubmittedWithChainId(
                 event, chain_id,
             )))
         }
@@ -190,6 +284,11 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
             .send(Subscribe::new("CommitteeFinalized", addr.clone().into()))
             .await;
 
+        // Subscribe to CiphernodeSelected for ticket submission
+        let _ = bus
+            .send(Subscribe::new("CiphernodeSelected", addr.clone().into()))
+            .await;
+
         Ok(addr)
     }
 }
@@ -217,6 +316,12 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
                     ctx.notify(data);
                 }
             }
+            EnclaveEvent::CiphernodeSelected { data, .. } => {
+                // Submit ticket if chain matches and ticket_id is present
+                if self.provider.chain_id() == data.e3_id.chain_id() {
+                    ctx.notify(data);
+                }
+            }
             EnclaveEvent::Shutdown { data, .. } => ctx.notify(data),
             _ => (),
         }
@@ -235,6 +340,45 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalized>
         );
         self.finalized_committees
             .insert(msg.e3_id.clone(), msg.committee);
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<CiphernodeSelected>
+    for CiphernodeRegistrySolWriter<P>
+{
+    type Result = ResponseFuture<()>;
+
+    fn handle(&mut self, msg: CiphernodeSelected, _: &mut Self::Context) -> Self::Result {
+        let e3_id = msg.e3_id.clone();
+        let ticket_id = msg.ticket_id;
+        let contract_address = self.contract_address;
+        let provider = self.provider.clone();
+        let bus = self.bus.clone();
+
+        Box::pin(async move {
+            // Only submit if we have a ticket_id (score sortition)
+            let Some(ticket_id) = ticket_id else {
+                info!(
+                    "No ticket_id for E3 {:?}, skipping ticket submission (distance sortition)",
+                    e3_id
+                );
+                return;
+            };
+
+            info!("Submitting ticket {} for E3 {:?}", ticket_id, e3_id);
+
+            let result =
+                submit_ticket_to_registry(provider, contract_address, e3_id, ticket_id).await;
+            match result {
+                Ok(receipt) => {
+                    info!(tx=%receipt.transaction_hash, "Ticket submitted to registry");
+                }
+                Err(err) => {
+                    error!("Failed to submit ticket: {:?}", err);
+                    bus.err(EnclaveErrorType::Evm, err);
+                }
+            }
+        })
     }
 }
 
@@ -289,6 +433,28 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<Shutdown>
     fn handle(&mut self, _: Shutdown, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop();
     }
+}
+
+pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: E3id,
+    ticket_number: u64,
+) -> Result<TransactionReceipt> {
+    let e3_id: U256 = e3_id.try_into()?;
+    let ticket_number = U256::from(ticket_number);
+    let from_address = provider.provider().default_signer_address();
+    let current_nonce = provider
+        .provider()
+        .get_transaction_count(from_address)
+        .pending()
+        .await?;
+    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+    let builder = contract
+        .submitTicket(e3_id, ticket_number)
+        .nonce(current_nonce);
+    let receipt = builder.send().await?.get_receipt().await?;
+    Ok(receipt)
 }
 
 pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>(

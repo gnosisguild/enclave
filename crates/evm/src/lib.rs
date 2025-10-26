@@ -6,7 +6,6 @@
 
 mod bonding_registry_sol;
 mod ciphernode_registry_sol;
-mod committee_sortition_sol;
 mod enclave_sol;
 mod enclave_sol_reader;
 mod enclave_sol_writer;
@@ -17,9 +16,6 @@ mod repo;
 pub use bonding_registry_sol::{BondingRegistrySol, BondingRegistrySolReader};
 pub use ciphernode_registry_sol::{
     CiphernodeRegistrySol, CiphernodeRegistrySolReader, CiphernodeRegistrySolWriter,
-};
-pub use committee_sortition_sol::{
-    CommitteeSortitionSol, CommitteeSortitionSolReader, CommitteeSortitionSolWriter,
 };
 pub use enclave_sol::EnclaveSol;
 pub use enclave_sol_reader::EnclaveSolReader;

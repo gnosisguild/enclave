@@ -23,8 +23,7 @@ use e3_evm::{
         ProviderConfig,
     },
     BondingRegistryReaderRepositoryFactory, BondingRegistrySol,
-    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol,
-    CommitteeSortitionReaderRepositoryFactory, CommitteeSortitionSol, EnclaveSol, EnclaveSolReader,
+    CiphernodeRegistryReaderRepositoryFactory, CiphernodeRegistrySol, EnclaveSol, EnclaveSolReader,
     EnclaveSolReaderRepositoryFactory, EthPrivateKeyRepositoryFactory,
 };
 use e3_fhe::ext::FheExtension;
@@ -369,48 +368,6 @@ impl CiphernodeBuilder {
                     Err(_) => {
                         info!("No wallet configured for this node, skipping writer attachment");
                     }
-                }
-            }
-
-            if self.contract_components.committee_sortition {
-                if let Some(committee_sortition_contract) = &chain.contracts.committee_sortition {
-                    match provider_cache
-                        .ensure_write_provider(&repositories, chain, cipher)
-                        .await
-                    {
-                        Ok(write_provider) => {
-                            let enable_finalizer = self.pubkey_agg;
-                            CommitteeSortitionSol::attach_with_finalizer(
-                                &local_bus,
-                                write_provider.clone(),
-                                &committee_sortition_contract.address(),
-                                &repositories.committee_sortition_reader(write_provider.chain_id()),
-                                committee_sortition_contract.deploy_block(),
-                                chain.rpc_url.clone(),
-                                enable_finalizer,
-                            )
-                            .await?;
-                        }
-                        Err(e) => {
-                            return Err(anyhow::anyhow!(
-                                "Score sortition enabled but no wallet configured for node. \
-                                All nodes must have wallets to submit tickets. Error: {}",
-                                e
-                            ));
-                        }
-                    }
-                } else {
-                    info!(
-                        "📍 DISTANCE SORTITION MODE (CommitteeSortition contract not configured)"
-                    );
-                    if self.pubkey_agg {
-                        info!("   Role: AGGREGATOR (will publish committees immediately)");
-                    }
-                }
-            } else {
-                info!("📍 DISTANCE SORTITION MODE");
-                if self.pubkey_agg {
-                    info!("   Role: AGGREGATOR (will publish committees immediately)");
                 }
             }
         }

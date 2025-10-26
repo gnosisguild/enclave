@@ -10,6 +10,7 @@ mod ciphernode_selected;
 mod ciphertext_output_published;
 mod committee_finalized;
 mod committee_published;
+mod committee_requested;
 mod compute_request;
 mod configuration_updated;
 mod decryptionshare_created;
@@ -35,6 +36,7 @@ pub use ciphernode_selected::*;
 pub use ciphertext_output_published::*;
 pub use committee_finalized::*;
 pub use committee_published::*;
+pub use committee_requested::*;
 pub use compute_request::*;
 pub use configuration_updated::*;
 pub use decryptionshare_created::*;
@@ -137,6 +139,10 @@ pub enum EnclaveEvent {
         id: EventId,
         data: CommitteePublished,
     },
+    CommitteeRequested {
+        id: EventId,
+        data: CommitteeRequested,
+    },
     CommitteeFinalized {
         id: EventId,
         data: CommitteeFinalized,
@@ -235,6 +241,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::ConfigurationUpdated { id, .. } => id,
             EnclaveEvent::OperatorActivationChanged { id, .. } => id,
             EnclaveEvent::CommitteePublished { id, .. } => id,
+            EnclaveEvent::CommitteeRequested { id, .. } => id,
             EnclaveEvent::PlaintextOutputPublished { id, .. } => id,
             EnclaveEvent::EnclaveError { id, .. } => id,
             EnclaveEvent::E3RequestComplete { id, .. } => id,
@@ -260,6 +267,7 @@ impl EnclaveEvent {
             EnclaveEvent::CiphernodeSelected { data, .. } => Some(data.e3_id),
             EnclaveEvent::ThresholdShareCreated { data, .. } => Some(data.e3_id),
             EnclaveEvent::CommitteePublished { data, .. } => Some(data.e3_id),
+            EnclaveEvent::CommitteeRequested { data, .. } => Some(data.e3_id),
             EnclaveEvent::PlaintextOutputPublished { data, .. } => Some(data.e3_id),
             EnclaveEvent::CommitteeFinalized { data, .. } => Some(data.e3_id),
             EnclaveEvent::TicketSubmitted { data, .. } => Some(data.e3_id),
@@ -282,6 +290,7 @@ impl EnclaveEvent {
             EnclaveEvent::ConfigurationUpdated { data, .. } => format!("{:?}", data),
             EnclaveEvent::OperatorActivationChanged { data, .. } => format!("{:?}", data),
             EnclaveEvent::CommitteePublished { data, .. } => format!("{:?}", data),
+            EnclaveEvent::CommitteeRequested { data, .. } => format!("{:?}", data),
             EnclaveEvent::PlaintextOutputPublished { data, .. } => format!("{:?}", data),
             EnclaveEvent::E3RequestComplete { data, .. } => format!("{}", data),
             EnclaveEvent::EnclaveError { data, .. } => format!("{:?}", data),
@@ -312,6 +321,7 @@ impl_from_event!(
     ConfigurationUpdated,
     OperatorActivationChanged,
     CommitteePublished,
+    CommitteeRequested,
     CommitteeFinalized,
     TicketSubmitted,
     PlaintextOutputPublished,

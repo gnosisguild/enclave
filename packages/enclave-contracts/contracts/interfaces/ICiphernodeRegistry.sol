@@ -52,6 +52,23 @@ interface ICiphernodeRegistry {
         uint256 submissionDeadline
     );
 
+    /// @notice This event MUST be emitted when a ticket is submitted for sortition
+    /// @param e3Id ID of the E3 computation
+    /// @param node Address of the ciphernode submitting the ticket
+    /// @param ticketId The ticket number being submitted
+    /// @param score The computed score for the ticket
+    event TicketSubmitted(
+        uint256 indexed e3Id,
+        address indexed node,
+        uint256 ticketId,
+        uint256 score
+    );
+
+    /// @notice This event MUST be emitted when a committee is finalized
+    /// @param e3Id ID of the E3 computation
+    /// @param committee Array of selected ciphernode addresses
+    event CommitteeFinalized(uint256 indexed e3Id, address[] committee);
+
     /// @notice This event MUST be emitted when a committee is selected for an E3.
     /// @param e3Id ID of the E3 for which the committee was selected.
     /// @param publicKey Public key of the committee.
