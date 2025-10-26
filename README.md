@@ -131,7 +131,7 @@ pnpm clean
 		</tr>
 	<tbody>
 </table>
-<!-- readme: contributors -end -->
+<!-- readme: contributors-end -->
 
 ## Minimum Rust version
 
