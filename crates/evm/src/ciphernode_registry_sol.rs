@@ -289,6 +289,11 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
             .send(Subscribe::new("TicketGenerated", addr.clone().into()))
             .await;
 
+        // Stop gracefully on shutdown
+        let _ = bus
+            .send(Subscribe::new("Shutdown", addr.clone().into()))
+            .await;
+
         Ok(addr)
     }
 }

@@ -58,17 +58,23 @@ impl From<ConfigurationUpdatedWithChainId> for e3_events::ConfigurationUpdated {
     }
 }
 
-impl From<IBondingRegistry::OperatorActivationChanged> for e3_events::OperatorActivationChanged {
-    fn from(value: IBondingRegistry::OperatorActivationChanged) -> Self {
+struct OperatorActivationChangedWithChainId(
+    pub IBondingRegistry::OperatorActivationChanged,
+    pub u64,
+);
+
+impl From<OperatorActivationChangedWithChainId> for e3_events::OperatorActivationChanged {
+    fn from(value: OperatorActivationChangedWithChainId) -> Self {
         e3_events::OperatorActivationChanged {
-            operator: value.operator.to_string(),
-            active: value.active,
+            operator: value.0.operator.to_string(),
+            active: value.0.active,
+            chain_id: value.1,
         }
     }
 }
 
-impl From<IBondingRegistry::OperatorActivationChanged> for EnclaveEvent {
-    fn from(value: IBondingRegistry::OperatorActivationChanged) -> Self {
+impl From<OperatorActivationChangedWithChainId> for EnclaveEvent {
+    fn from(value: OperatorActivationChangedWithChainId) -> Self {
         let payload: e3_events::OperatorActivationChanged = value.into();
         EnclaveEvent::from(payload)
     }
@@ -98,7 +104,9 @@ pub fn extractor(data: &LogData, topic: Option<&B256>, chain_id: u64) -> Option<
                 error!("Error parsing event OperatorActivationChanged after topic was matched!");
                 return None;
             };
-            Some(EnclaveEvent::from(event))
+            Some(EnclaveEvent::from(OperatorActivationChangedWithChainId(
+                event, chain_id,
+            )))
         }
         Some(&IBondingRegistry::ConfigurationUpdated::SIGNATURE_HASH) => {
             let Ok(event) = IBondingRegistry::ConfigurationUpdated::decode_log_data(data) else {

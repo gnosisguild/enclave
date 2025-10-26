@@ -33,7 +33,7 @@ use e3_request::E3Router;
 use e3_sortition::{CiphernodeSelector, Sortition, SortitionRepositoryFactory};
 use e3_utils::{rand_eth_addr, SharedRng};
 use std::{collections::HashMap, sync::Arc};
-use tracing::info;
+use tracing::{error, info};
 
 /// Build a ciphernode configuration.
 // NOTE: We could use a typestate pattern here to separate production and testing methods. I hummed
@@ -366,9 +366,10 @@ impl CiphernodeBuilder {
                             );
                         }
                     }
-                    Err(_) => {
-                        info!("No wallet configured for this node, skipping writer attachment");
-                    }
+                    Err(e) => error!(
+                        "Failed to create write provider (likely no wallet configured), skipping writer attachment: {}",
+                        e
+                    ),
                 }
             }
         }

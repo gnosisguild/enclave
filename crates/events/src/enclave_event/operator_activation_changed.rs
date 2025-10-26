@@ -12,4 +12,5 @@ use serde::{Deserialize, Serialize};
 pub struct OperatorActivationChanged {
     pub operator: String,
     pub active: bool,
+    pub chain_id: u64,
 }

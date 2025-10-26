@@ -156,7 +156,7 @@ sequenceDiagram
     E3Program-->>Enclave: inputValidator
     Enclave->>ComputeProvider: validate(computeProviderParams)
     ComputeProvider-->>Enclave: decryptionVerifier
-    Enclave->>CiphernodeRegistry: requestCommittee(e3Id, threshold)
+    Enclave->>CiphernodeRegistry: requestCommittee(e3Id, seed, threshold)
     CiphernodeRegistry-->>Enclave: success
     Enclave-->>Users: e3Id, E3 struct
 
