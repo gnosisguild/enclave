@@ -19,6 +19,8 @@ pub struct E3Meta {
     pub threshold_n: usize,
     pub seed: Seed,
     pub params: ArcBytes,
+    pub esi_per_ct: usize,
+    pub error_size: ArcBytes,
 }
 
 pub struct E3MetaExtension;
@@ -41,6 +43,8 @@ impl E3Extension for E3MetaExtension {
             seed,
             e3_id,
             params,
+            esi_per_ct,
+            error_size,
             ..
         } = data.clone();
 
@@ -50,6 +54,8 @@ impl E3Extension for E3MetaExtension {
             threshold_n,
             seed,
             params,
+            esi_per_ct,
+            error_size,
         };
         ctx.repositories().meta(&e3_id).write(&meta);
         let _ = ctx.set_dependency(META_KEY, meta);

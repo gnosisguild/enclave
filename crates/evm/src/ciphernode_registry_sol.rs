@@ -16,8 +16,8 @@ use alloy::{
 use anyhow::Result;
 use e3_data::Repository;
 use e3_events::{
-    BusError, CiphernodeSelected, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent,
-    EventBus, OrderedSet, PublicKeyAggregated, Seed, Shutdown, Subscribe,
+    BusError, CommitteeFinalized, E3id, EnclaveErrorType, EnclaveEvent, EventBus, OrderedSet,
+    PublicKeyAggregated, Seed, Shutdown, Subscribe, TicketGenerated,
 };
 use std::collections::HashMap;
 use tracing::{error, info, trace};
@@ -284,9 +284,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> CiphernodeRegistrySolWriter
             .send(Subscribe::new("CommitteeFinalized", addr.clone().into()))
             .await;
 
-        // Subscribe to CiphernodeSelected for ticket submission
+        // Subscribe to TicketGenerated for ticket submission
         let _ = bus
-            .send(Subscribe::new("CiphernodeSelected", addr.clone().into()))
+            .send(Subscribe::new("TicketGenerated", addr.clone().into()))
             .await;
 
         Ok(addr)
@@ -316,8 +316,8 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<EnclaveEvent>
                     ctx.notify(data);
                 }
             }
-            EnclaveEvent::CiphernodeSelected { data, .. } => {
-                // Submit ticket if chain matches and ticket_id is present
+            EnclaveEvent::TicketGenerated { data, .. } => {
+                // Submit ticket if chain matches
                 if self.provider.chain_id() == data.e3_id.chain_id() {
                     ctx.notify(data);
                 }
@@ -343,12 +343,12 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CommitteeFinalized>
     }
 }
 
-impl<P: Provider + WalletProvider + Clone + 'static> Handler<CiphernodeSelected>
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<TicketGenerated>
     for CiphernodeRegistrySolWriter<P>
 {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, msg: CiphernodeSelected, _: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: TicketGenerated, _: &mut Self::Context) -> Self::Result {
         let e3_id = msg.e3_id.clone();
         let ticket_id = msg.ticket_id;
         let contract_address = self.contract_address;
@@ -356,15 +356,6 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CiphernodeSelected>
         let bus = self.bus.clone();
 
         Box::pin(async move {
-            // Only submit if we have a ticket_id (score sortition)
-            let Some(ticket_id) = ticket_id else {
-                info!(
-                    "No ticket_id for E3 {:?}, skipping ticket submission (distance sortition)",
-                    e3_id
-                );
-                return;
-            };
-
             info!("Submitting ticket {} for E3 {:?}", ticket_id, e3_id);
 
             let result =
@@ -375,6 +366,41 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<CiphernodeSelected>
                 }
                 Err(err) => {
                     error!("Failed to submit ticket: {:?}", err);
+                    bus.err(EnclaveErrorType::Evm, err);
+                }
+            }
+        })
+    }
+}
+
+/// Message to trigger committee finalization (called by aggregator)
+#[derive(Message, Clone, Debug)]
+#[rtype(result = "()")]
+pub struct FinalizeCommittee {
+    pub e3_id: E3id,
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> Handler<FinalizeCommittee>
+    for CiphernodeRegistrySolWriter<P>
+{
+    type Result = ResponseFuture<()>;
+
+    fn handle(&mut self, msg: FinalizeCommittee, _: &mut Self::Context) -> Self::Result {
+        let e3_id = msg.e3_id.clone();
+        let contract_address = self.contract_address;
+        let provider = self.provider.clone();
+        let bus = self.bus.clone();
+
+        Box::pin(async move {
+            info!("Finalizing committee for E3 {:?}", e3_id);
+
+            let result = finalize_committee_on_registry(provider, contract_address, e3_id).await;
+            match result {
+                Ok(receipt) => {
+                    info!(tx=%receipt.transaction_hash, "Committee finalized on registry");
+                }
+                Err(err) => {
+                    error!("Failed to finalize committee: {:?}", err);
                     bus.err(EnclaveErrorType::Evm, err);
                 }
             }
@@ -457,6 +483,24 @@ pub async fn submit_ticket_to_registry<P: Provider + WalletProvider + Clone>(
     Ok(receipt)
 }
 
+pub async fn finalize_committee_on_registry<P: Provider + WalletProvider + Clone>(
+    provider: EthProvider<P>,
+    contract_address: Address,
+    e3_id: E3id,
+) -> Result<TransactionReceipt> {
+    let e3_id: U256 = e3_id.try_into()?;
+    let from_address = provider.provider().default_signer_address();
+    let current_nonce = provider
+        .provider()
+        .get_transaction_count(from_address)
+        .pending()
+        .await?;
+    let contract = ICiphernodeRegistry::new(contract_address, provider.provider());
+    let builder = contract.finalizeCommittee(e3_id).nonce(current_nonce);
+    let receipt = builder.send().await?.get_receipt().await?;
+    Ok(receipt)
+}
+
 pub async fn publish_committee_to_registry<P: Provider + WalletProvider + Clone>(
     provider: EthProvider<P>,
     contract_address: Address,
@@ -515,11 +559,11 @@ impl CiphernodeRegistrySol {
         bus: &Addr<EventBus<EnclaveEvent>>,
         provider: EthProvider<P>,
         contract_address: &str,
-    ) -> Result<()>
+    ) -> Result<Addr<CiphernodeRegistrySolWriter<P>>>
     where
         P: Provider + WalletProvider + Clone + 'static,
     {
-        CiphernodeRegistrySolWriter::attach(bus, provider, contract_address).await?;
-        Ok(())
+        let writer = CiphernodeRegistrySolWriter::attach(bus, provider, contract_address).await?;
+        Ok(writer)
     }
 }

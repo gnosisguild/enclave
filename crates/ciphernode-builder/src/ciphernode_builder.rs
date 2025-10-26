@@ -285,7 +285,7 @@ impl CiphernodeBuilder {
         let sortition = Sortition::attach(&local_bus, repositories.sortition()).await?;
 
         // Ciphernode Selector
-        CiphernodeSelector::attach(&local_bus, &sortition, &addr);
+        CiphernodeSelector::attach(&local_bus, &sortition, &addr, &store);
 
         let mut provider_cache = ProviderCaches::new();
         let cipher = &self.cipher;
@@ -357,13 +357,22 @@ impl CiphernodeBuilder {
                     .await
                 {
                     Ok(write_provider) => {
-                        CiphernodeRegistrySol::attach_writer(
+                        let writer = CiphernodeRegistrySol::attach_writer(
                             &local_bus,
                             write_provider.clone(),
                             &chain.contracts.ciphernode_registry.address(),
                         )
                         .await?;
                         info!("CiphernodeRegistrySolWriter attached for publishing committees");
+
+                        // Attach CommitteeFinalizer if aggregator mode is enabled
+                        if self.pubkey_agg {
+                            info!("Attaching CommitteeFinalizer for score sortition");
+                            e3_aggregator::CommitteeFinalizer::attach(
+                                &local_bus,
+                                writer.recipient(),
+                            );
+                        }
                     }
                     Err(_) => {
                         info!("No wallet configured for this node, skipping writer attachment");

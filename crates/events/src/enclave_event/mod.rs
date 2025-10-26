@@ -28,6 +28,7 @@ mod shutdown;
 mod test_event;
 mod threshold_share_created;
 mod ticket_balance_updated;
+mod ticket_generated;
 mod ticket_submitted;
 
 pub use ciphernode_added::*;
@@ -54,6 +55,7 @@ pub use shutdown::*;
 pub use test_event::*;
 pub use threshold_share_created::*;
 pub use ticket_balance_updated::*;
+pub use ticket_generated::*;
 pub use ticket_submitted::*;
 
 use crate::{E3id, ErrorEvent, Event, EventId};
@@ -146,6 +148,10 @@ pub enum EnclaveEvent {
     CommitteeFinalized {
         id: EventId,
         data: CommitteeFinalized,
+    },
+    TicketGenerated {
+        id: EventId,
+        data: TicketGenerated,
     },
     TicketSubmitted {
         id: EventId,
@@ -250,6 +256,7 @@ impl From<EnclaveEvent> for EventId {
             EnclaveEvent::DocumentReceived { id, .. } => id,
             EnclaveEvent::ThresholdShareCreated { id, .. } => id,
             EnclaveEvent::CommitteeFinalized { id, .. } => id,
+            EnclaveEvent::TicketGenerated { id, .. } => id,
             EnclaveEvent::TicketSubmitted { id, .. } => id,
         }
     }
@@ -270,6 +277,7 @@ impl EnclaveEvent {
             EnclaveEvent::CommitteeRequested { data, .. } => Some(data.e3_id),
             EnclaveEvent::PlaintextOutputPublished { data, .. } => Some(data.e3_id),
             EnclaveEvent::CommitteeFinalized { data, .. } => Some(data.e3_id),
+            EnclaveEvent::TicketGenerated { data, .. } => Some(data.e3_id),
             EnclaveEvent::TicketSubmitted { data, .. } => Some(data.e3_id),
             _ => None,
         }
@@ -299,6 +307,7 @@ impl EnclaveEvent {
             EnclaveEvent::TestEvent { data, .. } => format!("{:?}", data),
             EnclaveEvent::DocumentReceived { data, .. } => format!("{:?}", data),
             EnclaveEvent::CommitteeFinalized { data, .. } => format!("{:?}", data),
+            EnclaveEvent::TicketGenerated { data, .. } => format!("{:?}", data),
             EnclaveEvent::TicketSubmitted { data, .. } => format!("{:?}", data),
             // _ => "<omitted>".to_string(),
         }
@@ -323,6 +332,7 @@ impl_from_event!(
     CommitteePublished,
     CommitteeRequested,
     CommitteeFinalized,
+    TicketGenerated,
     TicketSubmitted,
     PlaintextOutputPublished,
     EnclaveError,

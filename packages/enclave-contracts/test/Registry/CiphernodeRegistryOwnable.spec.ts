@@ -7,7 +7,6 @@ import { LeanIMT } from "@zk-kit/lean-imt";
 import { expect } from "chai";
 import { network } from "hardhat";
 import { poseidon2 } from "poseidon-lite";
-import { toASCII } from "punycode";
 
 import BondingRegistryModule from "../../ignition/modules/bondingRegistry";
 import CiphernodeRegistryModule from "../../ignition/modules/ciphernodeRegistry";
