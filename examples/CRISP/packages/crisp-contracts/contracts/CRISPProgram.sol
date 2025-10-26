@@ -106,12 +106,9 @@ contract CRISPProgram is IE3Program, Ownable {
 
         // Deploy a new input validator
         inputValidator = IInputValidator(
-            INPUT_VALIDATOR_FACTORY.deploy(
-                address(HONK_VERIFIER),
-                owner()
-            )
+            INPUT_VALIDATOR_FACTORY.deploy(address(HONK_VERIFIER), owner())
         );
-       
+
         return (ENCRYPTION_SCHEME_ID, inputValidator);
     }
 
