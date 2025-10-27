@@ -62,8 +62,6 @@ services:
     networks:
       - p2p_test_net
 
-
-
 networks:
   p2p_test_net:
     driver: bridge
