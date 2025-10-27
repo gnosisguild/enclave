@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "ciphernode:admin-add": "hardhat run scripts/ciphernode-add.ts -- ",
     "compile": "hardhat compile",
     "clean:deployments": "hardhat utils:clean-deployments",
     "deploy": "pnpm clean:deployments && hardhat run scripts/deploy-local.ts --network localhost",

@@ -29,6 +29,7 @@ export function getContractAddresses() {
     ciphernodeRegistry: process.env.REGISTRY_ADDRESS as `0x${string}`,
     bondingRegistry: process.env.BONDING_REGISTRY_ADDRESS as `0x${string}`,
     e3Program: process.env.E3_PROGRAM_ADDRESS as `0x${string}`,
+    feeToken: process.env.FEE_TOKEN_ADDRESS as `0x${string}`,
   };
 }
 
@@ -42,7 +43,6 @@ type E3Shared = {
   e3Id: bigint;
   e3Program: string;
   e3: E3;
-  filter: string;
 };
 
 type E3StateRequested = E3Shared & {
@@ -171,6 +171,7 @@ describe("Integration", () => {
     contracts: {
       enclave: contracts.enclave,
       ciphernodeRegistry: contracts.ciphernodeRegistry,
+      feeToken: contracts.feeToken,
     },
     rpcUrl: "ws://localhost:8545",
     privateKey:
@@ -185,15 +186,23 @@ describe("Integration", () => {
       DEFAULT_E3_CONFIG.threshold_min,
       DEFAULT_E3_CONFIG.threshold_max,
     ];
-    const startWindow = calculateStartWindow(60);
+    const startWindow = calculateStartWindow(100);
     const duration = BigInt(10);
     const e3ProgramParams = encodeBfvParams();
     const computeProviderParams = encodeComputeProviderParams(
-      DEFAULT_COMPUTE_PROVIDER_PARAMS
+      DEFAULT_COMPUTE_PROVIDER_PARAMS,
+      true // Mock the compute provider parameters, return 32 bytes of 0x00
     );
 
     let state;
     let event;
+
+    // Approve fee token
+    console.log("Approving fee token...");
+    const hash = await sdk.approveFeeToken(100000000000n);
+    console.log("Fee token approved:", hash);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // REQUEST phase
     await waitForEvent(EnclaveEventType.E3_REQUESTED, async () => {

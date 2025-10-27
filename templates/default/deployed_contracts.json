@@ -17,14 +17,6 @@
       },
       "blockNumber": 9181748,
       "address": "0x5ABDfCbA0366ABF2893D3f2465F4C97908488A6d"
-    },
-    "NaiveRegistryFilter": {
-      "constructorArgs": {
-        "ciphernodeRegistryAddress": "0x5ABDfCbA0366ABF2893D3f2465F4C97908488A6d",
-        "owner": "0x4f1f3a157073A35515C4fC4A8af2F1Af088f0676"
-      },
-      "blockNumber": 9181753,
-      "address": "0x58708A1bf1AEdf8e75755FDa1882F8dc46985009"
     }
   },
   "localhost": {

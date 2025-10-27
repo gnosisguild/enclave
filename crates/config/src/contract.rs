@@ -40,4 +40,5 @@ pub struct ContractAddresses {
     pub ciphernode_registry: Contract,
     pub bonding_registry: Contract,
     pub e3_program: Option<Contract>,
+    pub fee_token: Option<Contract>,
 }

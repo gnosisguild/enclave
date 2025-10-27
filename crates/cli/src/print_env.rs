@@ -25,6 +25,9 @@ pub fn extract_env_vars_vite(config: &AppConfig, chain: &str) -> String {
         if let Some(e3_program) = &chain.contracts.e3_program {
             env_vars.push(format!("VITE_E3_PROGRAM_ADDRESS={}", e3_program.address()));
         }
+        if let Some(fee_token) = &chain.contracts.fee_token {
+            env_vars.push(format!("VITE_FEE_TOKEN_ADDRESS={}", fee_token.address()));
+        }
     }
 
     env_vars.join(" ")
@@ -47,6 +50,9 @@ pub fn extract_env_vars(config: &AppConfig, chain: &str) -> String {
         ));
         if let Some(e3_program) = &chain.contracts.e3_program {
             env_vars.push(format!("E3_PROGRAM_ADDRESS={}", e3_program.address()));
+        }
+        if let Some(fee_token) = &chain.contracts.fee_token {
+            env_vars.push(format!("FEE_TOKEN_ADDRESS={}", fee_token.address()));
         }
     }
 

@@ -135,6 +135,7 @@ enum RegistryEventType {
   CIPHERNODE_REMOVED = "CiphernodeRemoved",
   COMMITTEE_REQUESTED = "CommitteeRequested",
   COMMITTEE_PUBLISHED = "CommitteePublished",
+  COMMITTEE_FINALIZED = "CommitteeFinalized",
   ENCLAVE_SET = "EnclaveSet",
   // ... more events
 }
