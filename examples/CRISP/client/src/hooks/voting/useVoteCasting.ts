@@ -120,7 +120,8 @@ export const useVoteCasting = () => {
         setTxUrl,
         showToast,
         navigate,
-        handleVoteEncryption
+        handleVoteEncryption,
+        signMessageAsync,
     ]);
 
     return { castVoteWithProof, isLoading };

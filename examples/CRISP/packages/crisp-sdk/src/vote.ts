@@ -149,8 +149,6 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
  * @param publicKey The public key to use for encryption
  * @param previousCiphertext The previous ciphertext to use for addition operation
  * @param bfvParams The BFV parameters to use for encryption
- * @param signature The voter's signature
- * @param signedMessage The signed message
  * @returns The CRISP circuit inputs
  */
 export const encryptVoteAndGenerateCRISPInputs = async (
