@@ -176,3 +176,25 @@ export interface BFVParams {
   plaintextModulus: bigint
   moduli: BigInt64Array
 }
+
+/**
+ * Interface representing the inputs for Noir signature verification
+ */
+export interface NoirSignatureInputs {
+  /**
+   * X coordinate of the public key
+   */
+  pub_key_x: Uint8Array
+  /**
+   * Y coordinate of the public key
+   */
+  pub_key_y: Uint8Array
+  /**
+   * The signature to verify
+   */
+  signature: Uint8Array
+  /**
+   * The hashed message that was signed
+   */
+  hashed_message: Uint8Array
+}

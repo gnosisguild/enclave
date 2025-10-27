@@ -6,6 +6,8 @@
 
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSignMessage } from 'wagmi';
+
 import { useVoteManagementContext } from '@/context/voteManagement';
 import { useNotificationAlertContext } from '@/context/NotificationAlert/NotificationAlert.context.tsx';
 import { Poll } from '@/model/poll.model';
@@ -21,6 +23,7 @@ export const useVoteCasting = () => {
         setTxUrl,
     } = useVoteManagementContext();
 
+    const { signMessageAsync } = useSignMessage();
     const { showToast } = useNotificationAlertContext();
     const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -47,6 +50,9 @@ export const useVoteCasting = () => {
 
         setIsLoading(true);
         console.log("Processing vote...");
+
+        // For now just sign and do not do nothing with the signature
+        await signMessageAsync({ message: `Vote for round ${roundState.id}` });
 
         try {
             const voteEncrypted = await handleVoteEncryption(pollSelected);

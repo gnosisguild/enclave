@@ -7,12 +7,9 @@
 use polynomial::Polynomial;
 
 // Check that all valid coefficients are either 0 or 1
-pub fn check_coefficient_values<let D: u32>(
-    k1: Polynomial<D>,
-    q_mod_t: Field,
-) {
-    // This value would allow to fit 
-    // 268435456 for yes and 268435456 for no 
+pub fn check_coefficient_values<let D: u32>(k1: Polynomial<D>, q_mod_t: Field) {
+    // This value would allow to fit
+    // 268435456 for yes and 268435456 for no
     // which would fit the supply of most tokens really (imagining one user just holds all tokens)
     let HALF_LARGEST_MINIMUM_DEGREE = 28;
 
@@ -24,14 +21,14 @@ pub fn check_coefficient_values<let D: u32>(
     // yes part
     for i in START_INDEX_Y..HALF_D {
         let coeff = k1.coefficients[i];
-        assert(0 == coeff * (q_mod_t - coeff));   
+        assert(0 == coeff * (q_mod_t - coeff));
     }
 
     // no part
     for i in START_INDEX_N..D {
         let coeff = k1.coefficients[i];
-        assert(0 == coeff * (q_mod_t - coeff));   
-    } 
+        assert(0 == coeff * (q_mod_t - coeff));
+    }
 }
 
 #[test]

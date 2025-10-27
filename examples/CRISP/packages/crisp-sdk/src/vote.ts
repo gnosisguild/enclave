@@ -8,6 +8,7 @@ import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
 import { BFVParams, type CRISPCircuitInputs, type IVote, VotingMode } from './types'
 import { toBinary } from './utils'
 import { MAXIMUM_VOTE_VALUE, DEFAULT_BFV_PARAMS } from './constants'
+import { extractSignature } from './signature'
 
 /**
  * This utility function calculates the first valid index for vote options
@@ -148,6 +149,8 @@ export const validateVote = (votingMode: VotingMode, vote: IVote, votingPower: b
  * @param publicKey The public key to use for encryption
  * @param previousCiphertext The previous ciphertext to use for addition operation
  * @param bfvParams The BFV parameters to use for encryption
+ * @param signature The voter's signature
+ * @param signedMessage The signed message
  * @returns The CRISP circuit inputs
  */
 export const encryptVoteAndGenerateCRISPInputs = async (
@@ -178,5 +181,29 @@ export const encryptVoteAndGenerateCRISPInputs = async (
     merkle_proof_length: '0',
     merkle_proof_indices: [],
     merkle_proof_siblings: [],
+  }
+}
+
+/**
+ * Generate the CRISP circuit inputs by extracting signature components and adding them to the partial inputs
+ * @todo Add the merkle tree inputs too
+ * @param partialInputs The partial CRISP circuit inputs
+ * @param signature The voter's signature
+ * @param signedMessage The signed message
+ * @returns The complete CRISP circuit inputs
+ */
+export const generateCRISPInputs = async (
+  partialInputs: CRISPCircuitInputs,
+  signature: `0x${string}`,
+  signedMessage: string,
+): Promise<CRISPCircuitInputs> => {
+  const { hashed_message, pub_key_x, pub_key_y, signature: extractedSignature } = await extractSignature(signedMessage, signature)
+
+  return {
+    ...partialInputs,
+    hashed_message: Array.from(hashed_message).map((b) => b.toString()),
+    public_key_x: Array.from(pub_key_x).map((b) => b.toString()),
+    public_key_y: Array.from(pub_key_y).map((b) => b.toString()),
+    signature: Array.from(extractedSignature).map((b) => b.toString()),
   }
 }
