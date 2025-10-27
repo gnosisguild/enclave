@@ -342,6 +342,9 @@ importers:
       '@enclave-e3/sdk':
         specifier: workspace:*
         version: link:../../../../packages/enclave-sdk
+      '@enclave/crisp-zk-inputs':
+        specifier: workspace:*
+        version: link:../crisp-zk-inputs
       '@zk-kit/lean-imt':
         specifier: ^2.2.4
         version: 2.2.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -367,9 +370,17 @@ importers:
       typescript:
         specifier: 5.8.3
         version: 5.8.3
+      vite:
+        specifier: ^5.4.19
+        version: 5.4.19(@types/node@22.7.5)
+      vite-plugin-wasm:
+        specifier: ^3.2.2
+        version: 3.5.0(vite@5.4.19(@types/node@22.7.5))
       vitest:
         specifier: ^1.6.1
         version: 1.6.1(@types/node@22.7.5)
+
+  examples/CRISP/packages/crisp-zk-inputs: {}
 
   packages/enclave-config:
     dependencies:
@@ -478,7 +489,7 @@ importers:
         version: 3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10)
       hardhat-gas-reporter:
         specifier: ^2.2.0
-        version: 2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+        version: 2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
@@ -16399,7 +16410,7 @@ snapshots:
       - debug
       - utf-8-validate
 
-  hardhat-gas-reporter@2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76):
+  hardhat-gas-reporter@2.3.0(bufferutil@4.0.9)(hardhat@3.0.4(bufferutil@4.0.9)(utf-8-validate@5.0.10))(typescript@5.8.3)(utf-8-validate@5.0.10):
     dependencies:
       '@ethersproject/abi': 5.8.0
       '@ethersproject/bytes': 5.8.0
@@ -16416,7 +16427,7 @@ snapshots:
       lodash: 4.17.21
       markdown-table: 2.0.0
       sha1: 1.1.1
-      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.25.76)
+      viem: 2.30.6(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
       - debug

@@ -3,7 +3,8 @@ members = [
   "server",
   ".enclave/support/dev",
   "program",
-  "crates/generator"
+  "crates/zk-inputs",
+  "crates/zk-inputs-wasm"
 ]
 resolver = "3"
 

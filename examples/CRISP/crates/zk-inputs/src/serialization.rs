@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Serialization module for crisp inputs data.
+//! Serialization module for CRISP ZK inputs data.
 //!
 //! This module handles the serialization of inputs data to JSON format.
 
@@ -17,7 +17,7 @@ use num_bigint::BigInt;
 use serde::Serialize;
 
 #[derive(Serialize)]
-pub struct CrispZKInputs {
+pub struct ZKInputs {
     ct_add: serde_json::Value,
     params: serde_json::Value,
     ct0is: Vec<serde_json::Value>,
@@ -39,7 +39,7 @@ fn to_string_1d_vec(vec: &[BigInt]) -> Vec<String> {
     vec.iter().map(|x| x.to_string()).collect()
 }
 
-/// Constructs a CrispZKInputs from GRECO bounds and vectors.
+/// Constructs a ZKInputs from GRECO bounds and vectors.
 ///
 /// # Arguments
 /// * `crypto_params` - Cryptographic parameters from GRECO
@@ -48,13 +48,13 @@ fn to_string_1d_vec(vec: &[BigInt]) -> Vec<String> {
 /// * `ciphertext_addition_inputs_standard` - Standard form ciphertext addition inputs
 ///
 /// # Returns
-/// A CrispZKInputs struct ready for JSON serialization
+/// A ZKInputs struct ready for JSON serialization
 pub fn construct_inputs(
     crypto_params: &GrecoCryptographicParameters,
     bounds: &GrecoBounds,
     vectors_standard: &GrecoVectors,
     ciphertext_addition_inputs_standard: &CiphertextAdditionInputs,
-) -> CrispZKInputs {
+) -> ZKInputs {
     let mut params_json = serde_json::Map::new();
 
     // Add crypto params.
@@ -158,7 +158,7 @@ pub fn construct_inputs(
         serde_json::json!(ciphertext_addition_inputs_standard.r_bound),
     );
 
-    CrispZKInputs {
+    ZKInputs {
         ct_add: serde_json::Value::Object(ciphertext_addition_params_json),
         params: serde_json::Value::Object(params_json),
         ct0is: vectors_standard
@@ -248,14 +248,14 @@ pub fn construct_inputs(
     }
 }
 
-/// Serializes a CrispZKInputs to JSON string.
+/// Serializes a ZKInputs to JSON string.
 ///
 /// # Arguments
-/// * `inputs` - The CrispZKInputs to serialize
+/// * `inputs` - The ZKInputs to serialize
 ///
 /// # Returns
 /// JSON string representation of the inputs
-pub fn serialize_inputs_to_json(inputs: &CrispZKInputs) -> Result<String> {
+pub fn serialize_inputs_to_json(inputs: &ZKInputs) -> Result<String> {
     serde_json::to_string(inputs).with_context(|| "Failed to serialize inputs to JSON")
 }
 
