@@ -5,16 +5,8 @@
 # Then allow cargo workspace files
 !Cargo.toml
 !Cargo.lock
-
-# Allow all other workspace members
-!crates/*/Cargo.toml
-!crates/*/src/**/*.rs
-!crates/*/build.rs
-
-# Allow packages
-!crates/*/package.json
+!crates/**/*
 !packages/**/*
-!packages/enclave-contracts/deployed_contracts.json
 !package.json
 !pnpm-workspace.yaml
 !pnpm-lock.yaml
