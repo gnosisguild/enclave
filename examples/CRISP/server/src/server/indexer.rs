@@ -292,9 +292,7 @@ pub async fn register_committee_published(
                 }
 
                 // Convert milliseconds to seconds for comparison with block.timestamp
-                let start_time_ms = e3.startWindow[0].to::<u64>();
-                let start_time_secs = start_time_ms / 1000; // Convert to seconds
-                let start_time = UNIX_EPOCH + Duration::from_secs(start_time_secs);
+                let start_time = UNIX_EPOCH + Duration::from_secs(e3.startWindow[0].to::<u64>());
 
                 // Get current time
                 let now = SystemTime::now();
