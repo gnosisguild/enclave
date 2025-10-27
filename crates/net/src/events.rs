@@ -11,7 +11,7 @@ use e3_events::{CorrelationId, DocumentMeta};
 use e3_utils::ArcBytes;
 use libp2p::{
     gossipsub::{MessageId, PublishError, TopicHash},
-    kad::{store, GetRecordError},
+    kad::{store, GetRecordError, PutRecordError},
     swarm::{dial_opts::DialOpts, ConnectionId, DialError},
 };
 use serde::{Deserialize, Serialize};
@@ -122,7 +122,7 @@ pub enum NetEvent {
     /// There was an error putting the document
     DhtPutRecordError {
         correlation_id: CorrelationId,
-        error: store::Error,
+        error: PutRecordError,
     },
     /// GossipSubscribed
     GossipSubscribed { count: usize, topic: TopicHash },

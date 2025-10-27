@@ -285,27 +285,41 @@ async fn process_swarm_event(
             }
             Err(e) => {
                 error!("step={:?} error={}", step, e);
+                event_tx.send(NetEvent::DhtGetRecordError {
+                    correlation_id: correlator.expire(&id)?,
+                    error: e,
+                })?;
             }
         },
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Kademlia(
             kad::Event::OutboundQueryProgressed {
                 id,
-                result: QueryResult::PutRecord(Ok(record)),
+                result: QueryResult::PutRecord(record),
                 ..
             },
         )) => {
-            let key = Cid(record.key.to_vec());
             let correlation_id = correlator.expire(&id)?;
-            info!(
-                "Put DHT record for key={} correlation_id={}",
-                key.to_string(),
-                correlation_id
-            );
-            event_tx.send(NetEvent::DhtPutRecordSucceeded {
-                key,
-                correlation_id,
-            })?;
+            match record {
+                Ok(record) => {
+                    let key = Cid(record.key.to_vec());
+                    info!(
+                        "Put DHT record for key={} correlation_id={}",
+                        key.to_string(),
+                        correlation_id
+                    );
+                    event_tx.send(NetEvent::DhtPutRecordSucceeded {
+                        key,
+                        correlation_id,
+                    })?;
+                }
+                Err(error) => {
+                    event_tx.send(NetEvent::DhtPutRecordError {
+                        correlation_id,
+                        error,
+                    })?;
+                }
+            }
         }
 
         SwarmEvent::Behaviour(NodeBehaviourEvent::Gossipsub(gossipsub::Event::Message {
