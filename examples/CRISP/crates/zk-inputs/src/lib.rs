@@ -362,7 +362,7 @@ mod tests {
 
         // Test that same vote produces different ciphertexts (due to randomness).
         let ct0_2 = generator
-            .encrypt_vote(&public_key, create_vote_vector(DEFAULT_DEGREE))
+            .encrypt_vote(&public_key, create_vote_vector())
             .expect("Failed to encrypt vote 0 again");
         assert_ne!(ct0, ct0_2);
 
