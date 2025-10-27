@@ -507,6 +507,7 @@ fn handle_shutdown(
     Ok(())
 }
 
+/// This correlates query_id and correlation_id.
 #[derive(Clone)]
 struct Correlator {
     inner: HashMap<QueryId, CorrelationId>,
@@ -518,11 +519,11 @@ impl Correlator {
             inner: HashMap::new(),
         }
     }
-
+    /// Add a pairing between query_id and correlation_id
     pub fn track(&mut self, query_id: QueryId, correlation_id: CorrelationId) {
         self.inner.insert(query_id, correlation_id);
     }
-
+    /// Remove the pairing and return the correlation_id
     pub fn expire(&mut self, query_id: &QueryId) -> Result<CorrelationId> {
         self.inner
             .remove(query_id)
