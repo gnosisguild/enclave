@@ -7,6 +7,10 @@
 use greco::{Greco, Params};
 use polynomial::Polynomial;
 
+mod ciphertext_addition;
+use ciphertext_addition::check_ciphertext_addition_constraints;
+use ciphertext_addition::check_range_bounds;
+use ciphertext_addition::CiphertextAdditionParams;
 mod ecdsa;
 use ecdsa::{address_to_field, derive_address, verify_signature};
 mod merkle_tree;
@@ -15,6 +19,7 @@ mod utils;
 use utils::check_coefficient_values;
 
 fn main(
+    ct_add_params: CiphertextAdditionParams<2048, 1>,
     params: pub Params<2048, 1>,
     pk0is: pub [Polynomial<2048>; 1],
     pk1is: pub [Polynomial<2048>; 1],
@@ -80,5 +85,15 @@ fn main(
 
     check_coefficient_values(k1, params.crypto_params().q_mod_t);
 
-    circuit.verify_correct_ciphertext_encryption();
+    let gammas = circuit.verify_correct_ciphertext_encryption();
+
+    check_range_bounds::<2048, 1, 1>(ct_add_params);
+
+    check_ciphertext_addition_constraints::<2048, 1>(
+        ct_add_params,
+        ct0is,
+        ct1is,
+        params.crypto_params().qis,
+        gammas,
+    );
 }
