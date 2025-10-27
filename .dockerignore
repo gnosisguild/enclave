@@ -13,6 +13,7 @@
 # Allow packages
 !crates/*/package.json
 !packages/**/*
+!packages/enclave-contracts/deployed_contracts.json
 !pnpm-workspace.yaml
 !pnpm-lock.yaml
 !rust-toolchain.toml
