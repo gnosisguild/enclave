@@ -96,18 +96,15 @@ where
     .await
     .context("Timeout waiting for predicate")?
     .context("Failed to receive from channel")?;
-
     Ok(result)
 }
 
 async fn runner() -> Result<Vec<String>> {
     let mut peer = TestPeer::setup().await?;
     let mut report = vec![];
-
     // DHT test
     test_dht(&mut peer).await?;
     report.push("DHT Test");
-
     peer.tx.send(NetCommand::Shutdown).await?;
     sleep(Duration::from_secs(20)).await;
 
@@ -129,13 +126,11 @@ fn get_next_id() -> u8 {
 }
 
 struct TestPeer {
-    name: String,
     sync_threshold: usize,
     rx: broadcast::Receiver<NetEvent>,
     tx: mpsc::Sender<NetCommand>,
     topic: IdentTopic,
     test_timeout: Option<Duration>,
-    _running: JoinHandle<()>,
 }
 
 static START_SYNC: &[u8] = b"START_SYNC";
@@ -154,7 +149,6 @@ impl TestPeer {
             info!("LEAD IS SYNCING id={}", id);
             let threshold = self.sync_threshold - 1;
             self.send_msg(&with_id(START_SYNC, id)).await?;
-
             for node in 0..threshold {
                 info!(
                     "SYNC: Waiting for reply {}/{} for id={} ...",
@@ -164,19 +158,15 @@ impl TestPeer {
                 );
                 self.wait_for_msg(&with_id(SYNC, id)).await?;
             }
-
             self.send_msg(&with_id(END_SYNC, id)).await?;
             info!("LEAD SYNCED for id={}!", id);
         } else {
             info!("FOLLOWER IS SYNCING for id={}", id);
             self.wait_for_msg(&with_id(START_SYNC, id)).await?;
-
             self.send_msg(&with_id(SYNC, id)).await?;
-
             self.wait_for_msg(&with_id(END_SYNC, id)).await?;
             info!("FOLLOWER SYNCED for id={}!", id);
         }
-
         sleep(Duration::from_secs(2)).await;
         Ok(())
     }
@@ -218,32 +208,24 @@ impl TestPeer {
         println!("Running with args {:?}", env::args());
         let name = env::args().nth(1).expect("need name");
         println!("{} starting up", name);
-
         let udp_port = env::var("QUIC_PORT")
             .ok()
             .and_then(|p| p.parse::<u16>().ok());
-
         let dial_to = env::var("DIAL_TO")
             .ok()
             .and_then(|p| p.parse::<String>().ok());
-
         let sync_threshold = env::var("SYNC_THRESHOLD")
             .ok()
             .and_then(|p| p.parse::<usize>().ok())
             .unwrap_or(3);
-
         let topic = IdentTopic::new("test");
-
         let peers: Vec<String> = dial_to.iter().cloned().collect();
-
         let id = libp2p::identity::Keypair::generate_ed25519();
         let mut peer = NetInterface::new(&id, peers, udp_port, &topic.to_string())?;
-
         // Extract input and outputs
         let tx = peer.tx();
         let mut rx = peer.rx();
-
-        let router_task = tokio::spawn({
+        let _router_task = tokio::spawn({
             let name = name.clone();
             async move {
                 println!("{} starting router task", name);
@@ -253,22 +235,17 @@ impl TestPeer {
                 println!("{} router task finished", name);
             }
         });
-
         println!("WAIT FOR MESH READY...");
         wait_for_mesh_ready(60, 3, &mut rx, &topic).await?;
         println!("MESH READY!");
-
         // Give network time to initialize
         sleep(Duration::from_secs(3)).await;
-
         Ok(TestPeer {
-            name,
             tx,
             rx,
             sync_threshold,
             topic,
             test_timeout: None,
-            _running: router_task,
         })
     }
 }
