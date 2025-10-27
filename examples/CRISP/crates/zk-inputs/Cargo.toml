@@ -1,0 +1,28 @@
+[package]
+name = "zk-inputs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core logic to pre-compute CRISP ZK inputs."
+
+[dependencies]
+fhe.workspace = true
+fhe-math.workspace = true
+fhe-traits.workspace = true
+greco = { package = "zkfhe-greco", git = "https://github.com/gnosisguild/zkfhe-generator" }
+shared = { package = "zkfhe-shared", git = "https://github.com/gnosisguild/zkfhe-generator" }
+bigint-poly = { git = "https://github.com/gnosisguild/bigint-poly", features = ["serde"] }
+serde.workspace = true
+serde_json.workspace = true
+num-bigint = "0.4.6"
+num-integer = "0.1"
+num-traits = "0.2"
+rayon = "1.10.0"
+rand = "0.8.5"
+hex = "0.4.3"
+itertools = "0.14.0"
+eyre.workspace = true
+
+
+

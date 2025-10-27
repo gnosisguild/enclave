@@ -35,7 +35,6 @@ members = [
 exclude = [
   "examples/CRISP/server",
   "examples/CRISP/program",
-  "examples/CRISP/wasm-crypto",
   "examples/default/client/wasm",
   "examples/default",
   # client needs to be able to build crates/support independently

@@ -8,6 +8,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { describe, it, expect, beforeAll } from 'vitest'
 import { BfvProtocolParams, type ProtocolParams } from '@enclave-e3/sdk'
+import { ZKInputsGenerator } from '@enclave/crisp-zk-inputs'
 
 import { calculateValidIndicesForPlaintext, decodeTally, encodeVote, encryptVoteAndGenerateCRISPInputs, validateVote } from '../src/vote'
 import { VotingMode } from '../src/types'
@@ -118,13 +119,8 @@ describe('Vote', () => {
     const vote = { yes: 10n, no: 0n }
     const votingPower = 10n
 
-    let publicKey: Uint8Array
-
-    beforeAll(async () => {
-      const buffer = await fs.readFile(path.resolve(__dirname, './fixtures/pubkey.bin'))
-
-      publicKey = Uint8Array.from(buffer)
-    })
+    let zkInputsGenerator = ZKInputsGenerator.withDefaults()
+    let publicKey = zkInputsGenerator.generatePublicKey()
 
     it('should encrypt a vote and generate the circuit inputs', async () => {
       const encodedVote = encodeVote(vote, VotingMode.GOVERNANCE, BfvProtocolParams.BFV_NORMAL, votingPower)

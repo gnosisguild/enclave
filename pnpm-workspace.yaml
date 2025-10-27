@@ -5,6 +5,7 @@ packages:
   - examples/CRISP/client
   - examples/CRISP/packages/crisp-sdk
   - examples/CRISP/packages/crisp-contracts
+  - examples/CRISP/packages/crisp-zk-inputs
   - packages/enclave-config
   - packages/enclave-react
   - packages/enclave-sdk

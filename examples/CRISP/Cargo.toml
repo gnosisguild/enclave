@@ -3,6 +3,8 @@ members = [
   "server",
   ".enclave/support/dev",
   "program",
+  "crates/zk-inputs",
+  "crates/zk-inputs-wasm"
 ]
 resolver = "3"
 
@@ -26,6 +28,7 @@ anyhow = { version = "=1.0.98" }
 actix-web = "=4.11.0"
 bincode = { version = "=1.3.3" }
 bytemuck = { version = "=1.23.1" }
+eyre = "=0.6.12"
 env_logger = "=0.11.8"
 hex = { version = "=0.4.3" }
 log = { version = "=0.4.27" }
