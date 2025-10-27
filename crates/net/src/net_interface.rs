@@ -295,12 +295,14 @@ async fn process_swarm_event(
             match record {
                 Ok(record) => {
                     let key = Cid(record.key.to_vec());
+                    info!("PUT RECORD SUCCESS: {:?}", key);
                     event_tx.send(NetEvent::DhtPutRecordSucceeded {
                         key,
                         correlation_id,
                     })?;
                 }
                 Err(error) => {
+                    error!("PUT RECORD FAILED: {}", error);
                     event_tx.send(NetEvent::DhtPutRecordError {
                         correlation_id,
                         error,
